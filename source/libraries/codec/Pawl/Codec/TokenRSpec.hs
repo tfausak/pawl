@@ -24,6 +24,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TokenR" $ do
+  let codec = TokenR.codec Card.codec
   -- CR 614.16: Doubling Season doubles the tokens you create.
   Spec.it s "MkTokenR" $
     Common.assertCodec
@@ -49,8 +50,6 @@ spec s = Spec.describe s "Pawl.Codec.TokenR" $ do
       )
       " {\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whatToken\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"plus\":{\"faces\":[{\"name\":\"Soldier Token\",\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]}}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
-  where
-    codec = TokenR.codec Card.codec
 
 -- A one-face creature token with every other field at the value
 -- Pawl.Codec.Face's decoder defaults it to; Pawl.Codec.CardSpec's bareFace.

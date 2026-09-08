@@ -295,45 +295,44 @@ designateProtector pc controller oid = do
 -- fixed before its effect fold begins.
 siegeDefeat :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 siegeDefeat =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [exile, offer]))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
-  where
-    -- "Exile it": the permanent the ability triggered from, which CR 113.7 binds
-    -- under Binding.triggerSource. No entry riders and no stated origin zone --
-    -- the ability functions on the battlefield, where the permanent already is --
-    -- and Binding.became for the exiled incarnation the next effect names.
-    exile =
-      Effect.MoveToZone
-        ( MoveToZone.MkMoveToZone
-            (ObjectRef.InSlot Binding.triggerSource)
-            Zone.Exile
-            EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
-            (Just Binding.became)
-            Nothing
-            LibraryPlacement.defaultValue
-            Nothing
-        )
-    -- "then you may cast it transformed without paying its mana cost": CR 608.2g's
-    -- cast during a resolution, with CR 712.11a's face rider and CR 118.9's
-    -- alternative cost. Both riders come from the OFFER, so nothing downstream
-    -- learns that rule 310.12b is what wrote them.
-    offer =
-      Effect.OfferCast
-        OfferCast.MkOfferCast
-          { OfferCast.ref = ObjectRef.InSlot Binding.became,
-            -- Rule 310.12b's "YOU may cast it": the trigger's controller, which
-            -- is the resolving controller, and a "may".
-            OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
-            OfferCast.optionality = CastObligation.Optional,
-            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced}
-          }
+  let -- "Exile it": the permanent the ability triggered from, which CR 113.7 binds
+      -- under Binding.triggerSource. No entry riders and no stated origin zone --
+      -- the ability functions on the battlefield, where the permanent already is --
+      -- and Binding.became for the exiled incarnation the next effect names.
+      exile =
+        Effect.MoveToZone
+          ( MoveToZone.MkMoveToZone
+              (ObjectRef.InSlot Binding.triggerSource)
+              Zone.Exile
+              EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
+              (Just Binding.became)
+              Nothing
+              LibraryPlacement.defaultValue
+              Nothing
+          )
+      -- "then you may cast it transformed without paying its mana cost": CR 608.2g's
+      -- cast during a resolution, with CR 712.11a's face rider and CR 118.9's
+      -- alternative cost. Both riders come from the OFFER, so nothing downstream
+      -- learns that rule 310.12b is what wrote them.
+      offer =
+        Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.ref = ObjectRef.InSlot Binding.became,
+              -- Rule 310.12b's "YOU may cast it": the trigger's controller, which
+              -- is the resolving controller, and a "may".
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = CastObligation.Optional,
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced}
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [exile, offer]))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- The intrinsic triggered abilities rule 310 gives a permanent, read off the
 -- finished projection. Pawl.Engine.Keyword.triggeredAbilitiesOf's sibling, and
@@ -346,7 +345,7 @@ siegeDefeat =
 -- rule 310.4b hangs off the CARD TYPE, where 310.12b hangs off an ability the rules
 -- grant, and layer 6 removes abilities.
 triggeredAbilitiesOf :: PC.ProjectedCharacteristics -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-triggeredAbilitiesOf pc = [siegeDefeat | Set.member Subtype.Siege (battleTypes pc)]
+triggeredAbilitiesOf pc = if Set.member Subtype.Siege (battleTypes pc) then [siegeDefeat] else []
 
 -- CR 122.1g / 310.4c: the defense counters on a permanent. Zero for an object the
 -- game does not hold, the answer Saga.loreOn gives for rule 714.3.

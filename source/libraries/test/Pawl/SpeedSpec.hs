@@ -34,6 +34,7 @@
 module Pawl.SpeedSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
@@ -81,7 +82,7 @@ raceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Prin
 raceBoard raceway swamp signInBlood filler =
   let base = S.landsInPlay swamp 2
       (racewayId, withRaceway) = S.addPermanent raceway S.alice base
-      stock pid g = foldr (\_ g' -> snd (S.addLibraryCard filler pid g')) g [1 .. (4 :: Int)]
+      stock pid g = foldr (\_ g2 -> snd (S.addLibraryCard filler pid g2)) g [1 .. (4 :: Int)]
       (gs, spellId) = S.handOne signInBlood (stock S.alice (stock S.bob withRaceway))
    in (gs, racewayId, spellId)
 
@@ -690,10 +691,14 @@ resolveTrigger answer gs =
 -- this turn's CR 603.3b log.
 inherentTriggersSpent :: GameState.GameState -> [PlayerId.PlayerId]
 inherentTriggersSpent gs =
-  [ AbilityTriggered.controller record
-  | GameEvent.AbilityTriggered record <- S.eventsOf gs,
-    AbilityTriggered.source record == TriggerSource.Sourceless
-  ]
+  Maybe.mapMaybe
+    ( \event -> case event of
+        GameEvent.AbilityTriggered record
+          | AbilityTriggered.source record == TriggerSource.Sourceless ->
+              Just (AbilityTriggered.controller record)
+        _ -> Nothing
+    )
+    (S.eventsOf gs)
 
 -- Put this player at exactly this speed, bypassing CR 702.179d's climb. Every
 -- case that uses it is about what READS speed (CR 702.178a's gate, CR 702.179e's

@@ -776,9 +776,9 @@ rewriteEffect pairs effect = case effect of
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.
 swapWordIn :: SubtypeFamily.SubtypeFamily -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Subtype.Type.Subtype -> Subtype.Type.Subtype
-swapWordIn family pairs word = List.foldl' step word pairs
-  where
-    step s (from, to) = if s == from && Subtype.inFamily family from then to else s
+swapWordIn family pairs word =
+  let step s (from, to) = if s == from && Subtype.inFamily family from then to else s
+   in List.foldl' step word pairs
 
 -- CR 612.1 through an ObjectRef. An InSlot names an object chosen at cast time,
 -- and the player-naming arms hold no subtype word; only the Filters and the
@@ -843,45 +843,45 @@ rewriteCard :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Card.Type.Card 
 rewriteCard pairs card = card {Card.Type.faces = fmap (rewriteFace pairs) (Card.Type.faces card)}
 
 rewriteFace :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Face.Face Card.Type.Card -> Face.Face Card.Type.Card
-rewriteFace pairs face = List.foldl' apply1 face pairs
-  where
-    apply1 f (from, to) =
-      let pair = [(from, to)]
-          typeLine = Face.typeLine f
-          subtypes = TypeLine.subtypes typeLine
-          renamed =
-            if Set.notMember from subtypes
-              then f
-              else
-                f
-                  { Face.typeLine = typeLine {TypeLine.subtypes = Set.insert to (Set.delete from subtypes)},
-                    Face.name = rewriteTokenName from to (Face.name f)
-                  }
-       in renamed
-            { -- CR 702.14a's land-type word inside a landwalk. Set.map rather
-              -- than Map.mapKeysWith (+), since a face's keywords are a Set.
-              Face.keywords = Set.map (Filter.rewriteKeyword pair) (Face.keywords renamed),
-              -- CR 208.2a's star, unevaluated as at layer 3.
-              Face.characteristicPT = fmap (rewriteCharacteristicPT pair) (Face.characteristicPT renamed),
-              -- CR 101.1's ceiling on X, whose Quantity can Count a criterion
-              -- naming a land type word. A regression fence: neither printing
-              -- pairs a bounded X with one -- both say "the greatest toughness
-              -- among creatures you control" -- so no test can falsify it.
-              Face.maximumX = fmap (rewriteQuantity pair) (Face.maximumX renamed),
-              Face.spell = rewriteModal pair (Face.spell renamed),
-              Face.activatedAbilities = fmap (rewriteActivatedAbility pair) (Face.activatedAbilities renamed),
-              -- CR 604.2's static ability, on the card a token or emblem is
-              -- defined with. A regression fence rather than a proved behaviour,
-              -- as Face.maximumX above is: a walk of every defined face in
-              -- data/cards for a replacementEffects key (2026-08-21) found none
-              -- at all, so no board can tell this line from its absence.
-              -- Pawl.ReplacementSpec's Dragonstorm Globe case is what proves
-              -- rewritePrintedReplacement itself.
-              Face.replacementEffects = fmap (rewritePrintedReplacement pair) (Face.replacementEffects renamed),
-              Face.triggeredAbilities = fmap (rewriteTriggeredAbility pair) (Face.triggeredAbilities renamed),
-              Face.delayedAbilities = fmap (rewriteTriggeredAbility pair) (Face.delayedAbilities renamed),
-              Face.staticAbilities = fmap (rewriteStaticAbility pair) (Face.staticAbilities renamed)
-            }
+rewriteFace pairs face =
+  let apply1 f (from, to) =
+        let pair = [(from, to)]
+            typeLine = Face.typeLine f
+            subtypes = TypeLine.subtypes typeLine
+            renamed =
+              if Set.notMember from subtypes
+                then f
+                else
+                  f
+                    { Face.typeLine = typeLine {TypeLine.subtypes = Set.insert to (Set.delete from subtypes)},
+                      Face.name = rewriteTokenName from to (Face.name f)
+                    }
+         in renamed
+              { -- CR 702.14a's land-type word inside a landwalk. Set.map rather
+                -- than Map.mapKeysWith (+), since a face's keywords are a Set.
+                Face.keywords = Set.map (Filter.rewriteKeyword pair) (Face.keywords renamed),
+                -- CR 208.2a's star, unevaluated as at layer 3.
+                Face.characteristicPT = fmap (rewriteCharacteristicPT pair) (Face.characteristicPT renamed),
+                -- CR 101.1's ceiling on X, whose Quantity can Count a criterion
+                -- naming a land type word. A regression fence: neither printing
+                -- pairs a bounded X with one -- both say "the greatest toughness
+                -- among creatures you control" -- so no test can falsify it.
+                Face.maximumX = fmap (rewriteQuantity pair) (Face.maximumX renamed),
+                Face.spell = rewriteModal pair (Face.spell renamed),
+                Face.activatedAbilities = fmap (rewriteActivatedAbility pair) (Face.activatedAbilities renamed),
+                -- CR 604.2's static ability, on the card a token or emblem is
+                -- defined with. A regression fence rather than a proved behaviour,
+                -- as Face.maximumX above is: a walk of every defined face in
+                -- data/cards for a replacementEffects key (2026-08-21) found none
+                -- at all, so no board can tell this line from its absence.
+                -- Pawl.ReplacementSpec's Dragonstorm Globe case is what proves
+                -- rewritePrintedReplacement itself.
+                Face.replacementEffects = fmap (rewritePrintedReplacement pair) (Face.replacementEffects renamed),
+                Face.triggeredAbilities = fmap (rewriteTriggeredAbility pair) (Face.triggeredAbilities renamed),
+                Face.delayedAbilities = fmap (rewriteTriggeredAbility pair) (Face.delayedAbilities renamed),
+                Face.staticAbilities = fmap (rewriteStaticAbility pair) (Face.staticAbilities renamed)
+              }
+   in List.foldl' apply1 face pairs
 
 -- A whole static ability under CR 612.1, for the defined-card walk above. A
 -- permanent's own statics are reached piecemeal instead, being read per layer.
@@ -915,21 +915,21 @@ rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.cre
 -- Total on the words creatureTypeWord answers, every one of which is non-empty;
 -- Text.breakOn is partial on an empty needle.
 replaceWholeWord :: Text.Text -> Text.Text -> Text.Text -> Text.Text
-replaceWholeWord from to = go Text.empty
-  where
-    go acc rest =
-      let (before, match) = Text.breakOn from rest
-          done = acc <> before
-       in if Text.null match
-            then done
-            else
-              let after = Text.drop (Text.length from) match
-               in if edge (lastChar done) && edge (fmap fst (Text.uncons after))
-                    then go (done <> to) after
-                    else go (done <> Text.take 1 match) (Text.drop 1 match)
-    edge = maybe True notWord
-    notWord c = not (Char.isAlphaNum c || c == '\'' || c == '-')
-    lastChar t = if Text.null t then Nothing else Just (Text.last t)
+replaceWholeWord from to =
+  let edge = maybe True notWord
+      notWord c = not (Char.isAlphaNum c || c == '\'' || c == '-')
+      lastChar t = if Text.null t then Nothing else Just (Text.last t)
+      go acc rest =
+        let (before, match) = Text.breakOn from rest
+            done = acc <> before
+         in if Text.null match
+              then done
+              else
+                let after = Text.drop (Text.length from) match
+                 in if edge (lastChar done) && edge (fmap fst (Text.uncons after))
+                      then go (done <> to) after
+                      else go (done <> Text.take 1 match) (Text.drop 1 match)
+   in go Text.empty
 
 -- CR 612.1 over an ACTIVATED ability printed on a permanent: the payload, CR
 -- 702.178a's "as long as" gate, and the ACTIVATION COST (CR 118.1, CR 602.1a),

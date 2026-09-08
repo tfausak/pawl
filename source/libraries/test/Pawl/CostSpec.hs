@@ -36,9 +36,6 @@ import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
-
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -433,7 +430,7 @@ wasAskedToChooseCost responses =
 villageRitesBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 villageRitesBoard swamp piker villageRites n =
   let base = S.landsInPlay swamp 1
-      addPiker (ids, gs) _ = let (oid, gs') = S.addPermanent piker S.alice gs in (ids <> [oid], gs')
+      addPiker (ids, gs) _ = let (oid, gs5) = S.addPermanent piker S.alice gs in (ids <> [oid], gs5)
       (pikers, withPikers) = List.foldl' addPiker ([], base) [1 .. n]
       (rites, gs1) = S.addHandCard villageRites S.alice withPikers
       (_, gs2) = S.addLibraryCard piker S.alice gs1
@@ -1359,7 +1356,7 @@ asmorFoodBoard ::
 asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight foods others =
   let addEach printing n gs0 =
         List.foldl'
-          (\(oids, g) _ -> let (oid, g') = S.addPermanent printing S.alice g in (oids <> [oid], g'))
+          (\(oids, g) _ -> let (oid, g2) = S.addPermanent printing S.alice g in (oids <> [oid], g2))
           ([], gs0)
           (replicate n ())
       (asmor, gs1) = S.addPermanent asmorPrinting S.alice (Setup.emptyGame S.bothPlayers)
@@ -1756,7 +1753,7 @@ jaradDrainBoard jarad swamp forest victim extras =
   let lands = S.landsFor forest S.alice 2 (S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers))
       (jaradId, withJarad) = S.addPermanent jarad S.alice lands
       (preyId, withPrey) = S.addPermanent victim S.alice withJarad
-   in (jaradId, preyId, foldl (\g printing -> snd (S.addPermanent printing S.alice g)) withPrey extras)
+   in (jaradId, preyId, List.foldl' (\g printing -> snd (S.addPermanent printing S.alice g)) withPrey extras)
 
 -- CR 602.2b pays an activation cost at CR 601.2h, so by the time Jarad's drain
 -- resolves the creature it sacrificed is a card in a graveyard and CR 608.2h's
@@ -2206,7 +2203,7 @@ thrastaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> I
 thrastaBoard forest glistenerElf thrastaPrinting forests elves =
   let base = S.landsInPlay forest forests
       (thrasta, gs1) = S.addHandCard thrastaPrinting S.alice base
-      addElf (oids, gs) _ = let (oid, gs') = S.addHandCard glistenerElf S.alice gs in (oid : oids, gs')
+      addElf (oids, gs) _ = let (oid, gs3) = S.addHandCard glistenerElf S.alice gs in (oid : oids, gs3)
       (elfIds, gs2) = List.foldl' addElf ([], gs1) [1 .. elves]
    in ( thrasta,
         reverse elfIds,
@@ -2689,7 +2686,7 @@ morcantBoard :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, 
 morcantBoard morcant elves =
   let (morcantId, gs0) = S.addPermanent morcant S.alice (Setup.emptyGame S.bothPlayers)
       add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
-      (elfIds, gs1) = foldl add ([], gs0) elves
+      (elfIds, gs1) = List.foldl' add ([], gs0) elves
    in ( morcantId,
         elfIds,
         gs1
@@ -3150,11 +3147,11 @@ trollBoard troll forest =
 -- own -- and it reads the CONTENTS rather than a length, since
 -- Event.removeCounters records nothing at all when there was nothing to remove.
 counterRemovalsOf :: GameState.GameState -> [CounterChange.CounterChange]
-counterRemovalsOf gs = Maybe.mapMaybe removal (S.eventsOf gs)
-  where
-    removal e = case e of
-      GameEvent.CountersRemoved change -> Just change
-      _ -> Nothing
+counterRemovalsOf gs =
+  let removal e = case e of
+        GameEvent.CountersRemoved change -> Just change
+        _ -> Nothing
+   in Maybe.mapMaybe removal (S.eventsOf gs)
 
 -- Barkhide Troll {G}{G} Creature -- Troll 2/2 (Oracle text checked against
 -- Scryfall): "This creature enters with a +1/+1 counter on it. {1}, Remove a
@@ -3746,19 +3743,18 @@ reversalBoard island ancientTomb manaLeak piker =
 -- declining fallback instead of passing.
 attemptLeak :: Bool -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
 attemptLeak taps decision tombId cast =
-  let ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
+  let answerer :: Prompt.Prompt r -> State.State Int r
+      answerer p = case p of
+        Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
+        Prompt.ChooseManaSource _ player candidates
+          | player == S.bob ->
+              pure (if taps && elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
+        Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
+          State.modify' (+ 1)
+          pure decision
+        _ -> pure (S.identityAnswer p)
+      ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
    in (after, asked)
-  where
-    answerer :: Prompt.Prompt r -> State.State Int r
-    answerer p = case p of
-      Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
-      Prompt.ChooseManaSource _ player candidates
-        | player == S.bob ->
-            pure (if taps && elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
-      Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
-        State.modify' (+ 1)
-        pure decision
-      _ -> pure (S.identityAnswer p)
 
 -- Mana Leak "Counter target spell unless its controller pays {3}", paid off an
 -- Ancient Tomb "{T}: Add {C}{C}. This land deals 2 damage to you."
@@ -3846,19 +3842,18 @@ shufflingReversalBoard island shufflingTomb manaLeak piker bottomCard topCard =
 -- any permutation of what was offered).
 attemptLeakShuffling :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
 attemptLeakShuffling decision tombId cast =
-  let ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
+  let answerer :: Prompt.Prompt r -> State.State Int r
+      answerer p = case p of
+        Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
+        Prompt.ChooseManaSource _ player candidates
+          | player == S.bob -> pure (if elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
+        Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
+          State.modify' (+ 1)
+          pure decision
+        Prompt.Shuffle ids -> pure (reverse ids)
+        _ -> pure (S.identityAnswer p)
+      ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
    in (after, asked)
-  where
-    answerer :: Prompt.Prompt r -> State.State Int r
-    answerer p = case p of
-      Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
-      Prompt.ChooseManaSource _ player candidates
-        | player == S.bob -> pure (if elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
-      Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
-        State.modify' (+ 1)
-        pure decision
-      Prompt.Shuffle ids -> pure (reverse ids)
-      _ -> pure (S.identityAnswer p)
 
 -- CR 733.1's last sentence at CR 118.12's moment: reversing bob's illegal
 -- payment does not undo the shuffle the mana ability he activated performed,

@@ -82,7 +82,7 @@ namesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
 namesIn zone gs = fmap (\oid -> S.soleFaceName oid gs) (Game.zoneMembers zone S.alice gs)
 
 namedIn :: CardName.CardName -> Zone.Zone -> GameState.GameState -> [ObjectId.ObjectId]
-namedIn name zone gs = [oid | oid <- Game.zoneMembers zone S.alice gs, S.soleFaceName oid gs == name]
+namedIn name zone gs = filter (\oid -> S.soleFaceName oid gs == name) (Game.zoneMembers zone S.alice gs)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Conjure" $ do

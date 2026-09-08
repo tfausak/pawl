@@ -1866,7 +1866,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
         free = S.runPure (buysBlack False) gs (Cost.tapForMana S.manaPerformer confluenceId)
         bought = S.runPure (buysBlack True) gs (Cost.tapForMana S.manaPerformer confluenceId)
     Spec.assertEqWith s "both ways of adding black are offered" (length blacks) 2
-    Spec.assertEqWith s "charging two different costs" (length (List.nub (fmap ManaOption.cost blacks))) 2
+    Spec.assertEqWith s "charging two different costs" (Set.size (Set.fromList (fmap ManaOption.cost blacks))) 2
     Spec.assertEqWith s "the free one: black in the pool" (poolTypes S.alice free) [ManaType.Colored Color.Black]
     Spec.assertEqWith s "the free one: and all 20 life" (S.lifeOf S.alice free) (Just 20)
     Spec.assertEqWith s "the bought one: the same black" (poolTypes S.alice bought) [ManaType.Colored Color.Black]
@@ -3079,12 +3079,12 @@ autumnWillowBoard s registry = do
 -- reading taken with the trigger still waiting could not tell them apart at
 -- gameplay level.
 resolveDown :: GameState.GameState -> GameState.GameState
-resolveDown = go (8 :: Int)
-  where
-    go n gs =
-      if n <= 0 || null (GameState.stack gs)
-        then gs
-        else go (n - 1) (S.runPure S.identityAnswer gs Stack.resolveTop)
+resolveDown =
+  let go n gs =
+        if n <= 0 || null (GameState.stack gs)
+          then gs
+          else go (n - 1) (S.runPure S.identityAnswer gs Stack.resolveTop)
+   in go (8 :: Int)
 
 -- alice and bob hold one Forest each; alice controls a Wild Growth enchanting
 -- BOB's. Returns alice's Forest, bob's Forest, the Aura and the board.

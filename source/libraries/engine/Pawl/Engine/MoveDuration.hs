@@ -72,10 +72,9 @@ returnMoved :: Game Bool
 returnMoved = do
   gs <- State.get
   let due =
-        [ (oid, watch)
-        | (oid, watch) <- Map.toList (GameState.movedUntilSourceLeaves gs),
-          hasLeftTheBattlefield (ReturnWatch.source watch) gs
-        ]
+        filter
+          (\(_, watch) -> hasLeftTheBattlefield (ReturnWatch.source watch) gs)
+          (Map.toList (GameState.movedUntilSourceLeaves gs))
   if null due
     then pure False
     else do

@@ -39,39 +39,38 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- tag, so neither changed a card on the wire.
 codec :: Codec.Codec ObjectRef.ObjectRef
 codec =
-  Arm.tagged
-    [ Arm.payload "InSlot" SlotName.codec ObjectRef.InSlot (\x -> case x of ObjectRef.InSlot y -> Just y; _ -> Nothing),
-      Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching (\x -> case x of ObjectRef.EachMatching y -> Just y; _ -> Nothing),
-      Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard (\x -> case x of ObjectRef.EachCardInGraveyard y -> Just y; _ -> Nothing),
-      Arm.nullary "EachCardInYourHand" ObjectRef.EachCardInYourHand,
-      Arm.payload "EachCardInHand" EachCardInHand.codec ObjectRef.EachCardInHand (\x -> case x of ObjectRef.EachCardInHand y -> Just y; _ -> Nothing),
-      Arm.optionalPayload "EachCardInYourLibrary" filterCodec ObjectRef.EachCardInYourLibrary (\x -> case x of ObjectRef.EachCardInYourLibrary y -> Just y; _ -> Nothing),
-      Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
-      Arm.payload "EachSpell" filterCodec ObjectRef.EachSpell (\x -> case x of ObjectRef.EachSpell y -> Just y; _ -> Nothing),
-      Arm.payload "EachOnStack" filterCodec ObjectRef.EachOnStack (\x -> case x of ObjectRef.EachOnStack y -> Just y; _ -> Nothing),
-      Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
-      Arm.nullary "EachOpponent" ObjectRef.EachOpponent,
-      Arm.nullary "ChosenPlayer" ObjectRef.ChosenPlayer,
-      -- The second arm carrying a bare 'Pawl.Codec.PlayerRef', beside
-      -- 'TopOfGraveyard' below: an indirection to a seat is the whole of what a
-      -- card writes here, so there is no payload record to make.
-      Arm.payload "Players" PlayerRef.codec ObjectRef.Players (\x -> case x of ObjectRef.Players y -> Just y; _ -> Nothing),
-      Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
-      Arm.payload "TopOfLibraryUntil" TopOfLibraryUntil.codec ObjectRef.TopOfLibraryUntil (\x -> case x of ObjectRef.TopOfLibraryUntil y -> Just y; _ -> Nothing),
-      -- CR 404.1's own end of the pile, and the one position arm carrying a bare
-      -- 'Pawl.Codec.PlayerRef' rather than a payload record: with no depth and no
-      -- filter to state, the seat is the whole of what a card writes.
-      Arm.payload "TopOfGraveyard" PlayerRef.codec ObjectRef.TopOfGraveyard (\x -> case x of ObjectRef.TopOfGraveyard y -> Just y; _ -> Nothing),
-      Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing),
-      Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing),
-      Arm.payload "ChosenCardFromAmong" ChosenCardFromAmong.codec ObjectRef.ChosenCardFromAmong (\x -> case x of ObjectRef.ChosenCardFromAmong y -> Just y; _ -> Nothing),
-      Arm.payload "EachCardFromAmong" EachCardFromAmong.codec ObjectRef.EachCardFromAmong (\x -> case x of ObjectRef.EachCardFromAmong y -> Just y; _ -> Nothing),
-      Arm.payload "RandomCardInHand" RandomCardInHand.codec ObjectRef.RandomCardInHand (\x -> case x of ObjectRef.RandomCardInHand y -> Just y; _ -> Nothing),
-      Arm.payload "AnyNumberMatching" filterCodec ObjectRef.AnyNumberMatching (\x -> case x of ObjectRef.AnyNumberMatching y -> Just y; _ -> Nothing),
-      Arm.payload "ChosenPermanent" filterCodec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
-      Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing)
-    ]
-  where
-    -- Written once so the encoder, the decoder and the schema cannot disagree
-    -- about which keyword codec the filter carries.
-    filterCodec = Filter.codec Keyword.codec
+  let -- Written once so the encoder, the decoder and the schema cannot disagree
+      -- about which keyword codec the filter carries.
+      filterCodec = Filter.codec Keyword.codec
+   in Arm.tagged
+        [ Arm.payload "InSlot" SlotName.codec ObjectRef.InSlot (\x -> case x of ObjectRef.InSlot y -> Just y; _ -> Nothing),
+          Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching (\x -> case x of ObjectRef.EachMatching y -> Just y; _ -> Nothing),
+          Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard (\x -> case x of ObjectRef.EachCardInGraveyard y -> Just y; _ -> Nothing),
+          Arm.nullary "EachCardInYourHand" ObjectRef.EachCardInYourHand,
+          Arm.payload "EachCardInHand" EachCardInHand.codec ObjectRef.EachCardInHand (\x -> case x of ObjectRef.EachCardInHand y -> Just y; _ -> Nothing),
+          Arm.optionalPayload "EachCardInYourLibrary" filterCodec ObjectRef.EachCardInYourLibrary (\x -> case x of ObjectRef.EachCardInYourLibrary y -> Just y; _ -> Nothing),
+          Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
+          Arm.payload "EachSpell" filterCodec ObjectRef.EachSpell (\x -> case x of ObjectRef.EachSpell y -> Just y; _ -> Nothing),
+          Arm.payload "EachOnStack" filterCodec ObjectRef.EachOnStack (\x -> case x of ObjectRef.EachOnStack y -> Just y; _ -> Nothing),
+          Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
+          Arm.nullary "EachOpponent" ObjectRef.EachOpponent,
+          Arm.nullary "ChosenPlayer" ObjectRef.ChosenPlayer,
+          -- The second arm carrying a bare 'Pawl.Codec.PlayerRef', beside
+          -- 'TopOfGraveyard' below: an indirection to a seat is the whole of what a
+          -- card writes here, so there is no payload record to make.
+          Arm.payload "Players" PlayerRef.codec ObjectRef.Players (\x -> case x of ObjectRef.Players y -> Just y; _ -> Nothing),
+          Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
+          Arm.payload "TopOfLibraryUntil" TopOfLibraryUntil.codec ObjectRef.TopOfLibraryUntil (\x -> case x of ObjectRef.TopOfLibraryUntil y -> Just y; _ -> Nothing),
+          -- CR 404.1's own end of the pile, and the one position arm carrying a bare
+          -- 'Pawl.Codec.PlayerRef' rather than a payload record: with no depth and no
+          -- filter to state, the seat is the whole of what a card writes.
+          Arm.payload "TopOfGraveyard" PlayerRef.codec ObjectRef.TopOfGraveyard (\x -> case x of ObjectRef.TopOfGraveyard y -> Just y; _ -> Nothing),
+          Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing),
+          Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing),
+          Arm.payload "ChosenCardFromAmong" ChosenCardFromAmong.codec ObjectRef.ChosenCardFromAmong (\x -> case x of ObjectRef.ChosenCardFromAmong y -> Just y; _ -> Nothing),
+          Arm.payload "EachCardFromAmong" EachCardFromAmong.codec ObjectRef.EachCardFromAmong (\x -> case x of ObjectRef.EachCardFromAmong y -> Just y; _ -> Nothing),
+          Arm.payload "RandomCardInHand" RandomCardInHand.codec ObjectRef.RandomCardInHand (\x -> case x of ObjectRef.RandomCardInHand y -> Just y; _ -> Nothing),
+          Arm.payload "AnyNumberMatching" filterCodec ObjectRef.AnyNumberMatching (\x -> case x of ObjectRef.AnyNumberMatching y -> Just y; _ -> Nothing),
+          Arm.payload "ChosenPermanent" filterCodec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
+          Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing)
+        ]

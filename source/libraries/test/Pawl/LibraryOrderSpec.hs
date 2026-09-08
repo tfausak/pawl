@@ -7,6 +7,7 @@
 module Pawl.LibraryOrderSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -54,8 +55,6 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -738,7 +737,7 @@ scryBoard s registry stock = do
   let (ballId, placed) = S.addPermanent crystalBall S.alice (S.landsInPlay forest 4)
       -- addLibraryCard puts its card ON TOP, so the deepest is stocked first.
       deck = reverse (take stock [piker, maiden, mountain, forest])
-      deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+      deal (acc, gs) printing = let (oid, gs2) = S.addLibraryCard printing S.alice gs in (oid : acc, gs2)
       (ids, stocked) = List.foldl' deal ([], placed) deck
   pure (ids, ballId, stocked {GameState.priority = Just S.alice})
 
@@ -907,7 +906,7 @@ surveilBoard s registry = do
   mountain <- S.printingOf s registry "Mountain"
   forest <- S.printingOf s registry "Forest"
   curate <- S.printingOf s registry "Curate"
-  let deal (acc, g) printing = let (oid, g') = S.addLibraryCard printing S.alice g in (oid : acc, g')
+  let deal (acc, g) printing = let (oid, g2) = S.addLibraryCard printing S.alice g in (oid : acc, g2)
       -- addLibraryCard puts its card ON TOP, so the deepest is stocked first and
       -- `ids` comes back top-first.
       (ids, stocked) = List.foldl' deal ([], S.landsInPlay island 2) [forest, mountain, maiden, piker]
@@ -1011,7 +1010,7 @@ surveilOpcodeBoard s registry stock = do
   maiden <- S.printingOf s registry "Bird Maiden"
   mountain <- S.printingOf s registry "Mountain"
   let (sourceId, base) = S.addPermanent piker S.alice (S.landsInPlay island 1)
-      deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+      deal (acc, gs) printing = let (oid, gs2) = S.addLibraryCard printing S.alice gs in (oid : acc, gs2)
       (ids, stocked) = List.foldl' deal ([], base) (reverse (take stock [maiden, mountain]))
   pure (ids, sourceId, stocked {GameState.priority = Just S.alice})
 
@@ -1082,7 +1081,7 @@ fatesealBoard s registry seats = do
   mountain <- S.printingOf s registry "Mountain"
   forest <- S.printingOf s registry "Forest"
   spin <- S.printingOf s registry "Spin into Myth"
-  let deal pid (acc, g) printing = let (oid, g') = S.addLibraryCard printing pid g in (oid : acc, g')
+  let deal pid (acc, g) printing = let (oid, g2) = S.addLibraryCard printing pid g in (oid : acc, g2)
       (creatureId, b1) = S.addPermanent piker S.alice (S.landsFor island S.alice 5 (Setup.emptyGame seats))
       (aliceLib, b2) = S.addLibraryCard forest S.alice b1
       (bobIds, b3) = List.foldl' (deal S.bob) ([], b2) [forest, mountain]
@@ -1333,13 +1332,13 @@ zoneNames zone gs =
 -- can read it through -- which is also what makes the empty list the assertion
 -- that CR 701.20e's look was NOT one.
 revealedNames :: GameState.GameState -> [String]
-revealedNames gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
-  where
-    revealedName event = case event of
-      GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
-        | pid == S.alice ->
-            fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
-      _ -> Nothing
+revealedNames gs =
+  let revealedName event = case event of
+        GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
+          | pid == S.alice ->
+              fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
+        _ -> Nothing
+   in Maybe.mapMaybe revealedName (S.eventsOf gs)
 
 exploreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exploreSpec s registry = Spec.describe s "Explore" $ do
@@ -1777,7 +1776,7 @@ targetsPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 targetsPlayer victim p = case p of
   Prompt.ChooseTargets _ _ _ sets ->
     fmap
-      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer victim) (Set.toAscList legal) <> Set.toAscList legal))))
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer victim) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
   _ -> S.identityAnswer p
 
@@ -2547,17 +2546,17 @@ optionalEffectSpec s registry =
 -- neither of the card's two gets the empty answer, which fails the target
 -- announcement rather than aiming somewhere plausible.
 deadlyComplicationAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-deadlyComplicationAnswer victim suspect p = case p of
-  Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex [0, 1])
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
-  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  _ -> S.identityAnswer p
-  where
-    aimAt :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
-    aimAt slot (_, offered)
-      | slot == creatureSlot = Set.filter ((== Just victim) . Recipient.objectOf) offered
-      | slot == suspectSlot = Set.filter ((== Just suspect) . Recipient.objectOf) offered
-      | otherwise = Set.empty
+deadlyComplicationAnswer victim suspect p =
+  let aimAt :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
+      aimAt slot (_, offered)
+        | slot == creatureSlot = Set.filter ((== Just victim) . Recipient.objectOf) offered
+        | slot == suspectSlot = Set.filter ((== Just suspect) . Recipient.objectOf) offered
+        | otherwise = Set.empty
+   in case p of
+        Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex [0, 1])
+        Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
 
 -- Deadly Complication's two slot names (data/cards/deadly-complication.json).
 creatureSlot, suspectSlot :: SlotName.SlotName

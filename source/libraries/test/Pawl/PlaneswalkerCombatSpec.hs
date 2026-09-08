@@ -1080,6 +1080,7 @@ stolenByBobJaceBoard s registry bobsLand carolsLand = do
 splitDefenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 splitDefenderSpec s registry = Spec.describe s "SplitDefendingPlayer" $ do
   let blocks blocker wraith = Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith))
+      blockOf pid blocker attacker = Combat.legalBlockDeclaration pid (Map.singleton blocker (Set.singleton attacker))
   Spec.it s "CR 802.2a the swampwalking attacker reads the planeswalker's controller, not the first defending player" $ do
     -- bob holds the Swamp and carol the Island. Carol controls the attacked
     -- Jace, so CR 702.14c asks about HER lands and the block is legal; an engine
@@ -1170,8 +1171,6 @@ splitDefenderSpec s registry = Spec.describe s "SplitDefendingPlayer" $ do
     let fight = runToEndOfCombatWith (pure . attackThePlaneswalker)
     Spec.assertEqWith s "CR 506.4c: the theft left the Wraith attacking nothing, so Jace keeps all five loyalty" (S.counterOf CounterKind.Loyalty jaceId (fight stolen)) 5
     Spec.assertEqWith s "control: with no Graft cast the same Wraith takes him to 2" (S.counterOf CounterKind.Loyalty jaceId (fight declared)) 2
-  where
-    blockOf pid blocker attacker = Combat.legalBlockDeclaration pid (Map.singleton blocker (Set.singleton attacker))
 
 -- CR 506.4c at three seats: alice attacks CAROL's Jace Beleren with a Goblin
 -- Piker, both opponents defend (CR 802.2, the default option), and each holds a

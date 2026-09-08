@@ -136,9 +136,9 @@ import qualified Pawl.Types.Zone as Zone
 -- The battlefield objects whose PRINTED card has this name (a printed card is
 -- unchanged by copying -- only the object's projected characteristics change).
 printedOnBattlefield :: String -> GameState.GameState -> [ObjectId]
-printedOnBattlefield name gs = filter isIt (Set.toList (GameState.battlefield gs))
-  where
-    isIt oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+printedOnBattlefield name gs =
+  let isIt oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+   in filter isIt (Set.toList (GameState.battlefield gs))
 
 -- Whether an object is still on the battlefield -- what a destroy is read
 -- through, where printedOnBattlefield above answers by PRINTED name and so
@@ -1215,7 +1215,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     let outcome buried =
           let graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) (S.landsInPlay swamp 9) buried
               after = castAndResolve copyNewest rise graves
-           in ( List.sort [Projection.namesOf oid after | oid <- Set.toList (GameState.battlefield after), Projection.isCreatureOf oid after],
+           in ( List.sort (fmap (\oid -> Projection.namesOf oid after) (filter (\oid -> Projection.isCreatureOf oid after) (Set.toList (GameState.battlefield after)))),
                 List.sort (fmap (fmap Face.name . (`Game.faceOf` after)) (Game.zoneMembers Zone.Graveyard S.alice after))
               )
         pikerFirst = outcome [piker, clone]
@@ -1947,11 +1947,11 @@ wardedCopyBoard forest island guard piker growth twincast =
 -- rule -- so a fixed count of resolutions would leave the two boards at
 -- different depths and the assertion would be reading two different moments.
 drainStack :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-drainStack answer = go (10 :: Int)
-  where
-    go fuel gs
-      | fuel <= 0 || null (GameState.stack gs) = gs
-      | otherwise = go (fuel - 1) (resolveOne answer gs)
+drainStack answer =
+  let go fuel gs
+        | fuel <= 0 || null (GameState.stack gs) = gs
+        | otherwise = go (fuel - 1) (resolveOne answer gs)
+   in go (10 :: Int)
 
 copyTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copyTargetSpec s registry =
@@ -2020,7 +2020,7 @@ stirCopyBoard swamp island stir twincast cards =
   let lands = S.landsFor island S.alice 2 (S.landsFor swamp S.alice 3 (Setup.emptyGame S.bothPlayers))
       (withStir, stirId) = S.handOne stir lands
       (twincastId, withBoth) = handAppend twincast S.alice withStir
-      add (acc, g) c = let (oid, g') = S.addGraveyardCard c S.alice g in (acc <> [oid], g')
+      add (acc, g) c = let (oid, g2) = S.addGraveyardCard c S.alice g in (acc <> [oid], g2)
       (ids, board) = List.foldl' add ([], withBoth) cards
    in (stirId, twincastId, ids, board {GameState.phase = Phase.PrecombatMain})
 

@@ -334,17 +334,15 @@ sampleControl = do
   gs <- State.get
   let grants = Projection.controlGrants gs
       sampled =
-        Map.fromList
-          [ (oid, pid)
-          | oid <- Set.toList (GameState.battlefield gs),
-            Just pid <- [Projection.controllerOfGiven grants Set.empty oid gs]
-          ]
-      changes =
-        [ GameEvent.ControlChanged (ControlChanged.MkControlChanged oid before after)
-        | (oid, after) <- Map.toList sampled,
-          Just before <- [Map.lookup oid (GameState.controlSample gs)],
-          before /= after
-        ]
+        Map.fromList $ do
+          oid <- Set.toList (GameState.battlefield gs)
+          Just pid <- [Projection.controllerOfGiven grants Set.empty oid gs]
+          pure (oid, pid)
+      changes = do
+        (oid, after) <- Map.toList sampled
+        Just before <- [Map.lookup oid (GameState.controlSample gs)]
+        Monad.guard (before /= after)
+        pure (GameEvent.ControlChanged (ControlChanged.MkControlChanged oid before after))
   State.put gs {GameState.controlSample = sampled}
   -- CR 603.2's simultaneity: two permanents whose control reverted in the same CR
   -- 514.2 sweep changed hands at the same moment, so the batch is one event group.
@@ -653,19 +651,18 @@ reactions incoming = do
 -- TRIGGERING.
 withinTriggerLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
 withinTriggerLimit gs =
-  go
-    ( Set.union
-        (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
-        (Set.map spentKey (GameState.triggeredThisGame gs))
-    )
-  where
-    spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
-    go _ [] = []
-    go spent (pending : rest) = case limitedKey pending of
-      Nothing -> pending : go spent rest
-      Just key
-        | Set.member key spent -> go spent rest
-        | otherwise -> pending : go (Set.insert key spent) rest
+  let spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
+      go _ [] = []
+      go spent (pending : rest) = case limitedKey pending of
+        Nothing -> pending : go spent rest
+        Just key
+          | Set.member key spent -> go spent rest
+          | otherwise -> pending : go (Set.insert key spent) rest
+   in go
+        ( Set.union
+            (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+            (Set.map spentKey (GameState.triggeredThisGame gs))
+        )
 
 -- What ONE INSTANCE of a triggered ability is, for the rider's purposes: what it
 -- hangs on and which ability it is -- the discriminator Pawl.Types.TriggerEntry
@@ -696,12 +693,12 @@ limitKey src ctrl ability =
 -- The key one pending trigger spends, or Nothing when its ability prints no
 -- rider.
 limitedKey :: PendingTrigger.PendingTrigger -> Maybe LimitKey
-limitedKey pending = case TriggeredAbility.limit (PendingTrigger.ability pending) of
-  TriggerLimit.Unlimited -> Nothing
-  TriggerLimit.OncePerTurn -> Just key
-  TriggerLimit.OncePerGame -> Just key
-  where
-    key = limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending)
+limitedKey pending =
+  let key = limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending)
+   in case TriggeredAbility.limit (PendingTrigger.ability pending) of
+        TriggerLimit.Unlimited -> Nothing
+        TriggerLimit.OncePerTurn -> Just key
+        TriggerLimit.OncePerGame -> Just key
 
 -- `triggeredEvent` read back: the record an event carries if it is one ability
 -- triggering (CR 603.3b), and nothing otherwise.

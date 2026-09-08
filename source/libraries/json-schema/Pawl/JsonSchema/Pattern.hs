@@ -58,25 +58,25 @@ flatten branches = case branches of
 -- | Stops at @)@ or at the end of input, so a group and the whole pattern share
 -- it.
 alternation :: String -> Either Text.Text ([[Node]], String)
-alternation = go []
-  where
-    go acc input = do
-      (branch, rest) <- sequenceOf input
-      case rest of
-        '|' : more -> go (branch : acc) more
-        _ -> Right (reverse $ branch : acc, rest)
+alternation =
+  let go acc input = do
+        (branch, rest) <- sequenceOf input
+        case rest of
+          '|' : more -> go (branch : acc) more
+          _ -> Right (reverse $ branch : acc, rest)
+   in go []
 
 sequenceOf :: String -> Either Text.Text ([Node], String)
-sequenceOf = go []
-  where
-    go acc input = case input of
-      [] -> Right (reverse acc, input)
-      c : _ | c == '|' || c == ')' -> Right (reverse acc, input)
-      _ -> do
-        (node, rest) <- atom input
-        case rest of
-          '*' : more -> go (Star node : acc) more
-          _ -> go (node : acc) rest
+sequenceOf =
+  let go acc input = case input of
+        [] -> Right (reverse acc, input)
+        c : _ | c == '|' || c == ')' -> Right (reverse acc, input)
+        _ -> do
+          (node, rest) <- atom input
+          case rest of
+            '*' : more -> go (Star node : acc) more
+            _ -> go (node : acc) rest
+   in go []
 
 atom :: String -> Either Text.Text (Node, String)
 atom input = case input of

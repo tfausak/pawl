@@ -1117,154 +1117,154 @@ asksFor asks ref = case asks of
 -- The same positions Resolve.effectObjectRefs names, tagged: a position added
 -- to one belongs in the other, and the two lists are read side by side.
 effectObjectRefs :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Asks, ObjectRef.ObjectRef)]
-effectObjectRefs effect = case effect of
-  Effect.AttachTarget {} -> []
-  Effect.AttachTargetToEach {} -> []
-  Effect.AttachBound {} -> []
-  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> read_ (fmap DamagePart.ref (Foldable.toList parts))
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
-  Effect.ChangeText {} -> []
-  Effect.AddMana {} -> []
-  Effect.ActivateManaAbilities {} -> []
-  Effect.MoveMana {} -> []
-  Effect.Search {} -> []
-  Effect.ExileAllGraveyards -> []
-  Effect.Proliferate -> []
-  Effect.ChooseCardName {} -> []
-  Effect.FromOutsideTheGame {} -> []
-  Effect.ExileThisSpell -> []
-  Effect.Bolster {} -> []
-  Effect.Amass {} -> []
-  Effect.Blight {} -> []
-  -- CR 701.66a's "target land you control" is an ordinary read, Detain's arm
-  -- below: the animation and the counters act on it and nothing gathers.
-  Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> read_ [ref]
-  Effect.TemptWithTheRing -> []
-  Effect.Venture {} -> []
-  Effect.ExileHandThenDraw -> []
-  Effect.PlayerSacrifices {} -> []
-  -- CR 727.5's exemption, optional: a card saying nothing about it exempts
-  -- nothing.
-  Effect.RestartGame mRef -> read_ (Maybe.maybeToList mRef)
-  Effect.ControlPlayerNextTurn {} -> []
-  Effect.ControlPlayerThisResolution {} -> []
-  Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
-  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> read_ [ref]
-  -- THE gather that asks, and the one that elides the random arm (#1733).
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [(AsksMoveGather, ref)]
-  Effect.Draw {} -> []
-  Effect.Mill {} -> []
-  -- CR 701.20a's reveal, the other asking arm.
-  Effect.Reveal (Reveal.MkReveal ref _) -> [(AsksRevealArm, ref)]
-  Effect.LookAt (LookAt.MkLookAt ref _) -> [(AsksLookAtArm, ref)]
-  Effect.Scry {} -> []
-  Effect.Surveil {} -> []
-  Effect.Fateseal {} -> []
-  Effect.Explore ref -> read_ [ref]
-  Effect.Discard subject -> case subject of
-    Discard.Counted {} -> []
-    Discard.These ref -> read_ [ref]
-  Effect.LoseLife {} -> []
-  Effect.GainLife {} -> []
-  Effect.ExchangeLifeTotals {} -> []
-  Effect.SetLifeTotal {} -> []
-  Effect.RedistributeLifeTotals -> []
-  Effect.IncreaseSpeed {} -> []
-  Effect.DecreaseSpeed {} -> []
-  -- CR 111.1's token holds a whole card, but the refs printed ON it are another
-  -- object's; mintedFaces is that axis, and every caller here sweeps one face at
-  -- a time. CreateEmblem answers the same way for CR 114.2's emblem.
-  Effect.Create {} -> []
-  Effect.Conjure {} -> []
-  Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _) -> read_ [ref]
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> read_ (ref : copyTargetsRefs targets)
-  Effect.Replace {} -> []
-  Effect.SkipNextPhase {} -> []
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
-  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _) -> read_ [ref]
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ srcRef _ _ destRef _) -> read_ (Maybe.maybeToList srcRef <> [destRef])
-  -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and
-  -- this arm never reaches the Game monad, so an AnyNumberMatching ref written
-  -- here would name nothing. inertChoosers is what says so at load time.
-  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref _) -> read_ [ref]
-  Effect.TurnFaceUp {} -> []
-  Effect.Fight {} -> []
-  Effect.RemoveFromCombat ref -> read_ [ref]
-  Effect.BecomesBlocked {} -> []
-  Effect.Counter (Counter.MkCounter ref _ _) -> read_ [ref]
-  Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
-  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> read_ [ref]
-  -- BOTH sides, each a READ -- CR 122.5 takes no choice of WHICH objects the
-  -- counters leave or land on, so this arm goes through the pure objectRefObjects
-  -- and a chooser-shaped ref written on either side would name nothing. WHICH
-  -- counters go to which recipient IS a choice, and it is asked of the answer
-  -- rather than of the ref (Prompt.ChooseDistributedMovedCounters).
-  Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> read_ [from, to]
-  Effect.RemoveCounters {} -> []
-  Effect.GainPlayerCounters {} -> []
-  Effect.RemovePlayerCounters {} -> []
-  Effect.PayAnyEnergy {} -> []
-  Effect.Tap ref -> read_ [ref]
-  Effect.Untap ref -> read_ [ref]
-  Effect.Detain ref -> read_ [ref]
-  Effect.Goad ref -> read_ [ref]
-  Effect.MakePlotted ref -> read_ [ref]
-  Effect.DoesNotUntapNext ref -> read_ [ref]
-  Effect.Transform ref -> [(AsksTransformGather, ref)]
-  -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
-  -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.
-  Effect.Convert ref -> [(AsksTransformGather, ref)]
-  -- A plain READ, unlike the two above: CR 710 states no "any number" flip, and
-  -- Pawl.Engine.Resolve's Flip arm sweeps the ref and asks nothing.
-  Effect.Flip ref -> read_ [ref]
-  -- A plain READ: Pawl.Engine.Resolve's Meld arm sweeps the ref and asks nothing.
-  Effect.Meld (Meld.MkMeld ref _) -> read_ [ref]
-  Effect.PhaseOut ref -> read_ [ref]
-  Effect.AddPhases {} -> []
-  Effect.EndTurn -> []
-  Effect.EndCombatPhase -> []
-  Effect.GainControl (DurationRef.MkDurationRef _ ref) -> read_ [ref]
-  Effect.ArmDelayedTrigger {} -> []
-  Effect.AffectPlayers {} -> []
-  Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
-  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
-  Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> read_ [ref]
-  Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> read_ [ref]
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
-    RestrictedCreatures.Named ref -> read_ [ref]
-    RestrictedCreatures.Matching _ -> []
-  Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> read_ [attacker]
-  Effect.CreateEmblem {} -> []
-  Effect.BecomeMonarch {} -> []
-  Effect.TakeTheInitiative {} -> []
-  Effect.Designate {} -> []
-  Effect.SetClassLevel {} -> []
-  Effect.Unsuspect ref -> read_ [ref]
-  Effect.SetHalfLocked {} -> []
-  Effect.Evolve {} -> []
-  Effect.Mentor {} -> []
-  Effect.Train {} -> []
-  Effect.ItBecomes {} -> []
-  Effect.ExileUntilMonarch {} -> []
-  Effect.ExileHaunting {} -> []
-  Effect.Attach {} -> []
-  Effect.PlaySubgame {} -> []
-  Effect.ChoosePlayer {} -> []
-  Effect.ChooseOpponentAtRandom {} -> []
-  Effect.RollDie {} -> []
-  Effect.FlipCoin {} -> []
-  Effect.TakeExtraTurn {} -> []
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> read_ [ref]
-  -- No ObjectRef at all: the opcode names a library.
-  Effect.Shuffle {} -> []
-  Effect.OfferCast offer -> read_ [OfferCast.ref offer]
-  Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
-  Effect.ForEach (ForEach.MkForEach ref _ _) -> read_ [ref]
-  where
-    read_ :: [ObjectRef.ObjectRef] -> [(Asks, ObjectRef.ObjectRef)]
-    read_ = fmap ((,) AsksNothing)
+effectObjectRefs effect =
+  let read_ :: [ObjectRef.ObjectRef] -> [(Asks, ObjectRef.ObjectRef)]
+      read_ = fmap ((,) AsksNothing)
+   in case effect of
+        Effect.AttachTarget {} -> []
+        Effect.AttachTargetToEach {} -> []
+        Effect.AttachBound {} -> []
+        Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> read_ (fmap DamagePart.ref (Foldable.toList parts))
+        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
+        Effect.ChangeText {} -> []
+        Effect.AddMana {} -> []
+        Effect.ActivateManaAbilities {} -> []
+        Effect.MoveMana {} -> []
+        Effect.Search {} -> []
+        Effect.ExileAllGraveyards -> []
+        Effect.Proliferate -> []
+        Effect.ChooseCardName {} -> []
+        Effect.FromOutsideTheGame {} -> []
+        Effect.ExileThisSpell -> []
+        Effect.Bolster {} -> []
+        Effect.Amass {} -> []
+        Effect.Blight {} -> []
+        -- CR 701.66a's "target land you control" is an ordinary read, Detain's arm
+        -- below: the animation and the counters act on it and nothing gathers.
+        Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> read_ [ref]
+        Effect.TemptWithTheRing -> []
+        Effect.Venture {} -> []
+        Effect.ExileHandThenDraw -> []
+        Effect.PlayerSacrifices {} -> []
+        -- CR 727.5's exemption, optional: a card saying nothing about it exempts
+        -- nothing.
+        Effect.RestartGame mRef -> read_ (Maybe.maybeToList mRef)
+        Effect.ControlPlayerNextTurn {} -> []
+        Effect.ControlPlayerThisResolution {} -> []
+        Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
+        Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> read_ [ref]
+        -- THE gather that asks, and the one that elides the random arm (#1733).
+        Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [(AsksMoveGather, ref)]
+        Effect.Draw {} -> []
+        Effect.Mill {} -> []
+        -- CR 701.20a's reveal, the other asking arm.
+        Effect.Reveal (Reveal.MkReveal ref _) -> [(AsksRevealArm, ref)]
+        Effect.LookAt (LookAt.MkLookAt ref _) -> [(AsksLookAtArm, ref)]
+        Effect.Scry {} -> []
+        Effect.Surveil {} -> []
+        Effect.Fateseal {} -> []
+        Effect.Explore ref -> read_ [ref]
+        Effect.Discard subject -> case subject of
+          Discard.Counted {} -> []
+          Discard.These ref -> read_ [ref]
+        Effect.LoseLife {} -> []
+        Effect.GainLife {} -> []
+        Effect.ExchangeLifeTotals {} -> []
+        Effect.SetLifeTotal {} -> []
+        Effect.RedistributeLifeTotals -> []
+        Effect.IncreaseSpeed {} -> []
+        Effect.DecreaseSpeed {} -> []
+        -- CR 111.1's token holds a whole card, but the refs printed ON it are another
+        -- object's; mintedFaces is that axis, and every caller here sweeps one face at
+        -- a time. CreateEmblem answers the same way for CR 114.2's emblem.
+        Effect.Create {} -> []
+        Effect.Conjure {} -> []
+        Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _) -> read_ [ref]
+        Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
+        Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> read_ (ref : copyTargetsRefs targets)
+        Effect.Replace {} -> []
+        Effect.SkipNextPhase {} -> []
+        Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
+        Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
+        Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _) -> read_ [ref]
+        Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ srcRef _ _ destRef _) -> read_ (Maybe.maybeToList srcRef <> [destRef])
+        -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and
+        -- this arm never reaches the Game monad, so an AnyNumberMatching ref written
+        -- here would name nothing. inertChoosers is what says so at load time.
+        Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref _) -> read_ [ref]
+        Effect.TurnFaceUp {} -> []
+        Effect.Fight {} -> []
+        Effect.RemoveFromCombat ref -> read_ [ref]
+        Effect.BecomesBlocked {} -> []
+        Effect.Counter (Counter.MkCounter ref _ _) -> read_ [ref]
+        Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
+        Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> read_ [ref]
+        -- BOTH sides, each a READ -- CR 122.5 takes no choice of WHICH objects the
+        -- counters leave or land on, so this arm goes through the pure objectRefObjects
+        -- and a chooser-shaped ref written on either side would name nothing. WHICH
+        -- counters go to which recipient IS a choice, and it is asked of the answer
+        -- rather than of the ref (Prompt.ChooseDistributedMovedCounters).
+        Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> read_ [from, to]
+        Effect.RemoveCounters {} -> []
+        Effect.GainPlayerCounters {} -> []
+        Effect.RemovePlayerCounters {} -> []
+        Effect.PayAnyEnergy {} -> []
+        Effect.Tap ref -> read_ [ref]
+        Effect.Untap ref -> read_ [ref]
+        Effect.Detain ref -> read_ [ref]
+        Effect.Goad ref -> read_ [ref]
+        Effect.MakePlotted ref -> read_ [ref]
+        Effect.DoesNotUntapNext ref -> read_ [ref]
+        Effect.Transform ref -> [(AsksTransformGather, ref)]
+        -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
+        -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.
+        Effect.Convert ref -> [(AsksTransformGather, ref)]
+        -- A plain READ, unlike the two above: CR 710 states no "any number" flip, and
+        -- Pawl.Engine.Resolve's Flip arm sweeps the ref and asks nothing.
+        Effect.Flip ref -> read_ [ref]
+        -- A plain READ: Pawl.Engine.Resolve's Meld arm sweeps the ref and asks nothing.
+        Effect.Meld (Meld.MkMeld ref _) -> read_ [ref]
+        Effect.PhaseOut ref -> read_ [ref]
+        Effect.AddPhases {} -> []
+        Effect.EndTurn -> []
+        Effect.EndCombatPhase -> []
+        Effect.GainControl (DurationRef.MkDurationRef _ ref) -> read_ [ref]
+        Effect.ArmDelayedTrigger {} -> []
+        Effect.AffectPlayers {} -> []
+        Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
+        Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
+        Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> read_ [ref]
+        Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> read_ [ref]
+        Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
+          RestrictedCreatures.Named ref -> read_ [ref]
+          RestrictedCreatures.Matching _ -> []
+        Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> read_ [attacker]
+        Effect.CreateEmblem {} -> []
+        Effect.BecomeMonarch {} -> []
+        Effect.TakeTheInitiative {} -> []
+        Effect.Designate {} -> []
+        Effect.SetClassLevel {} -> []
+        Effect.Unsuspect ref -> read_ [ref]
+        Effect.SetHalfLocked {} -> []
+        Effect.Evolve {} -> []
+        Effect.Mentor {} -> []
+        Effect.Train {} -> []
+        Effect.ItBecomes {} -> []
+        Effect.ExileUntilMonarch {} -> []
+        Effect.ExileHaunting {} -> []
+        Effect.Attach {} -> []
+        Effect.PlaySubgame {} -> []
+        Effect.ChoosePlayer {} -> []
+        Effect.ChooseOpponentAtRandom {} -> []
+        Effect.RollDie {} -> []
+        Effect.FlipCoin {} -> []
+        Effect.TakeExtraTurn {} -> []
+        Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> read_ [ref]
+        -- No ObjectRef at all: the opcode names a library.
+        Effect.Shuffle {} -> []
+        Effect.OfferCast offer -> read_ [OfferCast.ref offer]
+        Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
+        Effect.ForEach (ForEach.MkForEach ref _ _) -> read_ [ref]
 
 -- The chooser-shaped refs one effect writes where nothing can ask for them: the
 -- lint's offenders. Each is a CR 608.2d choice nobody makes, so the ref names no
@@ -1272,7 +1272,7 @@ effectObjectRefs effect = case effect of
 -- weaker than printed with nothing on the wire to show it.
 inertChoosers :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [ObjectRef.ObjectRef]
 inertChoosers effect =
-  [ref | (asks, ref) <- effectObjectRefs effect, chooserRef ref, not (asksFor asks ref)]
+  fmap snd (filter (\(asks, ref) -> chooserRef ref && not (asksFor asks ref)) (effectObjectRefs effect))
 
 -- CR 709.4a: a card's faces are referred to BY NAME (Card.faceNamed), so two
 -- faces sharing a name make that reference ambiguous -- faceNamed would return
@@ -1282,7 +1282,7 @@ inertChoosers effect =
 distinctFaceNamesOffends :: Card.Type.Card -> Bool
 distinctFaceNamesOffends card =
   let names = fmap Face.name (NonEmpty.toList (Card.Type.faces card))
-   in length (List.nub names) /= length names
+   in Set.size (Set.fromList names) /= length names
 
 -- CR 709.5a: "Each half of a split card with a shared type line shares the types
 -- and subtypes listed on that card's shared type line." pawl stores that
@@ -1345,7 +1345,11 @@ meldFaceCountOffends card =
 -- closure is a superset of effectFilters' own recursion, which can only subtract
 -- within the effect whose tally it is being subtracted from.
 mintedOwn :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Set.Set (Filter.Type.Filter Keyword.Keyword)
-mintedOwn effect = Set.fromList [f | e <- effectWithNested effect, (_, face) <- effectMintedFaces e, (SourceHostFramed, f) <- cardFilters face]
+mintedOwn effect = Set.fromList $ do
+  e <- effectWithNested effect
+  (_, face) <- effectMintedFaces e
+  (SourceHostFramed, f) <- cardFilters face
+  pure f
 
 -- The SourceHostFramed filters a face's resolution effects reach through the
 -- Filter traversal, each effect's minted faces subtracted from that effect's own
@@ -1355,7 +1359,16 @@ mintedOwn effect = Set.fromList [f | e <- effectWithNested effect, (_, face) <- 
 -- a card-wide minted set cancels a filter contributed by any other effect that
 -- happens to carry an equal one. The case below is the counter-example.
 viaFilters :: Face.Face Card.Type.Card -> Set.Set (Filter.Type.Filter Keyword.Keyword)
-viaFilters card = Set.unions [Set.difference (Set.fromList [f | (SourceHostFramed, f) <- effectFilters effect]) (mintedOwn effect) | effect <- cardResolutionEffects card]
+viaFilters card =
+  Set.unions
+    ( fmap
+        ( \effect ->
+            Set.difference
+              (Set.fromList (Maybe.mapMaybe (\pair -> case pair of (SourceHostFramed, f) -> Just f; _ -> Nothing) (effectFilters effect)))
+              (mintedOwn effect)
+        )
+        (cardResolutionEffects card)
+    )
 
 effectLintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 effectLintSpec s registry = Spec.describe s "Lint" $ do
@@ -1440,7 +1453,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- (#797).
   Spec.it s "every enchant ability on a card draws from the same pool" $ do
     ps <- S.allPrintings s
-    let offends c = length (List.nub (fmap TargetSlot.pool (Face.enchant c))) > 1
+    let offends c = Set.size (Set.fromList (fmap TargetSlot.pool (Face.enchant c))) > 1
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card mixes enchant pools, since CR 702.5c intersects them and Pool is not closed under intersection" (fmap (S.nameOf . Printing.card) offenders) []
   -- Pawl.Engine.Card.allTargetSlots binds the enchant slot under this name (Task 6), so a
@@ -1826,11 +1839,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
             (concatMap (\effect -> Resolve.effectPlayerRefs effect <> concatMap Resolve.objectRefPlayerRefs (Resolve.effectObjectRefs effect)) effects)
         -- The arity classification itself, shared by the effect leg above and the
         -- clause leg clashesIn folds in below.
-        slotsReadSinglyIn refs =
-          [ slot
-          | ref <- refs,
-            (slot, SlotArity.One) <- Map.toList (Resolve.playerRefSlots ref)
-          ]
+        slotsReadSinglyIn refs = do
+          ref <- refs
+          (slot, SlotArity.One) <- Map.toList (Resolve.playerRefSlots ref)
+          pure slot
         -- The reading side's fifth carrier: a NUMBER. Resolve.quantitySlots'
         -- SlotArity.One entries are exactly the Quantity.AgainstSlot arms, which
         -- aim an inner number at the object a slot names and so reach
@@ -1841,12 +1853,11 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         -- No subtraction of a minted object's text, which readSinglyInFilters
         -- needs: effectQuantities does not descend into the card a Create or a
         -- Conjure carries.
-        readSinglyInQuantities effects =
-          [ slot
-          | effect <- effects,
-            quantity <- effectQuantities effect,
-            (slot, SlotArity.One) <- Map.toList (Resolve.quantitySlots quantity)
-          ]
+        readSinglyInQuantities effects = do
+          effect <- effects
+          quantity <- effectQuantities effect
+          (slot, SlotArity.One) <- Map.toList (Resolve.quantitySlots quantity)
+          pure slot
         -- The three READING sides at once: this resolution's own effects, the
         -- conditions of the delayed abilities it arms, and the PlayerRefs its
         -- CLAUSES hold. CR 603.7c is what puts the second there -- the entry
@@ -2260,7 +2271,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- written anywhere else is (#2740).
   Spec.it s "every ObjectRef position the Filter traversal reaches is one the asking traversal reaches" $ do
     ps <- S.allPrintings s
-    let viaRefs card = Set.fromList [f | (_, ref) <- concatMap effectObjectRefs (cardResolutionEffects card), (SourceHostFramed, f) <- frame SourceHostFramed (objectRefFilters ref)]
+    let viaRefs card = Set.fromList $ do
+          (_, ref) <- concatMap effectObjectRefs (cardResolutionEffects card)
+          (SourceHostFramed, f) <- frame SourceHostFramed (objectRefFilters ref)
+          pure f
         offenders = filter (anyFace (\card -> viaFilters card /= viaRefs card) . Printing.card) ps
     Spec.assertEqWith s "the two ObjectRef traversals agree" (fmap (S.nameOf . Printing.card) offenders) []
     -- The subtraction is PER EFFECT, and this is what says so. Both sides are
@@ -2911,7 +2925,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- sweep without comparing anything.
   Spec.it s "an unlock trigger names one of its own card's faces" $ do
     ps <- S.allPrintings s
-    let doors c = [n | TriggerCondition.SelfHalfUnlocked n <- fmap TriggeredAbility.condition (Face.triggeredAbilities c)]
+    let doors c = Maybe.mapMaybe (\cond -> case TriggeredAbility.condition cond of TriggerCondition.SelfHalfUnlocked n -> Just n; _ -> Nothing) (Face.triggeredAbilities c)
         offends card = any (any (`notElem` fmap Face.name (NonEmpty.toList (Card.Type.faces card))) . doors) (Card.Type.faces card)
         offenders = filter (offends . Printing.card) ps
     Spec.assertBool

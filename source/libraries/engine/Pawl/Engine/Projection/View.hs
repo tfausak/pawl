@@ -1572,10 +1572,10 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
     if Set.member oid visited
       then Just (defaultControllerOf obj)
       else
-        let visited' = Set.insert oid visited
+        let visited2 = Set.insert oid visited
             -- Does an affected set carried by `source` name `oid`? controlNames
             -- below is the enumeration this membership test reads off.
-            namesFrom source a = Set.member oid (controlNames grants visited' gs source a)
+            namesFrom source a = Set.member oid (controlNames grants visited2 gs source a)
             storedSetter eff = case ContinuousEffect.modification eff of
               Modification.SetController pid
                 | namesFrom (ContinuousEffect.source eff) (ContinuousEffect.affected eff) ->
@@ -1585,7 +1585,7 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
             fromGrant g =
               if not (namesFrom (cgSource g) (cgAffected g))
                 then Nothing
-                else case controllerOfGiven grants visited' (cgSource g) gs of
+                else case controllerOfGiven grants visited2 (cgSource g) gs of
                   Nothing -> Nothing
                   Just who -> Just (cgTimestamp g, who)
             derived = Maybe.mapMaybe fromGrant grants

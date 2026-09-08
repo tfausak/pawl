@@ -22,8 +22,6 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
@@ -185,10 +183,7 @@ shieldsLeft gs =
 -- differs.
 riderHits :: PlayerId.PlayerId -> GameState.GameState -> [Natural.Natural]
 riderHits pid gs =
-  [ DamageEvent.amount de
-  | de <- S.damageEventsOf gs,
-    DamageEvent.target de == Recipient.ToPlayer pid
-  ]
+  fmap DamageEvent.amount (filter (\de -> DamageEvent.target de == Recipient.ToPlayer pid) (S.damageEventsOf gs))
 
 -- The CR 615.13 records a board holds, in the order Pawl.Engine.Damage wrote
 -- them. One per applying instance, whatever the batch was addressed to.
@@ -625,7 +620,7 @@ razorgrassBoard razorgrass warden =
 wardenOut :: GameState.GameState -> Int
 wardenOut gs =
   let wardenName = CardName.MkCardName (Text.pack "Soul Warden")
-   in length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName wardenName o gs]
+   in length (filter (\o -> Projection.hasName wardenName o gs) (Set.toList (GameState.battlefield gs)))
 
 -- razorgrassBoard's sibling for Sea Gate, Reborn, parameterized by alice's life
 -- total: the modal double-faced card and the {U} creature in hand, and NOTHING
@@ -646,7 +641,7 @@ seaGateBoard seaGate warrior life =
 warriorOut :: GameState.GameState -> Int
 warriorOut gs =
   let warriorName = CardName.MkCardName (Text.pack "Tidal Warrior")
-   in length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName warriorName o gs]
+   in length (filter (\o -> Projection.hasName warriorName o gs) (Set.toList (GameState.battlefield gs)))
 
 -- payLifeOnEntryAnswer's sibling for the CR 614.1c REVEAL cases: play the land,
 -- and answer its "you may reveal a Kithkin card from your hand" with this card.
@@ -688,7 +683,7 @@ clachanBoard clachan creature =
 namedOut :: String -> GameState.GameState -> Int
 namedOut name gs =
   let cardName = CardName.MkCardName (Text.pack name)
-   in length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName cardName o gs]
+   in length (filter (\o -> Projection.hasName cardName o gs) (Set.toList (GameState.battlefield gs)))
 
 -- Whether a life loss of exactly this size, by this player, was RECORDED -- the
 -- channel a card that watches for life loss reads, and the half of CR 119.4 a
@@ -736,8 +731,14 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
       -- never appears, which is CR 614.6's "if an event is replaced, it never
       -- happens" -- and is why this is read at the postcombat main phase rather
       -- than after the turn, since Engine.handoffTurn clears the log.
-      stepsBegunBy pid gs = [ph | GameEvent.StepBegan (StepBegan.MkStepBegan ph who) <- S.eventsOf gs, who == pid]
-      combatStepsOf pid gs = [ph | ph@(Phase.Combat _) <- stepsBegunBy pid gs]
+      stepsBegunBy pid gs =
+        Maybe.mapMaybe
+          ( \event -> case event of
+              GameEvent.StepBegan (StepBegan.MkStepBegan ph who) | who == pid -> Just ph
+              _ -> Nothing
+          )
+          (S.eventsOf gs)
+      combatStepsOf pid gs = filter (\ph -> case ph of Phase.Combat _ -> True; _ -> False) (stepsBegunBy pid gs)
       armed gs = length (GameState.replacements gs)
   -- The control: the same board with the creature never cast. bob's combat
   -- phase runs all five of CR 506.1's steps and his Piker takes two off
@@ -2646,7 +2647,7 @@ attackNoBlock p = case p of
 attackAndBlock :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 attackAndBlock blocker attacker p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
-  Prompt.DeclareBlockers _ _ _ attackers -> Map.fromList [(blocker, Set.singleton a) | a <- attackers, a == attacker]
+  Prompt.DeclareBlockers _ _ _ attackers -> Map.fromList (fmap (\a -> (blocker, Set.singleton a)) (filter (== attacker) attackers))
   _ -> S.identityAnswer p
 
 -- Put a board at declare attackers with BOB active and alice defending -- the

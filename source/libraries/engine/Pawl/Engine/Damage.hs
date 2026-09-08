@@ -2,6 +2,7 @@ module Pawl.Engine.Damage where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -158,21 +159,19 @@ tiersCleared thresholds assigned lethal answer =
 -- SBA will (damageEvent captures it as the damage is dealt, per CR 702.2e).
 deathtouchedRecipients :: [DamageEvent.DamageEvent] -> Set.Set Recipient.Recipient
 deathtouchedRecipients events =
-  Set.fromList
-    [ target
-    | event <- events,
-      DamageEvent.dealtByDeathtouch event,
-      -- Every combat event is built with amount > 0 (CR 510.1a), so this is a
-      -- fence on "nonzero" rather than a reachable filter.
-      DamageEvent.amount event > 0,
-      target <- case DamageEvent.target event of
-        Recipient.ToCreature _ -> [DamageEvent.target event]
-        Recipient.ToObject _ -> []
-        Recipient.ToPlaneswalker _ -> []
-        Recipient.ToBattle _ -> []
-        Recipient.ToPlayer _ -> []
-        Recipient.ToPile _ -> []
-    ]
+  Set.fromList $ do
+    event <- events
+    Monad.guard (DamageEvent.dealtByDeathtouch event)
+    -- Every combat event is built with amount > 0 (CR 510.1a), so this is a
+    -- fence on "nonzero" rather than a reachable filter.
+    Monad.guard (DamageEvent.amount event > 0)
+    case DamageEvent.target event of
+      Recipient.ToCreature _ -> [DamageEvent.target event]
+      Recipient.ToObject _ -> []
+      Recipient.ToPlaneswalker _ -> []
+      Recipient.ToBattle _ -> []
+      Recipient.ToPlayer _ -> []
+      Recipient.ToPile _ -> []
 
 -- CR 702.19b / 702.2c: a blocker's lethal threshold is toughness minus marked
 -- damage -- but 702.2c makes any nonzero assignment by a deathtouch source
@@ -588,12 +587,11 @@ gatherCombatDamage assigns = do
   let combat = GameState.combat gs
       attackers = filter (assigns . fst) (Map.toList (Combat.Type.attackers combat))
       blocking =
-        Map.toList . Map.fromListWith Set.union $
-          [ (blocker, Set.singleton attacker)
-          | (attacker, blockers) <- Map.toList (Combat.Type.blockers combat),
-            blocker <- Set.toList blockers,
-            assigns blocker
-          ]
+        Map.toList . Map.fromListWith Set.union $ do
+          (attacker, blockers) <- Map.toList (Combat.Type.blockers combat)
+          blocker <- Set.toList blockers
+          Monad.guard (assigns blocker)
+          pure (blocker, Set.singleton attacker)
       -- CR 703.4k / CR 802.5: each player in APNAP order announces how each
       -- attacking or blocking creature THEY CONTROL assigns its combat damage.
       -- Partitioned by controller rather than by role: attackers-then-blockers
@@ -797,18 +795,19 @@ excessThreshold gs source recipient = do
   oid <- Recipient.objectOf recipient
   let types = damagedCardTypes gs recipient
       bars =
-        [ bar
-        | (cardType, bar) <-
-            [ ( CardType.Creature,
-                if Projection.hasKeyword Keyword.Deathtouch source gs
-                  then 1
-                  else lethalRemaining gs oid
-              ),
-              (CardType.Planeswalker, Cost.loyaltyCountersOn oid gs),
-              (CardType.Battle, Battle.defenseOn oid gs)
-            ],
-          Set.member cardType types
-        ]
+        fmap
+          snd
+          ( filter
+              (\(cardType, _) -> Set.member cardType types)
+              [ ( CardType.Creature,
+                  if Projection.hasKeyword Keyword.Deathtouch source gs
+                    then 1
+                    else lethalRemaining gs oid
+                ),
+                (CardType.Planeswalker, Cost.loyaltyCountersOn oid gs),
+                (CardType.Battle, Battle.defenseOn oid gs)
+              ]
+          )
   Monad.guard (not (null bars))
   pure (minimum bars)
 
@@ -858,7 +857,7 @@ splitExcess gs event =
     Monad.guard (excess > 0)
     player <- Projection.controllerOf oid gs
     pure $
-      [event {DamageEvent.amount = bar} | bar > 0]
+      (if bar > 0 then [event {DamageEvent.amount = bar}] else [])
         <> [damageEvent gs (DamageEvent.kind event) (DamageEvent.source event) (Recipient.ToPlayer player) excess]
 
 -- CR 120.3: carry out a batch of damage events' results -- mark damage on
@@ -1098,7 +1097,7 @@ processDamage events = do
       removalOn kind before after oid =
         let was = countersOn kind oid before
             now = countersOn kind oid after
-         in [GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind was now) | was > now]
+         in if was > now then [GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind was now)] else []
       -- The `was > now` guard above already subsumes the card-type classification,
       -- so this folds both kinds over every hit permanent rather than asking which
       -- of CR 120.3's results the recipient earned: a creature has neither kind on
@@ -1106,7 +1105,7 @@ processDamage events = do
       removalsBetween before after =
         concatMap
           (\oid -> concatMap (\kind -> removalOn kind before after oid) [CounterKind.Loyalty, CounterKind.Defense])
-          (List.nub (Maybe.mapMaybe permanentHit survivors))
+          (ListUtils.nubOrd (Maybe.mapMaybe permanentHit survivors))
       -- CR 120.3b / 702.90b, CR 120.3d / 702.90c / 702.80a and CR 120.3g /
       -- 702.164c: the counters a damage event CAUSES, placed through
       -- Event.putCounters and Event.putPlayerCounters -- CR 122.6's two funnels --
@@ -1425,7 +1424,7 @@ lifelinkGains survivors =
           )
           survivors
       totals = Map.fromListWith (+) keyed
-   in fmap (\key -> (snd key, Map.findWithDefault 0 key totals)) (List.nub (fmap fst keyed))
+   in fmap (\key -> (snd key, Map.findWithDefault 0 key totals)) (ListUtils.nubOrd (fmap fst keyed))
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).

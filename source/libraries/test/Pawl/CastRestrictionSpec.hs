@@ -667,7 +667,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     -- offered list is empty for a reason that has nothing to do with mana. Wax
     -- wants a creature; Wane wants an enchantment.
     let targets g = snd (S.addPermanent ghostlyPrison S.alice (snd (S.addPermanent piker S.alice g)))
-        namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+        namesOffered gs = Maybe.mapMaybe (\a -> case a of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
         (green, _) = S.handOne waxWane (targets (S.landsInPlay forest 1))
         (both, _) = S.handOne waxWane (targets (snd (S.addPermanent plains S.alice (S.landsInPlay forest 1))))
     -- CR 709.3a: "Only the chosen half is evaluated to see if it can be cast."
@@ -800,7 +800,7 @@ wearTearSpec s registry = Spec.describe s "WearTear" $ do
     ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
     wearTear <- S.printingOf s registry "Wear"
     let targets g = snd (S.addPermanent ghostlyPrison S.alice (snd (S.addPermanent sphere S.alice g)))
-        namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+        namesOffered gs = Maybe.mapMaybe (\a -> case a of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
         (red, _) = S.handOne wearTear (targets (S.landsInPlay mountain 2))
         (both, _) = S.handOne wearTear (targets (S.landsFor plains S.alice 1 (S.landsInPlay mountain 2)))
     Spec.assertEqWith s "two Mountains: Wear alone, and no fused cast" (namesOffered red) [wearName]
@@ -817,7 +817,7 @@ wearTearSpec s registry = Spec.describe s "WearTear" $ do
     ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
     waxWane <- S.printingOf s registry "Wax"
     let targets g = snd (S.addPermanent ghostlyPrison S.alice (snd (S.addPermanent piker S.alice g)))
-        namesOffered board = [n | A.Cast _ n _ <- Action.legalActions S.alice board]
+        namesOffered board = Maybe.mapMaybe (\a -> case a of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice board)
         (unfused, _) = S.handOne waxWane (targets (S.landsFor plains S.alice 1 (S.landsInPlay forest 1)))
     Spec.assertEqWith s "both halves payable, and still two offers" (namesOffered unfused) [waxName, waneName]
     Spec.assertEqWith s "and no fused face to offer" (fmap Face.name (Card.fusedFace (Printing.card waxWane))) Nothing
@@ -839,7 +839,7 @@ wearTearSpec s registry = Spec.describe s "WearTear" $ do
     ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
     wearTear <- S.printingOf s registry "Wear"
     let mana = S.landsFor plains S.alice 1 (S.landsInPlay mountain 2)
-        namesOffered board = [n | A.Cast _ n _ <- Action.legalActions S.alice board]
+        namesOffered board = Maybe.mapMaybe (\a -> case a of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice board)
         (artifactOnly, _) = S.handOne wearTear (snd (S.addPermanent sphere S.alice mana))
         (bothTargets, _) = S.handOne wearTear (snd (S.addPermanent ghostlyPrison S.alice (snd (S.addPermanent sphere S.alice mana))))
     Spec.assertEqWith s "no enchantment: Wear alone, and no fused cast" (namesOffered artifactOnly) [wearName]
@@ -1654,11 +1654,9 @@ heartsBoards s registry = do
 
 -- Every number CR 601.2c's announcement carried while casting this spell.
 announcedCounts :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
-announcedCounts spellId gs =
-  [ n
-  | Response.AnnouncedTargets counts <- snd (Replay.record S.identityAnswer gs (S.cast S.alice spellId)),
-    n <- Map.elems counts
-  ]
+announcedCounts spellId gs = do
+  Response.AnnouncedTargets counts <- snd (Replay.record S.identityAnswer gs (S.cast S.alice spellId))
+  Map.elems counts
 
 -- CR 702.127a, aftermath, all three of the static abilities the one word stands
 -- for -- on Onward // Victory, where the keyword is printed on the RIGHT half
@@ -2615,8 +2613,8 @@ terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
         (pikerId, pikerBoard) = S.addHandCard piker S.alice g1
         after = S.runPure (aimAtPlayer S.bob) pikerBoard (S.cast S.alice pikerId >> Engine.priorityLoop)
         (_, g2) = S.addPermanent piker S.alice (S.landsFor mountain S.alice 5 (Setup.emptyGame S.bothPlayers))
-        (terrorId, terrorBoard') = S.addHandCard terror S.alice g2
-        itself = S.runPure (aimAtPlayer S.bob) terrorBoard' (S.cast S.alice terrorId >> Engine.priorityLoop)
+        (terrorId, terrorBoard2) = S.addHandCard terror S.alice g2
+        itself = S.runPure (aimAtPlayer S.bob) terrorBoard2 (S.cast S.alice terrorId >> Engine.priorityLoop)
     Spec.assertEqWith s "the Piker entered" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
     Spec.assertEqWith s "CR 603.2 and the Dragon dealt the Piker's 2 to bob" (S.lifeOf S.bob after) (Just 18)
     Spec.assertEqWith s "the Dragon entering beside a Piker already out dealt nothing" (S.lifeOf S.bob itself) (Just 20)

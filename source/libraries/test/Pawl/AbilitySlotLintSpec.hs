@@ -322,11 +322,11 @@ activatedAbilityOffends ability =
 -- source, which CR 113.7's `triggerSource` already names and
 -- Projection.viewWithLastKnown already answers off its last known information.
 sacrificesAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
-sacrificesAsCost = any isSacrifice . Cost.Type.components
-  where
-    isSacrifice component = case component of
-      CostComponent.Sacrifice {} -> True
-      _ -> False
+sacrificesAsCost =
+  let isSacrifice component = case component of
+        CostComponent.Sacrifice {} -> True
+        _ -> False
+   in any isSacrifice . Cost.Type.components
 
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
@@ -342,11 +342,11 @@ sacrificesAsCost = any isSacrifice . Cost.Type.components
 -- Not offered on the CAST side (cardOffends below): Cast.castSpell discards the
 -- payment map, so a spell reading the slot would silently no-op.
 tapsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
-tapsAsCost = any isTap . Cost.Type.components
-  where
-    isTap component = case component of
-      CostComponent.TapPermanents {} -> True
-      _ -> False
+tapsAsCost =
+  let isTap component = case component of
+        CostComponent.TapPermanents {} -> True
+        _ -> False
+   in any isTap . Cost.Type.components
 
 -- Does this cost tap permanents to reach a THRESHOLD? tapsAsCost's shape, and the
 -- same reason one rule over: CR 601.2h's payment binds
@@ -357,11 +357,11 @@ tapsAsCost = any isTap . Cost.Type.components
 -- components (data/cards/synthetic-crewed-battery.json) binds both slots, and one
 -- carrying either binds only that one.
 tapsForTotalPowerAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
-tapsForTotalPowerAsCost = any isThresholdTap . Cost.Type.components
-  where
-    isThresholdTap component = case component of
-      CostComponent.TapForTotalPower {} -> True
-      _ -> False
+tapsForTotalPowerAsCost =
+  let isThresholdTap component = case component of
+        CostComponent.TapForTotalPower {} -> True
+        _ -> False
+   in any isThresholdTap . Cost.Type.components
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
@@ -1290,7 +1290,7 @@ declaredAbilityNames face =
 -- name, and every printed producer prints exactly one grant.
 ignoredAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
 ignoredAbilityNames face =
-  Set.fromList [name | SpecialAction.IgnoreThisUntilEndOfTurn name _ <- Face.specialActions face]
+  Set.fromList (Maybe.mapMaybe (\action -> case action of SpecialAction.IgnoreThisUntilEndOfTurn name _ -> Just name; _ -> Nothing) (Face.specialActions face))
 
 -- Every AbilityName a face's IGNORABLE abilities declare -- the other side of
 -- that join. SEVERAL rows may carry one name, which is Damping Engine's one

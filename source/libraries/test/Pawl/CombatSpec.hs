@@ -1927,8 +1927,8 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     -- The Lord's OTHER modification, which the swap must leave alone: a Tidal
     -- Warrior is a printed 1/1, so a 2/2 is the +1/+1 half still applying.
     Spec.assertEqWith s "and the Warrior is a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
-    (onSwamp, warrior', blocker') <- lordBoard False "Swamp"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton warrior')) onSwamp) "a Swamp does not"
+    (onSwamp, warrior2, blocker2) <- lordBoard False "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton warrior2)) onSwamp) "a Swamp does not"
   Spec.it s "CR 612.1 a hacked Lord of Atlantis grants SWAMPwalk instead" $ do
     -- THE CASE. Island -> Swamp on the Lord, and bob's board never moves: the
     -- Island that used to stop the block no longer does, and the Swamp that
@@ -1939,8 +1939,8 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     let after = S.runPure S.aggressiveAnswer onIsland (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf warrior after) (Set.singleton blocker)
     Spec.assertEqWith s "the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
-    (onSwamp, warrior', blocker') <- lordBoard True "Swamp"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton warrior')) onSwamp)) "a Swamp stops it now"
+    (onSwamp, warrior2, blocker2) <- lordBoard True "Swamp"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton warrior2)) onSwamp)) "a Swamp stops it now"
   Spec.it s "CR 612.3 a Hack on the creature that RECEIVED islandwalk moves nothing" $ do
     -- CR 612.3 itself, and the case the two above are read against a THIRD
     -- time: the same Island -> Swamp swap, aimed at the WARRIOR. Its islandwalk
@@ -1960,10 +1960,10 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     Spec.assertEqWith s "and the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
     -- The half that keeps this from passing by the landwalk simply vanishing: a
     -- Warrior that had wrongly picked up swampwalk would make this one illegal.
-    (onSwamp, warrior', blocker') <- lordBoardAt theWarrior True "Swamp"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton warrior')) onSwamp) "and a Swamp still does not"
+    (onSwamp, warrior2, blocker2) <- lordBoardAt theWarrior True "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton warrior2)) onSwamp) "and a Swamp still does not"
     let after = S.runPure S.aggressiveAnswer onSwamp (Combat.declareBlockers S.manaPerformer)
-    Spec.assertEqWith s "the block sticks" (Combat.blockersOf warrior' after) (Set.singleton blocker')
+    Spec.assertEqWith s "the block sticks" (Combat.blockersOf warrior2 after) (Set.singleton blocker2)
   -- The PRINTED half, one carrier over: Bog Wraith ("Creature -- Wraith 3/3,
   -- Swampwalk" and nothing else) has the keyword on its own type line rather
   -- than from a grant, so the swap has to reach the projection's keyword map at
@@ -1976,15 +1976,15 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
   Spec.it s "CR 702.14c an unhacked Bog Wraith walks on SWAMPS" $ do
     (onSwamp, wraith, blocker) <- wraithBoard False "Swamp"
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton wraith)) onSwamp)) "a Swamp stops the block"
-    (onIsland, wraith', blocker') <- wraithBoard False "Island"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton wraith')) onIsland) "an Island does not"
+    (onIsland, wraith2, blocker2) <- wraithBoard False "Island"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton wraith2)) onIsland) "an Island does not"
   Spec.it s "CR 612.1 a hacked Bog Wraith walks on ISLANDS" $ do
     (onSwamp, wraith, blocker) <- wraithBoard True "Swamp"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton wraith)) onSwamp) "a Swamp no longer stops the block"
     let after = S.runPure S.aggressiveAnswer onSwamp (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf wraith after) (Set.singleton blocker)
-    (onIsland, wraith', blocker') <- wraithBoard True "Island"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton wraith')) onIsland)) "an Island stops it now"
+    (onIsland, wraith2, blocker2) <- wraithBoard True "Island"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton wraith2)) onIsland)) "an Island stops it now"
   -- The THIRD carrier, and the one that needed the walk into a defined card's
   -- keywords (see #643): a landwalk printed on a TOKEN, by the spell that mints
   -- it. Goblin Scouts {3}{R}{R} Sorcery, whole text "Create three 1/1 red Goblin
@@ -2001,8 +2001,8 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
   Spec.it s "CR 702.14c an unhacked Goblin Scouts mints MOUNTAINwalkers" $ do
     (onMountain, scout, blocker) <- scoutBoard False "Mountain"
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton scout)) onMountain)) "a Mountain stops the block"
-    (onSwamp, scout', blocker') <- scoutBoard False "Swamp"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton scout')) onSwamp) "a Swamp does not"
+    (onSwamp, scout2, blocker2) <- scoutBoard False "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton scout2)) onSwamp) "a Swamp does not"
   Spec.it s "CR 612.1 a hacked Goblin Scouts mints SWAMPwalkers instead" $ do
     (onMountain, scout, blocker) <- scoutBoard True "Mountain"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton scout)) onMountain) "a Mountain no longer stops the block"
@@ -2012,8 +2012,8 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     -- token's creature types and its derived name are untouched.
     Spec.assertEqWith s "still a Goblin Scout" (Projection.subtypesOf scout onMountain) (Set.fromList [Subtype.Goblin, Subtype.Scout])
     Spec.assertEqWith s "still named Goblin Scout Token" (Projection.namesOf scout onMountain) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Scout Token")))
-    (onSwamp, scout', blocker') <- scoutBoard True "Swamp"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton scout')) onSwamp)) "a Swamp stops it now"
+    (onSwamp, scout2, blocker2) <- scoutBoard True "Swamp"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker2 (Set.singleton scout2)) onSwamp)) "a Swamp stops it now"
 
 -- alice casts Goblin Scouts, optionally has a Magical Hack resolved at the
 -- SORCERY ON THE STACK (Mountain -> Swamp), and then the sorcery resolves; the
@@ -2241,7 +2241,12 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           ( Combat.blockersOf first after,
             Combat.blockersOf second after,
             Combat.blockersOf third after,
-            [n | GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared b n) <- S.eventsOf after, b == guard]
+            Maybe.mapMaybe
+              ( \event -> case event of
+                  GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared b n) | b == guard -> Just n
+                  _ -> Nothing
+              )
+              (S.eventsOf after)
           )
           (Set.singleton guard, Set.singleton guard, Set.singleton guard, [3])
       _ -> Spec.assertFailure s "fixture should have three attackers and one blocker"
@@ -4300,10 +4305,10 @@ textChangedCombatRestrictionSpec s registry = Spec.describe s "TextChangedCombat
     -- text change: the restriction lifts exactly when a Mountain is on the
     -- battlefield, and bob's Mountain counts, the clause naming no controller.
     (without, crasher) <- crasherBoard False False Subtype.Mountain Subtype.Island
-    (with, crasher') <- crasherBoard True False Subtype.Mountain Subtype.Island
+    (with, crasher2) <- crasherBoard True False Subtype.Mountain Subtype.Island
     Spec.assertBool s (not (Combat.canAttack S.alice crasher without)) "with no Mountain the Crasher cannot attack"
     Spec.assertEqWith s "and is not offered" (Combat.legalAttackers S.alice without) []
-    Spec.assertBool s (Combat.canAttack S.alice crasher' with) "with bob's Mountain it can"
+    Spec.assertBool s (Combat.canAttack S.alice crasher2 with) "with bob's Mountain it can"
   Spec.it s "CR 612.1 a hacked Crasher reads ISLANDS and alice's own Island frees it" $ do
     -- THE FREEING DIRECTION. Mountain -> Island on the Crasher, and the board
     -- never moves: there is still no Mountain anywhere, and the Island that could
@@ -4450,12 +4455,12 @@ textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAff
     -- text change would fail.
     swamp <- S.printingOf s registry "Swamp"
     (printed, _, _, theirs) <- embargo [swamp] False Subtype.Island Subtype.Swamp
-    (hacked, _, sourceId, theirs') <- embargo [swamp] True Subtype.Island Subtype.Swamp
-    case (theirs, theirs') of
-      ([blocker], [blocker']) -> do
+    (hacked, _, sourceId, theirs2) <- embargo [swamp] True Subtype.Island Subtype.Swamp
+    case (theirs, theirs2) of
+      ([blocker], [blocker2]) -> do
         Spec.assertEqWith s "the Hack resolved onto the Embargo" (Projection.textChangesAffecting sourceId hacked) [(Subtype.Island, Subtype.Swamp)]
         Spec.assertBool s (Combat.canBlock S.bob blocker printed) "under the printed Embargo bob's animated Swamp can block"
-        Spec.assertBool s (not (Combat.canBlock S.bob blocker' hacked)) "under the hacked one it cannot"
+        Spec.assertBool s (not (Combat.canBlock S.bob blocker2 hacked)) "under the hacked one it cannot"
       _ -> Spec.assertFailure s "fixture should have one blocker"
   Spec.it s "CR 508.1d the printed Frenzy requires the animated Swamp to attack" $ do
     -- The requirement twin of the premise above, and the same anti-vacuity shape:

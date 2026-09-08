@@ -3,6 +3,7 @@ module Pawl.Engine.Sba where
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -484,7 +485,7 @@ legendGroups pcs gs =
           | Set.member Supertype.Legendary (PC.supertypes pc) ->
               case Projection.controllerOf oid gs of
                 Nothing -> []
-                Just controller -> [((controller, name), [oid]) | name <- Set.toList (PC.names pc)]
+                Just controller -> fmap (\name -> ((controller, name), [oid])) (Set.toList (PC.names pc))
           | otherwise -> []
       keyed = concatMap legendary (Set.toList (GameState.battlefield gs))
       byKey = Map.fromListWith (<>) keyed
@@ -495,9 +496,9 @@ legendGroups pcs gs =
         first : rest@(_ : _) -> Just (controller, first NonEmpty.:| rest)
         _ -> Nothing
    in -- Sorted above, so two keys over the same permanents produce EQUAL pairs
-      -- and nub collapses them. A member has one controller, so equal member
+      -- and nubOrd collapses them. A member has one controller, so equal member
       -- lists cannot carry different controllers.
-      List.nub (Maybe.mapMaybe toGroup (Map.toList byKey))
+      ListUtils.nubOrd (Maybe.mapMaybe toGroup (Map.toList byKey))
 
 -- CR 704.5j: ask one same-named group's controller which to keep, and return the
 -- rest -- the permanents this pass must put into their OWNERS' graveyards.
@@ -820,7 +821,7 @@ performStateBasedActions = Event.simultaneously $ do
   -- from the board the pass began in, so an animated Rest in Peace this pass is
   -- itself burying still exiles the cards the rest of the batch would put into
   -- graveyards. See Pawl.Engine.Replacement's applyReplacementsIn.
-  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable <> routed))
+  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (ListUtils.nubOrd (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable <> routed))
   -- CR 903.9a's ACTION half: "its owner may put it into the command zone". A real
   -- zone change (CR 400.7 mints a fresh incarnation), so it goes through the same
   -- batch funnel as the buries above rather than editing the zone sets -- a
@@ -961,7 +962,7 @@ performStateBasedActions = Event.simultaneously $ do
           let g1 = Game.removeFromZones (Object.owner obj) oid g
            in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
       vanished = List.foldl' ceaseToExist departed vanishing
-      removeN n c = let c' = c - n in if c' == 0 then Nothing else Just c'
+      removeN n c = let c2 = c - n in if c2 == 0 then Nothing else Just c2
       balance g (oid, n) =
         let strip obj = obj {Object.counters = Map.update (removeN n) CounterKind.MinusOneMinusOne (Map.update (removeN n) CounterKind.PlusOnePlusOne (Object.counters obj))}
          in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
@@ -991,14 +992,13 @@ performStateBasedActions = Event.simultaneously $ do
       -- single kind and rule 704.5q removes both, which is Damage's posture for a
       -- permanent that is a battle and a planeswalker at once.
       countersOn kind oid g = maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid g)
-      annihilationRemovals =
-        [ GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind was now)
-        | (oid, _) <- annihilations,
-          kind <- [CounterKind.PlusOnePlusOne, CounterKind.MinusOneMinusOne],
-          let was = countersOn kind oid drained,
-          let now = countersOn kind oid balanced,
-          was > now
-        ]
+      annihilationRemovals = do
+        (oid, _) <- annihilations
+        kind <- [CounterKind.PlusOnePlusOne, CounterKind.MinusOneMinusOne]
+        let was = countersOn kind oid drained
+            now = countersOn kind oid balanced
+        Monad.guard (was > now)
+        pure (GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind was now))
       recorded = List.foldl' (flip Event.recordEvent) balanced annihilationRemovals
       -- CR 704.5aa: "that player's speed becomes 1", applied to the players
       -- classified from the pre-pass board above. Applied LATE like every other

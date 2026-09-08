@@ -85,13 +85,13 @@ import qualified Pawl.Types.Zone as Zone
 -- `otherwise` branch. Written as an addend anyway, because that is what rule
 -- 902.4 says of whatever the starting total is.
 startingLife :: (Foldable f) => GameSettings.GameSettings -> Int -> f a -> Integer -> Integer
-startingLife settings seats commander modifier = modifier + base
-  where
-    base :: Integer
-    base
-      | GameSettings.brawl settings = if seats > 2 then 30 else 25
-      | not (null commander) = 40
-      | otherwise = 20
+startingLife settings seats commander modifier =
+  let base :: Integer
+      base
+        | GameSettings.brawl settings = if seats > 2 then 30 else 25
+        | not (null commander) = 40
+        | otherwise = 20
+   in modifier + base
 
 -- How many cards this deck holds, CR 903.5a's commander included: rule 903.5a
 -- counts the deck at exactly 100 cards "including its commander", so the card

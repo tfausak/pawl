@@ -26,12 +26,12 @@ defaultSelection = ModeSelection.ChooseExactly 1
 -- field's: it reads the assembled record, and it is a rule of Magic rather than
 -- a property of the wire, so it has no schema representation.
 codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (Modal.Modal card ability)
-codec cardCodec abilityCodec = Fields.objectWith check $ do
-  modes <- Fields.required "modes" (Common.seq (Mode.codec cardCodec abilityCodec)) Modal.modes
-  selection <- Fields.defaulted "selection" defaultSelection ModeSelection.codec Modal.selection
-  pure Modal.MkModal {Modal.modes = modes, Modal.selection = selection}
-  where
-    check m =
-      if Seq.null (Modal.modes m)
-        then Left (Text.pack "modal has no modes")
-        else Right m
+codec cardCodec abilityCodec =
+  let check m =
+        if Seq.null (Modal.modes m)
+          then Left (Text.pack "modal has no modes")
+          else Right m
+   in Fields.objectWith check $ do
+        modes <- Fields.required "modes" (Common.seq (Mode.codec cardCodec abilityCodec)) Modal.modes
+        selection <- Fields.defaulted "selection" defaultSelection ModeSelection.codec Modal.selection
+        pure Modal.MkModal {Modal.modes = modes, Modal.selection = selection}

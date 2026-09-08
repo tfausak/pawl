@@ -42,8 +42,6 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Facing as Facing
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -103,16 +101,16 @@ discardAtBob p = case p of
 
 -- Add k cards of a printing to pid's hand (each a fresh Hand-zone object).
 handCards :: Printing.Printing -> PlayerId.PlayerId -> Int -> GameState.GameState -> GameState.GameState
-handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
-  where
-    addOne g =
-      let (printingId, gP) = Game.intern printing g
-          (oid, g1) = Game.freshObjectId gP
-          obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
-       in g1
-            { GameState.objects = Map.insert oid obj (GameState.objects g1),
-              GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
-            }
+handCards printing pid k gs =
+  let addOne g =
+        let (printingId, gP) = Game.intern printing g
+            (oid, g1) = Game.freshObjectId gP
+            obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
+         in g1
+              { GameState.objects = Map.insert oid obj (GameState.objects g1),
+                GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
+              }
+   in List.foldl' (\g _ -> addOne g) gs [1 .. k]
 
 -- Put k cards of a printing into pid's library, each on top of the last, for a
 -- draw to find.
@@ -132,12 +130,12 @@ settleAtAlicesUpkeep gs =
 -- belong to one player, so the moved card's owner is the drawer. Any OTHER route
 -- from library to hand would count here too; no fixture below has one.
 drawersOf :: GameState.GameState -> [PlayerId.PlayerId]
-drawersOf gs = Maybe.mapMaybe drawer (S.zoneChangesOf gs)
-  where
-    drawer zc =
-      if ZoneChange.from zc == Zone.Library && ZoneChange.to zc == Zone.Hand
-        then fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
-        else Nothing
+drawersOf gs =
+  let drawer zc =
+        if ZoneChange.from zc == Zone.Library && ZoneChange.to zc == Zone.Hand
+          then fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
+          else Nothing
+   in Maybe.mapMaybe drawer (S.zoneChangesOf gs)
 
 -- Shahrazad and Sindbad on alice's battlefield, untapped and settled so its {T}
 -- is payable (CR 302.6), over a library whose TOP card is `top` and a hand
@@ -776,7 +774,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (alices, g2) = S.addHandCard swamp S.alice g1
         (carols, g3) = S.addHandCard swamp S.carol g2
         after = S.runPure S.identityAnswer g3 (mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) [bobs, alices, carols])
-        enchanting = [Object.attachedTo o | o <- Map.elems (GameState.objects after), Object.zone o == Zone.Battlefield, Maybe.isJust (Object.attachedTo o)]
+        enchanting = fmap Object.attachedTo (filter (\o -> Object.zone o == Zone.Battlefield && Maybe.isJust (Object.attachedTo o)) (Map.elems (GameState.objects after)))
     Spec.assertEqWith s "bob's card went to the bottom of bob's library" (namesIn Zone.Library S.bob after) [Just (S.printingName piker), Just (S.printingName swamp)]
     Spec.assertEqWith s "and not to bob's graveyard" (namesIn Zone.Graveyard S.bob after) []
     Spec.assertEqWith s "alice's own card reached her graveyard -- she is not the enchanted player" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName swamp)]
@@ -1342,17 +1340,17 @@ soulConduitBoard conduit island aliceLife bobLife carolLife =
 -- fills the target slot with `sides` -- S.preferring rather than a fixed set, so
 -- the announced count (CR 601.2c) is what decides how many are named.
 conduitAnswer :: [PlayerId.PlayerId] -> Prompt.Prompt r -> r
-conduitAnswer sides p = case p of
-  Prompt.ChooseAction _ _ options -> case filter isActivation options of
-    a : _ -> a
-    [] -> A.Pass
-  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
-  _ -> S.identityAnswer p
-  where
-    wanted r = case r of
-      Recipient.ToPlayer pid -> elem pid sides
-      _ -> False
+conduitAnswer sides p =
+  let wanted r = case r of
+        Recipient.ToPlayer pid -> elem pid sides
+        _ -> False
+   in case p of
+        Prompt.ChooseAction _ _ options -> case filter isActivation options of
+          a : _ -> a
+          [] -> A.Pass
+        Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
+        _ -> S.identityAnswer p
 
 -- Takes the first activation offered and aims every target slot at `who`.
 exchangeAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
@@ -1384,10 +1382,10 @@ isActivation a = case a of
 -- the exchange a GAIN and a LOSS rather than two assignments, so this is what a
 -- "whenever you gain life" trigger would have to read.
 lifeGains :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
-lifeGains gs = [(pid, n) | GameEvent.LifeGained (LifeChange.MkLifeChange pid n) <- S.eventsOf gs]
+lifeGains gs = Maybe.mapMaybe (\ev -> case ev of GameEvent.LifeGained (LifeChange.MkLifeChange pid n) -> Just (pid, n); _ -> Nothing) (S.eventsOf gs)
 
 lifeLosses :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
-lifeLosses gs = [(pid, n) | GameEvent.LifeLost (LifeChange.MkLifeChange pid n) <- S.eventsOf gs]
+lifeLosses gs = Maybe.mapMaybe (\ev -> case ev of GameEvent.LifeLost (LifeChange.MkLifeChange pid n) -> Just (pid, n); _ -> Nothing) (S.eventsOf gs)
 
 exchangeLifeTotalsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do

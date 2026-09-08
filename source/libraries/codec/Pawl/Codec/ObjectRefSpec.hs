@@ -1,7 +1,7 @@
 module Pawl.Codec.ObjectRefSpec where
 
 import qualified Data.Either as Either
-import qualified Data.List as List
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -382,8 +382,8 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Spec.assertEqWith
       s
       "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield, one chosen permanent and the source with one chosen permanent all encode differently"
-      ( length
-          ( List.nub
+      ( Set.size
+          ( Set.fromList
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (ZoneScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature))),

@@ -159,20 +159,19 @@ anonymous arms = (tagged arms) {Codec.schema = fmap Schema.oneOf (traverse armSc
 -- that string, deliberately, since the tag genuinely is known here.
 taggedWith :: forall a. (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a
 taggedWith enc arms =
-  Codec.MkCodec
-    { Codec.encode = enc,
-      Codec.decode = \value -> do
-        (t, mv) <- Common.asTagged value
-        case List.find ((== t) . tag) arms of
-          Nothing -> Left . Text.pack $ "unknown " <> name <> ": " <> t
-          Just arm -> decodeValue arm mv,
-      Codec.schema = Define.define (Name.typeName proxy) $ do
-        schemas <- traverse armSchema arms
-        pure (Schema.oneOf schemas)
-    }
-  where
-    proxy = Typeable.Proxy :: Typeable.Proxy a
-    name = Text.unpack . Name.unwrap $ Name.typeName proxy
+  let proxy = Typeable.Proxy :: Typeable.Proxy a
+      name = Text.unpack . Name.unwrap $ Name.typeName proxy
+   in Codec.MkCodec
+        { Codec.encode = enc,
+          Codec.decode = \value -> do
+            (t, mv) <- Common.asTagged value
+            case List.find ((== t) . tag) arms of
+              Nothing -> Left . Text.pack $ "unknown " <> name <> ": " <> t
+              Just arm -> decodeValue arm mv,
+          Codec.schema = Define.define (Name.typeName proxy) $ do
+            schemas <- traverse armSchema arms
+            pure (Schema.oneOf schemas)
+        }
 
 -- | The whole codec for an ALL-NULLARY tagged sum, derived from the datatype.
 --

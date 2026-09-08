@@ -91,7 +91,7 @@ wishBoard mountain wish sideboard =
   let (board, wishId) = S.handOne wish (S.landsInPlay mountain 4)
       -- Interned in LIST ORDER, so the ids ascend with the list and the case
       -- below can name what Prompt.ChooseFromOutsideTheGame offers last.
-      intern (printing, n) (acc, gs) = let (printingId, gs') = Game.intern printing gs in (acc <> [(printingId, n)], gs')
+      intern (printing, n) (acc, gs) = let (printingId, gs2) = Game.intern printing gs in (acc <> [(printingId, n)], gs2)
       (entries, interned) = List.foldl' (flip intern) ([], board) sideboard
       stock p = p {Player.outsideTheGame = Map.fromList entries}
    in (interned {GameState.players = Map.adjust stock S.alice (GameState.players interned)}, wishId)
@@ -425,7 +425,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
         (_, g2) = S.addLibraryCard piker S.alice g1
         (_, g3) = S.addLibraryCard signInBlood S.alice g2
         parent = S.runPure S.identityAnswer g3 (S.cast S.alice summonsId >> Stack.resolveTop)
-        faceDownIds = [oid | oid <- Set.toList (GameState.battlefield parent), maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid parent)]
+        faceDownIds = filter (\oid -> maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid parent)) (Set.toList (GameState.battlefield parent))
         manifestedId = Maybe.fromMaybe summonsId (Maybe.listToMaybe faceDownIds)
         sub = Setup.subgameStateFrom S.alice parent
         creatureOrLand = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
@@ -438,7 +438,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
           Prompt.ChooseFromOutsideTheGame _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== OutsideCard.InAnotherGame manifestedId) (NonEmpty.toList candidates))
           _ -> S.identityAnswer p
         wishing predicate = snd (Engine.runGamePure preferManifest sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) manifestedId S.alice))
-        offeredOuter predicate = [oid | OutsideCard.InAnotherGame oid <- Event.eligible predicate manifestedId S.alice sub]
+        offeredOuter predicate = Maybe.mapMaybe (\card -> case card of OutsideCard.InAnotherGame oid -> Just oid; _ -> Nothing) (Event.eligible predicate manifestedId S.alice sub)
     -- CR 708.2a's 2/2 creature is what the creature-or-land wish reaches, and CR
     -- 708.9's reveal is what arrives: the card itself, not the 2/2.
     Spec.assertEqWith s "CR 708.2a/729.4: the creature-or-land wish takes the manifest, and CR 708.9 hands it over as the sorcery card underneath" (printingsIn Zone.Hand S.alice (wishing creatureOrLand)) [signInBlood]

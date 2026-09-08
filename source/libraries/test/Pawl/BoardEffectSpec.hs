@@ -142,14 +142,13 @@ exhumeSpec s registry =
       -- whose the arrival is.
       arrivals gs =
         List.sort
-          [ (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs)
-          | oid <- Set.toList (GameState.battlefield gs),
-            fmap S.nameOf (Game.cardOf oid gs) /= named "Swamp"
-          ]
+          ( fmap
+              (\oid -> (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs))
+              (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) /= named "Swamp") (Set.toList (GameState.battlefield gs)))
+          )
       choices responses =
         length
-          [ () | Response.ChoseCardInGraveyard _ <- responses
-          ]
+          (filter (\r -> case r of Response.ChoseCardInGraveyard _ -> True; _ -> False) responses)
       -- The prompt's candidates in the order it offers them, which is the order
       -- Resolve.graveyardCardsOf sorts each graveyard into.
       secondOf offered = case offered of
@@ -335,14 +334,13 @@ bloodForBonesSpec s registry =
       named = Just . CardName.MkCardName . Text.pack
       arrivals gs =
         List.sort
-          [ (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs)
-          | oid <- Set.toList (GameState.battlefield gs),
-            fmap S.nameOf (Game.cardOf oid gs) /= named "Swamp"
-          ]
+          ( fmap
+              (\oid -> (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs))
+              (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) /= named "Swamp") (Set.toList (GameState.battlefield gs)))
+          )
       choices responses =
         length
-          [ () | Response.ChoseCardInGraveyard _ <- responses
-          ]
+          (filter (\r -> case r of Response.ChoseCardInGraveyard _ -> True; _ -> False) responses)
    in Spec.describe s "BloodForBones" $ do
         -- The headline: the card alice chose is on the battlefield, a DIFFERENT
         -- one she chose is in her hand, and the answerer asked for the first one
@@ -363,11 +361,7 @@ bloodForBonesSpec s registry =
               -- Piker has paid the cost, so it is neither the first candidate nor
               -- next to it, and the Piker is the last.
               wantedBy name gs1 =
-                Maybe.listToMaybe
-                  [ oid
-                  | oid <- Game.zoneMembers Zone.Graveyard S.alice gs1,
-                    fmap S.nameOf (Game.cardOf oid gs1) == named name
-                  ]
+                List.find (\oid -> fmap S.nameOf (Game.cardOf oid gs1) == named name) (Game.zoneMembers Zone.Graveyard S.alice gs1)
               -- FIRST the Sentry, and then the Sentry AGAIN -- which the second
               -- return cannot grant, so the fallback is the pinned Piker.
               choosing :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -515,9 +509,9 @@ skullwinderSpec s registry =
                 Stack.resolveTop
          in (after, responses)
       named = Just . CardName.MkCardName . Text.pack
-      opponentChoices responses = length [() | Response.ChoseOpponent _ <- responses]
-      playerChoices responses = length [() | Response.ChosePlayer _ <- responses]
-      cardChoices responses = length [() | Response.ChoseCardInGraveyard _ <- responses]
+      opponentChoices responses = length (filter (\r -> case r of Response.ChoseOpponent _ -> True; _ -> False) responses)
+      playerChoices responses = length (filter (\r -> case r of Response.ChosePlayer _ -> True; _ -> False) responses)
+      cardChoices responses = length (filter (\r -> case r of Response.ChoseCardInGraveyard _ -> True; _ -> False) responses)
       -- The third candidate the prompt offers, by POSITION rather than by name:
       -- a name would be found again in a union of every graveyard, and the
       -- position is what tells the two offers apart.
@@ -583,7 +577,7 @@ skullwinderSpec s registry =
           Spec.assertEqWith
             s
             "and the Snake itself is on the battlefield"
-            (List.sort [fmap S.nameOf (Game.cardOf oid after) | oid <- Set.toList (GameState.battlefield after), fmap S.nameOf (Game.cardOf oid after) /= named "Forest"])
+            (List.sort (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (filter (\oid -> fmap S.nameOf (Game.cardOf oid after) /= named "Forest") (Set.toList (GameState.battlefield after)))))
             [named "Skullwinder"]
         -- CR 102.2 / 608.2d: PlayerScope.Opponents leaves the CONTROLLER out of
         -- the offer, so an answerer naming alice is answering a question she was
@@ -702,7 +696,7 @@ elvishPiperSpec s registry =
             (piperId, withPiper) = S.addPermanent piper S.alice mana
             (withMine, mineIds) =
               List.foldl'
-                (\(g, ids) printing -> let (oid, g') = S.addHandCard printing S.alice g in (g', ids <> [oid]))
+                (\(g, ids) printing -> let (oid, g2) = S.addHandCard printing S.alice g in (g2, ids <> [oid]))
                 (withPiper, [])
                 mine
             withTheirs = List.foldl' (\g printing -> snd (S.addHandCard printing S.bob g)) withMine theirs
@@ -718,19 +712,20 @@ elvishPiperSpec s registry =
       -- How many times a player was asked which card in their hand to take. ZERO
       -- is the observation that pins the candidate set: one matching card is
       -- elided (CR 101.3), so a gather that offered the whole hand would ask.
-      handChoices responses = length [() | Response.ChoseCardInHand _ <- responses]
+      handChoices responses = length (filter (\r -> case r of Response.ChoseCardInHand _ -> True; _ -> False) responses)
       named = Just . CardName.MkCardName . Text.pack
       -- alice's battlefield minus the Forests: the Piper, plus whatever the
       -- ability put there. By NAME, since CR 400.7 mints a fresh id at the
       -- destination.
       arrivals gs =
         List.sort
-          [ nm
-          | oid <- Set.toList (GameState.battlefield gs),
-            Projection.controllerOf oid gs == Just S.alice,
-            let nm = fmap S.nameOf (Game.cardOf oid gs),
-            nm /= named "Forest"
-          ]
+          ( filter
+              (/= named "Forest")
+              ( fmap
+                  (\oid -> fmap S.nameOf (Game.cardOf oid gs))
+                  (filter (\oid -> Projection.controllerOf oid gs == Just S.alice) (Set.toList (GameState.battlefield gs)))
+              )
+          )
       -- Says yes to the printed "may" and names `wanted` when a hand choice is
       -- put. Answering the "may" is what makes the ability do anything at all --
       -- S.identityAnswer declines it.
@@ -1424,10 +1419,10 @@ gloriousProtectorSpec s registry =
       -- arrival and Game.zoneMembers -- indexed by OWNER (CR 108.3) -- cannot.
       controlledNames pid gs =
         List.sort
-          [ fmap S.nameOf (Game.cardOf oid gs)
-          | oid <- Set.toList (GameState.battlefield gs),
-            Projection.controllerOf oid gs == Just pid
-          ]
+          ( fmap
+              (\oid -> fmap S.nameOf (Game.cardOf oid gs))
+              (filter (\oid -> Projection.controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs)))
+          )
       exiledNames gs = List.sort (namesIn Zone.Exile S.alice gs <> namesIn Zone.Exile S.bob gs)
       -- alice: four Plains, three non-Angel creatures, an Angel, and the Protector
       -- in hand. bob: one non-Angel creature. Nothing is tapped and nothing has
@@ -1682,10 +1677,10 @@ banisherPriestSpec s registry =
       -- by OWNER (CR 108.3) -- cannot answer.
       controlledNames pid gs =
         List.sort
-          [ fmap S.nameOf (Game.cardOf oid gs)
-          | oid <- Set.toList (GameState.battlefield gs),
-            Projection.controllerOf oid gs == Just pid
-          ]
+          ( fmap
+              (\oid -> fmap S.nameOf (Game.cardOf oid gs))
+              (filter (\oid -> Projection.controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs)))
+          )
       exiledNames gs = List.sort (concatMap (\pid -> namesIn Zone.Exile pid gs) [S.alice, S.bob, S.carol])
       permanentNamed name gs =
         List.find

@@ -60,31 +60,29 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- not have (#1969).
 objects :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> ObjectId -> Bool
 objects pcs gs a b =
-  a == b
-    || ( quiet gs
-           && Map.lookup a pcs == Map.lookup b pcs
-           && sameObject
-           && not (namedByRelation a gs)
-           && not (namedByRelation b gs)
-           && not (namedByAnother a gs)
-           && not (namedByAnother b gs)
-       )
-  where
-    sameObject = case (Map.lookup a (GameState.objects gs), Map.lookup b (GameState.objects gs)) of
-      (Just x, Just y) -> x {Object.timestamp = Object.timestamp y} == y
-      _ -> False
+  let sameObject = case (Map.lookup a (GameState.objects gs), Map.lookup b (GameState.objects gs)) of
+        (Just x, Just y) -> x {Object.timestamp = Object.timestamp y} == y
+        _ -> False
+   in a == b
+        || ( quiet gs
+               && Map.lookup a pcs == Map.lookup b pcs
+               && sameObject
+               && not (namedByRelation a gs)
+               && not (namedByRelation b gs)
+               && not (namedByAnother a gs)
+               && not (namedByAnother b gs)
+           )
 
 -- | One candidate per interchangeability class, keeping the FIRST of each in the
 -- order it was offered. Deterministic, because Pawl.Engine.Replay.defaultAnswer
 -- and several callers read the head of a candidate list.
 representatives :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> NonEmpty.NonEmpty ObjectId -> NonEmpty.NonEmpty ObjectId
 representatives pcs gs candidates =
-  case List.foldl' keep [] (NonEmpty.toList candidates) of
-    -- Unreachable: keep drops nothing it has not already got a class for.
-    [] -> candidates
-    first : rest -> first NonEmpty.:| rest
-  where
-    keep kept oid = if any (objects pcs gs oid) kept then kept else kept <> [oid]
+  let keep kept oid = if any (objects pcs gs oid) kept then kept else kept <> [oid]
+   in case List.foldl' keep [] (NonEmpty.toList candidates) of
+        -- Unreachable: keep drops nothing it has not already got a class for.
+        [] -> candidates
+        first : rest -> first NonEmpty.:| rest
 
 -- Whether the board stores nothing that could name one object and not another,
 -- BAR the id-keyed relations namedByRelation searches instead.
@@ -227,14 +225,13 @@ noCombat =
 -- coverage.
 namedByRelation :: ObjectId -> GameState -> Bool
 namedByRelation oid gs =
-  relates phasedOutNames (GameState.phasedOut gs)
-    || relates monarchWatchNames (GameState.exiledUntilMonarch gs)
-    || relates returnWatchNames (GameState.movedUntilSourceLeaves gs)
-    || relates Set.singleton (GameState.haunting gs)
-    || relates Set.singleton (GameState.exiledWith gs)
-    || relates pileNames (GameState.exilePiles gs)
-  where
-    relates names = any (\(key, value) -> key == oid || Set.member oid (names value)) . Map.toList
+  let relates names = any (\(key, value) -> key == oid || Set.member oid (names value)) . Map.toList
+   in relates phasedOutNames (GameState.phasedOut gs)
+        || relates monarchWatchNames (GameState.exiledUntilMonarch gs)
+        || relates returnWatchNames (GameState.movedUntilSourceLeaves gs)
+        || relates Set.singleton (GameState.haunting gs)
+        || relates Set.singleton (GameState.exiledWith gs)
+        || relates pileNames (GameState.exilePiles gs)
 
 -- The objects a GameState.phasedOut row names BEYOND its key: none, since CR
 -- 702.26a's stored value is the player the permanent phased out under.
@@ -287,13 +284,13 @@ pileNames stamp = case stamp of
 -- still a candidate of its own" is the case, and it asserts the identical
 -- projection alongside the offer so the reason is pinned as well as the answer.
 namedByAnother :: ObjectId -> GameState -> Bool
-namedByAnother oid gs = any names (Map.toList (GameState.objects gs))
-  where
-    names (other, obj) =
-      other /= oid
-        && ( (Object.attachedTo obj >>= Recipient.objectOf) == Just oid
-               || any (bindingNames oid) (Map.elems (Object.bindings obj))
-           )
+namedByAnother oid gs =
+  let names (other, obj) =
+        other /= oid
+          && ( (Object.attachedTo obj >>= Recipient.objectOf) == Just oid
+                 || any (bindingNames oid) (Map.elems (Object.bindings obj))
+             )
+   in any names (Map.toList (GameState.objects gs))
 
 -- Whether one slot's binding names this object.
 bindingNames :: ObjectId -> Binding.Binding -> Bool

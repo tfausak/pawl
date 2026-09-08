@@ -27,6 +27,7 @@ module Pawl.Engine.Replacement where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1084,13 +1085,13 @@ matchesPutter gs src subject cause = case (subject, cause) of
 -- one: a floating row's source has left the battlefield, so it enchants nobody
 -- and the arm admits nothing.
 relationHolds :: GameState -> ObjectId -> Maybe PlayerId -> ControllerRelation -> Maybe PlayerId -> Bool
-relationHolds gs src you rel theirs = case rel of
-  ControllerRelation.Anyones -> True
-  ControllerRelation.Yours -> both (==) you theirs
-  ControllerRelation.Opponents -> both (Game.areOpponents gs) you theirs
-  ControllerRelation.EnchantedPlayers -> both (==) (Projection.enchantedPlayerOf src gs) theirs
-  where
-    both f a b = Maybe.fromMaybe False (f <$> a <*> b)
+relationHolds gs src you rel theirs =
+  let both f a b = Maybe.fromMaybe False (f <$> a <*> b)
+   in case rel of
+        ControllerRelation.Anyones -> True
+        ControllerRelation.Yours -> both (==) you theirs
+        ControllerRelation.Opponents -> both (Game.areOpponents gs) you theirs
+        ControllerRelation.EnchantedPlayers -> both (==) (Projection.enchantedPlayerOf src gs) theirs
 
 -- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation, read against
 -- the controller of the effect's SOURCE?
@@ -1909,32 +1910,32 @@ readsApplier re = case re of
 -- and CR 616.1a's bucket is exactly an origin of SelfReplacement, so every
 -- candidate reaching this comparison shares one origin.
 choose :: GameState -> ProposedEvent -> [ReplacementCandidate] -> Game (Maybe ReplacementCandidate)
-choose gs event candidates = case candidates of
-  [] -> pure Nothing
-  first : rest ->
-    if all (\c -> distinguishing c == distinguishing first) rest
-      then pure (Just first)
-      else case chooserOf gs event of
-        -- No chooser: the affected object is gone. Apply the canonical first
-        -- rather than prompt nobody -- and in particular make no choice on behalf
-        -- of a player who is not there to make it.
-        Nothing -> pure (Just first)
-        Just pid -> do
-          let decider = Decide.deciderFor pid gs
-          answer <- Game.choose (Prompt.ChooseReplacement decider pid (fmap entryOf candidates))
-          -- Reject-not-repair, as payment and Engine.permute already do: an
-          -- out-of-range index leaves the canonical first standing rather than
-          -- dropping the event or crashing.
-          pure (Just (at candidates answer first))
-  where
-    -- What two candidates must agree on to be interchangeable here.
-    distinguishing c =
-      ( ReplacementCandidate.effect c,
-        ReplacementCandidate.lifetime c,
-        if readsApplier (ReplacementCandidate.effect c)
-          then ReplacementCandidate.controller c
-          else Nothing
-      )
+choose gs event candidates =
+  let -- What two candidates must agree on to be interchangeable here.
+      distinguishing c =
+        ( ReplacementCandidate.effect c,
+          ReplacementCandidate.lifetime c,
+          if readsApplier (ReplacementCandidate.effect c)
+            then ReplacementCandidate.controller c
+            else Nothing
+        )
+   in case candidates of
+        [] -> pure Nothing
+        first : rest ->
+          if all (\c -> distinguishing c == distinguishing first) rest
+            then pure (Just first)
+            else case chooserOf gs event of
+              -- No chooser: the affected object is gone. Apply the canonical first
+              -- rather than prompt nobody -- and in particular make no choice on behalf
+              -- of a player who is not there to make it.
+              Nothing -> pure (Just first)
+              Just pid -> do
+                let decider = Decide.deciderFor pid gs
+                answer <- Game.choose (Prompt.ChooseReplacement decider pid (fmap entryOf candidates))
+                -- Reject-not-repair, as payment and Engine.permute already do: an
+                -- out-of-range index leaves the canonical first standing rather than
+                -- dropping the event or crashing.
+                pure (Just (at candidates answer first))
 
 -- What a candidate looks like to the player being asked (#74): its source and
 -- the effect that distinguishes it from another of the same source. A
@@ -2395,7 +2396,7 @@ oneEventPerRecipient :: [DamageEvent.DamageEvent] -> [DamageEvent.DamageEvent]
 oneEventPerRecipient events =
   let key event = event {DamageEvent.amount = 0}
       total event = sum (fmap DamageEvent.amount (filter (\other -> key other == key event) events))
-   in fmap (\event -> event {DamageEvent.amount = total event}) (List.nubBy (\one two -> key one == key two) events)
+   in fmap (\event -> event {DamageEvent.amount = total event}) (ListUtils.nubOrdOn key events)
 
 -- CR 615.1a: is this damage rewrite a PREVENTION effect, rather than one of CR
 -- 614.1a's replacements? "Effects that use the word 'prevent' are prevention
@@ -2539,7 +2540,7 @@ liveDestination gs oid
 printedDestination :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe Recipient.Recipient
 printedDestination gs context filter_ =
   let viewOf = Projection.viewsOf gs
-   in case [oid | oid <- Set.toList (GameState.battlefield gs), Filter.matches context (viewOf oid) filter_] of
+   in case filter (\oid -> Filter.matches context (viewOf oid) filter_) (Set.toList (GameState.battlefield gs)) of
         [oid] -> liveDestination gs oid
         _ -> Nothing
 
@@ -2805,7 +2806,10 @@ printedBy candidate = case candidate of
 groupPreventions :: [Prevention] -> [Prevention]
 groupPreventions ps =
   let merge (a1, s1, r1) (a2, _, _) = (Map.unionWith (+) a1 a2, s1, r1)
-      keyed = Map.fromListWith merge [(Prevention.by p, (Prevention.amounts p, Prevention.source p, Prevention.rider p)) | p <- ps]
+      keyed =
+        Map.fromListWith
+          merge
+          (fmap (\p -> (Prevention.by p, (Prevention.amounts p, Prevention.source p, Prevention.rider p))) ps)
       rebuild (by, (amounts, source, rider)) =
         Prevention.MkPrevention {Prevention.by = by, Prevention.source = source, Prevention.amounts = amounts, Prevention.rider = rider}
    in fmap rebuild (Map.toAscList keyed)
@@ -2968,18 +2972,18 @@ contested gs events =
                   ( Map.toList
                       ( Map.fromListWith
                           (<>)
-                          [ (pid, [position])
-                          | (position, event) <- hits,
-                            Just pid <- [chooserOf gs (ProposedEvent.WouldDealDamage event)]
-                          ]
+                          ( Maybe.mapMaybe
+                              (\(position, event) -> fmap (\pid -> (pid, [position])) (chooserOf gs (ProposedEvent.WouldDealDamage event)))
+                              hits
+                          )
                       )
                   )
           _ -> Nothing
       groups = concatMap contestedBy (collect gs (GameState.replacements gs))
       merged = Map.fromListWith (<>) groups
-   in [ (pid, List.sort (List.nub positions))
-      | (pid, positions) <- List.sortOn (seatOf gs . fst) (Map.toList merged)
-      ]
+   in fmap
+        (\(pid, positions) -> (pid, Set.toAscList (Set.fromList positions)))
+        (List.sortOn (seatOf gs . fst) (Map.toList merged))
 
 -- CR 615.7 / 122.1c: a prevention that a batch can exhaust, as the pair (what it
 -- has left, what a set of events would demand of it) -- both in the unit the

@@ -908,7 +908,7 @@ everWatchingThresholdSpec s registry =
       -- clause is checked at the GATHER, so an ability it rejects "does nothing"
       -- and never becomes a trigger to record. Asserted beside the hand because
       -- the hand alone cannot tell a clause that held from a draw that failed.
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
       -- bob active and declaring, with `defending` settled as CR 506.2a's one
       -- defending player. combatBoardOf's tail of steps, so S.runToStep can walk
       -- from the declare attackers step to the next one.
@@ -1053,7 +1053,7 @@ seiferSpec s registry =
       -- legal target and CR 603.3d removes it. The count is the closest
       -- observable there is, and it is what the two silent boards below lead
       -- with.
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
    in Spec.describe s "Seifer, Balamb Rival" $ do
         -- The proving test: alice attacks bob, so rule 508.3e's two subjects are
         -- alice and bob, and the goad lands on the Giant the trigger named.
@@ -1161,7 +1161,7 @@ luluSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       stunOn oid gs = fmap (Map.findWithDefault 0 CounterKind.Stun . Object.counters) (Game.lookupObject oid gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
    in Spec.describe s "Lulu, Stern Guardian" $ do
         -- The proving test: alice picks bob, so rule 508.3e's two subjects are
         -- alice and bob and the trigger fires. TWO Pikers so the target slot is
@@ -1237,7 +1237,7 @@ marauderTollSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
       fixture = do
         piker <- S.printingOf s registry "Goblin Piker"
         toll <- S.printingOf s registry "Synthetic Marauder's Toll"
@@ -1296,7 +1296,7 @@ reprisalLedgerSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
       fixture = do
         piker <- S.printingOf s registry "Goblin Piker"
         ledger <- S.printingOf s registry "Synthetic Reprisal Ledger"
@@ -1626,7 +1626,7 @@ handOfThePraetorsSpec s registry =
       -- Elf's {G}) and two Mountains (Goblin Piker's {1}{R}). carol gets no
       -- land: she never casts, and is only ever a seat the counter must miss.
       board forest mountain hand =
-        let addLands pid n printing g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
+        let addLands pid n printing g = List.foldl' (\g2 _ -> snd (S.addPermanent printing pid g2)) g [1 .. (n :: Int)]
             withLands =
               addLands S.bob 2 mountain
                 . addLands S.bob 2 forest
@@ -2064,6 +2064,14 @@ rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
         -- Both victims start TAPPED, so the first sentence of each card (CR 701.26b)
         -- has something to do and `Tapped` at the end cannot be state left standing.
         staged = S.tapObject carolPiker (S.tapObject bobPiker g4)
+        -- Narrows every target slot to one object, `aimedCast`'s filter without its cast
+        -- pinning: the board holds two stealable creatures on purpose, so the engine's
+        -- first offer is not the one either leg means. Filtering the OFFERED set rather
+        -- than naming a Recipient keeps the answer in whatever shape the slot offered.
+        aimAtVictim :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+        aimAtVictim oid p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just oid) . Recipient.objectOf) legal) sets
+          _ -> S.identityAnswer p
         resolveOne victim spellId g =
           S.settleSba (S.runPure (aimAtVictim victim) (S.runPure (aimAtVictim victim) g (S.cast S.alice spellId)) Stack.resolveTop)
         stolen = resolveOne carolPiker actId (resolveOne bobPiker rayId staged)
@@ -2095,15 +2103,6 @@ rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
     Spec.assertEqWith s "CR 514.3a the turn has not handed off" (GameState.turnNumber afterCleanup) (GameState.turnNumber scheduled)
     -- The observation point fired at all.
     Spec.assertBool s (elem (GameEvent.ControlChanged (ControlChanged.MkControlChanged bobPiker S.alice S.bob)) (S.eventsOf afterCleanup)) "Engine.sampleControl minted CR 603.2's event for the reversion"
-  where
-    -- Narrows every target slot to one object, `aimedCast`'s filter without its cast
-    -- pinning: the board holds two stealable creatures on purpose, so the engine's
-    -- first offer is not the one either leg means. Filtering the OFFERED set rather
-    -- than naming a Recipient keeps the answer in whatever shape the slot offered.
-    aimAtVictim :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-    aimAtVictim oid p = case p of
-      Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just oid) . Recipient.objectOf) legal) sets
-      _ -> S.identityAnswer p
 
 -- Matoya, Archon Elder {2}{U} Legendary Creature -- Human Warlock 1/4, "Whenever
 -- you scry or surveil, draw a card" -- CR 603.1b's AnyOf over
@@ -2811,13 +2810,13 @@ isTapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState
 -- The CR 117.5 boundary and the stack, run until neither has anything left --
 -- what a leg needs when one trigger's resolution is what fires the next.
 settleTriggers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-settleTriggers answer = go (10 :: Int)
-  where
-    go n gs =
-      let placed = S.runPure answer gs Engine.settleForPriority
-       in if n <= 0 || null (GameState.stack placed)
-            then placed
-            else go (n - 1) (S.runPure answer placed Stack.resolveTop)
+settleTriggers answer =
+  let go n gs =
+        let placed = S.runPure answer gs Engine.settleForPriority
+         in if n <= 0 || null (GameState.stack placed)
+              then placed
+              else go (n - 1) (S.runPure answer placed Stack.resolveTop)
+   in go (10 :: Int)
 
 -- Rule 702.6a's minted equip ability, off the PROJECTION: an Equipment declares
 -- the keyword and prints no activated ability of its own.
@@ -3047,9 +3046,7 @@ sixthSenseAnswer p = case p of
 handNames :: PlayerId.PlayerId -> GameState.GameState -> [String]
 handNames pid gs =
   List.sort
-    [ Text.unpack (CardName.unwrap (S.soleFaceName oid gs))
-    | oid <- Game.zoneMembers Zone.Hand pid gs
-    ]
+    (fmap (\oid -> Text.unpack (CardName.unwrap (S.soleFaceName oid gs))) (Game.zoneMembers Zone.Hand pid gs))
 
 -- CR 701.26a's "becomes tapped", over a whole card. Betrayal ({U} Enchantment --
 -- Aura, "Enchant creature an opponent controls / Whenever enchanted creature

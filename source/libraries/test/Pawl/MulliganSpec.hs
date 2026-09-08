@@ -303,13 +303,13 @@ takeThenDecline k p = case p of
 -- 701.20e's look is not one of them -- it is private and records no event --
 -- which is what keeps this a count of the reveals alone.
 revealedNames :: GameState.GameState -> [String]
-revealedNames gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
-  where
-    revealedName event = case event of
-      GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
-        | pid == S.alice ->
-            fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
-      _ -> Nothing
+revealedNames gs =
+  let revealedName event = case event of
+        GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
+          | pid == S.alice ->
+              fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
+        _ -> Nothing
+   in Maybe.mapMaybe revealedName (S.eventsOf gs)
 
 -- alice's library: `above` Mountains, then a Serum Powder, then 20 more; bob's
 -- is uniform. With `above` = 7 the Powder is NOT in the opening hand and is
@@ -699,7 +699,7 @@ spec s registry =
       Spec.assertEqWith
         s
         "and the two entries name one card, not two"
-        (fmap (length . List.nub . fmap fst) offered)
+        (fmap (Set.size . Set.fromList . fmap fst) offered)
         [1]
     Spec.it s "CR 103.5b: taking the FIRST of two actions does the first one's thing" $ do
       twofold <- S.printingOf s registry "Synthetic Twofold Powder"

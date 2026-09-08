@@ -3,6 +3,7 @@ module Pawl.Engine.Mana where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Bifunctor as Bifunctor
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -343,7 +344,7 @@ manaYieldsOf = manaYieldsOfGiven Map.empty
 -- The same yields against a pre-projected board, which is manaRoutesOfGiven's
 -- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
-manaYieldsOfGiven pcs oid gs = List.nub (fmap (Mana.MkMana . yieldUnits) (manaOptionsOfGiven pcs oid gs))
+manaYieldsOfGiven pcs oid gs = ListUtils.nubOrd (fmap (Mana.MkMana . yieldUnits) (manaOptionsOfGiven pcs oid gs))
 
 -- The same yields narrowed to the ones this player could actually get, each with
 -- HOW MANY TIMES they could get it, WHAT ONE of those activations spends, and
@@ -418,7 +419,7 @@ manaSuppliesGiven capacity pcs pid oid gs =
       rankOf (activations, _, manaCost) = (Activations.times activations, null (ManaCost.unwrap manaCost))
    in fmap
         (\yield -> List.maximumBy (Ord.comparing rankOf) (filter ((==) yield . yieldOf) available))
-        (List.nub (fmap yieldOf available))
+        (ListUtils.nubOrd (fmap yieldOf available))
 
 -- Every way this object could be tapped for mana, as the COST CR 602.2b makes
 -- that activation pay paired with the mana it adds -- one entry per (route,
@@ -487,7 +488,7 @@ manaOptionsOfGiven pcs oid gs =
         fmap
           (\parts -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.ability = ability, ManaOption.yield = List.foldl' (\acc (ref, units) -> Map.insertWith (\new old -> Mana.MkMana (unitsOf old <> unitsOf new)) ref (Mana.MkMana units) acc) Map.empty parts, ManaOption.effects = others})
           (traverse (\addition -> fmap ((,) (ManaAddition.player addition) . replicate (Natural.toIntSaturating (ManaAddition.count addition)) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
-   in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
+   in ListUtils.nubOrd (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- Every unit one option adds, whoever gets it, in printed order within each
 -- recipient's share (Pawl.Types.ManaOption.yield).
@@ -589,7 +590,7 @@ typesOf = fmap ManaUnit.manaType . unitsOf
 -- makes Sol Ring read as a choice between two singles, which Pawl.ManaSpec's
 -- solRingSpec is the standing proof against.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
-manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
+manaTypesOf oid gs = ListUtils.nubOrd (concatMap typesOf (manaYieldsOf oid gs))
 
 setPool :: PlayerId -> Mana -> GameState -> GameState
 setPool pid pool gs = gs {GameState.manaPool = Map.insert pid pool (GameState.manaPool gs)}
@@ -944,7 +945,7 @@ spendableAs clauses manaType =
     [] -> Set.singleton manaType
     applicable ->
       Set.unions
-        ( [Set.singleton manaType | not (any SpendManaAsThough.only applicable)]
+        ( (if not (any SpendManaAsThough.only applicable) then [Set.singleton manaType] else [])
             <> fmap SpendManaAsThough.asThough applicable
         )
 
@@ -1134,11 +1135,10 @@ resolutions spending (ManaCost.MkManaCost symbols) =
 -- spend/canPay.
 substituteX :: Natural -> ManaCost -> ManaCost
 substituteX x (ManaCost.MkManaCost symbols) =
-  ManaCost.MkManaCost (fmap sub symbols)
-  where
-    sub symbol = case symbol of
-      ManaSymbol.Variable -> ManaSymbol.Generic x
-      other -> other
+  let sub symbol = case symbol of
+        ManaSymbol.Variable -> ManaSymbol.Generic x
+        other -> other
+   in ManaCost.MkManaCost (fmap sub symbols)
 
 -- Every way to remove one unit that satisfies `wanted`, one result per candidate
 -- unit. The branching point of the search below.
@@ -1148,12 +1148,12 @@ substituteX x (ManaCost.MkManaCost symbols) =
 -- state. Pawl.Engine.Cost.payMana resolves them from the board once per pass and
 -- hands them down through `spend`; empty is the ordinary board.
 removals :: [SpendManaAsThough.SpendManaAsThough] -> Demand -> [ManaUnit] -> [[ManaUnit]]
-removals clauses wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
-  where
-    without (i, u) =
-      if servesUnit clauses u wanted
-        then Just (take i units <> drop (i + 1) units)
-        else Nothing
+removals clauses wanted units =
+  let without (i, u) =
+        if servesUnit clauses u wanted
+          then Just (take i units <> drop (i + 1) units)
+          else Nothing
+   in Maybe.mapMaybe without (zip [0 :: Int ..] units)
 
 -- Could this one unit, under the payer's CR 609.4b permissions, serve that one
 -- demand? The PAYMENT road's shape of `serves`: CR 106.6 was settled before a
@@ -1204,15 +1204,16 @@ paysStep clauses step unit = case step of
 -- Set-at-a-time rather than a search per assignment, so the work is bounded by
 -- the distinct sub-pools rather than by the permutations of them; see #595.
 leftovers :: [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> [ManaUnit] -> Set.Set [ManaUnit]
-leftovers clauses steps units = List.foldl' advance (Set.singleton (List.sort units)) steps
-  where
-    advance pools step =
-      Set.fromList
-        [ List.delete unit pool
-        | pool <- Set.toList pools,
-          unit <- Set.toAscList (Set.fromList pool),
-          paysStep clauses step unit
-        ]
+leftovers clauses steps units =
+  let advance pools step =
+        Set.fromList
+          ( do
+              pool <- Set.toList pools
+              unit <- Set.toAscList (Set.fromList pool)
+              Monad.guard (paysStep clauses step unit)
+              pure (List.delete unit pool)
+          )
+   in List.foldl' advance (Set.singleton (List.sort units)) steps
 
 -- The distinct units that could pay the next step and still leave the rest of the
 -- payment possible. The offer `spendChosen` asks over; a unit that pays this step
@@ -1222,23 +1223,22 @@ spendable :: [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> [ManaUni
 spendable clauses steps units = case steps of
   [] -> []
   step : rest ->
-    [ unit
-    | unit <- Set.toAscList (Set.fromList units),
-      paysStep clauses step unit,
-      not (Set.null (leftovers clauses rest (List.delete unit units)))
-    ]
+    filter
+      (\unit -> paysStep clauses step unit && not (Set.null (leftovers clauses rest (List.delete unit units))))
+      (Set.toAscList (Set.fromList units))
 
 -- The resolution a payment out of this pool will take -- the one `spend` settles
 -- on -- as the steps it decomposes into and the life it commits.
 plan :: [SpendManaAsThough.SpendManaAsThough] -> ManaSpending -> Natural -> ManaCost -> Mana -> Maybe ([Maybe Demand], Natural)
 plan clauses spending budget cost (Mana.MkMana units) =
   Maybe.listToMaybe
-    [ (steps, life)
-    | (demands, generic, life) <- resolutions spending cost,
-      life <= budget,
-      let steps = paymentSteps demands generic,
-      not (Set.null (leftovers clauses steps units))
-    ]
+    ( do
+        (demands, generic, life) <- resolutions spending cost
+        Monad.guard (life <= budget)
+        let steps = paymentSteps demands generic
+        Monad.guard (not (Set.null (leftovers clauses steps units)))
+        pure (steps, life)
+    )
 
 -- CR 601.2h: the PLAYER pays the cost, so which mana leaves their pool is theirs
 -- to choose, CR 107.4b's generic symbol included. Answers the pool that is left.
@@ -1255,23 +1255,23 @@ plan clauses spending budget cost (Mana.MkMana units) =
 -- caller cannot recover it by subtraction -- two equal units are the same value,
 -- so a pool that shrank by one says nothing about which.
 spendChosen :: PlayerId -> [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> Mana -> Game (Mana, Mana)
-spendChosen pid clauses steps0 (Mana.MkMana units0) = fmap (Bifunctor.bimap Mana.MkMana Mana.MkMana) (go steps0 units0)
-  where
-    go steps units = case steps of
-      [] -> pure (units, [])
-      _ : rest -> case spendable clauses steps units of
-        -- Unreachable from `plan`, which offers these steps only where some
-        -- payment completes them.
+spendChosen pid clauses steps0 (Mana.MkMana units0) =
+  let go steps units = case steps of
         [] -> pure (units, [])
-        first : others -> do
-          chosen <-
-            if null others || Set.size (leftovers clauses steps units) < 2
-              then pure first
-              else do
-                gs <- State.get
-                answer <- Game.choose (Prompt.ChooseManaToSpend (Decide.deciderFor pid gs) pid (first NonEmpty.:| others))
-                pure (if List.elem answer (first : others) then answer else first)
-          fmap (fmap (chosen :)) (go rest (List.delete chosen units))
+        _ : rest -> case spendable clauses steps units of
+          -- Unreachable from `plan`, which offers these steps only where some
+          -- payment completes them.
+          [] -> pure (units, [])
+          first : others -> do
+            chosen <-
+              if null others || Set.size (leftovers clauses steps units) < 2
+                then pure first
+                else do
+                  gs <- State.get
+                  answer <- Game.choose (Prompt.ChooseManaToSpend (Decide.deciderFor pid gs) pid (first NonEmpty.:| others))
+                  pure (if List.elem answer (first : others) then answer else first)
+            fmap (fmap (chosen :)) (go rest (List.delete chosen units))
+   in fmap (Bifunctor.bimap Mana.MkMana Mana.MkMana) (go steps0 units0)
 
 -- Spend a pool against a cost, within a budget of `budget` life. Nothing when no
 -- resolution fits; otherwise the pool that is left and the life to pay for it.
@@ -1396,128 +1396,128 @@ monocoloredHybridGeneric = 2
 --
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
 announce :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural, Natural)
-announce subject capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 0 symbols
-  where
-    -- "Payable" here means SOME completion of the remaining announcements pays
-    -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
-    -- here rather than left to canPay's own `resolutions` so that each completion
-    -- is an announcement-free cost by the time `total` sees it.
-    --
-    -- `done` is the reversed prefix already announced, `ways` the symbols this
-    -- route would leave in place of the one being asked about, and `extra` the
-    -- life it would commit on top of what is committed already. `outside` rides
-    -- on every one of them, for the reason the haddock gives.
-    stillPayable done rest gs extra ways =
-      let candidate (tail_, life) =
-            any
-              (\totalled -> canPayCommitting subject capacity spending pid (outside + extra + life) claimed totalled gs)
-              (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
-       in any candidate (completions rest)
-    -- One symbol's announcement. Asked only where two routes are payable, and
-    -- FILTERED, NOT TRUSTED where it is asked.
-    --
-    -- With NO payable route the cost is unpayable and there is nothing to
-    -- announce: the payment fails (CR 118.6, CR 601.2h). `fallback` is returned
-    -- only because this must return SOMETHING; it is not a choice, because there
-    -- is no payable option for it to choose between.
-    --
-    -- UNREACHABLE from a caller that gated on payability first, and it is `total`
-    -- above that makes that true rather than merely plausible: the gate and this
-    -- offer measure payability through the same totalling, so no completion
-    -- payable here can be one the gate refused. Unreachable BY CONSTRUCTION and
-    -- not by conservatism, because the gate is now the same predicate over the
-    -- same completions -- Pawl.Engine.Cost.canPaySomeCompletion is this
-    -- `stillPayable` with nothing yet announced, which is what closed the
-    -- monocolored hybrid's disagreement about CR 118.7a's reductions. {X} used to
-    -- be a wedge in that -- a gate at X=0 while this runs on the value the player
-    -- named -- and BOTH callers now close it the same way, by
-    -- re-asking their own payability predicate at the announced value before
-    -- calling Cost.announce at all: Cast.castSpell (#417) and
-    -- Activate.activateAbility (#544).
-    choose :: (Eq a) => a -> [a] -> (NonEmpty.NonEmpty a -> Prompt.Prompt a) -> Game a
-    choose fallback offers mkPrompt = case offers of
-      [] -> pure fallback
-      [only] -> pure only
-      first : others -> do
-        answer <- Game.choose (mkPrompt (first NonEmpty.:| others))
-        pure (if List.elem answer offers then answer else first)
-    -- `paidWithLife` counts the symbols the third accumulator's haddock
-    -- describes; it moves in lockstep with `committed` and is carried separately
-    -- for the reason given there.
-    go done committed paidWithLife remaining = case remaining of
-      [] -> pure (ManaCost.MkManaCost (reverse done), committed, paidWithLife)
-      symbol@(ManaSymbol.Phyrexian color) : rest -> do
-        gs <- State.get
-        let asMana = ManaSymbol.OfType (ManaType.Colored color)
-            offers =
-              [PhyrexianPayment.PaysMana | stillPayable done rest gs committed [asMana]]
-                <> [PhyrexianPayment.PaysLife | stillPayable done rest gs (committed + phyrexianLife) []]
-        announced <-
-          choose PhyrexianPayment.PaysMana offers $
-            Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
-        case announced of
-          PhyrexianPayment.PaysMana -> go (asMana : done) committed paidWithLife rest
-          PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) (paidWithLife + 1) rest
-      -- CR 107.4f's hybrid Phyrexian symbol, whose three ways are the arm above's
-      -- two with the mana one split in half. TWO PROMPTS, in that order: mana or
-      -- life, then which colour -- and the second is asked only of the mana
-      -- route, so the pair reaches exactly rule 107.4f's three announcements.
+announce subject capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) =
+  let -- "Payable" here means SOME completion of the remaining announcements pays
+      -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
+      -- here rather than left to canPay's own `resolutions` so that each completion
+      -- is an announcement-free cost by the time `total` sees it.
       --
-      -- Both prompts are FILTERED BY PAYABILITY on the same `stillPayable` the
-      -- arms around them use, which is what keeps the split from offering a
-      -- colour the board cannot produce, and what elides the second prompt
-      -- outright where one colour is payable. The mana route is offered at all
-      -- only where some colour is: a PaysMana with no payable half would strand
-      -- the payment CR 601.2b's last sentence promises.
-      symbol@(ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r)) : rest -> do
-        gs <- State.get
-        let halves = hybridHalves (ManaType.Colored l) (ManaType.Colored r)
-            payableHalves = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) halves
-            offers =
-              [PhyrexianPayment.PaysMana | not (null payableHalves)]
-                <> [PhyrexianPayment.PaysLife | stillPayable done rest gs (committed + phyrexianLife) []]
-        announced <-
-          choose PhyrexianPayment.PaysMana offers $
-            Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
-        case announced of
-          PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) (paidWithLife + 1) rest
-          PhyrexianPayment.PaysMana -> do
-            half <-
-              choose (ManaType.Colored l) payableHalves $
-                Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
-            go (ManaSymbol.OfType half : done) committed paidWithLife rest
-      -- CR 107.4e: "a monocolored hybrid symbol such as {2/B} can be paid with
-      -- either one black mana or two mana of any type." Neither way commits life,
-      -- so both are measured at the life already committed; what they differ in is
-      -- the NUMBER of mana demanded, which is what makes this a real choice rather
-      -- than a relabelling -- and what makes the {2} route reducible.
-      ManaSymbol.MonocoloredHybrid manaType : rest -> do
-        gs <- State.get
-        let asTyped = ManaSymbol.OfType manaType
-            asGeneric = ManaSymbol.Generic monocoloredHybridGeneric
-            offers =
-              [HybridPayment.PaysTyped | stillPayable done rest gs committed [asTyped]]
-                <> [HybridPayment.PaysGeneric | stillPayable done rest gs committed [asGeneric]]
-        announced <-
-          choose HybridPayment.PaysTyped offers $
-            Prompt.AnnounceHybridPayment (Decide.deciderFor pid gs) pid oid manaType
-        case announced of
-          HybridPayment.PaysTyped -> go (asTyped : done) committed paidWithLife rest
-          HybridPayment.PaysGeneric -> go (asGeneric : done) committed paidWithLife rest
-      -- CR 107.4e: "a hybrid symbol such as {W/U} can be paid with either white
-      -- or blue mana." Both ways spend ONE mana and commit no life, so this
-      -- announcement moves neither CR 601.2f's total nor any reduction -- which
-      -- is what sets it apart from the monocolored hybrid just above. What it
-      -- decides is WHICH mana of an oversupplied pool is spent, and so what is
-      -- left floating afterwards.
-      symbol@(ManaSymbol.Hybrid (Hybrid.MkHybrid a b)) : rest -> do
-        gs <- State.get
-        let offers = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) (hybridHalves a b)
-        announced <-
-          choose a offers $
-            Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
-        go (ManaSymbol.OfType announced : done) committed paidWithLife rest
-      other : rest -> go (other : done) committed paidWithLife rest
+      -- `done` is the reversed prefix already announced, `ways` the symbols this
+      -- route would leave in place of the one being asked about, and `extra` the
+      -- life it would commit on top of what is committed already. `outside` rides
+      -- on every one of them, for the reason the haddock gives.
+      stillPayable done rest gs extra ways =
+        let candidate (tail_, life) =
+              any
+                (\totalled -> canPayCommitting subject capacity spending pid (outside + extra + life) claimed totalled gs)
+                (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
+         in any candidate (completions rest)
+      -- One symbol's announcement. Asked only where two routes are payable, and
+      -- FILTERED, NOT TRUSTED where it is asked.
+      --
+      -- With NO payable route the cost is unpayable and there is nothing to
+      -- announce: the payment fails (CR 118.6, CR 601.2h). `fallback` is returned
+      -- only because this must return SOMETHING; it is not a choice, because there
+      -- is no payable option for it to choose between.
+      --
+      -- UNREACHABLE from a caller that gated on payability first, and it is `total`
+      -- above that makes that true rather than merely plausible: the gate and this
+      -- offer measure payability through the same totalling, so no completion
+      -- payable here can be one the gate refused. Unreachable BY CONSTRUCTION and
+      -- not by conservatism, because the gate is now the same predicate over the
+      -- same completions -- Pawl.Engine.Cost.canPaySomeCompletion is this
+      -- `stillPayable` with nothing yet announced, which is what closed the
+      -- monocolored hybrid's disagreement about CR 118.7a's reductions. {X} used to
+      -- be a wedge in that -- a gate at X=0 while this runs on the value the player
+      -- named -- and BOTH callers now close it the same way, by
+      -- re-asking their own payability predicate at the announced value before
+      -- calling Cost.announce at all: Cast.castSpell (#417) and
+      -- Activate.activateAbility (#544).
+      choose :: (Eq a) => a -> [a] -> (NonEmpty.NonEmpty a -> Prompt.Prompt a) -> Game a
+      choose fallback offers mkPrompt = case offers of
+        [] -> pure fallback
+        [only] -> pure only
+        first : others -> do
+          answer <- Game.choose (mkPrompt (first NonEmpty.:| others))
+          pure (if List.elem answer offers then answer else first)
+      -- `paidWithLife` counts the symbols the third accumulator's haddock
+      -- describes; it moves in lockstep with `committed` and is carried separately
+      -- for the reason given there.
+      go done committed paidWithLife remaining = case remaining of
+        [] -> pure (ManaCost.MkManaCost (reverse done), committed, paidWithLife)
+        symbol@(ManaSymbol.Phyrexian color) : rest -> do
+          gs <- State.get
+          let asMana = ManaSymbol.OfType (ManaType.Colored color)
+              offers =
+                (if stillPayable done rest gs committed [asMana] then [PhyrexianPayment.PaysMana] else [])
+                  <> (if stillPayable done rest gs (committed + phyrexianLife) [] then [PhyrexianPayment.PaysLife] else [])
+          announced <-
+            choose PhyrexianPayment.PaysMana offers $
+              Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
+          case announced of
+            PhyrexianPayment.PaysMana -> go (asMana : done) committed paidWithLife rest
+            PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) (paidWithLife + 1) rest
+        -- CR 107.4f's hybrid Phyrexian symbol, whose three ways are the arm above's
+        -- two with the mana one split in half. TWO PROMPTS, in that order: mana or
+        -- life, then which colour -- and the second is asked only of the mana
+        -- route, so the pair reaches exactly rule 107.4f's three announcements.
+        --
+        -- Both prompts are FILTERED BY PAYABILITY on the same `stillPayable` the
+        -- arms around them use, which is what keeps the split from offering a
+        -- colour the board cannot produce, and what elides the second prompt
+        -- outright where one colour is payable. The mana route is offered at all
+        -- only where some colour is: a PaysMana with no payable half would strand
+        -- the payment CR 601.2b's last sentence promises.
+        symbol@(ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r)) : rest -> do
+          gs <- State.get
+          let halves = hybridHalves (ManaType.Colored l) (ManaType.Colored r)
+              payableHalves = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) halves
+              offers =
+                (if not (null payableHalves) then [PhyrexianPayment.PaysMana] else [])
+                  <> (if stillPayable done rest gs (committed + phyrexianLife) [] then [PhyrexianPayment.PaysLife] else [])
+          announced <-
+            choose PhyrexianPayment.PaysMana offers $
+              Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
+          case announced of
+            PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) (paidWithLife + 1) rest
+            PhyrexianPayment.PaysMana -> do
+              half <-
+                choose (ManaType.Colored l) payableHalves $
+                  Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
+              go (ManaSymbol.OfType half : done) committed paidWithLife rest
+        -- CR 107.4e: "a monocolored hybrid symbol such as {2/B} can be paid with
+        -- either one black mana or two mana of any type." Neither way commits life,
+        -- so both are measured at the life already committed; what they differ in is
+        -- the NUMBER of mana demanded, which is what makes this a real choice rather
+        -- than a relabelling -- and what makes the {2} route reducible.
+        ManaSymbol.MonocoloredHybrid manaType : rest -> do
+          gs <- State.get
+          let asTyped = ManaSymbol.OfType manaType
+              asGeneric = ManaSymbol.Generic monocoloredHybridGeneric
+              offers =
+                (if stillPayable done rest gs committed [asTyped] then [HybridPayment.PaysTyped] else [])
+                  <> (if stillPayable done rest gs committed [asGeneric] then [HybridPayment.PaysGeneric] else [])
+          announced <-
+            choose HybridPayment.PaysTyped offers $
+              Prompt.AnnounceHybridPayment (Decide.deciderFor pid gs) pid oid manaType
+          case announced of
+            HybridPayment.PaysTyped -> go (asTyped : done) committed paidWithLife rest
+            HybridPayment.PaysGeneric -> go (asGeneric : done) committed paidWithLife rest
+        -- CR 107.4e: "a hybrid symbol such as {W/U} can be paid with either white
+        -- or blue mana." Both ways spend ONE mana and commit no life, so this
+        -- announcement moves neither CR 601.2f's total nor any reduction -- which
+        -- is what sets it apart from the monocolored hybrid just above. What it
+        -- decides is WHICH mana of an oversupplied pool is spent, and so what is
+        -- left floating afterwards.
+        symbol@(ManaSymbol.Hybrid (Hybrid.MkHybrid a b)) : rest -> do
+          gs <- State.get
+          let offers = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) (hybridHalves a b)
+          announced <-
+            choose a offers $
+              Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
+          go (ManaSymbol.OfType announced : done) committed paidWithLife rest
+        other : rest -> go (other : done) committed paidWithLife rest
+   in go [] 0 0 symbols
 
 -- Every way the announcements of a cost's UNANNOUNCED tail could go, as the
 -- symbols that leaves and the life those choices commit -- CR 601.2b's own
@@ -1535,8 +1535,8 @@ completions symbols = case symbols of
   [] -> [([], 0)]
   ManaSymbol.Phyrexian color : rest ->
     let asMana = ManaSymbol.OfType (ManaType.Colored color)
-     in [(asMana : tail_, life) | (tail_, life) <- completions rest]
-          <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
+     in fmap (Bifunctor.first (asMana :)) (completions rest)
+          <> fmap (\(tail_, life) -> (tail_, life + phyrexianLife)) (completions rest)
   -- CR 107.4f's hybrid Phyrexian symbol: three ways rather than two, the arm
   -- above's life route beside one nonhybrid equivalent per component colour.
   -- `hybridHalves` collapses the degenerate pair for the reason it does above.
@@ -1553,26 +1553,26 @@ completions symbols = case symbols of
   -- announceable symbols with a hybrid Phyrexian symbol among them; none does.
   ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) : rest ->
     concatMap
-      (\half -> [(ManaSymbol.OfType half : tail_, life) | (tail_, life) <- completions rest])
+      (\half -> fmap (Bifunctor.first (ManaSymbol.OfType half :)) (completions rest))
       (hybridHalves (ManaType.Colored l) (ManaType.Colored r))
-      <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
+      <> fmap (\(tail_, life) -> (tail_, life + phyrexianLife)) (completions rest)
   -- CR 107.4e's two ways, neither of which commits life. The {2} is a Generic
   -- symbol and not a demand for two mana of the stated type: CR 107.4e says "two
   -- mana of any type", and CR 107.4b says a numerical symbol represents generic
   -- mana, which "can be paid with any type of mana" -- the same permission, which
   -- is why the substitution loses nothing.
   ManaSymbol.MonocoloredHybrid manaType : rest ->
-    [(ManaSymbol.OfType manaType : tail_, life) | (tail_, life) <- completions rest]
-      <> [(ManaSymbol.Generic monocoloredHybridGeneric : tail_, life) | (tail_, life) <- completions rest]
+    fmap (Bifunctor.first (ManaSymbol.OfType manaType :)) (completions rest)
+      <> fmap (Bifunctor.first (ManaSymbol.Generic monocoloredHybridGeneric :)) (completions rest)
   -- CR 107.4e's colour/colour half: one mana of either component type, and
   -- neither way commits life. Expanded here rather than ridden through so that
   -- every completion really is CR 601.2b's NONHYBRID equivalent cost -- the
   -- thing CR 601.2f is defined over.
   ManaSymbol.Hybrid (Hybrid.MkHybrid a b) : rest ->
     concatMap
-      (\half -> [(ManaSymbol.OfType half : tail_, life) | (tail_, life) <- completions rest])
+      (\half -> fmap (Bifunctor.first (ManaSymbol.OfType half :)) (completions rest))
       (hybridHalves a b)
-  other : rest -> [(other : tail_, life) | (tail_, life) <- completions rest]
+  other : rest -> fmap (Bifunctor.first (other :)) (completions rest)
 
 -- CR 107.4e's two ways for a colour/colour hybrid, as the mana types they name.
 -- The ONE place `Hybrid t t` is collapsed: that symbol is degenerate rather than
@@ -1725,52 +1725,58 @@ sourceOptions clauses admitting contended supplies =
       -- OPTIONS, which is what they are: one activation makes one or the other.
       -- A narrow yield holds at most one unit, so the fold is that unit's own
       -- answer and the key is exact.
-      unitLists = [((activations, manaCost, foldMap admitting (unitsOf yield)), unitsOf yield) | (activations, yield, manaCost) <- supplies]
+      unitLists =
+        fmap
+          (\(activations, yield, manaCost) -> ((activations, manaCost, foldMap admitting (unitsOf yield)), unitsOf yield))
+          supplies
       (narrow, wide) = List.partition (\(_, units) -> length units <= 1) unitLists
-      grouped = [(key, collapsed admits units) | (key@(_, _, admits), units) <- Map.toList (Map.fromListWith (<>) narrow)]
-      apart = [(key, fmap (rewriteSupply clauses . supplyOf admitting) units) | (key, units) <- wide]
-   in List.nub (concatMap optionsFor (grouped <> apart))
-  where
-    optionsFor ((activations, manaCost, _), offered) =
-      let claims = Activations.claims activations
-          life = Activations.life activations
-          eats = not (null (ManaCost.unwrap manaCost))
-          -- A mana-EATING option is always worth taking fewer times, for the same
-          -- reason a claiming or a life-paying one is: what it does not activate
-          -- is mana the rest of the board no longer owes. The free-and-uncontended
-          -- shortcut below rests on a board's clauses only ever GROWING as
-          -- supplies are added, which stops being true the moment an option adds
-          -- a demand as well.
-          counts =
-            if not eats && (null claims || not contended) && life == 0
-              then [Activations.times activations]
-              else [0 .. Activations.times activations]
-          -- CR 107.4e's hybrid and CR 107.4f's Phyrexian inside a mana ability's
-          -- OWN cost, resolved the way the cost being paid is: one option per
-          -- resolution, so the board picks. ManaSpending.AsProduced because rule
-          -- 118.14's permission is granted for a CAST, and this is an activation.
-          resolved = if eats then resolutions ManaSpending.AsProduced manaCost else [([], 0, 0)]
-       in [ MkSourceOption
-              { optionSupplies = concat (List.genericReplicate k offered),
-                optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
-                optionClaims = Claim.scale k claims,
-                optionLife = k * (life + owed)
-              }
-          | k <- counts,
-            (demands, generic, owed) <- resolved
-          ]
-    collapsed admits units =
-      if null units
-        then []
-        else
-          [ rewriteSupply
-              clauses
-              MkSupply
-                { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
-                  supplyTags = Set.unions (fmap ManaUnit.tags units),
-                  supplyAdmits = admits
-                }
-          ]
+      grouped =
+        fmap
+          (\(key@(_, _, admits), units) -> (key, collapsed admits units))
+          (Map.toList (Map.fromListWith (<>) narrow))
+      apart = fmap (Bifunctor.second (fmap (rewriteSupply clauses . supplyOf admitting))) wide
+      optionsFor ((activations, manaCost, _), offered) =
+        let claims = Activations.claims activations
+            life = Activations.life activations
+            eats = not (null (ManaCost.unwrap manaCost))
+            -- A mana-EATING option is always worth taking fewer times, for the same
+            -- reason a claiming or a life-paying one is: what it does not activate
+            -- is mana the rest of the board no longer owes. The free-and-uncontended
+            -- shortcut below rests on a board's clauses only ever GROWING as
+            -- supplies are added, which stops being true the moment an option adds
+            -- a demand as well.
+            counts =
+              if not eats && (null claims || not contended) && life == 0
+                then [Activations.times activations]
+                else [0 .. Activations.times activations]
+            -- CR 107.4e's hybrid and CR 107.4f's Phyrexian inside a mana ability's
+            -- OWN cost, resolved the way the cost being paid is: one option per
+            -- resolution, so the board picks. ManaSpending.AsProduced because rule
+            -- 118.14's permission is granted for a CAST, and this is an activation.
+            resolved = if eats then resolutions ManaSpending.AsProduced manaCost else [([], 0, 0)]
+         in do
+              k <- counts
+              (demands, generic, owed) <- resolved
+              pure
+                MkSourceOption
+                  { optionSupplies = concat (List.genericReplicate k offered),
+                    optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
+                    optionClaims = Claim.scale k claims,
+                    optionLife = k * (life + owed)
+                  }
+      collapsed admits units =
+        if null units
+          then []
+          else
+            [ rewriteSupply
+                clauses
+                MkSupply
+                  { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
+                    supplyTags = Set.unions (fmap ManaUnit.tags units),
+                    supplyAdmits = admits
+                  }
+            ]
+   in ListUtils.nubOrd (concatMap optionsFor (grouped <> apart))
 
 -- The resolutions of `cost` this player could actually pay right now, in
 -- `resolutions`' order -- so the head costs the least life of any of them, which
@@ -1920,9 +1926,9 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- it, which `admits` reads per demand. Mishra's Workshop's three
       -- colourless are still no supply for the instant it may not buy, because
       -- the cost's own demands -- typed and generic alike -- ask that same set.
-      subjects = List.nub (subject : fmap PaymentSubject.Activating sources)
+      subjects = Set.toList (Set.fromList (subject : fmap PaymentSubject.Activating sources))
       admittedBy = fmap (\each -> (each, admitsUnder each pid gs)) subjects
-      admitting unit = Set.fromList [each | (each, ok) <- admittedBy, ok unit]
+      admitting unit = Set.fromList (fmap fst (filter (\(_, ok) -> ok unit) admittedBy))
       -- CR 609.4b, resolved ONCE for this whole question and applied to both
       -- halves of the board: a rewrite reaching the pool but not the untapped
       -- sources (or the other way round) would make this disagree with `spend`
@@ -1975,21 +1981,21 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- is the payment this walk was asked about. That map is CR 106.6's other
       -- half -- `admits` pairs a demand with the payment it belongs to before
       -- asking whether the mana admits it.
-      boards =
-        [ ( fmap ((,) (0 :: Natural)) (pooled <> concatMap (optionSupplies . snd) free)
-              <> concat [fmap ((,) k) (optionSupplies option) | (k, (_, option)) <- ranked],
-            concat [fmap ((,) k) (optionDemands option) | (k, (_, option)) <- ranked],
+      boards = do
+        taken <- sequenceA options
+        Monad.guard (Claim.satisfiable (claimed <> concatMap (optionClaims . snd) taken))
+        let (eating, free) = List.partition (not . null . optionDemands . snd) taken
+        order <- orderings eating
+        let ranked = zip [1 :: Natural ..] order
+        let costPosition = 1 + Natural.length eating
+        pure
+          ( fmap ((,) (0 :: Natural)) (pooled <> concatMap (optionSupplies . snd) free)
+              <> concatMap (\(k, (_, option)) -> fmap ((,) k) (optionSupplies option)) ranked,
+            concatMap (\(k, (_, option)) -> fmap ((,) k) (optionDemands option)) ranked,
             costPosition,
-            Map.fromList ((costPosition, subject) : [(k, PaymentSubject.Activating oid) | (k, (oid, _)) <- ranked]),
+            Map.fromList ((costPosition, subject) : fmap (\(k, (oid, _)) -> (k, PaymentSubject.Activating oid)) ranked),
             sum (fmap (optionLife . snd) taken)
           )
-        | taken <- sequenceA options,
-          Claim.satisfiable (claimed <> concatMap (optionClaims . snd) taken),
-          let (eating, free) = List.partition (not . null . optionDemands . snd) taken,
-          order <- orderings eating,
-          let ranked = zip [1 :: Natural ..] order,
-          let costPosition = 1 + Natural.length eating
-        ]
       payable (demands, generic, life) =
         let fits (supplies, eaten, costPosition, subjectAt, spent) =
               let -- Both sides tagged with their position, so Hall's condition
@@ -2002,7 +2008,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
                   -- symbol takes any mana (`anyTypeDemand`), but only mana this
                   -- payment may spend, and a count cannot say which supplies it
                   -- may draw on. Multiplicity is what `demandedIn` reads, so the
-                  -- copies cost `List.nub` one element however large the symbol.
+                  -- copies cost `Set.fromList` one element however large the symbol.
                   wanted_ = fmap ((,) costPosition) (demands <> List.genericReplicate generic anyTypeDemand) <> eaten
                   -- CR 106.6 asked of the demand rather than of the mana: WHICH
                   -- payment a demand belongs to is what the restriction asks
@@ -2029,7 +2035,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
                     -- clause over the whole demand set implies it, since a supply
                     -- serving nothing is still counted here.
                     && Natural.length supplies >= Natural.length wanted_
-                    && all hallHolds (List.subsequences (List.nub wanted_))
+                    && all hallHolds (List.subsequences (Set.toList (Set.fromList wanted_)))
          in any fits boards
    in filter payable (resolutions spending cost)
 

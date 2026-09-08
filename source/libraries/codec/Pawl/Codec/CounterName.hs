@@ -83,46 +83,46 @@ reserved = foldMap spellings [minBound .. maxBound]
 -- is the only arm that may: those are the names 'make' checks, so reserving one
 -- would reserve every name at once.
 spellings :: CounterKindFamily.CounterKindFamily -> Set.Set Text.Text
-spellings family = case family of
-  CounterKindFamily.PlusOnePlusOne -> one "+1/+1"
-  CounterKindFamily.MinusOneMinusOne -> one "-1/-1"
-  -- CR 122.1b's fifteen, in the rule's own order. The payload is dropped by
-  -- 'familyOf', so one arm answers for every keyword counter -- which is why
-  -- this arm is a list where the others are a single spelling.
-  CounterKindFamily.Keyword ->
-    Set.fromList $
-      fmap
-        Text.pack
-        [ "flying",
-          "first strike",
-          "double strike",
-          "deathtouch",
-          "decayed",
-          "exalted",
-          "haste",
-          "hexproof",
-          "indestructible",
-          "lifelink",
-          "menace",
-          "reach",
-          "shadow",
-          "trample",
-          "vigilance"
-        ]
-  CounterKindFamily.Loyalty -> one "loyalty"
-  CounterKindFamily.Lore -> one "lore"
-  CounterKindFamily.Defense -> one "defense"
-  CounterKindFamily.Time -> one "time"
-  CounterKindFamily.Fade -> one "fade"
-  CounterKindFamily.Age -> one "age"
-  CounterKindFamily.Shield -> one "shield"
-  CounterKindFamily.Finality -> one "finality"
-  CounterKindFamily.Stun -> one "stun"
-  CounterKindFamily.Level -> one "level"
-  CounterKindFamily.Hone -> one "hone"
-  CounterKindFamily.Named -> Set.empty
-  where
-    one = Set.singleton . Text.pack
+spellings family =
+  let one = Set.singleton . Text.pack
+   in case family of
+        CounterKindFamily.PlusOnePlusOne -> one "+1/+1"
+        CounterKindFamily.MinusOneMinusOne -> one "-1/-1"
+        -- CR 122.1b's fifteen, in the rule's own order. The payload is dropped by
+        -- 'familyOf', so one arm answers for every keyword counter -- which is why
+        -- this arm is a list where the others are a single spelling.
+        CounterKindFamily.Keyword ->
+          Set.fromList $
+            fmap
+              Text.pack
+              [ "flying",
+                "first strike",
+                "double strike",
+                "deathtouch",
+                "decayed",
+                "exalted",
+                "haste",
+                "hexproof",
+                "indestructible",
+                "lifelink",
+                "menace",
+                "reach",
+                "shadow",
+                "trample",
+                "vigilance"
+              ]
+        CounterKindFamily.Loyalty -> one "loyalty"
+        CounterKindFamily.Lore -> one "lore"
+        CounterKindFamily.Defense -> one "defense"
+        CounterKindFamily.Time -> one "time"
+        CounterKindFamily.Fade -> one "fade"
+        CounterKindFamily.Age -> one "age"
+        CounterKindFamily.Shield -> one "shield"
+        CounterKindFamily.Finality -> one "finality"
+        CounterKindFamily.Stun -> one "stun"
+        CounterKindFamily.Level -> one "level"
+        CounterKindFamily.Hone -> one "hone"
+        CounterKindFamily.Named -> Set.empty
 
 -- | Pawl.Engine.Keyword.familyOf's twin, one layer down because 'reserved' is
 -- needed here. Exhaustive and wildcard-free: this is the link that makes a new

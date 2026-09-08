@@ -142,41 +142,40 @@ targetSlotSlots slot =
 -- reads would otherwise dangle.
 modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 modeSlots mode =
-  joinSlots
-    [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
-      joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap multiplierSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap targetSlotSlots (Map.elems (Mode.targetSlots mode)))
-    ]
-  where
-    -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
-    payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
-    -- And the gate's OTHER slot-reading position, its "for each" multiplier
-    -- (Pawl.Types.PayGate.perEach): a cost scaled by what a bound object names is
-    -- a read the payer field need not repeat, and payGatePaidBy evaluates it
-    -- against this resolution's own context, so the slot really is asked for.
-    -- quantitySlots' WHOLE answer, targetSlotSlots' computed bound's reason.
-    multiplierSlot = maybe Map.empty quantitySlots . (Clause.payGate Monad.>=> PayGate.perEach)
-    -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
-    -- clause too, and Jungle Wayfinder's names the table rather than a slot --
-    -- but a card may name one, and an asker slot no effect also reads would
-    -- otherwise dangle.
-    askerSlot clause = case Clause.optionality clause of
-      Optionality.Mandatory -> Map.empty
-      Optionality.Optional ref -> playerRefSlots ref
-    -- And every clause's branch CHOOSER, for the same reason one rider over: CR
-    -- 608.2d's announcement is scoped to a clause pair and its reference may
-    -- name a slot.
-    chooserSlot = maybe Map.empty (playerRefSlots . OrElse.chooser) . Clause.orElse
-    -- And every clause's CR 701.46a "if", which CR 608.2c lets read what an
-    -- earlier clause of the same resolution bound: Psychic Miasma's "if a land
-    -- card is discarded this way" counts over CR 400.7j's fold of the slot its
-    -- first clause binds. A gate is the ONLY place a card may read a slot and
-    -- perform nothing, so a read reported nowhere else dangles here.
-    conditionSlot = maybe Map.empty conditionSlots . Clause.condition
+  let -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
+      payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
+      -- And the gate's OTHER slot-reading position, its "for each" multiplier
+      -- (Pawl.Types.PayGate.perEach): a cost scaled by what a bound object names is
+      -- a read the payer field need not repeat, and payGatePaidBy evaluates it
+      -- against this resolution's own context, so the slot really is asked for.
+      -- quantitySlots' WHOLE answer, targetSlotSlots' computed bound's reason.
+      multiplierSlot = maybe Map.empty quantitySlots . (Clause.payGate Monad.>=> PayGate.perEach)
+      -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
+      -- clause too, and Jungle Wayfinder's names the table rather than a slot --
+      -- but a card may name one, and an asker slot no effect also reads would
+      -- otherwise dangle.
+      askerSlot clause = case Clause.optionality clause of
+        Optionality.Mandatory -> Map.empty
+        Optionality.Optional ref -> playerRefSlots ref
+      -- And every clause's branch CHOOSER, for the same reason one rider over: CR
+      -- 608.2d's announcement is scoped to a clause pair and its reference may
+      -- name a slot.
+      chooserSlot = maybe Map.empty (playerRefSlots . OrElse.chooser) . Clause.orElse
+      -- And every clause's CR 701.46a "if", which CR 608.2c lets read what an
+      -- earlier clause of the same resolution bound: Psychic Miasma's "if a land
+      -- card is discarded this way" counts over CR 400.7j's fold of the slot its
+      -- first clause binds. A gate is the ONLY place a card may read a slot and
+      -- perform nothing, so a read reported nowhere else dangles here.
+      conditionSlot = maybe Map.empty conditionSlots . Clause.condition
+   in joinSlots
+        [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
+          joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap multiplierSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap targetSlotSlots (Map.elems (Mode.targetSlots mode)))
+        ]
 
 -- The slot a target pool draws its candidates from, if it draws them from one
 -- (CR 400.1's per-player graveyard), read singly.
@@ -373,7 +372,7 @@ resolveSpellWith runSubgame oid = do
                         -- CR 608.2d's "or" next, and BEFORE the "may": Twiddle
                         -- prints one "may" over the pair, so a branch a player
                         -- did not announce has no "may" left to offer THEM.
-                        (announced, picked') <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
+                        (announced, picked2) <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
                         let branch = maybe True (not . Set.null) announced
                         taken <- if branch then exercises oid effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
                         -- CR 118.12: then the cost paid on resolution, against the
@@ -381,7 +380,7 @@ resolveSpellWith runSubgame oid = do
                         -- re-validation. Both maps are projected into THIS
                         -- instance's view (CR 700.2d) after legality is decided,
                         -- since deciding it after the rename would miss in `slots`.
-                        (admitted, answers') <-
+                        (admitted, answers2) <-
                           if taken
                             then
                               let chosenAtStart = Binding.targetsOf (Object.bindings obj)
@@ -397,7 +396,7 @@ resolveSpellWith runSubgame oid = do
                                     clause
                             else pure (False, answers)
                         Monad.when admitted (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause)))
-                        pure (answers', picked', recordTaken admitted cIdx ran)
+                        pure (answers2, picked2, recordTaken admitted cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
                     (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
@@ -582,14 +581,14 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- Pawl.ResolveSpec's "CR 608.2d announcing Teardrop Kami's
                       -- tap taps the untapped Piker", which reddens when this
                       -- conjunct is defeated.
-                      (announced, picked') <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
+                      (announced, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
                       let branch = maybe True (not . Set.null) announced
                       taken <- if branch then exercises stackId effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
                       -- START-of-resolution slots.
-                      (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
+                      (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
                       Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause)))
-                      pure (answers', picked', recordTaken admitted cIdx ran)
+                      pure (answers2, picked2, recordTaken admitted cIdx ran)
                   )
                   (Map.empty, Map.empty, Set.empty)
                   (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
@@ -685,7 +684,8 @@ chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map Slot
 chosenBranch resolving controller idx cIdx legal picked clause = case Clause.orElse clause of
   Nothing -> pure (Nothing, picked)
   Just orElse ->
-    let branches = NonEmpty.nub (NonEmpty.sort (cIdx NonEmpty.:| [OrElse.sibling orElse]))
+    let other = OrElse.sibling orElse
+        branches = if cIdx == other then NonEmpty.singleton cIdx else NonEmpty.sort (cIdx NonEmpty.:| [other])
         key = NonEmpty.head branches
         won answers = Just (Map.keysSet (Map.filter (== cIdx) answers))
      in case Map.lookup key picked of
@@ -858,14 +858,14 @@ payGateAdmits resolving source controller idx cIdx legal announced answers claus
   Nothing -> pure (True, answers)
   Just gate -> do
     let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
-    (asked, answers') <- case Map.lookup offerAt answers of
+    (asked, answers2) <- case Map.lookup offerAt answers of
       Just recorded -> pure (recorded, answers)
       Nothing -> do
         recorded <- payGatePaid resolving source controller idx cIdx legal announced gate
         pure (recorded, Map.insert offerAt recorded answers)
     let selected = Map.keysSet (Map.filter (branchTaken (PayGate.branch gate)) asked)
     State.modify' (bindPlayersSlot resolving Binding.gatePlayers selected)
-    pure (not (Set.null selected), answers')
+    pure (not (Set.null selected), answers2)
 
 -- Which branch of CR 118.12 a payment outcome selects, off the classification a
 -- card states -- never off what the payment DID.

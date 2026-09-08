@@ -1047,7 +1047,7 @@ seizedByProtector ::
   PlayerId.PlayerId ->
   m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 seizedByProtector s registry blockerSeat = do
-  let wraith who = ["Bog Wraith" | who == blockerSeat]
+  let wraith who = if who == blockerSeat then ["Bog Wraith"] else []
   (gs, battle, mine, _, _) <-
     battleCombatOf s registry S.carol S.carol ["Goblin Piker"] (wraith S.bob) (replicate 5 "Mountain" <> wraith S.carol)
   (board, spell) <- seizing s registry S.carol (bothDefending gs)
@@ -1409,10 +1409,10 @@ battleCombatOf ::
   m (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], [ObjectId.ObjectId])
 battleCombatOf s registry protector defender mine theirs hers = do
   let printings = Monad.mapM (S.printingOf s registry)
-  mine' <- printings mine
-  theirs' <- printings theirs
-  hers' <- printings hers
-  battleCombat s registry protector defender mine' theirs' hers'
+  mine2 <- printings mine
+  theirs2 <- printings theirs
+  hers2 <- printings hers
+  battleCombat s registry protector defender mine2 theirs2 hers2
 
 -- alice is active and controls a Siege that `protector` protects (CR 310.9a),
 -- plus one Settled permanent per printing in `mine`; bob and carol get one each

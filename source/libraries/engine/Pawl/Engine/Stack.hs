@@ -71,11 +71,11 @@ endResolutionControl gs = gs {GameState.control = Map.mapMaybe outlivesResolutio
 -- The rows of one player's control stack that a resolution ending leaves in
 -- place, or Nothing where none is left -- a player under no control has no key.
 outlivesResolution :: NonEmpty.NonEmpty PlayerControl.PlayerControl -> Maybe (NonEmpty.NonEmpty PlayerControl.PlayerControl)
-outlivesResolution = NonEmpty.nonEmpty . NonEmpty.filter survives
-  where
-    survives row = case PlayerControl.duration row of
-      ControlDuration.UntilTurnEnds -> True
-      ControlDuration.UntilResolutionEnds -> False
+outlivesResolution =
+  let survives row = case PlayerControl.duration row of
+        ControlDuration.UntilTurnEnds -> True
+        ControlDuration.UntilResolutionEnds -> False
+   in NonEmpty.nonEmpty . NonEmpty.filter survives
 
 -- One object resolves. CR 729.1a's "the spell or ability that created the
 -- subgame" names both kinds of object, so the injected runner goes to the spell

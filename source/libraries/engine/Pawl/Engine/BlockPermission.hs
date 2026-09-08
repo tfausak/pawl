@@ -9,6 +9,7 @@
 -- produced it.
 module Pawl.Engine.BlockPermission where
 
+import qualified Control.Monad as Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -114,16 +115,16 @@ additionalBlocks candidates gs =
               -- empty case above already turned away every permanent that
               -- prints no permission.
               let changes = Projection.textChangesAffecting source gs
-               in [ (creature, extra)
-                  | permission <- permissions,
-                    granted source changes permission,
+               in do
+                    permission <- permissions
+                    Monad.guard (granted source changes permission)
                     -- Bound here rather than in the pair, so a counted
                     -- permission folds the battlefield once per permission and
                     -- not once per candidate.
-                    let extra = amount source changes permission,
-                    let affected = BlockPermission.affected permission,
-                    creature <- candidates,
-                    named source (if null changes then affected else Projection.rewriteAffected changes affected) creature
-                  ]
+                    let extra = amount source changes permission
+                        affected = BlockPermission.affected permission
+                    creature <- candidates
+                    Monad.guard (named source (if null changes then affected else Projection.rewriteAffected changes affected) creature)
+                    pure (creature, extra)
             else []
    in Map.fromListWith (\a b -> (+) <$> a <*> b) (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))

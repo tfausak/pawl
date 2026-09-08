@@ -65,7 +65,7 @@ poisonousSpec s registry =
   let -- Hang `n` Auras off `host`, each owned by alice. Attached directly rather
       -- than cast: the cast path is proved once, by the whole-card test below.
       hang printing n host gs =
-        foldl
+        List.foldl'
           (\g _ -> let (aura, g1) = S.addPermanent printing S.alice g in S.attach aura host g1)
           gs
           (replicate n ())
@@ -195,7 +195,7 @@ poisonousSpec s registry =
           case S.combatBoardOf [piker] [] of
             (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
             (gs0, attacker : _, _) -> do
-              let withSwamps = foldl (\g _ -> snd (S.addPermanent swamp S.alice g)) gs0 (replicate 4 ())
+              let withSwamps = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) gs0 (replicate 4 ())
                   (spellId, inHand) = S.addHandCard initiation S.alice withSwamps
                   cast = S.runPure S.aggressiveAnswer inHand {GameState.priority = Just S.alice} (S.cast S.alice spellId)
                   resolved = S.runPure S.aggressiveAnswer cast Stack.resolveTop
@@ -588,7 +588,7 @@ prowessSpec s registry =
   let -- alice bears the Swiftspear and has four Mountains, bob four as well, so
       -- a negative never fails for want of mana; carol is the third seat.
       board mountain swiftspear =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent mountain pid g2)) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 (addLands S.alice 4 S.threePlayerGame)
             (spearId, withSpear) = S.addPermanent swiftspear S.alice withLands
          in ( spearId,
@@ -1308,13 +1308,17 @@ creatureBecomesBlockedByAtLeastSpec s registry =
       firedBy :: ObjectId.ObjectId -> GameState.GameState -> Int
       firedBy oid gs =
         length
-          [ ()
-          | GameEvent.AbilityTriggered record <- S.eventsOf gs,
-            AbilityTriggered.source record == TriggerSource.OfObject oid,
-            case TriggeredAbility.condition (AbilityTriggered.ability record) of
-              TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> True
-              _ -> False
-          ]
+          ( filter
+              ( \event -> case event of
+                  GameEvent.AbilityTriggered record ->
+                    AbilityTriggered.source record == TriggerSource.OfObject oid
+                      && case TriggeredAbility.condition (AbilityTriggered.ability record) of
+                        TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> True
+                        _ -> False
+                  _ -> False
+              )
+              (S.eventsOf gs)
+          )
    in Spec.describe s "CreatureBecomesBlockedByAtLeast" $ do
         -- The proving test and its control on ONE board: the same Elves, the same
         -- two Giants, the same Seifer, and only the size of the block differs. Two

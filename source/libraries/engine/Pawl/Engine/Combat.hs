@@ -3,6 +3,8 @@ module Pawl.Engine.Combat where
 import qualified Control.Applicative as Applicative
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Bifunctor as Bifunctor
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -536,11 +538,12 @@ barredAnnouncements candidates gs =
       aimedAt oid target = Maybe.maybe False (\d -> Set.member (oid, d, attackTargetKind target) aimed) (targetDefender target gs)
       gatedAt oid target = Maybe.maybe False (\d -> Set.member (oid, d) gated) (targetDefender target gs)
    in Set.fromList
-        [ (oid, target)
-        | oid <- candidates,
-          target <- declarableTargets gs,
-          aimedAt oid target || gatedAt oid target
-        ]
+        ( do
+            oid <- candidates
+            target <- declarableTargets gs
+            Monad.guard (aimedAt oid target || gatedAt oid target)
+            pure (oid, target)
+        )
 
 -- attackCeiling against the restrictions the caller already gathered: each caller
 -- also asks attackDeclarationAllowed of the player's own declaration, and the two
@@ -605,7 +608,7 @@ attackCeilingGiven limit alone barred candidates gs =
               -- negative difference and no room at all.
               Just n -> Integer.toIntSaturating (min (toInteger (length rest)) (max 0 (toInteger n - toInteger held)))
             gains = take (room + 1) (List.scanl' (+) 0 (List.sortBy (flip compare) (fmap weightOf rest)))
-            sized = [got + gain | (more, gain) <- zip [0 :: Int ..] gains, held + more /= 1]
+            sized = fmap (\(_, gain) -> got + gain) (filter (\(more, _) -> held + more /= 1) (zip [0 :: Int ..] gains))
             -- CR 506.5's exception, the one size `sized` skips: a declaration of
             -- exactly one creature is illegal when that creature can't attack
             -- alone, so size one is answered over the creatures the restriction
@@ -643,12 +646,13 @@ attackCeilingGiven limit alone barred candidates gs =
               ( \acc (group, _) ->
                   acc
                     <> Set.fromList
-                      [ Map.insert oid target pinned
-                      | pinned <- Set.toList acc,
-                        (oid, target) <- Set.toList group,
-                        List.elem target (announceable oid),
-                        Maybe.maybe True (== target) (Map.lookup oid pinned)
-                      ]
+                      ( do
+                          pinned <- Set.toList acc
+                          (oid, target) <- Set.toList group
+                          Monad.guard (List.elem target (announceable oid))
+                          Monad.guard (Maybe.maybe True (== target) (Map.lookup oid pinned))
+                          pure (Map.insert oid target pinned)
+                      )
               )
               (Set.singleton Map.empty)
               (Map.toList (Requirement.groups required))
@@ -657,7 +661,7 @@ attackCeilingGiven limit alone barred candidates gs =
       -- arguments it fixes: the pinned creatures are held at THEIR announcement
       -- rather than at their best one, and are off the list the scan ranges over.
       obeyedBy pinned = Requirement.groupsMet required (Set.fromList (Map.toList pinned))
-      pinnedEntries pinned = [(oid, (target, Map.findWithDefault 0 (oid, target) weights)) | (oid, target) <- Map.toList pinned]
+      pinnedEntries pinned = fmap (\(oid, target) -> (oid, (target, Map.findWithDefault 0 (oid, target) weights))) (Map.toList pinned)
       scanRest pinned = filter (\entry -> Map.notMember (fst entry) pinned) eligible
       scoreOf pinned = fmap (obeyedBy pinned +) (ceilingOver (pinnedEntries pinned) (scanRest pinned))
       -- The empty system always scores: it pins nothing, and `sized` admits the
@@ -1093,7 +1097,12 @@ requirementsMet requirements declaration = Requirement.met requirements (declare
 -- (blocker, attacker) pair per block it declares.
 declaredPairs :: Map ObjectId (Set ObjectId) -> Set (ObjectId, ObjectId)
 declaredPairs declaration =
-  Set.fromList [(blocker, attacker) | (blocker, attackers) <- Map.toList declaration, attacker <- Set.toList attackers]
+  Set.fromList
+    ( do
+        (blocker, attackers) <- Map.toList declaration
+        attacker <- Set.toList attackers
+        pure (blocker, attacker)
+    )
 
 -- CR 509.1c's maximization: a declaration obeying the most of `requirements`
 -- that any declaration CR 509.1a lets the defending player write down obeys
@@ -1127,21 +1136,25 @@ bestBlockDeclaration requirements limit arity pcs able candidates attackers gs =
       -- of one of those is what obeys the group, so the same options walk
       -- reaches it.
       named = Map.keys weights <> concatMap Set.toList (Map.keys (Requirement.groups requirements))
-      requiredOf = Map.fromListWith Set.union [(blocker, Set.singleton attacker) | (blocker, attacker) <- named]
+      requiredOf = Map.fromListWith Set.union (fmap (Bifunctor.second Set.singleton) named)
       wanted = Set.fromList (fmap snd named)
       menaced = Set.filter (\attacker -> Projection.hasKeywordGiven pcs Keyword.Menace attacker gs) wanted
       relevant blocker =
         let required = Map.findWithDefault Set.empty blocker requiredOf
          in filter (\attacker -> able blocker attacker && (Set.member attacker required || Set.member attacker menaced)) attackers
-      valueOf blocker chosen = sum [Map.findWithDefault 0 (blocker, attacker) weights | attacker <- Set.toList chosen]
+      valueOf blocker chosen = sum (fmap (\attacker -> Map.findWithDefault 0 (blocker, attacker) weights) (Set.toList chosen))
       -- Blockers with some option beyond blocking nothing, with their options
       -- in choicesUpTo's order and the most each could obey alone.
       movers =
-        [ (blocker, options, maximum (fmap (valueOf blocker) options))
-        | blocker <- candidates,
-          let options = choicesUpTo (arity blocker) (relevant blocker),
-          not (null (drop 1 options))
-        ]
+        filter
+          (\(_, options, _) -> not (null (drop 1 options)))
+          ( fmap
+              ( \blocker ->
+                  let options = choicesUpTo (arity blocker) (relevant blocker)
+                   in (blocker, options, maximum (fmap (valueOf blocker) options))
+              )
+              candidates
+          )
       -- How many more blockers may block under `limit`.
       room used = case limit of
         Nothing -> Nothing
@@ -1173,7 +1186,7 @@ bestBlockDeclaration requirements limit arity pcs able candidates attackers gs =
                         -- long and the bound stays admissible. It is still the
                         -- score CR 509.1c asks for, and a board carrying a
                         -- group of weight two would read it.
-                        let gained = Requirement.covering requirements obeyed [(blocker, attacker) | attacker <- Set.toList chosen]
+                        let gained = Requirement.covering requirements obeyed (fmap (\attacker -> (blocker, attacker)) (Set.toList chosen))
                          in go
                               acc
                               (Map.insert blocker chosen declaration)
@@ -1190,7 +1203,7 @@ bestBlockDeclaration requirements limit arity pcs able candidates attackers gs =
 choicesUpTo :: Maybe Natural -> [ObjectId] -> [Set ObjectId]
 choicesUpTo n attackers =
   let extend acc attacker =
-        acc <> [Set.insert attacker chosen | chosen <- acc, withinLimit n (Set.size chosen + 1)]
+        acc <> fmap (Set.insert attacker) (filter (\chosen -> withinLimit n (Set.size chosen + 1)) acc)
    in List.foldl' extend [Set.empty] attackers
 
 -- CR 509.1c's two halves, computed together because neither is usable alone: the
@@ -1585,7 +1598,7 @@ attemptAttackDeclaration perform pid rejected = do
         -- Deduplicated too: CR 508.1a's declaration is a SET, and the event
         -- fold below would otherwise record a creature's declaration twice and
         -- make CR 506.5's count disagree with it.
-        offered = List.nub (filter isCandidate chosen)
+        offered = ListUtils.nubOrd (filter isCandidate chosen)
     -- CR 508.1b: the announcement, one question per chosen creature, in the
     -- rule's own order -- BEFORE CR 508.1c's restrictions and CR 508.1d's
     -- requirements, which is what a requirement naming its object (Alluring
@@ -2249,7 +2262,10 @@ attemptBlockDeclaration perform pid attacking rejected = do
             let declaration = if paid then legal else forcedBlockDeclaration pid gs2
             -- The pairs the declaration states, blocker-major, which is the order
             -- CR 509.1a writes it in and the order the events below are recorded in.
-            let pairs = [(blocker, attacker) | (blocker, attackers) <- Map.toList declaration, attacker <- Set.toList attackers]
+            let pairs = do
+                  (blocker, attackers) <- Map.toList declaration
+                  attacker <- Set.toList attackers
+                  pure (blocker, attacker)
             Monad.unless (null pairs) $ do
               let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
                   merged = List.foldl' add (Combat.blockers (GameState.combat gs2)) pairs

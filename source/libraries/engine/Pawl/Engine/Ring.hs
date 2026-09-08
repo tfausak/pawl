@@ -161,9 +161,9 @@ theRingEmblem temptations =
               -- the controller order a batch, so nothing rides on it, but the
               -- printed order is the one a reader can check.
               Face.triggeredAbilities =
-                [theRingLootsOnAttack | temptations >= 2]
-                  <> [theRingSacrificesTheBlocker | temptations >= 3]
-                  <> [theRingDrainsOnCombatDamage | temptations >= 4],
+                (if temptations >= 2 then [theRingLootsOnAttack] else [])
+                  <> (if temptations >= 3 then [theRingSacrificesTheBlocker] else [])
+                  <> (if temptations >= 4 then [theRingDrainsOnCombatDamage] else []),
               Face.delayedAbilities =
                 if temptations >= 3
                   then Map.singleton theRingBlockerSacrificeName theRingBlockerSacrifice
@@ -265,32 +265,31 @@ yourRingBearer =
 -- theRingDrainsOnCombatDamage's reasons.
 theRingLootsOnAttack :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theRingLootsOnAttack =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition =
-        TriggerCondition.PlayerAttacksWith
-          PlayerAttacksWith.MkPlayerAttacksWith
-            { PlayerAttacksWith.player = PlayerRelation.You,
-              PlayerAttacksWith.filter = yourRingBearer,
-              PlayerAttacksWith.attackers = 1
-            },
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [draw, discard]))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
-  where
-    draw = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing)
-    discard =
-      Effect.Discard
-        ( Discard.Counted
-            CountedDiscard.MkCountedDiscard
-              { CountedDiscard.slot = Binding.you,
-                CountedDiscard.quantity = Quantity.Literal 1,
-                CountedDiscard.discarded = Nothing
-              }
-        )
+  let draw = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing)
+      discard =
+        Effect.Discard
+          ( Discard.Counted
+              CountedDiscard.MkCountedDiscard
+                { CountedDiscard.slot = Binding.you,
+                  CountedDiscard.quantity = Quantity.Literal 1,
+                  CountedDiscard.discarded = Nothing
+                }
+          )
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition =
+            TriggerCondition.PlayerAttacksWith
+              PlayerAttacksWith.MkPlayerAttacksWith
+                { PlayerAttacksWith.player = PlayerRelation.You,
+                  PlayerAttacksWith.filter = yourRingBearer,
+                  PlayerAttacksWith.attackers = 1
+                },
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [draw, discard]))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- CR 701.54c's three-temptation sentence names the delayed ability it creates.
 -- Face.delayedAbilities files it under this name and Effect.ArmDelayedTrigger arms
@@ -325,27 +324,26 @@ theRingBlockerSacrificeName = AbilityName.MkAbilityName (Text.pack "sacrifice th
 -- theRingDrainsOnCombatDamage's reasons.
 theRingSacrificesTheBlocker :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theRingSacrificesTheBlocker =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.PermanentBecomesBlockedBy yourRingBearer,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
-  where
-    effect =
-      Effect.ArmDelayedTrigger
-        ArmDelayedTrigger.MkArmDelayedTrigger
-          { ArmDelayedTrigger.name = theRingBlockerSacrificeName,
-            -- CR 603.7a's floor: the ability watches for the end of combat from
-            -- the moment it is created, rule 701.54c naming no later turn.
-            ArmDelayedTrigger.onset = Onset.Immediately,
-            -- CR 603.7b's default, spelled as the absence that rule words it as:
-            -- "at end of combat" states no duration, so it fires once.
-            ArmDelayedTrigger.duration = Nothing
-          }
+  let effect =
+        Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = theRingBlockerSacrificeName,
+              -- CR 603.7a's floor: the ability watches for the end of combat from
+              -- the moment it is created, rule 701.54c naming no later turn.
+              ArmDelayedTrigger.onset = Onset.Immediately,
+              -- CR 603.7b's default, spelled as the absence that rule words it as:
+              -- "at end of combat" states no duration, so it fires once.
+              ArmDelayedTrigger.duration = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.PermanentBecomesBlockedBy yourRingBearer,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- | CR 603.7 / 701.54c: the delayed half of the sentence above -- at end of
 -- combat, the blocking creature is sacrificed.
@@ -405,26 +403,25 @@ theRingBlockerSacrifice =
 -- clause is a regression fence rather than a proved behaviour.
 theRingDrainsOnCombatDamage :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theRingDrainsOnCombatDamage =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer yourRingBearer,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      -- No intervening "if" (CR 603.4): rule 701.54c gives the emblem the ability
-      -- or does not, and an ability that exists and declines to trigger is a
-      -- different thing.
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
-  where
-    effect =
-      Effect.LoseLife
-        ( LifeLoss.MkLifeLoss
-            (PlayerRef.Relative PlayerRelation.Opponent)
-            (Quantity.Literal 3)
-            LifeLossCause.ByEffect
-        )
+  let effect =
+        Effect.LoseLife
+          ( LifeLoss.MkLifeLoss
+              (PlayerRef.Relative PlayerRelation.Opponent)
+              (Quantity.Literal 3)
+              LifeLossCause.ByEffect
+          )
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer yourRingBearer,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          -- No intervening "if" (CR 603.4): rule 701.54c gives the emblem the ability
+          -- or does not, and an ability that exists and declines to trigger is a
+          -- different thing.
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- | CR 701.54c's first clause, "Your Ring-bearer is legendary", as the emblem's one
 -- static ability. Rulebook text minted here rather than card data, on this module's

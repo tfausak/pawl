@@ -15,13 +15,13 @@ data Example = MkExample
   }
   deriving (Eq, Ord, Show)
 
-size' :: Codec.Codec Integer
-size' = Common.integer
+size2 :: Codec.Codec Integer
+size2 = Common.integer
 
 codec :: Codec.Codec Example
 codec = Fields.object $ do
-  s <- Fields.required "size" size' size
-  l <- Fields.defaulted "label" Nothing (Common.maybe size') label
+  s <- Fields.required "size" size2 size
+  l <- Fields.defaulted "label" Nothing (Common.maybe size2) label
   pure MkExample {size = s, label = l}
 
 -- | Rejects a zero 'size', proving 'objectWith' runs its check on the
@@ -34,8 +34,8 @@ nonZeroSize e =
 
 codecWith :: Codec.Codec Example
 codecWith = Fields.objectWith nonZeroSize $ do
-  s <- Fields.required "size" size' size
-  l <- Fields.defaulted "label" Nothing (Common.maybe size') label
+  s <- Fields.required "size" size2 size
+  l <- Fields.defaulted "label" Nothing (Common.maybe size2) label
   pure MkExample {size = s, label = l}
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

@@ -1,5 +1,6 @@
 module Pawl.Engine.Action where
 
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activate as Activate
@@ -102,11 +103,11 @@ playableLands pid gs =
       --
       -- Nubbed, because two grants naming one pile would otherwise offer every
       -- land in it twice.
-      fromGranted = List.nub (concatMap (\(zone, owner) -> Game.zoneMembers zone owner gs) (PlayerEffect.playLandPiles pid gs))
+      fromGranted = ListUtils.nubOrd (concatMap (\(zone, owner) -> Game.zoneMembers zone owner gs) (PlayerEffect.playLandPiles pid gs))
       -- Per card instead, because CR 715.3d's permission is state on ONE exiled
       -- incarnation naming ONE player.
       fromExile = filter (\oid -> Cast.permitsPlayFromExile pid oid gs) (Cast.zoneCandidates Zone.Exile pid gs)
-   in concatMap playable (List.nub (fromHand <> fromGranted <> fromExile))
+   in concatMap playable (ListUtils.nubOrd (fromHand <> fromGranted <> fromExile))
 
 -- The cards in this player's hand whose own text grants CR 116.2e's special
 -- action: Circling Vultures' "you may discard this card any time you could cast
@@ -259,7 +260,7 @@ legalActions pid gs =
       --
       -- A list of at most one, where the two above are a list per card: rule
       -- 116.2g's subject is the one companion CR 103.2b let this player reveal.
-      companions = [Action.PutCompanionIntoHand | Companion.canTake pid gs]
+      companions = if Companion.canTake pid gs then [Action.PutCompanionIntoHand] else []
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile

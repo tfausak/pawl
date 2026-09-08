@@ -16,6 +16,7 @@
 module Pawl.Engine.EndEffect where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Expiry as Expiry
@@ -78,7 +79,7 @@ canEnd pid oid gs = case offerToEnd oid gs of
 -- baked seat is then what settles who is offered one whose source has left, and
 -- it needs no board to read.
 endable :: PlayerId -> GameState -> [ObjectId]
-endable pid gs = filter (\oid -> canEnd pid oid gs) (List.nub (fmap fst (Expiry.paidExpiries gs)))
+endable pid gs = filter (\oid -> canEnd pid oid gs) (ListUtils.nubOrd (fmap fst (Expiry.paidExpiries gs)))
 
 -- CR 116.2c, in order: pay the cost, then end the effect.
 --

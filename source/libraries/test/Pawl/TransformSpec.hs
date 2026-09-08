@@ -293,7 +293,7 @@ spec s registry = Spec.describe s "Transform" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     island <- S.printingOf s registry "Island"
     let (gs, _) = S.handOne gargoyle (S.landsInPlay island 1)
-        namesOffered = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+        namesOffered = Maybe.mapMaybe (\action -> case action of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
     Spec.assertEqWith
       s
       "CR 712.11: the card proposes its front face and no other"
@@ -1348,10 +1348,12 @@ convertSpec s registry = Spec.describe s "Convert" $ do
         settled = S.runPure S.identityAnswer (S.markDamage golemId 2 board) Engine.settleForPriority
         after = S.runPure S.identityAnswer settled Stack.resolveTop
         transformedInto =
-          [ PC.names (Transformed.characteristics t)
-          | GameEvent.Transformed t <- S.eventsOf after,
-            Transformed.object t == ratchetId
-          ]
+          Maybe.mapMaybe
+            ( \event -> case event of
+                GameEvent.Transformed t | Transformed.object t == ratchetId -> Just (PC.names (Transformed.characteristics t))
+                _ -> Nothing
+            )
+            (S.eventsOf after)
     Spec.assertEqWith s "the convert recorded a Transformed naming the face it landed on" transformedInto [Set.singleton ratchetFront]
     Spec.assertEqWith s "and the permanent really is on that face" (faceNameOf ratchetId after) (Just ratchetFront)
   -- CR 702.161a: "During your turn, this permanent is an artifact creature in
@@ -1449,7 +1451,15 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
     Spec.assertEqWith
       s
       "both casts are legal actions, the converted one included"
-      (List.sort [n | A.Cast o n _ <- Action.legalActions S.alice board, o == oid])
+      ( List.sort
+          ( Maybe.mapMaybe
+              ( \action -> case action of
+                  A.Cast o n _ | o == oid -> Just n
+                  _ -> Nothing
+              )
+              (Action.legalActions S.alice board)
+          )
+      )
       (List.sort [ratchetFront, ratchetBack])
   -- CR 118.9a from the other side, and the pair the case above cannot make. An
   -- offered cast (CR 608.2g) that states NO alternative cost of its own leaves
@@ -1510,12 +1520,11 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
 -- changes zones a NEW object: the id `medicBoard` handed back for a graveyard
 -- card names nothing once that card has been returned to the battlefield.
 inZoneAs :: Printing.Printing -> Zone.Zone -> GameState.GameState -> [TapState.TapState]
-inZoneAs printing zone gs =
-  [ Object.tapped o
-  | oid <- Game.zoneMembers zone S.alice gs,
-    fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing),
-    o <- Maybe.maybeToList (Game.lookupObject oid gs)
-  ]
+inZoneAs printing zone gs = do
+  oid <- Game.zoneMembers zone S.alice gs
+  Monad.guard (fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing))
+  o <- Maybe.maybeToList (Game.lookupObject oid gs)
+  pure (Object.tapped o)
 
 -- Both zones at once, so "returned" and "tapped" are one assertion rather than
 -- two that could each pass while the other fails: a card returned to the wrong

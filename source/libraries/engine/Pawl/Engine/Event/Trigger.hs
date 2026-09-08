@@ -7,6 +7,7 @@
 module Pawl.Engine.Event.Trigger where
 
 import qualified Control.Monad as Monad
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -1819,348 +1820,348 @@ functionsIn subtypes delayed zone ability = case zoneFunctionedFrom subtypes del
 -- function only while the object is on the battlefield. Every `battlefield` arm
 -- below is that sentence, not an omission.
 zonesTriggeredFrom :: TriggerCondition -> Set.Set Zone
-zonesTriggeredFrom cond = case cond of
-  -- CR 309.4c: "as long as a dungeon card is in the command zone, its abilities
-  -- may trigger". The honest answer, and inert: eventTriggers' command-zone source
-  -- is CR 114.4's and takes emblems alone, so nothing consults this arm --
-  -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability.
-  TriggerCondition.RoomEntered _ -> Set.singleton Zone.Command
-  -- CR 113.6's default for the three whose watcher is an ordinary permanent:
-  -- Matoya, Archon Elder and Wildgrowth Walker are creatures, and neither the
-  -- scry, the surveil nor the explore is a condition that cannot trigger from
-  -- the battlefield, so CR 113.6k's exception does not apply.
-  TriggerCondition.PlayerScries _ -> battlefield
-  TriggerCondition.RingTemptsPlayer _ -> battlefield
-  TriggerCondition.PlayerSurveils _ -> battlefield
-  TriggerCondition.PermanentExplores _ -> battlefield
-  -- CR 113.6's default again: Synthetic Blight Chronicler is an ordinary
-  -- creature, and a
-  -- blight is a condition a battlefield permanent can watch, so CR 113.6k's
-  -- exception does not apply.
-  TriggerCondition.PlayerBlights _ -> battlefield
-  -- CR 113.6's default again, and NOT the graveyard, though Dungeon Crawler
-  -- watches from there: completing a dungeon is a condition a battlefield
-  -- permanent could watch perfectly well, so CR 113.6k's exception does not
-  -- apply. What puts Dungeon Crawler's ability in the graveyard is CR 113.6m,
-  -- read off its effect by `zoneFunctionedFrom` above -- Squee, Goblin Nabob's
-  -- road, proved by Pawl.DungeonSpec's "CR 309.7 completing a dungeon triggers
-  -- Dungeon Crawler out of the graveyard".
-  TriggerCondition.PlayerCompletesDungeon _ -> battlefield
-  -- CR 113.6's default again: Feywild Trickster is a creature, and nothing
-  -- about rolling a die is a condition that cannot trigger from the
-  -- battlefield.
-  TriggerCondition.PlayerRollsDice _ -> battlefield
-  TriggerCondition.PlayerWinsCoinFlip _ -> battlefield
-  -- CR 113.6's default, and CR 701.43c makes it the only possible answer rather
-  -- than a default: an object that isn't on the battlefield can't be exerted, so
-  -- the bearer is standing there when its own exert is recorded.
-  TriggerCondition.SelfExerted -> battlefield
-  -- CR 113.6's default, and CR 701.3a makes it the only possible answer for the
-  -- exert arm's reason: the host of an attachment is a permanent, so the bearer
-  -- is on the battlefield whenever this can match.
-  TriggerCondition.SelfBecomesAttachedBy _ -> battlefield
-  TriggerCondition.SelfBecomesAttachedTo _ -> battlefield
-  -- The battlefield too, even though CR 701.3d's own routes include the bearer
-  -- leaving it: this names where the ability FUNCTIONS (CR 113.6), and CR 603.10c
-  -- is what lets a bearer that has left be offered anyway.
-  TriggerCondition.SelfBecomesUnattachedFrom _ -> battlefield
-  -- EXILE, and this arm is CR 113.6k's exception rather than its default:
-  -- CR 702.170b's special action exiles the card as it becomes plotted, so
-  -- the object bearing Aloe Alchemist's "when this card becomes plotted" is
-  -- in exile at the moment it fires and can never be on the battlefield for
-  -- it. Answering `battlefield` here would leave the trigger unreachable --
-  -- eventTriggers finds this bearer through its exile scan, which is gated on
-  -- exactly this answer.
-  TriggerCondition.SelfBecomesPlotted -> Set.singleton Zone.Exile
-  -- CR 603.6a is an enters-the-battlefield ability; its bearer is on the
-  -- battlefield when it fires.
-  TriggerCondition.SelfEnters -> battlefield
-  TriggerCondition.PermanentEnters _ -> battlefield
-  TriggerCondition.StepBegins {} -> battlefield
-  -- CR 709.5c makes an unlocked designation something a permanent ON THE
-  -- BATTLEFIELD has, so this condition cannot trigger from a graveyard at all.
-  TriggerCondition.SelfHalfUnlocked _ -> battlefield
-  -- CR 709.5c again, one object over: the permanent that became fully unlocked is
-  -- on the battlefield, and CR 113.6 leaves the WATCHER where it usually is.
-  -- Balemurk Leech is a creature and does nothing from a graveyard.
-  TriggerCondition.RoomFullyUnlocked _ -> battlefield
-  -- THE UNION, which is CR 113.6k's second sentence read literally: each condition
-  -- of a multi-condition ability functions where it functions, and the ability is
-  -- offered from every zone any of them reaches. Blind Hunter's ability is the
-  -- producer -- battlefield for "when this creature enters", exile for "or the
-  -- creature it haunts dies" -- and it is the rule's own example.
-  --
-  -- Offering the ability in both zones cannot double-fire it: `matchesTrigger`
-  -- still has to admit the bearer, and the two conditions are about different ids
-  -- in different zones, so at most one of them matches any event.
-  --
-  -- The empty list falls to CR 113.6's default rather than to the empty union,
-  -- which would say the ability functions nowhere. No card writes one.
-  TriggerCondition.AnyOf conditions -> case conditions of
-    [] -> battlefield
-    _ -> Set.unions (fmap zonesTriggeredFrom conditions)
-  -- CR 708.7 is about a PERMANENT being turned face up, and CR 110.1 puts
-  -- permanents on the battlefield alone, so CR 113.6k never reaches this.
-  TriggerCondition.SelfTurnedFaceUp -> battlefield
-  -- CR 701.27a transforms a PERMANENT, which CR 110.1 puts on the battlefield
-  -- alone, so CR 113.6k never reaches this either.
-  TriggerCondition.SelfTransformedInto _ -> battlefield
-  -- CR 113.6's default for the watcher's side, PermanentTurnedFaceUp's reason
-  -- below: Cult of the Waxing Moon is a creature watching from the battlefield.
-  TriggerCondition.PermanentTransforms _ -> battlefield
-  -- CR 113.6's default, one object over: the WATCHER is an ordinary permanent
-  -- doing its watching from the battlefield -- Aven Farseer is a creature -- so CR
-  -- 113.6k's exception, which is for a condition that cannot trigger from the
-  -- battlefield at all, does not apply.
-  TriggerCondition.PermanentTurnedFaceUp _ -> battlefield
-  -- The same default: CR 702.112b's "only permanents can be or become renowned"
-  -- keeps the subject on the battlefield, and Valeron Wardens watches from it.
-  TriggerCondition.PermanentBecomesDesignated {} -> battlefield
-  -- The same default again: rule 702.100b's marker goes to a creature, and
-  -- Renegade Krasis is the creature watching itself.
-  TriggerCondition.SelfEvolves -> battlefield
-  TriggerCondition.SelfMutates -> battlefield
-  -- The same default a third time, from the Equipment's side: CR 301.5c unattaches
-  -- an Equipment rather than moving it, so one that equips anything is on the
-  -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
-  -- is for a condition that cannot trigger from the battlefield at all.
-  TriggerCondition.AttachedCreatureMentors -> battlefield
-  -- CR 113.6's default from the bearer's side, Aura or Equipment alike (CR
-  -- 303.4m): an Aura is itself a permanent on the battlefield and CR 704.5n
-  -- leaves an Equipment standing on it, so the bearer watches from there, and CR
-  -- 113.6k's exception -- for a condition that cannot trigger from the
-  -- battlefield at all -- does not apply. What DOES apply is CR 113.6m's Aura
-  -- clause, read by zoneFunctionedFrom above, which is why this arm is reached
-  -- for Screams from Within and Skullclamp but not for Synthetic Widowed Blade.
-  TriggerCondition.AttachedCreatureDies -> battlefield
-  -- The same default for the same reason, and more plainly: an Aura enchanting a
-  -- permanent is itself a permanent on the battlefield, and CR 113.6k's exception
-  -- is for a condition that cannot trigger from there at all.
-  TriggerCondition.AttachedCreatureBecomesTapped -> battlefield
-  -- CR 110.5 makes tapped a permanent's status, so only a permanent can
-  -- become untapped and only the battlefield can hold one.
-  TriggerCondition.SelfBecomesUntapped -> battlefield
-  -- The same default and the same reason, one event over.
-  TriggerCondition.AttachedPermanentTappedForMana -> battlefield
-  -- CR 113.6's default once more: Autumn Willow, Harmony is a creature watching
-  -- from the board it stands on, and CR 113.6k's exception -- for a condition
-  -- that cannot trigger from the battlefield at all -- does not apply.
-  TriggerCondition.PermanentTappedForMana {} -> battlefield
-  -- The same default from the training creature's own side: rule 702.149a's ability
-  -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
-  -- exception -- for a condition that cannot trigger from there at all -- does not
-  -- apply.
-  TriggerCondition.SelfTrains -> battlefield
-  -- The same default: CR 702.122a's ability is a Vehicle permanent's, so its
-  -- bearer is on the battlefield and CR 113.6k's exception does not apply.
-  TriggerCondition.SelfBecomesCrewed -> battlefield
-  -- The same default once more: rule 702.122a taps a creature on the
-  -- battlefield, so its bearer is there too.
-  TriggerCondition.SelfCrewsVehicle -> battlefield
-  -- CR 113.6's default: an ability of a permanent functions only while that
-  -- permanent is on the battlefield. CR 113.6k's exception is for a trigger
-  -- condition that CANNOT trigger from the battlefield, and this one plainly can
-  -- -- Mayhem Devil watches every sacrifice from the board it stands on.
-  TriggerCondition.PermanentSacrificed {} -> battlefield
-  -- CR 603.8's state triggers are not event triggers, so this scan is not their
-  -- reader in any zone; stateTriggers below gathers them from the battlefield.
-  TriggerCondition.StateIs _ -> battlefield
-  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> battlefield
-  -- CR 113.6's default again, and the match's own shape on top of it: this arm
-  -- compares the bearer against the event's RECIPIENT, and CR 120.3's recipient is
-  -- a player or a permanent -- so a bearer anywhere but the battlefield can never
-  -- be the one damaged.
-  TriggerCondition.SelfIsDealtDamage -> battlefield
-  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> battlefield
-  -- The batch reading watches from the battlefield too, and for the arm above's
-  -- reason: its bearer is a bystander.
-  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> battlefield
-  TriggerCondition.CreatureDealtCombatDamageToMonarch -> battlefield
-  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> battlefield
-  TriggerCondition.PlayerTookInitiative -> battlefield
-  TriggerCondition.OpponentLostLifeDuringYourTurn -> battlefield
-  -- CR 302.6 / 508.1a: only a permanent on the battlefield can be declared as an
-  -- attacker, so CR 113.6k never reaches this.
-  TriggerCondition.SelfAttacks _ -> battlefield
-  TriggerCondition.SelfAttacksWithAnother _ -> battlefield
-  TriggerCondition.SelfAttacksPermanent _ -> battlefield
-  TriggerCondition.CreatureAttacksAlone _ -> battlefield
-  TriggerCondition.CreatureAttacksYou -> battlefield
-  TriggerCondition.AttachedPlayerIsAttacked -> battlefield
-  -- CR 508.1b / 310.5: the announcement names a planeswalker the defending player
-  -- CONTROLS or a battle they protect, both battlefield permanents, so CR 113.6k
-  -- never reaches this one either.
-  TriggerCondition.SelfIsAttacked -> battlefield
-  TriggerCondition.PlayerAttacks _ -> battlefield
-  TriggerCondition.PlayerAttacksWith {} -> battlefield
-  TriggerCondition.PlayerAttacksPlayer {} -> battlefield
-  TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
-  TriggerCondition.SelfBlocks -> battlefield
-  TriggerCondition.SelfBlocksCreature _ -> battlefield
-  TriggerCondition.SelfBlocksAtLeast _ -> battlefield
-  TriggerCondition.SelfBlocksOneOrMore _ -> battlefield
-  TriggerCondition.SelfBecomesBlocked -> battlefield
-  TriggerCondition.SelfBecomesBlockedBy _ -> battlefield
-  TriggerCondition.PermanentBecomesBlockedBy _ -> battlefield
-  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> battlefield
-  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> battlefield
-  TriggerCondition.SelfAttacksUnblocked -> battlefield
-  -- CR 702.29c: a cycling ability triggers from whatever zone the card winds up
-  -- in, the graveyard for every printing in this pool, and a cycled card cannot be
-  -- on the battlefield. eventTriggers' `cycledCard` is what actually serves it.
-  TriggerCondition.SelfCycled -> Set.singleton Zone.Graveyard
-  -- CR 113.6k's fourth zone: rule 702.94a's reveal happens FROM a hand and rule
-  -- 701.20b leaves the card there, so this condition cannot trigger from the
-  -- battlefield at all and the hand is the one zone it can. eventTriggers'
-  -- `revealedInHand` is what serves it.
-  TriggerCondition.SelfRevealedForMiracle -> Set.singleton Zone.Hand
-  -- CR 113.6k's exception again, on SelfCycled's argument: CR 701.9a discards a
-  -- card from a HAND, so this condition can never trigger from the battlefield,
-  -- and the graveyard rule 701.9a moves the card to is the one zone the scan
-  -- meets it in.
-  --
-  -- eventTriggers' `inGraveyards` is what serves it, gated on exactly this
-  -- answer -- Pawl.TriggerSpec's Bartered Cow cases go red if this arm answers
-  -- the battlefield. No candidate source of its own is owed: `cycledCard`
-  -- recovers the card the CYCLING cause named, which rule 702.29c makes narrower
-  -- than this condition rather than a gap under it.
-  TriggerCondition.SelfDiscarded -> Set.singleton Zone.Graveyard
-  -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
-  -- graveyard does not see an opponent discard.
-  TriggerCondition.PlayerDiscards _ -> battlefield
-  -- CR 113.6's default too, and NOT the graveyard SelfCycled answers above: the
-  -- bearer here is a permanent, not the card that was cycled, so the zone the
-  -- cycled card winds up in (rule 702.29c's second sentence) is nothing to do
-  -- with where this ability functions. eventTriggers' `cycledCard` serves the
-  -- self-scoped condition only.
-  TriggerCondition.PlayerCycles _ -> battlefield
-  -- CR 113.6's default again: Erudite Wizard watches its controller's draws from
-  -- the battlefield. CR 702.94a's miracle answers a hand below, and it is a
-  -- different condition -- it watches the REVEAL, not the draw.
-  TriggerCondition.PlayerDrawsNthCard {} -> battlefield
-  -- The condition this predicate exists for: a card cannot be put into a graveyard
-  -- from a library while on the battlefield, so this can never trigger from there
-  -- and the graveyard it lands in is the one zone it can.
-  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Set.singleton Zone.Graveyard
-  -- The graveyard for a NEARER reason than the library condition's, and the one
-  -- that matters: this condition CAN follow a battlefield-to-graveyard move, but CR
-  -- 603.6c's last sentence denies it the leaves-the-battlefield look-back, so
-  -- the bearer is never the permanent on the battlefield -- it is always the card
-  -- that arrived in the graveyard. Nothing it can trigger from is the
-  -- battlefield, so CR 113.6k puts it in every zone it can, and the graveyard is
-  -- where the scan meets it whatever zone the card came from.
-  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Set.singleton Zone.Graveyard
-  -- The bystander reading takes CR 113.6's default instead: the watcher is a
-  -- permanent on the battlefield (Planar Void), and nothing about the condition
-  -- says otherwise.
-  TriggerCondition.CardPutIntoGraveyard _ -> battlefield
-  -- The mirror image, defaulting for a reason rather than by omission: a dies trigger CAN
-  -- trigger from the battlefield, which CR 603.10a's look-back is what makes true
-  -- of a permanent that is a graveyard card by the time the scan runs.
-  -- `leftBattlefield` serves it from CR 608.2h; neither graveyard source may, or
-  -- the ability would be read off the graveyard card and credited to its owner.
-  TriggerCondition.SelfDies -> battlefield
-  -- The same answer one step further: this condition's bearer is not the permanent
-  -- that died at all, and watches from the battlefield.
-  TriggerCondition.PermanentDies _ -> battlefield
-  -- The batch reading watches from the battlefield too, and for the arm above's
-  -- reason: its bearer is a bystander.
-  TriggerCondition.PermanentsDie _ -> battlefield
-  -- The same CR 603.10a answer as both dies conditions, and harder to miss here:
-  -- the destination may be a hand or library, and an ability found in a GRAVEYARD
-  -- could not be what fired for a permanent that went somewhere else.
-  TriggerCondition.SelfLeavesTheBattlefield -> battlefield
-  -- The same answer once more, and here it is the ONLY one CR 113.6k could give:
-  -- the bearer is a bystander that never left the battlefield at all.
-  TriggerCondition.PermanentLeavesTheBattlefield _ -> battlefield
-  -- The same answer for the same reason: the bearer is a bystander that never
-  -- left the battlefield.
-  TriggerCondition.PermanentReturnedToHand _ -> battlefield
-  TriggerCondition.PermanentsReturnedToHand _ -> battlefield
-  -- CR 113.6's default once more: Kishla Skimmer is a creature watching its
-  -- controller's graveyard from the battlefield, and CR 113.6k's exception is for
-  -- a condition that cannot trigger from there at all.
-  TriggerCondition.CardLeavesGraveyard {} -> battlefield
-  -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
-  -- abilities of cards with haunt that refer to the haunted creature can trigger
-  -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
-  -- card Effect.ExileHaunting put in exile is in GameState.haunting at all -- so
-  -- this condition cannot trigger from the battlefield, and exile is the one zone
-  -- it can trigger from. eventTriggers' `inExile` is what serves it.
-  TriggerCondition.HauntedCreatureDies -> Set.singleton Zone.Exile
-  -- CR 113.6's default again: the bearer watches from the battlefield.
-  TriggerCondition.SpellOrAbilityCounters _ -> battlefield
-  TriggerCondition.AbilityIsCountered -> battlefield
-  -- The same default: Selfless Squire watches damage addressed to its controller from
-  -- the battlefield, and a card in a graveyard sees nothing prevented.
-  TriggerCondition.DamageToPlayerPrevented _ -> battlefield
-  -- CR 113.6's default: the Vindicator's prevention ability functions on the
-  -- battlefield, so the trigger paired with it watches from there too.
-  TriggerCondition.SelfPreventsDamage _ -> battlefield
-  -- CR 113.6's default once more: Ajani's Pridemate has to be on the battlefield
-  -- to receive the counter its own ability puts on it.
-  TriggerCondition.PlayerGainsLife _ -> battlefield
-  -- CR 113.6's default, the arm above's: Synthetic Communal Vigil is an
-  -- enchantment watching the table from the battlefield.
-  TriggerCondition.PlayersGainLife _ -> battlefield
-  -- And once more: Exquisite Blood is an enchantment, and CR 113.6 leaves its
-  -- ability functioning only where the permanent is.
-  TriggerCondition.PlayerLosesLife _ -> battlefield
-  -- CR 122.1's first sentence puts counters on OBJECTS, and CR 714.3 keeps a
-  -- Saga's lore counters on the permanent -- so CR 113.6's default holds and a
-  -- chapter ability functions from the battlefield alone.
-  TriggerCondition.SelfCountersReached {} -> battlefield
-  TriggerCondition.SelfBecomesClassLevel _ -> battlefield
-  TriggerCondition.SelfLastCounterRemoved _ -> battlefield
-  TriggerCondition.SelfCountersRemoved _ -> battlefield
-  -- The battlefield, every counter mirror's answer: a permanent takes CR 122.6
-  -- counters there, and these conditions' bearers are bystanders watching from
-  -- it.
-  TriggerCondition.PermanentsGetCounters {} -> battlefield
-  TriggerCondition.PermanentGetsCounters {} -> battlefield
-  -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
-  -- and a card in a graveyard sees nothing cast.
-  TriggerCondition.SpellCast {} -> battlefield
-  -- CR 113.6k, the second zone it reaches: CR 601.2a moves the object to the stack
-  -- to cast it and leaves it there, so at CR 601.2i it is on the stack and not on
-  -- the battlefield -- this condition cannot trigger from there at all. The stack
-  -- is the one zone it can, and eventTriggers' `spellCast` is what serves it.
-  TriggerCondition.SelfCast -> Set.singleton Zone.Stack
-  -- CR 113.6's default, unlike SelfCast just above: rule 702.21a prints ward on a
-  -- permanent, so the bearer watches the announcement from the battlefield. A
-  -- spell on the stack can become a target too, and no card in the pool is one.
-  TriggerCondition.SelfBecomesTargeted _ -> battlefield
-  -- CR 113.6's default again: Dormant Gomazoa is a creature and Amulet of
-  -- Safekeeping an artifact, both watching their controller from the
-  -- battlefield. Nothing on the stack reads its controller becoming a target.
-  TriggerCondition.ControllerBecomesTarget {} -> battlefield
-  -- CR 113.6's default once again: Professor Hojo is a creature, watching the
-  -- creatures beside it from the battlefield.
-  TriggerCondition.PermanentsBecomeTargeted {} -> battlefield
-  -- CR 113.6's default a last time: Historian's Boon is an enchantment watching
-  -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
-  TriggerCondition.SagaFinalChapterTriggers _ -> battlefield
-  -- CR 113.6's default once more: Custodi Lich is a creature and watches the
-  -- crown from the battlefield, so the card sees no crowning from a graveyard.
-  TriggerCondition.PlayerBecomesMonarch _ -> battlefield
-  -- CR 113.6's default, and never actually consulted: this condition's only carrier
-  -- is a CR 603.7 delayed entry, which Event.delayedPending gathers out of
-  -- GameState.delayedTriggers rather than out of a zone. The default is right
-  -- anyway -- the event it matches happens on the battlefield.
-  TriggerCondition.LoseControlOfBound _ -> battlefield
-  -- Never consulted either, and for LoseControlOfBound's reason: rule 701.66a's
-  -- delayed ability is a GameState.delayedTriggers entry, gathered out of the
-  -- store rather than out of a zone.
-  TriggerCondition.BoundDiesOrIsExiled _ -> battlefield
-  -- Never consulted either, and for the same reason: CR 603.12 routes a
-  -- reflexive through rule 603.7, so its only carrier is a delayed entry
-  -- Event.delayedPending gathers out of GameState.delayedTriggers. EMPTY rather
-  -- than CR 113.6's default, which is the honest answer here where it is not for
-  -- the arm above: a reflexive is created by a RESOLVING spell or ability and
-  -- watches no zone at all, its source having been able to leave before it fires.
-  TriggerCondition.Reflexive -> Set.empty
-  where
-    battlefield = Set.singleton Zone.Battlefield
+zonesTriggeredFrom cond =
+  let battlefield = Set.singleton Zone.Battlefield
+   in case cond of
+        -- CR 309.4c: "as long as a dungeon card is in the command zone, its abilities
+        -- may trigger". The honest answer, and inert: eventTriggers' command-zone source
+        -- is CR 114.4's and takes emblems alone, so nothing consults this arm --
+        -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability.
+        TriggerCondition.RoomEntered _ -> Set.singleton Zone.Command
+        -- CR 113.6's default for the three whose watcher is an ordinary permanent:
+        -- Matoya, Archon Elder and Wildgrowth Walker are creatures, and neither the
+        -- scry, the surveil nor the explore is a condition that cannot trigger from
+        -- the battlefield, so CR 113.6k's exception does not apply.
+        TriggerCondition.PlayerScries _ -> battlefield
+        TriggerCondition.RingTemptsPlayer _ -> battlefield
+        TriggerCondition.PlayerSurveils _ -> battlefield
+        TriggerCondition.PermanentExplores _ -> battlefield
+        -- CR 113.6's default again: Synthetic Blight Chronicler is an ordinary
+        -- creature, and a
+        -- blight is a condition a battlefield permanent can watch, so CR 113.6k's
+        -- exception does not apply.
+        TriggerCondition.PlayerBlights _ -> battlefield
+        -- CR 113.6's default again, and NOT the graveyard, though Dungeon Crawler
+        -- watches from there: completing a dungeon is a condition a battlefield
+        -- permanent could watch perfectly well, so CR 113.6k's exception does not
+        -- apply. What puts Dungeon Crawler's ability in the graveyard is CR 113.6m,
+        -- read off its effect by `zoneFunctionedFrom` above -- Squee, Goblin Nabob's
+        -- road, proved by Pawl.DungeonSpec's "CR 309.7 completing a dungeon triggers
+        -- Dungeon Crawler out of the graveyard".
+        TriggerCondition.PlayerCompletesDungeon _ -> battlefield
+        -- CR 113.6's default again: Feywild Trickster is a creature, and nothing
+        -- about rolling a die is a condition that cannot trigger from the
+        -- battlefield.
+        TriggerCondition.PlayerRollsDice _ -> battlefield
+        TriggerCondition.PlayerWinsCoinFlip _ -> battlefield
+        -- CR 113.6's default, and CR 701.43c makes it the only possible answer rather
+        -- than a default: an object that isn't on the battlefield can't be exerted, so
+        -- the bearer is standing there when its own exert is recorded.
+        TriggerCondition.SelfExerted -> battlefield
+        -- CR 113.6's default, and CR 701.3a makes it the only possible answer for the
+        -- exert arm's reason: the host of an attachment is a permanent, so the bearer
+        -- is on the battlefield whenever this can match.
+        TriggerCondition.SelfBecomesAttachedBy _ -> battlefield
+        TriggerCondition.SelfBecomesAttachedTo _ -> battlefield
+        -- The battlefield too, even though CR 701.3d's own routes include the bearer
+        -- leaving it: this names where the ability FUNCTIONS (CR 113.6), and CR 603.10c
+        -- is what lets a bearer that has left be offered anyway.
+        TriggerCondition.SelfBecomesUnattachedFrom _ -> battlefield
+        -- EXILE, and this arm is CR 113.6k's exception rather than its default:
+        -- CR 702.170b's special action exiles the card as it becomes plotted, so
+        -- the object bearing Aloe Alchemist's "when this card becomes plotted" is
+        -- in exile at the moment it fires and can never be on the battlefield for
+        -- it. Answering `battlefield` here would leave the trigger unreachable --
+        -- eventTriggers finds this bearer through its exile scan, which is gated on
+        -- exactly this answer.
+        TriggerCondition.SelfBecomesPlotted -> Set.singleton Zone.Exile
+        -- CR 603.6a is an enters-the-battlefield ability; its bearer is on the
+        -- battlefield when it fires.
+        TriggerCondition.SelfEnters -> battlefield
+        TriggerCondition.PermanentEnters _ -> battlefield
+        TriggerCondition.StepBegins {} -> battlefield
+        -- CR 709.5c makes an unlocked designation something a permanent ON THE
+        -- BATTLEFIELD has, so this condition cannot trigger from a graveyard at all.
+        TriggerCondition.SelfHalfUnlocked _ -> battlefield
+        -- CR 709.5c again, one object over: the permanent that became fully unlocked is
+        -- on the battlefield, and CR 113.6 leaves the WATCHER where it usually is.
+        -- Balemurk Leech is a creature and does nothing from a graveyard.
+        TriggerCondition.RoomFullyUnlocked _ -> battlefield
+        -- THE UNION, which is CR 113.6k's second sentence read literally: each condition
+        -- of a multi-condition ability functions where it functions, and the ability is
+        -- offered from every zone any of them reaches. Blind Hunter's ability is the
+        -- producer -- battlefield for "when this creature enters", exile for "or the
+        -- creature it haunts dies" -- and it is the rule's own example.
+        --
+        -- Offering the ability in both zones cannot double-fire it: `matchesTrigger`
+        -- still has to admit the bearer, and the two conditions are about different ids
+        -- in different zones, so at most one of them matches any event.
+        --
+        -- The empty list falls to CR 113.6's default rather than to the empty union,
+        -- which would say the ability functions nowhere. No card writes one.
+        TriggerCondition.AnyOf conditions -> case conditions of
+          [] -> battlefield
+          _ -> Set.unions (fmap zonesTriggeredFrom conditions)
+        -- CR 708.7 is about a PERMANENT being turned face up, and CR 110.1 puts
+        -- permanents on the battlefield alone, so CR 113.6k never reaches this.
+        TriggerCondition.SelfTurnedFaceUp -> battlefield
+        -- CR 701.27a transforms a PERMANENT, which CR 110.1 puts on the battlefield
+        -- alone, so CR 113.6k never reaches this either.
+        TriggerCondition.SelfTransformedInto _ -> battlefield
+        -- CR 113.6's default for the watcher's side, PermanentTurnedFaceUp's reason
+        -- below: Cult of the Waxing Moon is a creature watching from the battlefield.
+        TriggerCondition.PermanentTransforms _ -> battlefield
+        -- CR 113.6's default, one object over: the WATCHER is an ordinary permanent
+        -- doing its watching from the battlefield -- Aven Farseer is a creature -- so CR
+        -- 113.6k's exception, which is for a condition that cannot trigger from the
+        -- battlefield at all, does not apply.
+        TriggerCondition.PermanentTurnedFaceUp _ -> battlefield
+        -- The same default: CR 702.112b's "only permanents can be or become renowned"
+        -- keeps the subject on the battlefield, and Valeron Wardens watches from it.
+        TriggerCondition.PermanentBecomesDesignated {} -> battlefield
+        -- The same default again: rule 702.100b's marker goes to a creature, and
+        -- Renegade Krasis is the creature watching itself.
+        TriggerCondition.SelfEvolves -> battlefield
+        TriggerCondition.SelfMutates -> battlefield
+        -- The same default a third time, from the Equipment's side: CR 301.5c unattaches
+        -- an Equipment rather than moving it, so one that equips anything is on the
+        -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
+        -- is for a condition that cannot trigger from the battlefield at all.
+        TriggerCondition.AttachedCreatureMentors -> battlefield
+        -- CR 113.6's default from the bearer's side, Aura or Equipment alike (CR
+        -- 303.4m): an Aura is itself a permanent on the battlefield and CR 704.5n
+        -- leaves an Equipment standing on it, so the bearer watches from there, and CR
+        -- 113.6k's exception -- for a condition that cannot trigger from the
+        -- battlefield at all -- does not apply. What DOES apply is CR 113.6m's Aura
+        -- clause, read by zoneFunctionedFrom above, which is why this arm is reached
+        -- for Screams from Within and Skullclamp but not for Synthetic Widowed Blade.
+        TriggerCondition.AttachedCreatureDies -> battlefield
+        -- The same default for the same reason, and more plainly: an Aura enchanting a
+        -- permanent is itself a permanent on the battlefield, and CR 113.6k's exception
+        -- is for a condition that cannot trigger from there at all.
+        TriggerCondition.AttachedCreatureBecomesTapped -> battlefield
+        -- CR 110.5 makes tapped a permanent's status, so only a permanent can
+        -- become untapped and only the battlefield can hold one.
+        TriggerCondition.SelfBecomesUntapped -> battlefield
+        -- The same default and the same reason, one event over.
+        TriggerCondition.AttachedPermanentTappedForMana -> battlefield
+        -- CR 113.6's default once more: Autumn Willow, Harmony is a creature watching
+        -- from the board it stands on, and CR 113.6k's exception -- for a condition
+        -- that cannot trigger from the battlefield at all -- does not apply.
+        TriggerCondition.PermanentTappedForMana {} -> battlefield
+        -- The same default from the training creature's own side: rule 702.149a's ability
+        -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
+        -- exception -- for a condition that cannot trigger from there at all -- does not
+        -- apply.
+        TriggerCondition.SelfTrains -> battlefield
+        -- The same default: CR 702.122a's ability is a Vehicle permanent's, so its
+        -- bearer is on the battlefield and CR 113.6k's exception does not apply.
+        TriggerCondition.SelfBecomesCrewed -> battlefield
+        -- The same default once more: rule 702.122a taps a creature on the
+        -- battlefield, so its bearer is there too.
+        TriggerCondition.SelfCrewsVehicle -> battlefield
+        -- CR 113.6's default: an ability of a permanent functions only while that
+        -- permanent is on the battlefield. CR 113.6k's exception is for a trigger
+        -- condition that CANNOT trigger from the battlefield, and this one plainly can
+        -- -- Mayhem Devil watches every sacrifice from the board it stands on.
+        TriggerCondition.PermanentSacrificed {} -> battlefield
+        -- CR 603.8's state triggers are not event triggers, so this scan is not their
+        -- reader in any zone; stateTriggers below gathers them from the battlefield.
+        TriggerCondition.StateIs _ -> battlefield
+        TriggerCondition.SelfDealsCombatDamageToPlayer _ -> battlefield
+        -- CR 113.6's default again, and the match's own shape on top of it: this arm
+        -- compares the bearer against the event's RECIPIENT, and CR 120.3's recipient is
+        -- a player or a permanent -- so a bearer anywhere but the battlefield can never
+        -- be the one damaged.
+        TriggerCondition.SelfIsDealtDamage -> battlefield
+        TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> battlefield
+        -- The batch reading watches from the battlefield too, and for the arm above's
+        -- reason: its bearer is a bystander.
+        TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> battlefield
+        TriggerCondition.CreatureDealtCombatDamageToMonarch -> battlefield
+        TriggerCondition.CreaturesDealtCombatDamageToInitiative -> battlefield
+        TriggerCondition.PlayerTookInitiative -> battlefield
+        TriggerCondition.OpponentLostLifeDuringYourTurn -> battlefield
+        -- CR 302.6 / 508.1a: only a permanent on the battlefield can be declared as an
+        -- attacker, so CR 113.6k never reaches this.
+        TriggerCondition.SelfAttacks _ -> battlefield
+        TriggerCondition.SelfAttacksWithAnother _ -> battlefield
+        TriggerCondition.SelfAttacksPermanent _ -> battlefield
+        TriggerCondition.CreatureAttacksAlone _ -> battlefield
+        TriggerCondition.CreatureAttacksYou -> battlefield
+        TriggerCondition.AttachedPlayerIsAttacked -> battlefield
+        -- CR 508.1b / 310.5: the announcement names a planeswalker the defending player
+        -- CONTROLS or a battle they protect, both battlefield permanents, so CR 113.6k
+        -- never reaches this one either.
+        TriggerCondition.SelfIsAttacked -> battlefield
+        TriggerCondition.PlayerAttacks _ -> battlefield
+        TriggerCondition.PlayerAttacksWith {} -> battlefield
+        TriggerCondition.PlayerAttacksPlayer {} -> battlefield
+        TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
+        TriggerCondition.SelfBlocks -> battlefield
+        TriggerCondition.SelfBlocksCreature _ -> battlefield
+        TriggerCondition.SelfBlocksAtLeast _ -> battlefield
+        TriggerCondition.SelfBlocksOneOrMore _ -> battlefield
+        TriggerCondition.SelfBecomesBlocked -> battlefield
+        TriggerCondition.SelfBecomesBlockedBy _ -> battlefield
+        TriggerCondition.PermanentBecomesBlockedBy _ -> battlefield
+        TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> battlefield
+        TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> battlefield
+        TriggerCondition.SelfAttacksUnblocked -> battlefield
+        -- CR 702.29c: a cycling ability triggers from whatever zone the card winds up
+        -- in, the graveyard for every printing in this pool, and a cycled card cannot be
+        -- on the battlefield. eventTriggers' `cycledCard` is what actually serves it.
+        TriggerCondition.SelfCycled -> Set.singleton Zone.Graveyard
+        -- CR 113.6k's fourth zone: rule 702.94a's reveal happens FROM a hand and rule
+        -- 701.20b leaves the card there, so this condition cannot trigger from the
+        -- battlefield at all and the hand is the one zone it can. eventTriggers'
+        -- `revealedInHand` is what serves it.
+        TriggerCondition.SelfRevealedForMiracle -> Set.singleton Zone.Hand
+        -- CR 113.6k's exception again, on SelfCycled's argument: CR 701.9a discards a
+        -- card from a HAND, so this condition can never trigger from the battlefield,
+        -- and the graveyard rule 701.9a moves the card to is the one zone the scan
+        -- meets it in.
+        --
+        -- eventTriggers' `inGraveyards` is what serves it, gated on exactly this
+        -- answer -- Pawl.TriggerSpec's Bartered Cow cases go red if this arm answers
+        -- the battlefield. No candidate source of its own is owed: `cycledCard`
+        -- recovers the card the CYCLING cause named, which rule 702.29c makes narrower
+        -- than this condition rather than a gap under it.
+        TriggerCondition.SelfDiscarded -> Set.singleton Zone.Graveyard
+        -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
+        -- graveyard does not see an opponent discard.
+        TriggerCondition.PlayerDiscards _ -> battlefield
+        -- CR 113.6's default too, and NOT the graveyard SelfCycled answers above: the
+        -- bearer here is a permanent, not the card that was cycled, so the zone the
+        -- cycled card winds up in (rule 702.29c's second sentence) is nothing to do
+        -- with where this ability functions. eventTriggers' `cycledCard` serves the
+        -- self-scoped condition only.
+        TriggerCondition.PlayerCycles _ -> battlefield
+        -- CR 113.6's default again: Erudite Wizard watches its controller's draws from
+        -- the battlefield. CR 702.94a's miracle answers a hand below, and it is a
+        -- different condition -- it watches the REVEAL, not the draw.
+        TriggerCondition.PlayerDrawsNthCard {} -> battlefield
+        -- The condition this predicate exists for: a card cannot be put into a graveyard
+        -- from a library while on the battlefield, so this can never trigger from there
+        -- and the graveyard it lands in is the one zone it can.
+        TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Set.singleton Zone.Graveyard
+        -- The graveyard for a NEARER reason than the library condition's, and the one
+        -- that matters: this condition CAN follow a battlefield-to-graveyard move, but CR
+        -- 603.6c's last sentence denies it the leaves-the-battlefield look-back, so
+        -- the bearer is never the permanent on the battlefield -- it is always the card
+        -- that arrived in the graveyard. Nothing it can trigger from is the
+        -- battlefield, so CR 113.6k puts it in every zone it can, and the graveyard is
+        -- where the scan meets it whatever zone the card came from.
+        TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Set.singleton Zone.Graveyard
+        -- The bystander reading takes CR 113.6's default instead: the watcher is a
+        -- permanent on the battlefield (Planar Void), and nothing about the condition
+        -- says otherwise.
+        TriggerCondition.CardPutIntoGraveyard _ -> battlefield
+        -- The mirror image, defaulting for a reason rather than by omission: a dies trigger CAN
+        -- trigger from the battlefield, which CR 603.10a's look-back is what makes true
+        -- of a permanent that is a graveyard card by the time the scan runs.
+        -- `leftBattlefield` serves it from CR 608.2h; neither graveyard source may, or
+        -- the ability would be read off the graveyard card and credited to its owner.
+        TriggerCondition.SelfDies -> battlefield
+        -- The same answer one step further: this condition's bearer is not the permanent
+        -- that died at all, and watches from the battlefield.
+        TriggerCondition.PermanentDies _ -> battlefield
+        -- The batch reading watches from the battlefield too, and for the arm above's
+        -- reason: its bearer is a bystander.
+        TriggerCondition.PermanentsDie _ -> battlefield
+        -- The same CR 603.10a answer as both dies conditions, and harder to miss here:
+        -- the destination may be a hand or library, and an ability found in a GRAVEYARD
+        -- could not be what fired for a permanent that went somewhere else.
+        TriggerCondition.SelfLeavesTheBattlefield -> battlefield
+        -- The same answer once more, and here it is the ONLY one CR 113.6k could give:
+        -- the bearer is a bystander that never left the battlefield at all.
+        TriggerCondition.PermanentLeavesTheBattlefield _ -> battlefield
+        -- The same answer for the same reason: the bearer is a bystander that never
+        -- left the battlefield.
+        TriggerCondition.PermanentReturnedToHand _ -> battlefield
+        TriggerCondition.PermanentsReturnedToHand _ -> battlefield
+        -- CR 113.6's default once more: Kishla Skimmer is a creature watching its
+        -- controller's graveyard from the battlefield, and CR 113.6k's exception is for
+        -- a condition that cannot trigger from there at all.
+        TriggerCondition.CardLeavesGraveyard {} -> battlefield
+        -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
+        -- abilities of cards with haunt that refer to the haunted creature can trigger
+        -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
+        -- card Effect.ExileHaunting put in exile is in GameState.haunting at all -- so
+        -- this condition cannot trigger from the battlefield, and exile is the one zone
+        -- it can trigger from. eventTriggers' `inExile` is what serves it.
+        TriggerCondition.HauntedCreatureDies -> Set.singleton Zone.Exile
+        -- CR 113.6's default again: the bearer watches from the battlefield.
+        TriggerCondition.SpellOrAbilityCounters _ -> battlefield
+        TriggerCondition.AbilityIsCountered -> battlefield
+        -- The same default: Selfless Squire watches damage addressed to its controller from
+        -- the battlefield, and a card in a graveyard sees nothing prevented.
+        TriggerCondition.DamageToPlayerPrevented _ -> battlefield
+        -- CR 113.6's default: the Vindicator's prevention ability functions on the
+        -- battlefield, so the trigger paired with it watches from there too.
+        TriggerCondition.SelfPreventsDamage _ -> battlefield
+        -- CR 113.6's default once more: Ajani's Pridemate has to be on the battlefield
+        -- to receive the counter its own ability puts on it.
+        TriggerCondition.PlayerGainsLife _ -> battlefield
+        -- CR 113.6's default, the arm above's: Synthetic Communal Vigil is an
+        -- enchantment watching the table from the battlefield.
+        TriggerCondition.PlayersGainLife _ -> battlefield
+        -- And once more: Exquisite Blood is an enchantment, and CR 113.6 leaves its
+        -- ability functioning only where the permanent is.
+        TriggerCondition.PlayerLosesLife _ -> battlefield
+        -- CR 122.1's first sentence puts counters on OBJECTS, and CR 714.3 keeps a
+        -- Saga's lore counters on the permanent -- so CR 113.6's default holds and a
+        -- chapter ability functions from the battlefield alone.
+        TriggerCondition.SelfCountersReached {} -> battlefield
+        TriggerCondition.SelfBecomesClassLevel _ -> battlefield
+        TriggerCondition.SelfLastCounterRemoved _ -> battlefield
+        TriggerCondition.SelfCountersRemoved _ -> battlefield
+        -- The battlefield, every counter mirror's answer: a permanent takes CR 122.6
+        -- counters there, and these conditions' bearers are bystanders watching from
+        -- it.
+        TriggerCondition.PermanentsGetCounters {} -> battlefield
+        TriggerCondition.PermanentGetsCounters {} -> battlefield
+        -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
+        -- and a card in a graveyard sees nothing cast.
+        TriggerCondition.SpellCast {} -> battlefield
+        -- CR 113.6k, the second zone it reaches: CR 601.2a moves the object to the stack
+        -- to cast it and leaves it there, so at CR 601.2i it is on the stack and not on
+        -- the battlefield -- this condition cannot trigger from there at all. The stack
+        -- is the one zone it can, and eventTriggers' `spellCast` is what serves it.
+        TriggerCondition.SelfCast -> Set.singleton Zone.Stack
+        -- CR 113.6's default, unlike SelfCast just above: rule 702.21a prints ward on a
+        -- permanent, so the bearer watches the announcement from the battlefield. A
+        -- spell on the stack can become a target too, and no card in the pool is one.
+        TriggerCondition.SelfBecomesTargeted _ -> battlefield
+        -- CR 113.6's default again: Dormant Gomazoa is a creature and Amulet of
+        -- Safekeeping an artifact, both watching their controller from the
+        -- battlefield. Nothing on the stack reads its controller becoming a target.
+        TriggerCondition.ControllerBecomesTarget {} -> battlefield
+        -- CR 113.6's default once again: Professor Hojo is a creature, watching the
+        -- creatures beside it from the battlefield.
+        TriggerCondition.PermanentsBecomeTargeted {} -> battlefield
+        -- CR 113.6's default a last time: Historian's Boon is an enchantment watching
+        -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
+        TriggerCondition.SagaFinalChapterTriggers _ -> battlefield
+        -- CR 113.6's default once more: Custodi Lich is a creature and watches the
+        -- crown from the battlefield, so the card sees no crowning from a graveyard.
+        TriggerCondition.PlayerBecomesMonarch _ -> battlefield
+        -- CR 113.6's default, and never actually consulted: this condition's only carrier
+        -- is a CR 603.7 delayed entry, which Event.delayedPending gathers out of
+        -- GameState.delayedTriggers rather than out of a zone. The default is right
+        -- anyway -- the event it matches happens on the battlefield.
+        TriggerCondition.LoseControlOfBound _ -> battlefield
+        -- Never consulted either, and for LoseControlOfBound's reason: rule 701.66a's
+        -- delayed ability is a GameState.delayedTriggers entry, gathered out of the
+        -- store rather than out of a zone.
+        TriggerCondition.BoundDiesOrIsExiled _ -> battlefield
+        -- Never consulted either, and for the same reason: CR 603.12 routes a
+        -- reflexive through rule 603.7, so its only carrier is a delayed entry
+        -- Event.delayedPending gathers out of GameState.delayedTriggers. EMPTY rather
+        -- than CR 113.6's default, which is the honest answer here where it is not for
+        -- the arm above: a reflexive is created by a RESOLVING spell or ability and
+        -- watches no zone at all, its source having been able to leave before it fires.
+        TriggerCondition.Reflexive -> Set.empty
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -2643,7 +2644,7 @@ delayedPending grouped gs =
       -- occurrences whose "if" holds: CR 603.7b gives the controller every event
       -- that OCCURRED, and CR 603.4 then answers for the one they picked.
       triggered entry
-        | reflexive entry = pure (filter (interveningHolds gs) [bare entry | armed entry])
+        | reflexive entry = pure (filter (interveningHolds gs) (if armed entry then [bare entry] else []))
         | otherwise = fmap (filter (interveningHolds gs) . fmap (pend entry)) (firedBy entry)
       -- Triggering spends the one shot only for an entry with no stated duration.
       spent (entry, fired) = not (null fired) && Maybe.isNothing (DelayedTrigger.expiry entry)
@@ -2683,7 +2684,7 @@ delayedPending grouped gs =
         -- reads. Pawl.EventTriggerSpec's "the store still holds it" is what pins
         -- that second half.
         let seated = List.sortOn (Replacement.seatOf gs . DelayedTrigger.controller . snd) (zip [0 :: Int ..] (Foldable.toList store))
-            controllers = List.nub (fmap (DelayedTrigger.controller . snd) seated)
+            controllers = ListUtils.nubOrd (fmap (DelayedTrigger.controller . snd) seated)
             -- CR 603.3b's entry, built from a STORE entry: the question is asked
             -- before the entry has fired, so the PendingTrigger that
             -- Pawl.Engine.Engine.entryOf reads does not exist yet.

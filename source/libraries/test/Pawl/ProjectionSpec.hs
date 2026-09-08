@@ -11,6 +11,7 @@
 -- fold with, and the untagged AddSubtype beside them.
 module Pawl.ProjectionSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -34,10 +35,6 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
--- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Engine.Filter already claims
--- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
--- aliased Subtype.Type below for the same reason, against Pawl.Engine.Subtype.
-
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -45,9 +42,6 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
--- Pawl.Types.Action aliased Action.Type: Pawl.Engine.Action already claims the
--- alias Action above (the same phase exception Filter takes).
-
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -357,13 +351,13 @@ bloodMoonUrborg forest urborg bloodMoon urborgFirst =
       place g =
         if urborgFirst
           then
-            let (u, g') = S.addPermanent urborg S.alice g
-                (_, g'') = S.addPermanent bloodMoon S.alice g'
-             in (u, g'')
+            let (u, g2) = S.addPermanent urborg S.alice g
+                (_, g3) = S.addPermanent bloodMoon S.alice g2
+             in (u, g3)
           else
-            let (_, g') = S.addPermanent bloodMoon S.alice g
-                (u, g'') = S.addPermanent urborg S.alice g'
-             in (u, g'')
+            let (_, g2) = S.addPermanent bloodMoon S.alice g
+                (u, g3) = S.addPermanent urborg S.alice g2
+             in (u, g3)
       (urborgId, gs) = place g1
    in (forestId, urborgId, gs)
 
@@ -385,13 +379,13 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
       place g =
         if ashayaFirst
           then
-            let (a, g') = S.addPermanent ashaya S.alice g
-                (_, g'') = S.addPermanent bloodMoon S.alice g'
-             in (a, g'')
+            let (a, g4) = S.addPermanent ashaya S.alice g
+                (_, g5) = S.addPermanent bloodMoon S.alice g4
+             in (a, g5)
           else
-            let (_, g') = S.addPermanent bloodMoon S.alice g
-                (a, g'') = S.addPermanent ashaya S.alice g'
-             in (a, g'')
+            let (_, g4) = S.addPermanent bloodMoon S.alice g
+                (a, g5) = S.addPermanent ashaya S.alice g4
+             in (a, g5)
       (ashayaId, gs) = place g3
    in (forestId, pikerId, tokenId, ashayaId, gs)
 
@@ -545,13 +539,13 @@ ascentGond ascent gond piker ascentFirst =
       place g =
         if ascentFirst
           then
-            let (_, g') = S.addPermanent ascent S.alice g
-                (gondId, g'') = S.addPermanent gond S.alice g'
-             in S.attach gondId pikerId g''
+            let (_, g3) = S.addPermanent ascent S.alice g
+                (gondId, g4) = S.addPermanent gond S.alice g3
+             in S.attach gondId pikerId g4
           else
-            let (gondId, g') = S.addPermanent gond S.alice g
-                (_, g'') = S.addPermanent ascent S.alice g'
-             in S.attach gondId pikerId g''
+            let (gondId, g3) = S.addPermanent gond S.alice g
+                (_, g4) = S.addPermanent ascent S.alice g3
+             in S.attach gondId pikerId g4
    in (pikerId, bareId, place g2, snd (S.addPermanent ascent S.alice g2))
 
 -- The printings the graveyard-dependency group below shares: Synthetic Charnel
@@ -4417,21 +4411,22 @@ levelsOn oid gs = case Game.lookupObject oid gs of
 tappedCount :: GameState.GameState -> Int
 tappedCount gs =
   length
-    [ o
-    | oid <- Set.toList (GameState.battlefield gs),
-      Just o <- [Game.lookupObject oid gs],
-      Object.tapped o == TapState.Tapped
-    ]
+    ( do
+        oid <- Set.toList (GameState.battlefield gs)
+        o <- Maybe.maybeToList (Game.lookupObject oid gs)
+        Monad.guard (Object.tapped o == TapState.Tapped)
+        pure o
+    )
 
 -- The Activate actions offered for one source. Filtered by source rather than
 -- `any isActivate`, so a board with other permanents on it cannot answer for
 -- the Student.
 levelUpsOf :: ObjectId.ObjectId -> GameState.GameState -> [Action.Type.Action]
-levelUpsOf oid gs = filter isIt (Action.legalActions S.alice gs)
-  where
-    isIt a = case a of
-      Action.Type.Activate o _ -> o == oid
-      _ -> False
+levelUpsOf oid gs =
+  let isIt a = case a of
+        Action.Type.Activate o _ -> o == oid
+        _ -> False
+   in filter isIt (Action.legalActions S.alice gs)
 
 -- Activate the Student's one ability and resolve it. Partial on purpose: a board
 -- offering anything but exactly one ability is a fixture bug, and a silent

@@ -87,9 +87,9 @@ import qualified Pawl.Types.Zone as Zone
 -- new object, and pawl gives each one a fresh ObjectId, so the id the cast was
 -- handed names nothing on the battlefield (the Pawl.CopySpec precedent).
 leechesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
-leechesOnBattlefield gs = filter isLeech (Set.toList (GameState.battlefield gs))
-  where
-    isLeech oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.faceOf oid gs)
+leechesOnBattlefield gs =
+  let isLeech oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Monstrous War-Leech")) (Game.faceOf oid gs)
+   in filter isLeech (Set.toList (GameState.battlefield gs))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
@@ -1087,9 +1087,9 @@ sacrificesAll p = case p of
 
 -- The Forests on the battlefield, whatever their tap state.
 forestsOn :: GameState.GameState -> [ObjectId.ObjectId]
-forestsOn gs = filter isForest (Set.toList (GameState.battlefield gs))
-  where
-    isForest oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Forest")) (Game.faceOf oid gs)
+forestsOn gs =
+  let isForest oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Forest")) (Game.faceOf oid gs)
+   in filter isForest (Set.toList (GameState.battlefield gs))
 
 -- The newest battlefield permanent with this printed name -- ids ascend, and CR
 -- 400.7 mints a fresh one on every zone change, so the id a cast was handed
@@ -1235,11 +1235,11 @@ mirageOn landId subtype p = case p of
 -- leechesOnBattlefield precedent above: the cast's ObjectId names a spell that
 -- CR 400.7 has already replaced).
 auraOf :: GameState.GameState -> ObjectId.ObjectId
-auraOf gs = case filter isMirage (Set.toList (GameState.battlefield gs)) of
-  oid : _ -> oid
-  [] -> ObjectId.MkObjectId 999
-  where
-    isMirage oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Convincing Mirage")) (Game.faceOf oid gs)
+auraOf gs =
+  let isMirage oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Convincing Mirage")) (Game.faceOf oid gs)
+   in case filter isMirage (Set.toList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 999
 
 -- Take a permanent off the battlefield without routing it anywhere, so a test can
 -- ask what the board looks like once its continuous effect is no longer gathered.
@@ -2067,9 +2067,9 @@ ingesterPlay decision victim board =
 
 -- The card in exile whose printed name is `name`.
 exiledNamed :: String -> GameState.GameState -> [ObjectId.ObjectId]
-exiledNamed name gs = filter matches (Set.toList (GameState.exile gs))
-  where
-    matches oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+exiledNamed name gs =
+  let matches oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+   in filter matches (Set.toList (GameState.exile gs))
 
 ingesterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ingesterSpec s registry = Spec.describe s "Phyrexian Ingester" $ do
@@ -2114,9 +2114,9 @@ ingesterSpec s registry = Spec.describe s "Phyrexian Ingester" $ do
 -- The cards in alice's graveyard with this printed name. Graveyards are indexed
 -- by OWNER (CR 108.3), which is who Pawl.Support puts a card there for.
 graveyardNamed :: String -> GameState.GameState -> [ObjectId.ObjectId]
-graveyardNamed name gs = filter matches (Game.zoneMembers Zone.Graveyard S.alice gs)
-  where
-    matches oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+graveyardNamed name gs =
+  let matches oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+   in filter matches (Game.zoneMembers Zone.Graveyard S.alice gs)
 
 -- Answer the as-enters exile with the SECOND card offered, pinned by index so a
 -- broken offer cannot be repaired by an answerer that searches for the card the

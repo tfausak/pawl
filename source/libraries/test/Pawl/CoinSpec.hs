@@ -262,7 +262,7 @@ statedBoard s registry withEdgar skies = do
       -- and replaces a hand size with a loss.
       stocked = repeatedly (snd . S.addLibraryCard mountain S.alice) 3 (repeatedly (snd . S.addLibraryCard mountain S.bob) 3 g4)
       landed = S.landsFor mountain S.alice (2 * skies + 2) stocked
-      addSky (ids, g) = let (i, g') = S.addHandCard sky S.alice g in (i : ids, g')
+      addSky (ids, g) = let (i, g5) = S.addHandCard sky S.alice g in (i : ids, g5)
       (skyIds, handed) = repeatedly addSky skies ([], landed)
    in pure (skyIds, atLife S.bob 17 handed)
 
@@ -282,7 +282,7 @@ repeatedly f n x = if n <= 0 then x else repeatedly f (n - 1) (f x)
 -- clause.
 afterSkies :: CoinFace.CoinFace -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
 afterSkies called skyIds board =
-  S.settleSba (foldl (\g i -> S.runPure (flipAnswer CoinFace.Tails called) g (S.cast S.alice i >> Stack.resolveTop)) board skyIds)
+  S.settleSba (List.foldl' (\g i -> S.runPure (flipAnswer CoinFace.Tails called) g (S.cast S.alice i >> Stack.resolveTop)) board skyIds)
 
 -- One Winter Sky won: 1 damage to each player and each creature, so both Pikers
 -- die, alice's extra creature and bob's Bird Maiden survive, and nobody draws.

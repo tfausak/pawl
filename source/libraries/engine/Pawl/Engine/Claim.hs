@@ -47,9 +47,8 @@ satisfiableAxis :: [(Set.Set ObjectId, Natural)] -> Bool
 satisfiableAxis entries =
   let shared = objectsWantedTwice (fmap fst entries)
       (lone, met) = List.partition (\(pool, _) -> Set.disjoint pool shared) entries
+      fits subset = Natural.length (Set.unions (fmap fst subset)) >= sum (fmap snd subset)
    in all (\entry -> fits [entry]) lone && all fits (List.subsequences met)
-  where
-    fits subset = Natural.length (Set.unions (fmap fst subset)) >= sum (fmap snd subset)
 
 -- The objects that appear in two or more of these pools -- what makes a pool
 -- meet another one. Counted rather than compared pairwise, so this is linear in
@@ -58,7 +57,13 @@ objectsWantedTwice :: [Set.Set ObjectId] -> Set.Set ObjectId
 objectsWantedTwice pools =
   Map.keysSet
     . Map.filter (> (1 :: Natural))
-    $ Map.fromListWith (+) [(oid, 1) | pool <- pools, oid <- Set.toList pool]
+    $ Map.fromListWith
+      (+)
+      ( do
+          pool <- pools
+          oid <- Set.toList pool
+          pure (oid, 1)
+      )
 
 -- The same question asked of whole CLAIMS rather than of one axis's merged
 -- pools, and asked GROUPWISE: the groups are one per mana source plus the claims
@@ -76,10 +81,19 @@ contested groups =
     . Map.filter (> (1 :: Natural))
     $ Map.fromListWith
       (+)
-      [ (key, 1)
-      | group <- groups,
-        key <- Set.toList (Set.fromList [(Claim.axis claim, oid) | claim <- group, oid <- Set.toList (Claim.pool claim)])
-      ]
+      ( do
+          group <- groups
+          key <-
+            Set.toList
+              ( Set.fromList
+                  ( do
+                      claim <- group
+                      oid <- Set.toList (Claim.pool claim)
+                      pure (Claim.axis claim, oid)
+                  )
+              )
+          pure (key, 1)
+      )
 
 -- Whether any of these claims draws on an object `contested` above marked.
 contends :: Set.Set (ClaimAxis.ClaimAxis, ObjectId) -> [Claim] -> Bool
@@ -91,13 +105,13 @@ contends marked = any (\claim -> any (\oid -> Set.member (Claim.axis claim, oid)
 -- `satisfiable` walks -- and 1 when nothing is claimed at all, since a claimless
 -- payment is limited by something this module cannot see.
 repeats :: [Claim] -> Natural
-repeats claims = case concatMap (Maybe.mapMaybe limit . List.subsequences) (byAxis claims) of
-  [] -> 1
-  limits -> minimum limits
-  where
-    limit subset = case sum (fmap snd subset) of
-      0 -> Nothing
-      wanted -> Just (div (Natural.length (Set.unions (fmap fst subset))) wanted)
+repeats claims =
+  let limit subset = case sum (fmap snd subset) of
+        0 -> Nothing
+        wanted -> Just (div (Natural.length (Set.unions (fmap fst subset))) wanted)
+   in case concatMap (Maybe.mapMaybe limit . List.subsequences) (byAxis claims) of
+        [] -> 1
+        limits -> minimum limits
 
 -- The same claims made `n` times over, which is what one source activated `n`
 -- times contends for. Exact rather than an approximation: `byAxis` adds the

@@ -56,9 +56,6 @@ import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
--- Aliased Condition.Type, not Condition, per the project-wide convention
--- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
--- and must not collide.
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
@@ -1360,7 +1357,7 @@ permanentsDieSpec s registry =
       -- "once for the batch" and "once per turn" would be the same claim, and the
       -- gameplay assertion would prove the weaker one.
       deathGroups gs =
-        List.nub
+        Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
                   GameEvent.Moved (Moved.MkMoved zc _ _)
@@ -1407,7 +1404,7 @@ permanentsDieSpec s registry =
           Spec.assertEqWith s "the Townsfolk is a 4/4: one +1/+1 counter for the whole batch" (S.powerToughnessOf bearer after) (Just (4, 4))
           Spec.assertEqWith s "it was a 3/3 before the batch" (S.powerToughnessOf bearer board) (Just (3, 3))
           Spec.assertEqWith s "all three creatures died" (fmap (\oid -> Game.lookupObject oid settled) [aliceFirst, aliceSecond, bobs]) [Nothing, Nothing, Nothing]
-          Spec.assertEqWith s "and they died as one event group" (length (deathGroups settled)) 1
+          Spec.assertEqWith s "and they died as one event group" (Set.size (deathGroups settled)) 1
           Spec.assertEqWith s "so exactly one trigger reached the stack" (length (GameState.stack settled)) 1
         -- The other half, without which "fires once per turn" answers the board
         -- above correctly. A second batch, in the same turn, is a second trigger
@@ -1425,7 +1422,7 @@ permanentsDieSpec s registry =
               afterAgain = resolveWholeStack again
           Spec.assertEqWith s "the Townsfolk is a 5/5 after the second batch" (S.powerToughnessOf bearer afterAgain) (Just (5, 5))
           Spec.assertEqWith s "it was a 4/4 after the first" (S.powerToughnessOf bearer after) (Just (4, 4))
-          Spec.assertEqWith s "the third Piker died in a group of its own" (length (deathGroups again)) 2
+          Spec.assertEqWith s "the third Piker died in a group of its own" (Set.size (deathGroups again)) 2
           Spec.assertEqWith s "and one more trigger reached the stack" (length (GameState.stack again)) 1
         -- The control that separates "once per event group" from "once per trigger
         -- scan", which the two boards above cannot tell apart: alice's Salt Road
@@ -1465,7 +1462,7 @@ permanentsDieSpec s registry =
           Spec.assertEqWith s "the Townsfolk is a 4/4: 2/2 under Night, plus two counters" (S.powerToughnessOf bearer twice) (Just (4, 4))
           Spec.assertEqWith s "it was a 2/2 before either batch" (S.powerToughnessOf bearer withLands) (Just (2, 2))
           Spec.assertEqWith s "the Piker and both tokens reached a graveyard" (length (filter (\zc -> ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard) (S.zoneChangesOf settled))) 3
-          Spec.assertEqWith s "in two event groups, both inside one scan" (length (deathGroups settled)) 2
+          Spec.assertEqWith s "in two event groups, both inside one scan" (Set.size (deathGroups settled)) 2
           Spec.assertEqWith s "so two triggers reached the stack" (length (GameState.stack settled)) 2
         -- CR 608.2f over the MOVES themselves. alice's Synthetic Twofold Interment
         -- puts four Goblins into their owners' graveyards in one instruction --
@@ -1502,7 +1499,7 @@ permanentsDieSpec s registry =
           Spec.assertEqWith s "the Townsfolk is a 4/4: one +1/+1 counter for the whole sweep" (S.powerToughnessOf bearer after) (Just (4, 4))
           Spec.assertEqWith s "it was a 3/3 before the sweep" (S.powerToughnessOf bearer withLands) (Just (3, 3))
           Spec.assertEqWith s "all four Goblins left the battlefield" (fmap (\oid -> Game.lookupObject oid resolved) [aliceFirst, aliceSecond, aliceThird, bobs]) [Nothing, Nothing, Nothing, Nothing]
-          Spec.assertEqWith s "and they moved as one event group" (length (deathGroups resolved)) 1
+          Spec.assertEqWith s "and they moved as one event group" (Set.size (deathGroups resolved)) 1
           Spec.assertEqWith s "so exactly one trigger reached the stack" (length (GameState.stack settled)) 1
         -- The control the board above needs, on the same road and inside the same
         -- resolution: the Interment's SECOND clause is its own instruction, so a
@@ -1534,7 +1531,7 @@ permanentsDieSpec s registry =
           Spec.assertEqWith s "the Townsfolk is a 5/5: one +1/+1 counter per clause" (S.powerToughnessOf bearer after) (Just (5, 5))
           Spec.assertEqWith s "it was a 3/3 before the spell" (S.powerToughnessOf bearer withLands) (Just (3, 3))
           Spec.assertEqWith s "both creatures left the battlefield" (fmap (\oid -> Game.lookupObject oid resolved) [goblin, undead]) [Nothing, Nothing]
-          Spec.assertEqWith s "in two event groups, both inside one scan" (length (deathGroups resolved)) 2
+          Spec.assertEqWith s "in two event groups, both inside one scan" (Set.size (deathGroups resolved)) 2
           Spec.assertEqWith s "so two triggers reached the stack" (length (GameState.stack settled)) 2
         -- "YOU CONTROL", the ControlledBy arm (CR 109.5 against the ability's
         -- controller, CR 603.3a). The pair to the first board, differing in exactly
@@ -1574,7 +1571,7 @@ permanentsDieSpec s registry =
           let settled = S.runPure S.identityAnswer (S.markDamage bearer 3 (S.markDamage aliceFirst lethal board)) Engine.settleForPriority
           Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack settled)) 1
           Spec.assertEqWith s "both died" (fmap (\oid -> Game.lookupObject oid settled) [bearer, aliceFirst]) [Nothing, Nothing]
-          Spec.assertEqWith s "in one event group" (length (deathGroups settled)) 1
+          Spec.assertEqWith s "in one event group" (Set.size (deathGroups settled)) 1
         -- The condition is the card's rather than this spec's, as it is for Meren:
         -- what the three boards above played out is the printed Filter, and a
         -- transcription that drifted to PermanentDies would answer 5/5 above.

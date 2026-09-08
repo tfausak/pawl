@@ -133,34 +133,33 @@ returnName = AbilityName.MkAbilityName (Text.pack "earthbend")
 -- ability's controller (CR 603.7d), the player who earthbent.
 returnAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 returnAbility =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.BoundDiesOrIsExiled Binding.earthbentLand,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-          (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }
-  where
-    effect =
-      Effect.MoveToZone
-        MoveToZone.MkMoveToZone
-          { MoveToZone.ref = ObjectRef.InSlot Binding.became,
-            MoveToZone.zone = Zone.Battlefield,
-            MoveToZone.riders =
-              EntryRiders.MkEntryRiders
-                { EntryRiders.tapped = TapState.Tapped,
-                  EntryRiders.attacking = False,
-                  EntryRiders.blocking = Nothing,
-                  EntryRiders.transformed = False,
-                  EntryRiders.counters = Map.empty,
-                  EntryRiders.underOwner = False,
-                  EntryRiders.exiledFaceDown = False,
-                  EntryRiders.faceDown = Nothing
-                },
-            MoveToZone.slot = Nothing,
-            MoveToZone.origin = Nothing,
-            MoveToZone.placement = LibraryPlacement.defaultValue,
-            MoveToZone.duration = Nothing
-          }
+  let effect =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot Binding.became,
+              MoveToZone.zone = Zone.Battlefield,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Tapped,
+                    EntryRiders.attacking = False,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Nothing,
+              MoveToZone.origin = Nothing,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.BoundDiesOrIsExiled Binding.earthbentLand,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }

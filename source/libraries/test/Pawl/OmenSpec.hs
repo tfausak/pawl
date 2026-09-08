@@ -14,6 +14,7 @@
 module Pawl.OmenSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
@@ -86,7 +87,7 @@ spec s registry = Spec.describe s "Omen" $ do
   Spec.it s "CR 720.3 both halves are offered from a hand" $ do
     dawnbreaker <- S.printingOf s registry "Riling Dawnbreaker"
     plains <- S.printingOf s registry "Plains"
-    let namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+    let namesOffered gs = Maybe.mapMaybe (\action -> case action of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
         (both, _) = S.handOne dawnbreaker (S.landsInPlay plains 5)
         (one, _) = S.handOne dawnbreaker (S.landsInPlay plains 2)
     Spec.assertEqWith s "five Plains: both halves" (namesOffered both) [dawnbreakerName, roarName]

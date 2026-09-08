@@ -7,6 +7,7 @@
 -- DamageDealtToThisTurn.
 module Pawl.ConditionSpec where
 
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -72,9 +73,9 @@ boardOf :: Printing.Printing -> Integer -> (Count.ViewOf, GameState.GameState)
 boardOf swamp n =
   let gs0 = Setup.emptyGame S.bothPlayers
       step (ids, g) _ =
-        let (oid, g') = S.addPermanent swamp S.alice g
-         in (ids <> [oid], g')
-      (oids, gs) = foldl step ([], gs0) [1 .. n]
+        let (oid, g2) = S.addPermanent swamp S.alice g
+         in (ids <> [oid], g2)
+      (oids, gs) = List.foldl' step ([], gs0) [1 .. n]
       table = fmap (\oid -> (oid, Set.empty, Set.singleton Subtype.Swamp, Just S.alice)) oids
    in (S.stubView table, gs)
 
@@ -183,7 +184,7 @@ enteredThisTurnSpec s registry = Spec.describe s "EnteredThisTurn" $ do
         -- One whole turn later, through the real handoff -- the same idiom
         -- Pawl.ExpirySpec's `handoff` uses.
         later = S.runPure S.identityAnswer arrived Engine.handoffTurn
-        named gs = [oid | oid <- Set.toList (GameState.battlefield gs), S.soleFaceName oid gs == S.printingName thrasta]
+        named gs = filter (\oid -> S.soleFaceName oid gs == S.printingName thrasta) (Set.toList (GameState.battlefield gs))
         hexproof gs oid = Map.member (Keyword.Hexproof Nothing) (Projection.keywordsOf oid gs)
         reaches gs oid = case S.spellTargetSlot doomBlade of
           Nothing -> False
@@ -228,11 +229,9 @@ enteredFromSpec s registry =
       play pid oid gs = drain 8 (cast pid oid gs)
       ownerOf oid gs = fmap Object.owner (Map.lookup oid (GameState.objects gs))
       vesselsOwnedBy pid vessel gs =
-        [ oid
-        | oid <- Set.toList (GameState.battlefield gs),
-          S.soleFaceName oid gs == S.printingName vessel,
-          ownerOf oid gs == Just pid
-        ]
+        filter
+          (\oid -> S.soleFaceName oid gs == S.printingName vessel && ownerOf oid gs == Just pid)
+          (Set.toList (GameState.battlefield gs))
       oneDemon after = case S.tokensOf after of
         [tok] -> do
           Spec.assertEqWith s "5/5" (Projection.powerOf tok after, Projection.toughnessOf tok after) (Just 5, Just 5)
@@ -346,10 +345,7 @@ interveningRecheckSpec s registry =
       -- CR 400.7 mints a fresh id for the returned card, so the entrant is found
       -- by name rather than by the id the ability was activated from.
       skeletonsOn skeleton gs =
-        [ oid
-        | oid <- Set.toList (GameState.battlefield gs),
-          S.soleFaceName oid gs == S.printingName skeleton
-        ]
+        filter (\oid -> S.soleFaceName oid gs == S.printingName skeleton) (Set.toList (GameState.battlefield gs))
       sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
       -- One damage on a 1/1 and a state-based-action pass: CR 704.5g destroys the
       -- entrant where it stands, with the Knight's trigger already on the stack
@@ -461,11 +457,9 @@ foreignGraveyardCastSpec s registry =
           (stolen, staged) = S.addGraveyardCard vessel S.bob (S.landsFor swamp S.alice 2 combat)
           after = S.runCombat (stealing stolen) (snd (S.addGraveyardCard amalgam S.bob staged))
           vessels owner =
-            [ oid
-            | oid <- Set.toList (GameState.battlefield after),
-              S.soleFaceName oid after == S.printingName vessel,
-              fmap Object.owner (Map.lookup oid (GameState.objects after)) == Just owner
-            ]
+            filter
+              (\oid -> S.soleFaceName oid after == S.printingName vessel && fmap Object.owner (Map.lookup oid (GameState.objects after)) == Just owner)
+              (Set.toList (GameState.battlefield after))
       case mine of
         [_, knightId] -> do
           Spec.assertEqWith s "CR 603.4 the Knight grew, so it read the cast out of bob's graveyard" (Projection.powerOf knightId after, Projection.toughnessOf knightId after) (Just 3, Just 3)

@@ -211,8 +211,6 @@ inherentPending events gs =
       -- (Effect.DecreaseSpeed) can now make observable, a player dropped back
       -- below 4 having spent no trigger.
       below = Maybe.maybe False (< maxSpeed) (speedOf you gs)
-   in [ PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty Nothing
-      | hasSpeed,
-        below,
-        List.any lostLife events
-      ]
+   in if hasSpeed && below && List.any lostLife events
+        then [PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty Nothing]
+        else []

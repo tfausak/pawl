@@ -268,5 +268,5 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       $ \root -> do
         loaded <- Registry.loadRoot root
         Spec.assertEqWith s "ascending, .json only" (fmap fst loaded) [root <> "/bird-maiden.json", root <> "/goblin-piker.json"]
-        Spec.assertEqWith s "the good one parsed" [Face.name (Card.combined c) | (_, Right c) <- loaded] [CardName.MkCardName $ Text.pack "Goblin Piker"]
-        Spec.assertEqWith s "and the bad one is reported, not thrown" (length [reason | (_, Left reason) <- loaded]) 1
+        Spec.assertEqWith s "the good one parsed" (Maybe.mapMaybe (\entry -> case snd entry of Right c -> Just (Face.name (Card.combined c)); Left _ -> Nothing) loaded) [CardName.MkCardName $ Text.pack "Goblin Piker"]
+        Spec.assertEqWith s "and the bad one is reported, not thrown" (length (Maybe.mapMaybe (\entry -> case snd entry of Left reason -> Just reason; Right _ -> Nothing) loaded)) 1

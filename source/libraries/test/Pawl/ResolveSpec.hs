@@ -10,6 +10,7 @@ module Pawl.ResolveSpec where
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1406,7 +1407,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- FOUR matching lands, all DIFFERENT basics, against a search that names no
   -- number: a cap that came from anywhere but the library's own contents would
   -- have to be a literal, and four distinct names make "all four" assertable
-  -- rather than "one, four times" -- List.nub in the executor cannot repair it.
+  -- rather than "one, four times" -- the executor's dedupe cannot repair it.
   -- None of them is the Island the mana came from. The Piker gives the filter a
   -- nonland to reject, so the offer is strictly larger than the largest legal
   -- answer and the prompt cannot short-circuit.
@@ -2878,7 +2879,7 @@ severanceBoard s registry names = do
   lands <- mapM (S.printingOf s registry) names
   piker <- S.printingOf s registry "Goblin Piker"
   severance <- S.printingOf s registry "Mana Severance"
-  let place (ids, g) printing = let (oid, g') = S.addLibraryCard printing S.alice g in (ids <> [oid], g')
+  let place (ids, g) printing = let (oid, g3) = S.addLibraryCard printing S.alice g in (ids <> [oid], g3)
       (landIds, g1) = List.foldl' place ([], S.landsInPlay island 2) lands
       (pikerId, g2) = S.addLibraryCard piker S.alice g1
       (gs, spellId) = S.handOne severance g2
@@ -3016,12 +3017,12 @@ twiddleTapState oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
 -- Which branches CR 608.2d actually asked about, in the order asked.
 branchesAnnounced :: [Response.Response] -> [ClauseIndex.ClauseIndex]
-branchesAnnounced responses = [c | Response.ChoseClause c <- responses]
+branchesAnnounced = Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing)
 
 -- And which "may"s CR 603.5 asked about, so a second offer to the losing branch
 -- would show up as a second answer.
 optionalsAnswered :: [Response.Response] -> [OptionalDecision.OptionalDecision]
-optionalsAnswered responses = [d | Response.ChoseOptional d <- responses]
+optionalsAnswered = Maybe.mapMaybe (\r -> case r of Response.ChoseOptional d -> Just d; _ -> Nothing)
 
 -- The board the two Teardrop Kami cases share, built to match twiddleBoard as
 -- closely as an ability can: alice's Kami is the source, bob's Goblin Piker the
@@ -3294,7 +3295,7 @@ predictBoard s registry top = do
   let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
       mine printing gs = snd (S.addLibraryCard printing S.alice gs)
       g1 = foldr mine (S.landsInPlay island 2) [piker, piker, piker]
-      g2 = foldl (flip stock) g1 (reverse cards)
+      g2 = List.foldl' (flip stock) g1 (reverse cards)
    in pure (S.handOne predict g2)
 
 -- The cast and its one resolution, and nothing else: the narrowest path that
@@ -3327,7 +3328,7 @@ sphinxBoard s registry top = do
   -- Added last is on top, S.addLibraryCard's order and predictBoard's reason.
   let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
       (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
-      g1 = foldl (flip stock) g0 [piker, piker, card]
+      g1 = List.foldl' (flip stock) g0 [piker, piker, card]
   pure (g1 {GameState.priority = Just S.alice}, Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)), sphinxId)
 
 -- One activation and resolution, the narrowest path that shows the comparison.
@@ -3362,7 +3363,7 @@ twiceSphinx s registry = do
       (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
       -- Top first: Crucible of Worlds, then a Goblin Piker, then two more to
       -- keep bob off CR 104.3c and to keep the library assertion a count.
-      g1 = foldl (flip stock) g0 [piker, piker, piker, crucible]
+      g1 = List.foldl' (flip stock) g0 [piker, piker, piker, crucible]
       board = g1 {GameState.priority = Just S.alice}
   case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)) of
     Nothing -> pure board
@@ -3477,7 +3478,7 @@ atCarolFinding p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (TargetCount.least . fst) offers
   Prompt.ChooseTargets _ _ _ sets ->
     fmap
-      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
   Prompt.Search _ pid matches cap ->
     if pid == S.carol
@@ -3532,7 +3533,7 @@ atCarolTargeted p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (TargetCount.least . fst) offers
   Prompt.ChooseTargets _ _ _ sets ->
     fmap
-      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
   _ -> S.identityAnswer p
 
@@ -3837,8 +3838,8 @@ wormsSpec s registry =
           Spec.assertEqWith s "CR 608.2c nothing was done, so the enchantment stands" (wormsStands after) 1
           Spec.assertEqWith s "carol's one Mountain is still hers" (lands after) (3, 3, 1)
           Spec.assertEqWith s "and she took no damage in its place" (lives after) (Just 20, Just 20, Just 20)
-          Spec.assertEqWith s "CR 118.3 the cost was offered to the two seats who could pay it and not to carol" [d | Response.ChoseToPay d <- asked] [PaymentDecision.Declines, PaymentDecision.Declines]
-          Spec.assertEqWith s "CR 608.2d the announcement itself was still put to all three seats" (length [c | Response.ChoseClause c <- asked]) 3
+          Spec.assertEqWith s "CR 118.3 the cost was offered to the two seats who could pay it and not to carol" (Maybe.mapMaybe (\r -> case r of Response.ChoseToPay d -> Just d; _ -> Nothing) asked) [PaymentDecision.Declines, PaymentDecision.Declines]
+          Spec.assertEqWith s "CR 608.2d the announcement itself was still put to all three seats" (length (Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing) asked)) 3
 
 -- CR 701.21a's second sentence -- "a player can't sacrifice ... something that's
 -- a permanent they don't control" -- which is what separates an ordinary printed
@@ -3899,7 +3900,7 @@ sacrificerSpec s registry =
               -- Anti-vacuity: the steal really happened, and the three tokens
               -- really were alice's before it.
               Spec.assertEqWith s "CR 613.1b bob controlled the stolen token when the end step began" (Projection.controllerOf stolen taken) (Just S.bob)
-              Spec.assertEqWith s "CR 111.7 alice made three tokens and controlled all of them" (length (standing armed), List.nub (fmap (`Projection.controllerOf` armed) (standing armed))) (3, [Just S.alice])
+              Spec.assertEqWith s "CR 111.7 alice made three tokens and controlled all of them" (length (standing armed), ListUtils.nubOrd (fmap (`Projection.controllerOf` armed) (standing armed))) (3, [Just S.alice])
             _ -> Spec.assertFailure s "fixture should have made three tokens"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

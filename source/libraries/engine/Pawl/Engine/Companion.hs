@@ -73,7 +73,11 @@ conditionOf :: PrintingId -> GameState -> Maybe (Filter.Type.Filter Keyword)
 conditionOf printingId gs = do
   card <- Game.cardOfPrinting printingId gs
   let face = Game.resolveFaceFor Nothing card
-  Maybe.listToMaybe [predicate | Keyword.Companion predicate <- Foldable.toList (Face.keywords face)]
+  Maybe.listToMaybe
+    ( Maybe.mapMaybe
+        (\keyword -> case keyword of Keyword.Companion predicate -> Just predicate; _ -> Nothing)
+        (Foldable.toList (Face.keywords face))
+    )
 
 -- CR 702.139a: does this player's STARTING DECK fulfill the condition? Every card
 -- in it must match, which is what makes one Filter enough to state a condition
@@ -100,7 +104,7 @@ fulfilled predicate pid gs =
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
         Just card -> Filter.matches context (Projection.viewOfCard (Game.resolveFaceFor Nothing card)) predicate
-   in all admits [printingId | (printingId, n) <- Map.toAscList deck, n > 0]
+   in all (admits . fst) (filter (\(_, n) -> n > 0) (Map.toAscList deck))
 
 -- CR 103.2b: the cards this player may reveal as a companion -- the ones they own
 -- outside the game that have a companion ability whose condition their starting
@@ -115,7 +119,7 @@ revealable pid gs =
       admits printingId = case conditionOf printingId gs of
         Nothing -> False
         Just predicate -> fulfilled predicate pid gs
-   in [printingId | (printingId, n) <- Map.toAscList pool, n > 0, admits printingId]
+   in fmap fst (filter (\(printingId, n) -> n > 0 && admits printingId) (Map.toAscList pool))
 
 -- CR 103.2b: put the reveal to this player, and record what they revealed.
 --

@@ -1,3 +1,4 @@
+# Extensions: an allowlist. Adding one means adding it here, with the reason.
 - extensions:
   - default: false
   - name:
@@ -7,48 +8,60 @@
     - RankNTypes
     - ScopedTypeVariables
 
-# Prefer `f . g $ h x` over `f $ g $ h x`.
+# Hint groups beyond the default set.
+# dollar:     prefer `f . g $ h x` over `f $ g $ h x`
+# future:     prefer `pure` over `return`
+# generalise: prefer `fmap` over `map`, `(<>)` over `(++)`, and so on
 - group: {name: dollar, enabled: true}
-
-# Prefer `pure` over `return`.
 - group: {name: future, enabled: true}
-
-# Prefer `fmap` over `map`, `(<>)` over `(++)`, and so on.
 - group: {name: generalise, enabled: true}
 
-# Generally prefer named functions over operators.
-- ignore: {name: "Use <$>"}
-
-# Prefer `elem x xs` over ``x `elem` xs``.
-- ignore: {name: "Use infix"}
-
-# Prefer `\x -> elem x xs` over ``(`elem` xs)``.
-- ignore: {name: "Avoid lambda using `infix`"}
-
-# Avoid `[x | p]` trick.
-- ignore: {name: "Use list comprehension"}
-
-# Avoid `LambdaCase` extension.
-- ignore: {name: "Use lambda-case"}
-
-# Avoid `TupleSections` extension.
-- ignore: {name: "Use tuple-section"}
+# Hints that argue against the style guide.
+- ignore: {name: "Use <$>"} # prefer named functions over operators
+- ignore: {name: "Use infix"} # prefer `elem x xs` over ``x `elem` xs``
+- ignore: {name: "Avoid lambda using `infix`"} # prefer `\x -> elem x xs`
+- ignore: {name: "Use list comprehension"} # avoid the `[x | p]` trick
+- ignore: {name: "Use lambda-case"} # LambdaCase is not on the allowlist
+- ignore: {name: "Use tuple-section"} # TupleSections is not on the allowlist
+- ignore: {name: "Use nub"} # nub is restricted below
+- ignore: {name: "Replace case with fromMaybe"} # `case` and `fromMaybe` both read well
 
 # A traversal whose job is to be revisited when a payload gains a field cannot
 # write `{}`, which is what this hint asks for.
 - ignore: {name: "Use record patterns", within: [Pawl.Engine.Resolve.Slots.objectRefQuantities, Pawl.Engine.Resolve.Slots.objectRefPlayerRefs]}
 
-# Prefer using monomorphic, total conversion functions.
+# Restricted functions. Partial ones stay legal in tests, where blowing up at
+# runtime is the same as failing.
 - functions:
-  - name: fromIntegral
+  - name: [Data.List.head, Data.List.tail, Data.List.!!, Data.Maybe.fromJust, Prelude.head, Prelude.tail, Prelude.!!, error, errorWithoutStackTrace, undefined]
+    within: ["**.*Spec", Pawl.Support]
+    message: "Return Maybe or Either instead."
+  - name: [read, reads]
+    within: ["**.*Spec", Pawl.Support]
+    message: "Use a total parser, such as Text.Read.readMaybe."
+  - name: [fromIntegral, fromInteger]
     within: []
     message: "Use Pawl.Extra.Int, Pawl.Extra.Integer, or Pawl.Extra.Natural."
-  - name: fromInteger
-    within: []
-    message: "Use Pawl.Extra.Integer."
   - name: realToFrac
     within: []
     message: "Use Pawl.Extra, adding the conversion there if it is missing."
   - name: toEnum
     within: []
     message: "Use a named total conversion, such as Data.Char.chr."
+  - name: Data.Text.Encoding.decodeUtf8
+    within: []
+    message: "Use Data.Text.Encoding.decodeUtf8' instead."
+  - name: Control.Exception.throw
+    within: []
+    message: "Return Either, or use throwIO in IO."
+  - name: [Data.List.nub, Data.List.nubBy, Data.List.NonEmpty.nub, Data.List.NonEmpty.nubBy]
+    within: []
+    message: "Use a Set, or Data.Containers.ListUtils.nubOrd."
+  - name: [Data.Foldable.foldl, Data.List.foldl, Prelude.foldl]
+    within: []
+    message: "Use Data.Foldable.foldl' instead."
+
+# Restricted modules: unsafe, or for debugging only.
+- modules:
+  - name: [Debug.Trace, System.IO.Unsafe, Unsafe.Coerce, Control.Concurrent]
+    within: []

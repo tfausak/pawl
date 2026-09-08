@@ -15,12 +15,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator Pawl.Engine.Filter already claims the alias Filter.
-
--- Aliased Card.Type, per the project-wide convention (CardSpec): the logic
--- module Pawl.Engine.Card may later be imported and must not collide.
-
 import Pawl.CastProhibitionSpec (equipBoard, flashBoard, flashOnOwnTurn, isActivateOf, isPlay, landDropBoard, nextTurnFor, orreryScopeBoard, playEveryLand)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
@@ -456,7 +450,7 @@ counteringBoard island cancel stifle sorcerer victim permanents =
       (srcId, withSorcerer) = S.addPermanent sorcerer S.alice withLands
       -- CR 302.6: settled, so the Sorcerer's {T} may be activated at all.
       settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-      addPermanent (ids, g) (who, p) = let (oid, g') = S.addPermanent p who g in (oid : ids, g')
+      addPermanent (ids, g) (who, p) = let (oid, g2) = S.addPermanent p who g in (oid : ids, g2)
       (permanentIds, withPermanents) = List.foldl' addPermanent ([], settled) permanents
       (victimId, onStack) = S.spellOnStack victim S.alice withPermanents
       (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
@@ -1544,11 +1538,11 @@ oppressiveRaysSpec s registry =
 -- The activations offered for ONE source, so a board carrying two activatable
 -- permanents can say which of them was offered.
 activationsOf :: ObjectId.ObjectId -> [Action.Type.Action] -> [Action.Type.Action]
-activationsOf oid = filter isIt
-  where
-    isIt a = case a of
-      Action.Type.Activate o _ -> o == oid
-      _ -> False
+activationsOf oid =
+  let isIt a = case a of
+        Action.Type.Activate o _ -> o == oid
+        _ -> False
+   in filter isIt
 
 -- alice has one untapped Plains and `warning`, `secondCard` in hand, in her
 -- own precombat main phase with an empty stack -- plus a second Plains ON TOP

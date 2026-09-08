@@ -1035,16 +1035,17 @@ eligible predicate source pid gs =
       admitsOutside entry = case OutsideObject.facing entry of
         Facing.FaceDown state -> matchesFace (Card.faceDownFace (FaceDownState.listed state))
         Facing.FaceUp -> admits (OutsideObject.printing entry)
-      fromPool = [OutsideCard.InPool printingId | (printingId, n) <- Map.toAscList pool, n > 0, admits printingId]
+      fromPool = fmap (\(printingId, _) -> OutsideCard.InPool printingId) (filter (\(printingId, n) -> n > 0 && admits printingId) (Map.toAscList pool))
       -- CR 108.3b scopes the reach to the acting player's OWN cards outside the
       -- game -- the owner guard below is that scope, not an ownership check on
       -- the pool (which is already per-player).
       fromOuter =
-        [ OutsideCard.InAnotherGame oid
-        | (oid, entry) <- Map.toAscList (GameState.outsideObjects gs),
-          OutsideObject.owner entry == pid,
-          admitsOutside entry
-        ]
+        fmap
+          (\(oid, _) -> OutsideCard.InAnotherGame oid)
+          ( filter
+              (\(_, entry) -> OutsideObject.owner entry == pid && admitsOutside entry)
+              (Map.toAscList (GameState.outsideObjects gs))
+          )
    in fromPool <> fromOuter
 
 -- CR 400.11c: put a card this player owns from outside the game matching the
@@ -4088,7 +4089,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       -- being the answer and CR 110.2's default -- the owner, which is what
       -- `Nothing` means to the funnel -- takes over. Undying and persist are what
       -- print it (CR 702.93a, CR 702.79a).
-      under' = if EntryRiders.underOwner riders then Nothing else under
+      under2 = if EntryRiders.underOwner riders then Nothing else under
       -- CR 708.3: "objects that are put onto the battlefield face down are
       -- turned face down BEFORE they enter the battlefield". Handed to the
       -- funnel rather than written after it for the tap state's reason, and the
@@ -4117,7 +4118,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       facing = if onto then maybe Facing.FaceUp Facing.FaceDown (EntryRiders.faceDown riders) else Facing.FaceUp
   if refused
     then pure Seq.empty
-    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried
+    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under2 shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being
@@ -5315,16 +5316,15 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
 -- two departures with one arrival each. Its own comment has the reason.
 perpetuate :: ObjectId -> Seq.Seq ObjectId -> Game ()
 perpetuate oldId newIds =
-  State.modify' $ \gs ->
-    gs
-      { GameState.continuousEffects = fmap follow (GameState.continuousEffects gs)
-      }
-  where
-    arrivals = Set.fromList (Foldable.toList newIds)
-    follow eff =
-      if Expiry.follows (ContinuousEffect.expiry eff)
-        then reanchor oldId arrivals eff
-        else eff
+  let arrivals = Set.fromList (Foldable.toList newIds)
+      follow eff =
+        if Expiry.follows (ContinuousEffect.expiry eff)
+          then reanchor oldId arrivals eff
+          else eff
+   in State.modify' $ \gs ->
+        gs
+          { GameState.continuousEffects = fmap follow (GameState.continuousEffects gs)
+          }
 
 -- carryOver's and perpetuate's per-effect half: swap oldId for the arriving ids
 -- in a locked affected set that names it, and leave every other effect alone. A
@@ -5393,27 +5393,26 @@ reanchor oldId newIds eff = case ContinuousEffect.affected eff of
 lingeringHandover :: ObjectId -> PlayerId -> GameState -> [ContinuousEffect.ContinuousEffect Card]
 lingeringHandover oid lastController gs =
   let lingering :: [(Natural, Duration.Duration)]
-      lingering =
-        [ (n, duration)
-        | (n, sa) <- zip [0 ..] (Projection.staticAbilitiesOf oid gs),
-          duration <- Maybe.maybeToList (StaticAbility.lingers sa)
-        ]
+      lingering = do
+        (n, sa) <- zip [0 ..] (Projection.staticAbilitiesOf oid gs)
+        duration <- Maybe.maybeToList (StaticAbility.lingers sa)
+        pure (n, duration)
    in if null lingering
         then []
-        else
-          [ ContinuousEffect.MkContinuousEffect
+        else do
+          (n, ts, modification, frozen) <- Projection.frozenStaticParts oid gs
+          duration <- fmap snd (filter ((== n) . fst) lingering)
+          -- No bindings to bake a CR 611.2b condition against: this duration is
+          -- a PRINTED static ability's, and no resolution chose anything for it.
+          expiry <- Maybe.maybeToList (Expiry.arm Map.empty lastController oid duration gs)
+          pure
+            ContinuousEffect.MkContinuousEffect
               { ContinuousEffect.source = oid,
                 ContinuousEffect.timestamp = ts,
                 ContinuousEffect.expiry = expiry,
                 ContinuousEffect.modification = modification,
                 ContinuousEffect.affected = Affected.TheseObjects frozen
               }
-          | (n, ts, modification, frozen) <- Projection.frozenStaticParts oid gs,
-            duration <- fmap snd (filter ((== n) . fst) lingering),
-            -- No bindings to bake a CR 611.2b condition against: this duration is
-            -- a PRINTED static ability's, and no resolution chose anything for it.
-            expiry <- Maybe.maybeToList (Expiry.arm Map.empty lastController oid duration gs)
-          ]
 
 -- The single destruction funnel (CR 701.8 / 702.12b): the Destroy opcode and the
 -- CR 704.5g/h state-based actions both flow through here.

@@ -892,7 +892,7 @@ replenishSpec s registry =
       -- below (the cast-gate vacuity trap).
       board plains replenish creatures buried =
         let withLands = S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers)
-            step add (acc, g) printing = let (oid, g') = add printing S.alice g in (acc <> [oid], g')
+            step add (acc, g) printing = let (oid, g2) = add printing S.alice g in (acc <> [oid], g2)
             (creatureIds, withCreatures) = List.foldl' (step S.addPermanent) ([], withLands) creatures
             (buriedIds, withBuried) = List.foldl' (step S.addGraveyardCard) ([], withCreatures) buried
             (ready, spell) = S.handOne replenish withBuried
@@ -905,7 +905,7 @@ replenishSpec s registry =
       run answer spell gs =
         let ((_, resolved), responses) = Replay.record answer gs (S.cast S.alice spell >> Stack.resolveTop)
          in (S.settleSba resolved, responses)
-      hostsChosen responses = length [() | Response.ChoseAttachment _ <- responses]
+      hostsChosen responses = length (Maybe.mapMaybe (\response -> case response of Response.ChoseAttachment _ -> Just (); _ -> Nothing) responses)
       -- Which card is on this host, read through attachedTo: CR 400.7 minted a
       -- fresh id at the destination, so the Aura cannot be named by the id it was
       -- buried under.
@@ -1043,7 +1043,7 @@ replenishSpec s registry =
                 let (spell, _, buriedIds, gs) = board plains replenish [] buried
                     (after, responses) = run S.castAnswer spell gs
                     -- The Aura's GRAVEYARD id, whichever slot of the batch it took.
-                    auraId = Maybe.listToMaybe [oid | (oid, printing) <- zip buriedIds buried, Printing.card printing == Printing.card unholy]
+                    auraId = Maybe.listToMaybe (fmap fst (filter (\(_, printing) -> Printing.card printing == Printing.card unholy) (zip buriedIds buried)))
                     -- By CARD: CR 400.7 minted a fresh id at the battlefield.
                     masterNew = List.find (\oid -> Game.cardOf oid after == Just (Printing.card master)) (Set.toList (GameState.battlefield after))
                  in ( fmap (`S.powerToughnessOf` after) masterNew,

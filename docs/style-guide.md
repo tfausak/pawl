@@ -4,10 +4,11 @@ Preferences for writing Haskell here --- style and practice more than layout,
 which Ormolu owns. Recommendations, not laws: deviate when you can defend it
 in review. Above all, prefer clarity over cleverness.
 
-`hooky fix` runs Ormolu and HLint; `.hlint.yaml` enforces the rules marked
-*(hlint)* below and the extension allowlist, and is configured not to suggest
-against the rest. Code compiles under `-Weverything -Werror` (`pedantic`),
-less the `-Wno-*` list in `pawl.cabal`'s `common library` stanza.
+`hooky fix` runs Ormolu and HLint; `.hlint.yaml` enforces these guidelines
+wherever HLint can state one, and is configured not to suggest against the
+rest. What follows is what it cannot state, or cannot state in full. Code
+compiles under `-Weverything -Werror` (`pedantic`), less the `-Wno-*` list in
+`pawl.cabal`'s `common library` stanza.
 
 ## Modules and imports
 
@@ -52,7 +53,7 @@ less the `-Wno-*` list in `pawl.cabal`'s `common library` stanza.
 - Avoid `String`; use `Text`.
 - Avoid `Int`; prefer arbitrary precision (`Integer`, `Natural`) unless a wire
   or storage format forces a width. Convert with the named total functions in
-  `Pawl.Extra.*`, never `fromIntegral` *(hlint)*.
+  `Pawl.Extra.*`, never `fromIntegral`.
 - Avoid `List` for anything but a stack or a once-iterated stream: `Seq` when
   order matters, `Set` when it doesn't.
 
@@ -63,6 +64,7 @@ less the `-Wno-*` list in `pawl.cabal`'s `common library` stanza.
   clauses.
 - Avoid using partial functions (`head`, `fromJust`) and writing them
   (non-exhaustive matches, `undefined`, `error`); return `Maybe`/`Either`.
+  Tests may use them, where blowing up is the same as failing.
 - Prefer `do` notation to `>>=` chains, and monadic `do` (bind each field,
   then `pure Record { title = title, ... }`) to `<$>`/`<*>` for building
   records --- the applicative form silently swaps same-typed fields. Never
@@ -76,4 +78,4 @@ less the `-Wno-*` list in `pawl.cabal`'s `common library` stanza.
 - Avoid list comprehensions; `map`/`filter`, or `do` with `guard`.
 - Avoid multi-layered nesting of `case`: pull one value out at a time.
 - Avoid duplicate guards: `y | p y -> a | q y -> b`, not two `y | ...` arms.
-- `g $ f x` over `g (f x)`; `h . g $ f x` over `h $ g $ f x` *(hlint)*.
+- `g $ f x` over `g (f x)`.

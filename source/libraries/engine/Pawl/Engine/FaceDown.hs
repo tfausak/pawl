@@ -204,11 +204,11 @@ canTurnFaceUp pid procedure oid gs =
 -- (docs/design.md's second invariant).
 turnableFaceUp :: PlayerId -> GameState -> [(ObjectId, TurnUpProcedure)]
 turnableFaceUp pid gs =
-  [ (oid, procedure)
-  | oid <- Set.toAscList (GameState.battlefield gs),
-    procedure <- [TurnUpProcedure.Morph, TurnUpProcedure.Disguise, TurnUpProcedure.Manifest],
-    canTurnFaceUp pid procedure oid gs
-  ]
+  do
+    oid <- Set.toAscList (GameState.battlefield gs)
+    procedure <- [TurnUpProcedure.Morph, TurnUpProcedure.Disguise, TurnUpProcedure.Manifest]
+    Monad.guard (canTurnFaceUp pid procedure oid gs)
+    pure (oid, procedure)
 
 -- CR 702.37e, CR 702.168d and CR 701.40b, in the order all three rules share:
 -- show all players what the procedure's cost is, pay it, then turn the permanent
@@ -283,13 +283,12 @@ turnFaceUp perform pid procedure oid = do
 -- half of its first sentence, and its second sentence.
 revealsInsteadOfTurningUp :: ObjectId -> GameState -> Bool
 revealsInsteadOfTurningUp oid gs =
-  fmap (Facing.reasonOf . Object.facing) (Game.lookupObject oid gs) == Just (Just FaceDownReason.Manifested)
-    && maybe
-      False
-      (not . Set.null . Set.intersection instantOrSorcery . TypeLine.types . Face.typeLine)
-      (Game.faceUpFaceOf oid gs)
-  where
-    instantOrSorcery = Set.fromList [CardType.Instant, CardType.Sorcery]
+  let instantOrSorcery = Set.fromList [CardType.Instant, CardType.Sorcery]
+   in fmap (Facing.reasonOf . Object.facing) (Game.lookupObject oid gs) == Just (Just FaceDownReason.Manifested)
+        && maybe
+          False
+          (not . Set.null . Set.intersection instantOrSorcery . TypeLine.types . Face.typeLine)
+          (Game.faceUpFaceOf oid gs)
 
 -- The turning-over itself, once whatever allowed it has allowed it: the status
 -- write, CR 708.11's replacement loop, and CR 708.7's event, in that order and

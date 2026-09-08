@@ -739,7 +739,7 @@ brineBoard island savor brine piker =
       (carolPiker, g2) = S.addPermanent piker S.carol g1
       (savorId, g3) = S.addHandCard savor S.alice g2
       (brineId, g4) = S.addHandCard brine S.bob g3
-      stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (15 :: Int)]
+      stock g pid = List.foldl' (\g5 _ -> snd (S.addLibraryCard piker pid g5)) g [1 .. (15 :: Int)]
       stocked = List.foldl' stock g4 [S.alice, S.bob, S.carol]
    in ( (S.tapObject carolPiker (S.tapObject alicePiker stocked))
           { GameState.phase = Phase.PrecombatMain,
@@ -987,8 +987,8 @@ coldsteelHeartSpec s registry = Spec.describe s "Coldsteel Heart (CR 616.1)" $ d
     case castColdsteel mountain coldsteel (const 0) of
       ([entries], _, _) -> do
         Spec.assertEqWith s "CR 616.1e offered both candidates" (length entries) 2
-        Spec.assertEqWith s "and the player can tell them apart" (length (List.nub entries)) 2
-        Spec.assertEqWith s "though both come from the same permanent" (length (List.nub (fmap ReplacementEntry.source entries))) 1
+        Spec.assertEqWith s "and the player can tell them apart" (Set.size (Set.fromList entries)) 2
+        Spec.assertEqWith s "though both come from the same permanent" (Set.size (Set.fromList (fmap ReplacementEntry.source entries))) 1
       (payloads, _, _) -> Spec.assertFailure s ("expected exactly one ChooseReplacement, got " <> show (length payloads))
   -- The card-data control: independent of any payload assertion, so a JSON typo
   -- cannot hide behind a green one. Both rewrites ran.

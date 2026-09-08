@@ -22,6 +22,7 @@
 -- read here, and that group reads what its chapters' CR 611.2b durations do.
 module Pawl.SagaSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -402,4 +403,4 @@ stocked :: Printing.Printing -> GameState.GameState
 stocked plains =
   let base = S.landsInPlay plains 3
       add gs pid = snd (S.addLibraryCard plains pid gs)
-   in foldl add base [S.alice, S.alice, S.bob, S.bob]
+   in List.foldl' add base [S.alice, S.alice, S.bob, S.bob]

@@ -428,10 +428,9 @@ gathered gs =
       -- so a minted restriction that IS gated cannot slip past CR 508.1c's second
       -- clause either.
       mintedRows source =
-        [ (source, [], restriction)
-        | anyMinted,
-          restriction <- Keyword.mintedCombatRestrictionsOf (Projection.keywordsOf source gs)
-        ]
+        if anyMinted
+          then fmap (\restriction -> (source, [], restriction)) (Keyword.mintedCombatRestrictionsOf (Projection.keywordsOf source gs))
+          else []
       -- The short-circuit Pawl.Engine.Projection.replacementsAffecting takes, for
       -- its reason: projecting every permanent on every declaration would cost
       -- every board a walk that almost no board needs. One shared thunk, so the
@@ -882,7 +881,11 @@ cantAttackPlayer candidates players gs =
         Nothing -> []
         Just (AimedAt.MkAimedAt scope kinds) ->
           let barred = filter (\pid -> PlayerEffect.inScope pid (ActiveAttackProhibition.controller active) gs scope) players
-           in [(creature, pid, kind) | creature <- storedSubjects candidates gs active, pid <- barred, kind <- Set.toList kinds]
+           in do
+                creature <- storedSubjects candidates gs active
+                pid <- barred
+                kind <- Set.toList kinds
+                pure (creature, pid, kind)
       -- One whole-board projection and one grant walk for the whole walk, both
       -- unforced until some permanent actually reaches `named`.
       pcs = Projection.projectAll gs
@@ -905,7 +908,11 @@ cantAttackPlayer candidates players gs =
               -- CR 116.2d, `cantBeBlockedBy`'s filter on the other pairwise
               -- arm and a regression fence for the same reason.
               unignored creature = not (IgnoredAbility.ignoredForSubject creature source (nameOf restriction) gs)
-           in [(creature, pid, kind) | creature <- filter (\creature -> named source subject creature && unignored creature) candidates, pid <- barred, kind <- Set.toList kinds]
+           in do
+                creature <- filter (\creature -> named source subject creature && unignored creature) candidates
+                pid <- barred
+                kind <- Set.toList kinds
+                pure (creature, pid, kind)
       -- CR 508.5 through CR 802.3a: this arm's own gate is read at the seat the
       -- row names, which is the player being attacked and so the defending player
       -- of that announcement. One gather, one gate reading per seat,

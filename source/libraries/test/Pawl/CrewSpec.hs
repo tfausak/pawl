@@ -41,6 +41,7 @@
 -- fixtures watch, and CR 702.122d's "can't crew Vehicles".
 module Pawl.CrewSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Activate as Activate
@@ -88,7 +89,7 @@ board :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [Object
 board dreadnought crewers =
   let (vehicleId, gs0) = S.addPermanent dreadnought S.alice S.threePlayerGame
       add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
-      (crewIds, gs1) = foldl add ([], gs0) crewers
+      (crewIds, gs1) = List.foldl' add ([], gs0) crewers
    in (vehicleId, crewIds, gs1 {GameState.priority = Just S.alice})
 
 -- Activate the Vehicle's crew ability and resolve it. Returns the state
@@ -386,8 +387,8 @@ crewReaderBoard :: Printing.Printing -> [Printing.Printing] -> [Printing.Printin
 crewReaderBoard reader vehicles crewers =
   let (readerId, gs0) = S.addPermanent reader S.alice S.threePlayerGame
       add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
-      (vehicleIds, gs1) = foldl add ([], gs0) vehicles
-      (crewIds, gs2) = foldl add ([], gs1) crewers
+      (vehicleIds, gs1) = List.foldl' add ([], gs0) vehicles
+      (crewIds, gs2) = List.foldl' add ([], gs1) crewers
    in (readerId, vehicleIds, crewIds, gs2 {GameState.priority = Just S.alice})
 
 -- Crew `vehicleId`, then let CR 603.3 gather what that resolution triggered onto

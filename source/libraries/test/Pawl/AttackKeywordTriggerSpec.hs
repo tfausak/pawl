@@ -1152,7 +1152,7 @@ larcenySpec s registry =
         larceny <- S.printingOf s registry "Larceny"
         piker <- S.printingOf s registry "Goblin Piker"
         let (gs0, _, _, _) = S.threePlayerCombat [larceny, piker] [] []
-            stocked = List.foldl' (\g pid -> List.foldl' (\g' _ -> snd (S.addHandCard piker pid g')) g [(), (), ()]) gs0 [S.alice, S.bob, S.carol]
+            stocked = List.foldl' (\g pid -> List.foldl' (\g2 _ -> snd (S.addHandCard piker pid g2)) g [(), (), ()]) gs0 [S.alice, S.bob, S.carol]
             atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) plan stocked
             fought = S.runPure plan atDamage Damage.dealCombatDamage
             placed = S.runPure plan fought Engine.settleForPriority

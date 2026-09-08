@@ -87,12 +87,11 @@ import qualified Pawl.Types.Zone as Zone
 -- self-replacement ones the rule does admit are written into those effects.
 isManaAbility :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 isManaAbility ab =
-  not (null (Maybe.mapMaybe manaProduced effects))
-    && Map.null (Modal.allTargetSlots (ActivatedAbility.modal ab))
-    && not (any movesLibraryCard effects)
-    && not (any costMovesLibraryCard (Cost.components (ActivatedAbility.cost ab)))
-  where
-    effects = Modal.allEffects (ActivatedAbility.modal ab)
+  let effects = Modal.allEffects (ActivatedAbility.modal ab)
+   in not (null (Maybe.mapMaybe manaProduced effects))
+        && Map.null (Modal.allTargetSlots (ActivatedAbility.modal ab))
+        && not (any movesLibraryCard effects)
+        && not (any costMovesLibraryCard (Cost.components (ActivatedAbility.cost ab)))
 
 -- CR 605.1b: a TRIGGERED ability is a mana ability if it doesn't require a
 -- target, triggers from the activation or resolution of an activated mana
@@ -113,11 +112,10 @@ isManaAbility ab =
 -- stops it producing.
 isTriggeredManaAbility :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 isTriggeredManaAbility ab =
-  triggersFromMana (TriggeredAbility.condition ab)
-    && not (null (Maybe.mapMaybe manaProduced effects))
-    && Map.null (Modal.allTargetSlots (TriggeredAbility.modal ab))
-  where
-    effects = Modal.allEffects (TriggeredAbility.modal ab)
+  let effects = Modal.allEffects (TriggeredAbility.modal ab)
+   in triggersFromMana (TriggeredAbility.condition ab)
+        && not (null (Maybe.mapMaybe manaProduced effects))
+        && Map.null (Modal.allTargetSlots (TriggeredAbility.modal ab))
 
 -- CR 605.1b's middle clause, asked of one condition: does it trigger from the
 -- activation or resolution of an activated mana ability, or from mana being

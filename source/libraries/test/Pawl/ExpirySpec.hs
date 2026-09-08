@@ -1379,12 +1379,12 @@ castingFromExile oid p = case p of
 -- Whole steps, through the real turn machinery, until that turn number begins or
 -- the game ends. Bounded so a rules bug cannot hang the suite rather than fail.
 runToTurn :: (forall r. Prompt.Prompt r -> r) -> Natural -> GameState.GameState -> GameState.GameState
-runToTurn answer turn = go (128 :: Int)
-  where
-    go budget gs =
-      if budget <= 0 || GameState.turnNumber gs >= turn || Maybe.isJust (GameState.result gs)
-        then gs
-        else go (budget - 1) (S.runPure answer gs Engine.runStep)
+runToTurn answer turn =
+  let go budget gs =
+        if budget <= 0 || GameState.turnNumber gs >= turn || Maybe.isJust (GameState.result gs)
+          then gs
+          else go (budget - 1) (S.runPure answer gs Engine.runStep)
+   in go (128 :: Int)
 
 -- CR 601.3's permission, as the player it names.
 permissionOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe PlayerId.PlayerId

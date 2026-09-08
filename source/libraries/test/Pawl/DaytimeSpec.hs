@@ -43,6 +43,7 @@
 -- effect and has nothing to do with day or night.
 module Pawl.DaytimeSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -183,12 +184,11 @@ insectToken = CardName.MkCardName (Text.pack "Insect Token")
 -- A LIST rather than the first match, so a board that somehow grew two of them
 -- fails loudly instead of answering about one.
 expertFaces :: GameState.GameState -> [CardName.CardName]
-expertFaces gs =
-  [ name
-  | oid <- Game.zoneMembers Zone.Battlefield S.alice gs,
-    name <- Maybe.maybeToList (faceNameOf oid gs),
-    name == expertFront || name == expertBack
-  ]
+expertFaces gs = do
+  oid <- Game.zoneMembers Zone.Battlefield S.alice gs
+  name <- Maybe.maybeToList (faceNameOf oid gs)
+  Monad.guard (name == expertFront || name == expertBack)
+  pure name
 
 -- alice controls Tovolar and five Forests, with Infestation Expert in hand.
 -- `spells` is what the previous turn's active player cast, which is the whole of

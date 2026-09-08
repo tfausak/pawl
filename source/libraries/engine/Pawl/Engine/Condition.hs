@@ -43,28 +43,28 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.SlotName (SlotName)
 
 holds :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Condition.Type.Condition -> Bool
-holds viewOf context gs oid condition = case condition of
-  -- Both sides are evaluated against `oid` and with the same view, so a
-  -- Quantity.Power on either side reads the same object and a Quantity.Count on
-  -- either side sweeps the same board. Only the Comparison is oriented.
-  Condition.Type.Compares c ->
-    case (evaluate (Compares.measured c), evaluate (Compares.threshold c)) of
-      (Just n, Just t) -> case Compares.comparison c of
-        Comparison.Exactly -> n == t
-        Comparison.AtLeast -> n >= t
-        Comparison.AtMost -> n <= t
-      _ -> False
-  -- Each disjunct collapses its own unanswerable quantities to False, so an
-  -- empty list is False and a disjunct reading a slot nothing filled cannot
-  -- poison the ones beside it.
-  Condition.Type.Any conditions -> any (holds viewOf context gs oid) conditions
-  -- Each conjunct collapses its own unanswerable quantities to False, so a
-  -- conjunct nothing could evaluate makes the whole conjunction False rather
-  -- than leaving it undetermined -- the same conservative reading the header
-  -- gives one comparison. An empty list is True, the fold's unit.
-  Condition.Type.All conditions -> all (holds viewOf context gs oid) conditions
-  where
-    evaluate = Quantity.evaluate viewOf context gs oid
+holds viewOf context gs oid condition =
+  let evaluate = Quantity.evaluate viewOf context gs oid
+   in case condition of
+        -- Both sides are evaluated against `oid` and with the same view, so a
+        -- Quantity.Power on either side reads the same object and a Quantity.Count on
+        -- either side sweeps the same board. Only the Comparison is oriented.
+        Condition.Type.Compares c ->
+          case (evaluate (Compares.measured c), evaluate (Compares.threshold c)) of
+            (Just n, Just t) -> case Compares.comparison c of
+              Comparison.Exactly -> n == t
+              Comparison.AtLeast -> n >= t
+              Comparison.AtMost -> n <= t
+            _ -> False
+        -- Each disjunct collapses its own unanswerable quantities to False, so an
+        -- empty list is False and a disjunct reading a slot nothing filled cannot
+        -- poison the ones beside it.
+        Condition.Type.Any conditions -> any (holds viewOf context gs oid) conditions
+        -- Each conjunct collapses its own unanswerable quantities to False, so a
+        -- conjunct nothing could evaluate makes the whole conjunction False rather
+        -- than leaving it undetermined -- the same conservative reading the header
+        -- gives one comparison. An empty list is True, the fold's unit.
+        Condition.Type.All conditions -> all (holds viewOf context gs oid) conditions
 
 -- CR 611.2b: the condition with every PlayerRef.InSlot inside it baked to the
 -- seat the resolution's bindings name (Quantity.bakeBound, which carries the

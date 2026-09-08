@@ -28,8 +28,8 @@
 module Pawl.Engine.Commander where
 
 import qualified Control.Monad as Monad
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -347,7 +347,7 @@ returnable events gs =
       offer oid = case Game.lookupObject oid gs of
         Just obj | isCommander oid gs && stillThere oid -> Just (Object.owner obj, oid)
         _ -> Nothing
-   in Maybe.mapMaybe offer (List.nub arrivals)
+   in Maybe.mapMaybe offer (ListUtils.nubOrd arrivals)
 
 -- | CR 903.9b: "if a commander would be put into its owner's hand or library from
 -- anywhere, its owner may put it into the command zone instead". This is the

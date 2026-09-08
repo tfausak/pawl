@@ -2,6 +2,7 @@ module Pawl.Engine.Mulligan where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -192,10 +193,10 @@ handWindowExcept cap acted field question perform pid = do
           Nothing -> pure ()
           Just action -> do
             perform (fst key) pid (HandAction.effects action)
-            let acted' = case cap of
+            let acted2 = case cap of
                   HandWindowCap.Repeatable -> acted
                   HandWindowCap.OncePerCard -> Set.insert (fst key) acted
-            handWindowExcept cap acted' field question perform pid
+            handWindowExcept cap acted2 field question perform pid
 
 -- CR 103.6: the starting player acts first, then each other player in turn
 -- order, which is exactly the order `owners` arrives in. A player who has left
@@ -239,10 +240,10 @@ mulliganRounds perform counts deciding = do
       -- CR 103.5 takes every mulligan simultaneously. pawl is sequential;
       -- because a hand is hidden information, applying them in turn order is
       -- observably equivalent.
-      counts' <- Monad.foldM takeMulligan counts mulliganers
+      counts2 <- Monad.foldM takeMulligan counts mulliganers
       -- Kept players have dropped out; only this round's mulliganers decide
       -- again.
-      mulliganRounds perform counts' mulliganers
+      mulliganRounds perform counts2 mulliganers
 
 -- CR 103.5c / CR 800.6: how many of a player's mulligans are free -- do not
 -- count toward the cards bottomed or the mulligans allowed.
@@ -318,7 +319,7 @@ takeMulligan counts pid = do
         -- naming one card twice would bottom it twice, and the second
         -- changeZone is a no-op on an id that has already moved, so the hand
         -- would end up one card too big rather than visibly wrong.
-        let kept = List.genericTake n (List.nub (filter (\oid -> List.elem oid newHand) answer))
+        let kept = List.genericTake n (ListUtils.nubOrd (filter (\oid -> List.elem oid newHand) answer))
             topUp = List.genericTake (n - Natural.length kept) (filter (\oid -> List.notElem oid kept) newHand)
         pure (kept <> topUp)
       else -- CR 103.5: with nothing to bottom (a free mulligan, CR 103.5c) or a

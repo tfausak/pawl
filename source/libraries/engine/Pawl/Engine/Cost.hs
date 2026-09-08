@@ -18,6 +18,7 @@ module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -204,223 +205,226 @@ candidateCostsFor = candidateCostsGiven False
 -- permission adds: the printed cost first, then each alternative (CR 118.9a),
 -- untagged.
 candidateCostsGiven :: Bool -> PlayerId -> CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
-candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
-  Nothing -> []
-  Just obj | Facing.isFaceDown (Object.facing obj) -> [untagged faceDownCost]
-  Just obj -> case Object.source obj of
-    Source.OfCard printingId -> costsOfPrinting obj printingId
-    -- CR 701.42a puts a melded permanent onto the battlefield rather than onto
-    -- the stack, so it is never announced and there is no cost to offer for it.
-    Source.OfMeld _ -> []
-    -- CR 730.2 merges an object into a permanent on the battlefield, so a merged
-    -- permanent is never announced either.
-    Source.OfMerge _ -> []
-    Source.OfToken _ -> []
-    Source.OfAbility _ -> []
-    Source.OfTrigger _ -> []
-    Source.OfEmblem _ -> []
-    -- CR 707.10: "a copy of a spell isn't cast", so it is never announced and
-    -- there is no cost to offer for it.
-    Source.OfSpellCopy _ -> []
-    -- CR 722.3c's copy is CAST -- "the prepared permanent's controller may cast
-    -- the copy" -- so CR 601.2 announces it like any other spell and it is priced
-    -- exactly as the card-backed arm above prices a card, off the one-faced
-    -- printing Pawl.Engine.Prepare interned for the prepare spell's
-    -- characteristics.
-    Source.OfCardCopy printingId -> costsOfPrinting obj printingId
-    Source.OfInherentTrigger _ -> []
-  where
-    -- The card-backed body the two printing-carrying arms above share. CR 601.2
-    -- is why they share it rather than the copy getting a price of its own: a
-    -- cast copy goes through that rule's steps like any other spell, so every
-    -- alternative cost, every additional cost and every zone clause below reads
-    -- the same for both.
-    costsOfPrinting obj printingId = case Game.cardOfPrinting printingId gs of
-      -- Unreachable: a PrintingId is minted only by Game.intern, which inserts.
-      Nothing -> []
-      Just card ->
-        let face = Game.resolveFace (Just name) card
-            printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
-            -- CR 118.9d: an alternative replaces only the MANA cost; every
-            -- additional cost still applies. CR 702.34a's last sentence sends
-            -- flashback through the same rules, so its cost is wrapped the same.
-            withAdditional alternative =
-              alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
-            -- CR 604.2: an alternative cost whose "as long as" clause does not
-            -- hold is not offered at all.
-            --
-            -- CR 109.5's "you" is the CASTER, who a card in a hand or a graveyard
-            -- has no controller to supply (CR 108.4). The two coincided while
-            -- Cast.zoneCandidates handed out only the caster's own pile; a
-            -- permission naming somebody else's hand separates them (see #2169), and
-            -- the CR 601.3 permission and the CR 118.9 grant below read the caster
-            -- for the same reason.
-            available alternative = case AlternativeCost.condition alternative of
-              Nothing -> True
-              Just cond ->
-                Condition.holds
-                  (Projection.fullView gs)
-                  (Filter.contextFor (Game.teams gs) (Just pid) (Just oid))
-                  gs
-                  oid
-                  cond
-            alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
-            -- CR 702.103a: bestow, offered from EVERY zone rather than from one
-            -- arm of the case below -- "a static ability that functions in any
-            -- zone from which you could play the card it's on". So it is appended
-            -- to whatever that zone's own list is instead of replacing it, and
-            -- LAST, so `firstOffered` still reads the printed cost.
-            --
-            -- CR 118.9d wraps it in `withAdditional`, flashback's reason: an
-            -- alternative replaces only the mana cost.
-            --
-            -- The keywords are read off the PROJECTION for the graveyard arm's CR
-            -- 613.1 reason -- an ability granted where the card lies states rule
-            -- 702.103a's cost as much as a printed one -- which is the read the
-            -- hand arm below does not take for its own printed alternatives.
-            bestowed =
-              fmap
-                (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Bestow cost)) (withAdditional cost))
-                (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs)))
-            -- CR 702.160a / CR 718.3: prototype, offered from EVERY zone for
-            -- bestow's reason -- CR 113.6e classes an ability that modifies how
-            -- its own object can be cast as functioning "in any zone from which
-            -- it could be played or cast" -- so it is appended beside the zone's
-            -- own list rather than replacing it, and LAST, so `firstOffered`
-            -- still reads the printed cost.
-            --
-            -- CR 118.9d wraps it in `withAdditional` for flashback's reason. The
-            -- inset frame's POWER AND TOUGHNESS ride the tag rather than the
-            -- cost: nothing about the price depends on them, and
-            -- Pawl.Engine.Projection.View.withPrototype reads them back off
-            -- the keyword once Pawl.Engine.Cast has stamped the choice.
-            --
-            -- The keywords are read off the PROJECTION, bestow's read and for
-            -- rule 613.1's reason.
-            prototyped =
-              fmap
-                (\prototype -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Prototype prototype)) (withAdditional Cost.MkCost {Cost.mana = Just (Prototype.cost prototype), Cost.components = []}))
-                (Keyword.prototypes (Map.keysSet (Projection.keywordsOf oid gs)))
-            -- CR 702.140a: mutate, offered from EVERY zone for bestow's reason
-            -- -- rule 702.140a's static ability "functions while the spell with
-            -- mutate is on the stack", which CR 113.6e reaches from wherever the
-            -- cast begins -- so it joins the zone's own list rather than
-            -- replacing it, and LAST, so `firstOffered` still reads the printed
-            -- cost.
-            --
-            -- CR 118.9d wraps it in `withAdditional` for flashback's reason, and
-            -- rule 702.140a says the same in its own words: "casting a spell
-            -- using its mutate ability follows the rules for paying alternative
-            -- costs".
-            --
-            -- The keywords are read off the PROJECTION, bestow's read and for
-            -- rule 613.1's reason.
-            mutated =
-              fmap
-                (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
-                (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
-            -- CR 702.162a: more than meets the eye, read from EVERY zone for
-            -- bestow's reason -- "a static ability that functions in any zone from
-            -- which the spell may be cast".
-            --
-            -- Offered only for the BACK face, which is what rule 702.162a buys:
-            -- "you may cast this card CONVERTED by paying [cost]", and CR 712.11a
-            -- says a card cast converted is put on the stack with its back face
-            -- up. Pawl.Engine.Card.castableFaces is what puts that face on the
-            -- table (CR 712.11d); this prices it.
-            --
-            -- The keywords are the FRONT face's, printed, which is CR 712.11d's own
-            -- scope: the ability is "an ability of a double-faced card's front
-            -- face". So it is read off the card rather than off the projection of
-            -- the half being proposed, which carries the BACK face's keywords. A
-            -- more than meets the eye ability GRANTED to a card in a zone is
-            -- therefore not expanded (gap #1859).
-            converted =
-              if fmap Face.name (Card.backFace card) == Just (Face.name face)
-                then
-                  fmap
-                    (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
-                    (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (Card.frontFace card)))
-                else []
-            -- `converted` REPLACES the zone's own list rather than joining it:
-            -- the back face is a candidate at all only because rule 702.162a's
-            -- permission put it there, so that permission's cost is the only route
-            -- to casting it. CR 712.11 makes the FRONT face the default and CR
-            -- 712.11a names the converted cast as the way to a back face; no rule
-            -- offers a nonmodal back face for its own printed cost. Empty for every
-            -- other face and for every card without the ability, so each zone arm
-            -- below is reached exactly as it was.
-            --
-            -- Unobservable in this pool either way: no nonmodal back face prints a
-            -- mana cost, so the candidate this drops would have been CR 118.6's
-            -- unpayable one. Written because the alternative is a cast the rules do
-            -- not permit; a printing whose back face had a mana cost would be the
-            -- card that told the two apart.
-            orConverted zoneCandidates = if null converted then zoneCandidates else converted
-         in (<> (bestowed <> prototyped <> mutated)) . orConverted $ case Object.zone obj of
-              -- Four shapes, differing in what they do to the printed cost.
-              -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
-              -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it
-              -- is `printed`; jump-start (CR 702.133a) ADDS a discard to `printed`,
-              -- one however many such abilities the card has; and CR 601.3 /
-              -- Yawgmoth's Will is an EFFECT stating no cost, offering the hand's
-              -- list BESIDE the three rather than instead of them. Rule 702.34a's
-              -- "if the resulting spell is an instant or sorcery spell" gates the
-              -- PERMISSION (Keyword.permissionsFor) and is not re-asked here.
-              Zone.Graveyard ->
-                let -- CR 613.1: the keywords the card HAS in the graveyard, not
-                    -- the ones it prints, an ability granted there (CR 113.6f)
-                    -- stating rule 702.34a's cost as much as a printed one. Read
-                    -- off the OBJECT, so the caller's CR 709.3a half is measured.
-                    keywords = Map.keysSet (Projection.keywordsOf oid gs)
-                    -- The flashback keyword AS IT WAS READ: rule 702.34a's ability
-                    -- and its cost are one sentence, so the cost is what
-                    -- distinguishes one instance from another.
-                    flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
-                 in fmap flashback (Keyword.flashbackCosts keywords)
-                      <> [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed | Keyword.hasAftermath keywords]
-                      <> [ CandidateCost.MkCandidateCost
-                             (Just Keyword.Type.JumpStart)
-                             -- CR 702.133a's cost names no quality -- "discard a
-                             -- card" -- so the criterion admits everything.
-                             printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))]}
-                         | Keyword.hasJumpStart keywords
-                         ]
-                      -- UNTAGGED: an effect's permission states no cost, so
-                      -- neither rule 702.34a's clause nor rule 702.133a's is
-                      -- satisfied by paying it.
-                      <> (if permitted || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then fmap untagged (printed : alternatives) else [])
-              -- CR 702.170d: a PLOTTED card is cast "without paying its mana
-              -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
-              -- rule 702.170d being the only thing permitting this cast. The zone's
-              -- other permissions (CR 715.3d, Effect.GrantPlayFromExile) state no
-              -- cost and fall through to the `_` arm.
-              Zone.Exile
-                | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
-              -- CR 702.143a: a FORETOLD card is cast for its foretell cost, CR
-              -- 118.9's alternative cost, wrapped by withAdditional as flashback's
-              -- is. INSTEAD of the printed cost, the plotted arm's reason.
+candidateCostsGiven permitted pid name oid gs =
+  let -- The card-backed body the two printing-carrying arms above share. CR 601.2
+      -- is why they share it rather than the copy getting a price of its own: a
+      -- cast copy goes through that rule's steps like any other spell, so every
+      -- alternative cost, every additional cost and every zone clause below reads
+      -- the same for both.
+      costsOfPrinting obj printingId = case Game.cardOfPrinting printingId gs of
+        -- Unreachable: a PrintingId is minted only by Game.intern, which inserts.
+        Nothing -> []
+        Just card ->
+          let face = Game.resolveFace (Just name) card
+              printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
+              -- CR 118.9d: an alternative replaces only the MANA cost; every
+              -- additional cost still applies. CR 702.34a's last sentence sends
+              -- flashback through the same rules, so its cost is wrapped the same.
+              withAdditional alternative =
+                alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
+              -- CR 604.2: an alternative cost whose "as long as" clause does not
+              -- hold is not offered at all.
               --
-              -- Not implemented: CR 702.143d's card foretold with NO foretell cost,
-              -- unreachable from this module's own writer since CR 116.2h exiles
-              -- only a card with foretell (#1486).
-              Zone.Exile
-                | Maybe.isJust (Object.foretold obj) ->
-                    fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
-              -- CR 118.9's other half, "applied to it from another effect", as a
-              -- STANDING grant (Omniscience): a player-scoped alternative cost no
-              -- per-card list can hold. APPENDED to the hand's ordinary list rather
-              -- than replacing it, CR 118.9a letting the controller announce which
-              -- single alternative they pay, and last so that `firstOffered` still
-              -- reads the printed cost. Untagged, `untagged`'s reason.
+              -- CR 109.5's "you" is the CASTER, who a card in a hand or a graveyard
+              -- has no controller to supply (CR 108.4). The two coincided while
+              -- Cast.zoneCandidates handed out only the caster's own pile; a
+              -- permission naming somebody else's hand separates them (see #2169), and
+              -- the CR 601.3 permission and the CR 118.9 grant below read the caster
+              -- for the same reason.
+              available alternative = case AlternativeCost.condition alternative of
+                Nothing -> True
+                Just cond ->
+                  Condition.holds
+                    (Projection.fullView gs)
+                    (Filter.contextFor (Game.teams gs) (Just pid) (Just oid))
+                    gs
+                    oid
+                    cond
+              alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
+              -- CR 702.103a: bestow, offered from EVERY zone rather than from one
+              -- arm of the case below -- "a static ability that functions in any
+              -- zone from which you could play the card it's on". So it is appended
+              -- to whatever that zone's own list is instead of replacing it, and
+              -- LAST, so `firstOffered` still reads the printed cost.
               --
-              -- CR 107.3b's "the only legal choice for X is 0" falls out rather
-              -- than being enforced: withoutPayingManaCost carries an empty
-              -- ManaCost, which has no variable to prompt for.
-              Zone.Hand ->
-                fmap untagged (printed : alternatives)
-                  <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs]
-              _ -> fmap untagged (printed : alternatives)
+              -- CR 118.9d wraps it in `withAdditional`, flashback's reason: an
+              -- alternative replaces only the mana cost.
+              --
+              -- The keywords are read off the PROJECTION for the graveyard arm's CR
+              -- 613.1 reason -- an ability granted where the card lies states rule
+              -- 702.103a's cost as much as a printed one -- which is the read the
+              -- hand arm below does not take for its own printed alternatives.
+              bestowed =
+                fmap
+                  (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Bestow cost)) (withAdditional cost))
+                  (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+              -- CR 702.160a / CR 718.3: prototype, offered from EVERY zone for
+              -- bestow's reason -- CR 113.6e classes an ability that modifies how
+              -- its own object can be cast as functioning "in any zone from which
+              -- it could be played or cast" -- so it is appended beside the zone's
+              -- own list rather than replacing it, and LAST, so `firstOffered`
+              -- still reads the printed cost.
+              --
+              -- CR 118.9d wraps it in `withAdditional` for flashback's reason. The
+              -- inset frame's POWER AND TOUGHNESS ride the tag rather than the
+              -- cost: nothing about the price depends on them, and
+              -- Pawl.Engine.Projection.View.withPrototype reads them back off
+              -- the keyword once Pawl.Engine.Cast has stamped the choice.
+              --
+              -- The keywords are read off the PROJECTION, bestow's read and for
+              -- rule 613.1's reason.
+              prototyped =
+                fmap
+                  (\prototype -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Prototype prototype)) (withAdditional Cost.MkCost {Cost.mana = Just (Prototype.cost prototype), Cost.components = []}))
+                  (Keyword.prototypes (Map.keysSet (Projection.keywordsOf oid gs)))
+              -- CR 702.140a: mutate, offered from EVERY zone for bestow's reason
+              -- -- rule 702.140a's static ability "functions while the spell with
+              -- mutate is on the stack", which CR 113.6e reaches from wherever the
+              -- cast begins -- so it joins the zone's own list rather than
+              -- replacing it, and LAST, so `firstOffered` still reads the printed
+              -- cost.
+              --
+              -- CR 118.9d wraps it in `withAdditional` for flashback's reason, and
+              -- rule 702.140a says the same in its own words: "casting a spell
+              -- using its mutate ability follows the rules for paying alternative
+              -- costs".
+              --
+              -- The keywords are read off the PROJECTION, bestow's read and for
+              -- rule 613.1's reason.
+              mutated =
+                fmap
+                  (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
+                  (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+              -- CR 702.162a: more than meets the eye, read from EVERY zone for
+              -- bestow's reason -- "a static ability that functions in any zone from
+              -- which the spell may be cast".
+              --
+              -- Offered only for the BACK face, which is what rule 702.162a buys:
+              -- "you may cast this card CONVERTED by paying [cost]", and CR 712.11a
+              -- says a card cast converted is put on the stack with its back face
+              -- up. Pawl.Engine.Card.castableFaces is what puts that face on the
+              -- table (CR 712.11d); this prices it.
+              --
+              -- The keywords are the FRONT face's, printed, which is CR 712.11d's own
+              -- scope: the ability is "an ability of a double-faced card's front
+              -- face". So it is read off the card rather than off the projection of
+              -- the half being proposed, which carries the BACK face's keywords. A
+              -- more than meets the eye ability GRANTED to a card in a zone is
+              -- therefore not expanded (gap #1859).
+              converted =
+                if fmap Face.name (Card.backFace card) == Just (Face.name face)
+                  then
+                    fmap
+                      (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
+                      (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (Card.frontFace card)))
+                  else []
+              -- `converted` REPLACES the zone's own list rather than joining it:
+              -- the back face is a candidate at all only because rule 702.162a's
+              -- permission put it there, so that permission's cost is the only route
+              -- to casting it. CR 712.11 makes the FRONT face the default and CR
+              -- 712.11a names the converted cast as the way to a back face; no rule
+              -- offers a nonmodal back face for its own printed cost. Empty for every
+              -- other face and for every card without the ability, so each zone arm
+              -- below is reached exactly as it was.
+              --
+              -- Unobservable in this pool either way: no nonmodal back face prints a
+              -- mana cost, so the candidate this drops would have been CR 118.6's
+              -- unpayable one. Written because the alternative is a cast the rules do
+              -- not permit; a printing whose back face had a mana cost would be the
+              -- card that told the two apart.
+              orConverted zoneCandidates = if null converted then zoneCandidates else converted
+           in (<> (bestowed <> prototyped <> mutated)) . orConverted $ case Object.zone obj of
+                -- Four shapes, differing in what they do to the printed cost.
+                -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
+                -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it
+                -- is `printed`; jump-start (CR 702.133a) ADDS a discard to `printed`,
+                -- one however many such abilities the card has; and CR 601.3 /
+                -- Yawgmoth's Will is an EFFECT stating no cost, offering the hand's
+                -- list BESIDE the three rather than instead of them. Rule 702.34a's
+                -- "if the resulting spell is an instant or sorcery spell" gates the
+                -- PERMISSION (Keyword.permissionsFor) and is not re-asked here.
+                Zone.Graveyard ->
+                  let -- CR 613.1: the keywords the card HAS in the graveyard, not
+                      -- the ones it prints, an ability granted there (CR 113.6f)
+                      -- stating rule 702.34a's cost as much as a printed one. Read
+                      -- off the OBJECT, so the caller's CR 709.3a half is measured.
+                      keywords = Map.keysSet (Projection.keywordsOf oid gs)
+                      -- The flashback keyword AS IT WAS READ: rule 702.34a's ability
+                      -- and its cost are one sentence, so the cost is what
+                      -- distinguishes one instance from another.
+                      flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
+                   in fmap flashback (Keyword.flashbackCosts keywords)
+                        <> (if Keyword.hasAftermath keywords then [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed] else [])
+                        <> ( if Keyword.hasJumpStart keywords
+                               then
+                                 [ CandidateCost.MkCandidateCost
+                                     (Just Keyword.Type.JumpStart)
+                                     -- CR 702.133a's cost names no quality -- "discard a
+                                     -- card" -- so the criterion admits everything.
+                                     printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))]}
+                                 ]
+                               else []
+                           )
+                        -- UNTAGGED: an effect's permission states no cost, so
+                        -- neither rule 702.34a's clause nor rule 702.133a's is
+                        -- satisfied by paying it.
+                        <> (if permitted || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then fmap untagged (printed : alternatives) else [])
+                -- CR 702.170d: a PLOTTED card is cast "without paying its mana
+                -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
+                -- rule 702.170d being the only thing permitting this cast. The zone's
+                -- other permissions (CR 715.3d, Effect.GrantPlayFromExile) state no
+                -- cost and fall through to the `_` arm.
+                Zone.Exile
+                  | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
+                -- CR 702.143a: a FORETOLD card is cast for its foretell cost, CR
+                -- 118.9's alternative cost, wrapped by withAdditional as flashback's
+                -- is. INSTEAD of the printed cost, the plotted arm's reason.
+                --
+                -- Not implemented: CR 702.143d's card foretold with NO foretell cost,
+                -- unreachable from this module's own writer since CR 116.2h exiles
+                -- only a card with foretell (#1486).
+                Zone.Exile
+                  | Maybe.isJust (Object.foretold obj) ->
+                      fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
+                -- CR 118.9's other half, "applied to it from another effect", as a
+                -- STANDING grant (Omniscience): a player-scoped alternative cost no
+                -- per-card list can hold. APPENDED to the hand's ordinary list rather
+                -- than replacing it, CR 118.9a letting the controller announce which
+                -- single alternative they pay, and last so that `firstOffered` still
+                -- reads the printed cost. Untagged, `untagged`'s reason.
+                --
+                -- CR 107.3b's "the only legal choice for X is 0" falls out rather
+                -- than being enforced: withoutPayingManaCost carries an empty
+                -- ManaCost, which has no variable to prompt for.
+                Zone.Hand ->
+                  fmap untagged (printed : alternatives)
+                    <> (if PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs then [untagged (withoutPayingManaCost face)] else [])
+                _ -> fmap untagged (printed : alternatives)
+   in case Game.lookupObject oid gs of
+        Nothing -> []
+        Just obj | Facing.isFaceDown (Object.facing obj) -> [untagged faceDownCost]
+        Just obj -> case Object.source obj of
+          Source.OfCard printingId -> costsOfPrinting obj printingId
+          -- CR 701.42a puts a melded permanent onto the battlefield rather than onto
+          -- the stack, so it is never announced and there is no cost to offer for it.
+          Source.OfMeld _ -> []
+          -- CR 730.2 merges an object into a permanent on the battlefield, so a merged
+          -- permanent is never announced either.
+          Source.OfMerge _ -> []
+          Source.OfToken _ -> []
+          Source.OfAbility _ -> []
+          Source.OfTrigger _ -> []
+          Source.OfEmblem _ -> []
+          -- CR 707.10: "a copy of a spell isn't cast", so it is never announced and
+          -- there is no cost to offer for it.
+          Source.OfSpellCopy _ -> []
+          -- CR 722.3c's copy is CAST -- "the prepared permanent's controller may cast
+          -- the copy" -- so CR 601.2 announces it like any other spell and it is priced
+          -- exactly as the card-backed arm above prices a card, off the one-faced
+          -- printing Pawl.Engine.Prepare interned for the prepare spell's
+          -- characteristics.
+          Source.OfCardCopy printingId -> costsOfPrinting obj printingId
+          Source.OfInherentTrigger _ -> []
 
 -- CR 601.2f: the mana or alternative cost, plus additional costs and increases,
 -- minus reductions. `cost` arrives with X already substituted (CR 601.2b precedes
@@ -557,13 +561,13 @@ reductionOrders adjustments manaCost =
       orders rs =
         if uniform rs
           then [rs]
-          else concatMap (\r -> fmap (r :) (orders (List.delete r rs))) (List.nub rs)
+          else concatMap (\r -> fmap (r :) (orders (List.delete r rs))) (ListUtils.nubOrd rs)
       withTotal order =
         let reordered = adjustments {CostAdjustments.reductions = order}
          in (reordered, applyAdjustments reordered manaCost)
       manaValue (_, ManaCost.MkManaCost symbols) = sum (fmap Quantity.symbolValue symbols)
       candidates = List.sortOn manaValue (fmap withTotal (orders (CostAdjustments.reductions adjustments)))
-   in case List.nubBy (\x y -> snd x == snd y) candidates of
+   in case ListUtils.nubOrdOn snd candidates of
         entry : rest -> entry NonEmpty.:| rest
         -- Unreachable: `orders` answers at least one order for every list, the
         -- empty one included, so the deduplication has something to keep. Left
@@ -1022,7 +1026,7 @@ reductionHalvesOf :: ManaSymbol.ManaSymbol -> Maybe [ManaSymbol.ManaSymbol]
 reductionHalvesOf symbol = case symbol of
   ManaSymbol.Generic _ -> Nothing
   ManaSymbol.OfType _ -> Nothing
-  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Just (List.nub [ManaSymbol.OfType a, ManaSymbol.OfType b])
+  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Just (ListUtils.nubOrd [ManaSymbol.OfType a, ManaSymbol.OfType b])
   ManaSymbol.MonocoloredHybrid manaType ->
     Just [ManaSymbol.OfType manaType, ManaSymbol.Generic Mana.monocoloredHybridGeneric]
   ManaSymbol.Phyrexian _ -> Nothing
@@ -1444,169 +1448,169 @@ tapObject = Event.tap
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
 claimOf :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
-claimOf slots pid oid component gs = case component of
-  -- CR 701.21a: the permanents this player controls that match the criterion.
-  CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates slots pid (Just oid) criterion gs)) n
-  CostComponent.SacrificeThis ->
-    claim
-      (ClaimAxis.Removal Zone.Battlefield)
-      -- CR 101.2's prohibition, as canPayComponent reads it below; the two
-      -- answers have to agree.
-      ( itself
-          ( Set.member oid (GameState.battlefield gs)
-              && Projection.controllerOf oid gs == Just pid
-              && not (SacrificeRestriction.prohibited oid gs)
-          )
-      )
-      1
-  -- The same battlefield pool SacrificeThis draws on -- a permanent returned to
-  -- hand is as gone from the battlefield as one sacrificed -- and WITHOUT CR
-  -- 101.2's prohibition, `canPayComponent`'s reading below and for its reason.
-  -- The two answers have to agree.
-  --
-  -- A FENCE and not proven behaviour: Grinning Ignus is the one card printing
-  -- this component, its cost states one component and a non-empty mana part, so
-  -- `repeatsOf` settles at 1 before any axis matters. Keying it ClaimAxis.Tapping
-  -- instead leaves the suite green.
-  CostComponent.ReturnThis ->
-    claim
-      (ClaimAxis.Removal Zone.Battlefield)
-      ( itself
-          ( Set.member oid (GameState.battlefield gs)
-              && Projection.controllerOf oid gs == Just pid
-          )
-      )
-      1
-  -- The same battlefield pool the two arms above claim, and on the same axis: a
-  -- permanent exiled is as gone from the battlefield as one sacrificed. WITHOUT
-  -- CR 101.2's prohibition, ReturnThis' reading above and for its reason; the
-  -- two answers have to agree.
-  --
-  -- A FENCE and not proven behaviour, ReturnThis' note above: every printing of
-  -- this component in `data/cards/` -- Brittle Effigy, Hanged Executioner --
-  -- states a non-empty mana part, so `repeatsOf` settles at 1 before any axis
-  -- matters.
-  CostComponent.ExileThis ->
-    claim
-      (ClaimAxis.Removal Zone.Battlefield)
-      ( itself
-          ( Set.member oid (GameState.battlefield gs)
-              && Projection.controllerOf oid gs == Just pid
-          )
-      )
-      1
-  CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
-    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates slots pid oid criterion gs)) n
-  CostComponent.DiscardThis _ -> claim (ClaimAxis.Removal Zone.Hand) (itself (isOwnedIn Zone.Hand)) 1
-  -- The same hand pool the two arms above claim, and on the same axis: what the
-  -- payment spends is a card leaving the hand, and the battlefield end adds a
-  -- permanent rather than competing for one. A FENCE and not proven behaviour --
-  -- every printing of this cost is a CR 118.12 offer, which `repeatsOf` never
-  -- measures, so no board separates this from any other axis.
-  CostComponent.PutCardFromHandOntoBattlefield criterion ->
-    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (putOntoBattlefieldCandidates slots pid oid criterion gs)) 1
-  -- The same hand pool and the same axis: CR 406.2's exile spends a card leaving
-  -- the hand exactly as a discard does. LOAD-BEARING and not a fence -- Cadaverous
-  -- Bloom's cost has no mana part, so `repeatsOf` reads this claim to decide how
-  -- many times the ability can be activated, which is the hand's size.
-  --
-  -- The pool excludes only the object the COST is on, so a spell being offered
-  -- counts as fuel for the source that would pay for it -- CR 601.2a has moved it
-  -- to the stack by the time CR 601.2h pays, and this reading is one card too
-  -- generous at the offer (gap #3393).
-  CostComponent.ExileCardFromHand criterion ->
-    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
-  CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
-    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid criterion gs)) n
-  -- A pool of at most ONE, CR 404.2's order having picked it.
-  CostComponent.ExileTopFromGraveyard criterion ->
-    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate slots pid criterion gs))) 1
-  CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
-  -- CR 701.17a spends cards out of the paying player's own library, so the pool
-  -- is that library and the count is how many the mill takes -- the ZONE keying a
-  -- Removal soundly for the header's reason. What it buys is two mills of one
-  -- cost needing two cards rather than one, which Hall's condition then asks; a
-  -- FENCE, no card in `data/cards/` milling twice in one cost.
-  CostComponent.MillCards n ->
-    claim (ClaimAxis.Removal Zone.Library) (Set.fromList (Game.zoneMembers Zone.Library pid gs)) n
-  -- CR 107.5: {T} spends exactly the untapped-ness the TapPermanents arm below
-  -- claims, so it is the same axis, on a pool of one.
-  CostComponent.TapThis ->
-    claim
-      ClaimAxis.Tapping
-      -- canPayComponent's own guard for this component, read below; the two
-      -- answers have to agree.
-      ( itself
-          ( Set.member oid (GameState.battlefield gs)
-              && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
-          )
-      )
-      1
-  -- Nothing, and no printing can observe it: CR 107.6's {Q} spends TAPPED-ness,
-  -- a third axis, and names the object the cost is on, so two such claims could
-  -- only come from one cost carrying {Q} twice.
-  CostComponent.UntapThis -> Nothing
-  -- ONE, and deliberately not the Natural: that number is a THRESHOLD on an
-  -- aggregate rather than a count of objects, so how many permanents a payment
-  -- taps is not settled until the payer picks them. A threshold above 0 needs
-  -- some permanent of positive power (canPayComponent below), so one is a LOWER
-  -- BOUND on what the payment taps and can never over-refuse; a threshold of 0 is
-  -- paid by the empty set, taps nothing and claims nothing.
-  --
-  -- The pool is tapCandidates', TapPermanents' below: tapped candidates included,
-  -- the same permissive reading and for its reason. CR 702.122a's own criterion
-  -- excludes them (Pawl.Engine.Keyword's crew), so a crew cost's pool is the
-  -- untapped creatures exactly.
-  CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
-    | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) 1
-    | otherwise -> Nothing
-  -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's,
-  -- for the header's reason. ManaSpec's "a creature tapped for mana can still be
-  -- sacrificed" is the case that proves the axes stay apart.
-  --
-  -- The pool is every candidate the criterion admits, tapped ones included --
-  -- the PERMISSIVE reading where a criterion omits "untapped", unobservable
-  -- since an already-tapped candidate spends no untapped-ness.
-  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
-    claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) n
-  -- The battlefield pool SacrificeThis and ReturnThis draw on, on their axis
-  -- and not the tapping one: a permanent returned to hand is as gone from the
-  -- battlefield as one sacrificed, so a cost that returns and a cost that
-  -- sacrifices compete for the same objects.
-  --
-  -- A FENCE and not proven behaviour, ReturnThis' above and for its reason:
-  -- Meloku the Clouded Mirror's cost states one object-claiming component, so
-  -- Hall's condition groups a single claim and keying it ClaimAxis.Tapping
-  -- instead leaves the suite green.
-  CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
-    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates slots pid oid criterion gs)) n
-  CostComponent.PayLife _ -> Nothing
-  CostComponent.PayLifeX -> Nothing
-  CostComponent.PayEnergyX -> Nothing
-  CostComponent.PayEnergy _ -> Nothing
-  CostComponent.AddLoyaltyToThis _ -> Nothing
-  CostComponent.RemoveLoyaltyFromThis _ -> Nothing
-  -- Nothing: CR 122.1's counter is a marker rather than an object, so no object
-  -- leaves any pool -- the two arms either side of this one, for their reason. A
-  -- FENCE, `repeatsOf` settling before any axis matters for a cost with one
-  -- component and a mana part.
-  CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
-  CostComponent.PutPlusOneCountersOnThis _ -> Nothing
-  -- Nothing, though this one DOES pick an object out of a pool: CR 701.68a takes
-  -- nothing out of a zone. Two blights in one cost may choose the same creature,
-  -- which is right -- CR 122.6 stacks counters.
-  CostComponent.Blight _ -> Nothing
-  CostComponent.BlightX -> Nothing
-  where
-    claim a p n = Just (Claim.Type.MkClaim {Claim.Type.axis = a, Claim.Type.pool = p, Claim.Type.count = n})
-    itself condition = if condition then Set.singleton oid else Set.empty
-    -- canPayComponent's own guard for the two `*This` arms that read a zone
-    -- rather than control: CR 108.4 gives a card outside the battlefield no
-    -- controller, and CR 400.3 puts it in its OWNER's zone.
-    isOwnedIn zone = case Game.lookupObject oid gs of
-      Nothing -> False
-      Just obj -> Object.zone obj == zone && Object.owner obj == pid
+claimOf slots pid oid component gs =
+  let claim a p n = Just (Claim.Type.MkClaim {Claim.Type.axis = a, Claim.Type.pool = p, Claim.Type.count = n})
+      itself condition = if condition then Set.singleton oid else Set.empty
+      -- canPayComponent's own guard for the two `*This` arms that read a zone
+      -- rather than control: CR 108.4 gives a card outside the battlefield no
+      -- controller, and CR 400.3 puts it in its OWNER's zone.
+      isOwnedIn zone = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> Object.zone obj == zone && Object.owner obj == pid
+   in case component of
+        -- CR 701.21a: the permanents this player controls that match the criterion.
+        CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
+          claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates slots pid (Just oid) criterion gs)) n
+        CostComponent.SacrificeThis ->
+          claim
+            (ClaimAxis.Removal Zone.Battlefield)
+            -- CR 101.2's prohibition, as canPayComponent reads it below; the two
+            -- answers have to agree.
+            ( itself
+                ( Set.member oid (GameState.battlefield gs)
+                    && Projection.controllerOf oid gs == Just pid
+                    && not (SacrificeRestriction.prohibited oid gs)
+                )
+            )
+            1
+        -- The same battlefield pool SacrificeThis draws on -- a permanent returned to
+        -- hand is as gone from the battlefield as one sacrificed -- and WITHOUT CR
+        -- 101.2's prohibition, `canPayComponent`'s reading below and for its reason.
+        -- The two answers have to agree.
+        --
+        -- A FENCE and not proven behaviour: Grinning Ignus is the one card printing
+        -- this component, its cost states one component and a non-empty mana part, so
+        -- `repeatsOf` settles at 1 before any axis matters. Keying it ClaimAxis.Tapping
+        -- instead leaves the suite green.
+        CostComponent.ReturnThis ->
+          claim
+            (ClaimAxis.Removal Zone.Battlefield)
+            ( itself
+                ( Set.member oid (GameState.battlefield gs)
+                    && Projection.controllerOf oid gs == Just pid
+                )
+            )
+            1
+        -- The same battlefield pool the two arms above claim, and on the same axis: a
+        -- permanent exiled is as gone from the battlefield as one sacrificed. WITHOUT
+        -- CR 101.2's prohibition, ReturnThis' reading above and for its reason; the
+        -- two answers have to agree.
+        --
+        -- A FENCE and not proven behaviour, ReturnThis' note above: every printing of
+        -- this component in `data/cards/` -- Brittle Effigy, Hanged Executioner --
+        -- states a non-empty mana part, so `repeatsOf` settles at 1 before any axis
+        -- matters.
+        CostComponent.ExileThis ->
+          claim
+            (ClaimAxis.Removal Zone.Battlefield)
+            ( itself
+                ( Set.member oid (GameState.battlefield gs)
+                    && Projection.controllerOf oid gs == Just pid
+                )
+            )
+            1
+        CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
+          claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates slots pid oid criterion gs)) n
+        CostComponent.DiscardThis _ -> claim (ClaimAxis.Removal Zone.Hand) (itself (isOwnedIn Zone.Hand)) 1
+        -- The same hand pool the two arms above claim, and on the same axis: what the
+        -- payment spends is a card leaving the hand, and the battlefield end adds a
+        -- permanent rather than competing for one. A FENCE and not proven behaviour --
+        -- every printing of this cost is a CR 118.12 offer, which `repeatsOf` never
+        -- measures, so no board separates this from any other axis.
+        CostComponent.PutCardFromHandOntoBattlefield criterion ->
+          claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (putOntoBattlefieldCandidates slots pid oid criterion gs)) 1
+        -- The same hand pool and the same axis: CR 406.2's exile spends a card leaving
+        -- the hand exactly as a discard does. LOAD-BEARING and not a fence -- Cadaverous
+        -- Bloom's cost has no mana part, so `repeatsOf` reads this claim to decide how
+        -- many times the ability can be activated, which is the hand's size.
+        --
+        -- The pool excludes only the object the COST is on, so a spell being offered
+        -- counts as fuel for the source that would pay for it -- CR 601.2a has moved it
+        -- to the stack by the time CR 601.2h pays, and this reading is one card too
+        -- generous at the offer (gap #3393).
+        CostComponent.ExileCardFromHand criterion ->
+          claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
+        CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
+          claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid criterion gs)) n
+        -- A pool of at most ONE, CR 404.2's order having picked it.
+        CostComponent.ExileTopFromGraveyard criterion ->
+          claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate slots pid criterion gs))) 1
+        CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
+        -- CR 701.17a spends cards out of the paying player's own library, so the pool
+        -- is that library and the count is how many the mill takes -- the ZONE keying a
+        -- Removal soundly for the header's reason. What it buys is two mills of one
+        -- cost needing two cards rather than one, which Hall's condition then asks; a
+        -- FENCE, no card in `data/cards/` milling twice in one cost.
+        CostComponent.MillCards n ->
+          claim (ClaimAxis.Removal Zone.Library) (Set.fromList (Game.zoneMembers Zone.Library pid gs)) n
+        -- CR 107.5: {T} spends exactly the untapped-ness the TapPermanents arm below
+        -- claims, so it is the same axis, on a pool of one.
+        CostComponent.TapThis ->
+          claim
+            ClaimAxis.Tapping
+            -- canPayComponent's own guard for this component, read below; the two
+            -- answers have to agree.
+            ( itself
+                ( Set.member oid (GameState.battlefield gs)
+                    && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
+                )
+            )
+            1
+        -- Nothing, and no printing can observe it: CR 107.6's {Q} spends TAPPED-ness,
+        -- a third axis, and names the object the cost is on, so two such claims could
+        -- only come from one cost carrying {Q} twice.
+        CostComponent.UntapThis -> Nothing
+        -- ONE, and deliberately not the Natural: that number is a THRESHOLD on an
+        -- aggregate rather than a count of objects, so how many permanents a payment
+        -- taps is not settled until the payer picks them. A threshold above 0 needs
+        -- some permanent of positive power (canPayComponent below), so one is a LOWER
+        -- BOUND on what the payment taps and can never over-refuse; a threshold of 0 is
+        -- paid by the empty set, taps nothing and claims nothing.
+        --
+        -- The pool is tapCandidates', TapPermanents' below: tapped candidates included,
+        -- the same permissive reading and for its reason. CR 702.122a's own criterion
+        -- excludes them (Pawl.Engine.Keyword's crew), so a crew cost's pool is the
+        -- untapped creatures exactly.
+        CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
+          | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) 1
+          | otherwise -> Nothing
+        -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's,
+        -- for the header's reason. ManaSpec's "a creature tapped for mana can still be
+        -- sacrificed" is the case that proves the axes stay apart.
+        --
+        -- The pool is every candidate the criterion admits, tapped ones included --
+        -- the PERMISSIVE reading where a criterion omits "untapped", unobservable
+        -- since an already-tapped candidate spends no untapped-ness.
+        CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
+          claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) n
+        -- The battlefield pool SacrificeThis and ReturnThis draw on, on their axis
+        -- and not the tapping one: a permanent returned to hand is as gone from the
+        -- battlefield as one sacrificed, so a cost that returns and a cost that
+        -- sacrifices compete for the same objects.
+        --
+        -- A FENCE and not proven behaviour, ReturnThis' above and for its reason:
+        -- Meloku the Clouded Mirror's cost states one object-claiming component, so
+        -- Hall's condition groups a single claim and keying it ClaimAxis.Tapping
+        -- instead leaves the suite green.
+        CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
+          claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates slots pid oid criterion gs)) n
+        CostComponent.PayLife _ -> Nothing
+        CostComponent.PayLifeX -> Nothing
+        CostComponent.PayEnergyX -> Nothing
+        CostComponent.PayEnergy _ -> Nothing
+        CostComponent.AddLoyaltyToThis _ -> Nothing
+        CostComponent.RemoveLoyaltyFromThis _ -> Nothing
+        -- Nothing: CR 122.1's counter is a marker rather than an object, so no object
+        -- leaves any pool -- the two arms either side of this one, for their reason. A
+        -- FENCE, `repeatsOf` settling before any axis matters for a cost with one
+        -- component and a mana part.
+        CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+        CostComponent.PutPlusOneCountersOnThis _ -> Nothing
+        -- Nothing, though this one DOES pick an object out of a pool: CR 701.68a takes
+        -- nothing out of a zone. Two blights in one cost may choose the same creature,
+        -- which is right -- CR 122.6 stacks counters.
+        CostComponent.Blight _ -> Nothing
+        CostComponent.BlightX -> Nothing
 
 -- CR 118.3's "fully", asked of a cost's components TOGETHER rather than one at a
 -- time: CR 601.2h pays them in any order, so the question is whether SOME
@@ -1876,22 +1880,22 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
 -- something else IS spending they are loose, and Pawl.Engine.Mana's joint
 -- question across sources tightens them.
 repeatsOf :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
-repeatsOf pid oid cost gs = case Cost.mana cost of
-  Just (ManaCost.MkManaCost []) -> case ceilings of
-    [] -> 1
-    limits -> minimum limits
-  _ -> 1
-  where
-    components = Cost.components cost
-    claims = claimsOf Map.empty pid oid components gs
-    objectCeiling = if null claims then [] else [Claim.repeats claims]
-    lifeCeiling = case lifeOwedBy components of
-      0 -> []
-      owed -> [div (lifeTotalOf pid gs) owed]
-    counterCeiling = case plusOneCountersOwedBy components of
-      0 -> []
-      owed -> [div (countersOn CounterKind.PlusOnePlusOne oid gs) owed]
-    ceilings = objectCeiling <> lifeCeiling <> counterCeiling <> Maybe.mapMaybe uncountedCeiling components
+repeatsOf pid oid cost gs =
+  let components = Cost.components cost
+      claims = claimsOf Map.empty pid oid components gs
+      objectCeiling = if null claims then [] else [Claim.repeats claims]
+      lifeCeiling = case lifeOwedBy components of
+        0 -> []
+        owed -> [div (lifeTotalOf pid gs) owed]
+      counterCeiling = case plusOneCountersOwedBy components of
+        0 -> []
+        owed -> [div (countersOn CounterKind.PlusOnePlusOne oid gs) owed]
+      ceilings = objectCeiling <> lifeCeiling <> counterCeiling <> Maybe.mapMaybe uncountedCeiling components
+   in case Cost.mana cost of
+        Just (ManaCost.MkManaCost []) -> case ceilings of
+          [] -> 1
+          limits -> minimum limits
+        _ -> 1
 
 -- The ceiling ONE component imposes that `repeatsOf`'s three totals do not
 -- already carry, or Nothing where one of them does. 1 for every resource this
@@ -2483,20 +2487,19 @@ reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
 -- are non-decreasing along the log.
 keepingLibraryActions :: GameState -> GameState -> GameState
 keepingLibraryActions since snapshot =
-  snapshot
-    { GameState.library = Map.mapWithKey keep (GameState.library snapshot),
-      GameState.events = GameState.events snapshot <> Seq.filter revealedFromLibrary (Seq.drop (Seq.length (GameState.events snapshot)) (GameState.events since)),
-      GameState.nextEventGroup = GameState.nextEventGroup since
-    }
-  where
-    keep pid held = case Map.lookup pid (GameState.library since) of
-      Just reordered | members reordered == members held -> reordered
-      _ -> held
-    members held = Set.fromList (Foldable.toList held)
-    inLibraryOf gs oid = any (Foldable.elem oid) (GameState.library gs)
-    revealedFromLibrary logged = case LoggedEvent.event logged of
-      GameEvent.Revealed revealed -> inLibraryOf snapshot (Revealed.card revealed) && inLibraryOf since (Revealed.card revealed)
-      _ -> False
+  let keep pid held = case Map.lookup pid (GameState.library since) of
+        Just reordered | members reordered == members held -> reordered
+        _ -> held
+      members held = Set.fromList (Foldable.toList held)
+      inLibraryOf gs oid = any (Foldable.elem oid) (GameState.library gs)
+      revealedFromLibrary logged = case LoggedEvent.event logged of
+        GameEvent.Revealed revealed -> inLibraryOf snapshot (Revealed.card revealed) && inLibraryOf since (Revealed.card revealed)
+        _ -> False
+   in snapshot
+        { GameState.library = Map.mapWithKey keep (GameState.library snapshot),
+          GameState.events = GameState.events snapshot <> Seq.filter revealedFromLibrary (Seq.drop (Seq.length (GameState.events snapshot)) (GameState.events since)),
+          GameState.nextEventGroup = GameState.nextEventGroup since
+        }
 
 -- The restore every caller that reverts a failed payment to its own snapshot
 -- performs: `before` with what CR 733.1's last sentence keeps standing, read off
@@ -2740,50 +2743,50 @@ payToll perform pid charges = do
 -- above, one charge at a time. Its Natural is discarded for Activate's reason:
 -- rule 702.150a asks about the player who CAST an object.
 announceToll :: PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game [(ObjectId, Cost Keyword.Type.Keyword)]
-announceToll pid charges = go [] 0 charges
-  where
-    symbolsOf = foldMap ManaCost.unwrap . Cost.mana . snd
-    -- CR 118.3 makes the whole toll one demand on one life total, so every
-    -- charge's own CR 119.4 payments ride on every route offered for any of them.
-    outside = sum (fmap (lifeOwedBy . Cost.components . snd) charges)
-    go done committed remaining = case remaining of
-      [] -> pure (reverse done)
-      (tag, cost) : rest -> case Cost.mana cost of
-        -- CR 118.6: nothing to announce, and unreachable besides -- payToll
-        -- refuses a toll holding an unpayable charge before calling this.
-        Nothing -> go ((tag, cost) : done) committed rest
-        Just manaCost -> do
-          gs <- State.get
-          -- Order within the probe carries nothing -- payability is a question
-          -- about a multiset of symbols -- so `done` rides in reversed.
-          --
-          -- `others` and `committed` below are REDUNDANT with each other on
-          -- every board `data/cards/` can build, the pool's only hybrid toll
-          -- being Norn's Annex's {W/P}: dropping either alone leaves
-          -- CombatEffectSpec's "CR 508.1h two taxed attackers at 3 life"
-          -- green, and dropping both puts alice at -1. Both are kept because
-          -- they answer different halves of CR 118.3 -- what the rest of the
-          -- toll still needs, and what earlier answers have already spent.
-          let others = concatMap symbolsOf done <> concatMap symbolsOf rest
-              total_ mana = [ManaCost.MkManaCost (ManaCost.unwrap mana <> others)]
-              claimed = concatMap (\(t, c) -> claimsOf Map.empty pid t (Cost.components c) gs) charges
-          (settled, life, _) <-
-            Mana.announce
-              PaymentSubject.ForNeither
-              (manaActivationsGiven (PlayerEffect.applying pid gs))
-              ManaSpending.AsProduced
-              pid
-              tag
-              total_
-              (outside + committed)
-              claimed
-              manaCost
-          let paid =
-                cost
-                  { Cost.mana = Just settled,
-                    Cost.components = Cost.components cost <> [CostComponent.PayLife life | life > 0]
-                  }
-          go ((tag, paid) : done) (committed + life) rest
+announceToll pid charges =
+  let symbolsOf = foldMap ManaCost.unwrap . Cost.mana . snd
+      -- CR 118.3 makes the whole toll one demand on one life total, so every
+      -- charge's own CR 119.4 payments ride on every route offered for any of them.
+      outside = sum (fmap (lifeOwedBy . Cost.components . snd) charges)
+      go done committed remaining = case remaining of
+        [] -> pure (reverse done)
+        (tag, cost) : rest -> case Cost.mana cost of
+          -- CR 118.6: nothing to announce, and unreachable besides -- payToll
+          -- refuses a toll holding an unpayable charge before calling this.
+          Nothing -> go ((tag, cost) : done) committed rest
+          Just manaCost -> do
+            gs <- State.get
+            -- Order within the probe carries nothing -- payability is a question
+            -- about a multiset of symbols -- so `done` rides in reversed.
+            --
+            -- `others` and `committed` below are REDUNDANT with each other on
+            -- every board `data/cards/` can build, the pool's only hybrid toll
+            -- being Norn's Annex's {W/P}: dropping either alone leaves
+            -- CombatEffectSpec's "CR 508.1h two taxed attackers at 3 life"
+            -- green, and dropping both puts alice at -1. Both are kept because
+            -- they answer different halves of CR 118.3 -- what the rest of the
+            -- toll still needs, and what earlier answers have already spent.
+            let others = concatMap symbolsOf done <> concatMap symbolsOf rest
+                total_ mana = [ManaCost.MkManaCost (ManaCost.unwrap mana <> others)]
+                claimed = concatMap (\(t, c) -> claimsOf Map.empty pid t (Cost.components c) gs) charges
+            (settled, life, _) <-
+              Mana.announce
+                PaymentSubject.ForNeither
+                (manaActivationsGiven (PlayerEffect.applying pid gs))
+                ManaSpending.AsProduced
+                pid
+                tag
+                total_
+                (outside + committed)
+                claimed
+                manaCost
+            let paid =
+                  cost
+                    { Cost.mana = Just settled,
+                      Cost.components = Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
+                    }
+            go ((tag, paid) : done) (committed + life) rest
+   in go [] 0 charges
 
 -- CR 508.1j / 509.1f: can the payer tell one order of a toll's CHARGES from
 -- another? `orderObservable` below, one level up, and its two conditions read
@@ -3083,114 +3086,114 @@ payManaExcept perform inFlight record subject spending pid cost = do
 -- payManaExcept itself, whose callers unwind more than the window, discards it
 -- and puts the whole state back (#3119).
 payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game (Bool, GameState -> Game ())
-payManaWindow perform inFlight record subject spending pid cost = window Set.empty []
-  where
-    -- What the pool would leave if the cost were paid out of it right now.
-    --
-    -- CR 609.4b's clauses are resolved from the board on EVERY pass rather than
-    -- captured at entry: they are a CR 613.11 continuous effect and not a
-    -- permission the cast carried in, so a Celestial Dawn that leaves
-    -- mid-payment stops applying (CR 604.2) -- the opposite of `spending`, which
-    -- rule 118.14 fixes when the cast was permitted.
-    settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
-    -- `activated` is the sources whose mana ability this window ran, newest
-    -- first -- CR 733.1's "any legal mana abilities that player activated",
-    -- gathered because that rule offers them back.
-    window refused activated = do
-      gs <- State.get
-      let covered = Maybe.isJust (settlement gs)
-          -- One projection per pass, shared by the enumeration and the
-          -- interchangeability test rather than computed twice: Mana.manaSources
-          -- is this same call.
-          pcs = Projection.projectAll gs
-          -- CR 605.3a offers every source, and this window narrows it by CR
-          -- 605.3c alone: a permanent whose mana ability is mid-activation is
-          -- off its own window and off every window nested inside it.
-          --
-          -- The capacity is taken on the board of the PASS rather than once for
-          -- the payment: a tap changes the board, and
-          -- Pawl.Engine.PlayerEffect.applying is a function of it. `pid` is the
-          -- payer, and manaSourcesGiven offers only what that player controls, so
-          -- the capacity's own `pid` is this one.
-          windowCapacity = manaActivationsGiven (PlayerEffect.applying pid gs)
-          offered = filter (`Set.notMember` inFlight) (Mana.manaSourcesGiven windowCapacity (Projection.controlGrants gs) pcs pid gs)
-      case filter (`Set.notMember` refused) offered of
-        [] -> settle activated
-        candidate : rest -> do
-          answer <- chooseSource covered pid (Interchangeable.representatives pcs gs (candidate NonEmpty.:| rest)) gs
-          case answer of
-            Nothing -> settle activated
-            Just oid -> do
-              produced <- tapForManaWith perform inFlight oid
-              -- An activation that FAILED reversed itself already (payActivation
-              -- below), so it is not one of rule 733.1's to offer back.
-              window (if produced then refused else Set.insert oid refused) (if produced then oid : activated else activated)
-    -- CR 601.2h: the window is closed, so the cost is paid out of what is there
-    -- -- and simply is not paid when the player floated too little.
-    --
-    -- WHICH mana goes is the payer's (Mana.spendChosen), so this asks rather
-    -- than reading `settlement`'s assignment: that one answers only whether the
-    -- pool pays.
-    settle :: [ObjectId] -> Game (Bool, GameState -> Game ())
-    settle activated = do
-      -- The state the window CLOSED on, which is the one a payer who declines
-      -- to reverse their mana abilities goes back to: this is after every
-      -- activation and before a symbol of the cost has been paid out of the
-      -- pool.
-      gs <- State.get
-      -- CR 733.1's reversal, closed over the window's own two facts and taking
-      -- the caller's entry state. Built here and not in the caller because this
-      -- is the one place that holds both.
+payManaWindow perform inFlight record subject spending pid cost =
+  let -- What the pool would leave if the cost were paid out of it right now.
       --
-      -- CR 106.6: the payment sees only the mana it may spend, and the rest of
-      -- the pool goes back beside what it leaves (CR 106.4 -- unspent mana stays
-      -- unspent, it does not vanish because one cost could not use it).
-      let undo = reverseIllegal pid (reverse activated) gs
-          (available, withheld) = Mana.spendableFor subject pid gs
-      case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana available) of
-        Nothing -> pure (False, undo)
-        Just (steps, life) -> do
-          (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
-          -- Three writes in the order the one composed `State.modify'` they
-          -- replace applied them in: the pool goes back, then the life is paid,
-          -- then CR 400.7d's record of what was spent. Event.payLife is monadic
-          -- because CR 119.4's loss goes through the replacement funnel.
-          State.modify' (Mana.setPool pid (Mana.Type.MkMana (withheld <> left)))
-          Event.payLife pid life
-          State.modify' (recordSpent spent)
-          pure (True, undo)
-    -- CR 400.7d's cost record for the MANA, kept where CR 107.4h's third
-    -- sentence can be asked about it afterwards -- "the {S} symbol can also be
-    -- used to refer to mana of any type produced by a snow source spent to pay a
-    -- cost". Berg Strider and Forsworn Paladin are the readers.
-    --
-    -- `record` is the object it goes on, and it is the CALLER's rather than the
-    -- subject's: CR 601.2h's payer names the spell (Pawl.Engine.Cast), and CR
-    -- 602.2b's names the CR 602.2a ability object on the stack rather than the
-    -- source permanent PaymentSubject.Activating carries (Pawl.Engine.Activate).
-    -- Writing an activation's units onto the source would clobber the record of
-    -- the mana that cast it, which is the one CR 400.7d is about.
-    --
-    -- Nothing for the payments with no object to name: a special action's cost, a
-    -- combat toll, CR 118.12's resolution-time payment, and a mana ability's own
-    -- cost, which CR 605.3b keeps off the stack entirely.
-    --
-    -- Written HERE rather than by the caller because this is the one place that
-    -- knows which units went. An unpaid cost writes nothing: `payMana` restores
-    -- the state it entered with, and this line is only reached once the payment
-    -- has settled.
-    --
-    -- CR 106.6a's eagerly created effects go up beside the record and on the
-    -- same state, since this is the same "one place that knows which units
-    -- went": ManaRider.granted mints one continuous effect per unit whose rider
-    -- the paid-for object matches (Generator Servant). AFTER the record, so
-    -- that the condition is matched on the board CR 400.7d has already
-    -- described -- a rider clause reading the payment would otherwise see none.
-    recordSpent spent gs = case record of
-      Nothing -> gs
-      Just sid ->
-        let recorded = gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
-         in ManaRider.granted sid spent recorded
+      -- CR 609.4b's clauses are resolved from the board on EVERY pass rather than
+      -- captured at entry: they are a CR 613.11 continuous effect and not a
+      -- permission the cast carried in, so a Celestial Dawn that leaves
+      -- mid-payment stops applying (CR 604.2) -- the opposite of `spending`, which
+      -- rule 118.14 fixes when the cast was permitted.
+      settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
+      -- `activated` is the sources whose mana ability this window ran, newest
+      -- first -- CR 733.1's "any legal mana abilities that player activated",
+      -- gathered because that rule offers them back.
+      window refused activated = do
+        gs <- State.get
+        let covered = Maybe.isJust (settlement gs)
+            -- One projection per pass, shared by the enumeration and the
+            -- interchangeability test rather than computed twice: Mana.manaSources
+            -- is this same call.
+            pcs = Projection.projectAll gs
+            -- CR 605.3a offers every source, and this window narrows it by CR
+            -- 605.3c alone: a permanent whose mana ability is mid-activation is
+            -- off its own window and off every window nested inside it.
+            --
+            -- The capacity is taken on the board of the PASS rather than once for
+            -- the payment: a tap changes the board, and
+            -- Pawl.Engine.PlayerEffect.applying is a function of it. `pid` is the
+            -- payer, and manaSourcesGiven offers only what that player controls, so
+            -- the capacity's own `pid` is this one.
+            windowCapacity = manaActivationsGiven (PlayerEffect.applying pid gs)
+            offered = filter (`Set.notMember` inFlight) (Mana.manaSourcesGiven windowCapacity (Projection.controlGrants gs) pcs pid gs)
+        case filter (`Set.notMember` refused) offered of
+          [] -> settle activated
+          candidate : rest -> do
+            answer <- chooseSource covered pid (Interchangeable.representatives pcs gs (candidate NonEmpty.:| rest)) gs
+            case answer of
+              Nothing -> settle activated
+              Just oid -> do
+                produced <- tapForManaWith perform inFlight oid
+                -- An activation that FAILED reversed itself already (payActivation
+                -- below), so it is not one of rule 733.1's to offer back.
+                window (if produced then refused else Set.insert oid refused) (if produced then oid : activated else activated)
+      -- CR 601.2h: the window is closed, so the cost is paid out of what is there
+      -- -- and simply is not paid when the player floated too little.
+      --
+      -- WHICH mana goes is the payer's (Mana.spendChosen), so this asks rather
+      -- than reading `settlement`'s assignment: that one answers only whether the
+      -- pool pays.
+      settle :: [ObjectId] -> Game (Bool, GameState -> Game ())
+      settle activated = do
+        -- The state the window CLOSED on, which is the one a payer who declines
+        -- to reverse their mana abilities goes back to: this is after every
+        -- activation and before a symbol of the cost has been paid out of the
+        -- pool.
+        gs <- State.get
+        -- CR 733.1's reversal, closed over the window's own two facts and taking
+        -- the caller's entry state. Built here and not in the caller because this
+        -- is the one place that holds both.
+        --
+        -- CR 106.6: the payment sees only the mana it may spend, and the rest of
+        -- the pool goes back beside what it leaves (CR 106.4 -- unspent mana stays
+        -- unspent, it does not vanish because one cost could not use it).
+        let undo = reverseIllegal pid (reverse activated) gs
+            (available, withheld) = Mana.spendableFor subject pid gs
+        case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana available) of
+          Nothing -> pure (False, undo)
+          Just (steps, life) -> do
+            (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
+            -- Three writes in the order the one composed `State.modify'` they
+            -- replace applied them in: the pool goes back, then the life is paid,
+            -- then CR 400.7d's record of what was spent. Event.payLife is monadic
+            -- because CR 119.4's loss goes through the replacement funnel.
+            State.modify' (Mana.setPool pid (Mana.Type.MkMana (withheld <> left)))
+            Event.payLife pid life
+            State.modify' (recordSpent spent)
+            pure (True, undo)
+      -- CR 400.7d's cost record for the MANA, kept where CR 107.4h's third
+      -- sentence can be asked about it afterwards -- "the {S} symbol can also be
+      -- used to refer to mana of any type produced by a snow source spent to pay a
+      -- cost". Berg Strider and Forsworn Paladin are the readers.
+      --
+      -- `record` is the object it goes on, and it is the CALLER's rather than the
+      -- subject's: CR 601.2h's payer names the spell (Pawl.Engine.Cast), and CR
+      -- 602.2b's names the CR 602.2a ability object on the stack rather than the
+      -- source permanent PaymentSubject.Activating carries (Pawl.Engine.Activate).
+      -- Writing an activation's units onto the source would clobber the record of
+      -- the mana that cast it, which is the one CR 400.7d is about.
+      --
+      -- Nothing for the payments with no object to name: a special action's cost, a
+      -- combat toll, CR 118.12's resolution-time payment, and a mana ability's own
+      -- cost, which CR 605.3b keeps off the stack entirely.
+      --
+      -- Written HERE rather than by the caller because this is the one place that
+      -- knows which units went. An unpaid cost writes nothing: `payMana` restores
+      -- the state it entered with, and this line is only reached once the payment
+      -- has settled.
+      --
+      -- CR 106.6a's eagerly created effects go up beside the record and on the
+      -- same state, since this is the same "one place that knows which units
+      -- went": ManaRider.granted mints one continuous effect per unit whose rider
+      -- the paid-for object matches (Generator Servant). AFTER the record, so
+      -- that the condition is matched on the board CR 400.7d has already
+      -- described -- a rider clause reading the payment would otherwise see none.
+      recordSpent spent gs = case record of
+        Nothing -> gs
+        Just sid ->
+          let recorded = gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
+           in ManaRider.granted sid spent recorded
+   in window Set.empty []
 
 payMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payMana perform = payManaExcept perform Set.empty Nothing
@@ -3316,10 +3319,10 @@ tapForManaWith perform inFlight oid = do
               -- (Pawl.Types.Mana) and CR 101.4's ordering rule is about
               -- CHOICES, of which the addition itself makes none.
               State.modify'
-                ( \gs' ->
+                ( \gs2 ->
                     List.foldl'
-                      (\acc (ref, mana) -> List.foldl' (\inner recipient -> Mana.addMana recipient (Mana.unitsOf mana) inner) acc (Mana.recipientsOf controller gs' ref))
-                      gs'
+                      (\acc (ref, mana) -> List.foldl' (\inner recipient -> Mana.addMana recipient (Mana.unitsOf mana) inner) acc (Mana.recipientsOf controller gs2 ref))
+                      gs2
                       (Map.toList (ManaOption.yield chosen))
                 )
               -- CR 405.6c: "if a mana ability both produces mana and has another
@@ -3727,7 +3730,7 @@ payComponent moment slots pid oid component = case component of
   -- Discard effect, which completes an undersized answer: a cost may simply go
   -- unpaid, where an effect has no such out. The answer is read as a SET of card
   -- ids and rejected unless that set is exactly `n` cards drawn from `held`, so
-  -- `List.nub` is what the Set-answered Sacrifice arm already accepts rather than
+  -- `ListUtils.nubOrd` is what the Set-answered Sacrifice arm already accepts rather than
   -- the repair it looks like.
   --
   -- CR 701.9a's move goes through Event.discard, so the card gets a CR 400.7
@@ -3741,7 +3744,7 @@ payComponent moment slots pid oid component = case component of
       if Natural.length held <= n
         then pure held
         else Game.choose (Prompt.ChooseDiscard decider pid held n)
-    let distinct = List.nub chosen
+    let distinct = ListUtils.nubOrd chosen
     if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do
         Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) distinct

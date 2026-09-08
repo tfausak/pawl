@@ -17,9 +17,6 @@ import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
-
 import Pawl.DamageReplacementSpec (graveyardNames)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
@@ -356,7 +353,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     swamp <- S.printingOf s registry "Swamp"
     uthdenTroll <- S.printingOf s registry "Uthden Troll"
     terror <- S.printingOf s registry "Terror"
-    let base = foldl (\gs p -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
+    let base = List.foldl' (\gs p -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
         (troll, g1) = S.addPermanent uthdenTroll S.alice base
         -- {R}: Regenerate this creature -- the shield is really activated.
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
@@ -540,11 +537,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               (gs, spellId) = S.handOne rise graves
               after = castAndResolve S.identityAnswer gs spellId
               workers =
-                [ oid
-                | oid <- Set.toList (GameState.battlefield after),
-                  Projection.namesOf oid after == Set.singleton (CardName.MkCardName (Text.pack "Arcbound Worker"))
-                ]
-           in [(countersOn CounterKind.PlusOnePlusOne oid after, S.powerToughnessOf oid after) | oid <- workers]
+                filter
+                  (\oid -> Projection.namesOf oid after == Set.singleton (CardName.MkCardName (Text.pack "Arcbound Worker")))
+                  (Set.toList (GameState.battlefield after))
+           in fmap (\oid -> (countersOn CounterKind.PlusOnePlusOne oid after, S.powerToughnessOf oid after)) workers
         menaceFirst = outcome [corpsejackMenace, arcboundWorker]
         workerFirst = outcome [arcboundWorker, corpsejackMenace]
     Spec.assertEqWith s "modular 1's one counter, undoubled -- a 1/1 Worker" menaceFirst [(1, Just (1, 1))]
@@ -593,7 +589,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) withPiker buried
               (gs, spellId) = S.handOne rise graves
               after = S.settleSba (castAndResolve sacrificesAll gs spellId)
-              pikers = length [oid | oid <- Set.toList (GameState.battlefield after), Projection.hasName pikerName oid after]
+              pikers = length (filter (\oid -> Projection.hasName pikerName oid after) (Set.toList (GameState.battlefield after)))
            in (pikers, fmap (`S.powerToughnessOf` after) (newestNamed (CardName.MkCardName (Text.pack "Wood Elemental")) after))
         ashayaFirst = outcome [ashaya, woodElemental]
         elementalFirst = outcome [woodElemental, ashaya]
@@ -633,7 +629,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         played = S.runPure S.playLandAnswer board Engine.priorityLoop
         untap oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)}
         ratsName = CardName.MkCardName (Text.pack "Typhoid Rats")
-        ratsOut gs = length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName ratsName o gs]
+        ratsOut gs = length (filter (\o -> Projection.hasName ratsName o gs) (Set.toList (GameState.battlefield gs)))
     case Set.toList (GameState.battlefield played) of
       [permId] -> do
         Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
@@ -1266,7 +1262,7 @@ squadronBoard island squadron rite =
 -- The battlefield's Faerie Squadrons, by name: CR 400.7 gives the permanent a new
 -- id, so the one the cast was handed names nothing here.
 squadronsOut :: GameState.GameState -> [ObjectId.ObjectId]
-squadronsOut gs = [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName (CardName.MkCardName (Text.pack "Faerie Squadron")) o gs]
+squadronsOut gs = filter (\o -> Projection.hasName (CardName.MkCardName (Text.pack "Faerie Squadron")) o gs) (Set.toList (GameState.battlefield gs))
 
 -- Cast the Squadron with this kicker answer and settle. `kicks` answers CR
 -- 702.33a and defers the rest, so CR 616.1's order between the two entry rows is
@@ -1394,7 +1390,7 @@ zoneSizes gs =
 -- The battlefield's Monstrous War-Leech, by name: CR 400.7 gives the permanent a
 -- new id, so the one the cast was handed names nothing here.
 leechOut :: GameState.GameState -> [ObjectId.ObjectId]
-leechOut gs = [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName (CardName.MkCardName (Text.pack "Monstrous War-Leech")) o gs]
+leechOut gs = filter (\o -> Projection.hasName (CardName.MkCardName (Text.pack "Monstrous War-Leech")) o gs) (Set.toList (GameState.battlefield gs))
 
 -- Cast the Leech with this kicker answer and settle: the entry rewrite's effects
 -- are queued by Pawl.Engine.Event and drained by performSettle, so the mill has
@@ -1642,10 +1638,10 @@ galvanicBlastSpec s registry =
 surgeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId])
 surgeBoard mountain splitter surge firebolt artifacts =
   let base = S.landsFor mountain S.alice 5 (Setup.emptyGame S.bothPlayers)
-      addArtifact (ids, g) _ = let (oid, g') = S.addPermanent splitter S.alice g in (ids <> [oid], g')
+      addArtifact (ids, g) _ = let (oid, g4) = S.addPermanent splitter S.alice g in (ids <> [oid], g4)
       (splitters, g1) = List.foldl' addArtifact ([], base) [1 .. artifacts]
       (surgeId, g2) = S.addHandCard surge S.alice g1
-      addBolt (ids, g) _ = let (oid, g') = S.addHandCard firebolt S.alice g in (ids <> [oid], g')
+      addBolt (ids, g) _ = let (oid, g4) = S.addHandCard firebolt S.alice g in (ids <> [oid], g4)
       (bolts, g3) = List.foldl' addBolt ([], g2) [1 :: Int, 2]
    in ( g3
           { GameState.phase = Phase.PrecombatMain,
@@ -1764,10 +1760,7 @@ threeSeatSpecimenBoard island gatherSpecimens creature =
 rowSourceOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe ObjectId.ObjectId
 rowSourceOf who gs =
   Maybe.listToMaybe
-    [ ActiveReplacement.source active
-    | active <- GameState.replacements gs,
-      ActiveReplacement.controller active == who
-    ]
+    (fmap ActiveReplacement.source (filter (\active -> ActiveReplacement.controller active == who) (GameState.replacements gs)))
 
 -- Name the candidate whose source is `preferred`, but only when CR 616.1's race
 -- is put to `who`; every other prompt takes the default. The readout for WHICH

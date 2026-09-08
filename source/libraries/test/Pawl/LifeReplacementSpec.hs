@@ -180,13 +180,13 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
 -- cases below drive down. FILTERED rather than hand-built, so CR 608.2b's re-read
 -- at resolution keeps the recipient the prompt offered.
 exchangingWithBob :: Prompt.Prompt r -> r
-exchangingWithBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
-  _ -> S.identityAnswer p
-  where
-    wanted r = case r of
-      Recipient.ToPlayer pid -> pid == S.bob
-      _ -> False
+exchangingWithBob p =
+  let wanted r = case r of
+        Recipient.ToPlayer pid -> pid == S.bob
+        _ -> False
+   in case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
+        _ -> S.identityAnswer p
 
 -- CR 614.1a with CR 119.4 and CR 119.5: Bloodletter of Aclazotz ({1}{B}{B}{B}
 -- Creature -- Vampire Demon, 2/4, "Flying / If an opponent would lose life during
@@ -668,7 +668,7 @@ collectorRaceAnswer preferred p = case p of
 -- from under an assertion (CR 104.3c).
 stockLibraries :: Printing.Printing -> GameState.GameState -> GameState.GameState
 stockLibraries piker gs =
-  let stock pid n g = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (n :: Int)]
+  let stock pid n g = List.foldl' (\g2 _ -> snd (S.addLibraryCard piker pid g2)) g [1 .. (n :: Int)]
    in stock S.bob 4 (stock S.alice 3 (stock S.carol 2 gs))
 
 -- alice holds the collector when `collecting`, carol holds Ancestral Recall and the

@@ -153,12 +153,12 @@ payingLastRoom p = case p of
 -- triggered on the venture is placed and then resolved too. Bounded, so a bug that
 -- kept the stack full fails the case rather than hanging it.
 resolveAll :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-resolveAll answer = go (20 :: Int)
-  where
-    go n gs
-      | n <= 0 = gs
-      | null (GameState.stack gs) = gs
-      | otherwise = go (n - 1) (S.runPure answer gs (Stack.resolveTop >> Engine.settleForPriority))
+resolveAll answer =
+  let go n gs
+        | n <= 0 = gs
+        | null (GameState.stack gs) = gs
+        | otherwise = go (n - 1) (S.runPure answer gs (Stack.resolveTop >> Engine.settleForPriority))
+   in go (20 :: Int)
 
 -- One venture: activate Secret Door's ability, then resolve everything it puts on
 -- the stack.
@@ -239,7 +239,7 @@ dungeonBoard island door dungeons lands =
       (doorId, g1) = S.addPermanent door S.alice stocked
       -- CR 309.2: a dungeon is recorded on the player and no object is minted for
       -- it, so its printing is interned here rather than by an object build.
-      intern (ids, g) printing = let (i, g') = Game.intern printing g in (ids <> [i], g')
+      intern (ids, g) printing = let (i, g3) = Game.intern printing g in (ids <> [i], g3)
       (dungeonIds, g2) = List.foldl' intern ([], g1) dungeons
       owned p = p {Player.dungeons = Set.fromList dungeonIds}
    in (doorId, g2 {GameState.players = Map.adjust owned S.alice (GameState.players g2)})
