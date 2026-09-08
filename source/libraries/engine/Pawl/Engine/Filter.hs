@@ -273,6 +273,12 @@ data View = MkView
     -- regeneration and CR 120.3d/120.3e mark none at all for a wither or infect
     -- source, so the marks are a strict subset of what was dealt.
     dealtDamageThisTurn :: Bool,
+    -- CR 302.6: has this candidate's CONTROLLER controlled it continuously since
+    -- their most recent turn began? Read from Object.sickness, the field CR
+    -- 302.6's own gates on attacking and the tap symbol are read from, and
+    -- compared against the PROJECTED controller so that layer 2 moving the seat
+    -- and Pawl.Engine.Engine.checkControlContinuity clearing the settle agree.
+    controlledSinceTurnBegan :: Bool,
     -- CR 303.4 / 110.1 / 701.3a: the HOST this candidate is attached to, viewed
     -- as a candidate in its own right, so that AttachedTo's nested Filter has
     -- something to be evaluated against. Not a characteristic either (CR 109.3):
@@ -736,6 +742,9 @@ playerView pid =
       -- Pawl.Engine.Target.admittedGiven's Recipient.ToPlayer arm -- build the
       -- view through it. Pawl.DamageSpec's Needle Drop case is what proves it.
       dealtDamageThisTurn = False,
+      -- CR 302.6's continuity is about a creature a player CONTROLS, and a player
+      -- is not one -- False is the answer here rather than a default.
+      controlledSinceTurnBegan = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything, because Object.attachedTo is
       -- a field of the ATTACHED permanent, and a player is not one. So there is
@@ -1564,6 +1573,10 @@ matches context view predicate = case predicate of
   -- 120.6's regeneration and CR 120.3d's wither both leave a creature that was
   -- dealt damage carrying nothing marked.
   Filter.DealtDamageThisTurn -> dealtDamageThisTurn view
+  -- CR 302.6: not a look-back over the log at all, unlike the three atoms above
+  -- -- the engine keeps the answer as Object.sickness, written at the untap step
+  -- and cleared whenever control moves.
+  Filter.ControlledSinceTurnBegan -> controlledSinceTurnBegan view
   -- CR 701.3a: a live read of Object.attachedTo and of the host's own projection,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
@@ -1808,6 +1821,8 @@ rewrite pairs predicate = case predicate of
   Filter.DeclaredBlockerThisCombat -> predicate
   Filter.MilledThisTurn -> predicate
   Filter.DealtDamageThisTurn -> predicate
+  -- Untouched for AttackedThisTurn's reason: the atom names no subtype.
+  Filter.ControlledSinceTurnBegan -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: the nested filter describes
   -- the HOST ("attached to a Swamp"), so CR 612.1's word swap reaches it exactly
   -- as it reaches the same description written at the top level.
@@ -2280,6 +2295,8 @@ bakeBound players predicate = case predicate of
   Filter.DeclaredBlockerThisCombat -> predicate
   Filter.MilledThisTurn -> predicate
   Filter.DealtDamageThisTurn -> predicate
+  -- Untouched: the atom names no slot for CR 603.2's map to substitute into.
+  Filter.ControlledSinceTurnBegan -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: a ControlledByBound written
   -- into the HOST's description is baked exactly as the same atom written at the
   -- top level would be. Pawl.Engine.Filter.boundSlots descends to match, which is
@@ -2414,6 +2431,7 @@ manaValueThresholds predicate = case predicate of
   Filter.DeclaredBlockerThisCombat -> []
   Filter.MilledThisTurn -> []
   Filter.DealtDamageThisTurn -> []
+  Filter.ControlledSinceTurnBegan -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
   -- literals inside bound the HOST's mana value and never the candidate's. Only
   -- widening CR 601.3a's sample is the safe direction.
@@ -2554,6 +2572,7 @@ statesAQuality predicate = case predicate of
   Filter.DeclaredBlockerThisCombat -> True
   Filter.MilledThisTurn -> True
   Filter.DealtDamageThisTurn -> True
+  Filter.ControlledSinceTurnBegan -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to
   -- something" is itself a stated quality under CR 701.23b, so even the trivial
   -- nest `And []` leaves this atom stating one and no descent could change it.

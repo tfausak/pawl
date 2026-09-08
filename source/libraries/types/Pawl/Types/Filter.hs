@@ -283,6 +283,19 @@ data Filter keyword
     -- (GameEvent.DamageDealt), and not Object.damage being positive: a wither or
     -- infect source marks nothing at all (CR 120.3d).
     DealtDamageThisTurn
+  | -- | CR 302.6: the candidate's CONTROLLER has controlled it continuously since
+    -- their most recent turn began -- Total War's "creatures the player hasn't
+    -- controlled continuously since the beginning of the turn", negated. Reads
+    -- Object.sickness, the same field CR 302.6 gates attacking and the tap symbol
+    -- on, so a creature that changed control this turn is False whichever
+    -- direction the change went.
+    --
+    -- The printed wording says "since the beginning of the turn" and this atom
+    -- answers "since their most recent turn began". The two coincide for the
+    -- ACTIVE player, which is the only seat either printing asks about: CR 508.1
+    -- lets only the active player declare attackers, and Nettling Imp names the
+    -- active player outright.
+    ControlledSinceTurnBegan
   | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to something the nested
     -- Filter admits -- Crown of the Ages' "target Aura attached to a creature".
     -- The nest asks about the HOST's characteristics against the OUTER context,
