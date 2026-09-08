@@ -926,6 +926,65 @@ headlessSkaabSpec s registry =
         (Just TapState.Tapped)
       Spec.assertEqWith s "and it is 3/6" (entered >>= \oid -> S.powerToughnessOf oid resolved) (Just (3, 6))
 
+-- Cadaverous Bloom {3}{B}{G} Enchantment: "Exile a card from your hand: Add
+-- {B}{B} or {G}{G}." (Oracle checked against Scryfall 2026-09-07.)
+--
+-- The gate card for CostComponent.ExileCardFromHand, the first component that
+-- exiles a card out of a HIDDEN zone (CR 400.2) rather than a graveyard. What
+-- separates it from CostComponent.DiscardCards is only the destination, so the
+-- exile assertion leads every case: a payment that put the card in a graveyard
+-- would satisfy every other assertion here.
+--
+-- Silent Arbiter is {4} and targets nothing as it is cast, so every mana on
+-- these boards comes through the Bloom, and the Bloom has no {T} for CR 107.5 to
+-- bar a second activation -- two cards in hand are two activations and {B}{B}{B}{B}.
+-- Goblin Piker is the fuel: it is never cast, so nothing but the exile can move it.
+cadaverousBloomSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cadaverousBloomSpec s registry =
+  Spec.describe s "Cadaverous Bloom" $ do
+    Spec.it s "CR 406.2 two cards exiled from hand pay for a {4} spell" $ do
+      bloom <- S.printingOf s registry "Cadaverous Bloom"
+      piker <- S.printingOf s registry "Goblin Piker"
+      arbiter <- S.printingOf s registry "Silent Arbiter"
+      let (spell, gs) = cadaverousBloomBoard bloom piker arbiter 2
+          resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 406.2 both fuel cards are in exile" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 2
+      Spec.assertEqWith s "and not in the graveyard, which a discard would have reached" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
+      Spec.assertEqWith s "CR 601.2g the Arbiter resolved off those two activations" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silent Arbiter")) S.alice resolved) 1
+      Spec.assertEqWith s "and the hand is empty" (S.handSize S.alice resolved) 0
+    -- The same board one fuel card short, which is the ONE thing that differs:
+    -- one activation adds {B}{B} and CR 118.3 refuses the rest, so CR 601.2
+    -- rewinds the whole cast and the card that would have paid is still in hand.
+    Spec.it s "CR 118.3 one card in hand is one activation, and {2} does not pay {4}" $ do
+      bloom <- S.printingOf s registry "Cadaverous Bloom"
+      piker <- S.printingOf s registry "Goblin Piker"
+      arbiter <- S.printingOf s registry "Silent Arbiter"
+      let (spell, gs) = cadaverousBloomBoard bloom piker arbiter 1
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+      Spec.assertEqWith s "nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice cast)) 0
+      Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
+      Spec.assertEqWith s "and both cards are still in hand" (S.handSize S.alice cast) 2
+
+-- The Bloom on the battlefield, `fuel` Goblin Pikers in hand and the spell on
+-- top of them. No lands: every mana here has to come through the Bloom.
+cadaverousBloomBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (ObjectId.ObjectId, GameState.GameState)
+cadaverousBloomBoard bloom piker spell fuel =
+  let base = snd (S.addPermanent bloom S.alice (Setup.emptyGame S.bothPlayers))
+      fuelled = List.foldl' (\gs _ -> snd (S.addHandCard piker S.alice gs)) base [1 .. fuel]
+      (oid, gs1) = S.addHandCard spell S.alice fuelled
+   in ( oid,
+        gs1
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
 -- Synthetic Frail Exhumation {1}{B} Creature -- Zombie 2/2: "As an additional
 -- cost to cast this spell, exile a creature card with power 2 or less from your
 -- graveyard."
@@ -1931,6 +1990,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   altarsReapSpec s registry
   spitefulSpec s registry
   headlessSkaabSpec s registry
+  cadaverousBloomSpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry
   putridRaptorSpec s registry

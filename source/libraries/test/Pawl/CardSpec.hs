@@ -2830,6 +2830,8 @@ costComponentFilters component = case component of
   -- CR 601.2f's discard as a cost: Magmatic Insight's "a land card".
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards _ f) -> [f]
   CostComponent.PutCardFromHandOntoBattlefield f -> [f]
+  -- CR 406.2 out of the hand: Cadaverous Bloom's "a card".
+  CostComponent.ExileCardFromHand f -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []

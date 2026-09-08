@@ -180,6 +180,7 @@ costMovesLibraryCard component = case component of
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.ExileCardFromHand _ -> False
   -- These move no card at all.
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
