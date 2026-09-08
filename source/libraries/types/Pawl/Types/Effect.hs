@@ -615,6 +615,15 @@ data Effect card ability
     -- grants (Release to the Wind, Soul Partition) each carry a second clause
     -- pawl cannot yet spell.
     GrantPlayFromExile GrantPlayFromExile.GrantPlayFromExile
+  | -- | CR 406.3: CR 109.5's "you" may look at the face-down exiled cards the
+    -- ObjectRef names, for as long as they remain in exile (Extract Power).
+    --
+    -- A separate opcode from GrantPlayFromExile above, and rule 406.3 is why the
+    -- two do not merge: the permission it states outlives the instruction that
+    -- gave it, where a play permission takes CR 611.2a's stated duration, and
+    -- the printings come apart as well (Rogue Class grants the look at level 1
+    -- and the play at level 3).
+    GrantLookAtExiled ObjectRef.ObjectRef
   | -- | CR 702.170c: the objects the ObjectRef names each become plotted
     -- (Kellan Joins Up). Not named Plot, CR 702.170e reserving that verb for CR
     -- 116.2k's special action; CR 702.170d fixes the beneficiary and the timing.

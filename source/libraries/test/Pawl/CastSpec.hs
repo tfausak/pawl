@@ -687,6 +687,7 @@ handInPlay printing board =
             Object.facing = Facing.FaceUp,
             Object.flipped = False,
             Object.exiledFaceDown = False,
+            Object.exileLookers = Set.empty,
             Object.damage = 0,
             Object.sickness = Sickness.Settled S.alice,
             Object.bindings = Map.empty,

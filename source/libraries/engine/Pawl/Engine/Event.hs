@@ -717,6 +717,7 @@ mintCard pid under printingId dest position gs =
             Object.facing = Facing.FaceUp,
             Object.flipped = False,
             Object.exiledFaceDown = False,
+            Object.exileLookers = Set.empty,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
@@ -908,6 +909,7 @@ createEmblem pid card = do
                 Object.facing = Facing.FaceUp,
                 Object.flipped = False,
                 Object.exiledFaceDown = False,
+                Object.exileLookers = Set.empty,
                 Object.damage = 0,
                 Object.sickness = Sickness.Settled pid,
                 Object.bindings = Map.empty,
@@ -5990,6 +5992,7 @@ createTokens controller card copy n tapped entering = do
                       Object.facing = Facing.FaceUp,
                       Object.flipped = False,
                       Object.exiledFaceDown = False,
+                      Object.exileLookers = Set.empty,
                       Object.damage = 0,
                       Object.sickness = Sickness.Sick,
                       -- CR 707.2 / 111.3: a token copy's copiable values are the
@@ -6189,6 +6192,7 @@ meld controller victims resultCard = do
                 Object.facing = Facing.FaceUp,
                 Object.flipped = False,
                 Object.exiledFaceDown = False,
+                Object.exileLookers = Set.empty,
                 Object.damage = 0,
                 -- CR 302.6 through CR 400.7: a permanent that has just entered is
                 -- a new object nobody has controlled for any time.

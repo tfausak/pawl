@@ -3600,6 +3600,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     }
                 grant o = o {Object.playableFromExile = Just permission}
              in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}
+  -- CR 406.3: write the look permission onto every object the ObjectRef names,
+  -- as CR 109.5's "you".
+  --
+  -- NOT gated on the object being in exile, nor on its being face down,
+  -- Effect.GrantPlayFromExile's reason one rule over: a stamp that landed
+  -- anywhere else is inert, since Pawl.Engine.Exile.mayLookAt reads it only
+  -- where CR 406.3's default does not already answer yes.
+  Effect.GrantLookAtExiled ref ->
+    State.modify' $ \gs ->
+      let allow o = o {Object.exileLookers = Set.insert controller (Object.exileLookers o)}
+       in gs {GameState.objects = foldr (Map.adjust allow) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)}
   -- CR 702.170c: each named card becomes plotted -- the stamp CR 702.170d reads
   -- and the GameEvent.Plotted entry a "when this card becomes plotted" trigger
   -- reads, both through Pawl.Engine.Plot.becomePlotted, so this route and CR

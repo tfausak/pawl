@@ -9,7 +9,8 @@
 --
 -- THE INVARIANT: this is the closed half. CR 406.3's default and CR 702.143a's
 -- grant are both rulebook, so reading Object.foretold here is the same act as
--- reading a Phase. Nothing here asks which CARD is in exile.
+-- reading a Phase. Object.exileLookers is a set of players an effect wrote, read
+-- without asking which effect. Nothing here asks which CARD is in exile.
 module Pawl.Engine.Exile where
 
 import qualified Control.Monad as Monad
@@ -29,7 +30,7 @@ import Pawl.Types.PlayerId (PlayerId)
 -- kept face up and may be examined by any player at any time" -- so the whole
 -- question is Object.exiledFaceDown, which is the rider that overrides it.
 --
--- CR 702.143a is the one grant in the pool: "that player may look at that card
+-- CR 702.143a is one such grant: "that player may look at that card
 -- as long as it remains in exile", said of the player who took the foretell
 -- special action, who is the card's OWNER (CR 400.1 makes a hand a per-player
 -- zone and the action exiles from the actor's own hand). CR 702.143d says the
@@ -37,27 +38,35 @@ import Pawl.Types.PlayerId (PlayerId)
 -- Object.foretold stamp Pawl.Engine.Foretell writes IS the permission, and the
 -- owner is the one player it names.
 --
--- DERIVED rather than stored, and CR 406.3's tail is what makes that exact: the
--- permission runs until the card leaves the exile zone, and the stamp has the
--- same lifetime -- it is per-incarnation state, so CR 400.7's fresh incarnation
--- on the way out clears it at the same moment the rule ends the permission. That
--- rule's OTHER ending -- the card becoming part of a pile of cards that are
--- shuffled -- has nothing to end: pileOf below builds the piles, and no card in
--- `data/cards/` shuffles one. A stored per-player relation would answer
--- identically for every board pawl can build, since foretell is the only grant
--- that exists: no card in the pool has hideaway (CR 702.75a's granted "may look
--- at this card in the exile zone"), and Effect.GrantPlayFromExile carries no
--- look permission of its own.
+-- The foretold arm stays DERIVED rather than stored, and CR 406.3's tail is what
+-- makes that exact: the permission runs until the card leaves the exile zone,
+-- and the stamp has the same lifetime -- it is per-incarnation state, so CR
+-- 400.7's fresh incarnation on the way out clears it at the same moment the rule
+-- ends the permission. That rule's OTHER ending -- the card becoming part of a
+-- pile of cards that are shuffled -- has nothing to end: pileOf below builds the
+-- piles, and no card in `data/cards/` shuffles one.
 --
--- Not implemented: a grant that names a player who is not the card's owner.
--- CR 702.75a's hideaway is the printed shape -- "the player who controls the
--- permanent that exiled this card may look at this card in the exile zone" --
--- and no card in `data/cards/` has hideaway, which is the same card the gate one
--- rule over wants (gap #2504).
+-- Object.exileLookers is rule 406.3's OTHER grant, the one an instruction makes
+-- -- "once a player is allowed to look at a card exiled face down, that player
+-- may continue to look at that card" -- and it is stored because the rule keeps
+-- it alive past the instruction that gave it, which leaves nothing to derive it
+-- from. It names a player who need not be the OWNER: Extract Power looks at each
+-- player's top card and exiles them, so the caster may look at a card somebody
+-- else owns. Pawl.ExileSpec's "CR 406.3 the player the exiling instruction let
+-- look names both cards, and the owner who was shown nothing gets their pile" is
+-- what proves the two seats come apart.
+--
+-- CR 702.75a's hideaway states the same permission of a permanent's controller
+-- rather than of the effect's, and no card in `data/cards/` has hideaway
+-- (gap #3033).
 mayLookAt :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 mayLookAt pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
-  pure (not (Object.exiledFaceDown obj) || (Maybe.isJust (Object.foretold obj) && Object.owner obj == pid))
+  pure
+    ( not (Object.exiledFaceDown obj)
+        || (Maybe.isJust (Object.foretold obj) && Object.owner obj == pid)
+        || Set.member pid (Object.exileLookers obj)
+    )
 
 -- | CR 406.4's first half: may this player choose this exiled card SPECIFICALLY?
 --

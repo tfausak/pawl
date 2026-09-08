@@ -4,6 +4,8 @@
 -- absent characteristics as Pawl.Engine.Projection.gatherGiven's exile walk
 -- reads them, the EntryRiders.exiledFaceDown rider
 -- Pawl.Engine.Event.changeZoneEntering reads,
+-- CR 406.3's instruction-given look permission -- Object.exileLookers as
+-- Effect.GrantLookAtExiled writes it --
 -- CR 406.4's two halves over Pawl.Engine.Target's Pool.CardsInExile arm -- the
 -- permission Pawl.Engine.Exile.mayLookAt answers, the pile
 -- Pawl.Engine.Exile.pileOf sorts a card into and Pawl.Engine.Target's piledOffer
@@ -16,10 +18,12 @@
 -- makes one pile of what it hid, two castings make two, and which pile a chooser
 -- names is which card the draw can hand them.
 --
--- Gameplay-level, off two producers that exile face down and differ in exactly
+-- Gameplay-level, off three producers that exile face down and differ in exactly
 -- the permission. Ignorant Bliss {1}{R} Instant -- "Exile all cards from your
 -- hand face down" -- grants nobody a look, so not even the owner may choose what
--- it exiled; foretell (CR 702.143a) grants the owner one, so she may. Synthetic
+-- it exiled; foretell (CR 702.143a) grants the owner one, so she may; Extract
+-- Power looks at the cards before hiding them, which rule 406.3 turns into a
+-- permission for the LOOKER, who owns only one of them. Synthetic
 -- Blind Reclamation's unqualified "target exiled card" is what reads the
 -- difference back out, and Riftsweeper's printed "face-up exiled card" is the
 -- third reading -- a card whose own words refuse what rule 406.4 offers. Runic
@@ -72,6 +76,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Face-down exile" $ do
   foretold s registry
   runicRepetition s registry
+  extractPower s registry
   Spec.describe s "Ignorant Bliss" $ do
     -- CR 406.3a and CR 406.4's first half, read through the pool that offers
     -- exiled cards as targets. The board is deliberately one board: alice's two
@@ -386,6 +391,71 @@ foretoldBoard s registry = do
         [only] -> only
         _ -> S.noSource
   pure (downId, upId, aliceSpell, bobSpell, board)
+
+-- CR 406.3's OTHER permission, the one an instruction gives: "if a player is
+-- instructed to look at a card and then exile it face down ... that player may
+-- continue to look at that card until it leaves the exile zone". Extract Power
+-- {5}{U} Sorcery -- "Look at the top card of each player's library, then exile
+-- those cards face down. You may play them without paying their mana costs for
+-- as long as they remain exiled" (Oracle text checked 2026-09-08) -- is the
+-- producer, and it is the one shape that tells the permission apart from
+-- OWNERSHIP: alice is instructed to look at bob's card too, so she may name a
+-- card she does not own, while bob may name neither -- not even his own.
+--
+-- Against Ignorant Bliss above, which is the same board minus the instruction:
+-- that spell exiles cards face down without looking at them first, and its
+-- owner may name none of them.
+--
+-- Pawl's Extract Power is STRICTER than printed twice over, and this group proves
+-- only the look. Nothing here can spell "without paying their mana costs" for a
+-- permission granted over an exiled card (#3433), so its GrantPlayFromExile makes
+-- the cards playable at their cost; and CR 406.3a's turn face up at announcement
+-- is missing (#3434), so neither card can actually be cast.
+extractPower :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+extractPower s registry = Spec.describe s "Extract Power" $ do
+  Spec.it s "CR 406.3 the player the exiling instruction let look names both cards, and the owner who was shown nothing gets their pile" $ do
+    reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+    board <- castExtractPower s registry
+    case S.spellTargetSlot reclamation of
+      Just theSlot -> do
+        Spec.assertEqWith
+          s
+          "alice looked at both cards as they were exiled, so both are offered to her by name -- bob's included"
+          (offerTo S.alice theSlot board)
+          (Set.fromList (fmap Recipient.ToObject (faceDownExiled board)))
+        Spec.assertEqWith
+          s
+          "bob was shown nothing, so neither card is offered to him by name, his own included (CR 406.4)"
+          (offerTo S.bob theSlot board)
+          (Set.fromList (fmap Recipient.ToPile (pilesIn board)))
+        -- Proxies, AFTER the two behavioural assertions so neither can absorb a
+        -- mutation: one instruction hid two cards, so they are ONE pile, and
+        -- both seats own one of them.
+        Spec.assertEqWith s "two cards were exiled face down, one from each library" (length (faceDownExiled board)) 2
+        Spec.assertEqWith s "and one instruction hid them, so they are one pile" (length (pilesIn board)) 1
+        Spec.assertEqWith
+          s
+          "the two cards are owned by different seats, so ownership cannot be what the offer read"
+          (Set.fromList (Maybe.mapMaybe (\oid -> fmap Object.owner (Game.lookupObject oid board)) (faceDownExiled board)))
+          (Set.fromList [S.alice, S.bob])
+      Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
+
+-- alice casts Extract Power off six Islands. Each library is stocked with a
+-- DIFFERENT card so the two exiled cards are told apart by owner, and with a
+-- second card beneath so neither library empties (CR 104.3c).
+castExtractPower :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+castExtractPower s registry = do
+  power <- S.printingOf s registry "Extract Power"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  let (g1, powerId) = S.handOne power (S.landsInPlay island 6)
+      (_, g2) = S.addLibraryCard bolt S.alice g1
+      (_, g3) = S.addLibraryCard piker S.alice g2
+      (_, g4) = S.addLibraryCard bolt S.bob g3
+      (_, g5) = S.addLibraryCard sentry S.bob g4
+  pure (S.runPure S.identityAnswer (S.runPure S.identityAnswer g5 (S.cast S.alice powerId)) Engine.priorityLoop)
 
 -- CR 406.4's draw runs over the WHOLE pile, and the spell's own restriction is
 -- judged on the card the draw named rather than before it: Runic Repetition

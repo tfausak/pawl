@@ -170,6 +170,7 @@ mint oid gs =
                 -- exiles; rule 722.3c states no such rider, so the copy is
                 -- ordinary face-up exile that everybody may look at.
                 Object.exiledFaceDown = False,
+                Object.exileLookers = Set.empty,
                 Object.damage = 0,
                 Object.sickness = Sickness.Sick,
                 Object.bindings = Map.empty,
