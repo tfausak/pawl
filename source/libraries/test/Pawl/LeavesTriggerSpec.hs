@@ -2416,7 +2416,8 @@ hauntSpec s registry =
 --
 -- Joraga's "up to two" is also what makes the batch leg expressible at all: it
 -- is the pool's only activated ability that can name two creatures in one
--- announcement.
+-- announcement. That leg's bearer is Synthetic Target Scryer rather than the
+-- Hojo, for the reason stated there.
 professorHojoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 professorHojoSpec s registry =
   let -- Pins every target slot at the wanted recipients. The offered set is
@@ -2428,15 +2429,18 @@ professorHojoSpec s registry =
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
         Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.intersection candidates wanted) sets
         _ -> S.identityAnswer p
-      -- THREE SEATS: alice controls the Hojo and everything that targets, bob
+      -- THREE SEATS: alice controls the watcher and everything that targets, bob
       -- holds the creature she does not control, and carol is neither. Two would
       -- collapse "a creature you control" onto "a creature".
-      board = do
+      --
+      -- The BEARER is a parameter because the batch leg needs one without the
+      -- rider; see that leg for why.
+      boardBearing bearerName = do
         forest <- S.printingOf s registry "Forest"
         plains <- S.printingOf s registry "Plains"
         swamp <- S.printingOf s registry "Swamp"
         mountain <- S.printingOf s registry "Mountain"
-        hojo <- S.printingOf s registry "Professor Hojo"
+        hojo <- S.printingOf s registry bearerName
         joraga <- S.printingOf s registry "Joraga Auxiliary"
         juggler <- S.printingOf s registry "Rune-Brand Juggler"
         piker <- S.printingOf s registry "Goblin Piker"
@@ -2451,10 +2455,10 @@ professorHojoSpec s registry =
             (firstPiker, g3) = S.addPermanent piker S.alice g2
             (secondPiker, g4) = S.addPermanent piker S.alice g3
             -- bob's, the CR 109.2 negative's other half: the same printing under
-            -- a seat that is not the Hojo's controller.
+            -- a seat that is not the watcher's controller.
             (bobsPiker, g5) = S.addPermanent piker S.bob g4
             (jugglerId, g6) = S.addHandCard juggler S.alice g5
-            -- CR 104.3c: the Hojo draws, so an unstocked library is a loss
+            -- CR 104.3c: the watcher draws, so an unstocked library is a loss
             -- waiting rather than a reading.
             stocked = List.foldl' (\g pid -> snd (S.addLibraryCard forest pid g)) g6 [S.alice, S.bob, S.carol, S.alice, S.bob, S.carol]
         pure
@@ -2469,12 +2473,13 @@ professorHojoSpec s registry =
                 GameState.priority = Just S.alice
               }
           )
-      -- Down to the bottom: the Hojo's trigger sits above whatever announced the
+      board = boardBearing "Professor Hojo"
+      -- Down to the bottom: the watcher's trigger sits above whatever announced the
       -- targets, so a single resolution would leave the announcement unresolved
       -- and the controls below unreadable. Stack.resolveTop is a no-op on an
       -- empty stack, so the extra passes are harmless.
       drain = Foldable.foldr (>>) (pure ()) (replicate 3 (Stack.resolveTop >> Engine.settleForPriority))
-      -- Activate Joraga's ability at `wanted`, settle so the Hojo's trigger
+      -- Activate Joraga's ability at `wanted`, settle so the watcher's trigger
       -- reaches the stack, then resolve everything. The answerer is written out
       -- at each use rather than bound once: it is polymorphic in the prompt's
       -- answer type, and a let-bound copy would be pinned to one.
@@ -2517,15 +2522,20 @@ professorHojoSpec s registry =
         -- announcement, so an activation that names two of alice's creatures is
         -- one occurrence of the trigger event and not two.
         --
-        -- The card's own "triggers only once each turn" rider MASKS the batch
-        -- reading here: Event.Trigger.batchScoped answering False would yield two
-        -- pending triggers and Engine.withinTurnLimit would drop the second
-        -- anyway, so this leg alone does not separate the two. Dropping the
-        -- card's TriggerLimit alongside that flip makes the reading below three
-        -- rather than two (2026-09-08). What the leg proves as it stands is the
-        -- printed sentence: two targets in one announcement draw ONE card.
+        -- SYNTHETIC TARGET SCRYER AND NOT THE HOJO, which is the whole of what
+        -- makes this leg say anything: Hojo's own "this ability triggers only
+        -- once each turn" would collapse a second firing by itself
+        -- (Engine.withinTurnLimit), so the printed card cannot tell CR 603.2c's
+        -- two sentences apart. The Scryer is Hojo's clause without the rider, and
+        -- no printing of this written form lacks it -- if one turns up it
+        -- replaces the synthetic (docs/design.md section 6).
+        --
+        -- What goes red here is Event.becameTarget's `simultaneously` bracket:
+        -- without it each recipient gets an EventGroup of its own,
+        -- Event.Trigger.oncePerBatch has nothing to collapse, and this reads
+        -- three.
         Spec.it s "CR 603.2c one activation naming two of your creatures draws once" $ do
-          (joragaId, firstPiker, secondPiker, _, _, gs) <- board
+          (joragaId, firstPiker, secondPiker, _, _, gs) <- boardBearing "Synthetic Target Scryer"
           case activatedAt (Set.fromList [Recipient.ToCreature firstPiker, Recipient.ToCreature secondPiker]) joragaId gs of
             Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activate.abilitiesFor joragaId gs)) 1
             Just after -> do

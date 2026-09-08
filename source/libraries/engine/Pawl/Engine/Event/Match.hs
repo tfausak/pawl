@@ -5343,10 +5343,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- says so: CR 601.2c makes the object a target while it is still where the
   -- announcement found it.
   --
-  -- Not implemented: the announcement's own moment. CR 603.2 fires the ability
-  -- when the event occurs, while this reads the board at the CR 117.5 boundary
-  -- that follows, so a permanent named as a target and buried by CR 704 before
-  -- the gather is invisible here (#3418).
+  -- The board it reads is the one at the CR 117.5 boundary, where CR 603.2 fires
+  -- the ability at the announcement -- so a permanent named as a target and gone
+  -- before the gather is invisible here, and the trigger that the rules already
+  -- fired does not. Rune-Brand Juggler reaches it: its ability may target the
+  -- suspected creature its own cost sacrifices (gap #3418).
   --
   -- Firing ONCE for the whole announcement is Event.Trigger.batchScoped's
   -- answer and not this function's: matchesTriggerGiven sees one event at a

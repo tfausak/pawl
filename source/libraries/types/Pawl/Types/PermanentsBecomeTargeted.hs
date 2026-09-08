@@ -15,8 +15,9 @@ data PermanentsBecomeTargeted = MkPermanentsBecomeTargeted
   { -- | The permanents the condition watches, read live off the battlefield --
     -- CR 601.2c makes them targets while they are still there.
     --
-    -- Not implemented: the read at the announcement's own moment rather than at
-    -- the CR 117.5 boundary the batch is gathered on (#3418).
+    -- Read at the CR 117.5 boundary the batch is gathered on rather than at the
+    -- announcement's own moment, which diverges on a board Rune-Brand Juggler
+    -- reaches (gap #3418).
     filter :: Filter.Filter Keyword.Keyword,
     -- | Which of CR 601.2c's announcement roads, the sibling
     -- Pawl.Types.ControllerBecomesTarget's field one recipient over. Nothing is

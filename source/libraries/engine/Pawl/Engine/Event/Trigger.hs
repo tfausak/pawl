@@ -636,13 +636,17 @@ batchScoped condition = case condition of
   -- activated ability" naming the whole rule 601.2c announcement as one trigger
   -- event, so an activation that names three of them contains one occurrence.
   --
-  -- MASKED, not unproven: Professor Hojo, the only printing of this written
-  -- form, also prints "this ability triggers only once each turn", and
-  -- Engine.withinTurnLimit drops a batch's second firing whichever answer this
-  -- gives -- so flipping this arm alone leaves the suite green. Dropping the
-  -- card's TriggerLimit as well makes Pawl.LeavesTriggerSpec's "one card drawn,
-  -- not two" read three cards instead of two (2026-09-08), which is what says
-  -- the classification is load-bearing rather than decorative.
+  -- This arm answers for nothing unless Event.becameTarget BRACKETS its
+  -- per-recipient loop: oncePerBatch collapses within one Pawl.Types.EventGroup,
+  -- and an unbracketed loop gives each recipient a group of its own. That
+  -- bracket is what makes rule 601.2c's one announcement one group, and the two
+  -- lines are proved together -- Pawl.LeavesTriggerSpec's "one card drawn, not
+  -- two" reads three when either is undone.
+  --
+  -- The BEARER there is Synthetic Target Scryer and not Professor Hojo: Hojo
+  -- prints "this ability triggers only once each turn", and
+  -- Engine.withinTurnLimit collapses a second firing whatever this answers, so
+  -- the printed card cannot separate CR 603.2c's two sentences.
   TriggerCondition.PermanentsBecomeTargeted {} -> True
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False

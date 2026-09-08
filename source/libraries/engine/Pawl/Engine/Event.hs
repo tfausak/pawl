@@ -5647,12 +5647,24 @@ counterOne source controller oid = do
 -- CALLED AFTER THE ANNOUNCEMENT SUCCEEDS rather than at rule 601.2c's own
 -- position in the sequence. The rule puts the trigger before the costs are paid
 -- but holds the ability off the stack "until the spell has finished being cast",
--- and CR 601.2 rewinds the whole announcement if it does not -- so a trigger
--- recorded here and one recorded earlier differ only in a case where the earlier
--- one would have to be taken back.
+-- and CR 601.2 rewinds the whole announcement if it does not.
+--
+-- The position IS observable, and not only through a rewind: this runs after the
+-- costs are paid, so an activation whose cost removes the creature it also
+-- targeted -- Rune-Brand Juggler sacrificing the suspected creature its own
+-- ability names -- records the event with that permanent already gone, where CR
+-- 601.2c made it a target while it stood (gap #3418).
+--
+-- BRACKETED, which is what makes CR 603.2c's first sentence readable: rule
+-- 601.2c makes the chosen objects targets in one announcement, so every event
+-- this loop records shares one Pawl.Types.EventGroup and
+-- Event.Trigger.oncePerBatch can collapse a batch condition to one firing.
+-- Unbracketed, a batch-scoped arm is inert -- each recipient gets a group of its
+-- own and fires the ability again. Per-occurrence siblings are unaffected:
+-- eventTriggers keys them Nothing, so ward on two creatures still fires twice.
 becameTarget :: ObjectId -> StackObjectKind.StackObjectKind -> PlayerId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Game ()
 becameTarget source kind controller chosen =
-  Foldable.for_ (concatMap Set.toAscList (Map.elems chosen)) $ \targeted ->
+  simultaneously . Foldable.for_ (concatMap Set.toAscList (Map.elems chosen)) $ \targeted ->
     State.modify'
       . recordEvent
       $ GameEvent.BecameTarget
