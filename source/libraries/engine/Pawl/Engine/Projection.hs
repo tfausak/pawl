@@ -22,7 +22,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePrintedReplacement, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, functionsFromZone, hostOf, lastKnownView, staticAbilitiesOf, viewOfCharacteristics)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, hostOf, lastKnownView, staticAbilitiesOf, viewOfCharacteristics)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -75,7 +75,6 @@ import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
-import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
@@ -4304,13 +4303,6 @@ toxicIn keywords =
         Keyword.Type.Toxic n -> n * count
         _ -> 0
    in sum (Map.elems (Map.mapWithKey value keywords))
-
--- CR 303.4b's other destination: WHICH PLAYER this object is attached to --
--- what an enchant-player Aura "enchants". hostOf's twin, Nothing where the
--- object is attached to nothing or to an object. Like hostOf, no projection,
--- read live off Object.attachedTo.
-enchantedPlayerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
-enchantedPlayerOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.playerOf
 
 -- The battlefield permanents a player controls (CR 108.4). Computes the grant
 -- list ONCE and threads it, which is linear rather than quadratic.

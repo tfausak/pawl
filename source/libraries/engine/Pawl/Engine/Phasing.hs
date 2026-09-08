@@ -111,12 +111,13 @@ import qualified Pawl.Types.Zone as Zone
 -- for each other whichever way round: a permanent phasing OUT in this event was
 -- phased in before it and is not on the returning list.
 --
--- Nothing observes the order. Minting first answers the same on every board in
--- the pool, because the two things the mint reads -- the permanent's controller
--- and its copiable values -- are both derived off Pawl.Engine.Game.lookupObject
--- rather than off battlefield membership, and #1866 is why: CR 702.26e is not
--- implemented for the projection arms that carry no battlefield conjunct. So
--- this order is the rule's, kept as a fence rather than proven.
+-- The order is the rule's, kept as a fence rather than proven: no card in the
+-- pool both prepares and phases. It is not free of consequence, though -- one of
+-- the two things the mint reads is the permanent's CONTROLLER, and a layer-2
+-- control grant bounded by the battlefield (Affected.AttachedPlayerControls,
+-- Synthetic Puppeteer's Yoke) answers differently before the return is written
+-- than after. Its copiable values do not: those come off
+-- Pawl.Engine.Game.lookupObject rather than off battlefield membership.
 phasingEvent :: PlayerId -> GameState -> GameState
 phasingEvent pid gs =
   let returning = phasingIn pid gs
