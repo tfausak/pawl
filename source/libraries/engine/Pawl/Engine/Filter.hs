@@ -1600,14 +1600,17 @@ matches context view predicate = case predicate of
     Just oid -> Set.member oid (cantCrewVehicles context)
     Nothing -> False
   -- CR 120.1 / 608.2i: the same look-back again, over the damage events. Like
-  -- the two atoms above it cannot stop being true within a turn, and unlike
-  -- either it is not the reading CR 120.3e's marked damage would give -- CR
-  -- 120.6's regeneration and CR 120.3d's wither both leave a creature that was
-  -- dealt damage carrying nothing marked.
+  -- AttackedThisTurn and MilledThisTurn it cannot stop being true within a turn,
+  -- and unlike either it is not the reading CR 120.3e's marked damage would give
+  -- -- CR 120.6's regeneration and CR 120.3d's wither both leave a creature that
+  -- was dealt damage carrying nothing marked. Named rather than counted, since
+  -- CantCrewVehicles sits between them and is neither: a prohibition lifts the
+  -- moment its source leaves.
   Filter.DealtDamageThisTurn -> dealtDamageThisTurn view
-  -- CR 302.6: not a look-back over the log at all, unlike the three atoms above
-  -- -- the engine keeps the answer as Object.sickness, written at the untap step
-  -- and cleared whenever control moves.
+  -- CR 302.6: not a look-back over the log at all, unlike AttackedThisTurn,
+  -- MilledThisTurn and DealtDamageThisTurn -- the engine keeps the answer as
+  -- Object.sickness, written at the untap step and cleared whenever control
+  -- moves.
   Filter.ControlledSinceTurnBegan -> controlledSinceTurnBegan view
   -- CR 701.3a: a live read of Object.attachedTo and of the host's own projection,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature

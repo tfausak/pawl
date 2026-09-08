@@ -4973,6 +4973,7 @@ activatedAbilityFilters ability =
 --     permission.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
+--     `crewRestrictions` (CR 702.122d / 101.2),
 --     `entryRestrictions` (CR 400.4a / 101.2),
 --     `counterRestrictions` (CR 122.6 / 101.2),
 --     `activationProhibitions` (CR 602.2 / 101.2),

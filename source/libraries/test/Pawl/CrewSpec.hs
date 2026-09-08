@@ -16,7 +16,7 @@
 -- choice exists for.
 --
 -- The arithmetic is deliberately non-degenerate. Hill Giant is 3/3 and
--- Blind-Spot Giant is 4/1, so the crewing pair totals 7 -- which is not 6 (the
+-- Blind-Spot Giant is 4/3, so the crewing pair totals 7 -- which is not 6 (the
 -- threshold), not 2 (how many creatures were tapped), and not either creature's
 -- own power. Only one route through the numbers reaches the answer, so a case
 -- cannot pass by summing the wrong thing.
@@ -486,7 +486,7 @@ crewingWith tappers p = case p of
 -- WHICH creatures paid.
 --
 -- The arithmetic is non-degenerate for the module header's reason. Blind-Spot
--- Giant is 4/1 and Hill Giant is 3/3, so 4+3 = 7 pays crew 6 while either alone
+-- Giant is 4/3 and Hill Giant is 3/3, so 4+3 = 7 pays crew 6 while either alone
 -- falls short -- and where three creatures are wanted the enchanted one is a
 -- SECOND Blind-Spot Giant, so the two power-4 creatures differ in the Aura and in
 -- nothing else.
