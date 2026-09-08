@@ -1541,6 +1541,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.ObjectCounters _ -> quantity
   Quantity.Type.ObjectCountersOfAnyKind -> quantity
   Quantity.Type.OpponentsAttacked _ -> quantity
+  Quantity.Type.AttackersDeclaredThisTurn _ -> quantity
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity
   Quantity.Type.LifeGainedThisTurn _ -> quantity
   Quantity.Type.PlayersDealtDamageThisTurn _ -> quantity

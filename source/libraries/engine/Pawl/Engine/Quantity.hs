@@ -484,6 +484,23 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.OpponentsAttacked ref -> case playersOf ref of
     Just [pid] -> Just (toInteger (length (filter (attackedOpponent (Game.teams gs) pid) (Set.toList (Combat.declaredAttacked (GameState.combat gs))))))
     _ -> Nothing
+  -- CR 508.1a / 608.2i: how many creatures that player has declared as attackers
+  -- this turn -- rule 207.2c's raid, compared against 1. OpponentsAttacked's arm
+  -- in arity, and CardsDiscardedThisTurn's in footing: Nothing for a reference
+  -- naming anything but exactly one player, since "whose attack?" has no sum, and
+  -- a fold over GameState.events, whose extent Engine.beginTurnOf's clearing
+  -- makes "this turn".
+  --
+  -- The LOG and not Combat.declaredAttackers, which CR 511.3 clears at the end of
+  -- combat -- so the postcombat main phase, where every raid trigger this answers
+  -- is checked, would read an empty record. Game.attackersDeclaredThisTurn is the
+  -- fold, so a second reader cannot drift from this one.
+  --
+  -- An EMPTY log answers 0 rather than Nothing, as CardsDiscardedThisTurn's does.
+  -- What is unanswered is only the reference.
+  Quantity.AttackersDeclaredThisTurn ref -> case playersOf ref of
+    Just [pid] -> Just (toInteger (Game.attackersDeclaredThisTurn gs pid))
+    _ -> Nothing
   -- CR 701.9a / 608.2i: how many cards that player has discarded this turn.
   -- OpponentsAttacked's arm in shape -- live, one player only, resolved through the
   -- same playersOf, and Nothing for a reference naming anything but exactly
@@ -970,6 +987,7 @@ objectSlots quantity = case quantity of
   Quantity.WasBlocking -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
+  Quantity.AttackersDeclaredThisTurn _ -> Set.empty
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.LifeGainedThisTurn _ -> Set.empty
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
@@ -1191,6 +1209,7 @@ readsX quantity = case quantity of
   Quantity.WasBlocking -> False
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False
+  Quantity.AttackersDeclaredThisTurn _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.LifeGainedThisTurn _ -> False
   Quantity.PlayersDealtDamageThisTurn _ -> False

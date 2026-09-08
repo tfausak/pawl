@@ -342,6 +342,19 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.OpponentsAttacked (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"OpponentsAttacked\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 508.1a, on OpponentsAttacked's terms: a PlayerRef and nothing else, with
+  -- the same recursive-decoder pair. Mardu Skullhunter's is the Relative arm.
+  Spec.it s "AttackersDeclaredThisTurn, relative and from a slot" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.AttackersDeclaredThisTurn (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"AttackersDeclaredThisTurn\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.AttackersDeclaredThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"AttackersDeclaredThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 701.9a, with a PlayerRef and nothing else on the wire: what is counted is
   -- the turn-scoped event log. Asmoranomardicadaistinaculdacar's is the Relative
   -- arm; the InSlot arm beside it is the one a recursive decoder could lose a
