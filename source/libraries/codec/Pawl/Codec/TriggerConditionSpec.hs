@@ -224,6 +224,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfAttacksWithAnother Filter.PowerGreaterThanSource)
       " {\"type\":\"SelfAttacksWithAnother\",\"value\":{\"type\":\"PowerGreaterThanSource\"}} "
+  -- CR 508.3a's second sentence. A Filter over the PERMANENT attacked, so the
+  -- same wire shape as the arm above over a different subject -- Thrashing
+  -- Frontliner's "a battle".
+  Spec.it s "SelfAttacksPermanent" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfAttacksPermanent (Filter.HasCardType CardType.Battle))
+      " {\"type\":\"SelfAttacksPermanent\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Battle\"}}} "
   -- CR 506.5. A Filter over the ATTACKER where the sibling above takes a
   -- frequency: "alone" is the constructor's own, so it has no encoding of its
   -- own here.
@@ -295,6 +304,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedPlayerIsAttacked
       " {\"type\":\"AttachedPlayerIsAttacked\"} "
+  -- Rule 508.3b's other two subjects, nullary for the arm above's reason: the
+  -- subject is the ability's own source, so there is nothing to parameterize.
+  Spec.it s "SelfIsAttacked" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfIsAttacked
+      " {\"type\":\"SelfIsAttacked\"} "
   -- CR 702.105a, nullary: the comparison is over life totals, so there is nothing
   -- for a card to parameterize.
   Spec.it s "SelfAttacksPlayerWithMostLife" $

@@ -875,12 +875,18 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacks _ -> []
   -- CR 702.149a's Filter holds no Count for PermanentEnters' reason.
   TriggerCondition.SelfAttacksWithAnother _ -> []
+  -- Its Filter names the PERMANENT attacked and holds no Count for the arm
+  -- above's reason.
+  TriggerCondition.SelfAttacksPermanent _ -> []
   TriggerCondition.CreatureAttacksAlone _ -> []
   -- Nullary, so no Count either.
   TriggerCondition.CreatureAttacksYou -> []
   -- Nullary too, and rule 508.3b's "one or more" is the EVENT's grouping rather
   -- than a number this condition counts.
   TriggerCondition.AttachedPlayerIsAttacked -> []
+  -- The arm above's answer, over the same event: the subject is one permanent
+  -- and nothing here is counted.
+  TriggerCondition.SelfIsAttacked -> []
   -- A PlayerRelation holds no Count, and rule 508.3d's "one or more" is the
   -- EVENT's grouping for the arm above's reason, not a number this condition
   -- counts.
@@ -1691,16 +1697,18 @@ cardReplacementEffects card =
 -- what the lints downstream ask is whether a card authored the effect rather than
 -- which field it sat in.
 replacementPrintedEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
-replacementPrintedEffects replacement = replacementEffectRiders replacement <> replacementEntryEffects replacement
+replacementPrintedEffects replacement = replacementEffectRiders replacement <> replacementRewriteEffects replacement
 
--- CR 614.1c: the effects an as-enters rewrite runs -- Monstrous War-Leech's mill.
--- Kept apart from the riders below rather than folded in, because CR 615.5's
--- rider is a lint's subject in its own right (riderWithoutPreventionOffends) and
--- these are not one.
-replacementEntryEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
-replacementEntryEffects replacement = case replacement of
+-- The effects a REWRITE runs, on the two axes that carry a program: CR 614.1c's
+-- as-enters (Monstrous War-Leech's mill) and CR 614.1a's instead (Kill-Suit
+-- Cultist's destruction). Kept apart from the riders below rather than folded
+-- in, because CR 615.5's rider is a lint's subject in its own right
+-- (riderWithoutPreventionOffends) and these are not one.
+replacementRewriteEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects effects)) -> Foldable.toList effects
   ReplacementEffect.EntryR {} -> []
+  ReplacementEffect.DamageR (DamageR.MkDamageR _ (DamageRewrite.RunEffects effects) _) -> Foldable.toList effects
   ReplacementEffect.DamageR {} -> []
   ReplacementEffect.CounterR {} -> []
   ReplacementEffect.ZoneChangeR {} -> []
@@ -3303,6 +3311,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.149a names a quality the OTHER attackers must have, so this one DOES
   -- carry a Filter -- "power greater than this creature's power".
   TriggerCondition.SelfAttacksWithAnother f -> unframed [f]
+  -- CR 508.3a's second sentence names a quality the PERMANENT attacked must
+  -- have, so this one DOES carry a Filter -- Thrashing Frontliner's "a battle".
+  TriggerCondition.SelfAttacksPermanent f -> unframed [f]
   -- CR 506.5's condition names a quality the ATTACKER must have, so it carries a
   -- Filter -- rule 702.83a's "a creature you control".
   TriggerCondition.CreatureAttacksAlone f -> unframed [f]
@@ -3312,6 +3323,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 508.3b names no quality of anything: its subject is the ability's own
   -- attachment, so there is no Filter here either.
   TriggerCondition.AttachedPlayerIsAttacked -> []
+  -- Rule 508.3b's other two subjects name no quality either: the subject is the
+  -- ability's own source, matched by identity.
+  TriggerCondition.SelfIsAttacked -> []
   -- CR 508.3d names no quality of anything either: its subject is a player, its
   -- payload is a PlayerRelation and not a Filter, and the creatures it counts
   -- are the DECLARATION's.
@@ -3471,9 +3485,11 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerDrawsNthCard _ -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfAttacksWithAnother _ -> []
+  TriggerCondition.SelfAttacksPermanent _ -> []
   TriggerCondition.CreatureAttacksAlone _ -> []
   TriggerCondition.CreatureAttacksYou -> []
   TriggerCondition.AttachedPlayerIsAttacked -> []
+  TriggerCondition.SelfIsAttacked -> []
   TriggerCondition.PlayerAttacks _ -> []
   TriggerCondition.PlayerAttacksWith _ -> []
   TriggerCondition.PlayerAttacksPlayer _ -> []
@@ -4000,7 +4016,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- rewrite that describes something must be classified here rather than have its
 -- Filter go unlinted.
-damageRewriteFilters :: DamageRewrite.DamageRewrite -> [Filter.Type.Filter Keyword.Keyword]
+damageRewriteFilters :: DamageRewrite.DamageRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
 damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.RedirectMatching f -> [f]
   DamageRewrite.Redirect _ -> []
@@ -4011,6 +4027,10 @@ damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.PreventAllBut _ -> []
   DamageRewrite.SetAmount _ -> []
   DamageRewrite.Scale _ -> []
+  -- CR 614.1a's instead-effects hold no Filter of their own; the ones inside
+  -- them are reached as ordinary effect filters, through cardResolutionEffects
+  -- -- EntryRewrite.RunEffects' answer, and for its reason.
+  DamageRewrite.RunEffects _ -> []
 
 -- A face's printed replacement ability reaches a Filter on a second axis beside
 -- the rewrite's: CR 604.2's "as long as" clause counts objects, exactly as the

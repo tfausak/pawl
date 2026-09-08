@@ -102,6 +102,7 @@ import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Effect as Effect.Type
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -118,6 +119,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility.Type
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -144,6 +146,7 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.OutsideObject as OutsideObject
+import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
@@ -1598,7 +1601,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
 -- build here rather than silently losing it. The three that `Replacement.prevents`
 -- refuses are unreachable, since `Replacement.inertPrevention` answers Just only
 -- for a rewrite that prevents.
-applyInertly :: ReplacementCandidate -> DamageRewrite.DamageRewrite -> ProposedEvent -> Game (Maybe ProposedEvent)
+applyInertly :: ReplacementCandidate -> DamageRewrite.DamageRewrite (Effect.Type.Effect Card (GrantedAbility.Type.GrantedAbility Card)) -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyInertly candidate rewrite event = do
   case rewrite of
     -- CR 122.1c's "prevent that damage and remove a shield counter from it". The
@@ -1628,6 +1631,7 @@ applyInertly candidate rewrite event = do
     DamageRewrite.Redirect _ -> pure ()
     DamageRewrite.RedirectNext _ _ -> pure ()
     DamageRewrite.RedirectMatching _ -> pure ()
+    DamageRewrite.RunEffects _ -> pure ()
   pure (Just event)
 
 -- CR 614.6: apply one chosen effect. Nothing means the event does not happen.
@@ -2842,6 +2846,47 @@ apply batch candidate event =
         pure . Just $ case Replacement.printedDestination gs (Replacement.candidateContext gs candidate) filter_ of
           Nothing -> event
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
+      -- CR 614.1a's "instead" with an ACTION rather than an amount or a
+      -- destination -- Kill-Suit Cultist's "destroy that creature instead". The
+      -- damage event does not happen, which is PreventAll's Nothing above, and
+      -- the effects run in its place.
+      --
+      -- NOT a prevention: the clause never says "prevent" (CR 615.1a), so
+      -- `Replacement.prevents` refuses this rewrite, `preventionBy` records no
+      -- Pawl.Types.Prevention and CR 615.13's trigger never fires.
+      --
+      -- QUEUED, not run here, for the reason EntryRewrite.RunEffects' arm above
+      -- gives: this module is below Pawl.Engine.Resolve and cannot run a card's
+      -- effects. The environment goes onto the queue with them, since the ability
+      -- that installed the row is long gone (CR 400.7); see
+      -- Pawl.Types.PendingDamageEffect.
+      --
+      -- The row's SLOTS carry CR 601.2c's target forward, which is what makes
+      -- "that creature" nameable at the event, and they are objects rather than
+      -- recipients (Pawl.Types.ActiveReplacement.slots), so the tag is rebuilt
+      -- generically -- Recipient.objectOf is what every reader of an
+      -- ObjectRef.InSlot asks, and it admits ToObject.
+      DamageRewrite.RunEffects effects -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        case ReplacementCandidate.controller candidate of
+          -- CR 109.5 has nobody to answer with: a permanent-sourced candidate
+          -- whose source has left the board (see ReplacementCandidate.controller).
+          -- The damage is replaced all the same -- CR 614.1's "instead" is not
+          -- conditional on the performer -- and nothing runs.
+          Nothing -> pure Nothing
+          Just controller -> do
+            State.modify' $ \g ->
+              g
+                { GameState.pendingDamageEffects =
+                    GameState.pendingDamageEffects g
+                      Seq.|> PendingDamageEffect.MkPendingDamageEffect
+                        { PendingDamageEffect.effects = effects,
+                          PendingDamageEffect.targets = fmap (Set.map Recipient.ToObject) (ReplacementCandidate.slots candidate),
+                          PendingDamageEffect.controller = controller,
+                          PendingDamageEffect.source = ReplacementCandidate.source candidate
+                        }
+                }
+            pure Nothing
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR {}, _) -> pure (Just event)
     -- CR 701.19a / 122.1c: under either arm the DESTRUCTION does not happen, so
@@ -6731,9 +6776,11 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerBecomesMonarch _ -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
+  TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
+  TriggerCondition.SelfIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.PlayerAttacksPlayer {} -> False
@@ -6983,12 +7030,14 @@ controllerTurnScoped cond = case cond of
   -- its thief's turn.
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
+  TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   -- CR 506.2 makes this one an OPPONENT's turn every time, which is not the
   -- controller's turn either -- StepBegins' OpponentsTurn arm above answers the
   -- same way for the same reason.
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
+  TriggerCondition.SelfIsAttacked -> False
   -- The only arm around here that can answer True, and only on one relation: CR
   -- 508.1 lets only the active player declare attackers, so the declarer named
   -- by the event is always the active player. You therefore pins the event to CR

@@ -104,7 +104,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 declarationsOf :: ObjectId -> GameState -> Int
 declarationsOf bearer gs =
   let declaredIt event = case event of
-        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _) -> oid == bearer
+        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) -> oid == bearer
         _ -> False
    in length (Seq.filter (declaredIt . LoggedEvent.event) (GameState.events gs))
 
@@ -1207,7 +1207,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- sentence true -- a creature put onto the battlefield attacking is in the
   -- record and has no event here.
   TriggerCondition.SelfAttacks frequency -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _) ->
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) ->
       oid == bearer && case frequency of
         TriggerFrequency.EveryTime -> True
         -- "For the first time each turn". The declaration being matched is
@@ -1293,7 +1293,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- a REGRESSION FENCE rather than a live path: the bearer was declared an
   -- attacker a moment ago and nothing has had priority since.
   TriggerCondition.SelfAttacksWithAnother f -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _)
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _)
       | oid == bearer ->
           let viewOf = Projection.viewWithLastKnown bearer gs
               context = Filter.contextComparingPower (Game.teams gs) (Just you) bearer (Filter.power =<< viewOf bearer)
@@ -1303,6 +1303,90 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
               -- because the rule says it, not because a test proves it.
               admits other = other /= bearer && maybe False (\view -> Filter.matches context view f) (viewOf other)
            in any admits (Map.keys (Combat.attackers (GameState.combat gs)))
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 508.3a's second sentence, self-scoped: the bearer was declared as an
+  -- attacker and CR 508.1b's announcement named a permanent the Filter admits.
+  -- SelfAttacks' event and its identity check, with the target the same event
+  -- carries read beside them.
+  --
+  -- The TARGET and not CR 508.5's defending player, which the event also carries:
+  -- CR 310.9d makes those two different things for a battle, and this sentence
+  -- asks about the announcement. AttackTarget.OfPlayer therefore answers False --
+  -- "attacks a battle" and "attacks a player" are different clauses, where
+  -- CreatureAttacksYou below reads the defending player and cannot tell them
+  -- apart.
+  --
+  -- The permanent's characteristics come from the game as it stands, which is
+  -- CreatureAttacksAlone's reading of CR 603.10; viewWithLastKnown with the
+  -- BEARER as the source, the attacked permanent being a different object, so CR
+  -- 608.2h's last known information does not stand in for it.
+  TriggerCondition.SelfAttacksPermanent f -> case event of
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ target _)
+      | oid == bearer ->
+          case target of
+            AttackTarget.OfPlayer _ -> False
+            AttackTarget.OfPlaneswalker attacked -> admits attacked
+            AttackTarget.OfBattle attacked -> admits attacked
+      where
+        admits attacked = case Projection.viewWithLastKnown bearer gs attacked of
+          Nothing -> False
+          Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
@@ -1372,7 +1456,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- and CR 508.2's triggers go on the stack before any player gets priority.
   -- viewWithLastKnown for PermanentEnters' reason.
   TriggerCondition.CreatureAttacksAlone f -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ count)
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ count)
       | count == 1 ->
           case Projection.viewWithLastKnown attacker gs attacker of
             Nothing -> False
@@ -1450,7 +1534,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- which is PlayerAttacks (CR 508.3d) and AttachedPlayerIsAttacked (CR 508.3b)
   -- below, each against its own event.
   TriggerCondition.CreatureAttacksYou -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _) -> defending == you
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _ _) -> defending == you
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
@@ -1769,6 +1853,80 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.CardArrived _ -> False
+  -- CR 508.3b's other two subjects: the ability's own source is the planeswalker
+  -- or the battle that was attacked. The arm above's event and its per-TARGET
+  -- arity -- one GameEvent.BecameAttacked per distinct target -- with the subject
+  -- read off the SOURCE rather than off Object.attachedTo, so this arm looks
+  -- nothing up on the board.
+  --
+  -- AttackTarget.OfPlayer answers False and needs no comparison: rule 508.3b's
+  -- player subject is the arm above, and a permanent is never a PlayerId.
+  --
+  -- By identity on the id the event carries, so CR 506.4c taking the permanent
+  -- out of combat afterwards cannot unmake the trigger -- rule 508.3b asks what
+  -- the declaration named.
+  TriggerCondition.SelfIsAttacked -> case event of
+    GameEvent.BecameAttacked payload ->
+      case BecameAttacked.target payload of
+        AttackTarget.OfPlayer _ -> False
+        AttackTarget.OfPlaneswalker attacked -> attacked == bearer
+        AttackTarget.OfBattle attacked -> attacked == bearer
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
   -- CR 508.3e: the player the payload names declared attackers, and at least one
   -- of them was sent at a PLAYER. AttachedPlayerIsAttacked's event and its
   -- per-TARGET arity, with the subject read off a relation instead of off the
@@ -1877,7 +2035,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Game.stillPlaying rather than every seat the game began with: a player who has
   -- left (CR 800.4a) has no life total left to be beaten.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _)
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _)
       | oid == bearer ->
           case Map.lookup bearer (Combat.attackers (GameState.combat gs)) of
             Just (AttackTarget.OfPlayer attacked) ->

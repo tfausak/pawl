@@ -298,6 +298,7 @@ import qualified Pawl.Codec.PaidExpirySpec
 import qualified Pawl.Codec.PayBranchSpec
 import qualified Pawl.Codec.PayGateSpec
 import qualified Pawl.Codec.PayObligationSpec
+import qualified Pawl.Codec.PendingDamageEffectSpec
 import qualified Pawl.Codec.PendingEntryEffectSpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
 import qualified Pawl.Codec.PermanentCandidateSpec
@@ -910,6 +911,7 @@ spec s registry = do
   Pawl.Codec.PayBranchSpec.spec s
   Pawl.Codec.PayGateSpec.spec s
   Pawl.Codec.PayObligationSpec.spec s
+  Pawl.Codec.PendingDamageEffectSpec.spec s
   Pawl.Codec.PendingEntryEffectSpec.spec s
   Pawl.Codec.PermanentBecomesDesignatedSpec.spec s
   Pawl.Codec.CounterPlacementSpec.spec s

@@ -1062,16 +1062,18 @@ rewriteReplacementEffect pairs effect = case effect of
   ReplacementEffect.PhaseR _ -> effect
 
 -- CR 612.1 through a damage REWRITE, rewriteEntryRewrite's twin one event class
--- over. Only CR 614.9's printed destination holds a Filter for a word to sit in;
--- the rest are numbers, a Scaling and a baked Recipient.
+-- over. CR 614.9's printed destination holds a Filter for a word to sit in and
+-- the nested effects hold whatever an ability's clauses do; the rest are
+-- numbers, a Scaling and a baked Recipient.
 --
 -- NO BOARD OBSERVES IT: the pool's one printed destination is
 -- Filter.IsHostOfSource (Pariah), which names no subtype for CR 612.1 to swap,
--- so mutating this arm away leaves the suite green. The arm is the rule rather
--- than a proven behaviour -- a card redirecting to "the enchanted Goblin" would
--- be what proves it. Exhaustive rather than a wildcard,
--- rewriteReplacementEffect's posture.
-rewriteDamageRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> DamageRewrite.DamageRewrite -> DamageRewrite.DamageRewrite
+-- and the pool's one nested program is Kill-Suit Cultist's destruction of a
+-- slot, which names none either -- so mutating either arm away leaves the suite
+-- green. Both are the rule rather than a proven behaviour: a card redirecting to
+-- "the enchanted Goblin" would prove the first. Exhaustive rather than a
+-- wildcard, rewriteReplacementEffect's posture.
+rewriteDamageRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> DamageRewrite.DamageRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> DamageRewrite.DamageRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewriteDamageRewrite pairs rewrite = case rewrite of
   DamageRewrite.RedirectMatching f -> DamageRewrite.RedirectMatching (Filter.rewrite pairs f)
   DamageRewrite.Redirect _ -> rewrite
@@ -1082,6 +1084,9 @@ rewriteDamageRewrite pairs rewrite = case rewrite of
   DamageRewrite.PreventAllBut _ -> rewrite
   DamageRewrite.SetAmount _ -> rewrite
   DamageRewrite.Scale _ -> rewrite
+  -- CR 614.1a's "instead [do something]", the payload shared with an ability's
+  -- clauses -- EntryRewrite.RunEffects' arm exactly.
+  DamageRewrite.RunEffects es -> DamageRewrite.RunEffects (fmap (rewriteEffect pairs) es)
 
 -- CR 612.1 through what a CR 614.1a draw replacement does. The wish filter is the
 -- one printed word a draw rewrite can hold, and it is the SAME Filter
@@ -1341,9 +1346,13 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
   TriggerCondition.SelfAttacksWithAnother f -> TriggerCondition.SelfAttacksWithAnother (Filter.rewrite pairs f)
+  -- DESCENDS for the arm above's reason: rule 508.3a's second sentence names a
+  -- permanent, and a Filter over one can name a creature type CR 612.1 rewrites.
+  TriggerCondition.SelfAttacksPermanent f -> TriggerCondition.SelfAttacksPermanent (Filter.rewrite pairs f)
   TriggerCondition.CreatureAttacksAlone f -> TriggerCondition.CreatureAttacksAlone (Filter.rewrite pairs f)
   TriggerCondition.CreatureAttacksYou -> condition
   TriggerCondition.AttachedPlayerIsAttacked -> condition
+  TriggerCondition.SelfIsAttacked -> condition
   TriggerCondition.PlayerAttacks _ -> condition
   -- DESCENDS, where the arm above does not: rule 508.3c's Filter names a
   -- creature type, which is exactly what CR 612.1's text-changing effect

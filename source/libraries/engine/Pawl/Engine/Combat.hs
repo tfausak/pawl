@@ -285,11 +285,6 @@ attackersOn pid gs =
 -- from this very function by noteAttackingNothing below and asked ahead of it by
 -- both callers (Damage.combatRecipient and
 -- Projection.viewOfCharacteristics).
---
--- Not implemented: CR 508.3b's planeswalker and battle subjects. The event that
--- would carry them is there -- GameEvent.BecameAttacked names the permanent --
--- and no trigger condition asks; Pawl.Types.TriggerCondition's
--- AttachedPlayerIsAttacked records the sweep behind that (#2279).
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs =
   -- No defending player is no attack (see Pawl.Engine.Defender.defendingPlayers).
@@ -1792,15 +1787,21 @@ attemptAttackDeclaration perform pid rejected = do
               -- target here came from declarableTargets, and each of the three
               -- arms answers a player for one of those.
               --
-              -- Not implemented: CR 508.3a's attacks-a-permanent form, which
-              -- neither event below can be matched on -- it needs the target
-              -- beside the ATTACKER's identity, and this one carries CR 508.5's
-              -- defending player instead (#3052).
+              -- It carries CR 508.1b's announcement too, beside that player and
+              -- not derived from it: rule 508.3a's second sentence asks what the
+              -- creature was declared attacking, which for a battle is a
+              -- permanent whose protector is the defending player (CR 310.9d).
+              -- Pawl.BattleSpec's "CR 508.3a whole card: Thrashing Frontliner
+              -- declared at the Siege gets +1/+1" is what proves the two are read
+              -- apart, its falsifier being the same board with the announcement
+              -- aimed at the protector instead.
               State.modify'
                 ( \g ->
-                    let defendingFor oid = (\t -> Defender.playerOf Projection.controllerWithLastKnown t g) =<< Map.lookup oid recorded
-                        declared = Natural.length attacking
-                        record h oid = Maybe.maybe h (\d -> Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid d declared)) h) (defendingFor oid)
+                    let declared = Natural.length attacking
+                        record h oid = Maybe.fromMaybe h $ do
+                          t <- Map.lookup oid recorded
+                          d <- Defender.playerOf Projection.controllerWithLastKnown t g
+                          pure (Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid d t declared)) h)
                      in List.foldl' record g attacking
                 )
               -- CR 508.3b's arity, which is the declaration's rather than the

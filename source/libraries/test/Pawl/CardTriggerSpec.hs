@@ -208,6 +208,66 @@ curseOfVitalitySpec s registry =
               Spec.assertEqWith s "and nothing was declared" (sentAt after) []
             Nothing -> Spec.assertFailure s "fixture should give alice two Pikers, bob a Jace and carol the Curse"
 
+-- CR 508.3b's OTHER two subjects, the group above being its player subject:
+-- "whenever this planeswalker is attacked", read off the ability's own source.
+-- Same rule, same event, same once-per-declaration arity.
+--
+-- The producer is SYNTHETIC, and no printing is being passed over. Scryfall
+-- o:"is attacked" o:"whenever" returned five cards on 2026-09-07 and all five are
+-- the Curses enchanting a PLAYER that the group above draws from;
+-- o:"planeswalker is attacked" and o:"this battle is attacked" returned nothing.
+-- Rule 508.3b names planeswalkers and battles as subjects in as many words, so
+-- nothing in the CR forbids the card. Any printing writing either subject
+-- replaces it.
+--
+-- Synthetic Warded Sentinel is {2}{W} Planeswalker, loyalty 4, "Whenever this
+-- planeswalker is attacked, you gain 2 life" -- Curse of Vitality's first
+-- sentence with the subject moved from an enchanted player to the source itself.
+--
+-- THREE SEATS for the group above's reason, and bob is attackable HIMSELF, which
+-- is what the two cases below turn on: they differ in CR 508.1b's announcement and
+-- in nothing else, and CR 508.5 makes bob the defending player on both -- so a
+-- condition reading that field rather than rule 508.3b's subject would pay twice.
+wardedSentinelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wardedSentinelSpec s registry =
+  let board = do
+        piker <- S.printingOf s registry "Goblin Piker"
+        sentinel <- S.printingOf s registry "Synthetic Warded Sentinel"
+        case S.threePlayerCombat [piker] [sentinel] [] of
+          (gs0, [_], [walker], []) ->
+            -- Loyalty for the Jace's reason in the group above: CR 704.5i buries a
+            -- planeswalker with none before CR 508.1b can offer it.
+            pure (Just (walker, S.addCounter CounterKind.Loyalty 3 walker gs0))
+          _ -> pure Nothing
+      -- The target is FILTERED out of the offered set rather than built, so a leg
+      -- CR 508.1b never offered falls back visibly and the record assertion catches
+      -- it. bob is the defending player either way.
+      aimedAt :: AttackTarget.AttackTarget -> Prompt.Prompt r -> r
+      aimedAt target p = case p of
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== target) (NonEmpty.toList options))
+        _ -> S.attackTo S.bob p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      sentAt gs = Map.elems (Combat.Type.attackers (GameState.combat gs))
+   in Spec.describe s "Synthetic Warded Sentinel" $ do
+        Spec.it s "CR 508.3b whole card: the Sentinel being attacked pays its controller" $ do
+          built <- board
+          case built of
+            Just (walker, gs) -> do
+              let after = atBlockers (aimedAt (AttackTarget.OfPlaneswalker walker)) gs
+              Spec.assertEqWith s "bob gained 2 and nobody else moved" (lives after) (Just 20, Just 22, Just 20)
+              Spec.assertEqWith s "CR 508.1b and the Sentinel really is what was attacked" (sentAt after) [AttackTarget.OfPlaneswalker walker]
+            Nothing -> Spec.assertFailure s "fixture should give alice a Piker and bob the Sentinel"
+        Spec.it s "CR 508.3b the same attacker sent at the Sentinel's CONTROLLER leaves it silent" $ do
+          -- THE FALSIFIER, one announcement apart from the case above.
+          built <- board
+          case built of
+            Just (_, gs) -> do
+              let after = atBlockers (aimedAt (AttackTarget.OfPlayer S.bob)) gs
+              Spec.assertEqWith s "nobody gained life" (lives after) (Just 20, Just 20, Just 20)
+              Spec.assertEqWith s "CR 508.1b and bob himself really is what was attacked" (sentAt after) [AttackTarget.OfPlayer S.bob]
+            Nothing -> Spec.assertFailure s "fixture should give alice a Piker and bob the Sentinel"
+
 -- CR 508.3d: the third of rule 508.3's three arities, and the first trigger in
 -- the pool whose subject is the ATTACKING PLAYER.
 --
@@ -3101,6 +3161,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   anafenzaAttackSpec s registry
   curseOfVitalitySpec s registry
+  wardedSentinelSpec s registry
   boggartPranksterSpec s registry
   avatarRokuSpec s registry
   everWatchingThresholdSpec s registry
