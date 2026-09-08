@@ -54,9 +54,14 @@ data Source
     -- OfMeld's reason, and a token when that component is one: rule 730.2d says
     -- which, and Pawl.Engine.Game.sourceIsToken reads the head for it.
     --
-    -- Not implemented: CR 730.2e through 730.2g's face-down components, CR
-    -- 730.2h's flip components, and CR 730.2i/730.2j's double-faced components
-    -- (#874).
+    -- CR 730.2e gives the permanent its topmost component's STATUS, which is
+    -- Object.facing and not a field here: every component of a pawl permanent
+    -- shares that one status, which is CR 730.2f's "each face-up component that
+    -- represents it is turned face down" said once.
+    --
+    -- Not implemented: CR 730.2g's instant or sorcery component, which keeps a
+    -- face-down merged permanent from turning face up (#3392); CR 730.2h's flip
+    -- components, and CR 730.2i/730.2j's double-faced components (#874).
     OfMerge (NonEmpty.NonEmpty MergeComponent.MergeComponent)
   | -- | CR 111.3/111.6: a token -- a permanent not represented by a card. Its
     -- characteristics ARE a Card (CR 111.3: effect-defined values are functionally
