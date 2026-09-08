@@ -42,13 +42,15 @@ import Pawl.Types.SlotName (SlotName)
 -- nobody rewrote. Reading a slot name and renaming one must agree about where a
 -- quantity is, which is the whole reason this is a traversal.
 --
--- Only Aggregation.Greatest carries a quantity; the other two aggregate the
--- matched set alone, and neither the Scope nor the Filter holds one.
+-- Aggregation.Greatest and Aggregation.Total each carry a quantity; the other
+-- two aggregate the matched set alone, and neither the Scope nor the Filter
+-- holds one.
 overCount :: (Applicative f) => (quantity -> f quantity) -> Count.Type.Count quantity -> f (Count.Type.Count quantity)
 overCount f count = case Count.Type.aggregation count of
   Aggregation.Members -> pure count
   Aggregation.DistinctCardTypes -> pure count
   Aggregation.Greatest quantity -> fmap (\q -> count {Count.Type.aggregation = Aggregation.Greatest q}) (f quantity)
+  Aggregation.Total quantity -> fmap (\q -> count {Count.Type.aggregation = Aggregation.Total q}) (f quantity)
 
 -- overCount as a fold: whatever the per-member quantity contributes. The binding
 -- slots it reads, for the two readers in Pawl.Engine.Quantity that want a Set.
@@ -60,8 +62,8 @@ foldCount f = Const.getConst . overCount (Const.Const . f)
 anyCount :: (quantity -> Bool) -> Count.Type.Count quantity -> Bool
 anyCount predicate = Monoid.getAny . foldCount (Monoid.Any . predicate)
 
--- The count with its per-member quantity REWRITTEN. The two aggregations carrying
--- no quantity are returned untouched, there being nothing there to rewrite.
+-- The count with its per-member quantity REWRITTEN. An aggregation carrying no
+-- quantity is returned untouched, there being nothing there to rewrite.
 mapCount :: (quantity -> quantity) -> Count.Type.Count quantity -> Count.Type.Count quantity
 mapCount f = Identity.runIdentity . overCount (Identity.Identity . f)
 

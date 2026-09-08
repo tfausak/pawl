@@ -20,5 +20,6 @@ codec quantityCodec =
   Arm.tagged
     [ Arm.nullary "Members" Aggregation.Members,
       Arm.nullary "DistinctCardTypes" Aggregation.DistinctCardTypes,
-      Arm.payload "Greatest" quantityCodec Aggregation.Greatest (\x -> case x of Aggregation.Greatest y -> Just y; _ -> Nothing)
+      Arm.payload "Greatest" quantityCodec Aggregation.Greatest (\x -> case x of Aggregation.Greatest y -> Just y; _ -> Nothing),
+      Arm.payload "Total" quantityCodec Aggregation.Total (\x -> case x of Aggregation.Total y -> Just y; _ -> Nothing)
     ]

@@ -655,7 +655,7 @@ plantedPlayer = PlayerRef.InSlot . SlotName.MkSlotName . Text.pack
 quantityCounts :: Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
 quantityCounts = QuantitySlot.nestedCounts
 
--- The Quantities a Count's AGGREGATION carries: only Greatest has one. Named so
+-- The Quantities a Count's AGGREGATION carries: Greatest and Total. Named so
 -- quantityKindFilters below and Pawl.Engine.QuantitySlot's own Count descent
 -- reach the same field rather than each spelling the aggregation out.
 countQuantities :: Count.Type.Count Quantity.Type.Quantity -> [Quantity.Type.Quantity]
@@ -663,6 +663,7 @@ countQuantities count = case Count.Type.aggregation count of
   Aggregation.Members -> []
   Aggregation.DistinctCardTypes -> []
   Aggregation.Greatest quantity -> [quantity]
+  Aggregation.Total quantity -> [quantity]
 
 -- Every Quantity a Condition holds: both sides of a comparison, plus whatever a
 -- disjunction or a conjunction nests (Pawl.Types.Condition).

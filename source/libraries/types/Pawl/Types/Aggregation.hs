@@ -22,8 +22,16 @@ data Aggregation quantity
     -- existing Quantity that Pawl.Engine.Quantity.evaluate already reads against
     -- one object rather than a narrower stand-in duplicating its arms.
     --
-    -- Not implemented: a summing arm, which Sutured Ghoul and Wretched
-    -- Bonemass both ask for ("the total power of the exiled cards") (#3108).
     -- Least is not here either, and no card in data/cards asks for it.
     Greatest quantity
+  | -- | The SUM of a per-member quantity -- "the total mana value of cards you
+    -- own in exile" (Ashiok, Wicked Manipulator's -7). Greatest's neighbour: the
+    -- same per-member Quantity, folded with (+) rather than max, and for the same
+    -- reason parameterized rather than named concretely.
+    --
+    -- Unlike Greatest it answers over an EMPTY matched set, because a sum has an
+    -- identity and a maximum does not. Pawl.PlaneswalkerSpec's AshiokLoyalty
+    -- group is what proves the three aggregations come apart: two exiled cards of
+    -- unequal mana value read differently under Members, Greatest and this.
+    Total quantity
   deriving (Eq, Ord, Show)

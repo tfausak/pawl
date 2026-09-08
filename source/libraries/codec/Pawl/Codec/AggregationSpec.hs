@@ -28,4 +28,10 @@ spec s = Spec.describe s "Pawl.Codec.Aggregation" $ do
       (Aggregation.codec Common.integer)
       (Aggregation.Greatest 3)
       " {\"type\":\"Greatest\",\"value\":3} "
+  Spec.it s "Total" $
+    Common.assertCodec
+      s
+      (Aggregation.codec Common.integer)
+      (Aggregation.Total 3)
+      " {\"type\":\"Total\",\"value\":3} "
   Spec.it s "has a schema" $ Common.assertHasSchema s (Aggregation.codec Common.integer)
