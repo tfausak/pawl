@@ -61,6 +61,13 @@ hasLeftTheBattlefield oid gs = case Game.lookupObject oid gs of
 -- The entry goes whether or not the move happened. A cancelled move (CR 614.6) or
 -- an id that is no longer in the zone it was moved to has had its duration end all
 -- the same, and rule 610.3 creates the second one-shot effect once.
+--
+-- CR 610.3c -- "returns under its owner's control" -- is the door's own answer
+-- rather than a decision made here: the move names no controller, so the arrival
+-- takes the rules' default and the object comes back to its owner. Pawl.BoardEffectSpec's Banisher Priest case fences that (a creature
+-- exiled by another seat's ability comes back to its owner, not to the exiler),
+-- but it is a fence and not a proof: a ReturnWatch records no controller, so the
+-- other reading cannot be spelled here to mutate against.
 returnMoved :: Game Bool
 returnMoved = do
   gs <- State.get
