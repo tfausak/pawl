@@ -22,6 +22,11 @@
 -- face-down component differs on it, and CR 702.37e's special action is what
 -- turns the merged permanent back over.
 --
+-- Akki Lavarunner // Tok-Tok, Volcano Born is the FLIP host CR 730.2h needs, and
+-- data/cards/'s only Flip printing: a {3}{R} 1/1 Goblin Warrior with haste whose
+-- combat damage to an opponent flips it into the legendary 2/2 Goblin Shaman
+-- Tok-Tok, Volcano Born. CR 710's own coverage of it is Pawl.FlipSpec's.
+--
 -- Falcon Abomination is the creature it merges with: {2}{U} 2\/2 Creature --
 -- Bird Zombie, flying, "When this creature enters, create a 2\/2 black Zombie
 -- creature token with decayed". Non-Human (CR 702.140a), a DIFFERENT name, box
@@ -58,6 +63,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -76,7 +82,9 @@ import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -440,6 +448,78 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "the token and the card represent one permanent, the card on top" (componentNames cat (onto MutateSide.Over)) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Cat Token")]
     Spec.assertEqWith s "and the other way under" (componentNames cat (onto MutateSide.Under)) [CardName.MkCardName (Text.pack "Cat Token"), CardName.MkCardName (Text.pack "Cubwarden")]
     Spec.assertBool s (not (isForest catBoard)) "setup: the Cat token was a token before anything merged with it, so Ashaya left it alone"
+  -- CR 730.2h: "if a merged permanent contains a flip card, that component's
+  -- alternative characteristics are used instead of its normal characteristics
+  -- if the merged permanent is flipped."
+  --
+  -- Played out from the two cards' own text. Cubwarden merges UNDER Akki
+  -- Lavarunner, so CR 730.2a leaves the flip card topmost and the merged
+  -- permanent is a 1/1 with haste that also has CR 702.140e's lifelink; it
+  -- attacks unblocked, and Akki's printed trigger flips the permanent it is now
+  -- one component of.
+  --
+  -- The DISCRIMINATOR is haste, asserted beside the name and the box: CR 710.2
+  -- says the flip component's normal "text box" stops applying too, so an
+  -- implementation that reached the alternative half by folding it over the
+  -- merge's existing stamp keeps haste and gets every other reading right.
+  -- Lifelink is the other side of the same sentence -- rule 710.2 takes back
+  -- only the flip component's own text, and the component under it is no part
+  -- of that.
+  Spec.it s "CR 730.2h a flipped merged permanent uses its flip component's alternative characteristics" $ do
+    plains <- S.printingOf s registry "Plains"
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let (host, board, spellId) = mutateBoard plains akki cubwarden
+        merged = merging MutateSide.Under host board spellId
+        after = S.runCombat S.aggressiveAnswer (intoCombat merged)
+    Spec.assertEqWith
+      s
+      "CR 730.2h the flipped merged permanent is Tok-Tok, Volcano Born, a 2/2, and CR 710.2's normal text box no longer applies"
+      (Projection.namesOf host after, S.powerToughnessOf host after, Projection.hasKeyword Keyword.Haste host after)
+      (Set.singleton (CardName.MkCardName (Text.pack "Tok-Tok, Volcano Born")), Just (2, 2), False)
+    Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink host after) "CR 702.140e while the component under the flip card still contributes lifelink"
+    -- The fixture facts, after the behaviour: the same permanent read as the
+    -- normal half before the flip, the flip really happened, the combat that
+    -- fired it really connected, and two cards really represent one permanent.
+    Spec.assertEqWith
+      s
+      "setup: before the flip the same permanent was Akki Lavarunner, a 1/1"
+      (Projection.namesOf host merged, S.powerToughnessOf host merged, Projection.hasKeyword Keyword.Haste host merged)
+      (Set.singleton (CardName.MkCardName (Text.pack "Akki Lavarunner")), Just (1, 1), True)
+    Spec.assertEqWith s "setup: CR 110.5 the status itself is set" (fmap Object.flipped (Game.lookupObject host after)) (Just True)
+    Spec.assertEqWith s "setup: the 1/1 connected, which is what fired the trigger" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "setup: the two cards represent one permanent, the flip card on top" (componentNames host after) [CardName.MkCardName (Text.pack "Akki Lavarunner"), CardName.MkCardName (Text.pack "Cubwarden")]
+  -- CR 903.9c's split names "the card that represents it and is a commander",
+  -- and CR 111.6 says a token is not a card -- so a merged commander's TOKEN
+  -- component is put into the appropriate zone with every other non-commander
+  -- component, whatever printing it was interned under.
+  --
+  -- HAND-BUILT, and the only case in this file that is: the component list is
+  -- given a card and a token under ONE printing, which is what makes the two
+  -- readings of the split differ, and no printing in data/cards/ mints a token
+  -- copy of a card for a mutate spell to merge with. An audit fold-in from
+  -- #3390 rather than a rule this pool can reach.
+  Spec.it s "CR 903.9c/111.6 a merged commander's token component is not split off to the command zone" $ do
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let (oid, base) = S.addPermanent cubwarden S.alice (Setup.emptyGame S.bothPlayers)
+    case Game.lookupObject oid base >>= (printingBehind . Object.source) of
+      Nothing -> Spec.assertFailure s "the fixture did not put a card onto the battlefield"
+      Just pid -> do
+        let board =
+              (asMergeOfCardAndToken oid pid base)
+                { GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton pid}) S.alice (GameState.players (asMergeOfCardAndToken oid pid base))
+                }
+            after = snd (S.runPureWith returningCommander board (Event.changeZoneReturning oid Zone.Hand))
+        Spec.assertEqWith
+          s
+          "CR 903.9c one card goes to the command zone, and the token component interned under the same printing does not follow it"
+          (Maybe.mapMaybe (\c -> fmap Object.source (Game.lookupObject c after)) (Set.toList (GameState.command after)))
+          [Source.OfCard pid]
+        -- The fixture facts, after it: the permanent really was a merge of a
+        -- card and a token under one printing, and CR 903.9b's offer really was
+        -- accepted.
+        Spec.assertEqWith s "setup: the components were a card and a token under one printing" (fmap (Foldable.toList . Game.componentsOf . Object.source) (Game.lookupObject oid board)) (Just [MergeComponent.OfCard pid, MergeComponent.OfToken pid])
+        Spec.assertEqWith s "setup: the merged permanent left the battlefield" (Game.lookupObject oid after) Nothing
   -- CR 730.3 over a component list that holds a token: "each of the individual
   -- components are put into the appropriate zone", and CR 111.7 is what the
   -- appropriate zone comes to for a token -- it ceases to exist. Cubwarden's own
@@ -788,3 +868,32 @@ catId gs =
     List.find
       (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (CardName.MkCardName (Text.pack "Cat Token")))
       (Game.zoneMembers Zone.Battlefield S.alice gs)
+
+-- The printing a source names when it is a bare card, and nothing otherwise --
+-- what the commander case above needs before it can rebuild the source as a
+-- merge of that same printing twice.
+printingBehind :: Source.Source -> Maybe PrintingId.PrintingId
+printingBehind source = case source of
+  Source.OfCard pid -> Just pid
+  _ -> Nothing
+
+-- One permanent rewritten into a merged permanent whose components are a CARD
+-- and a TOKEN under the same printing. Written by hand because no card in
+-- data/cards/ mints a token copy of a card, so no merge in this file's other
+-- cases can produce the pair.
+asMergeOfCardAndToken :: ObjectId.ObjectId -> PrintingId.PrintingId -> GameState.GameState -> GameState.GameState
+asMergeOfCardAndToken oid pid gs =
+  gs
+    { GameState.objects =
+        Map.adjust
+          (\o -> o {Object.source = Source.OfMerge (MergeComponent.OfCard pid NonEmpty.:| [MergeComponent.OfToken pid])})
+          oid
+          (GameState.objects gs)
+    }
+
+-- CR 903.9b's offer accepted, and nothing else answered: the move below raises
+-- no other prompt, so an answerer that took one would be hiding a question.
+returningCommander :: Prompt.Prompt r -> r
+returningCommander p = case p of
+  Prompt.ReturnCommander {} -> CommandZoneDecision.Returns
+  _ -> S.identityAnswer p

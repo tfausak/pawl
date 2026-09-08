@@ -59,9 +59,13 @@ data Source
     -- shares that one status, which is CR 730.2f's "each face-up component that
     -- represents it is turned face down" said once.
     --
+    -- CR 730.2h's flip components are Object.flipped and not a field here
+    -- either: what the flip reaches is decided at the merge, which stamps a
+    -- second reading of it beside the first (Pawl.Engine.Binding.setMergeCopy).
+    --
     -- Not implemented: CR 730.2g's instant or sorcery component, which keeps a
-    -- face-down merged permanent from turning face up (#3392); CR 730.2h's flip
-    -- components, and CR 730.2i/730.2j's double-faced components (#874).
+    -- face-down merged permanent from turning face up (#3392); CR 730.2i/730.2j's
+    -- double-faced components (#874).
     OfMerge (NonEmpty.NonEmpty MergeComponent.MergeComponent)
   | -- | CR 111.3/111.6: a token -- a permanent not represented by a card. Its
     -- characteristics ARE a Card (CR 111.3: effect-defined values are functionally

@@ -26,9 +26,11 @@
 -- Not implemented: Akki's printed trigger is "whenever this creature deals
 -- damage to an opponent", and the card carries the COMBAT-damage condition, so
 -- noncombat damage it deals to an opponent does not flip it (#3363). Nor CR
--- 710.5's alternative name, which is #679's, nor a merged permanent containing a
--- flipped flip card (CR 730.2h), which is #874's, nor whether a permanent that
--- COPIED a flip card may flip at all (#3366).
+-- 710.5's alternative name, which is #679's, nor whether a permanent that COPIED
+-- a flip card may flip at all (#3366).
+--
+-- CR 730.2h's merged permanent containing a flip card is Pawl.MutateSpec's, this
+-- card being the pool's only flip printing and Cubwarden what merges with it.
 module Pawl.FlipSpec where
 
 import qualified Data.Foldable as Foldable

@@ -4814,7 +4814,14 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                   -- below, as a GameEvent.CardArrived naming the command zone,
                   -- which is how CR 903.9c's two arrivals in two different zones
                   -- are both said.
-                  (commandComponents, destComponents) = Seq.partition (\component -> Just (MergeComponent.printing component) == splitOff) components
+                  --
+                  -- A TOKEN component never goes to the command zone, whatever
+                  -- printing it was interned under: CR 903.9c splits off "the
+                  -- card that represents it and is a commander", and CR 111.6
+                  -- says a token is not a card. Commander.commanderPrintingOf
+                  -- filters the same way on the way in, so the two agree about
+                  -- which component the designation can sit on.
+                  (commandComponents, destComponents) = Seq.partition (\component -> not (Game.componentIsToken component) && Just (MergeComponent.printing component) == splitOff) components
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
@@ -6276,10 +6283,18 @@ meldable victims gs = do
 -- contributes is its card's characteristics and CR 708.2's substitution then
 -- applies to the resulting PERMANENT rather than to any component of it.
 --
+-- CR 730.2h's flip components are stamped as a SECOND reading of the same merge,
+-- both sides read again through Projection.copiableCharacteristicsFlipped, and
+-- Projection.stampedSnapshotOf spends it once the merged permanent is flipped.
+-- Two readings rather than one because CR 110.5a keeps status out of the
+-- characteristics: flipping is no CR 613 layer to fold in later, and CR 730.2a
+-- fixes this stamp's timestamp at the merge, so what the flip may reach is
+-- decided here or nowhere.
+--
 -- Not implemented: CR 730.2g's instant or sorcery component, which cannot be
--- turned face up (#3392); CR 730.2h's flip components and CR 730.2i/730.2j's
--- double-faced components. A spell with no printing behind it -- CR 707.10's
--- copy of a mutating creature spell -- refuses here rather than merging (#874).
+-- turned face up (#3392); CR 730.2i/730.2j's double-faced components. A spell
+-- with no printing behind it -- CR 707.10's copy of a mutating creature spell --
+-- refuses here rather than merging (#874).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
@@ -6304,11 +6319,18 @@ merge sid target side = do
             -- and its printed seed otherwise.
             spellPc = Projection.copiableCharacteristicsFaceUp sid gs
             hostPc = Projection.copiableCharacteristicsFaceUp target gs
+            -- CR 730.2h's reading of the same two sides: each flip component's
+            -- alternative characteristics in place of its normal ones, and every
+            -- other component's record unchanged.
+            spellFlippedPc = Projection.copiableCharacteristicsFlipped sid gs
+            hostFlippedPc = Projection.copiableCharacteristicsFlipped target gs
             -- CR 730.2a's base is the TOPMOST side and CR 702.140e's union comes
             -- from the other, which is the whole of what the side decides.
-            resulting = case side of
-              MutateSide.Over -> Projection.withMergedAbilities hostPc spellPc
-              MutateSide.Under -> Projection.withMergedAbilities spellPc hostPc
+            fold ofSpell ofHost = case side of
+              MutateSide.Over -> Projection.withMergedAbilities ofHost ofSpell
+              MutateSide.Under -> Projection.withMergedAbilities ofSpell ofHost
+            resulting = fold spellPc hostPc
+            resultingFlipped = fold spellFlippedPc hostFlippedPc
         State.modify' (`forgetObject` sid)
         State.modify'
           ( \g ->
@@ -6319,7 +6341,7 @@ merge sid target side = do
                           o
                             { Object.source = Source.OfMerge merged,
                               Object.facing = facing,
-                              Object.bindings = Binding.setCopy resulting (Object.bindings o)
+                              Object.bindings = Binding.setMergeCopy resulting resultingFlipped (Object.bindings o)
                             }
                       )
                       target
