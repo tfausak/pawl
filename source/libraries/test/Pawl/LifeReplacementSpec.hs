@@ -180,13 +180,13 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
 -- cases below drive down. FILTERED rather than hand-built, so CR 608.2b's re-read
 -- at resolution keeps the recipient the prompt offered.
 exchangingWithBob :: Prompt.Prompt r -> r
-exchangingWithBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
-  _ -> S.identityAnswer p
-  where
-    wanted r = case r of
-      Recipient.ToPlayer pid -> pid == S.bob
-      _ -> False
+exchangingWithBob p =
+  let wanted r = case r of
+        Recipient.ToPlayer pid -> pid == S.bob
+        _ -> False
+   in case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
+        _ -> S.identityAnswer p
 
 -- CR 614.1a with CR 119.4 and CR 119.5: Bloodletter of Aclazotz ({1}{B}{B}{B}
 -- Creature -- Vampire Demon, 2/4, "Flying / If an opponent would lose life during

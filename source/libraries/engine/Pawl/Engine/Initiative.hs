@@ -167,28 +167,28 @@ beginsHoldersUpkeep holder gs logged = case (TriggeredAbility.condition upkeepVe
 -- to the holder hands the initiative to the active player, not the damager's
 -- controller".
 inherentPending :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
-inherentPending events gs = held <> takes
-  where
-    held = case GameState.initiative gs of
-      Nothing -> []
-      Just holder -> upkeeps holder <> handoffs holder
-    sourceless controller ability bindings = PendingTrigger.MkPendingTrigger TriggerSource.Sourceless controller ability bindings Nothing
-    upkeeps holder = fmap (\_ -> sourceless holder upkeepVenture Map.empty) (filter (beginsHoldersUpkeep holder gs) events)
-    -- Each pair is a damaging creature and who controlled it AS THE DAMAGE WAS
-    -- DEALT (Event.combatDamagerAgainst, which is also what screens the event
-    -- shape), so a creature the same step's state-based actions have already
-    -- destroyed is still one of "those creatures".
-    handoffs holder =
-      let damagers = Maybe.mapMaybe (Event.combatDamagerAgainst holder gs) events
-          sameController a b = snd a == snd b
-       in fmap (\(oid, _) -> sourceless holder combatHandoff (Binding.setTriggerSource oid Map.empty)) (List.nubBy sameController damagers)
-    -- A PARTIAL case with a wildcard, Speed.inherentPending's posture: this
-    -- matcher answers about one event shape, and a new GameEvent constructor is
-    -- not an event rule 726.2 names.
-    takes = Maybe.mapMaybe taker events
-    taker logged = case LoggedEvent.event logged of
-      GameEvent.TookInitiative pid -> Just (sourceless pid takeVenture Map.empty)
-      _ -> Nothing
+inherentPending events gs =
+  let held = case GameState.initiative gs of
+        Nothing -> []
+        Just holder -> upkeeps holder <> handoffs holder
+      sourceless controller ability bindings = PendingTrigger.MkPendingTrigger TriggerSource.Sourceless controller ability bindings Nothing
+      upkeeps holder = fmap (\_ -> sourceless holder upkeepVenture Map.empty) (filter (beginsHoldersUpkeep holder gs) events)
+      -- Each pair is a damaging creature and who controlled it AS THE DAMAGE WAS
+      -- DEALT (Event.combatDamagerAgainst, which is also what screens the event
+      -- shape), so a creature the same step's state-based actions have already
+      -- destroyed is still one of "those creatures".
+      handoffs holder =
+        let damagers = Maybe.mapMaybe (Event.combatDamagerAgainst holder gs) events
+            sameController a b = snd a == snd b
+         in fmap (\(oid, _) -> sourceless holder combatHandoff (Binding.setTriggerSource oid Map.empty)) (List.nubBy sameController damagers)
+      -- A PARTIAL case with a wildcard, Speed.inherentPending's posture: this
+      -- matcher answers about one event shape, and a new GameEvent constructor is
+      -- not an event rule 726.2 names.
+      takes = Maybe.mapMaybe taker events
+      taker logged = case LoggedEvent.event logged of
+        GameEvent.TookInitiative pid -> Just (sourceless pid takeVenture Map.empty)
+        _ -> Nothing
+   in held <> takes
 
 -- | CR 726.1 / 726.3 / 726.5: a player takes the initiative. The ONE writer of
 -- GameState.initiative once a game is under way (Pawl.Engine.Setup only ever

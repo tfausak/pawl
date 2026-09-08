@@ -1818,18 +1818,18 @@ soulfireOrdering wanted order p = case p of
 -- these boards leaves bob's Ogre Sentry -- a legal candidate of the same
 -- AnyTarget pool -- deliberately unchosen.
 aimingAtEveryPlayer :: Natural -> Prompt.Prompt r -> r
-aimingAtEveryPlayer n p = case p of
-  Prompt.AnnounceTargets {} -> announcingCount n p
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring isPlayerRecipient sets
-  _ -> S.identityAnswer p
-  where
-    isPlayerRecipient r = case r of
-      Recipient.ToPlayer _ -> True
-      Recipient.ToCreature _ -> False
-      Recipient.ToPlaneswalker _ -> False
-      Recipient.ToBattle _ -> False
-      Recipient.ToObject _ -> False
-      Recipient.ToPile _ -> False
+aimingAtEveryPlayer n p =
+  let isPlayerRecipient r = case r of
+        Recipient.ToPlayer _ -> True
+        Recipient.ToCreature _ -> False
+        Recipient.ToPlaneswalker _ -> False
+        Recipient.ToBattle _ -> False
+        Recipient.ToObject _ -> False
+        Recipient.ToPile _ -> False
+   in case p of
+        Prompt.AnnounceTargets {} -> announcingCount n p
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring isPlayerRecipient sets
+        _ -> S.identityAnswer p
 
 -- CR 107.14's "you may pay any amount of {E}" (Effect.PayAnyEnergy): the payer
 -- names the amount as the spell RESOLVES -- not at CR 601.2b, which is what

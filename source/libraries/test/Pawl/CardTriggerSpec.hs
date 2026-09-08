@@ -2064,6 +2064,14 @@ rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
         -- Both victims start TAPPED, so the first sentence of each card (CR 701.26b)
         -- has something to do and `Tapped` at the end cannot be state left standing.
         staged = S.tapObject carolPiker (S.tapObject bobPiker g4)
+        -- Narrows every target slot to one object, `aimedCast`'s filter without its cast
+        -- pinning: the board holds two stealable creatures on purpose, so the engine's
+        -- first offer is not the one either leg means. Filtering the OFFERED set rather
+        -- than naming a Recipient keeps the answer in whatever shape the slot offered.
+        aimAtVictim :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+        aimAtVictim oid p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just oid) . Recipient.objectOf) legal) sets
+          _ -> S.identityAnswer p
         resolveOne victim spellId g =
           S.settleSba (S.runPure (aimAtVictim victim) (S.runPure (aimAtVictim victim) g (S.cast S.alice spellId)) Stack.resolveTop)
         stolen = resolveOne carolPiker actId (resolveOne bobPiker rayId staged)
@@ -2095,15 +2103,6 @@ rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
     Spec.assertEqWith s "CR 514.3a the turn has not handed off" (GameState.turnNumber afterCleanup) (GameState.turnNumber scheduled)
     -- The observation point fired at all.
     Spec.assertBool s (elem (GameEvent.ControlChanged (ControlChanged.MkControlChanged bobPiker S.alice S.bob)) (S.eventsOf afterCleanup)) "Engine.sampleControl minted CR 603.2's event for the reversion"
-  where
-    -- Narrows every target slot to one object, `aimedCast`'s filter without its cast
-    -- pinning: the board holds two stealable creatures on purpose, so the engine's
-    -- first offer is not the one either leg means. Filtering the OFFERED set rather
-    -- than naming a Recipient keeps the answer in whatever shape the slot offered.
-    aimAtVictim :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-    aimAtVictim oid p = case p of
-      Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just oid) . Recipient.objectOf) legal) sets
-      _ -> S.identityAnswer p
 
 -- Matoya, Archon Elder {2}{U} Legendary Creature -- Human Warlock 1/4, "Whenever
 -- you scry or surveil, draw a card" -- CR 603.1b's AnyOf over
@@ -2811,13 +2810,13 @@ isTapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState
 -- The CR 117.5 boundary and the stack, run until neither has anything left --
 -- what a leg needs when one trigger's resolution is what fires the next.
 settleTriggers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-settleTriggers answer = go (10 :: Int)
-  where
-    go n gs =
-      let placed = S.runPure answer gs Engine.settleForPriority
-       in if n <= 0 || null (GameState.stack placed)
-            then placed
-            else go (n - 1) (S.runPure answer placed Stack.resolveTop)
+settleTriggers answer =
+  let go n gs =
+        let placed = S.runPure answer gs Engine.settleForPriority
+         in if n <= 0 || null (GameState.stack placed)
+              then placed
+              else go (n - 1) (S.runPure answer placed Stack.resolveTop)
+   in go (10 :: Int)
 
 -- Rule 702.6a's minted equip ability, off the PROJECTION: an Equipment declares
 -- the keyword and prints no activated ability of its own.

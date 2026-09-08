@@ -45,26 +45,26 @@ codec = Common.wrapper Card.codec Printing.MkPrinting Printing.card
 -- not written. Pawl.Codec.PrintingSpec's "a name the resolver answers
 -- differently for is written out in full" is that case.
 reference :: (CardName.Type.CardName -> Maybe Card.Type.Card) -> Codec.Codec Printing.Printing
-reference resolve = Arm.anonymous [named, inline]
-  where
-    -- FIRST, so that Arm.tagged's take-the-first-matching-arm encoder prefers a
-    -- name; `inline` matches everything.
-    named =
-      Arm.MkArm
-        { Arm.tag = "Named",
-          Arm.decodeValue = \mv -> do
-            name <- Common.withValue mv (Codec.decode CardName.codec)
-            case resolve name of
-              Nothing -> Left (Text.pack ("no such card: " <> Text.unpack (CardName.Type.unwrap name)))
-              Just card -> Right (Printing.MkPrinting card),
-          Arm.valueSchema = Arm.RequiredValue (Codec.schema CardName.codec),
-          Arm.projectValue = \printing ->
-            let name = firstFaceName (Printing.card printing)
-             in if resolve name == Just (Printing.card printing)
-                  then Just (Just (Codec.encode CardName.codec name))
-                  else Nothing
-        }
-    inline = Arm.payload "Inline" codec id Just
+reference resolve =
+  -- FIRST, so that Arm.tagged's take-the-first-matching-arm encoder prefers a
+  -- name; `inline` matches everything.
+  let named =
+        Arm.MkArm
+          { Arm.tag = "Named",
+            Arm.decodeValue = \mv -> do
+              name <- Common.withValue mv (Codec.decode CardName.codec)
+              case resolve name of
+                Nothing -> Left (Text.pack ("no such card: " <> Text.unpack (CardName.Type.unwrap name)))
+                Just card -> Right (Printing.MkPrinting card),
+            Arm.valueSchema = Arm.RequiredValue (Codec.schema CardName.codec),
+            Arm.projectValue = \printing ->
+              let name = firstFaceName (Printing.card printing)
+               in if resolve name == Just (Printing.card printing)
+                    then Just (Just (Codec.encode CardName.codec name))
+                    else Nothing
+          }
+      inline = Arm.payload "Inline" codec id Just
+   in Arm.anonymous [named, inline]
 
 -- | The name a printing is written under. The FIRST face's, not the joined
 -- name: CR 709.4a gives a split card two names and no combined one, and

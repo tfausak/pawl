@@ -1609,150 +1609,150 @@ conditionSlotsAreExhaustive condition = case condition of
 -- how a Quantity nested in an ObjectRef went unread once (#2729), so those are
 -- taken from effectObjectRefs ahead of the case and no arm below names one.
 readsX :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Bool
-readsX = any effectReadsX
-  where
-    effectReadsX effect = any (any Quantity.readsX . objectRefQuantities) (effectObjectRefs effect) || effectOwnReadsX effect
-    -- effectReadsX's half that is not an ObjectRef's: this opcode's own fields,
-    -- and its nested effects through the recursion back into readsX.
-    effectOwnReadsX effect = case effect of
-      Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> any (Quantity.readsX . DamagePart.quantity) parts
-      Effect.Fight {} -> False
-      -- Untamed Might's "+X/+X" sits inside the Modification, not on the effect.
-      Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
-      Effect.ChangeText {} -> False
-      Effect.AddMana _ -> False
-      Effect.ActivateManaAbilities _ -> False
-      Effect.MoveMana _ -> False
-      Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> any Quantity.readsX quantity
-      Effect.ExileAllGraveyards -> False
-      Effect.Proliferate -> False
-      -- No Quantity: rule 201.4 chooses one name and states no count.
-      Effect.ChooseCardName _ -> False
-      Effect.FromOutsideTheGame _ -> False
-      Effect.ExileThisSpell -> False
-      Effect.Bolster quantity -> Quantity.readsX quantity
-      Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
-      Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-      Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.readsX quantity
-      Effect.TemptWithTheRing -> False
-      Effect.Venture {} -> False
-      Effect.ExileHandThenDraw -> False
-      Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
-      Effect.RestartGame _ -> False
-      Effect.ControlPlayerNextTurn _ -> False
-      Effect.ControlPlayerThisResolution _ -> False
-      Effect.Destroy {} -> False
-      Effect.Sacrifice _ -> False
-      Effect.TurnFaceDown _ -> False
-      Effect.TurnFaceUp _ -> False
-      Effect.RemoveFromCombat _ -> False
-      Effect.BecomesBlocked _ -> False
-      -- The entry rider is a nested position of its own, CR 122.6's count per
-      -- kind, and no ObjectRef holds it.
-      Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> any Quantity.readsX (riderQuantities riders)
-      Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.readsX quantity
-      Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
-      Effect.Reveal {} -> False
-      Effect.LookAt {} -> False
-      Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-      Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-      Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-      Effect.Explore {} -> False
-      Effect.Discard subject -> case subject of
-        Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
-        Discard.These {} -> False
-      Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> Quantity.readsX quantity
-      Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-      Effect.ExchangeLifeTotals _ -> False
-      Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-      Effect.RedistributeLifeTotals -> False
-      Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-      Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
-      -- The token's printed P/T box reaches CR 601.2b's X too: it is the
-      -- creating effect's number (tokenBoxQuantities).
-      Effect.Create (Create.MkCreate quantity card riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders <> tokenBoxQuantities card)
-      Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
-      Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> any Quantity.readsX (quantity : riderQuantities riders)
-      Effect.BecomeCopy {} -> False
-      Effect.CopyStackObject {} -> False
-      -- CR 601.2b's X reaches the effects a rewrite or a CR 615.5 rider nests,
-      -- the two prevention opcodes' posture with their own riders.
-      Effect.Replace (Replace.MkReplace _ _ _ _ re) -> readsX (replacementRowEffects re)
-      Effect.SkipNextPhase {} -> False
-      -- CR 601.2b's X reaches the rider too.
-      Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
-      Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
-      -- No quantity and no rider, so CR 601.2b's X cannot reach it.
-      Effect.PreventNextDamageInstance {} -> False
-      Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ amount _ _ _ _ _) -> any Quantity.readsX amount
-      Effect.Counter {} -> False
-      Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
-      Effect.PutCountersFrom {} -> False
-      Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
-      Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
-      Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
-      Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
-      -- CR 107.14's amount is asked for as the spell resolves, never CR
-      -- 601.2b's announced X.
-      Effect.PayAnyEnergy _ -> False
-      Effect.Tap _ -> False
-      Effect.Untap _ -> False
-      Effect.Detain _ -> False
-      Effect.Goad _ -> False
-      Effect.MakePlotted _ -> False
-      Effect.DoesNotUntapNext _ -> False
-      Effect.Transform _ -> False
-      Effect.Convert _ -> False
-      Effect.Flip _ -> False
-      Effect.Meld _ -> False
-      Effect.PhaseOut _ -> False
-      Effect.AddPhases _ -> False
-      Effect.EndTurn -> False
-      Effect.EndCombatPhase -> False
-      Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
-      Effect.ArmDelayedTrigger {} -> False
-      Effect.AffectPlayers {} -> False
-      Effect.RequireBlock {} -> False
-      Effect.CantBeRegenerated {} -> False
-      Effect.ForbidBlock {} -> False
-      Effect.ForbidAttack {} -> False
-      Effect.ForbidActivation {} -> False
-      Effect.RequireAttack {} -> False
-      Effect.CreateEmblem {} -> False
-      Effect.BecomeMonarch {} -> False
-      Effect.TakeTheInitiative {} -> False
-      Effect.Designate (Designate.MkDesignate _ _ value) -> any Quantity.readsX value
-      Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
-      Effect.Unsuspect _ -> False
-      Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
-      Effect.Evolve _ -> False
-      Effect.Mentor _ -> False
-      Effect.Train _ -> False
-      Effect.ItBecomes _ -> False
-      Effect.ExileUntilMonarch _ -> False
-      Effect.ExileHaunting {} -> False
-      Effect.Attach _ -> False
-      Effect.AttachTarget {} -> False
-      Effect.AttachTargetToEach {} -> False
-      Effect.AttachBound {} -> False
-      Effect.PlaySubgame _ -> False
-      Effect.ChoosePlayer _ -> False
-      Effect.ChooseOpponentAtRandom _ -> False
-      -- CR 706.2's modifier and CR 706.1's count are ordinary Quantities, so
-      -- either may be the X the caster announced (CR 601.2b; Neverwinter
-      -- Hydra's "roll X dice").
-      Effect.RollDie rollDie -> Quantity.readsX (RollDie.count rollDie) || any Quantity.readsX (RollDie.modifier rollDie)
-      -- The number of coins is an ordinary Quantity, so it may be the X the
-      -- caster announced (Flock of Rabid Sheep's "flip X coins").
-      Effect.FlipCoin flipCoin -> Quantity.readsX (FlipCoin.count flipCoin)
-      -- The number of turns is an ordinary Quantity too.
-      Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
-      Effect.ShuffleIntoLibrary {} -> False
-      Effect.Shuffle {} -> False
-      Effect.OfferCast {} -> False
-      Effect.GrantPlayFromExile {} -> False
-      -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
-      Effect.ForEach (ForEach.MkForEach _ _ body) -> readsX (Foldable.toList body)
+readsX =
+  let effectReadsX effect = any (any Quantity.readsX . objectRefQuantities) (effectObjectRefs effect) || effectOwnReadsX effect
+      -- effectReadsX's half that is not an ObjectRef's: this opcode's own fields,
+      -- and its nested effects through the recursion back into readsX.
+      effectOwnReadsX effect = case effect of
+        Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> any (Quantity.readsX . DamagePart.quantity) parts
+        Effect.Fight {} -> False
+        -- Untamed Might's "+X/+X" sits inside the Modification, not on the effect.
+        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
+        Effect.ChangeText {} -> False
+        Effect.AddMana _ -> False
+        Effect.ActivateManaAbilities _ -> False
+        Effect.MoveMana _ -> False
+        Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> any Quantity.readsX quantity
+        Effect.ExileAllGraveyards -> False
+        Effect.Proliferate -> False
+        -- No Quantity: rule 201.4 chooses one name and states no count.
+        Effect.ChooseCardName _ -> False
+        Effect.FromOutsideTheGame _ -> False
+        Effect.ExileThisSpell -> False
+        Effect.Bolster quantity -> Quantity.readsX quantity
+        Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
+        Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.readsX quantity
+        Effect.TemptWithTheRing -> False
+        Effect.Venture {} -> False
+        Effect.ExileHandThenDraw -> False
+        Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
+        Effect.RestartGame _ -> False
+        Effect.ControlPlayerNextTurn _ -> False
+        Effect.ControlPlayerThisResolution _ -> False
+        Effect.Destroy {} -> False
+        Effect.Sacrifice _ -> False
+        Effect.TurnFaceDown _ -> False
+        Effect.TurnFaceUp _ -> False
+        Effect.RemoveFromCombat _ -> False
+        Effect.BecomesBlocked _ -> False
+        -- The entry rider is a nested position of its own, CR 122.6's count per
+        -- kind, and no ObjectRef holds it.
+        Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> any Quantity.readsX (riderQuantities riders)
+        Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.readsX quantity
+        Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
+        Effect.Reveal {} -> False
+        Effect.LookAt {} -> False
+        Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.Explore {} -> False
+        Effect.Discard subject -> case subject of
+          Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
+          Discard.These {} -> False
+        Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> Quantity.readsX quantity
+        Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.ExchangeLifeTotals _ -> False
+        Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.RedistributeLifeTotals -> False
+        Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
+        -- The token's printed P/T box reaches CR 601.2b's X too: it is the
+        -- creating effect's number (tokenBoxQuantities).
+        Effect.Create (Create.MkCreate quantity card riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders <> tokenBoxQuantities card)
+        Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
+        Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> any Quantity.readsX (quantity : riderQuantities riders)
+        Effect.BecomeCopy {} -> False
+        Effect.CopyStackObject {} -> False
+        -- CR 601.2b's X reaches the effects a rewrite or a CR 615.5 rider nests,
+        -- the two prevention opcodes' posture with their own riders.
+        Effect.Replace (Replace.MkReplace _ _ _ _ re) -> readsX (replacementRowEffects re)
+        Effect.SkipNextPhase {} -> False
+        -- CR 601.2b's X reaches the rider too.
+        Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
+        Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
+        -- No quantity and no rider, so CR 601.2b's X cannot reach it.
+        Effect.PreventNextDamageInstance {} -> False
+        Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ amount _ _ _ _ _) -> any Quantity.readsX amount
+        Effect.Counter {} -> False
+        Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
+        Effect.PutCountersFrom {} -> False
+        Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
+        Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
+        Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
+        Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
+        -- CR 107.14's amount is asked for as the spell resolves, never CR
+        -- 601.2b's announced X.
+        Effect.PayAnyEnergy _ -> False
+        Effect.Tap _ -> False
+        Effect.Untap _ -> False
+        Effect.Detain _ -> False
+        Effect.Goad _ -> False
+        Effect.MakePlotted _ -> False
+        Effect.DoesNotUntapNext _ -> False
+        Effect.Transform _ -> False
+        Effect.Convert _ -> False
+        Effect.Flip _ -> False
+        Effect.Meld _ -> False
+        Effect.PhaseOut _ -> False
+        Effect.AddPhases _ -> False
+        Effect.EndTurn -> False
+        Effect.EndCombatPhase -> False
+        Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
+        Effect.ArmDelayedTrigger {} -> False
+        Effect.AffectPlayers {} -> False
+        Effect.RequireBlock {} -> False
+        Effect.CantBeRegenerated {} -> False
+        Effect.ForbidBlock {} -> False
+        Effect.ForbidAttack {} -> False
+        Effect.ForbidActivation {} -> False
+        Effect.RequireAttack {} -> False
+        Effect.CreateEmblem {} -> False
+        Effect.BecomeMonarch {} -> False
+        Effect.TakeTheInitiative {} -> False
+        Effect.Designate (Designate.MkDesignate _ _ value) -> any Quantity.readsX value
+        Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
+        Effect.Unsuspect _ -> False
+        Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
+        Effect.Evolve _ -> False
+        Effect.Mentor _ -> False
+        Effect.Train _ -> False
+        Effect.ItBecomes _ -> False
+        Effect.ExileUntilMonarch _ -> False
+        Effect.ExileHaunting {} -> False
+        Effect.Attach _ -> False
+        Effect.AttachTarget {} -> False
+        Effect.AttachTargetToEach {} -> False
+        Effect.AttachBound {} -> False
+        Effect.PlaySubgame _ -> False
+        Effect.ChoosePlayer _ -> False
+        Effect.ChooseOpponentAtRandom _ -> False
+        -- CR 706.2's modifier and CR 706.1's count are ordinary Quantities, so
+        -- either may be the X the caster announced (CR 601.2b; Neverwinter
+        -- Hydra's "roll X dice").
+        Effect.RollDie rollDie -> Quantity.readsX (RollDie.count rollDie) || any Quantity.readsX (RollDie.modifier rollDie)
+        -- The number of coins is an ordinary Quantity, so it may be the X the
+        -- caster announced (Flock of Rabid Sheep's "flip X coins").
+        Effect.FlipCoin flipCoin -> Quantity.readsX (FlipCoin.count flipCoin)
+        -- The number of turns is an ordinary Quantity too.
+        Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
+        Effect.ShuffleIntoLibrary {} -> False
+        Effect.Shuffle {} -> False
+        Effect.OfferCast {} -> False
+        Effect.GrantPlayFromExile {} -> False
+        -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
+        Effect.ForEach (ForEach.MkForEach _ _ body) -> readsX (Foldable.toList body)
+   in any effectReadsX
 
 -- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads, which
 -- is also the set Pawl.CardSpec's reserved-name sweep ranges over. Exhaustive
@@ -1956,73 +1956,73 @@ legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
 -- order, a PlayerRef naming an unordered SET, so a caller with an ordering rule
 -- imposes it.
 playerRefPlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
-playerRefPlayers legal controller gs ref = case ref of
-  PlayerRef.InSlot slot -> case legalOne slot legal of
-    Just (Recipient.ToPlayer pid) -> [pid]
-    _ -> [] -- an unfilled, illegal, or non-player slot: no-op
-    -- Every player the slot names, InSlot's read without Binding.onlyOne's
-    -- collapse -- Binding.mayPlayers, the seats a CR 603.5 "may" selected.
-    -- Non-player recipients are dropped, as the arm above drops them.
-    --
-    -- Binding.gatePlayers is the same shape one question over, and Bellowing
-    -- Mauler's "each player loses 4 life unless they sacrifice a nontoken
-    -- creature of their choice" reads THAT slot plurally through the arm below.
-  PlayerRef.EachInSlot slot -> Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
-  PlayerRef.Relative PlayerRelation.You -> [controller]
-  PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller) everyone
-  -- CR 102.1's whole table, off the roster rather than by consing the controller
-  -- onto the Opponent set, so a departed seat stays out.
-  PlayerRef.Relative PlayerRelation.AnyPlayer -> everyone
-  PlayerRef.EachPlayer -> everyone
-  -- EachPlayer minus the seat the slot names. A slot that is unfilled, illegal,
-  -- names several, or names an object excludes NOBODY.
-  PlayerRef.EachPlayerExcept slot ->
-    let excluded = legalOne slot legal >>= Recipient.playerOf
-     in filter (\pid -> Just pid /= excluded) everyone
-  -- The baked seat, unreachable from card data. Not filtered against the roster:
-  -- it names one specific player who arrived from elsewhere.
-  PlayerRef.Specific pid -> [pid]
-  -- NOBODY, and not a hole: the reference names whichever player a fold has
-  -- reached, and this function is handed no fold. The two positions that DO
-  -- answer it never route through here -- Pawl.Engine.Quantity's playersOf reads
-  -- it off the view a Count's fold supplies, and the Effect.Search arm's
-  -- ownersFor substitutes the searcher for a search whose owner is its own
-  -- searcher -- so what reaches this arm is a reference in a position with no
-  -- candidate at all, and the opcode is a no-op.
-  PlayerRef.Candidate -> []
-  -- CR 608.2h: the controller of the object the slot names, through last known
-  -- information -- the clause naming the player generally MOVED it first, and CR
-  -- 108.4 leaves a card in a hand with no controller at all.
-  PlayerRef.ControllerOfBound slot -> case legalOne slot legal of
-    Just recipient -> case Recipient.objectOf recipient of
-      Just oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
-      Nothing -> []
-    Nothing -> []
-  -- CR 508.6: the players controlling a creature that is attacking the player the
-  -- slot names, narrowed by the relation the card printed -- Curse of Vitality's
-  -- "each opponent attacking that player".
-  --
-  -- The LIVE combat record, read as this effect applies (CR 608.2c): the sentence
-  -- is present tense, so a creature removed from combat (CR 506.4) since the
-  -- declaration has taken its controller out of the set. Not the event log, which
-  -- is Pawl.Engine.Turn.attackedThisStep's historical reading of the same rule.
-  --
-  -- AttackTarget.OfPlayer alone, CR 508.1b listing player, planeswalker and
-  -- battle separately: a creature attacking a planeswalker that player controls
-  -- is not attacking that player.
-  --
-  -- Filtered out of `everyone` rather than collected from the record, so the
-  -- roster order and the CR 102.1 exclusion of a departed seat are the ones every
-  -- other arm gives.
-  PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers relation slot) ->
-    case legalOne slot legal >>= Recipient.playerOf of
-      Nothing -> []
-      Just attacked ->
-        let sentAt = Map.keys (Map.filter (== AttackTarget.OfPlayer attacked) (Combat.attackers (GameState.combat gs)))
-            attackers = Maybe.mapMaybe (\oid -> Projection.controllerOf oid gs) sentAt
-         in filter (\pid -> PlayerRelation.holds (Game.teams gs) relation controller pid && pid `elem` attackers) everyone
-  where
-    everyone = Game.stillPlaying gs
+playerRefPlayers legal controller gs ref =
+  let everyone = Game.stillPlaying gs
+   in case ref of
+        PlayerRef.InSlot slot -> case legalOne slot legal of
+          Just (Recipient.ToPlayer pid) -> [pid]
+          _ -> [] -- an unfilled, illegal, or non-player slot: no-op
+          -- Every player the slot names, InSlot's read without Binding.onlyOne's
+          -- collapse -- Binding.mayPlayers, the seats a CR 603.5 "may" selected.
+          -- Non-player recipients are dropped, as the arm above drops them.
+          --
+          -- Binding.gatePlayers is the same shape one question over, and Bellowing
+          -- Mauler's "each player loses 4 life unless they sacrifice a nontoken
+          -- creature of their choice" reads THAT slot plurally through the arm below.
+        PlayerRef.EachInSlot slot -> Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+        PlayerRef.Relative PlayerRelation.You -> [controller]
+        PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller) everyone
+        -- CR 102.1's whole table, off the roster rather than by consing the controller
+        -- onto the Opponent set, so a departed seat stays out.
+        PlayerRef.Relative PlayerRelation.AnyPlayer -> everyone
+        PlayerRef.EachPlayer -> everyone
+        -- EachPlayer minus the seat the slot names. A slot that is unfilled, illegal,
+        -- names several, or names an object excludes NOBODY.
+        PlayerRef.EachPlayerExcept slot ->
+          let excluded = legalOne slot legal >>= Recipient.playerOf
+           in filter (\pid -> Just pid /= excluded) everyone
+        -- The baked seat, unreachable from card data. Not filtered against the roster:
+        -- it names one specific player who arrived from elsewhere.
+        PlayerRef.Specific pid -> [pid]
+        -- NOBODY, and not a hole: the reference names whichever player a fold has
+        -- reached, and this function is handed no fold. The two positions that DO
+        -- answer it never route through here -- Pawl.Engine.Quantity's playersOf reads
+        -- it off the view a Count's fold supplies, and the Effect.Search arm's
+        -- ownersFor substitutes the searcher for a search whose owner is its own
+        -- searcher -- so what reaches this arm is a reference in a position with no
+        -- candidate at all, and the opcode is a no-op.
+        PlayerRef.Candidate -> []
+        -- CR 608.2h: the controller of the object the slot names, through last known
+        -- information -- the clause naming the player generally MOVED it first, and CR
+        -- 108.4 leaves a card in a hand with no controller at all.
+        PlayerRef.ControllerOfBound slot -> case legalOne slot legal of
+          Just recipient -> case Recipient.objectOf recipient of
+            Just oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
+            Nothing -> []
+          Nothing -> []
+        -- CR 508.6: the players controlling a creature that is attacking the player the
+        -- slot names, narrowed by the relation the card printed -- Curse of Vitality's
+        -- "each opponent attacking that player".
+        --
+        -- The LIVE combat record, read as this effect applies (CR 608.2c): the sentence
+        -- is present tense, so a creature removed from combat (CR 506.4) since the
+        -- declaration has taken its controller out of the set. Not the event log, which
+        -- is Pawl.Engine.Turn.attackedThisStep's historical reading of the same rule.
+        --
+        -- AttackTarget.OfPlayer alone, CR 508.1b listing player, planeswalker and
+        -- battle separately: a creature attacking a planeswalker that player controls
+        -- is not attacking that player.
+        --
+        -- Filtered out of `everyone` rather than collected from the record, so the
+        -- roster order and the CR 102.1 exclusion of a departed seat are the ones every
+        -- other arm gives.
+        PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers relation slot) ->
+          case legalOne slot legal >>= Recipient.playerOf of
+            Nothing -> []
+            Just attacked ->
+              let sentAt = Map.keys (Map.filter (== AttackTarget.OfPlayer attacked) (Combat.attackers (GameState.combat gs)))
+                  attackers = Maybe.mapMaybe (\oid -> Projection.controllerOf oid gs) sentAt
+               in filter (\pid -> PlayerRelation.holds (Game.teams gs) relation controller pid && pid `elem` attackers) everyone
 
 -- CR 109.2's battlefield, narrowed by an effect-borne Filter and sorted into CR
 -- 608.2f's APNAP order. ObjectRef.EachMatching's whole answer, and the

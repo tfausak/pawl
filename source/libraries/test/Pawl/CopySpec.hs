@@ -136,9 +136,9 @@ import qualified Pawl.Types.Zone as Zone
 -- The battlefield objects whose PRINTED card has this name (a printed card is
 -- unchanged by copying -- only the object's projected characteristics change).
 printedOnBattlefield :: String -> GameState.GameState -> [ObjectId]
-printedOnBattlefield name gs = filter isIt (Set.toList (GameState.battlefield gs))
-  where
-    isIt oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+printedOnBattlefield name gs =
+  let isIt oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+   in filter isIt (Set.toList (GameState.battlefield gs))
 
 -- Whether an object is still on the battlefield -- what a destroy is read
 -- through, where printedOnBattlefield above answers by PRINTED name and so
@@ -1947,11 +1947,11 @@ wardedCopyBoard forest island guard piker growth twincast =
 -- rule -- so a fixed count of resolutions would leave the two boards at
 -- different depths and the assertion would be reading two different moments.
 drainStack :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-drainStack answer = go (10 :: Int)
-  where
-    go fuel gs
-      | fuel <= 0 || null (GameState.stack gs) = gs
-      | otherwise = go (fuel - 1) (resolveOne answer gs)
+drainStack answer =
+  let go fuel gs
+        | fuel <= 0 || null (GameState.stack gs) = gs
+        | otherwise = go (fuel - 1) (resolveOne answer gs)
+   in go (10 :: Int)
 
 copyTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copyTargetSpec s registry =

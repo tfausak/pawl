@@ -103,16 +103,16 @@ discardAtBob p = case p of
 
 -- Add k cards of a printing to pid's hand (each a fresh Hand-zone object).
 handCards :: Printing.Printing -> PlayerId.PlayerId -> Int -> GameState.GameState -> GameState.GameState
-handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
-  where
-    addOne g =
-      let (printingId, gP) = Game.intern printing g
-          (oid, g1) = Game.freshObjectId gP
-          obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
-       in g1
-            { GameState.objects = Map.insert oid obj (GameState.objects g1),
-              GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
-            }
+handCards printing pid k gs =
+  let addOne g =
+        let (printingId, gP) = Game.intern printing g
+            (oid, g1) = Game.freshObjectId gP
+            obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
+         in g1
+              { GameState.objects = Map.insert oid obj (GameState.objects g1),
+                GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
+              }
+   in List.foldl' (\g _ -> addOne g) gs [1 .. k]
 
 -- Put k cards of a printing into pid's library, each on top of the last, for a
 -- draw to find.
@@ -132,12 +132,12 @@ settleAtAlicesUpkeep gs =
 -- belong to one player, so the moved card's owner is the drawer. Any OTHER route
 -- from library to hand would count here too; no fixture below has one.
 drawersOf :: GameState.GameState -> [PlayerId.PlayerId]
-drawersOf gs = Maybe.mapMaybe drawer (S.zoneChangesOf gs)
-  where
-    drawer zc =
-      if ZoneChange.from zc == Zone.Library && ZoneChange.to zc == Zone.Hand
-        then fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
-        else Nothing
+drawersOf gs =
+  let drawer zc =
+        if ZoneChange.from zc == Zone.Library && ZoneChange.to zc == Zone.Hand
+          then fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
+          else Nothing
+   in Maybe.mapMaybe drawer (S.zoneChangesOf gs)
 
 -- Shahrazad and Sindbad on alice's battlefield, untapped and settled so its {T}
 -- is payable (CR 302.6), over a library whose TOP card is `top` and a hand
@@ -1342,17 +1342,17 @@ soulConduitBoard conduit island aliceLife bobLife carolLife =
 -- fills the target slot with `sides` -- S.preferring rather than a fixed set, so
 -- the announced count (CR 601.2c) is what decides how many are named.
 conduitAnswer :: [PlayerId.PlayerId] -> Prompt.Prompt r -> r
-conduitAnswer sides p = case p of
-  Prompt.ChooseAction _ _ options -> case filter isActivation options of
-    a : _ -> a
-    [] -> A.Pass
-  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
-  _ -> S.identityAnswer p
-  where
-    wanted r = case r of
-      Recipient.ToPlayer pid -> elem pid sides
-      _ -> False
+conduitAnswer sides p =
+  let wanted r = case r of
+        Recipient.ToPlayer pid -> elem pid sides
+        _ -> False
+   in case p of
+        Prompt.ChooseAction _ _ options -> case filter isActivation options of
+          a : _ -> a
+          [] -> A.Pass
+        Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
+        _ -> S.identityAnswer p
 
 -- Takes the first activation offered and aims every target slot at `who`.
 exchangeAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r

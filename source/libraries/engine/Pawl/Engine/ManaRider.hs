@@ -83,36 +83,36 @@ uncounterable oid gs = case Game.lookupObject oid gs of
 -- CantBeCountered is the arm that does NOT come this way; `uncounterable` above
 -- says why.
 granted :: ObjectId.ObjectId -> Mana.Mana -> GameState.GameState -> GameState.GameState
-granted oid spent gs = List.foldl' mint gs (Maybe.mapMaybe keywordOf (Mana.unwrap spent))
-  where
-    keywordOf unit = do
-      rider <- ManaUnit.rider unit
-      keyword <- case ManaRider.effect rider of
-        ManaRiderEffect.CantBeCountered -> Nothing
-        ManaRiderEffect.GainsHasteUntilEndOfTurn -> Just Keyword.Haste
-      Monad.guard (matchesCondition oid gs rider)
-      pure keyword
-    mint g keyword = case Projection.controllerOf oid g of
-      -- No controller is no CR 109.5 "you" to arm a duration against.
-      -- Unreachable on this road -- the paid-for object is on the stack, and
-      -- controllerOf falls back to its owner -- and written out because arm is
-      -- total over Duration.
-      Nothing -> g
-      Just controller -> case Expiry.arm Map.empty controller oid Duration.UntilEndOfTurn g of
-        -- UntilEndOfTurn always arms; this branch is written out for the same
-        -- reason, and the payment binds no slot for a duration to have named.
+granted oid spent gs =
+  let keywordOf unit = do
+        rider <- ManaUnit.rider unit
+        keyword <- case ManaRider.effect rider of
+          ManaRiderEffect.CantBeCountered -> Nothing
+          ManaRiderEffect.GainsHasteUntilEndOfTurn -> Just Keyword.Haste
+        Monad.guard (matchesCondition oid gs rider)
+        pure keyword
+      mint g keyword = case Projection.controllerOf oid g of
+        -- No controller is no CR 109.5 "you" to arm a duration against.
+        -- Unreachable on this road -- the paid-for object is on the stack, and
+        -- controllerOf falls back to its owner -- and written out because arm is
+        -- total over Duration.
         Nothing -> g
-        Just expiry ->
-          let (ts, g1) = Game.freshTimestamp g
-              effect =
-                ContinuousEffect.MkContinuousEffect
-                  { ContinuousEffect.source = oid,
-                    ContinuousEffect.timestamp = ts,
-                    ContinuousEffect.expiry = expiry,
-                    ContinuousEffect.modification = Modification.GainKeyword keyword,
-                    ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
-                  }
-           in g1 {GameState.continuousEffects = effect : GameState.continuousEffects g1}
+        Just controller -> case Expiry.arm Map.empty controller oid Duration.UntilEndOfTurn g of
+          -- UntilEndOfTurn always arms; this branch is written out for the same
+          -- reason, and the payment binds no slot for a duration to have named.
+          Nothing -> g
+          Just expiry ->
+            let (ts, g1) = Game.freshTimestamp g
+                effect =
+                  ContinuousEffect.MkContinuousEffect
+                    { ContinuousEffect.source = oid,
+                      ContinuousEffect.timestamp = ts,
+                      ContinuousEffect.expiry = expiry,
+                      ContinuousEffect.modification = Modification.GainKeyword keyword,
+                      ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+                    }
+             in g1 {GameState.continuousEffects = effect : GameState.continuousEffects g1}
+   in List.foldl' mint gs (Maybe.mapMaybe keywordOf (Mana.unwrap spent))
 
 -- Both roads' shared half: does this rider's printed "if that mana is spent on
 -- ..." clause hold of the object the mana paid for?

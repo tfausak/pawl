@@ -455,15 +455,15 @@ permanentSlot = SlotName.MkSlotName (Text.pack "permanent")
 -- cannot answer. A slot `picks` does not name falls back to the least member of
 -- its own legal set, so the answer stays total.
 chooseTwo :: [ModeIndex.ModeIndex] -> [(SlotName.SlotName, Recipient.Recipient)] -> Prompt.Prompt r -> r
-chooseTwo idxs picks p = case p of
-  Prompt.ChooseModes {} -> Seq.fromList idxs
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey pickFor sets
-  _ -> S.identityAnswer p
-  where
-    pickFor :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
-    pickFor slot (_, legal) = case lookup slot picks of
-      Just recipient -> Set.singleton recipient
-      Nothing -> maybe Set.empty Set.singleton (Set.lookupMin legal)
+chooseTwo idxs picks p =
+  let pickFor :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
+      pickFor slot (_, legal) = case lookup slot picks of
+        Just recipient -> Set.singleton recipient
+        Nothing -> maybe Set.empty Set.singleton (Set.lookupMin legal)
+   in case p of
+        Prompt.ChooseModes {} -> Seq.fromList idxs
+        Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey pickFor sets
+        _ -> S.identityAnswer p
 
 -- alice has four Islands and Cryptic Command in hand ({1}{U}{U}{U}); bob has one
 -- Goblin Piker on the battlefield.
@@ -1014,19 +1014,19 @@ forestCount = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest
 -- slot named neither of the card's two gets the empty answer, which fails the target
 -- announcement rather than aiming somewhere plausible.
 insistOneOrBoth :: [ModeIndex.ModeIndex] -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-insistOneOrBoth idxs boneId forestId p = case p of
-  Prompt.ChooseModes _ _ _ legal selection ->
-    if legal == vandalizeModes && selection == ModeSelection.ChooseBetween (ChooseBetween.MkChooseBetween 1 2)
-      then Seq.fromList idxs
-      else Seq.empty
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
-  _ -> S.identityAnswer p
-  where
-    aimAt :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
-    aimAt slot _
-      | slot == artifactSlot = Set.singleton (Recipient.ToObject boneId)
-      | slot == landSlot = Set.singleton (Recipient.ToObject forestId)
-      | otherwise = Set.empty
+insistOneOrBoth idxs boneId forestId p =
+  let aimAt :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
+      aimAt slot _
+        | slot == artifactSlot = Set.singleton (Recipient.ToObject boneId)
+        | slot == landSlot = Set.singleton (Recipient.ToObject forestId)
+        | otherwise = Set.empty
+   in case p of
+        Prompt.ChooseModes _ _ _ legal selection ->
+          if legal == vandalizeModes && selection == ModeSelection.ChooseBetween (ChooseBetween.MkChooseBetween 1 2)
+            then Seq.fromList idxs
+            else Seq.empty
+        Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
+        _ -> S.identityAnswer p
 
 -- CR 700.2's range instruction: "Choose one or both --" (Vandalize), the first
 -- selection in the pool whose size is not fixed by the card. One mode, the other,

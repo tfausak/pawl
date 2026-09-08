@@ -19,6 +19,9 @@ import qualified Pawl.Types.Uses as Uses
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Replace" $ do
+  -- The effect codec the card boundary would pass in (CR 615.5's riders ride
+  -- the DamageR arm underneath).
+  let codec = Replace.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
   -- CR 614.3: the unconditional case, which is most of them. The positional
   -- payload this replaces wrote the absent condition as an explicit null.
   Spec.it s "MkReplace, condition elided" $
@@ -50,7 +53,3 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"SelfReplacement\"},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":3},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":3}}},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
-  where
-    -- The effect codec the card boundary would pass in (CR 615.5's riders ride
-    -- the DamageR arm underneath).
-    codec = Replace.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))

@@ -1544,11 +1544,11 @@ oppressiveRaysSpec s registry =
 -- The activations offered for ONE source, so a board carrying two activatable
 -- permanents can say which of them was offered.
 activationsOf :: ObjectId.ObjectId -> [Action.Type.Action] -> [Action.Type.Action]
-activationsOf oid = filter isIt
-  where
-    isIt a = case a of
-      Action.Type.Activate o _ -> o == oid
-      _ -> False
+activationsOf oid =
+  let isIt a = case a of
+        Action.Type.Activate o _ -> o == oid
+        _ -> False
+   in filter isIt
 
 -- alice has one untapped Plains and `warning`, `secondCard` in hand, in her
 -- own precombat main phase with an empty stack -- plus a second Plains ON TOP

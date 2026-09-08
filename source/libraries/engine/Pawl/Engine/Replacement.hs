@@ -1084,13 +1084,13 @@ matchesPutter gs src subject cause = case (subject, cause) of
 -- one: a floating row's source has left the battlefield, so it enchants nobody
 -- and the arm admits nothing.
 relationHolds :: GameState -> ObjectId -> Maybe PlayerId -> ControllerRelation -> Maybe PlayerId -> Bool
-relationHolds gs src you rel theirs = case rel of
-  ControllerRelation.Anyones -> True
-  ControllerRelation.Yours -> both (==) you theirs
-  ControllerRelation.Opponents -> both (Game.areOpponents gs) you theirs
-  ControllerRelation.EnchantedPlayers -> both (==) (Projection.enchantedPlayerOf src gs) theirs
-  where
-    both f a b = Maybe.fromMaybe False (f <$> a <*> b)
+relationHolds gs src you rel theirs =
+  let both f a b = Maybe.fromMaybe False (f <$> a <*> b)
+   in case rel of
+        ControllerRelation.Anyones -> True
+        ControllerRelation.Yours -> both (==) you theirs
+        ControllerRelation.Opponents -> both (Game.areOpponents gs) you theirs
+        ControllerRelation.EnchantedPlayers -> both (==) (Projection.enchantedPlayerOf src gs) theirs
 
 -- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation, read against
 -- the controller of the effect's SOURCE?
@@ -1909,32 +1909,32 @@ readsApplier re = case re of
 -- and CR 616.1a's bucket is exactly an origin of SelfReplacement, so every
 -- candidate reaching this comparison shares one origin.
 choose :: GameState -> ProposedEvent -> [ReplacementCandidate] -> Game (Maybe ReplacementCandidate)
-choose gs event candidates = case candidates of
-  [] -> pure Nothing
-  first : rest ->
-    if all (\c -> distinguishing c == distinguishing first) rest
-      then pure (Just first)
-      else case chooserOf gs event of
-        -- No chooser: the affected object is gone. Apply the canonical first
-        -- rather than prompt nobody -- and in particular make no choice on behalf
-        -- of a player who is not there to make it.
-        Nothing -> pure (Just first)
-        Just pid -> do
-          let decider = Decide.deciderFor pid gs
-          answer <- Game.choose (Prompt.ChooseReplacement decider pid (fmap entryOf candidates))
-          -- Reject-not-repair, as payment and Engine.permute already do: an
-          -- out-of-range index leaves the canonical first standing rather than
-          -- dropping the event or crashing.
-          pure (Just (at candidates answer first))
-  where
-    -- What two candidates must agree on to be interchangeable here.
-    distinguishing c =
-      ( ReplacementCandidate.effect c,
-        ReplacementCandidate.lifetime c,
-        if readsApplier (ReplacementCandidate.effect c)
-          then ReplacementCandidate.controller c
-          else Nothing
-      )
+choose gs event candidates =
+  let -- What two candidates must agree on to be interchangeable here.
+      distinguishing c =
+        ( ReplacementCandidate.effect c,
+          ReplacementCandidate.lifetime c,
+          if readsApplier (ReplacementCandidate.effect c)
+            then ReplacementCandidate.controller c
+            else Nothing
+        )
+   in case candidates of
+        [] -> pure Nothing
+        first : rest ->
+          if all (\c -> distinguishing c == distinguishing first) rest
+            then pure (Just first)
+            else case chooserOf gs event of
+              -- No chooser: the affected object is gone. Apply the canonical first
+              -- rather than prompt nobody -- and in particular make no choice on behalf
+              -- of a player who is not there to make it.
+              Nothing -> pure (Just first)
+              Just pid -> do
+                let decider = Decide.deciderFor pid gs
+                answer <- Game.choose (Prompt.ChooseReplacement decider pid (fmap entryOf candidates))
+                -- Reject-not-repair, as payment and Engine.permute already do: an
+                -- out-of-range index leaves the canonical first standing rather than
+                -- dropping the event or crashing.
+                pure (Just (at candidates answer first))
 
 -- What a candidate looks like to the player being asked (#74): its source and
 -- the effect that distinguishes it from another of the same source. A

@@ -335,17 +335,17 @@ namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
 -- so making containsStar answer False everywhere leaves the suite green. It is
 -- kept because CR 208.2 states it.
 bakeTokenCharacteristics :: (Quantity.Type.Quantity -> Maybe Integer) -> Card.Type.Card -> Card.Type.Card
-bakeTokenCharacteristics eval card = card {Card.Type.faces = fmap bakeFace (Card.Type.faces card)}
-  where
-    bake quantity =
-      if Star.containsStar quantity
-        then quantity
-        else Quantity.Type.Literal (Quantity.determineWith eval quantity)
-    bakeFace face =
-      face
-        { Face.power = fmap (Power.MkPower . bake . Power.unwrap) (Face.power face),
-          Face.toughness = fmap (Toughness.MkToughness . bake . Toughness.unwrap) (Face.toughness face)
-        }
+bakeTokenCharacteristics eval card =
+  let bake quantity =
+        if Star.containsStar quantity
+          then quantity
+          else Quantity.Type.Literal (Quantity.determineWith eval quantity)
+      bakeFace face =
+        face
+          { Face.power = fmap (Power.MkPower . bake . Power.unwrap) (Face.power face),
+            Face.toughness = fmap (Toughness.MkToughness . bake . Toughness.unwrap) (Face.toughness face)
+          }
+   in card {Card.Type.faces = fmap bakeFace (Card.Type.faces card)}
 
 -- CR 608.2b: a target can stop being legal because an effect changed the spell's
 -- text, so the re-check measures the spell's own slots with CR 612.1's changes
@@ -396,14 +396,14 @@ applyClauseEffects ::
   (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()) ->
   [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] ->
   Game ()
-applyClauseEffects source applyOne = Monad.foldM_ step True
-  where
-    step happened effect = do
-      skipped <- if happened then pure False else State.gets (armsReflexive source effect)
-      before <- State.gets (Seq.length . GameState.events)
-      Monad.unless skipped (applyOne effect)
-      after <- State.gets (Seq.length . GameState.events)
-      pure (after > before)
+applyClauseEffects source applyOne =
+  let step happened effect = do
+        skipped <- if happened then pure False else State.gets (armsReflexive source effect)
+        before <- State.gets (Seq.length . GameState.events)
+        Monad.unless skipped (applyOne effect)
+        after <- State.gets (Seq.length . GameState.events)
+        pure (after > before)
+   in Monad.foldM_ step True
 
 -- CR 603.12: does this instruction create a REFLEXIVE triggered ability? The name
 -- is resolved exactly as the arm itself resolves it (declaredDelayedAbility, then
@@ -545,35 +545,35 @@ turnsOver pcs resolving frozen oid =
 -- the board that tells the two apart. Every stamp comes from
 -- GameState.nextTimestamp, so one `>` decides it and equality cannot arise.
 alreadyTurnedFor :: ObjectId -> ObjectId -> GameState -> Bool
-alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
-  Nothing -> False
-  Just ability -> case startedAt ability of
-    Nothing -> False
-    Just started -> maybe False (> started) (Game.lookupObject victim gs >>= Object.turnedOverAt)
-  where
-    -- Both of the rule's narrowings at once, and a CLASSIFICATION of the
-    -- resolving object throughout, never which card it is: Nothing unless the
-    -- object is an ability OF the victim, and otherwise the moment to measure
-    -- from. CR 725.2's sourceless inherent trigger has no permanent to be an
-    -- ability of, so it falls out with the spells.
-    startedAt ability = case Object.source ability of
-      Source.OfAbility activated
-        | ActivatedAbilitySource.source activated == victim -> Just (Object.timestamp ability)
-        | otherwise -> Nothing
-      Source.OfTrigger triggered
-        | TriggeredAbilitySource.source triggered == victim ->
-            -- CR 603.7a's creation moment when there is one, and the placement
-            -- stamp otherwise: an ability the source itself has carries none.
-            Just (Maybe.fromMaybe (Object.timestamp ability) (TriggeredAbilitySource.createdAt triggered))
-        | otherwise -> Nothing
-      Source.OfCard _ -> Nothing
-      Source.OfMeld _ -> Nothing
-      Source.OfMerge _ -> Nothing
-      Source.OfToken _ -> Nothing
-      Source.OfEmblem _ -> Nothing
-      Source.OfSpellCopy _ -> Nothing
-      Source.OfCardCopy _ -> Nothing
-      Source.OfInherentTrigger _ -> Nothing
+alreadyTurnedFor resolving victim gs =
+  -- Both of the rule's narrowings at once, and a CLASSIFICATION of the
+  -- resolving object throughout, never which card it is: Nothing unless the
+  -- object is an ability OF the victim, and otherwise the moment to measure
+  -- from. CR 725.2's sourceless inherent trigger has no permanent to be an
+  -- ability of, so it falls out with the spells.
+  let startedAt ability = case Object.source ability of
+        Source.OfAbility activated
+          | ActivatedAbilitySource.source activated == victim -> Just (Object.timestamp ability)
+          | otherwise -> Nothing
+        Source.OfTrigger triggered
+          | TriggeredAbilitySource.source triggered == victim ->
+              -- CR 603.7a's creation moment when there is one, and the placement
+              -- stamp otherwise: an ability the source itself has carries none.
+              Just (Maybe.fromMaybe (Object.timestamp ability) (TriggeredAbilitySource.createdAt triggered))
+          | otherwise -> Nothing
+        Source.OfCard _ -> Nothing
+        Source.OfMeld _ -> Nothing
+        Source.OfMerge _ -> Nothing
+        Source.OfToken _ -> Nothing
+        Source.OfEmblem _ -> Nothing
+        Source.OfSpellCopy _ -> Nothing
+        Source.OfCardCopy _ -> Nothing
+        Source.OfInherentTrigger _ -> Nothing
+   in case Game.lookupObject resolving gs of
+        Nothing -> False
+        Just ability -> case startedAt ability of
+          Nothing -> False
+          Just started -> maybe False (> started) (Game.lookupObject victim gs >>= Object.turnedOverAt)
 
 -- The cards in the named graveyards matching the filter, for
 -- ChosenCardInGraveyard's TheController chooser -- ObjectRef.EachCardInGraveyard
@@ -610,48 +610,48 @@ handChoosers legal controller gs player =
 -- 616.1 loop cancels (CR 614.6) simply does not arrive, and the rest keep their
 -- owner's relative order.
 settleArrivals :: Zone.Zone -> LibraryPlacement.LibraryPlacement -> [ObjectId] -> Game [(ObjectId, LibraryPosition.LibraryPosition)]
-settleArrivals zone placement targets = case zone of
-  Zone.Library -> do
-    settled <- Monad.mapM settleEnd targets
-    fmap concat (Monad.mapM (arrange settled) (List.nub (fmap fst settled)))
-  -- No other destination has ends, so nothing to settle and the funnel ignores
-  -- the position it is handed.
-  _ -> pure (fmap (\oid -> (oid, LibraryPosition.defaultValue)) targets)
-  where
-    settleEnd oid = do
-      gs <- State.get
-      case fmap Object.owner (Game.lookupObject oid gs) of
-        -- Already gone (CR 603.7c). moveOne is a no-op, so nobody to ask.
-        Nothing -> pure ((Nothing, LibraryPosition.defaultValue), oid)
-        Just owner -> do
-          position <- case placement of
-            LibraryPlacement.Stated stated -> pure stated
-            LibraryPlacement.RandomOrder stated -> pure stated
-            LibraryPlacement.OwnerChooses ->
-              Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor owner gs) owner oid)
-          pure ((Just owner, position), oid)
-    arrange settled key = do
-      let batch = [oid | (k, oid) <- settled, k == key]
-          (mOwner, position) = key
-      case (mOwner, batch) of
-        (Just owner, _ : _ : _) -> do
-          ordered <- case placement of
-            -- The effect states the order, so CR 401.4's owner is not asked.
-            -- Prompt.Shuffle is the randomness channel the mulligan and CR
-            -- 701.24a's own shuffle already go through, so the engine still
-            -- rolls nothing; Game.honourShuffle refuses an answer that is not a
-            -- permutation of the batch, which is what keeps a random order from
-            -- inventing or destroying cards.
-            LibraryPlacement.RandomOrder _ -> do
-              answer <- Game.ask (Prompt.Shuffle batch)
-              pure (Game.honourShuffle batch answer)
-            _ -> do
-              gs <- State.get
-              answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
-              pure (Game.permute batch answer)
-          pure (fmap (\oid -> (oid, position)) (reverse ordered))
-        -- One card is one order, which is CR 401.4's own "two or more".
-        _ -> pure (fmap (\oid -> (oid, position)) batch)
+settleArrivals zone placement targets =
+  let settleEnd oid = do
+        gs <- State.get
+        case fmap Object.owner (Game.lookupObject oid gs) of
+          -- Already gone (CR 603.7c). moveOne is a no-op, so nobody to ask.
+          Nothing -> pure ((Nothing, LibraryPosition.defaultValue), oid)
+          Just owner -> do
+            position <- case placement of
+              LibraryPlacement.Stated stated -> pure stated
+              LibraryPlacement.RandomOrder stated -> pure stated
+              LibraryPlacement.OwnerChooses ->
+                Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor owner gs) owner oid)
+            pure ((Just owner, position), oid)
+      arrange settled key = do
+        let batch = [oid | (k, oid) <- settled, k == key]
+            (mOwner, position) = key
+        case (mOwner, batch) of
+          (Just owner, _ : _ : _) -> do
+            ordered <- case placement of
+              -- The effect states the order, so CR 401.4's owner is not asked.
+              -- Prompt.Shuffle is the randomness channel the mulligan and CR
+              -- 701.24a's own shuffle already go through, so the engine still
+              -- rolls nothing; Game.honourShuffle refuses an answer that is not a
+              -- permutation of the batch, which is what keeps a random order from
+              -- inventing or destroying cards.
+              LibraryPlacement.RandomOrder _ -> do
+                answer <- Game.ask (Prompt.Shuffle batch)
+                pure (Game.honourShuffle batch answer)
+              _ -> do
+                gs <- State.get
+                answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+                pure (Game.permute batch answer)
+            pure (fmap (\oid -> (oid, position)) (reverse ordered))
+          -- One card is one order, which is CR 401.4's own "two or more".
+          _ -> pure (fmap (\oid -> (oid, position)) batch)
+   in case zone of
+        Zone.Library -> do
+          settled <- Monad.mapM settleEnd targets
+          fmap concat (Monad.mapM (arrange settled) (List.nub (fmap fst settled)))
+        -- No other destination has ends, so nothing to settle and the funnel ignores
+        -- the position it is handed.
+        _ -> pure (fmap (\oid -> (oid, LibraryPosition.defaultValue)) targets)
 
 -- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names
 -- as RECIPIENTS. It exists because CR 115.4's "any target" includes a player and
@@ -1344,13 +1344,12 @@ freezeRiders ::
   EntryRiders.EntryRiders Quantity.Type.Quantity ->
   EntryRiders.EntryRiders Natural
 freezeRiders viewOf context gs resolving source riders =
-  riders
-    { EntryRiders.counters = Map.mapMaybe frozen (EntryRiders.counters riders)
-    }
-  where
-    frozen quantity = case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n | n > 0 -> Just (Integer.toNaturalSaturating n)
-      _ -> Nothing
+  let frozen quantity = case Quantity.evaluateFor viewOf context gs resolving source quantity of
+        Just n | n > 0 -> Just (Integer.toNaturalSaturating n)
+        _ -> Nothing
+   in riders
+        { EntryRiders.counters = Map.mapMaybe frozen (EntryRiders.counters riders)
+        }
 
 -- The amount ONE RECIPIENT of a per-player instruction reads, which need not be
 -- the amount the rest of the table reads (Stronghold Discipline). Every opcode
@@ -1433,9 +1432,8 @@ fromAmongMembers legal resolving chosen slot = do
 -- means and Pawl.Engine.Decide.effective reads the end of it.
 pushControl :: PlayerId -> PlayerControl.PlayerControl -> GameState -> GameState
 pushControl pid row gs =
-  gs {GameState.control = Map.insertWith after pid (pure row) (GameState.control gs)}
-  where
-    after new old = old <> new
+  let after new old = old <> new
+   in gs {GameState.control = Map.insertWith after pid (pure row) (GameState.control gs)}
 
 -- CR 402.3 with a CR 608.2d choice: each hand the reference names is offered to
 -- its OWN owner (a hand's cards are that player's alone), who picks one card
@@ -7065,25 +7063,24 @@ performTriggeredManaAbility pending = case PendingTrigger.source pending of
 -- data/cards/ reads (#3124).
 performManaAbilityEffects :: ObjectId -> PlayerId -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game ()
 performManaAbilityEffects source controller =
-  Monad.mapM_
-    ( applyEffect
-        source
-        source
-        controller
-        -- CR 109.5's "you" is the player who activated the ability, and the
-        -- reserved self slot is CR 113.7's source. Both are bound here rather
-        -- than read off an object, because there is no ability object carrying
-        -- them: Pawl.Engine.Activate.activateAbility stamps them for every
-        -- ability that does go on the stack.
-        manaAbilityBindings
-        manaAbilityBindings
-    )
-  where
-    manaAbilityBindings =
-      Map.fromList
-        [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
-          (Binding.you, Set.singleton (Recipient.ToPlayer controller))
-        ]
+  let manaAbilityBindings =
+        Map.fromList
+          [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
+            (Binding.you, Set.singleton (Recipient.ToPlayer controller))
+          ]
+   in Monad.mapM_
+        ( applyEffect
+            source
+            source
+            controller
+            -- CR 109.5's "you" is the player who activated the ability, and the
+            -- reserved self slot is CR 113.7's source. Both are bound here rather
+            -- than read off an object, because there is no ability object carrying
+            -- them: Pawl.Engine.Activate.activateAbility stamps them for every
+            -- ability that does go on the stack.
+            manaAbilityBindings
+            manaAbilityBindings
+        )
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.
@@ -7453,6 +7450,9 @@ fatesealOne source n pid = do
 -- types, so it is no land card -- the answer the printed face gave.
 exploreOne :: ObjectId -> Game ()
 exploreOne oid = do
+  -- CR 122.6 through the one counter funnel, so a CR 614.1 counter replacement
+  -- (Hardened Scales) gets its opportunity against this placement too.
+  let grow pid = Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne 1)
   gs <- State.get
   case Projection.controllerWithLastKnown oid gs of
     -- An id nothing was ever filed under: nobody explores and nothing happens.
@@ -7476,7 +7476,3 @@ exploreOne oid = do
       -- id nobody ever controlled explores nothing; but not inside the library
       -- case, that rule firing even when the actions were impossible.
       State.modify' (Event.recordEvent (GameEvent.Explored oid))
-  where
-    -- CR 122.6 through the one counter funnel, so a CR 614.1 counter replacement
-    -- (Hardened Scales) gets its opportunity against this placement too.
-    grow pid = Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne 1)

@@ -653,19 +653,18 @@ reactions incoming = do
 -- TRIGGERING.
 withinTriggerLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
 withinTriggerLimit gs =
-  go
-    ( Set.union
-        (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
-        (Set.map spentKey (GameState.triggeredThisGame gs))
-    )
-  where
-    spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
-    go _ [] = []
-    go spent (pending : rest) = case limitedKey pending of
-      Nothing -> pending : go spent rest
-      Just key
-        | Set.member key spent -> go spent rest
-        | otherwise -> pending : go (Set.insert key spent) rest
+  let spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
+      go _ [] = []
+      go spent (pending : rest) = case limitedKey pending of
+        Nothing -> pending : go spent rest
+        Just key
+          | Set.member key spent -> go spent rest
+          | otherwise -> pending : go (Set.insert key spent) rest
+   in go
+        ( Set.union
+            (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+            (Set.map spentKey (GameState.triggeredThisGame gs))
+        )
 
 -- What ONE INSTANCE of a triggered ability is, for the rider's purposes: what it
 -- hangs on and which ability it is -- the discriminator Pawl.Types.TriggerEntry
@@ -696,12 +695,12 @@ limitKey src ctrl ability =
 -- The key one pending trigger spends, or Nothing when its ability prints no
 -- rider.
 limitedKey :: PendingTrigger.PendingTrigger -> Maybe LimitKey
-limitedKey pending = case TriggeredAbility.limit (PendingTrigger.ability pending) of
-  TriggerLimit.Unlimited -> Nothing
-  TriggerLimit.OncePerTurn -> Just key
-  TriggerLimit.OncePerGame -> Just key
-  where
-    key = limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending)
+limitedKey pending =
+  let key = limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending)
+   in case TriggeredAbility.limit (PendingTrigger.ability pending) of
+        TriggerLimit.Unlimited -> Nothing
+        TriggerLimit.OncePerTurn -> Just key
+        TriggerLimit.OncePerGame -> Just key
 
 -- `triggeredEvent` read back: the record an event carries if it is one ability
 -- triggering (CR 603.3b), and nothing otherwise.

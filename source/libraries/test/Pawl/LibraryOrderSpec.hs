@@ -1333,13 +1333,13 @@ zoneNames zone gs =
 -- can read it through -- which is also what makes the empty list the assertion
 -- that CR 701.20e's look was NOT one.
 revealedNames :: GameState.GameState -> [String]
-revealedNames gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
-  where
-    revealedName event = case event of
-      GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
-        | pid == S.alice ->
-            fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
-      _ -> Nothing
+revealedNames gs =
+  let revealedName event = case event of
+        GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
+          | pid == S.alice ->
+              fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
+        _ -> Nothing
+   in Maybe.mapMaybe revealedName (S.eventsOf gs)
 
 exploreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exploreSpec s registry = Spec.describe s "Explore" $ do
@@ -2547,17 +2547,17 @@ optionalEffectSpec s registry =
 -- neither of the card's two gets the empty answer, which fails the target
 -- announcement rather than aiming somewhere plausible.
 deadlyComplicationAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-deadlyComplicationAnswer victim suspect p = case p of
-  Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex [0, 1])
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
-  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  _ -> S.identityAnswer p
-  where
-    aimAt :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
-    aimAt slot (_, offered)
-      | slot == creatureSlot = Set.filter ((== Just victim) . Recipient.objectOf) offered
-      | slot == suspectSlot = Set.filter ((== Just suspect) . Recipient.objectOf) offered
-      | otherwise = Set.empty
+deadlyComplicationAnswer victim suspect p =
+  let aimAt :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
+      aimAt slot (_, offered)
+        | slot == creatureSlot = Set.filter ((== Just victim) . Recipient.objectOf) offered
+        | slot == suspectSlot = Set.filter ((== Just suspect) . Recipient.objectOf) offered
+        | otherwise = Set.empty
+   in case p of
+        Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex [0, 1])
+        Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
 
 -- Deadly Complication's two slot names (data/cards/deadly-complication.json).
 creatureSlot, suspectSlot :: SlotName.SlotName

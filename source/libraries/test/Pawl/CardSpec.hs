@@ -532,57 +532,56 @@ refCounts = concatMap quantityCounts . Resolve.objectRefQuantities
 -- compile. This list is where that shows up.
 objectRefPositions :: [(String, Effect.Effect () (), [ObjectRef.ObjectRef])]
 objectRefPositions =
-  [ ("deal-damage", Effect.DealDamage (DealDamage.MkDealDamage (Seq.fromList [DamagePart.MkDamagePart (plantedRef "dd1") (Quantity.Type.Literal 1), DamagePart.MkDamagePart (plantedRef "dd2") (Quantity.Type.Literal 1)]) Nothing Nothing), [plantedRef "dd1", plantedRef "dd2"]),
-    ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt")), [plantedRef "mt"]),
-    ("restart-game", Effect.RestartGame (Just (plantedRef "rg")), [plantedRef "rg"]),
-    ("destroy", Effect.Destroy (Destroy.MkDestroy (plantedRef "de") Regenerability.Regenerable Nothing Nothing Nothing), [plantedRef "de"]),
-    ("move-to-zone", Effect.MoveToZone (MoveToZone.MkMoveToZone (plantedRef "mz") Zone.Exile plainRiders Nothing Nothing LibraryPlacement.OwnerChooses Nothing), [plantedRef "mz"]),
-    ("reveal", Effect.Reveal (Reveal.MkReveal (plantedRef "rv") Nothing), [plantedRef "rv"]),
-    ("look-at", Effect.LookAt (LookAt.MkLookAt (plantedRef "la") (SlotName.MkSlotName (Text.pack "seen"))), [plantedRef "la"]),
-    ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
-    ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
-    ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders []), [plantedRef "cc"]),
-    ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject") []), [plantedRef "bc-original", plantedRef "bc-subject"]),
-    ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied), [plantedRef "cs"]),
-    -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
-    -- reach: a copy effect whose candidate description reads a slot no clause
-    -- binds is a dangling read like any other.
-    ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each"))), [plantedRef "cs-ref", plantedRef "cs-each"]),
-    ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
-    ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
-    ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
-    ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing), [plantedRef "co"]),
-    ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
-    ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
-    ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) Nothing (plantedRef "pf")), [plantedRef "pf"]),
-    ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
-    ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
-    ("detain", Effect.Detain (plantedRef "dt"), [plantedRef "dt"]),
-    ("earthbend", Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Type.Literal 1) (plantedRef "eb")), [plantedRef "eb"]),
-    ("goad", Effect.Goad (plantedRef "go"), [plantedRef "go"]),
-    ("does-not-untap-next", Effect.DoesNotUntapNext (plantedRef "du"), [plantedRef "du"]),
-    ("transform", Effect.Transform (plantedRef "tr"), [plantedRef "tr"]),
-    ("convert", Effect.Convert (plantedRef "cv"), [plantedRef "cv"]),
-    ("meld", Effect.Meld (Meld.MkMeld (plantedRef "me") ()), [plantedRef "me"]),
-    ("phase-out", Effect.PhaseOut (plantedRef "po"), [plantedRef "po"]),
-    ("turn-face-down", Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (plantedRef "tf") FaceDownCharacteristics.defaultValue), [plantedRef "tf"]),
-    ("remove-from-combat", Effect.RemoveFromCombat (plantedRef "rc"), [plantedRef "rc"]),
-    ("gain-control", Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (plantedRef "gc")), [plantedRef "gc"]),
-    ("require-block", Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfTurn (plantedRef "rb-blocker") (plantedRef "rb-attacker")), [plantedRef "rb-blocker", plantedRef "rb-attacker"]),
-    ("cant-be-regenerated", Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
-    ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "ra"]),
-    ("forbid-block", Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (plantedRef "fb")), [plantedRef "fb"]),
-    ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "fa")) Nothing), [plantedRef "fa"]),
-    ("forbid-activation", Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (plantedRef "fv")), [plantedRef "fv"]),
-    ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
-    ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
-    ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue), [plantedRef "oc"]),
-    ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced), [plantedRef "gp"]),
-    ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
-    ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])
-  ]
-  where
-    plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
+  let plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
+   in [ ("deal-damage", Effect.DealDamage (DealDamage.MkDealDamage (Seq.fromList [DamagePart.MkDamagePart (plantedRef "dd1") (Quantity.Type.Literal 1), DamagePart.MkDamagePart (plantedRef "dd2") (Quantity.Type.Literal 1)]) Nothing Nothing), [plantedRef "dd1", plantedRef "dd2"]),
+        ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt")), [plantedRef "mt"]),
+        ("restart-game", Effect.RestartGame (Just (plantedRef "rg")), [plantedRef "rg"]),
+        ("destroy", Effect.Destroy (Destroy.MkDestroy (plantedRef "de") Regenerability.Regenerable Nothing Nothing Nothing), [plantedRef "de"]),
+        ("move-to-zone", Effect.MoveToZone (MoveToZone.MkMoveToZone (plantedRef "mz") Zone.Exile plainRiders Nothing Nothing LibraryPlacement.OwnerChooses Nothing), [plantedRef "mz"]),
+        ("reveal", Effect.Reveal (Reveal.MkReveal (plantedRef "rv") Nothing), [plantedRef "rv"]),
+        ("look-at", Effect.LookAt (LookAt.MkLookAt (plantedRef "la") (SlotName.MkSlotName (Text.pack "seen"))), [plantedRef "la"]),
+        ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
+        ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
+        ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders []), [plantedRef "cc"]),
+        ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject") []), [plantedRef "bc-original", plantedRef "bc-subject"]),
+        ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied), [plantedRef "cs"]),
+        -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
+        -- reach: a copy effect whose candidate description reads a slot no clause
+        -- binds is a dangling read like any other.
+        ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each"))), [plantedRef "cs-ref", plantedRef "cs-each"]),
+        ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
+        ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
+        ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
+        ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing), [plantedRef "co"]),
+        ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
+        ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
+        ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) Nothing (plantedRef "pf")), [plantedRef "pf"]),
+        ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
+        ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
+        ("detain", Effect.Detain (plantedRef "dt"), [plantedRef "dt"]),
+        ("earthbend", Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Type.Literal 1) (plantedRef "eb")), [plantedRef "eb"]),
+        ("goad", Effect.Goad (plantedRef "go"), [plantedRef "go"]),
+        ("does-not-untap-next", Effect.DoesNotUntapNext (plantedRef "du"), [plantedRef "du"]),
+        ("transform", Effect.Transform (plantedRef "tr"), [plantedRef "tr"]),
+        ("convert", Effect.Convert (plantedRef "cv"), [plantedRef "cv"]),
+        ("meld", Effect.Meld (Meld.MkMeld (plantedRef "me") ()), [plantedRef "me"]),
+        ("phase-out", Effect.PhaseOut (plantedRef "po"), [plantedRef "po"]),
+        ("turn-face-down", Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (plantedRef "tf") FaceDownCharacteristics.defaultValue), [plantedRef "tf"]),
+        ("remove-from-combat", Effect.RemoveFromCombat (plantedRef "rc"), [plantedRef "rc"]),
+        ("gain-control", Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (plantedRef "gc")), [plantedRef "gc"]),
+        ("require-block", Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfTurn (plantedRef "rb-blocker") (plantedRef "rb-attacker")), [plantedRef "rb-blocker", plantedRef "rb-attacker"]),
+        ("cant-be-regenerated", Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
+        ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "ra"]),
+        ("forbid-block", Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (plantedRef "fb")), [plantedRef "fb"]),
+        ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "fa")) Nothing), [plantedRef "fa"]),
+        ("forbid-activation", Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (plantedRef "fv")), [plantedRef "fv"]),
+        ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
+        ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
+        ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue), [plantedRef "oc"]),
+        ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced), [plantedRef "gp"]),
+        ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
+        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])
+      ]
 
 -- The ref plantedRef at one position, named for it so a position answering with
 -- another position's ref is visible rather than merely absent.
@@ -597,44 +596,43 @@ plantedRef = ObjectRef.InSlot . SlotName.MkSlotName . Text.pack
 -- alone and compile.
 playerRefPositions :: [(String, Effect.Effect () (), [PlayerRef.PlayerRef])]
 playerRefPositions =
-  [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor 1 ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
-    ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
-    ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
-    ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
-    ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
-    ("surveil", Effect.Surveil (playerQuantity "su"), [plantedPlayer "su"]),
-    ("fateseal", Effect.Fateseal (playerQuantity "fs"), [plantedPlayer "fs"]),
-    ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect), [plantedPlayer "ll"]),
-    ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
-    ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
-    ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
-    ("decrease-speed", Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease (plantedPlayer "ds") one 0), [plantedPlayer "ds"]),
-    ("create", Effect.Create (Create.MkCreate one () EntryRiders.defaultValue Nothing (plantedPlayer "cr")), [plantedPlayer "cr"]),
-    ("skip-next-phase", Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase (plantedPlayer "sn") PhaseSelector.CombatPhase), [plantedPlayer "sn"]),
-    ("gain-player-counters", Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "gp") PlayerCounterKind.Rad one), [plantedPlayer "gp"]),
-    ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
-    ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (plantedPlayer "ra-defender")), [plantedPlayer "ra-defender"]),
-    ("blight", Effect.Blight (playerQuantity "bl"), [plantedPlayer "bl"]),
-    ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
-    ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
-    ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
-    ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
-    ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"]),
-    -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
-    -- the opcode -- the two CR 601.3 / 305.1 permissions that name whose zone
-    -- (Sen Triplets). Both are planted, since Pawl.Engine.PlayerEffect's
-    -- traversal is what the AffectPlayers arm delegates to and a missing arm
-    -- there answers [] rather than failing to compile.
-    ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []))), [plantedPlayer "ap-cast"]),
-    ("affect-players-play-lands-from", affecting (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (plantedPlayer "ap-land"))), [plantedPlayer "ap-land"]),
-    -- And an arm carrying none, so the traversal is shown answering nothing where
-    -- there is nothing to answer.
-    ("affect-players-cant-cast", affecting PlayerEffect.CantCastSpells, [])
-  ]
-  where
-    one = Quantity.Type.Literal 1
-    playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
-    affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
+  let one = Quantity.Type.Literal 1
+      playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
+      affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
+   in [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor 1 ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
+        ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
+        ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
+        ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
+        ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
+        ("surveil", Effect.Surveil (playerQuantity "su"), [plantedPlayer "su"]),
+        ("fateseal", Effect.Fateseal (playerQuantity "fs"), [plantedPlayer "fs"]),
+        ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect), [plantedPlayer "ll"]),
+        ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
+        ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
+        ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
+        ("decrease-speed", Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease (plantedPlayer "ds") one 0), [plantedPlayer "ds"]),
+        ("create", Effect.Create (Create.MkCreate one () EntryRiders.defaultValue Nothing (plantedPlayer "cr")), [plantedPlayer "cr"]),
+        ("skip-next-phase", Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase (plantedPlayer "sn") PhaseSelector.CombatPhase), [plantedPlayer "sn"]),
+        ("gain-player-counters", Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "gp") PlayerCounterKind.Rad one), [plantedPlayer "gp"]),
+        ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
+        ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (plantedPlayer "ra-defender")), [plantedPlayer "ra-defender"]),
+        ("blight", Effect.Blight (playerQuantity "bl"), [plantedPlayer "bl"]),
+        ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
+        ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
+        ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
+        ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
+        ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"]),
+        -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
+        -- the opcode -- the two CR 601.3 / 305.1 permissions that name whose zone
+        -- (Sen Triplets). Both are planted, since Pawl.Engine.PlayerEffect's
+        -- traversal is what the AffectPlayers arm delegates to and a missing arm
+        -- there answers [] rather than failing to compile.
+        ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []))), [plantedPlayer "ap-cast"]),
+        ("affect-players-play-lands-from", affecting (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (plantedPlayer "ap-land"))), [plantedPlayer "ap-land"]),
+        -- And an arm carrying none, so the traversal is shown answering nothing where
+        -- there is nothing to answer.
+        ("affect-players-cant-cast", affecting PlayerEffect.CantCastSpells, [])
+      ]
 
 -- The same list one type in, for the ObjectRef arms that count PER SEAT
 -- (CR 400.1's per-player zones). Resolve.objectRefPlayerRefs is what owes these.

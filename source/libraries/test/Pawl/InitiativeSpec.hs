@@ -68,11 +68,11 @@ markerOf pid gs = Dungeon.inDungeon pid gs >>= \oid -> Game.lookupObject oid gs 
 -- can assert both who took it and that nothing else was recorded. CR 726.5's
 -- re-take is exactly a second entry here with one designation on the board.
 takings :: GameState.GameState -> [PlayerId]
-takings gs = Maybe.mapMaybe took (S.eventsOf gs)
-  where
-    took event = case event of
-      GameEvent.TookInitiative pid -> Just pid
-      _ -> Nothing
+takings gs =
+  let took event = case event of
+        GameEvent.TookInitiative pid -> Just pid
+        _ -> Nothing
+   in Maybe.mapMaybe took (S.eventsOf gs)
 
 -- Answers everything an entry trigger, a venture and Undercity's rooms raise:
 -- take every target offered, and run Secret Entrance's search to completion so
@@ -91,12 +91,12 @@ answering p = case p of
 -- causes. Bounded, so a bug that kept the stack full fails the case rather than
 -- hanging it.
 resolveAll :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-resolveAll answer gs0 = go (20 :: Int) (S.runPure answer gs0 Engine.settleForPriority)
-  where
-    go n gs
-      | n <= 0 = gs
-      | null (GameState.stack gs) = gs
-      | otherwise = go (n - 1) (S.runPure answer gs (Stack.resolveTop >> Engine.settleForPriority))
+resolveAll answer gs0 =
+  let go n gs
+        | n <= 0 = gs
+        | null (GameState.stack gs) = gs
+        | otherwise = go (n - 1) (S.runPure answer gs (Stack.resolveTop >> Engine.settleForPriority))
+   in go (20 :: Int) (S.runPure answer gs0 Engine.settleForPriority)
 
 -- Every named player owns Undercity outside the game (CR 309.2), which is what
 -- CR 701.49d's "venture into Undercity" needs to find. Interned ONCE, so every

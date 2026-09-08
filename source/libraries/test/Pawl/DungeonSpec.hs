@@ -153,12 +153,12 @@ payingLastRoom p = case p of
 -- triggered on the venture is placed and then resolved too. Bounded, so a bug that
 -- kept the stack full fails the case rather than hanging it.
 resolveAll :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-resolveAll answer = go (20 :: Int)
-  where
-    go n gs
-      | n <= 0 = gs
-      | null (GameState.stack gs) = gs
-      | otherwise = go (n - 1) (S.runPure answer gs (Stack.resolveTop >> Engine.settleForPriority))
+resolveAll answer =
+  let go n gs
+        | n <= 0 = gs
+        | null (GameState.stack gs) = gs
+        | otherwise = go (n - 1) (S.runPure answer gs (Stack.resolveTop >> Engine.settleForPriority))
+   in go (20 :: Int)
 
 -- One venture: activate Secret Door's ability, then resolve everything it puts on
 -- the stack.

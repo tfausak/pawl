@@ -690,14 +690,14 @@ otherPileThan pile gs = case filter (\p -> Just p /= pile) (pilesIn gs) of
 -- 406.4's draw with the LAST card of the pile, which is the one answer a draw
 -- that took the first would not produce.
 throughPile :: Prompt.Prompt r -> r
-throughPile p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter isPile . snd) sets
-  Prompt.RandomObject members -> NonEmpty.last members
-  _ -> S.identityAnswer p
-  where
-    isPile recipient = case recipient of
-      Recipient.ToPile _ -> True
-      _ -> False
+throughPile p =
+  let isPile recipient = case recipient of
+        Recipient.ToPile _ -> True
+        _ -> False
+   in case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter isPile . snd) sets
+        Prompt.RandomObject members -> NonEmpty.last members
+        _ -> S.identityAnswer p
 
 -- One player casts their copy of the instant with the slot's whole offer FILTERED
 -- down to the foretold card, then the stack is resolved. Filtered rather than

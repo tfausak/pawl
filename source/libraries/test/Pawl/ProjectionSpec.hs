@@ -4427,11 +4427,11 @@ tappedCount gs =
 -- `any isActivate`, so a board with other permanents on it cannot answer for
 -- the Student.
 levelUpsOf :: ObjectId.ObjectId -> GameState.GameState -> [Action.Type.Action]
-levelUpsOf oid gs = filter isIt (Action.legalActions S.alice gs)
-  where
-    isIt a = case a of
-      Action.Type.Activate o _ -> o == oid
-      _ -> False
+levelUpsOf oid gs =
+  let isIt a = case a of
+        Action.Type.Activate o _ -> o == oid
+        _ -> False
+   in filter isIt (Action.legalActions S.alice gs)
 
 -- Activate the Student's one ability and resolve it. Partial on purpose: a board
 -- offering anything but exactly one ability is a fixture bug, and a silent

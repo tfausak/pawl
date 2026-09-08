@@ -144,11 +144,11 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- than one arm per effect, as storedPlayerScope takes: Pawl.Types.Effect is the
 -- open half's alphabet, and a new opcode is not a new search.
 searchZoneSets :: Face.Face Card.Type.Card -> [Set.Set Zone.Zone]
-searchZoneSets = Maybe.mapMaybe zonesOf . cardResolutionEffects
-  where
-    zonesOf effect = case effect of
-      Effect.Search search -> Just (Search.zones search)
-      _ -> Nothing
+searchZoneSets =
+  let zonesOf effect = case effect of
+        Effect.Search search -> Just (Search.zones search)
+        _ -> Nothing
+   in Maybe.mapMaybe zonesOf . cardResolutionEffects
 
 -- CR 701.3a's Filter.CanHostSubject, counted wherever it appears inside ONE
 -- Filter: under And/Or/Not, and inside the typecycling predicate a HasKeyword
@@ -810,14 +810,14 @@ timesKickedWithOffends card =
 -- nesting only multiplies the shapes the classifications above have to be right
 -- for.
 anyOfOffends :: TriggerCondition.TriggerCondition -> Bool
-anyOfOffends condition = case condition of
-  TriggerCondition.AnyOf conditions -> any inside conditions || any anyOfOffends conditions
-  _ -> False
-  where
-    inside c = case c of
-      TriggerCondition.StateIs _ -> True
-      TriggerCondition.AnyOf _ -> True
-      _ -> False
+anyOfOffends condition =
+  let inside c = case c of
+        TriggerCondition.StateIs _ -> True
+        TriggerCondition.AnyOf _ -> True
+        _ -> False
+   in case condition of
+        TriggerCondition.AnyOf conditions -> any inside conditions || any anyOfOffends conditions
+        _ -> False
 
 filterPositionLintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 filterPositionLintSpec s registry = Spec.describe s "Lint" $ do

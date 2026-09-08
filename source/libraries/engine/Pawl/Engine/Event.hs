@@ -5315,16 +5315,15 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
 -- two departures with one arrival each. Its own comment has the reason.
 perpetuate :: ObjectId -> Seq.Seq ObjectId -> Game ()
 perpetuate oldId newIds =
-  State.modify' $ \gs ->
-    gs
-      { GameState.continuousEffects = fmap follow (GameState.continuousEffects gs)
-      }
-  where
-    arrivals = Set.fromList (Foldable.toList newIds)
-    follow eff =
-      if Expiry.follows (ContinuousEffect.expiry eff)
-        then reanchor oldId arrivals eff
-        else eff
+  let arrivals = Set.fromList (Foldable.toList newIds)
+      follow eff =
+        if Expiry.follows (ContinuousEffect.expiry eff)
+          then reanchor oldId arrivals eff
+          else eff
+   in State.modify' $ \gs ->
+        gs
+          { GameState.continuousEffects = fmap follow (GameState.continuousEffects gs)
+          }
 
 -- carryOver's and perpetuate's per-effect half: swap oldId for the arriving ids
 -- in a locked affected set that names it, and leave every other effect alone. A

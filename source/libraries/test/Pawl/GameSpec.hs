@@ -2572,24 +2572,24 @@ aimingAt oid p = case p of
 -- printing's list is whichever one the card file happens to list first -- the
 -- cost is the thing that actually tells them apart.
 loyaltyChange :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Integer
-loyaltyChange ability = Maybe.listToMaybe (Maybe.mapMaybe change (Cost.Type.components (ActivatedAbility.cost ability)))
-  where
-    change c = case c of
-      CostComponent.AddLoyaltyToThis n -> Just (toInteger n)
-      CostComponent.RemoveLoyaltyFromThis n -> Just (negate (toInteger n))
-      _ -> Nothing
+loyaltyChange ability =
+  let change c = case c of
+        CostComponent.AddLoyaltyToThis n -> Just (toInteger n)
+        CostComponent.RemoveLoyaltyFromThis n -> Just (negate (toInteger n))
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe change (Cost.Type.components (ActivatedAbility.cost ability)))
 
 -- Does this Activate action fire a restart? Karn Liberated has three loyalty
 -- abilities, so "the first Activate" would be its +4 rather than its ultimate --
 -- the answer has to be PINNED to the ability under test, not taken by position.
 isRestartActivation :: A.Action -> Bool
-isRestartActivation a = case a of
-  A.Activate _ ability -> any isRestart (foldMap Mode.allEffects (Modal.modes (ActivatedAbility.modal ability)))
-  _ -> False
-  where
-    isRestart e = case e of
-      Effect.RestartGame _ -> True
-      _ -> False
+isRestartActivation a =
+  let isRestart e = case e of
+        Effect.RestartGame _ -> True
+        _ -> False
+   in case a of
+        A.Activate _ ability -> any isRestart (foldMap Mode.allEffects (Modal.modes (ActivatedAbility.modal ability)))
+        _ -> False
 
 -- CR 727 gate strategy. Whoever has priority activates the restart -- Karn
 -- Liberated's ultimate, which only bob's Karn offers -- and otherwise passes.

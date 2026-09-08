@@ -1415,14 +1415,13 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfAttacksPermanent f -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ target _)
       | oid == bearer ->
-          case target of
-            AttackTarget.OfPlayer _ -> False
-            AttackTarget.OfPlaneswalker attacked -> admits attacked
-            AttackTarget.OfBattle attacked -> admits attacked
-      where
-        admits attacked = case Projection.viewWithLastKnown bearer gs attacked of
-          Nothing -> False
-          Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+          let admits attacked = case Projection.viewWithLastKnown bearer gs attacked of
+                Nothing -> False
+                Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+           in case target of
+                AttackTarget.OfPlayer _ -> False
+                AttackTarget.OfPlaneswalker attacked -> admits attacked
+                AttackTarget.OfBattle attacked -> admits attacked
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False

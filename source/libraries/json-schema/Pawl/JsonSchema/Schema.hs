@@ -60,14 +60,13 @@ nonEmptyArray s = fromPairs $ keywords (array s) <> [Value.pair "minItems" $ Val
 
 tupleOf :: [Schema] -> Schema
 tupleOf ss =
-  fromPairs
-    [ Value.pair "type" $ Value.string "array",
-      Value.pair "prefixItems" . Value.array $ fmap unwrap ss,
-      Value.pair "minItems" $ Value.integer count,
-      Value.pair "maxItems" $ Value.integer count
-    ]
-  where
-    count = toInteger $ length ss
+  let count = toInteger $ length ss
+   in fromPairs
+        [ Value.pair "type" $ Value.string "array",
+          Value.pair "prefixItems" . Value.array $ fmap unwrap ss,
+          Value.pair "minItems" $ Value.integer count,
+          Value.pair "maxItems" $ Value.integer count
+        ]
 
 constant :: Text.Text -> Schema
 constant = fromPairs . pure . Value.pair "const" . Value.text

@@ -107,22 +107,22 @@ monarchAbilities = [endStepDraw, crownSteal]
 -- group, so a creature the same step's state-based actions have already destroyed
 -- still steals the crown.
 inherentMatch :: PlayerId -> TriggerCondition -> GameState -> LoggedEvent.LoggedEvent -> Maybe (Map SlotName.SlotName Binding)
-inherentMatch monarch cond gs logged = case (cond, LoggedEvent.event logged) of
-  (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active))
-    | began == wanted && scopeOk scope active -> Just Map.empty
-  -- CR 725.2: bind the damaging creature under the reserved trigger-source slot
-  -- so Effect.BecomeMonarch ControllerOfSource crowns THAT creature's
-  -- controller. The whole match is Event.combatDamagerAgainst's, which screens
-  -- the event shape as well as the damager.
-  (TriggerCondition.CreatureDealtCombatDamageToMonarch, _) ->
-    fmap (\(oid, _) -> Binding.setTriggerSource oid Map.empty) (Event.combatDamagerAgainst monarch gs logged)
-  _ -> Nothing
-  where
-    -- The monarch is the seat this scope is read against: CR 725.2 makes these
-    -- inherent abilities "controlled by the player who was the monarch at the
-    -- time the abilities triggered", so they are the "you" CR 109.5 would give a
-    -- printed one.
-    scopeOk s a = Event.turnScopeAdmits (Game.teams gs) s a monarch
+inherentMatch monarch cond gs logged =
+  let -- The monarch is the seat this scope is read against: CR 725.2 makes these
+      -- inherent abilities "controlled by the player who was the monarch at the
+      -- time the abilities triggered", so they are the "you" CR 109.5 would give a
+      -- printed one.
+      scopeOk s a = Event.turnScopeAdmits (Game.teams gs) s a monarch
+   in case (cond, LoggedEvent.event logged) of
+        (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active))
+          | began == wanted && scopeOk scope active -> Just Map.empty
+        -- CR 725.2: bind the damaging creature under the reserved trigger-source slot
+        -- so Effect.BecomeMonarch ControllerOfSource crowns THAT creature's
+        -- controller. The whole match is Event.combatDamagerAgainst's, which screens
+        -- the event shape as well as the damager.
+        (TriggerCondition.CreatureDealtCombatDamageToMonarch, _) ->
+          fmap (\(oid, _) -> Binding.setTriggerSource oid Map.empty) (Event.combatDamagerAgainst monarch gs logged)
+        _ -> Nothing
 
 -- CR 725.1/725.2: the inherent triggers that fire on this batch of events, as
 -- ordinary PendingTriggers whose source is TriggerSource.Sourceless -- which is

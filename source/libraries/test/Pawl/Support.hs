@@ -624,13 +624,13 @@ buildBoard registry setup = case boardFailure setup of
 -- turn order (Replay.defaultAnswer): a three-seat board that wants the
 -- other opponent defending sets Combat.defenders itself.
 designateBoardDefenders :: BuiltBoard -> BuiltBoard
-designateBoardDefenders built = case setupPhaseOf built of
-  Phase.Combat step
-    | step > CombatStep.BeginningOfCombat ->
-        built {builtState = runPure identityAnswer (builtState built) Combat.designateDefenders}
-  _ -> built
-  where
-    setupPhaseOf = GameState.phase . builtState
+designateBoardDefenders built =
+  let setupPhaseOf = GameState.phase . builtState
+   in case setupPhaseOf built of
+        Phase.Combat step
+          | step > CombatStep.BeginningOfCombat ->
+              built {builtState = runPure identityAnswer (builtState built) Combat.designateDefenders}
+        _ -> built
 
 buildBoardOrFail :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Board -> m BuiltBoard
 buildBoardOrFail s registry setup = do
@@ -1942,6 +1942,23 @@ answerTopPrompt location asked =
 answerActionPrompt :: GameState.GameState -> PlayerId.PlayerId -> [A.Action] -> State.StateT HarnessState (Either HarnessFailure) A.Action
 answerActionPrompt gs pid actions = do
   let key = whenOf gs pid
+      isAction verb = case verb of
+        MkCast {} -> True
+        MkPlayLand {} -> True
+        MkActivate {} -> True
+        _ -> False
+      takeAction index timed verb = case qualifier timed of
+        Just ref -> failHarness (MkUnexpectedQualifier key (Text.pack "ChooseAction") ref)
+        Nothing -> do
+          offered <- mapM (describeAction gs) actions
+          matching <- actionsMatching gs verb actions
+          chosen <- case matching of
+            [] -> failHarness (MkActionNotOffered key verb offered)
+            [action] -> pure action
+            _ -> failHarness (MkAmbiguousAction key verb offered)
+          popTimedAt key index
+          State.modify' (\state -> state {harnessAction = Just (key, verb, choicesOf verb)})
+          pure chosen
   entries <- queueAt key
   -- The first ACTION entry at this key, not the head. An entry for a prompt the
   -- engine elides (an attack target with one candidate, say) stays queued ahead
@@ -1949,25 +1966,7 @@ answerActionPrompt gs pid actions = do
   -- silently passing every priority at this key.
   case List.find (isAction . entry . snd) (zip [0 ..] (Foldable.toList entries)) of
     Nothing -> pure A.Pass
-    Just (index, timed) -> takeAction key index timed (entry timed)
-  where
-    isAction verb = case verb of
-      MkCast {} -> True
-      MkPlayLand {} -> True
-      MkActivate {} -> True
-      _ -> False
-    takeAction key index timed verb = case qualifier timed of
-      Just ref -> failHarness (MkUnexpectedQualifier key (Text.pack "ChooseAction") ref)
-      Nothing -> do
-        offered <- mapM (describeAction gs) actions
-        matching <- actionsMatching gs verb actions
-        chosen <- case matching of
-          [] -> failHarness (MkActionNotOffered key verb offered)
-          [action] -> pure action
-          _ -> failHarness (MkAmbiguousAction key verb offered)
-        popTimedAt key index
-        State.modify' (\state -> state {harnessAction = Just (key, verb, choicesOf verb)})
-        pure chosen
+    Just (index, timed) -> takeAction index timed (entry timed)
 
 choicesOf :: Entry -> ActionChoices
 choicesOf verb = case verb of
@@ -2853,22 +2852,22 @@ revealsOf gs = fmap (fmap PC.names) (Maybe.mapMaybe Event.revealOf (eventsOf gs)
 
 -- The battlefield objects that are tokens (CR 111.1) rather than cards.
 tokensOf :: GameState.GameState -> [ObjectId.ObjectId]
-tokensOf gs = filter isToken (Set.toList (GameState.battlefield gs))
-  where
-    isToken oid = case fmap Object.source (Game.lookupObject oid gs) of
-      Just (Source.OfToken _) -> True
-      _ -> False
+tokensOf gs =
+  let isToken oid = case fmap Object.source (Game.lookupObject oid gs) of
+        Just (Source.OfToken _) -> True
+        _ -> False
+   in filter isToken (Set.toList (GameState.battlefield gs))
 
 -- The creatures DECLARED as attackers so far this turn, in order (CR 508.2b).
 -- Deliberately not "who is attacking", which is Combat.attackers: CR 508.3a's
 -- last sentence turns on the difference, since a creature put onto the
 -- battlefield attacking is in that record and never appears here.
 attackerDeclarationsOf :: GameState.GameState -> [ObjectId.ObjectId]
-attackerDeclarationsOf gs = Maybe.mapMaybe declared (eventsOf gs)
-  where
-    declared event = case event of
-      GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) -> Just oid
-      _ -> Nothing
+attackerDeclarationsOf gs =
+  let declared event = case event of
+        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) -> Just oid
+        _ -> Nothing
+   in Maybe.mapMaybe declared (eventsOf gs)
 
 -- The characteristics of nothing: Projection.project on an id with no card in
 -- Setup.emptyGame. The filler snapshot for a hand-built GameEvent.Moved whose

@@ -142,41 +142,40 @@ targetSlotSlots slot =
 -- reads would otherwise dangle.
 modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 modeSlots mode =
-  joinSlots
-    [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
-      joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap multiplierSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap targetSlotSlots (Map.elems (Mode.targetSlots mode)))
-    ]
-  where
-    -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
-    payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
-    -- And the gate's OTHER slot-reading position, its "for each" multiplier
-    -- (Pawl.Types.PayGate.perEach): a cost scaled by what a bound object names is
-    -- a read the payer field need not repeat, and payGatePaidBy evaluates it
-    -- against this resolution's own context, so the slot really is asked for.
-    -- quantitySlots' WHOLE answer, targetSlotSlots' computed bound's reason.
-    multiplierSlot = maybe Map.empty quantitySlots . (Clause.payGate Monad.>=> PayGate.perEach)
-    -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
-    -- clause too, and Jungle Wayfinder's names the table rather than a slot --
-    -- but a card may name one, and an asker slot no effect also reads would
-    -- otherwise dangle.
-    askerSlot clause = case Clause.optionality clause of
-      Optionality.Mandatory -> Map.empty
-      Optionality.Optional ref -> playerRefSlots ref
-    -- And every clause's branch CHOOSER, for the same reason one rider over: CR
-    -- 608.2d's announcement is scoped to a clause pair and its reference may
-    -- name a slot.
-    chooserSlot = maybe Map.empty (playerRefSlots . OrElse.chooser) . Clause.orElse
-    -- And every clause's CR 701.46a "if", which CR 608.2c lets read what an
-    -- earlier clause of the same resolution bound: Psychic Miasma's "if a land
-    -- card is discarded this way" counts over CR 400.7j's fold of the slot its
-    -- first clause binds. A gate is the ONLY place a card may read a slot and
-    -- perform nothing, so a read reported nowhere else dangles here.
-    conditionSlot = maybe Map.empty conditionSlots . Clause.condition
+  let -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
+      payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
+      -- And the gate's OTHER slot-reading position, its "for each" multiplier
+      -- (Pawl.Types.PayGate.perEach): a cost scaled by what a bound object names is
+      -- a read the payer field need not repeat, and payGatePaidBy evaluates it
+      -- against this resolution's own context, so the slot really is asked for.
+      -- quantitySlots' WHOLE answer, targetSlotSlots' computed bound's reason.
+      multiplierSlot = maybe Map.empty quantitySlots . (Clause.payGate Monad.>=> PayGate.perEach)
+      -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
+      -- clause too, and Jungle Wayfinder's names the table rather than a slot --
+      -- but a card may name one, and an asker slot no effect also reads would
+      -- otherwise dangle.
+      askerSlot clause = case Clause.optionality clause of
+        Optionality.Mandatory -> Map.empty
+        Optionality.Optional ref -> playerRefSlots ref
+      -- And every clause's branch CHOOSER, for the same reason one rider over: CR
+      -- 608.2d's announcement is scoped to a clause pair and its reference may
+      -- name a slot.
+      chooserSlot = maybe Map.empty (playerRefSlots . OrElse.chooser) . Clause.orElse
+      -- And every clause's CR 701.46a "if", which CR 608.2c lets read what an
+      -- earlier clause of the same resolution bound: Psychic Miasma's "if a land
+      -- card is discarded this way" counts over CR 400.7j's fold of the slot its
+      -- first clause binds. A gate is the ONLY place a card may read a slot and
+      -- perform nothing, so a read reported nowhere else dangles here.
+      conditionSlot = maybe Map.empty conditionSlots . Clause.condition
+   in joinSlots
+        [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
+          joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap multiplierSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap targetSlotSlots (Map.elems (Mode.targetSlots mode)))
+        ]
 
 -- The slot a target pool draws its candidates from, if it draws them from one
 -- (CR 400.1's per-player graveyard), read singly.

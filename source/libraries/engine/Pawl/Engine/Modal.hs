@@ -64,9 +64,9 @@ allEffects m = concat (modeEffects m)
 -- contributes the selections of each size -- one mode alone adds less mana than
 -- both together, and both are ways the one activation could go.
 selectionEffects :: Modal.Modal card ability -> [[Effect card ability]]
-selectionEffects m = fmap concat (concatMap (\n -> enumerate n (modeEffects m)) (selectionSizes (Modal.selection m)))
-  where
-    enumerate = if allowsRepeats m then combinationsWithRepeats else combinations
+selectionEffects m =
+  let enumerate = if allowsRepeats m then combinationsWithRepeats else combinations
+   in fmap concat (concatMap (\n -> enumerate n (modeEffects m)) (selectionSizes (Modal.selection m)))
 
 -- CR 700.2d: "If a player is allowed to choose more than one mode for a modal
 -- spell or ability, that player normally can't choose the same mode more than

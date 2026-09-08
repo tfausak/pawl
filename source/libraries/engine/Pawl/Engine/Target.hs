@@ -1340,27 +1340,27 @@ announcedRange x slot capacity =
 -- pass through here, which is what makes this terminate: legalSetsGiven's second
 -- pass already answers a slot naming a dependent slot with nothing.
 slotCapacities :: Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Map SlotName Natural
-slotCapacities x slots sets gs = Map.mapWithKey capacity slots
-  where
-    legalOf name = Map.findWithDefault Set.empty name sets
-    capacity name slot =
-      let legal = legalOf name
-       in case scopeSlot (TargetSlot.pool slot) of
-            Nothing -> Natural.length legal
-            -- The scope names a slot this announcement does not declare -- CR
-            -- 603.2's trigger bindings reach a pool as `seed` and never as a
-            -- slot. Nothing here can bound such a slot's answers, so the
-            -- candidate count stands, which is what it was before this function
-            -- existed.
-            Just named -> case Map.lookup named slots of
+slotCapacities x slots sets gs =
+  let legalOf name = Map.findWithDefault Set.empty name sets
+      capacity name slot =
+        let legal = legalOf name
+         in case scopeSlot (TargetSlot.pool slot) of
               Nothing -> Natural.length legal
-              Just namedSlot ->
-                let candidates = legalOf named
-                    pids = Maybe.mapMaybe playerOf (Set.toList candidates)
-                    k = snd (announcedRange x namedSlot (Natural.length candidates))
-                    per = List.sortBy (flip compare) (fmap (\pid -> Natural.length (Set.intersection legal (graveyardsOf [pid] gs))) pids)
-                    elsewhere = Natural.length (Set.difference legal (graveyardsOf pids gs))
-                 in elsewhere + sum (take (Natural.toIntSaturating k) per)
+              -- The scope names a slot this announcement does not declare -- CR
+              -- 603.2's trigger bindings reach a pool as `seed` and never as a
+              -- slot. Nothing here can bound such a slot's answers, so the
+              -- candidate count stands, which is what it was before this function
+              -- existed.
+              Just named -> case Map.lookup named slots of
+                Nothing -> Natural.length legal
+                Just namedSlot ->
+                  let candidates = legalOf named
+                      pids = Maybe.mapMaybe playerOf (Set.toList candidates)
+                      k = snd (announcedRange x namedSlot (Natural.length candidates))
+                      per = List.sortBy (flip compare) (fmap (\pid -> Natural.length (Set.intersection legal (graveyardsOf [pid] gs))) pids)
+                      elsewhere = Natural.length (Set.difference legal (graveyardsOf pids gs))
+                   in elsewhere + sum (take (Natural.toIntSaturating k) per)
+   in Map.mapWithKey capacity slots
 
 -- CR 601.2c's two announcements over one slot map, in the rule's own order: how
 -- many targets each variable slot gets, then the targets themselves.
@@ -1434,13 +1434,13 @@ chooseTargets decider pid oid x slots sets = do
 -- pawl's own answer leaks where that rule is unimplemented, a face-down exiled
 -- card still reading its printed characteristics (#1479).
 piledOffer :: Maybe PlayerId -> GameState -> Set Recipient -> Set Recipient
-piledOffer perspective gs = Set.map replace
-  where
-    replace recipient = Maybe.fromMaybe recipient $ do
-      oid <- Recipient.objectOf recipient
-      if Exile.mayChoose perspective oid gs
-        then Nothing
-        else fmap Recipient.ToPile (Exile.pileOf oid gs)
+piledOffer perspective gs =
+  let replace recipient = Maybe.fromMaybe recipient $ do
+        oid <- Recipient.objectOf recipient
+        if Exile.mayChoose perspective oid gs
+          then Nothing
+          else fmap Recipient.ToPile (Exile.pileOf oid gs)
+   in Set.map replace
 
 -- CR 406.4: "and then a card is chosen at random from within that pile" -- every
 -- pile an announcement named, replaced by the card the draw picked out of it, so
@@ -1487,21 +1487,20 @@ piledOffer perspective gs = Set.map replace
 -- and no cost in `data/cards/` chooses an exiled card (#2568).
 drawFromPiles :: Maybe PlayerId -> Set Recipient -> Game (Set Recipient)
 drawFromPiles perspective picked = do
+  let draw recipient = case recipient of
+        Recipient.ToPile pile -> do
+          gs <- State.get
+          case pileMembers perspective pile gs of
+            [] -> pure Nothing
+            [only] -> pure (Just (Recipient.ToObject only))
+            first : second : more -> do
+              let offered = first NonEmpty.:| (second : more)
+              answer <- Game.ask (Prompt.RandomObject offered)
+              pure . Just . Recipient.ToObject $
+                if List.elem answer (NonEmpty.toList offered) then answer else first
+        _ -> pure (Just recipient)
   drawn <- traverse draw (Set.toList picked)
   pure (Set.fromList (Maybe.catMaybes drawn))
-  where
-    draw recipient = case recipient of
-      Recipient.ToPile pile -> do
-        gs <- State.get
-        case pileMembers perspective pile gs of
-          [] -> pure Nothing
-          [only] -> pure (Just (Recipient.ToObject only))
-          first : second : more -> do
-            let offered = first NonEmpty.:| (second : more)
-            answer <- Game.ask (Prompt.RandomObject offered)
-            pure . Just . Recipient.ToObject $
-              if List.elem answer (NonEmpty.toList offered) then answer else first
-      _ -> pure (Just recipient)
 
 -- CR 406.4's pile itself: every exiled card this chooser may not name that
 -- Pawl.Engine.Exile.pileOf sorts into this pile. Ascending by object id, which is
@@ -1560,33 +1559,32 @@ pileMembers perspective pile gs =
 -- filter naming a seed entry must stay out of this check.
 selectionLegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
 selectionLegal perspective seed source x slots sets chosen gs =
-  Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
-    && and (Map.elems (Map.mapWithKey slotLegal slots))
-    && jointlyCoherentGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots chosen gs
-  where
-    pcs = Projection.projectAll gs
-    caps = slotCapacities x slots sets gs
-    slotLegal slot targetSlot =
-      let legal = Map.findWithDefault Set.empty slot sets
-          picked = Map.findWithDefault Set.empty slot chosen
-          (_, hi) = announcedRange x targetSlot (Map.findWithDefault 0 slot caps)
-          -- The count the slot DEMANDS, unnarrowed by the board -- unlike the
-          -- ceiling beside it, which the board is entitled to lower (a caster
-          -- cannot choose more targets than there are). CR 601.2c gives no such
-          -- relief on the minimum: an announcement that cannot be filled makes the
-          -- casting or the activation illegal, and CR 601.2e returns the game to
-          -- before it was proposed.
-          --
-          -- Where the count is printed, `fillableModes` refused the mode before
-          -- the announcement began and this bound is the same number
-          -- announcedRange narrowed to. Where it is CR 601.2b's X, that gate ran
-          -- at the X=0 floor and could not know the value, so this is the only
-          -- place an X announced above what the board can supply is caught --
-          -- Pawl.CombatSpec's "CR 601.2c announcing more X than there are
-          -- creatures reverses the whole activation" proves it.
-          demanded = TargetCount.least (SlotCount.at x (TargetSlot.count targetSlot))
-          size = Natural.length picked
-       in Set.isSubsetOf picked legal && size >= demanded && size <= hi
+  let pcs = Projection.projectAll gs
+      caps = slotCapacities x slots sets gs
+      slotLegal slot targetSlot =
+        let legal = Map.findWithDefault Set.empty slot sets
+            picked = Map.findWithDefault Set.empty slot chosen
+            (_, hi) = announcedRange x targetSlot (Map.findWithDefault 0 slot caps)
+            -- The count the slot DEMANDS, unnarrowed by the board -- unlike the
+            -- ceiling beside it, which the board is entitled to lower (a caster
+            -- cannot choose more targets than there are). CR 601.2c gives no such
+            -- relief on the minimum: an announcement that cannot be filled makes the
+            -- casting or the activation illegal, and CR 601.2e returns the game to
+            -- before it was proposed.
+            --
+            -- Where the count is printed, `fillableModes` refused the mode before
+            -- the announcement began and this bound is the same number
+            -- announcedRange narrowed to. Where it is CR 601.2b's X, that gate ran
+            -- at the X=0 floor and could not know the value, so this is the only
+            -- place an X announced above what the board can supply is caught --
+            -- Pawl.CombatSpec's "CR 601.2c announcing more X than there are
+            -- creatures reverses the whole activation" proves it.
+            demanded = TargetCount.least (SlotCount.at x (TargetSlot.count targetSlot))
+            size = Natural.length picked
+         in Set.isSubsetOf picked legal && size >= demanded && size <= hi
+   in Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
+        && and (Map.elems (Map.mapWithKey slotLegal slots))
+        && jointlyCoherentGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots chosen gs
 
 -- CR 601.2c's JOINT CHECK on its own: every jointly judged slot re-derived
 -- against what the whole announcement chose, under `seed`. Three callers, and
@@ -1612,13 +1610,12 @@ jointlyCoherent perspective seed source slots chosen gs =
 -- legalRecipientsGiven.
 jointlyCoherentGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
-  and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
-  where
-    bindings = Map.union (fmap Binding.toRecipients chosen) seed
-    coherent slot targetSlot =
-      Set.isSubsetOf
-        (Map.findWithDefault Set.empty slot chosen)
-        (legalRecipientsGiven pcs grants pools perspective False bindings source targetSlot gs)
+  let bindings = Map.union (fmap Binding.toRecipients chosen) seed
+      coherent slot targetSlot =
+        Set.isSubsetOf
+          (Map.findWithDefault Set.empty slot chosen)
+          (legalRecipientsGiven pcs grants pools perspective False bindings source targetSlot gs)
+   in and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
 
 -- CR 601.2c: is there ONE announcement that fills every slot at once, rather than
 -- a minimum each slot can meet by itself? jointlyJudged's filter and bound halves
@@ -1659,37 +1656,36 @@ jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
 -- is the count that would make this every subset of the slot's candidates.
 jointlyFillableGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
-  Map.null readers || any coherent assignments
-  where
-    declared = Map.keysSet slots
-    reads_ slot =
-      Set.union
-        (Set.intersection declared (foldMap Filter.boundSlots (TargetSlot.filter slot)))
-        (boundSiblings declared slot)
-    readers = Map.filter (not . Set.null . reads_) slots
-    -- The slots being ENUMERATED: the ones a reader names, a reader that is
-    -- itself named included.
-    named = Map.restrictKeys slots (foldMap reads_ readers)
-    demanded slot = TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
-    legalOf name = Map.findWithDefault Set.empty name sets
-    -- The sizes ONE announcement could name this slot at, measured against
-    -- slotCapacities for that function's reason rather than against the union.
-    caps = slotCapacities 0 slots sets gs
-    sizesOf name slot =
-      let (lo, hi) = announcedRange 0 slot (Map.findWithDefault 0 name caps)
-       in [lo .. hi]
-    assignments =
-      List.foldr
-        (\(name, slot) rest -> [Map.insert name option m | size <- sizesOf name slot, option <- subsetsOfSize size (legalOf name), m <- rest])
-        [Map.empty]
-        (Map.toList named)
-    coherent chosen =
-      let bindings = Map.union (fmap Binding.toRecipients chosen) seed
-          admits name slot =
-            let legal = legalRecipientsGiven pcs grants pools perspective True bindings source slot gs
-             in Set.isSubsetOf (Map.findWithDefault Set.empty name chosen) legal
-                  && Natural.length legal >= demanded slot
-       in and (Map.elems (Map.mapWithKey admits readers))
+  let declared = Map.keysSet slots
+      reads_ slot =
+        Set.union
+          (Set.intersection declared (foldMap Filter.boundSlots (TargetSlot.filter slot)))
+          (boundSiblings declared slot)
+      readers = Map.filter (not . Set.null . reads_) slots
+      -- The slots being ENUMERATED: the ones a reader names, a reader that is
+      -- itself named included.
+      named = Map.restrictKeys slots (foldMap reads_ readers)
+      demanded slot = TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
+      legalOf name = Map.findWithDefault Set.empty name sets
+      -- The sizes ONE announcement could name this slot at, measured against
+      -- slotCapacities for that function's reason rather than against the union.
+      caps = slotCapacities 0 slots sets gs
+      sizesOf name slot =
+        let (lo, hi) = announcedRange 0 slot (Map.findWithDefault 0 name caps)
+         in [lo .. hi]
+      assignments =
+        List.foldr
+          (\(name, slot) rest -> [Map.insert name option m | size <- sizesOf name slot, option <- subsetsOfSize size (legalOf name), m <- rest])
+          [Map.empty]
+          (Map.toList named)
+      coherent chosen =
+        let bindings = Map.union (fmap Binding.toRecipients chosen) seed
+            admits name slot =
+              let legal = legalRecipientsGiven pcs grants pools perspective True bindings source slot gs
+               in Set.isSubsetOf (Map.findWithDefault Set.empty name chosen) legal
+                    && Natural.length legal >= demanded slot
+         in and (Map.elems (Map.mapWithKey admits readers))
+   in Map.null readers || any coherent assignments
 
 -- The subsets of exactly this size, ascending, which is the shape the search
 -- above enumerates one slot's candidate answers in. Empty when the set is

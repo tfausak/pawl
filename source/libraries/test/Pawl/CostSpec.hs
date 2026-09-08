@@ -3150,11 +3150,11 @@ trollBoard troll forest =
 -- own -- and it reads the CONTENTS rather than a length, since
 -- Event.removeCounters records nothing at all when there was nothing to remove.
 counterRemovalsOf :: GameState.GameState -> [CounterChange.CounterChange]
-counterRemovalsOf gs = Maybe.mapMaybe removal (S.eventsOf gs)
-  where
-    removal e = case e of
-      GameEvent.CountersRemoved change -> Just change
-      _ -> Nothing
+counterRemovalsOf gs =
+  let removal e = case e of
+        GameEvent.CountersRemoved change -> Just change
+        _ -> Nothing
+   in Maybe.mapMaybe removal (S.eventsOf gs)
 
 -- Barkhide Troll {G}{G} Creature -- Troll 2/2 (Oracle text checked against
 -- Scryfall): "This creature enters with a +1/+1 counter on it. {1}, Remove a
@@ -3746,19 +3746,18 @@ reversalBoard island ancientTomb manaLeak piker =
 -- declining fallback instead of passing.
 attemptLeak :: Bool -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
 attemptLeak taps decision tombId cast =
-  let ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
+  let answerer :: Prompt.Prompt r -> State.State Int r
+      answerer p = case p of
+        Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
+        Prompt.ChooseManaSource _ player candidates
+          | player == S.bob ->
+              pure (if taps && elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
+        Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
+          State.modify' (+ 1)
+          pure decision
+        _ -> pure (S.identityAnswer p)
+      ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
    in (after, asked)
-  where
-    answerer :: Prompt.Prompt r -> State.State Int r
-    answerer p = case p of
-      Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
-      Prompt.ChooseManaSource _ player candidates
-        | player == S.bob ->
-            pure (if taps && elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
-      Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
-        State.modify' (+ 1)
-        pure decision
-      _ -> pure (S.identityAnswer p)
 
 -- Mana Leak "Counter target spell unless its controller pays {3}", paid off an
 -- Ancient Tomb "{T}: Add {C}{C}. This land deals 2 damage to you."
@@ -3846,19 +3845,18 @@ shufflingReversalBoard island shufflingTomb manaLeak piker bottomCard topCard =
 -- any permutation of what was offered).
 attemptLeakShuffling :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
 attemptLeakShuffling decision tombId cast =
-  let ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
+  let answerer :: Prompt.Prompt r -> State.State Int r
+      answerer p = case p of
+        Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
+        Prompt.ChooseManaSource _ player candidates
+          | player == S.bob -> pure (if elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
+        Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
+          State.modify' (+ 1)
+          pure decision
+        Prompt.Shuffle ids -> pure (reverse ids)
+        _ -> pure (S.identityAnswer p)
+      ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
    in (after, asked)
-  where
-    answerer :: Prompt.Prompt r -> State.State Int r
-    answerer p = case p of
-      Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
-      Prompt.ChooseManaSource _ player candidates
-        | player == S.bob -> pure (if elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
-      Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
-        State.modify' (+ 1)
-        pure decision
-      Prompt.Shuffle ids -> pure (reverse ids)
-      _ -> pure (S.identityAnswer p)
 
 -- CR 733.1's last sentence at CR 118.12's moment: reversing bob's illegal
 -- payment does not undo the shuffle the mana ability he activated performed,

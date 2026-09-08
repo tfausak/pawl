@@ -77,67 +77,67 @@ type QuantityOf quantity = Maybe ObjectId -> Filter.View -> quantity -> Maybe In
 -- characteristic-defining ability and applied by
 -- Pawl.Engine.Quantity.determine.
 evaluate :: ViewOf -> QuantityOf quantity -> Filter.Context -> GameState -> Count.Type.Count quantity -> Maybe Integer
-evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
-  Scope.InZone (InZone.MkInZone zone ref) -> do
-    pids <- playersFor viewOf context gs ref
-    let ids = concatMap (\pid -> Game.zoneMembers zone pid gs) pids
-        kept = Maybe.mapMaybe (\oid -> fmap ((,) (Just oid)) (keep predicate context (viewOf oid))) ids
-    aggregate quantityOf aggregation kept
-  -- CR 608.2i: the event log. Views come from each event's stored snapshot
-  -- (CR 608.2h last-known information), never from a live object -- a token has
-  -- no printed card at all (CR 111.3) and an animated land died as a creature.
-  Scope.InHistory shape ->
-    let views = Maybe.mapMaybe (snapshotView gs shape . LoggedEvent.event) (Foldable.toList (GameState.events gs))
-        kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
-     in aggregate quantityOf aggregation kept
-  -- CR 102.1: the players themselves. Candidates come from the same
-  -- playersFor the zone arm indexes by, so CR 800.4a's departed seat is
-  -- uncountable here without a second reading of who is in the game -- and
-  -- unlike there, that IS observable: a departed player's zones were emptied,
-  -- so naming them cost nothing, while naming the player costs one.
-  --
-  -- Each candidate is seen through playerView below rather than through the
-  -- injected ViewOf, which answers about OBJECTS (CR 109.1) and has no id to
-  -- be asked with here. So the members are objectless, as InHistory's are, and
-  -- an Aggregation.Greatest over this scope folds a per-OBJECT quantity against
-  -- a player, which CR 208.1 and CR 202.3 give no answer to.
-  --
-  -- A per-PLAYER quantity DOES answer, and reaches the candidate through that
-  -- same view: it records the player's identity, and
-  -- Pawl.Types.PlayerRef.Candidate is what a card writes to read it -- Malignus'
-  -- "the highest life total among your opponents". So nothing here carries the
-  -- candidate beside the view: the view already names it.
-  Scope.OverPlayers ref -> do
-    pids <- playersFor viewOf context gs ref
-    -- The predicate is baked PER CANDIDATE (see bakePerspective): CR 110.2's
-    -- comparison is answered here, where the board is, and the match below is the
-    -- same pure one every other scope makes.
-    --
-    -- playerView rather than Filter.playerView is a REGRESSION FENCE on this road
-    -- and a proof on the other: routing the fold through the board-aware builder
-    -- leaves the suite green, no card spelling Filter.DealtDamageThisTurn under a
-    -- count over players -- Quantity.PlayersDealtDamageThisTurn is how a card asks
-    -- that (#1577). The target road, which Pawl.DamageSpec's Needle Drop case
-    -- covers, is what pays for the builder.
-    let kept = fmap ((,) Nothing) (Maybe.mapMaybe (\pid -> keep (bakePerspective viewOf context gs pid predicate) context (Just (playerView gs pid))) pids)
-    aggregate quantityOf aggregation kept
-  -- CR 400.7j: the objects one of the surrounding announcement's slots names,
-  -- wherever they wound up. The one scope whose candidates come from the
-  -- resolution's bindings rather than from the board, which is what lets it
-  -- follow a CR 614 redirect that moved them out of the zone the effect aimed
-  -- them at: Psychic Miasma's "if a land card is discarded this way" asked
-  -- under Rest in Peace.
-  --
-  -- Candidates are LIVE objects, so the injected ViewOf answers them exactly as
-  -- it answers the zone arm's -- and the two agree on any candidate they share,
-  -- since Filter.IsBound over a zone fold reaches the same ids.
-  Scope.OverBound slot ->
-    let ids = Set.toList (Map.findWithDefault Set.empty slot (Filter.slotObjects context))
-        kept = Maybe.mapMaybe (\oid -> if findableAfterMove gs oid then fmap ((,) (Just oid)) (keep predicate context (viewOf oid)) else Nothing) ids
-     in aggregate quantityOf aggregation kept
-  where
-    predicate = Count.Type.filter count
-    aggregation = Count.Type.aggregation count
+evaluate viewOf quantityOf context gs count =
+  let predicate = Count.Type.filter count
+      aggregation = Count.Type.aggregation count
+   in case Count.Type.scope count of
+        Scope.InZone (InZone.MkInZone zone ref) -> do
+          pids <- playersFor viewOf context gs ref
+          let ids = concatMap (\pid -> Game.zoneMembers zone pid gs) pids
+              kept = Maybe.mapMaybe (\oid -> fmap ((,) (Just oid)) (keep predicate context (viewOf oid))) ids
+          aggregate quantityOf aggregation kept
+        -- CR 608.2i: the event log. Views come from each event's stored snapshot
+        -- (CR 608.2h last-known information), never from a live object -- a token has
+        -- no printed card at all (CR 111.3) and an animated land died as a creature.
+        Scope.InHistory shape ->
+          let views = Maybe.mapMaybe (snapshotView gs shape . LoggedEvent.event) (Foldable.toList (GameState.events gs))
+              kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
+           in aggregate quantityOf aggregation kept
+        -- CR 102.1: the players themselves. Candidates come from the same
+        -- playersFor the zone arm indexes by, so CR 800.4a's departed seat is
+        -- uncountable here without a second reading of who is in the game -- and
+        -- unlike there, that IS observable: a departed player's zones were emptied,
+        -- so naming them cost nothing, while naming the player costs one.
+        --
+        -- Each candidate is seen through playerView below rather than through the
+        -- injected ViewOf, which answers about OBJECTS (CR 109.1) and has no id to
+        -- be asked with here. So the members are objectless, as InHistory's are, and
+        -- an Aggregation.Greatest over this scope folds a per-OBJECT quantity against
+        -- a player, which CR 208.1 and CR 202.3 give no answer to.
+        --
+        -- A per-PLAYER quantity DOES answer, and reaches the candidate through that
+        -- same view: it records the player's identity, and
+        -- Pawl.Types.PlayerRef.Candidate is what a card writes to read it -- Malignus'
+        -- "the highest life total among your opponents". So nothing here carries the
+        -- candidate beside the view: the view already names it.
+        Scope.OverPlayers ref -> do
+          pids <- playersFor viewOf context gs ref
+          -- The predicate is baked PER CANDIDATE (see bakePerspective): CR 110.2's
+          -- comparison is answered here, where the board is, and the match below is the
+          -- same pure one every other scope makes.
+          --
+          -- playerView rather than Filter.playerView is a REGRESSION FENCE on this road
+          -- and a proof on the other: routing the fold through the board-aware builder
+          -- leaves the suite green, no card spelling Filter.DealtDamageThisTurn under a
+          -- count over players -- Quantity.PlayersDealtDamageThisTurn is how a card asks
+          -- that (#1577). The target road, which Pawl.DamageSpec's Needle Drop case
+          -- covers, is what pays for the builder.
+          let kept = fmap ((,) Nothing) (Maybe.mapMaybe (\pid -> keep (bakePerspective viewOf context gs pid predicate) context (Just (playerView gs pid))) pids)
+          aggregate quantityOf aggregation kept
+        -- CR 400.7j: the objects one of the surrounding announcement's slots names,
+        -- wherever they wound up. The one scope whose candidates come from the
+        -- resolution's bindings rather than from the board, which is what lets it
+        -- follow a CR 614 redirect that moved them out of the zone the effect aimed
+        -- them at: Psychic Miasma's "if a land card is discarded this way" asked
+        -- under Rest in Peace.
+        --
+        -- Candidates are LIVE objects, so the injected ViewOf answers them exactly as
+        -- it answers the zone arm's -- and the two agree on any candidate they share,
+        -- since Filter.IsBound over a zone fold reaches the same ids.
+        Scope.OverBound slot ->
+          let ids = Set.toList (Map.findWithDefault Set.empty slot (Filter.slotObjects context))
+              kept = Maybe.mapMaybe (\oid -> if findableAfterMove gs oid then fmap ((,) (Just oid)) (keep predicate context (viewOf oid)) else Nothing) ids
+           in aggregate quantityOf aggregation kept
 
 -- CR 400.7j / CR 400.2: may a later part of the effect that moved this object
 -- FIND it? Where it landed in a public zone, which is what Game.isHiddenZone
@@ -262,146 +262,146 @@ playerView gs pid =
 -- be answered against the board has to fail to compile here rather than silently
 -- go unbaked and answer False.
 bakePerspective :: ViewOf -> Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> Filter.Type.Filter Keyword.Type.Keyword
-bakePerspective viewOf context gs candidate predicate = case predicate of
-  -- STRICTLY more, and False when no perspective frames the match (CR 109.5) --
-  -- the vacuous posture every player-referencing atom takes.
-  Filter.Type.ControlsMoreThanYou inner ->
-    let theirs = controlledMatching viewOf context gs inner candidate
-        yours = fmap (controlledMatching viewOf context gs inner) (Filter.perspective context)
-     in truth (maybe False (theirs >) yours)
-  -- CR 108.4 / 608.2h: is this candidate the player who controls the object the
-  -- slot names? Baked here for ControlsMoreThanYou's reason -- projecting a
-  -- controller is a question about the board -- and off the same view the fold
-  -- reads everything else through, which is what carries CR 608.2h in: the caller
-  -- that has already moved the object supplies a last-known-aware view, and
-  -- Pawl.Engine.Filter.View.controller then answers for a permanent that is gone.
-  --
-  -- False when the slot names no object or the view cannot describe it, the
-  -- vacuous posture above: an unanswerable atom admits no candidate rather than
-  -- admitting every one.
-  Filter.Type.IsControllerOfBound slot ->
-    truth (Just candidate == (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller))
-  -- CR 400.1 / 404.1: how big is THIS candidate's graveyard? Baked here for the
-  -- two atoms above's reason, one rule further out -- the question is about a
-  -- ZONE rather than about the candidate's characteristics, and
-  -- Pawl.Engine.Filter holds no game state to size one with.
-  --
-  -- OWNER-SLICED, which is right here where it is wrong for the battlefield
-  -- (see #161): rule 400.1 gives each player their own graveyard and CR 404.1 puts
-  -- an object on top of its OWNER's, so Game.zoneMembers asks exactly the rule's
-  -- question rather than approximating it, and the projected control
-  -- controlledMatching below reads has nothing to say about a card in a
-  -- graveyard. CR 608.2h fixes the moment: the answer is determined once, as the
-  -- effect is applied, which is when this fold runs.
-  Filter.Type.CardsInGraveyardAtLeast n ->
-    truth (toInteger (length (Game.zoneMembers Zone.Graveyard candidate gs)) >= toInteger n)
-  Filter.Type.And fs -> Filter.Type.And (fmap recur fs)
-  Filter.Type.Or fs -> Filter.Type.Or (fmap recur fs)
-  Filter.Type.Not f -> Filter.Type.Not (recur f)
-  Filter.Type.HasCardType _ -> predicate
-  Filter.Type.HasSupertype _ -> predicate
-  Filter.Type.HasColor _ -> predicate
-  Filter.Type.HasSubtype _ -> predicate
-  Filter.Type.HasName _ -> predicate
-  Filter.Type.HasNameOriginallyPrintedIn _ -> predicate
-  Filter.Type.HasKeyword _ -> predicate
-  Filter.Type.HasKeywordFamily _ -> predicate
-  Filter.Type.PowerAtLeast _ -> predicate
-  Filter.Type.PowerAtMost _ -> predicate
-  Filter.Type.ToughnessGreaterThanPower -> predicate
-  Filter.Type.PowerLessThanSource -> predicate
-  Filter.Type.PowerGreaterThanSource -> predicate
-  Filter.Type.PowerIsAmountInSlot _ -> predicate
-  Filter.Type.PowerAtLeastAmountInSlot _ -> predicate
-  Filter.Type.ManaValueAtMost _ -> predicate
-  Filter.Type.ManaValueIsEven -> predicate
-  Filter.Type.ManaValueAtMostAmount -> predicate
-  Filter.Type.ControlledBy _ -> predicate
-  Filter.Type.ControlledByDefendingPlayer -> predicate
-  Filter.Type.ControlledByBound _ -> predicate
-  Filter.Type.ControlledByPlayer _ -> predicate
-  Filter.Type.ControlledByRecipient -> predicate
-  Filter.Type.OwnedBy _ -> predicate
-  Filter.Type.IsSource -> predicate
-  Filter.Type.TargetsSource -> predicate
-  Filter.Type.TargetsOnlySource -> predicate
-  -- NOT descended into, for the reason AttachedTo below is not: `candidate` here
-  -- is a PLAYER, and CR 115.1 puts no player on the stack, so
-  -- Pawl.Engine.Filter answers this atom False for a player candidate whatever
-  -- the nest says and never evaluates it.
-  Filter.Type.TargetsOnlyOne _ -> predicate
-  Filter.Type.TargetsPlayer _ -> predicate
-  Filter.Type.IsBound _ -> predicate
-  Filter.Type.SameNameAsBound _ -> predicate
-  Filter.Type.SameControllerAsBound _ -> predicate
-  Filter.Type.HasChosenName -> predicate
-  Filter.Type.OfChosenPlayer -> predicate
-  Filter.Type.IsPlayer _ -> predicate
-  Filter.Type.IsAttacking -> predicate
-  -- Untouched for ControlledBy's reason: the relation is answered against the
-  -- perspective at Pawl.Engine.Filter.matches, which holds one.
-  Filter.Type.IsAttackingPlayer _ -> predicate
-  -- Untouched for the atom above's reason.
-  Filter.Type.IsAttackingPlaneswalker _ -> predicate
-  -- Untouched for the two atoms above's reason.
-  Filter.Type.IsAttackingBattle _ -> predicate
-  Filter.Type.DeclaredAttackedThisCombat -> predicate
-  Filter.Type.IsBlocking -> predicate
-  Filter.Type.IsBlocked -> predicate
-  Filter.Type.AttackedThisTurn -> predicate
-  Filter.Type.DeclaredAttackerThisCombat -> predicate
-  Filter.Type.DeclaredBlockerThisCombat -> predicate
-  Filter.Type.MilledThisTurn -> predicate
-  Filter.Type.DealtDamageThisTurn -> predicate
-  Filter.Type.ControlledSinceTurnBegan -> predicate
-  -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
-  -- call rather than an omission: `candidate` here is a PLAYER (the sole caller
-  -- folds this over playerView), and CR 303.4b makes a player enchanted by
-  -- an Aura rather than attached to one, so Pawl.Engine.Filter answers this atom
-  -- False for a player candidate whatever the nest says and never evaluates it.
-  -- Baking the nest against this candidate would bake a question about the HOST
-  -- against a player who is not it.
-  Filter.Type.AttachedTo _ -> predicate
-  -- CR 303.4b / 301.5a: something the nested Filter admits is attached TO this
-  -- PLAYER candidate. Baked here for CardsInGraveyardAtLeast's reason -- CR
-  -- 109.3 keeps attachment off the characteristics, so this is a board
-  -- question rather than one `viewOf` can answer -- and swept the same way
-  -- Pawl.Engine.Projection's attachedViews sweeps for an object: pawl stores
-  -- the attachment on the ATTACHED permanent, so there is nothing to index
-  -- from this side.
-  Filter.Type.HasAttached f ->
-    truth (any (\view -> Filter.matches context view f) (Maybe.mapMaybe viewOf (attachersOfPlayer gs candidate)))
-  Filter.Type.IsAttachedToSource -> predicate
-  Filter.Type.IsHostOfSource -> predicate
-  Filter.Type.CanHostSubject -> predicate
-  Filter.Type.CanAttachToSubject -> predicate
-  Filter.Type.IsCommander -> predicate
-  Filter.Type.IsToken -> predicate
-  Filter.Type.IsActivatedAbility -> predicate
-  Filter.Type.IsAbility -> predicate
-  Filter.Type.IsEmblem -> predicate
-  -- NOT descended into, RepresentedByCard's reason below: CR 113.7's subject is
-  -- an ability on the stack, which a player is not.
-  Filter.Type.FromSource _ -> predicate
-  Filter.Type.IsTapped -> predicate
-  Filter.Type.IsFaceDown -> predicate
-  -- NOT descended into, for AttachedTo's reason: CR 708.12's subject is the card
-  -- representing an OBJECT, so Pawl.Engine.Filter answers the atom False for a
-  -- player candidate whatever the nest says, and baking the nest here would bake
-  -- a question about that card against a player who is not one.
-  Filter.Type.RepresentedByCard _ -> predicate
-  Filter.Type.IsExiledFaceDown -> predicate
-  Filter.Type.Transformed -> predicate
-  Filter.Type.IsRingBearer -> predicate
-  Filter.Type.HasDesignation _ -> predicate
-  Filter.Type.HasCounters _ -> predicate
-  Filter.Type.HasCountersOfAnyKind -> predicate
-  Filter.Type.HasNonManaActivatedAbility -> predicate
-  Filter.Type.HasActivatedAbility -> predicate
-  Filter.Type.IsInZone _ -> predicate
-  Filter.Type.WasCastFrom _ -> predicate
-  where
-    recur = bakePerspective viewOf context gs candidate
+bakePerspective viewOf context gs candidate predicate =
+  let recur = bakePerspective viewOf context gs candidate
+   in case predicate of
+        -- STRICTLY more, and False when no perspective frames the match (CR 109.5) --
+        -- the vacuous posture every player-referencing atom takes.
+        Filter.Type.ControlsMoreThanYou inner ->
+          let theirs = controlledMatching viewOf context gs inner candidate
+              yours = fmap (controlledMatching viewOf context gs inner) (Filter.perspective context)
+           in truth (maybe False (theirs >) yours)
+        -- CR 108.4 / 608.2h: is this candidate the player who controls the object the
+        -- slot names? Baked here for ControlsMoreThanYou's reason -- projecting a
+        -- controller is a question about the board -- and off the same view the fold
+        -- reads everything else through, which is what carries CR 608.2h in: the caller
+        -- that has already moved the object supplies a last-known-aware view, and
+        -- Pawl.Engine.Filter.View.controller then answers for a permanent that is gone.
+        --
+        -- False when the slot names no object or the view cannot describe it, the
+        -- vacuous posture above: an unanswerable atom admits no candidate rather than
+        -- admitting every one.
+        Filter.Type.IsControllerOfBound slot ->
+          truth (Just candidate == (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller))
+        -- CR 400.1 / 404.1: how big is THIS candidate's graveyard? Baked here for the
+        -- two atoms above's reason, one rule further out -- the question is about a
+        -- ZONE rather than about the candidate's characteristics, and
+        -- Pawl.Engine.Filter holds no game state to size one with.
+        --
+        -- OWNER-SLICED, which is right here where it is wrong for the battlefield
+        -- (see #161): rule 400.1 gives each player their own graveyard and CR 404.1 puts
+        -- an object on top of its OWNER's, so Game.zoneMembers asks exactly the rule's
+        -- question rather than approximating it, and the projected control
+        -- controlledMatching below reads has nothing to say about a card in a
+        -- graveyard. CR 608.2h fixes the moment: the answer is determined once, as the
+        -- effect is applied, which is when this fold runs.
+        Filter.Type.CardsInGraveyardAtLeast n ->
+          truth (toInteger (length (Game.zoneMembers Zone.Graveyard candidate gs)) >= toInteger n)
+        Filter.Type.And fs -> Filter.Type.And (fmap recur fs)
+        Filter.Type.Or fs -> Filter.Type.Or (fmap recur fs)
+        Filter.Type.Not f -> Filter.Type.Not (recur f)
+        Filter.Type.HasCardType _ -> predicate
+        Filter.Type.HasSupertype _ -> predicate
+        Filter.Type.HasColor _ -> predicate
+        Filter.Type.HasSubtype _ -> predicate
+        Filter.Type.HasName _ -> predicate
+        Filter.Type.HasNameOriginallyPrintedIn _ -> predicate
+        Filter.Type.HasKeyword _ -> predicate
+        Filter.Type.HasKeywordFamily _ -> predicate
+        Filter.Type.PowerAtLeast _ -> predicate
+        Filter.Type.PowerAtMost _ -> predicate
+        Filter.Type.ToughnessGreaterThanPower -> predicate
+        Filter.Type.PowerLessThanSource -> predicate
+        Filter.Type.PowerGreaterThanSource -> predicate
+        Filter.Type.PowerIsAmountInSlot _ -> predicate
+        Filter.Type.PowerAtLeastAmountInSlot _ -> predicate
+        Filter.Type.ManaValueAtMost _ -> predicate
+        Filter.Type.ManaValueIsEven -> predicate
+        Filter.Type.ManaValueAtMostAmount -> predicate
+        Filter.Type.ControlledBy _ -> predicate
+        Filter.Type.ControlledByDefendingPlayer -> predicate
+        Filter.Type.ControlledByBound _ -> predicate
+        Filter.Type.ControlledByPlayer _ -> predicate
+        Filter.Type.ControlledByRecipient -> predicate
+        Filter.Type.OwnedBy _ -> predicate
+        Filter.Type.IsSource -> predicate
+        Filter.Type.TargetsSource -> predicate
+        Filter.Type.TargetsOnlySource -> predicate
+        -- NOT descended into, for the reason AttachedTo below is not: `candidate` here
+        -- is a PLAYER, and CR 115.1 puts no player on the stack, so
+        -- Pawl.Engine.Filter answers this atom False for a player candidate whatever
+        -- the nest says and never evaluates it.
+        Filter.Type.TargetsOnlyOne _ -> predicate
+        Filter.Type.TargetsPlayer _ -> predicate
+        Filter.Type.IsBound _ -> predicate
+        Filter.Type.SameNameAsBound _ -> predicate
+        Filter.Type.SameControllerAsBound _ -> predicate
+        Filter.Type.HasChosenName -> predicate
+        Filter.Type.OfChosenPlayer -> predicate
+        Filter.Type.IsPlayer _ -> predicate
+        Filter.Type.IsAttacking -> predicate
+        -- Untouched for ControlledBy's reason: the relation is answered against the
+        -- perspective at Pawl.Engine.Filter.matches, which holds one.
+        Filter.Type.IsAttackingPlayer _ -> predicate
+        -- Untouched for the atom above's reason.
+        Filter.Type.IsAttackingPlaneswalker _ -> predicate
+        -- Untouched for the two atoms above's reason.
+        Filter.Type.IsAttackingBattle _ -> predicate
+        Filter.Type.DeclaredAttackedThisCombat -> predicate
+        Filter.Type.IsBlocking -> predicate
+        Filter.Type.IsBlocked -> predicate
+        Filter.Type.AttackedThisTurn -> predicate
+        Filter.Type.DeclaredAttackerThisCombat -> predicate
+        Filter.Type.DeclaredBlockerThisCombat -> predicate
+        Filter.Type.MilledThisTurn -> predicate
+        Filter.Type.DealtDamageThisTurn -> predicate
+        Filter.Type.ControlledSinceTurnBegan -> predicate
+        -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
+        -- call rather than an omission: `candidate` here is a PLAYER (the sole caller
+        -- folds this over playerView), and CR 303.4b makes a player enchanted by
+        -- an Aura rather than attached to one, so Pawl.Engine.Filter answers this atom
+        -- False for a player candidate whatever the nest says and never evaluates it.
+        -- Baking the nest against this candidate would bake a question about the HOST
+        -- against a player who is not it.
+        Filter.Type.AttachedTo _ -> predicate
+        -- CR 303.4b / 301.5a: something the nested Filter admits is attached TO this
+        -- PLAYER candidate. Baked here for CardsInGraveyardAtLeast's reason -- CR
+        -- 109.3 keeps attachment off the characteristics, so this is a board
+        -- question rather than one `viewOf` can answer -- and swept the same way
+        -- Pawl.Engine.Projection's attachedViews sweeps for an object: pawl stores
+        -- the attachment on the ATTACHED permanent, so there is nothing to index
+        -- from this side.
+        Filter.Type.HasAttached f ->
+          truth (any (\view -> Filter.matches context view f) (Maybe.mapMaybe viewOf (attachersOfPlayer gs candidate)))
+        Filter.Type.IsAttachedToSource -> predicate
+        Filter.Type.IsHostOfSource -> predicate
+        Filter.Type.CanHostSubject -> predicate
+        Filter.Type.CanAttachToSubject -> predicate
+        Filter.Type.IsCommander -> predicate
+        Filter.Type.IsToken -> predicate
+        Filter.Type.IsActivatedAbility -> predicate
+        Filter.Type.IsAbility -> predicate
+        Filter.Type.IsEmblem -> predicate
+        -- NOT descended into, RepresentedByCard's reason below: CR 113.7's subject is
+        -- an ability on the stack, which a player is not.
+        Filter.Type.FromSource _ -> predicate
+        Filter.Type.IsTapped -> predicate
+        Filter.Type.IsFaceDown -> predicate
+        -- NOT descended into, for AttachedTo's reason: CR 708.12's subject is the card
+        -- representing an OBJECT, so Pawl.Engine.Filter answers the atom False for a
+        -- player candidate whatever the nest says, and baking the nest here would bake
+        -- a question about that card against a player who is not one.
+        Filter.Type.RepresentedByCard _ -> predicate
+        Filter.Type.IsExiledFaceDown -> predicate
+        Filter.Type.Transformed -> predicate
+        Filter.Type.IsRingBearer -> predicate
+        Filter.Type.HasDesignation _ -> predicate
+        Filter.Type.HasCounters _ -> predicate
+        Filter.Type.HasCountersOfAnyKind -> predicate
+        Filter.Type.HasNonManaActivatedAbility -> predicate
+        Filter.Type.HasActivatedAbility -> predicate
+        Filter.Type.IsInZone _ -> predicate
+        Filter.Type.WasCastFrom _ -> predicate
 
 -- A baked answer as a Filter. `And []` is the trivial predicate by
 -- Pawl.Types.Filter's own note, so its negation is the trivially false one --

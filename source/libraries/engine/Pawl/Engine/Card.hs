@@ -295,36 +295,36 @@ combinedFaces card = case Card.layout card of
 -- of the frame is one set of characteristics. docs/design.md section 2.11's rule
 -- against baking arity in is what makes this a `tail` rather than a pair.
 flippedFace :: Card.Card -> Maybe (Face.Face Card.Card)
-flippedFace card = case Card.layout card of
-  Layout.Normal -> Nothing
-  Layout.Split -> Nothing
-  Layout.Room -> Nothing
-  Layout.Flip -> case NonEmpty.tail (Card.faces card) of
-    [] -> Nothing
-    alternative : _ ->
-      Just
-        alternative
-          { -- CR 710.1c, first half: the mana cost is the normal half's, and CR
-            -- 202.3 derives the mana value from it wherever it is read.
-            Face.manaCost = Face.manaCost normal,
-            -- CR 710.1c, second half: the colour does not change either, and CR
-            -- 202.2 with CR 204.2 makes it exactly the mana cost above plus this
-            -- indicator. No printed flip card has one; taking the normal half's
-            -- is what makes the rule true rather than the pool.
-            Face.colorIndicator = Face.colorIndicator normal
-          }
-  Layout.Adventure -> Nothing
-  Layout.Omen -> Nothing
-  -- CR 710.1's flip frame and CR 722.1's inset frame are different printings
-  -- of different rules: a preparation card's alternative characteristics are
-  -- a SPELL's (CR 722.2), never a permanent's, so no status of the permanent
-  -- reaches them.
-  Layout.Preparation -> Nothing
-  Layout.Transforming -> Nothing
-  Layout.ModalDoubleFaced -> Nothing
-  Layout.Meld -> Nothing
-  where
-    normal = NonEmpty.head (Card.faces card)
+flippedFace card =
+  let normal = NonEmpty.head (Card.faces card)
+   in case Card.layout card of
+        Layout.Normal -> Nothing
+        Layout.Split -> Nothing
+        Layout.Room -> Nothing
+        Layout.Flip -> case NonEmpty.tail (Card.faces card) of
+          [] -> Nothing
+          alternative : _ ->
+            Just
+              alternative
+                { -- CR 710.1c, first half: the mana cost is the normal half's, and CR
+                  -- 202.3 derives the mana value from it wherever it is read.
+                  Face.manaCost = Face.manaCost normal,
+                  -- CR 710.1c, second half: the colour does not change either, and CR
+                  -- 202.2 with CR 204.2 makes it exactly the mana cost above plus this
+                  -- indicator. No printed flip card has one; taking the normal half's
+                  -- is what makes the rule true rather than the pool.
+                  Face.colorIndicator = Face.colorIndicator normal
+                }
+        Layout.Adventure -> Nothing
+        Layout.Omen -> Nothing
+        -- CR 710.1's flip frame and CR 722.1's inset frame are different printings
+        -- of different rules: a preparation card's alternative characteristics are
+        -- a SPELL's (CR 722.2), never a permanent's, so no status of the permanent
+        -- reaches them.
+        Layout.Preparation -> Nothing
+        Layout.Transforming -> Nothing
+        Layout.ModalDoubleFaced -> Nothing
+        Layout.Meld -> Nothing
 
 -- CR 722.2a's PREPARE SPELL: the inset frame of a preparation card, whose text
 -- "defines alternative characteristics that the object may have while it's a
@@ -375,195 +375,194 @@ foldSplit faces = List.foldl' merge2 (NonEmpty.head faces) (NonEmpty.tail faces)
 
 merge2 :: Face.Face Card.Card -> Face.Face Card.Card -> Face.Face Card.Card
 merge2 l r =
-  l
-    { -- CR 709.4a gives the card BOTH names and no joined one, and a single
-      -- CardName cannot carry that: this field is a RENDERING of the two, in
-      -- the form docs/rules.txt's own Examples write, unspaced -- "Fire//Ice"
-      -- (lines 3882, 5747) and "Assault//Battery" (line 5746). What the object
-      -- has for rules purposes is combinedNames above, which every name
-      -- question goes through (Pawl.Engine.Projection.hasName).
-      Face.name = CardName.join (Face.name l NonEmpty.:| [Face.name r]),
-      -- CR 709.4b: "the combined mana costs of its two halves", from which
-      -- colours and mana value fall out with no further arm.
-      Face.manaCost = concatCosts (Face.manaCost l) (Face.manaCost r),
-      -- CR 709.4c: "each card type specified on either of its halves" -- see
-      -- unionTypeLines for where the other two sets of the type line come from.
-      Face.typeLine = unionTypeLines (Face.typeLine l) (Face.typeLine r),
-      -- CR 709.4c again: a keyword is the NAME of an ability the object has (CR
-      -- 702.1), so "each ability in the text box of each half" is what unions
-      -- these.
-      Face.keywords = Set.union (Face.keywords l) (Face.keywords r),
-      -- CR 709.4: the colour indicator is a characteristic (CR 109.3), and no
-      -- subrule narrows it the way 709.4b narrows the mana cost.
-      Face.colorIndicator = Set.union (Face.colorIndicator l) (Face.colorIndicator r),
-      -- CR 709.4c: "each ability in the text box of each half".
-      Face.staticAbilities = Face.staticAbilities l <> Face.staticAbilities r,
-      Face.activatedAbilities = Face.activatedAbilities l <> Face.activatedAbilities r,
-      Face.replacementEffects = Face.replacementEffects l <> Face.replacementEffects r,
-      Face.triggeredAbilities = Face.triggeredAbilities l <> Face.triggeredAbilities r,
-      -- Left-biased: two halves that arm a delayed ability under the same
-      -- AbilityName do not both survive here, and the right half's is the one
-      -- lost (#652). Reachable since fuse landed -- a fused split spell resolves
-      -- off this view (CR 702.102b), where before it was combined-view-only and
-      -- CR 709.3b kept every resolution on one half.
-      Face.delayedAbilities = Map.union (Face.delayedAbilities l) (Face.delayedAbilities r),
-      -- Unreachable rather than merged: CR 709.4's combined view is a Room's, and
-      -- CR 309.2c keeps a dungeon card out of every zone but the command zone, so
-      -- no card has both halves and rooms. Concatenating would be wrong if one ever
-      -- did -- a RoomIndex counts within one face, so the right half's arrows would
-      -- point into the left half's rooms -- but with one side always empty this
-      -- picks whichever side has them.
-      Face.rooms = Face.rooms l <> Face.rooms r,
-      -- Unreachable for the same reason and settled the same way: a dungeon card
-      -- has no halves, so at most one side carries this. The LEFT half wins where
-      -- both somehow do, which is what a record update would have done silently.
-      Face.dungeonEntryQuality = Face.dungeonEntryQuality l <|> Face.dungeonEntryQuality r,
-      Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
-      Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
-      Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
-      Face.alternativeCosts = Face.alternativeCosts l <> Face.alternativeCosts r,
-      -- CR 709.4c again: a cost reduction a half prints about itself is an
-      -- ability in that half's text box, so the combined view has both, and CR
-      -- 702.102b gives a fused split spell the same pair. Exercised since fuse
-      -- landed: Pawl.Engine.Cost.selfReductions reads this list off the face a
-      -- proposal stamped, which for a fused cast is `fusedFace` below. Written
-      -- before there was any such cast for its neighbours' reason -- a record
-      -- UPDATE would otherwise keep the left half's silently.
-      Face.costReductions = Face.costReductions l <> Face.costReductions r,
-      Face.playerAbilities = Face.playerAbilities l <> Face.playerAbilities r,
-      Face.blockRequirements = Face.blockRequirements l <> Face.blockRequirements r,
-      Face.blockPermissions = Face.blockPermissions l <> Face.blockPermissions r,
-      Face.attackRequirements = Face.attackRequirements l <> Face.attackRequirements r,
-      Face.combatRestrictions = Face.combatRestrictions l <> Face.combatRestrictions r,
-      Face.sacrificeRestrictions = Face.sacrificeRestrictions l <> Face.sacrificeRestrictions r,
-      Face.untapRestrictions = Face.untapRestrictions l <> Face.untapRestrictions r,
-      Face.attachRestrictions = Face.attachRestrictions l <> Face.attachRestrictions r,
-      Face.counterRestrictions = Face.counterRestrictions l <> Face.counterRestrictions r,
-      Face.activationProhibitions = Face.activationProhibitions l <> Face.activationProhibitions r,
-      Face.entryRestrictions = Face.entryRestrictions l <> Face.entryRestrictions r,
-      Face.attackCosts = Face.attackCosts l <> Face.attackCosts r,
-      Face.blockCosts = Face.blockCosts l <> Face.blockCosts r,
-      Face.mulliganActions = Face.mulliganActions l <> Face.mulliganActions r,
-      Face.openingHandActions = Face.openingHandActions l <> Face.openingHandActions r,
-      -- CR 709.4c: "each ability in the text box of each half", so a permission
-      -- printed on either half survives into the combined view. No printed split
-      -- card grants a CR 116.2 special action; the line is here for the reason
-      -- its neighbours are -- a record UPDATE would otherwise keep the left
-      -- half's silently.
-      Face.specialActions = Face.specialActions l <> Face.specialActions r,
-      -- CR 709.4c again, and CR 702.5a: an enchant ability IS an ability in a
-      -- half's text box, so both halves' survive here -- and CR 702.5c says what
-      -- a combined view carrying two of them means, which is
-      -- Card.enchantTargetSlot's conjunction. Concatenated rather than
-      -- left-biased for that reason, unlike the printed boxes below.
-      Face.enchant = Face.enchant l <> Face.enchant r,
-      -- The half that prints the box. Where exactly ONE does, this is CR 709.4
-      -- read rather than guessed: "the characteristics of a split card are those
-      -- of its two halves combined", so the combined view has the power the one
-      -- half has, exactly as CR 709.4c's card types and abilities are had. That
-      -- is the case Pawl.CardSpec's SplitBox group proves, over synthetic split
-      -- cards carrying each box on the RIGHT half alone -- a record update over
-      -- `l` answers Nothing there, and the permanent is a 0/0, a planeswalker
-      -- with no loyalty counters or a battle with no defense counters.
-      --
-      -- Where BOTH halves print one, no rule answers and the left bias below is
-      -- arbitrary rather than wrong. CR 709.4's three worked readings of
-      -- "combined" -- 709.4a's two names, 709.4b's concatenated mana cost,
-      -- 709.4c's card types and abilities -- each give the combined object what
-      -- both halves have AT ONCE, and none of them picks a half. A printed box
-      -- cannot be had twice: CR 208.1 gives a creature one power, CR 208.5 speaks
-      -- of a creature having "no value for its power" and never of two, and CR
-      -- 613.4 has one number to work on. SUMMING was the alternative, generalising
-      -- the mana value that falls out of CR 709.4b -- rejected because 709.4b adds
-      -- symbol LISTS and states no arithmetic over numbers, and because addition
-      -- is not idempotent: a characteristic printed once and belonging to both
-      -- halves, which is exactly what CR 709.5a's shared type line is, survives
-      -- unionTypeLines and would be doubled here.
-      --
-      -- The power and toughness boxes are picked by definedBox rather than by
-      -- firstJust, because CR 709.4c reaches THEM through the ability that
-      -- defines them: the half whose characteristic-defining ability covers a box
-      -- takes that box, and only where neither half's does is the left bias above
-      -- what settles it. See characteristicPT below.
-      Face.power = fmap Power.MkPower (fst powerBox),
-      Face.toughness = fmap Toughness.MkToughness (fst toughnessBox),
-      Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
-      Face.defense = firstJust (Face.defense l) (Face.defense r),
-      -- The same left bias, and vacuous today: CR 313.2 keeps a vanguard card in
-      -- the command zone, so no vanguard has ever been printed with two faces
-      -- for this to combine.
-      Face.vanguard = firstJust (Face.vanguard l) (Face.vanguard r),
-      -- CR 709.4c reaches this one where it does not reach the four above: a
-      -- characteristic-defining ability IS "an ability in the text box" (CR
-      -- 604.3), so the combined view has BOTH halves' -- one per box, which is
-      -- the shape CR 208.2a's "[This creature's] [power or toughness] is equal
-      -- to . . ." template prints. Two halves defining DISJOINT boxes (*/2 //
-      -- 2/*) is the case the rules settle whole: each ability defines a box the
-      -- other says nothing about, so there is nothing for CR 613.4a to order.
-      -- Pawl.CardSpec's SplitBox group proves it on Synthetic Twinned Colossus //
-      -- Synthetic Twinned Titan.
-      --
-      -- Two halves defining the SAME box is left-biased, and no rule says
-      -- otherwise: CR 613.4a applies both in layer 7a in timestamp order and CR
-      -- 613.7a gives each the timestamp of the object it is on, so the two are
-      -- tied. CR 613.8's dependency system does not break the tie -- clause (c)
-      -- of CR 613.8a does admit a pair of characteristic-defining abilities, but
-      -- neither of a pair like this changes what the other does (clause (b)), and
-      -- CR 613.8b's fallback is timestamp order again. Nothing is asked of a
-      -- player either, since CR 613 hands nobody a choice of order, so the bias
-      -- is where the rules run out, as it is for the printed boxes above.
-      Face.characteristicPT = case (snd powerBox, snd toughnessBox) of
-        (Nothing, Nothing) -> Nothing
-        -- CR 208.2's star stands in where one box has no ability behind it: the
-        -- seed substitutes it into that box and leaves the box as it found it,
-        -- number or star (Pawl.Engine.Projection.View.seedCharacteristicPT).
-        (p, t) -> Just CharacteristicPT.MkCharacteristicPT {CharacteristicPT.power = Maybe.fromMaybe Quantity.Star p, CharacteristicPT.toughness = Maybe.fromMaybe Quantity.Star t},
-      -- CR 709.4c: a sentence bounding X is an ability in a half's text box, so
-      -- the combined view has BOTH halves', and CR 702.102b hands the pair to a
-      -- fused split spell. Concatenated rather than left-biased for that reason,
-      -- unlike the printed boxes above: CR 101.2 makes each "can't" bind, so
-      -- Pawl.Engine.Cost.maximumX takes the least of them, which is the ceiling a
-      -- fused cast is priced against. Reachable since fuse landed,
-      -- Face.costReductions' reason.
-      Face.maximumX = Face.maximumX l <> Face.maximumX r,
-      -- CR 709.4c once more: "this spell can't be countered" is an ability in a
-      -- half's text box (CR 113.6g puts it on the stack), so the combined view has
-      -- it if EITHER half prints it -- and CR 702.102b hands that to a fused split
-      -- spell, which is the cast that made this line matter. A record update kept
-      -- the left half's silently until fuse landed, and CR 709.3b made that
-      -- harmless: the half on the stack was the half whose clause was read
-      -- (Pawl.Engine.Event.counterOne, through Game.faceOf).
-      --
-      -- A DISJUNCTION and not `firstJust`, because this is a permission-shaped
-      -- field with a default rather than a printed box: Counterable is what a face
-      -- printing nothing carries (Pawl.Codec.Face defaults it), so "the first half
-      -- that has one" would read a silent default as an answer and drop a right
-      -- half's clause.
-      --
-      -- Nothing proves the gameplay path: no printing pairs fuse with a
-      -- can't-be-countered clause -- Scryfall `keyword:fuse o:"can't be
-      -- countered"`, 2026-09-01, no hit -- so what the suite
-      -- holds is the FOLD, in Pawl.CardSpec's "CR 709.4 a split card's
-      -- characteristics are its two halves combined", where only the right half
-      -- carries the clause. The reader beyond it is one line already driven for
-      -- every ordinary spell.
-      Face.counterability =
-        if Face.counterability l == Counterability.CantBeCountered || Face.counterability r == Counterability.CantBeCountered
-          then Counterability.CantBeCountered
-          else Counterability.Counterable
+  let powerBox = definedBox l r (fmap Power.unwrap . Face.power) CharacteristicPT.power
+      toughnessBox = definedBox l r (fmap Toughness.unwrap . Face.toughness) CharacteristicPT.toughness
+   in l
+        { -- CR 709.4a gives the card BOTH names and no joined one, and a single
+          -- CardName cannot carry that: this field is a RENDERING of the two, in
+          -- the form docs/rules.txt's own Examples write, unspaced -- "Fire//Ice"
+          -- (lines 3882, 5747) and "Assault//Battery" (line 5746). What the object
+          -- has for rules purposes is combinedNames above, which every name
+          -- question goes through (Pawl.Engine.Projection.hasName).
+          Face.name = CardName.join (Face.name l NonEmpty.:| [Face.name r]),
+          -- CR 709.4b: "the combined mana costs of its two halves", from which
+          -- colours and mana value fall out with no further arm.
+          Face.manaCost = concatCosts (Face.manaCost l) (Face.manaCost r),
+          -- CR 709.4c: "each card type specified on either of its halves" -- see
+          -- unionTypeLines for where the other two sets of the type line come from.
+          Face.typeLine = unionTypeLines (Face.typeLine l) (Face.typeLine r),
+          -- CR 709.4c again: a keyword is the NAME of an ability the object has (CR
+          -- 702.1), so "each ability in the text box of each half" is what unions
+          -- these.
+          Face.keywords = Set.union (Face.keywords l) (Face.keywords r),
+          -- CR 709.4: the colour indicator is a characteristic (CR 109.3), and no
+          -- subrule narrows it the way 709.4b narrows the mana cost.
+          Face.colorIndicator = Set.union (Face.colorIndicator l) (Face.colorIndicator r),
+          -- CR 709.4c: "each ability in the text box of each half".
+          Face.staticAbilities = Face.staticAbilities l <> Face.staticAbilities r,
+          Face.activatedAbilities = Face.activatedAbilities l <> Face.activatedAbilities r,
+          Face.replacementEffects = Face.replacementEffects l <> Face.replacementEffects r,
+          Face.triggeredAbilities = Face.triggeredAbilities l <> Face.triggeredAbilities r,
+          -- Left-biased: two halves that arm a delayed ability under the same
+          -- AbilityName do not both survive here, and the right half's is the one
+          -- lost (#652). Reachable since fuse landed -- a fused split spell resolves
+          -- off this view (CR 702.102b), where before it was combined-view-only and
+          -- CR 709.3b kept every resolution on one half.
+          Face.delayedAbilities = Map.union (Face.delayedAbilities l) (Face.delayedAbilities r),
+          -- Unreachable rather than merged: CR 709.4's combined view is a Room's, and
+          -- CR 309.2c keeps a dungeon card out of every zone but the command zone, so
+          -- no card has both halves and rooms. Concatenating would be wrong if one ever
+          -- did -- a RoomIndex counts within one face, so the right half's arrows would
+          -- point into the left half's rooms -- but with one side always empty this
+          -- picks whichever side has them.
+          Face.rooms = Face.rooms l <> Face.rooms r,
+          -- Unreachable for the same reason and settled the same way: a dungeon card
+          -- has no halves, so at most one side carries this. The LEFT half wins where
+          -- both somehow do, which is what a record update would have done silently.
+          Face.dungeonEntryQuality = Face.dungeonEntryQuality l <|> Face.dungeonEntryQuality r,
+          Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
+          Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
+          Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
+          Face.alternativeCosts = Face.alternativeCosts l <> Face.alternativeCosts r,
+          -- CR 709.4c again: a cost reduction a half prints about itself is an
+          -- ability in that half's text box, so the combined view has both, and CR
+          -- 702.102b gives a fused split spell the same pair. Exercised since fuse
+          -- landed: Pawl.Engine.Cost.selfReductions reads this list off the face a
+          -- proposal stamped, which for a fused cast is `fusedFace` below. Written
+          -- before there was any such cast for its neighbours' reason -- a record
+          -- UPDATE would otherwise keep the left half's silently.
+          Face.costReductions = Face.costReductions l <> Face.costReductions r,
+          Face.playerAbilities = Face.playerAbilities l <> Face.playerAbilities r,
+          Face.blockRequirements = Face.blockRequirements l <> Face.blockRequirements r,
+          Face.blockPermissions = Face.blockPermissions l <> Face.blockPermissions r,
+          Face.attackRequirements = Face.attackRequirements l <> Face.attackRequirements r,
+          Face.combatRestrictions = Face.combatRestrictions l <> Face.combatRestrictions r,
+          Face.sacrificeRestrictions = Face.sacrificeRestrictions l <> Face.sacrificeRestrictions r,
+          Face.untapRestrictions = Face.untapRestrictions l <> Face.untapRestrictions r,
+          Face.attachRestrictions = Face.attachRestrictions l <> Face.attachRestrictions r,
+          Face.counterRestrictions = Face.counterRestrictions l <> Face.counterRestrictions r,
+          Face.activationProhibitions = Face.activationProhibitions l <> Face.activationProhibitions r,
+          Face.entryRestrictions = Face.entryRestrictions l <> Face.entryRestrictions r,
+          Face.attackCosts = Face.attackCosts l <> Face.attackCosts r,
+          Face.blockCosts = Face.blockCosts l <> Face.blockCosts r,
+          Face.mulliganActions = Face.mulliganActions l <> Face.mulliganActions r,
+          Face.openingHandActions = Face.openingHandActions l <> Face.openingHandActions r,
+          -- CR 709.4c: "each ability in the text box of each half", so a permission
+          -- printed on either half survives into the combined view. No printed split
+          -- card grants a CR 116.2 special action; the line is here for the reason
+          -- its neighbours are -- a record UPDATE would otherwise keep the left
+          -- half's silently.
+          Face.specialActions = Face.specialActions l <> Face.specialActions r,
+          -- CR 709.4c again, and CR 702.5a: an enchant ability IS an ability in a
+          -- half's text box, so both halves' survive here -- and CR 702.5c says what
+          -- a combined view carrying two of them means, which is
+          -- Card.enchantTargetSlot's conjunction. Concatenated rather than
+          -- left-biased for that reason, unlike the printed boxes below.
+          Face.enchant = Face.enchant l <> Face.enchant r,
+          -- The half that prints the box. Where exactly ONE does, this is CR 709.4
+          -- read rather than guessed: "the characteristics of a split card are those
+          -- of its two halves combined", so the combined view has the power the one
+          -- half has, exactly as CR 709.4c's card types and abilities are had. That
+          -- is the case Pawl.CardSpec's SplitBox group proves, over synthetic split
+          -- cards carrying each box on the RIGHT half alone -- a record update over
+          -- `l` answers Nothing there, and the permanent is a 0/0, a planeswalker
+          -- with no loyalty counters or a battle with no defense counters.
           --
-          -- Face.spell is deliberately NOT merged either: it stays the left half's,
-          -- and nothing casts it. CR 709.3b means the thing on the stack is ONE half
-          -- for every cast this view is asked about -- castableFaces below is what
-          -- such a cast reads -- so the combined view is never the payload that
-          -- resolves. The one printing that puts BOTH halves on the stack is CR
-          -- 702.102's fuse, and it does not merge them here: `fusedFace` below builds
-          -- that payload over this view, so a fused spell reads rule 702.102d's
-          -- ordering and every other reader of `combined` is untouched.
-    }
-  where
-    powerBox = definedBox l r (fmap Power.unwrap . Face.power) CharacteristicPT.power
-    toughnessBox = definedBox l r (fmap Toughness.unwrap . Face.toughness) CharacteristicPT.toughness
+          -- Where BOTH halves print one, no rule answers and the left bias below is
+          -- arbitrary rather than wrong. CR 709.4's three worked readings of
+          -- "combined" -- 709.4a's two names, 709.4b's concatenated mana cost,
+          -- 709.4c's card types and abilities -- each give the combined object what
+          -- both halves have AT ONCE, and none of them picks a half. A printed box
+          -- cannot be had twice: CR 208.1 gives a creature one power, CR 208.5 speaks
+          -- of a creature having "no value for its power" and never of two, and CR
+          -- 613.4 has one number to work on. SUMMING was the alternative, generalising
+          -- the mana value that falls out of CR 709.4b -- rejected because 709.4b adds
+          -- symbol LISTS and states no arithmetic over numbers, and because addition
+          -- is not idempotent: a characteristic printed once and belonging to both
+          -- halves, which is exactly what CR 709.5a's shared type line is, survives
+          -- unionTypeLines and would be doubled here.
+          --
+          -- The power and toughness boxes are picked by definedBox rather than by
+          -- firstJust, because CR 709.4c reaches THEM through the ability that
+          -- defines them: the half whose characteristic-defining ability covers a box
+          -- takes that box, and only where neither half's does is the left bias above
+          -- what settles it. See characteristicPT below.
+          Face.power = fmap Power.MkPower (fst powerBox),
+          Face.toughness = fmap Toughness.MkToughness (fst toughnessBox),
+          Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
+          Face.defense = firstJust (Face.defense l) (Face.defense r),
+          -- The same left bias, and vacuous today: CR 313.2 keeps a vanguard card in
+          -- the command zone, so no vanguard has ever been printed with two faces
+          -- for this to combine.
+          Face.vanguard = firstJust (Face.vanguard l) (Face.vanguard r),
+          -- CR 709.4c reaches this one where it does not reach the four above: a
+          -- characteristic-defining ability IS "an ability in the text box" (CR
+          -- 604.3), so the combined view has BOTH halves' -- one per box, which is
+          -- the shape CR 208.2a's "[This creature's] [power or toughness] is equal
+          -- to . . ." template prints. Two halves defining DISJOINT boxes (*/2 //
+          -- 2/*) is the case the rules settle whole: each ability defines a box the
+          -- other says nothing about, so there is nothing for CR 613.4a to order.
+          -- Pawl.CardSpec's SplitBox group proves it on Synthetic Twinned Colossus //
+          -- Synthetic Twinned Titan.
+          --
+          -- Two halves defining the SAME box is left-biased, and no rule says
+          -- otherwise: CR 613.4a applies both in layer 7a in timestamp order and CR
+          -- 613.7a gives each the timestamp of the object it is on, so the two are
+          -- tied. CR 613.8's dependency system does not break the tie -- clause (c)
+          -- of CR 613.8a does admit a pair of characteristic-defining abilities, but
+          -- neither of a pair like this changes what the other does (clause (b)), and
+          -- CR 613.8b's fallback is timestamp order again. Nothing is asked of a
+          -- player either, since CR 613 hands nobody a choice of order, so the bias
+          -- is where the rules run out, as it is for the printed boxes above.
+          Face.characteristicPT = case (snd powerBox, snd toughnessBox) of
+            (Nothing, Nothing) -> Nothing
+            -- CR 208.2's star stands in where one box has no ability behind it: the
+            -- seed substitutes it into that box and leaves the box as it found it,
+            -- number or star (Pawl.Engine.Projection.View.seedCharacteristicPT).
+            (p, t) -> Just CharacteristicPT.MkCharacteristicPT {CharacteristicPT.power = Maybe.fromMaybe Quantity.Star p, CharacteristicPT.toughness = Maybe.fromMaybe Quantity.Star t},
+          -- CR 709.4c: a sentence bounding X is an ability in a half's text box, so
+          -- the combined view has BOTH halves', and CR 702.102b hands the pair to a
+          -- fused split spell. Concatenated rather than left-biased for that reason,
+          -- unlike the printed boxes above: CR 101.2 makes each "can't" bind, so
+          -- Pawl.Engine.Cost.maximumX takes the least of them, which is the ceiling a
+          -- fused cast is priced against. Reachable since fuse landed,
+          -- Face.costReductions' reason.
+          Face.maximumX = Face.maximumX l <> Face.maximumX r,
+          -- CR 709.4c once more: "this spell can't be countered" is an ability in a
+          -- half's text box (CR 113.6g puts it on the stack), so the combined view has
+          -- it if EITHER half prints it -- and CR 702.102b hands that to a fused split
+          -- spell, which is the cast that made this line matter. A record update kept
+          -- the left half's silently until fuse landed, and CR 709.3b made that
+          -- harmless: the half on the stack was the half whose clause was read
+          -- (Pawl.Engine.Event.counterOne, through Game.faceOf).
+          --
+          -- A DISJUNCTION and not `firstJust`, because this is a permission-shaped
+          -- field with a default rather than a printed box: Counterable is what a face
+          -- printing nothing carries (Pawl.Codec.Face defaults it), so "the first half
+          -- that has one" would read a silent default as an answer and drop a right
+          -- half's clause.
+          --
+          -- Nothing proves the gameplay path: no printing pairs fuse with a
+          -- can't-be-countered clause -- Scryfall `keyword:fuse o:"can't be
+          -- countered"`, 2026-09-01, no hit -- so what the suite
+          -- holds is the FOLD, in Pawl.CardSpec's "CR 709.4 a split card's
+          -- characteristics are its two halves combined", where only the right half
+          -- carries the clause. The reader beyond it is one line already driven for
+          -- every ordinary spell.
+          Face.counterability =
+            if Face.counterability l == Counterability.CantBeCountered || Face.counterability r == Counterability.CantBeCountered
+              then Counterability.CantBeCountered
+              else Counterability.Counterable
+              --
+              -- Face.spell is deliberately NOT merged either: it stays the left half's,
+              -- and nothing casts it. CR 709.3b means the thing on the stack is ONE half
+              -- for every cast this view is asked about -- castableFaces below is what
+              -- such a cast reads -- so the combined view is never the payload that
+              -- resolves. The one printing that puts BOTH halves on the stack is CR
+              -- 702.102's fuse, and it does not merge them here: `fusedFace` below builds
+              -- that payload over this view, so a fused spell reads rule 702.102d's
+              -- ordering and every other reader of `combined` is untouched.
+        }
 
 -- CR 709.4c / 604.3: one printed power or toughness box of a split card's
 -- combined view, paired with the characteristic-defining ability that defines

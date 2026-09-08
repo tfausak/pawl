@@ -135,14 +135,14 @@ roomAbility room dungeonRoom =
 -- a room's "target creature" resolves against the dungeon exactly as a permanent's
 -- trigger resolves against itself.
 roomPending :: [GameEvent.GameEvent] -> GameState.GameState -> [PendingTrigger.PendingTrigger]
-roomPending events gs = Maybe.mapMaybe pendingFor events
-  where
-    pendingFor event = case event of
-      GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid room) -> do
-        entered <- roomAt room (roomsOf oid gs)
-        Monad.guard (fmap Object.owner (Game.lookupObject oid gs) == Just pid)
-        Just (PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) pid (roomAbility room entered) Map.empty Nothing)
-      _ -> Nothing
+roomPending events gs =
+  let pendingFor event = case event of
+        GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid room) -> do
+          entered <- roomAt room (roomsOf oid gs)
+          Monad.guard (fmap Object.owner (Game.lookupObject oid gs) == Just pid)
+          Just (PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) pid (roomAbility room entered) Map.empty Nothing)
+        _ -> Nothing
+   in Maybe.mapMaybe pendingFor events
 
 -- | CR 704.5t \/ 309.6: the dungeon cards whose owner must remove them from the
 -- game -- marker on the bottommost room, with no room ability of theirs still
@@ -155,21 +155,21 @@ roomPending events gs = Maybe.mapMaybe pendingFor events
 -- unscanned VentureMarkerEntered naming this dungeon is what stands for it, and
 -- it is exactly the event the ability will be gathered from.
 finished :: GameState.GameState -> [ObjectId]
-finished gs = filter isFinished (Set.toList (GameState.command gs))
-  where
-    onStack oid = any (fromDungeon oid) (GameState.stack gs)
-    fromDungeon oid stacked = case fmap Object.source (Game.lookupObject stacked gs) of
-      Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == oid
-      _ -> False
-    pending oid = any (aboutDungeon oid) (Event.unscannedEvents gs)
-    aboutDungeon oid event = case event of
-      GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered _ entered _) -> entered == oid
-      _ -> False
-    isFinished oid = case Game.lookupObject oid gs of
-      Nothing -> False
-      Just obj -> case Object.ventureRoom obj of
+finished gs =
+  let onStack oid = any (fromDungeon oid) (GameState.stack gs)
+      fromDungeon oid stacked = case fmap Object.source (Game.lookupObject stacked gs) of
+        Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == oid
+        _ -> False
+      pending oid = any (aboutDungeon oid) (Event.unscannedEvents gs)
+      aboutDungeon oid event = case event of
+        GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered _ entered _) -> entered == oid
+        _ -> False
+      isFinished oid = case Game.lookupObject oid gs of
         Nothing -> False
-        Just room -> isBottommost (roomsOf oid gs) room && not (onStack oid) && not (pending oid)
+        Just obj -> case Object.ventureRoom obj of
+          Nothing -> False
+          Just room -> isBottommost (roomsOf oid gs) room && not (onStack oid) && not (pending oid)
+   in filter isFinished (Set.toList (GameState.command gs))
 
 -- | CR 701.49a \/ 701.49d: may a venture indicating this quality bring this
 -- dungeon card into the game?
@@ -366,6 +366,9 @@ remove oid gs = case Game.lookupObject oid gs of
 -- the move is mandatory.
 advance :: PlayerId -> ObjectId -> RoomIndex.RoomIndex -> Game ()
 advance pid oid room = do
+  -- Ascending, so both the single-arrow shortcut and a transcript are
+  -- deterministic -- Ring.tempt's posture.
+  let nonEmptyExits = NonEmpty.nonEmpty . Set.toAscList
   gs <- State.get
   case roomAt room (roomsOf oid gs) >>= (nonEmptyExits . DungeonRoom.exits) of
     Nothing -> pure ()
@@ -379,10 +382,6 @@ advance pid oid room = do
         Event.recordEvent
           (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid chosen))
           g {GameState.objects = Map.adjust (\o -> o {Object.ventureRoom = Just chosen}) oid (GameState.objects g)}
-  where
-    -- Ascending, so both the single-arrow shortcut and a transcript are
-    -- deterministic -- Ring.tempt's posture.
-    nonEmptyExits = NonEmpty.nonEmpty . Set.toAscList
 
 -- | CR 701.49: venture into the dungeon.
 --
