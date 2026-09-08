@@ -114,6 +114,7 @@ import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.DamageDirection as DamageDirection
 import qualified Pawl.Types.DamagePart as DamagePart
@@ -330,6 +331,7 @@ vanillaFace name typeLine =
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
+      Face.crewRestrictions = [],
       Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
@@ -3707,6 +3709,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.DeclaredBlockerThisCombat -> []
   Filter.Type.AttackedThisTurn -> []
   Filter.Type.MilledThisTurn -> []
+  Filter.Type.CantCrewVehicles -> []
   Filter.Type.DealtDamageThisTurn -> []
   Filter.Type.ControlledSinceTurnBegan -> []
   -- DESCENT, for ControlsMoreThanYou's reason.
@@ -4976,6 +4979,7 @@ activatedAbilityFilters ability =
 --     permission.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
+--     `crewRestrictions` (CR 702.122d / 101.2),
 --     `entryRestrictions` (CR 400.4a / 101.2),
 --     `counterRestrictions` (CR 122.6 / 101.2),
 --     `activationProhibitions` (CR 602.2 / 101.2),
@@ -5039,6 +5043,7 @@ cardFilters card =
         <> concatMap (frame Unframed . combatRestrictionFilters) (Face.combatRestrictions card)
         <> concatMap (unframed . affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
         <> concatMap (unframed . affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
+        <> concatMap (unframed . affectedFilters . CrewRestriction.affected) (Face.crewRestrictions card)
         <> concatMap (unframed . attachRestrictionFilters) (Face.attachRestrictions card)
         <> concatMap (unframed . affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
         <> concatMap (unframed . affectedFilters . CounterRestriction.affected) (Face.counterRestrictions card)

@@ -354,6 +354,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.DeclaredAttackerThisCombat -> predicate
         Filter.Type.DeclaredBlockerThisCombat -> predicate
         Filter.Type.MilledThisTurn -> predicate
+        Filter.Type.CantCrewVehicles -> predicate
         Filter.Type.DealtDamageThisTurn -> predicate
         Filter.Type.ControlledSinceTurnBegan -> predicate
         -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing

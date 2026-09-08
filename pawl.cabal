@@ -335,6 +335,8 @@ library codec
     Pawl.Codec.CreateSpec
     Pawl.Codec.CreatureBecomesBlockedByAtLeast
     Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
+    Pawl.Codec.CrewRestriction
+    Pawl.Codec.CrewRestrictionSpec
     Pawl.Codec.Cycling
     Pawl.Codec.CyclingSpec
     Pawl.Codec.DamageDirection
@@ -1003,6 +1005,7 @@ library engine
     Pawl.Engine.Cost
     Pawl.Engine.Count
     Pawl.Engine.CounterRestriction
+    Pawl.Engine.CrewRestriction
     Pawl.Engine.Damage
     Pawl.Engine.Daytime
     Pawl.Engine.Decide
@@ -1605,6 +1608,7 @@ library types
     Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.CreatureBecomesBlockedByAtLeast
+    Pawl.Types.CrewRestriction
     Pawl.Types.Cycling
     Pawl.Types.DamageDirection
     Pawl.Types.DamageEvent

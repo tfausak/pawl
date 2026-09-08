@@ -35,6 +35,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.CrewRestriction as CrewRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Event as Event
@@ -1387,7 +1388,14 @@ topExileCandidate slots pid criterion gs =
 -- itself.
 tapCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 tapCandidates slots pid oid criterion gs =
-  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) (Just oid) slots
+  let -- CR 702.122d's prohibition rides the CONTEXT rather than narrowing the
+      -- pool here, and that is what confines rule 702.122d to a CREW cost: the
+      -- atom that reads it is written into rule 702.122a's criterion by
+      -- Pawl.Engine.Keyword's `crew` and by nothing else, so a TapForTotalPower
+      -- printed outside a crew ability
+      -- (data/cards/synthetic-crewed-battery.json) never asks and the set is
+      -- never forced.
+      context = Filter.contextCrewing (Game.teams gs) (Just pid) (Just oid) slots (CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs)
       viewOf = Projection.viewsOf gs
       matches candidate =
         Filter.matches context (viewOf candidate) criterion
@@ -3654,11 +3662,12 @@ payComponent moment slots pid oid component = case component of
   -- sibling arm's Binding.tappedPermanent: see that slot's comment for why one
   -- name for both questions would go quiet on a cost carrying both components.
   --
-  -- Not implemented: CR 702.122d's "can't crew Vehicles" restriction, and CR
-  -- 702.122e's intervening-"if" rider, which would read this set as the trigger's
-  -- condition rather than as its subject (#915). This component is not crew's
-  -- alone (data/cards/synthetic-crewed-battery.json), which is why the binding is
-  -- unconditional here and the crew reading is made where the keyword is known.
+  -- Not implemented: CR 702.122e's intervening-"if" rider, which would read this
+  -- set as the trigger's condition rather than as its subject (#915). This
+  -- component is not crew's alone (data/cards/synthetic-crewed-battery.json),
+  -- which is why the binding is unconditional here and the crew reading is made
+  -- where the keyword is known -- CR 702.122d's prohibition is made there too,
+  -- as the criterion atom `tapCandidates` above supplies the set for.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates slots pid oid criterion gs

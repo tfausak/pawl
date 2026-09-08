@@ -327,6 +327,11 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- dependent slot is offered, and selectionLegal is where an
             -- announcement naming one creature twice is rejected.
             Filter.slotObjects = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) targets,
+            -- EMPTY: CR 702.122d's prohibition is read where rule 702.122a's
+            -- cost picks its candidates (Pawl.Engine.Cost.tapCandidates) and no
+            -- target slot's Filter carries the atom, crew naming its Vehicle
+            -- rather than targeting it (CR 115.10a).
+            Filter.cantCrewVehicles = Set.empty,
             -- THE one site that fills it, alongside sourcePower and
             -- defendingPlayer above and for the same reason: SameNameAsBound
             -- lives in a target slot's Filter, and this is where one is matched.

@@ -277,6 +277,19 @@ data Filter keyword
     -- surveil (CR 701.25a) and explore (CR 701.44a) also do. Matches the
     -- incarnation the mill left the card as (CR 400.7).
     MilledThisTurn
+  | -- | CR 702.122d: an effect in force says this candidate "can't crew
+    -- Vehicles". Read off the surrounding evaluation's context rather than off
+    -- the candidate, since a prohibition is another permanent's static ability
+    -- (Pawl.Engine.CrewRestriction gathers them) -- so it is vacuously False
+    -- wherever no caller supplies the set, the posture IsBound takes.
+    --
+    -- Not printed by any card: Pawl.Engine.Keyword's `crew` is the only minter,
+    -- writing @Not CantCrewVehicles@ into rule 702.122a's cost criterion, which
+    -- is what confines rule 702.122d to a CREW cost -- the same cost component
+    -- is printable outside one (data/cards/synthetic-crewed-battery.json).
+    -- Pawl.FilterPositionLintSpec's "CR 702.122d no card asks
+    -- CantCrewVehicles" is what keeps a card out of the position.
+    CantCrewVehicles
   | -- | CR 120.1 / 608.2i: the candidate -- an object or a player, since CR 120.1
     -- has damage dealt to both -- was DEALT DAMAGE earlier this turn.
     -- AttackedThisTurn's look-back read one event arm over

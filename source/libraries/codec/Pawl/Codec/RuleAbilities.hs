@@ -11,6 +11,7 @@ import qualified Pawl.Codec.BlockPermission as BlockPermission
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
 import qualified Pawl.Codec.CounterRestriction as CounterRestriction
+import qualified Pawl.Codec.CrewRestriction as CrewRestriction
 import qualified Pawl.Codec.EntryRestriction as EntryRestriction
 import qualified Pawl.Codec.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Codec.UntapRestriction as UntapRestriction
@@ -32,6 +33,7 @@ codec = Fields.object $ do
   blockRequirements <- Fields.defaulted "blockRequirements" [] (Common.list BlockRequirement.codec) RuleAbilities.blockRequirements
   combatRestrictions <- Fields.defaulted "combatRestrictions" [] (Common.list CombatRestriction.codec) RuleAbilities.combatRestrictions
   counterRestrictions <- Fields.defaulted "counterRestrictions" [] (Common.list CounterRestriction.codec) RuleAbilities.counterRestrictions
+  crewRestrictions <- Fields.defaulted "crewRestrictions" [] (Common.list CrewRestriction.codec) RuleAbilities.crewRestrictions
   entryRestrictions <- Fields.defaulted "entryRestrictions" [] (Common.list EntryRestriction.codec) RuleAbilities.entryRestrictions
   sacrificeRestrictions <- Fields.defaulted "sacrificeRestrictions" [] (Common.list SacrificeRestriction.codec) RuleAbilities.sacrificeRestrictions
   untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) RuleAbilities.untapRestrictions
@@ -46,6 +48,7 @@ codec = Fields.object $ do
         RuleAbilities.blockRequirements = blockRequirements,
         RuleAbilities.combatRestrictions = combatRestrictions,
         RuleAbilities.counterRestrictions = counterRestrictions,
+        RuleAbilities.crewRestrictions = crewRestrictions,
         RuleAbilities.entryRestrictions = entryRestrictions,
         RuleAbilities.sacrificeRestrictions = sacrificeRestrictions,
         RuleAbilities.untapRestrictions = untapRestrictions

@@ -2383,6 +2383,10 @@ filterReads f = case f of
   Filter.Type.DeclaredAttackerThisCombat -> Set.empty
   Filter.Type.DeclaredBlockerThisCombat -> Set.empty
   Filter.Type.MilledThisTurn -> Set.empty
+  -- CR 702.122d reads nothing a layer writes, IsAttacking's reason one rule
+  -- over: the prohibition is gathered outside the layer system (CR 613.11) and
+  -- handed in on the context, so it is a fixed input to any single projection.
+  Filter.Type.CantCrewVehicles -> Set.empty
   Filter.Type.DealtDamageThisTurn -> Set.empty
   -- Reads the CONTROLLER, which layer 2 moves: CR 302.6's continuity claim is
   -- about a player, and Pawl.Engine.Engine.checkControlContinuity drops the settle when
@@ -2603,6 +2607,9 @@ filterReadsPeers f = case f of
   Filter.Type.DeclaredAttackerThisCombat -> False
   Filter.Type.DeclaredBlockerThisCombat -> False
   Filter.Type.MilledThisTurn -> False
+  -- CR 702.122d reads the CONTEXT's gathered set rather than any field of a
+  -- peer's view, so no second projection can change its answer.
+  Filter.Type.CantCrewVehicles -> False
   Filter.Type.DealtDamageThisTurn -> False
   Filter.Type.ControlledSinceTurnBegan -> False
   Filter.Type.IsAttachedToSource -> False
