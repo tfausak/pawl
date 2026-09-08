@@ -737,6 +737,34 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   -- (#3364). Pawl.Engine.Event.copiedSnapshot is the reader that spends it.
   Nothing -> baseCharacteristics oid gs
 
+-- CR 613.2a / 613.2b: an object's LAYER 1a value -- `copiableCharacteristics`
+-- above with layer 1b's face-down substitution not yet applied. CR 708.8 names
+-- the same value from the other side: it is what a permanent's copiable values
+-- revert to when it turns face up.
+--
+-- ONE caller and one rule. CR 730.2a makes a merge a copiable effect that CR
+-- 613.2a puts in layer 1a, so what Pawl.Engine.Event.merge folds is what layer
+-- 1a had left each side -- never what layer 1b afterwards did to the permanent.
+-- Read through `copiableCharacteristics` instead and a merge onto a face-down
+-- permanent freezes CR 708.2a's nameless 2/2 into the stamp, so the merged
+-- permanent goes on being a nameless 2/2 once it turns face up.
+--
+-- Written as a COUNTERFACTUAL BOARD rather than as a second seed, which is
+-- Pawl.Engine.Game.faceUpFaceOf's own posture one module over: the question is
+-- "what would this object's layer-1a value be if it were face up", and each of
+-- the three forks that answers it -- `copiableSnapshotOf` below, and
+-- Game.faceOf and Game.namesOf under `baseCharacteristics` -- reads
+-- Object.facing off the board rather than taking it as an argument. One map
+-- insert, on the merge road only.
+--
+-- No CR 613.7f timestamp rides the rewrite, and none should: nothing here turns
+-- anything over, and the board is thrown away with the read.
+copiableCharacteristicsFaceUp :: ObjectId -> GameState -> ProjectedCharacteristics
+copiableCharacteristicsFaceUp oid gs =
+  copiableCharacteristics
+    oid
+    gs {GameState.objects = Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects gs)}
+
 -- CR 707.3: the copy snapshot an object's copiable RULES TEXT is read from --
 -- Nothing for an object that is copying nothing, and Nothing again for one whose
 -- snapshot copied HALVES, whose rules text every reader must re-derive against
@@ -1160,8 +1188,14 @@ withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupO
 -- in data/cards/ prints a CDA box on a creature a mutate spell can target, so
 -- nothing tells the two readings apart today.
 --
+-- Each side arrives at LAYER 1a, through `copiableCharacteristicsFaceUp` above,
+-- so a FACE-DOWN component contributes its card's abilities rather than CR
+-- 708.2a's none: CR 730.2e gives a component a status, CR 109.3 keeps status out
+-- of the characteristics, and CR 613.2b applies rule 708.2's substitution to the
+-- resulting permanent one sublayer later.
+--
 -- Not implemented: a component whose own record is not the whole of what it
--- represents -- CR 730.2e through 730.2h's face-down and flip components (#874).
+-- represents -- CR 730.2h's flip components (#874).
 withMergedAbilities :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
 withMergedAbilities donor base =
   base

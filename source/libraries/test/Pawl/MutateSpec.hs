@@ -16,6 +16,12 @@
 -- ability observable, and the trigger makes rule 702.140d's own event
 -- observable.
 --
+-- Misthoof Kirin is the FACE-DOWN host CR 730.2e's cases merge with: {2}{W} 2/1
+-- Creature -- Kirin, flying, vigilance, "Megamorph {1}{W}". Cast face down for
+-- CR 702.37a's {3} it is a nameless 2/2 with no abilities, so every reading of a
+-- face-down component differs on it, and CR 702.37e's special action is what
+-- turns the merged permanent back over.
+--
 -- Falcon Abomination is the creature it merges with: {2}{U} 2\/2 Creature --
 -- Bird Zombie, flying, "When this creature enters, create a 2\/2 black Zombie
 -- creature token with decayed". Non-Human (CR 702.140a), a DIFFERENT name, box
@@ -35,10 +41,12 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -53,6 +61,8 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -74,6 +84,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -198,6 +209,69 @@ spec s registry = Spec.describe s "Mutate" $ do
     -- The proxy, after them: the target really is a Human on the board that
     -- resolved, which is the whole of rule 702.140b's condition.
     Spec.assertBool s (Set.member Subtype.Human (Projection.subtypesOf host turned)) "setup: the target was a Human when the spell began resolving"
+  -- CR 730.2e's mix, from the side where the merge CHANGES the status: a
+  -- face-up card merging over a face-down permanent. "The permanent's status is
+  -- determined by its topmost component", so the result is a face-up Cubwarden
+  -- and not the nameless 2/2 the board held a moment before.
+  --
+  -- Read off the NAME rather than off Object.facing, which would be a read of
+  -- the very field the rule writes: CR 708.2a leaves a face-down permanent with
+  -- no name at all, so a projected name is the status said in the one way the
+  -- board can observe it.
+  Spec.it s "CR 730.2e a merge over a face-down permanent leaves the topmost component's face-up status" $ do
+    plains <- S.printingOf s registry "Plains"
+    kirin <- S.printingOf s registry "Misthoof Kirin"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    case faceDownBoard plains kirin cubwarden of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (host, board, spellId) -> do
+        let after = merging MutateSide.Over host board spellId
+        Spec.assertEqWith
+          s
+          "CR 730.2e the merged permanent shows Cubwarden's name, so its status is the topmost component's"
+          (Projection.namesOf host after)
+          (Set.singleton (CardName.MkCardName (Text.pack "Cubwarden")))
+        -- The fixture facts behind it, after it: the host really was face down,
+        -- and really was nameless while it was, so the assertion above cannot
+        -- pass for want of either.
+        Spec.assertEqWith s "setup: the host was face down before the merge" (fmap Object.facing (Game.lookupObject host board)) (Just (Facing.faceDown FaceDownReason.Morphed))
+        Spec.assertEqWith s "setup: and CR 708.2a left it with no name at all" (Projection.namesOf host board) Set.empty
+        Spec.assertEqWith s "setup: the two cards represent one permanent" (componentNames host after) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Misthoof Kirin")]
+  -- CR 730.2e's other side: the merge goes UNDER, so the topmost component is
+  -- still the face-down one and the permanent stays face down -- and CR 702.37e's
+  -- special action then turns it over.
+  --
+  -- THE case the layer-1a read exists for. CR 730.2a is a copiable effect in
+  -- layer 1a (CR 613.2a) and CR 708.2's substitution is layer 1b (CR 613.2b), so
+  -- what the merge froze is the topmost component's OWN face -- not the nameless
+  -- 2/2 that face-down permanent was showing at the time. Read the showing face
+  -- instead and this permanent turns face up as a nameless 2/2 with lifelink,
+  -- which is what it did before this case existed.
+  --
+  -- CR 730.2f's "each face-down component that represents it is turned face up"
+  -- is not what this board discriminates: every component shares the one status
+  -- Object.facing carries, so the two readings of that rule cannot differ here.
+  Spec.it s "CR 730.2a/730.2e a face-down merged permanent turned face up shows the topmost component's own face" $ do
+    plains <- S.printingOf s registry "Plains"
+    kirin <- S.printingOf s registry "Misthoof Kirin"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    case faceDownBoard plains kirin cubwarden of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (host, board, spellId) -> do
+        let after = merging MutateSide.Under host board spellId
+            up = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph host)
+        Spec.assertEqWith
+          s
+          "CR 730.2a the topmost component's own name, and not the nameless 2/2 it was showing when the merge froze it"
+          (Projection.namesOf host up)
+          (Set.singleton (CardName.MkCardName (Text.pack "Misthoof Kirin")))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying host up) "CR 730.2a and its flying, which no other component prints"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink host up) "CR 702.140e and lifelink, from the component under it"
+        -- The fixture facts, after them: the merged permanent really was face
+        -- down until the special action turned it over, and really is one
+        -- permanent of two cards.
+        Spec.assertEqWith s "setup: CR 730.2e it was face down while its topmost component was" (Projection.namesOf host after) Set.empty
+        Spec.assertEqWith s "setup: the two cards represent one permanent, the face-down one on top" (componentNames host after) [CardName.MkCardName (Text.pack "Misthoof Kirin"), CardName.MkCardName (Text.pack "Cubwarden")]
   -- CR 730.2a's timestamp sentence, which is the one board it is observable on:
   -- the merge and the copy effect already on the target share layer 1a (CR
   -- 613.2a) and CR 613.7 orders them by timestamp, so the merge -- timestamped
@@ -615,6 +689,41 @@ mutateBoard plains falcon cubwarden =
       (host, withHost) = S.addPermanent falcon S.alice base
       (board, spellId) = S.handOne cubwarden withHost
    in (host, board, spellId)
+
+-- mutateBoard's shape with a FACE-DOWN creature as the host, which is what CR
+-- 730.2e's face-up-and-face-down mix needs. Misthoof Kirin -- {2}{W} 2/1
+-- Creature -- Kirin, flying, vigilance, megamorph {1}{W} -- is cast face down for
+-- CR 702.37a's {3} and resolves, and Cubwarden waits in hand. Nothing about the
+-- host is written by hand: the permanent is face down because a morph cast put
+-- it there, so CR 702.37e's special action can turn it back over.
+--
+-- TEN Plains, so all three actions are paid in one currency and none of them can
+-- fail for want of mana: {3} for the morph cast, CR 702.140a's {2}{W}{W} for the
+-- mutate, and CR 702.37b's megamorph {1}{W} for the turning over. Nothing here
+-- reads the tapped count, so the slack costs no assertion.
+--
+-- Nothing when the morph cast did not land, which every caller reports rather
+-- than asserting against a board it did not get.
+faceDownBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe (ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+faceDownBoard plains kirin cubwarden =
+  let base = S.landsFor plains S.alice 10 (Setup.emptyGame S.bothPlayers)
+      (withKirin, kirinId) = S.handOne kirin base
+      (board, spellId) = S.handOne cubwarden withKirin
+      down =
+        S.runPure
+          S.identityAnswer
+          board
+          (Cast.castSpell S.manaPerformer S.alice kirinId (S.printingName kirin) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
+   in fmap (\host -> (host, down, spellId)) (faceDownOn down)
+
+-- The one face-down permanent alice OWNS -- Game.zoneMembers indexes the
+-- battlefield by owner (CR 108.3) -- found by its status rather than by a name:
+-- CR 708.2a has left it with none to search for.
+faceDownOn :: GameState.GameState -> Maybe ObjectId.ObjectId
+faceDownOn gs =
+  List.find
+    (\oid -> maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs))
+    (Game.zoneMembers Zone.Battlefield S.alice gs)
 
 -- Cast Cubwarden for its mutate cost at `host`, put it on `side`, and drain the
 -- stack: the spell first, then CR 702.140d's trigger, which CR 603.3 puts on the

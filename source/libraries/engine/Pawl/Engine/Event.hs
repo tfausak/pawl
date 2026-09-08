@@ -6255,9 +6255,31 @@ meldable victims gs = do
 -- already projects rule 702.140e's added abilities -- which is what lets a
 -- Cubwarden merged UNDER trigger at all.
 --
--- Not implemented: CR 730.2e through 730.2j's face-down, flip and double-faced
--- components. A spell with no printing behind it -- CR 707.10's copy of a
--- mutating creature spell -- refuses here rather than merging (#874).
+-- The STATUS the merge leaves is CR 730.2e's: "if a merged permanent contains
+-- face-up and face-down components, the permanent's status is determined by its
+-- topmost component", so the topmost side's own facing is written onto the
+-- permanent. A bare field write and nothing else, which is the rest of that
+-- rule: no CR 613.7f timestamp, because rule 730.2e's second sentence says
+-- "other effects don't count it as being turned face up" and CR 613.7f's new
+-- timestamp is for a permanent that turns over; and no GameEvent.TurnedFaceUp,
+-- so the CR 708.7 abilities Pawl.Engine.FaceDown.performTurnFaceUp records that
+-- event for do not trigger.
+-- CR 730.2f needs nothing of its own -- "each face-up component that represents
+-- it is turned face down", and every component of a pawl permanent shares the
+-- one status this line writes, so the components cannot fall out of step with
+-- the permanent or with each other.
+--
+-- Each side's record is read at LAYER 1a, before layer 1b's face-down
+-- substitution (Projection.copiableCharacteristicsFaceUp), which is CR 613.2a's
+-- own placement of the merge: CR 730.2e gives a component a status and CR 109.3
+-- keeps status out of the characteristics, so what a face-down component
+-- contributes is its card's characteristics and CR 708.2's substitution then
+-- applies to the resulting PERMANENT rather than to any component of it.
+--
+-- Not implemented: CR 730.2g's instant or sorcery component, which cannot be
+-- turned face up (#3392); CR 730.2h's flip components and CR 730.2i/730.2j's
+-- double-faced components. A spell with no printing behind it -- CR 707.10's
+-- copy of a mutating creature spell -- refuses here rather than merging (#874).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
@@ -6270,12 +6292,18 @@ merge sid target side = do
               MutateSide.Under -> case existing of
                 first : rest -> first NonEmpty.:| (rest <> [component])
                 [] -> component NonEmpty.:| []
+            -- CR 730.2e: the topmost component's status becomes the
+            -- permanent's, so Over takes the spell's facing and Under leaves the
+            -- permanent showing whichever way it already was.
+            facing = case side of
+              MutateSide.Over -> Object.facing spell
+              MutateSide.Under -> Object.facing permanent
             -- What layer 1a had left each side, read off the PRE-merge board:
             -- the spell's own record and the permanent's, which is that
             -- permanent's copy snapshot where an earlier copy effect gave it one
             -- and its printed seed otherwise.
-            spellPc = Projection.copiableCharacteristics sid gs
-            hostPc = Projection.copiableCharacteristics target gs
+            spellPc = Projection.copiableCharacteristicsFaceUp sid gs
+            hostPc = Projection.copiableCharacteristicsFaceUp target gs
             -- CR 730.2a's base is the TOPMOST side and CR 702.140e's union comes
             -- from the other, which is the whole of what the side decides.
             resulting = case side of
@@ -6290,6 +6318,7 @@ merge sid target side = do
                       ( \o ->
                           o
                             { Object.source = Source.OfMerge merged,
+                              Object.facing = facing,
                               Object.bindings = Binding.setCopy resulting (Object.bindings o)
                             }
                       )
