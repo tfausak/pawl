@@ -6,6 +6,7 @@
 -- reaches the loop.
 module Pawl.Engine.Event.Match where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -70,6 +71,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -166,6 +168,36 @@ turnScopeAdmits teams scope active own = case scope of
   TurnScope.EachTurn -> True
   TurnScope.ControllersTurn -> active == own
   TurnScope.OpponentsTurn -> Teams.areOpponents teams own active
+
+-- CR 505.1b: how many main phases have begun this turn, counting the one whose
+-- beginning is being matched. GameState.events is cleared at the turn handoff
+-- (Pawl.Engine.Engine.handoffTurn), so the log is already scoped to the turn the
+-- rule scopes the count to, and a phase CR 500.11 skipped records no beginning
+-- and so has not "occurred".
+--
+-- Read off the log at SCAN time rather than stamped on the event, which names
+-- the right main phase because no two main phases can begin inside one unscanned
+-- window: CR 505.6 gives the active player priority in every main phase, and
+-- Pawl.Engine.Engine.placePendingTriggers scans at every priority boundary.
+--
+-- A comprehension rather than a case, so there is no fallthrough arm for a new
+-- GameEvent constructor to fall into; `isMainPhase` is exhaustive over Phase.
+mainPhasesBegun :: GameState -> Natural
+mainPhasesBegun gs =
+  Natural.length
+    [ ()
+    | GameEvent.StepBegan (StepBegan.MkStepBegan phase _) <- fmap LoggedEvent.event (Foldable.toList (GameState.events gs)),
+      isMainPhase phase
+    ]
+
+-- CR 505.1: the precombat and postcombat main phases, and no step of any other.
+isMainPhase :: Phase.Phase -> Bool
+isMainPhase phase = case phase of
+  Phase.PrecombatMain -> True
+  Phase.PostcombatMain -> True
+  Phase.Beginning _ -> False
+  Phase.Combat _ -> False
+  Phase.Ending _ -> False
 
 -- CR 122's removal as the two bearer-scoped counter-removal conditions read it:
 -- the before/after pair of a GameEvent.CountersRemoved that took counters of
@@ -393,10 +425,13 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.CardArrived _ -> False
-  -- CR 603.2b: this step began, on a turn the scope admits.
-  TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope) -> case event of
+  -- CR 603.2b: this step began, on a turn the scope admits, and -- for a card
+  -- that counts main phases rather than naming one -- at CR 505.1b's ordinal.
+  TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted ordinal scope) -> case event of
     GameEvent.StepBegan (StepBegan.MkStepBegan began active) ->
-      began == wanted && turnScopeAdmits (Game.teams gs) scope active you
+      began == wanted
+        && Maybe.maybe True (== mainPhasesBegun gs) ordinal
+        && turnScopeAdmits (Game.teams gs) scope active you
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast {} -> False

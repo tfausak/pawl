@@ -370,7 +370,8 @@ theRingBlockerSacrifice =
     { TriggeredAbility.condition =
         TriggerCondition.StepBegins
           StepBegins.MkStepBegins
-            { StepBegins.phase = Phase.Combat CombatStep.EndOfCombat,
+            { StepBegins.ordinal = Nothing,
+              StepBegins.phase = Phase.Combat CombatStep.EndOfCombat,
               StepBegins.scope = TurnScope.EachTurn
             },
       TriggeredAbility.modal =

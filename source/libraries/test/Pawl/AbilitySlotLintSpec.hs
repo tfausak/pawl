@@ -623,7 +623,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
         eachTurn ability =
           ability
             { TriggeredAbility.condition =
-                TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.DeclareAttackers) TurnScope.EachTurn)
+                TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.DeclareAttackers) Nothing TurnScope.EachTurn)
             }
         widened = face {Face.delayedAbilities = fmap eachTurn (Face.delayedAbilities face)}
         -- The other way a card can reach this: an onset naming an ability the

@@ -1296,7 +1296,7 @@ permanentDiesSpec s registry =
             "two triggered abilities, the first with that condition"
             (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.combinedFace meren)))
             [ TriggerCondition.PermanentDies anotherCreatureYouControl,
-              TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
+              TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.ControllersTurn)
             ]
 
 -- CR 603.2c's two sentences, and the fork they force on the written form
@@ -1992,7 +1992,7 @@ representativeEvents cond =
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
         TriggerCondition.PermanentEnters _ -> one (moved Zone.Stack Zone.Battlefield)
-        TriggerCondition.StepBegins (StepBegins.MkStepBegins phase _) -> one (GameEvent.StepBegan (StepBegan.MkStepBegan phase S.alice))
+        TriggerCondition.StepBegins (StepBegins.MkStepBegins phase _ _) -> one (GameEvent.StepBegan (StepBegan.MkStepBegan phase S.alice))
         -- CR 603.8: a state trigger matches a game STATE, so no log entry fires
         -- it at all (Event.matchesTrigger's StateIs arm answers False for every
         -- event). Any event is therefore as representative as any other.
@@ -2486,7 +2486,7 @@ everyTriggerCondition =
     TriggerCondition.CardPutIntoGraveyard Filter.Type.IsSource,
     TriggerCondition.PermanentDies Filter.Type.IsSource,
     TriggerCondition.PermanentsDie Filter.Type.IsSource,
-    TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn),
+    TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.EachTurn),
     TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
     TriggerCondition.SelfIsDealtDamage,

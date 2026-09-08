@@ -94,7 +94,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
       toJson
       fromJson
       ( TriggeredAbility.MkTriggeredAbility
-          { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
+          { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
             TriggeredAbility.modal =
               Modal.MkModal
                 (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Quantity.Literal 1))) Nothing Nothing))))) Map.empty))
@@ -124,7 +124,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
       ( Map.fromList
           [ ( AbilityName.MkAbilityName (Text.pack "sacrifice it"),
               TriggeredAbility.MkTriggeredAbility
-                { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn),
+                { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.EachTurn),
                   TriggeredAbility.modal =
                     Modal.MkModal
                       (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "token")), SacrificeEffect.sacrificer = Sacrificer.EffectController})))) Map.empty))
@@ -135,7 +135,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             ),
             ( AbilityName.MkAbilityName (Text.pack "each combat"),
               TriggeredAbility.MkTriggeredAbility
-                { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.BeginningOfCombat) TurnScope.EachTurn),
+                { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.BeginningOfCombat) Nothing TurnScope.EachTurn),
                   TriggeredAbility.modal =
                     Modal.MkModal
                       (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Untap (ObjectRef.EachMatching Filter.AttackedThisTurn))))) Map.empty))

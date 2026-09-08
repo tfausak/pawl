@@ -82,7 +82,7 @@ oneEffect cond eff =
 endStepDraw :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 endStepDraw =
   oneEffect
-    (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn))
+    (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.ControllersTurn))
     (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing))
 
 -- CR 725.2's crown steal. Controlled by the current monarch; makes a DIFFERENT
@@ -108,7 +108,7 @@ monarchAbilities = [endStepDraw, crownSteal]
 -- still steals the crown.
 inherentMatch :: PlayerId -> TriggerCondition -> GameState -> LoggedEvent.LoggedEvent -> Maybe (Map SlotName.SlotName Binding)
 inherentMatch monarch cond gs logged = case (cond, LoggedEvent.event logged) of
-  (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active))
+  (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active))
     | began == wanted && scopeOk scope active -> Just Map.empty
   -- CR 725.2: bind the damaging creature under the reserved trigger-source slot
   -- so Effect.BecomeMonarch ControllerOfSource crowns THAT creature's

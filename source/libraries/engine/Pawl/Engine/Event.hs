@@ -6968,14 +6968,14 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfBecomesUnattachedFrom _ -> False
   -- One of the two arms carrying a TurnScope, and the one the lint below this
   -- was written for (CR 603.3a, CR 109.5).
-  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ TurnScope.ControllersTurn) -> True
+  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ _ TurnScope.ControllersTurn) -> True
   -- "Each <step>" admits every player's turn, the pairing the lint rejects.
-  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ TurnScope.EachTurn) -> False
+  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ _ TurnScope.EachTurn) -> False
   -- And "during an opponent's <step>" admits every turn but the controller's,
   -- which is not the controller's turn either. No card prints it, so the lint
   -- cannot reach this arm; answering it any other way would make the
   -- classification wrong for the sake of an unreachable case.
-  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ TurnScope.OpponentsTurn) -> False
+  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ _ TurnScope.OpponentsTurn) -> False
   -- CR 702.179d's "during YOUR turn" is the same restriction StepBegins spells
   -- with a TurnScope, written into the condition itself because rule 702.179d
   -- states it there. No card bears this condition, so the lint this feeds cannot

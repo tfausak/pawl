@@ -3040,7 +3040,7 @@ decayedSacrificeName = AbilityName.MkAbilityName (Text.pack "decayed")
 decayedSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 decayedSacrifice =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn),
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) Nothing TurnScope.EachTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -3629,7 +3629,7 @@ exileTriggeredAbilitiesOf keywords = case suspend keywords of
 suspendUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 suspendUpkeep =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -3751,7 +3751,7 @@ vanishing = [vanishingUpkeep, vanishingLastCounter]
 vanishingUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 vanishingUpkeep =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -3802,7 +3802,7 @@ vanishingLastCounter =
 fading :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 fading =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.fromList [sacrificeClause, removeClause]) Map.empty))
@@ -3858,7 +3858,7 @@ fading =
 cumulativeUpkeep :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 cumulativeUpkeep cost =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.fromList [ageClause, upkeepClause]) Map.empty))

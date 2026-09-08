@@ -141,7 +141,7 @@ ability =
       -- the active player's, so ControllersTurn plus the active player as this
       -- ability's controller IS rule 728.1's "each player's precombat main
       -- phase" -- the rule quantifies over turns, not over the players of one.
-      TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain TurnScope.ControllersTurn),
+      TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           ( Seq.singleton

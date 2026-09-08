@@ -30,6 +30,7 @@
           "condition": {
             "type": "StepBegins",
             "value": {
+              "ordinal": 2,
               "phase": {
                 "type": "PostcombatMain"
               },

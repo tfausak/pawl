@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -1425,6 +1426,13 @@ acrobaticCheerleaderSpec s registry =
                 oid
                 stocked
                   { GameState.phase = Phase.PrecombatMain,
+                    -- The schedule has to agree with the phase the board is set
+                    -- to. Setup.emptyGame's own `remaining` still holds the
+                    -- beginning phase and the precombat main, so stepping from
+                    -- here begins the precombat main a SECOND time -- and CR
+                    -- 505.1b counts main phases that have begun, which would make
+                    -- the postcombat main this turn's third.
+                    GameState.remaining = Seq.drop 1 (Turn.dropRestOfPhase (Phase.Beginning BeginningStep.Upkeep) Turn.laterPhases),
                     GameState.activePlayer = S.alice,
                     GameState.priority = Just S.alice
                   }
@@ -1445,6 +1453,104 @@ acrobaticCheerleaderSpec s registry =
           Spec.assertEqWith s "one instance of flying across both of alice's second main phases" (Map.lookup Keyword.Flying (Projection.keywordsOf oid after)) (Just 1)
           Spec.assertEqWith s "the first of the two is where it triggered" (Map.lookup Keyword.Flying (Projection.keywordsOf oid fired)) (Just 1)
           Spec.assertEqWith s "and the second really offered the trigger again, tapped as its second main phase began" (GameState.phase secondMain, tapState oid secondMain, GameState.activePlayer secondMain) (Phase.PostcombatMain, Just TapState.Tapped, S.alice)
+
+-- CR 505.1b: "second main phase" counts the main phases that have occurred this
+-- turn, so an extra main phase moves which phase the card means -- it does not
+-- give the card a second chance at one. CR 505.1a is the other half and the
+-- reason this is not the phase's name: every main phase after the first is a
+-- POSTCOMBAT main phase, so a turn with an extra one holds two of those and only
+-- the ordinal tells the second main phase from the third.
+--
+-- Acrobatic Cheerleader, {1}{W} Creature -- Human Survivor 2/2: "Survival -- At
+-- the beginning of your second main phase, if this creature is tapped, put a
+-- flying counter on it. This ability triggers only once." Relentless Assault,
+-- {2}{R}{R} Sorcery: "Untap all creatures that attacked this turn. After this
+-- main phase, there is an additional combat phase followed by an additional main
+-- phase." Nothing of either is omitted.
+--
+-- The line of play makes the two readings disagree in the counter, not merely in
+-- the timing: alice casts the Assault in her precombat main and does NOT attack
+-- in the extra combat, so at the SECOND main phase the Cheerleader is untapped
+-- and CR 603.4's intervening "if" is false. She then attacks in the regular
+-- combat, so at the THIRD main phase it IS tapped -- which is the one moment a
+-- reading keyed to the phase's NAME would fire, and the printed card does not.
+--
+-- The pair is one board apart: the control never casts the Assault, and its
+-- postcombat main really is the second main phase, so the same attack does put
+-- the counter on. Both runs start from the same fixture and answer every prompt
+-- the same way; only the cast differs.
+--
+-- The reading is Projection.keywordsOf, which counts CR 122.1b counter INSTANCES
+-- -- Nothing where the ability never fired, against the control's Just 1 -- so a
+-- bare "it does not fly" cannot stand in for it.
+secondMainPhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+secondMainPhaseSpec s registry =
+  let atPhase p g = GameState.phase g == p
+      -- Run whole steps until `phase` is the current one and has NOT yet run.
+      -- Bounded so a fixture that never reaches the step ends rather than hangs.
+      stepUntil :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState -> Bool) -> GameState.GameState -> GameState.GameState
+      stepUntil answer done gs0 =
+        let go n g =
+              if n <= (0 :: Int) || done g
+                then g
+                else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+         in go 64 gs0
+      oneStep :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      oneStep answer = snd . (\g -> Engine.runGamePure answer g Engine.runStep)
+      tapState oid g = fmap Object.tapped (Map.lookup oid (GameState.objects g))
+      flyingOn oid g = Map.lookup Keyword.Flying (Projection.keywordsOf oid g)
+      -- Four Mountains is exactly Relentless Assault's {2}{R}{R}. bob holds no
+      -- creature, so nothing blocks and the Cheerleader's attack is what taps it
+      -- (CR 508.1f); twelve library cards a seat so no draw step decks anybody
+      -- (CR 104.3c).
+      board cheerleader mountain island assault =
+        let (oid, withCheerleader) = S.addPermanent cheerleader S.alice (Setup.emptyGame S.bothPlayers)
+            withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) withCheerleader [1 .. (4 :: Int)]
+            stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard island pid g')) g [1 .. (12 :: Int)]
+            stocked = List.foldl' stock withLands [S.alice, S.bob]
+            (spell, withSpell) = S.addHandCard assault S.alice stocked
+         in ( oid,
+              spell,
+              withSpell
+                { GameState.phase = Phase.PrecombatMain,
+                  -- The same agreement between phase and schedule
+                  -- `acrobaticCheerleaderSpec`'s board makes, and for the same
+                  -- reason: a precombat main begun twice miscounts every later
+                  -- main phase.
+                  GameState.remaining = Seq.drop 1 (Turn.dropRestOfPhase (Phase.Beginning BeginningStep.Upkeep) Turn.laterPhases),
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      boardOf = do
+        cheerleader <- S.printingOf s registry "Acrobatic Cheerleader"
+        mountain <- S.printingOf s registry "Mountain"
+        island <- S.printingOf s registry "Island"
+        assault <- S.printingOf s registry "Relentless Assault"
+        pure (board cheerleader mountain island assault)
+   in Spec.describe s "SecondMainPhase" $ do
+        Spec.it s "CR 505.1b an extra main phase makes the postcombat main the third, and it does not trigger" $ do
+          (oid, spell, gs) <- boardOf
+          let cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spell))
+              resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+              -- S.identityAnswer declares no attackers, so the extra combat
+              -- passes with the Cheerleader untapped.
+              secondMain = stepUntil S.identityAnswer (atPhase Phase.PostcombatMain) resolved
+              afterSecond = oneStep S.identityAnswer secondMain
+              -- S.aggressiveAnswer attacks with everything, so the regular combat
+              -- taps it before the turn's third main phase.
+              thirdMain = stepUntil S.aggressiveAnswer (atPhase Phase.PostcombatMain) afterSecond
+              after = oneStep S.aggressiveAnswer thirdMain
+          Spec.assertEqWith s "no flying counter: the third main phase is not the second" (flyingOn oid after) Nothing
+          Spec.assertEqWith s "the extra main phase really ran, with the Cheerleader untapped" (GameState.phase secondMain, tapState oid secondMain) (Phase.PostcombatMain, Just TapState.Untapped)
+          Spec.assertEqWith s "and the third main phase really ran, with it tapped" (GameState.phase thirdMain, tapState oid thirdMain) (Phase.PostcombatMain, Just TapState.Tapped)
+          Spec.assertEqWith s "the rider is unspent, so nothing but the ordinal held the trigger back" (Set.size (GameState.triggeredThisGame after)) 0
+        Spec.it s "CR 505.1b and the same attack does trigger at a second main phase the Assault did not move" $ do
+          (oid, _, gs) <- boardOf
+          let secondMain = stepUntil S.aggressiveAnswer (atPhase Phase.PostcombatMain) gs
+              after = oneStep S.aggressiveAnswer secondMain
+          Spec.assertEqWith s "one flying counter, put on at alice's second main phase" (flyingOn oid after) (Just 1)
+          Spec.assertEqWith s "which is the postcombat main, reached with the Cheerleader tapped" (GameState.phase secondMain, tapState oid secondMain) (Phase.PostcombatMain, Just TapState.Tapped)
 
 -- The rider on ONE of two abilities a single object bears. Both watch the same
 -- event, one prints the rider and one does not, and the unlimited one firing must
@@ -2144,6 +2250,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   whisperingWizardSpec s registry
   twinnedVigilSpec s registry
   acrobaticCheerleaderSpec s registry
+  secondMainPhaseSpec s registry
   clarionSpiritSpec s registry
   desolationTwinSpec s registry
   presenceOfTheMasterSpec s registry
