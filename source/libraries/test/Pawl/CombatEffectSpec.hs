@@ -1798,7 +1798,7 @@ battleGrantRemovalSpec s registry = Spec.describe s "BattleGrantRemoval" $ do
     -- The discriminating assertion: without the clause the grantee is still an
     -- attacking creature and bob takes both Pikers' two, for 16.
     Spec.assertEqWith s "CR 510.1 bob takes only the Piker that stayed in combat" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertEqWith s "CR 508.2b both Pikers really were declared, so this is the removal and not a failed declaration" (length (S.attackerDeclarationsOf after)) 2
+    Spec.assertEqWith s "CR 508.1k both Pikers really were declared, so this is the removal and not a failed declaration" (length (S.attackerDeclarationsOf after)) 2
     Spec.assertEqWith s "and the grantee is on the battlefield as a battle at defense five, so CR 704.5w did not bury it" (fmap (\oid -> (S.onBattlefield oid after, S.counterOf CounterKind.Defense oid after)) battles) [(True, 5)]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
