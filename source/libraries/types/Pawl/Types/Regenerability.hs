@@ -21,9 +21,9 @@ module Pawl.Types.Regenerability where
 -- `destroy CantBeRegenerated oid` says which rule is in play.
 --
 -- Gates regeneration ONLY. CR 701.19c names regeneration shields specifically, so
--- a future destruction replacement that is not a regeneration (a totem-armour
--- shape) must still apply -- which is why the gate reads the DestructionRewrite
--- rather than suppressing the whole DestructionR class.
+-- a destruction replacement that is not a regeneration must still apply -- CR
+-- 702.89a's umbra armor is the one in the pool -- which is why the gate reads the
+-- DestructionRewrite rather than suppressing the whole DestructionR class.
 data Regenerability
   = Regenerable
   | CantBeRegenerated

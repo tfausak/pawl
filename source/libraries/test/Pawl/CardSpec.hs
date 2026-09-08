@@ -2800,6 +2800,7 @@ keywordPayloadFilters keyword = case keyword of
   -- cost taps is written into the ability Pawl.Engine.Keyword.station mints, not
   -- into the keyword.
   Keyword.Station -> []
+  Keyword.UmbraArmor -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
