@@ -115,6 +115,7 @@ import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scope as Scope
@@ -244,6 +245,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.Ninjutsu _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -352,6 +354,7 @@ handAbilitiesFor :: Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbi
 handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Cycling (Cycling.MkCycling cost searchFor) -> [cycling cost searchFor]
   Keyword.Reinforce (Reinforce.MkReinforce n cost) -> [reinforce n cost]
+  Keyword.Ninjutsu cost -> [ninjutsu cost]
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
@@ -576,6 +579,104 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 -- 702.122a states a whole self-contained ability, so a permanent with crew twice
 -- has two of them to activate and two thresholds. Order is the Map's, for
 -- triggeredAbilitiesOf's reason.
+-- CR 702.49a's whole ability: "[Cost], Reveal this card from your hand, Return an
+-- unblocked attacking creature you control to its owner's hand: Put this card
+-- onto the battlefield from your hand tapped and attacking."
+--
+-- THE REVEAL IS NOT A COST COMPONENT, and rule 602.2a is why: an ability
+-- activated from a hidden zone reveals the card that has it, which
+-- Pawl.Engine.Activate.revealIfHidden does on this road already. CR 701.20a gives
+-- the two reveals -- the cost's and rule 602.2a's -- one duration, "from the time
+-- the spell or ability is announced until the time it leaves the stack", so the
+-- component would only reveal a card that is already revealed. Nothing in
+-- Pawl.Types.CostComponent reveals anything (#3017), and this ability is why that
+-- gap has no producer.
+--
+-- THE RETURN is Pawl.Types.CostComponent's ReturnPermanents, appended to the
+-- printed cost the way cycling appends its discard: rule 702.49a puts it before
+-- the colon, so an activation the player backs out of returns nothing, and the
+-- attacker is in its owner's hand while the ability is still on the stack. CR
+-- 400.3 is what makes the destination its OWNER's hand rather than the
+-- activator's.
+--
+-- "AN UNBLOCKED ATTACKING CREATURE YOU CONTROL" is four conjuncts and not three:
+-- CR 509.1h makes a creature blocked the moment a blocker is declared for it, and
+-- CR 506.1 leaves an attacking creature attacking after its blocker leaves
+-- combat, so Not IsBlocked has to be asked beside IsAttacking. The creature
+-- clause is rule 702.49a's own word and is not redundant with IsAttacking: a
+-- permanent that stops being a creature while attacking stays an attacking
+-- creature under CR 506.4 only while it is a creature.
+--
+-- THE EFFECT is Reassembling Skeleton's shape one zone over -- a MoveToZone of
+-- the ability's own source, whose `origin` states the zone CR 113.6m functions it
+-- in. That the origin is the HAND is also rule 702.49a's "functions only while
+-- the card with ninjutsu is in a player's hand"; handAbilitiesFor is the roster
+-- that offers it, so the restriction holds by construction there as well.
+--
+-- Not implemented: CR 702.49c's rider -- "the creature put onto the battlefield
+-- with the ninjutsu ability enters attacking the same player, planeswalker, or
+-- battle as the creature that was returned to its owner's hand". The `attacking`
+-- rider is a Bool, so Pawl.Engine.Combat.putOntoBattlefieldAttacking asks the
+-- entering creature's controller which defender instead, and the payment records
+-- nothing about which creature it returned (#3019). Identical wherever there is
+-- one thing to attack, and a real divergence where there is more than one.
+ninjutsu :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+ninjutsu cost =
+  let returned =
+        ReturnPermanents.MkReturnPermanents
+          { ReturnPermanents.count = 1,
+            ReturnPermanents.whichPermanents =
+              Filter.And
+                [ Filter.HasCardType CardType.Creature,
+                  Filter.ControlledBy PlayerRelation.You,
+                  Filter.IsAttacking,
+                  Filter.Not Filter.IsBlocked
+                ]
+          }
+      effect =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot Binding.triggerSource,
+              MoveToZone.zone = Zone.Battlefield,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Tapped,
+                    EntryRiders.attacking = True,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              -- Nothing looks back at the move, so it binds no slot.
+              MoveToZone.slot = Nothing,
+              MoveToZone.origin = Just Zone.Hand,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              -- CR 610.1's plain move; rule 702.49a states no "until".
+              MoveToZone.duration = Nothing
+            }
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ReturnPermanents returned]},
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          -- Rule 702.49a states no timing restriction, which leaves CR 117.1b's
+          -- default: a ninja may arrive after blockers are declared.
+          ActivatedAbility.restrictions = [],
+          ActivatedAbility.activator = Activator.Controller,
+          -- CR 702.49a gives the card this ability outright, with no "as long as".
+          ActivatedAbility.condition = Nothing,
+          -- Nothing on every keyword-minted ability: no clause of a card refers to
+          -- one, CR 702's own text being what mints it.
+          ActivatedAbility.name = Nothing,
+          -- Nothing here and written by `mintedBy` at the roster, the one place that
+          -- knows the keyword by identity rather than by reconstructing it.
+          ActivatedAbility.keyword = Nothing
+        }
+
 battlefieldAbilitiesOf :: Map Keyword Natural -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map.toAscList counts)
 
@@ -595,6 +696,9 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- CR 702.67c, in CR 702.6d's words: any of a Fortification's fortify
   -- abilities may be used, so one ability per instance as equip is.
   Keyword.Fortify cost -> List.genericReplicate count (fortify cost)
+  -- CR 702.49a's ability functions from a HAND, so it is minted by
+  -- handAbilitiesFor above and never from the battlefield.
+  Keyword.Ninjutsu _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1074,6 +1178,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.Ninjutsu _ -> []
   Keyword.FirstStrike -> []
   -- CR 702.8a grants no permission, and it is the near miss worth stating: its
   -- SECOND sentence widens the TIME a cast may be proposed at (Cast.instantSpeed)
@@ -1729,6 +1834,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.Ninjutsu _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1987,6 +2093,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.Ninjutsu _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -2145,6 +2252,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
+  Keyword.Ninjutsu _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -2324,6 +2432,7 @@ familyOf keyword = case keyword of
   -- group is what proves it.
   Keyword.Equip _ -> Just KeywordFamily.Equip
   Keyword.Fortify _ -> Just KeywordFamily.Fortify
+  Keyword.Ninjutsu _ -> Just KeywordFamily.Ninjutsu
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
   Keyword.Cycling {} -> Just KeywordFamily.Cycling

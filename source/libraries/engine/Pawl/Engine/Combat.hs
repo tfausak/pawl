@@ -1892,6 +1892,14 @@ attemptAttackDeclaration perform pid rejected = do
 -- 802.3's every defending player included, this being the same announcement --
 -- which Hanweir Garrison's and Meandering Towershell's rulings both require;
 -- elided at one candidate.
+--
+-- Not implemented: the effects rule 508.4 parenthesizes, which specify what the
+-- entering creature attacks and so should not reach this prompt at all. CR
+-- 702.49c is one -- a ninja arriving through ninjutsu attacks whatever the
+-- returned creature was attacking -- and Ninja of the Deep Hours is it in the
+-- pool; its controller is asked here instead (#3019). Identical on a board with
+-- one thing to attack, which is the board Pawl.ActivateSpec's Ninjutsu group
+-- runs on.
 putOntoBattlefieldAttacking :: ObjectId -> Game ()
 putOntoBattlefieldAttacking oid = do
   gs <- State.get

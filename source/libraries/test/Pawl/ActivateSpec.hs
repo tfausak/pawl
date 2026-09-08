@@ -45,6 +45,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
@@ -57,6 +58,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -76,6 +78,7 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -83,6 +86,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -539,6 +543,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
   cyclingSpec s registry
   equipSpec s registry
   reinforceSpec s registry
+  ninjutsuSpec s registry
   authoredHandAbilitySpec s registry
 
 -- CR 702.29: cycling, the first activated ability in the pool that is activated
@@ -570,6 +575,128 @@ fluctuatorBoard forest mauler piker lands mFluctuator =
       (_, g2) = S.addLibraryCard piker S.alice g1
       (g3, oid) = S.handOne mauler g2
    in (oid, g3 {GameState.priority = Just S.alice})
+
+-- CR 702.49: ninjutsu, cycling's neighbour on the hand roster and the first
+-- keyword-minted hand ability whose EFFECT puts its own card onto the
+-- battlefield. Ninja of the Deep Hours is a {3}{U} 2/2 Human Ninja with
+-- "Ninjutsu {1}{U}" and a combat-damage draw trigger; the creature half is never
+-- cast below, so every test isolates the keyword.
+--
+-- The board: alice attacks bob with a Goblin Piker and nothing blocks it, two
+-- Islands pay the {1}{U}, and the Ninja is in her hand. bob controls nothing at
+-- all, which is what leaves the Piker unblocked and is the one thing the negative
+-- board changes back.
+ninjutsuBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ninjutsuBoard s registry = do
+  (ninjaId, attackerId, gs) <- ninjutsuBeforeAttack s registry
+  pure (ninjaId, attackerId, (S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.alice})
+
+-- ninjutsuBoard one turn-based action earlier: the same seats, the same mana and
+-- the same hand, with the attack not yet declared. The paired control for every
+-- negative, so an offer that appears is CR 702.49a's return component finding a
+-- payer and nothing else.
+ninjutsuBeforeAttack :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ninjutsuBeforeAttack s registry = do
+  ninja <- S.printingOf s registry "Ninja of the Deep Hours"
+  piker <- S.printingOf s registry "Goblin Piker"
+  island <- S.printingOf s registry "Island"
+  let (g0, ours, _) = S.combatBoardOf [piker] []
+      (_, g1) = S.addPermanent island S.alice g0
+      (_, g2) = S.addPermanent island S.alice g1
+      (ninjaId, g3) = S.addHandCard ninja S.alice g2
+      attackerId = case ours of
+        oid : _ -> oid
+        -- combatBoardOf returns one id per printing given, so this is
+        -- unreachable; a bogus id fails the assertions rather than the suite.
+        [] -> S.noSource
+  pure (ninjaId, attackerId, g3 {GameState.priority = Just S.alice})
+
+-- The battlefield ids the second state has and the first does not. The ninjutsu
+-- effect moves a card out of a hand, so CR 400.7 gives the arriving permanent a
+-- NEW id and the hand id cannot be asserted on; the Piker went home as the cost
+-- was paid, so the difference across the resolution is exactly the Ninja.
+arrivedOnBattlefield :: GameState.GameState -> GameState.GameState -> [ObjectId.ObjectId]
+arrivedOnBattlefield before after = Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before))
+
+ninjutsuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ninjutsuSpec s registry = Spec.describe s "Ninjutsu" $ do
+  -- CR 702.49a: "Ninjutsu is an activated ability that functions only while the
+  -- card with ninjutsu is in a player's hand."
+  Spec.it s "CR 702.49a ninjutsu is offered from the hand" $ do
+    (ninjaId, _, gs) <- ninjutsuBoard s registry
+    Spec.assertBool s (not (null (activationsOf ninjaId (Action.legalActions S.alice gs)))) "an Activate is offered for the Ninja"
+
+  -- The whole card. CR 702.49a's effect -- "Put this card onto the battlefield
+  -- from your hand tapped and attacking" -- is what the first assertion reads,
+  -- and it is read AFTER the ability resolved rather than off the stack, so a
+  -- wrong implementation would have had the Ninja untapped, not attacking, or
+  -- still in the hand at the moment it is asked.
+  --
+  -- The Piker is in alice's hand BEFORE the Ninja arrives, which is rule 702.49a
+  -- putting the return in the cost rather than in the effect.
+  Spec.it s "CR 702.49a whole card: the Piker goes home and the Ninja arrives tapped and attacking" $ do
+    (ninjaId, attackerId, gs) <- ninjutsuBoard s registry
+    case Activate.abilitiesFor ninjaId gs of
+      [ability] -> do
+        let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice ninjaId ability))
+            resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+            arrived = arrivedOnBattlefield activated resolved
+        case arrived of
+          [oid] -> do
+            Spec.assertEqWith s "CR 702.49a the Ninja is attacking bob" (Map.lookup oid (Combat.Type.attackers (GameState.combat resolved))) (Just (AttackTarget.OfPlayer S.bob))
+            Spec.assertEqWith s "CR 702.49a and it arrived tapped" (fmap Object.tapped (Game.lookupObject oid resolved)) (Just TapState.Tapped)
+          _ -> Spec.assertFailure s ("expected exactly one Ninja on the battlefield, got " <> show (length arrived))
+        Spec.assertEqWith s "the Piker was attacking on the battlefield to begin with" (Set.member attackerId (GameState.battlefield gs)) True
+        Spec.assertEqWith
+          s
+          "CR 400.3 the Piker left the battlefield for its owner's hand as the cost was paid, while the Ninja is still in hand and the draw ability still on the stack"
+          (Set.member attackerId (GameState.battlefield activated), length (Game.zoneMembers Zone.Hand S.alice activated))
+          (False, 2)
+        Spec.assertEqWith s "and only the Piker is left in hand once the Ninja has arrived" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 1
+        Spec.assertBool s (Maybe.isNothing (Game.lookupObject ninjaId resolved)) "CR 400.7 the hand id is gone; the permanent is a new object"
+      _ -> Spec.assertFailure s "expected exactly one ninjutsu ability"
+
+  -- The cost's own gate, against the board one turn-based action earlier. Same
+  -- Islands, same hand, same seats: the only difference is whether alice has
+  -- declared an attack, so nothing to return is the whole reason.
+  Spec.it s "CR 702.49a ninjutsu is not offered with no unblocked attacker to return" $ do
+    (ninjaId, _, gs) <- ninjutsuBeforeAttack s registry
+    Spec.assertBool s (null (activationsOf ninjaId (Action.legalActions S.alice gs))) "no Activate offered before attackers are declared"
+
+  -- The ability rule 702.49a MEANS: the printed {1}{U} plus the rule's return
+  -- component. LAST in the group deliberately: it is a shape assertion, so any
+  -- mutation of the minted cost reddens it, and the three gameplay cases above
+  -- have to be able to report first.
+  --
+  -- The reveal is NOT in the cost: CR 602.2a reveals a card whose ability is
+  -- activated from a hidden zone anyway, which is what
+  -- Pawl.Engine.Activate.revealIfHidden does on this road.
+  Spec.it s "CR 702.49a the minted cost is the printed one plus the return" $ do
+    ninja <- S.printingOf s registry "Ninja of the Deep Hours"
+    (ninjaId, _, gs) <- ninjutsuBoard s registry
+    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.combinedFace ninja)) []
+    case Activate.abilitiesFor ninjaId gs of
+      [ability] ->
+        Spec.assertEqWith
+          s
+          "the printed {1}{U} plus rule 702.49a's unblocked attacking creature you control"
+          (ActivatedAbility.cost ability)
+          ( Cost.Type.MkCost
+              (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)]))
+              [ CostComponent.ReturnPermanents
+                  ( ReturnPermanents.MkReturnPermanents
+                      1
+                      ( Filter.Type.And
+                          [ Filter.Type.HasCardType CardType.Creature,
+                            Filter.Type.ControlledBy PlayerRelation.You,
+                            Filter.Type.IsAttacking,
+                            Filter.Type.Not Filter.Type.IsBlocked
+                          ]
+                      )
+                  )
+              ]
+          )
+      abilities -> Spec.assertFailure s ("expected exactly one ability, got " <> show (length abilities))
 
 cyclingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cyclingSpec s registry = Spec.describe s "Cycling" $ do

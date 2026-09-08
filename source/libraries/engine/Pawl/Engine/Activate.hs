@@ -698,13 +698,18 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
 -- nothing to activate, and mana abilities never reach this function (CR 605.3b
 -- keeps them off the stack).
 --
--- CR 701.20a's duration -- revealed until the ability leaves the stack -- is not
--- modeled, and is vacuous for every card in `data/cards/`: every ability a hand
--- offers there discards the card as a cost, whether rule 702 minted that cost
--- (CR 702.29a's cycling, CR 702.77a's reinforce) or the card authored it (Faerie
--- Macabre, CR 113.6j), so the card is in a public
--- graveyard a moment later. A forecast ability (CR 702.57a) is the shape that
--- would make the duration observable; none is in the pool (#1408).
+-- This reveal is also what CR 702.49a's "Reveal this card from your hand" comes
+-- to. Rule 602.2a fires on the same activation and rule 701.20a gives the two one
+-- duration, so Pawl.Engine.Keyword.ninjutsu mints no reveal component of its own
+-- and nothing in Pawl.Types.CostComponent reveals anything.
+--
+-- Not implemented: CR 701.20a's duration, revealed from announcement until the
+-- ability leaves the stack. Nothing stores it, so a player deciding a response
+-- cannot see the revealed card (#1408). Vacuous for cycling and reinforce, whose
+-- minted costs discard the card (CR 702.29a, CR 702.77a) as Faerie Macabre's
+-- authored one does (CR 113.6j), leaving it in a public graveyard a moment later.
+-- NOT vacuous for ninjutsu, whose card stays in its owner's hand for the whole
+-- window; Ninja of the Deep Hours is the first card in `data/cards/` this bites.
 revealIfHidden :: PlayerId -> ObjectId -> Game ()
 revealIfHidden pid srcId = do
   gs <- State.get
