@@ -18,10 +18,6 @@ import qualified Pawl.Codec.PlayerControl as PlayerControl.Codec
 import qualified Pawl.Codec.PlayerId as PlayerId.Codec
 import qualified Pawl.Codec.Printing as Printing.Codec
 import qualified Pawl.Engine.Card as Card
--- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
--- evaluator module Pawl.Engine.Filter is not imported here today, but the alias
--- convention is fixed project-wide so a later import never collides.
-
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Setup as Setup

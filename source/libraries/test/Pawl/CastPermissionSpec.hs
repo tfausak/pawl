@@ -15,12 +15,6 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator Pawl.Engine.Filter already claims the alias Filter.
-
--- Aliased Card.Type, per the project-wide convention (CardSpec): the logic
--- module Pawl.Engine.Card may later be imported and must not collide.
-
 import Pawl.CastProhibitionSpec (equipBoard, flashBoard, flashOnOwnTurn, isActivateOf, isPlay, landDropBoard, nextTurnFor, orreryScopeBoard, playEveryLand)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate

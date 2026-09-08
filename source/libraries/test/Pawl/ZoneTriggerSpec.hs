@@ -56,9 +56,6 @@ import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
--- Aliased Condition.Type, not Condition, per the project-wide convention
--- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
--- and must not collide.
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget

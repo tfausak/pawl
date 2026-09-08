@@ -107,8 +107,6 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator Pawl.Engine.Filter already claims the alias Filter.
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry

@@ -85,8 +85,6 @@ import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
--- The logic module, alongside Pawl.Types.Modal below: unambiguous under one alias
--- because the two export disjoint names (CardSpec's precedent).
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack

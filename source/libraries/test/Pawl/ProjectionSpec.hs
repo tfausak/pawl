@@ -35,10 +35,6 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
--- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Engine.Filter already claims
--- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
--- aliased Subtype.Type below for the same reason, against Pawl.Engine.Subtype.
-
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -46,9 +42,6 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
--- Pawl.Types.Action aliased Action.Type: Pawl.Engine.Action already claims the
--- alias Action above (the same phase exception Filter takes).
-
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility

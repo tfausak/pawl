@@ -12,9 +12,6 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Cycling as Cycling
--- Aliased Filter.Type, not Type, because the evaluator module Pawl.Engine.Filter
--- already claims the alias Filter (a documented exception to alias-to-last-
--- component, per the M4.5 P9 plan's global constraints).
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter.Type
