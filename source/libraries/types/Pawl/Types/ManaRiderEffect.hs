@@ -15,6 +15,14 @@ module Pawl.Types.ManaRiderEffect where
 -- The interpreter is Pawl.Engine.ManaRider, which is where the casing lives so
 -- that Pawl.Engine.Event.counterOne can ask one typed question --
 -- Pawl.Engine.PlayerEffect.cantBeCountered's arrangement, and for its reason.
+--
+-- An arm is answered on one of two roads, and which one is a property of the
+-- payload rather than a choice: a payload nothing but the rule asking it can
+-- observe is read back off CR 400.7d's record when that rule asks
+-- (Pawl.Engine.ManaRider.uncounterable), and one with an independently
+-- observable existence is MINTED at payment (Pawl.Engine.ManaRider.granted),
+-- which is CR 106.6a's "a separate effect is created once for each mana
+-- produced".
 data ManaRiderEffect
   = -- | CR 701.6a, denied through CR 101.2: the spell the mana paid for can't
     -- be countered. Boseiju, Who Shelters All's "if that mana is spent on an
@@ -28,4 +36,12 @@ data ManaRiderEffect
     -- has no atom naming an arbitrary ObjectId, so no such stored effect can be
     -- narrowed to the one spell this mana paid for.
     CantBeCountered
+  | -- | CR 702.10 for a duration CR 514.2 ends: the spell the mana paid for
+    -- gains haste until end of turn. Generator Servant's "if that mana is spent
+    -- on a creature spell, it gains haste until end of turn" is the printing.
+    --
+    -- The grant rides CR 400.7a onto the permanent the spell becomes
+    -- (Pawl.Engine.Event.carryOver), which is what makes it observable at all --
+    -- a haste on a spell is nothing.
+    GainsHasteUntilEndOfTurn
   deriving (Bounded, Enum, Eq, Ord, Show)
