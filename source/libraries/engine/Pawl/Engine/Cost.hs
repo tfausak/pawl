@@ -701,6 +701,7 @@ substituteXInComponent x component = case component of
   CostComponent.ExileThis -> component
   CostComponent.ExileCardsFromGraveyard {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
+  CostComponent.ExileCardFromHand _ -> component
   CostComponent.MillCards _ -> component
 
 -- Does this cost contain an X (CR 107.3)? What decides whether the caster is
@@ -754,6 +755,7 @@ componentHasVariable component = case component of
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.ExileCardFromHand _ -> False
   CostComponent.MillCards _ -> False
 
 -- CR 601.2b: the greatest value of X this player could legally announce -- what
@@ -837,6 +839,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.ExileCardFromHand _ -> False
   CostComponent.MillCards _ -> False
 
 -- CR 101.1: the ceiling this face's own words put on CR 601.2b's announced X --
@@ -1115,6 +1118,7 @@ loyaltyAmountOf component = case component of
   CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
+  CostComponent.ExileCardFromHand _ -> Nothing
   CostComponent.MillCards _ -> Nothing
 
 -- CR 606.5: multiple costs to add or remove loyalty counters are combined into a
@@ -1188,8 +1192,9 @@ zoneOfComponent component = case component of
   CostComponent.DiscardCards {} -> Nothing
   -- Nothing, and NOT Just Zone.Hand as DiscardThis above answers, for the same
   -- reason the arms above give: CR 113.6m asks about an ability that moves THE
-  -- OBJECT IT'S ON, and this moves another card out of the payer's hand.
+  -- OBJECT IT'S ON, and these move another card out of the payer's hand.
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
+  CostComponent.ExileCardFromHand _ -> Nothing
   -- Nothing, and NOT Just Zone.Library, for the arms above's reason: CR 701.17a
   -- mills the cards on top of the paying player's library, which are OTHER cards
   -- than the object the cost is on -- a Millikin on the battlefield is not in the
@@ -1224,12 +1229,16 @@ statesHiddenQuality cost = any componentStatesHiddenQuality (Cost.components cos
 
 componentStatesHiddenQuality :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 componentStatesHiddenQuality component = case component of
-  -- One of the two True-capable arms: CR 701.9a discards from the HAND, CR
+  -- One of the three True-capable arms: CR 701.9a discards from the HAND, CR
   -- 400.2's hidden zone, and the criterion is the rule's stated quality --
   -- Magmatic Insight's "discard a land card" states one, Cathartic Reunion's
   -- "discard two cards" does not.
   CostComponent.DiscardCards d -> Filter.statesAQuality (DiscardCards.whichCards d)
-  -- The other: CR 118.12's hand-to-battlefield cost reads the same hidden zone,
+  -- The second: CR 406.2's exile reads the same hidden hand, so the criterion
+  -- decides -- Jhoira of the Ghitu's "a nonland card" states a quality,
+  -- Cadaverous Bloom's "a card" does not.
+  CostComponent.ExileCardFromHand criterion -> Filter.statesAQuality criterion
+  -- The third: CR 118.12's hand-to-battlefield cost reads the same hidden zone,
   -- and every printing of it names a quality -- Hakbal of the Surging Soul's "a
   -- land card". The DESTINATION is not what rule 118.8c asks about; the zone the
   -- cards are described IN is, and that is the hand.
@@ -1320,6 +1329,17 @@ discardCandidates slots pid oid criterion gs =
 -- pools cannot disagree about what a hand holds.
 putOntoBattlefieldCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 putOntoBattlefieldCandidates = discardCandidates
+
+-- The cards this player may exile to pay an ExileCardFromHand component on
+-- `oid`: the same pool again, read out of the same hidden zone (CR 402.3) and
+-- narrowed by the same criterion through the same CR 613 projection. The
+-- DESTINATION is what separates this component from the two above, and CR 406.2
+-- says nothing about which cards may go there, so nothing separates the pools.
+--
+-- `oid` is excluded, discardCandidates' CR 601.2a exclusion: a card being cast is
+-- on the stack and not in the hand this reads.
+exileFromHandCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+exileFromHandCandidates = discardCandidates
 
 -- The cards this player may exile to pay an ExileCardsFromGraveyard component:
 -- their OWN graveyard, in its own order, narrowed by the criterion. Per-owner by
@@ -1485,6 +1505,17 @@ claimOf slots pid oid component gs = case component of
   -- measures, so no board separates this from any other axis.
   CostComponent.PutCardFromHandOntoBattlefield criterion ->
     claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (putOntoBattlefieldCandidates slots pid oid criterion gs)) 1
+  -- The same hand pool and the same axis: CR 406.2's exile spends a card leaving
+  -- the hand exactly as a discard does. LOAD-BEARING and not a fence -- Cadaverous
+  -- Bloom's cost has no mana part, so `repeatsOf` reads this claim to decide how
+  -- many times the ability can be activated, which is the hand's size.
+  --
+  -- The pool excludes only the object the COST is on, so a spell being offered
+  -- counts as fuel for the source that would pay for it -- CR 601.2a has moved it
+  -- to the stack by the time CR 601.2h pays, and this reading is one card too
+  -- generous at the offer (gap #3393).
+  CostComponent.ExileCardFromHand criterion ->
+    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
     claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid criterion gs)) n
   -- A pool of at most ONE, CR 404.2's order having picked it.
@@ -1881,6 +1912,7 @@ uncountedCeiling component = case component of
   CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis _ -> Nothing
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
+  CostComponent.ExileCardFromHand _ -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
@@ -2076,6 +2108,7 @@ lifeOwedByComponent component = case component of
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
+  CostComponent.ExileCardFromHand _ -> 0
   CostComponent.MillCards _ -> 0
 
 -- The +1\/+1 counters a cost takes OFF the object it is on, added up --
@@ -2117,6 +2150,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
+  CostComponent.ExileCardFromHand _ -> 0
   CostComponent.MillCards _ -> 0
 
 -- CR 118.3 for ONE component. `slots` is what CR 601.2c has bound, or would bind
@@ -2225,6 +2259,15 @@ canPayComponent slots pid oid component gs = case component of
   -- branch with no prompt at all.
   CostComponent.PutCardFromHandOntoBattlefield criterion ->
     not (null (putOntoBattlefieldCandidates slots pid oid criterion gs))
+  -- CR 118.3: payable only if the hand holds a card the criterion admits, the
+  -- arm above's reading. `claimOf` must agree.
+  --
+  -- REDUNDANT with that claim on every board Cadaverous Bloom can build, the
+  -- ReturnPermanents arm's note above: relaxing this arm to True leaves
+  -- Pawl.CostSpec's Cadaverous Bloom cases green, the empty claim pool refusing
+  -- the same activation. A FENCE, not proven behaviour.
+  CostComponent.ExileCardFromHand criterion ->
+    not (null (exileFromHandCandidates slots pid oid criterion gs))
   -- CR 702.29a: payable only while the card is in the paying player's hand.
   -- Asked of the zone and the owner rather than of control, CR 108.4 giving a
   -- card in a hand no controller and CR 400.3 putting it in its OWNER's.
@@ -2341,6 +2384,7 @@ criteriaOf component = case component of
   CostComponent.ReturnPermanents ret -> [ReturnPermanents.whichPermanents ret]
   CostComponent.DiscardCards discard -> [DiscardCards.whichCards discard]
   CostComponent.PutCardFromHandOntoBattlefield criterion -> [criterion]
+  CostComponent.ExileCardFromHand criterion -> [criterion]
   CostComponent.ExileCardsFromGraveyard exile -> [ExileCardsFromGraveyard.whichCards exile]
   CostComponent.ExileTopFromGraveyard criterion -> [criterion]
   -- The rest carry no criterion at all: each names either the source object or
@@ -2856,6 +2900,7 @@ paidInSecondPass component = case component of
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.ExileCardFromHand _ -> False
   -- These move no object at all.
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
@@ -2939,6 +2984,7 @@ orderSensitive component = case component of
   CostComponent.PutCardFromHandOntoBattlefield _ -> True
   CostComponent.ExileCardsFromGraveyard {} -> True
   CostComponent.ExileTopFromGraveyard _ -> True
+  CostComponent.ExileCardFromHand _ -> True
   CostComponent.ExileThisFromGraveyard -> True
   CostComponent.ExileThis -> True
   CostComponent.TapThis -> True
@@ -3711,6 +3757,29 @@ payComponent moment slots pid oid component = case component of
             answer <- Game.choose (Prompt.ChooseCardInHand decider pid oid (first NonEmpty.:| (second : more)))
             pure (if List.elem answer held then answer else first)
         Event.changeZone chosen Zone.Battlefield
+        pure bindsNothing
+  -- CR 406.2's move out of the hidden hand, PutCardFromHandOntoBattlefield's arm
+  -- above with the other destination: the candidates are re-read HERE so an
+  -- earlier component of the same cost that emptied the hand leaves this Unpaid,
+  -- and the prompt is raised only at two or more, one candidate leaving nothing
+  -- to put to anybody. FILTERED and not trusted (#222) -- an answer naming a card
+  -- that was never offered falls back to the first.
+  --
+  -- Through Event.changeZone, CR 400.7's funnel, so the exile is a zone change
+  -- like any other and a CR 603.6a leaves-the-hand watcher sees it.
+  CostComponent.ExileCardFromHand criterion -> do
+    gs <- State.get
+    let held = exileFromHandCandidates slots pid oid criterion gs
+        decider = Decide.deciderFor pid gs
+    case held of
+      [] -> pure Payment.Unpaid
+      first : rest -> do
+        chosen <- case rest of
+          [] -> pure first
+          second : more -> do
+            answer <- Game.choose (Prompt.ChooseCardInHand decider pid oid (first NonEmpty.:| (second : more)))
+            pure (if List.elem answer held then answer else first)
+        Event.changeZone chosen Zone.Exile
         pure bindsNothing
   -- CR 107.14: paying energy removes that many energy counters from the player.
   -- Natural subtraction is PARTIAL, so `left` is guarded; canPayComponent
