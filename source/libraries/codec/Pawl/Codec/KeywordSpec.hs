@@ -412,6 +412,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (fortify 3)
       " {\"type\":\"Fortify\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (fortify 3) /= Codec.encode Keyword.codec (Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []) Nothing))) "and is not equip"
+  -- CR 702.49a's payload is a bare Cost, fortify's shape, and the arm is
+  -- Arm.tagged: a Keyword constructor ships with no wire format and nothing red
+  -- unless a case like this one is written (#1715).
+  Spec.it s "Ninjutsu carries its cost" $ do
+    let ninjutsu n = Keyword.Ninjutsu (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (ninjutsu 2)
+      " {\"type\":\"Ninjutsu\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (ninjutsu 2) /= Codec.encode Keyword.codec (ninjutsu 3)) "the cost is part of the encoding"
   -- CR 702.87a's payload is a Cost, and the tag must not collide with the level
   -- COUNTER's -- CounterKind's "Level" and this keyword's "LevelUp" are two
   -- different wire tags for the two halves of rule 711.

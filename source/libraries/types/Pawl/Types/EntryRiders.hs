@@ -37,8 +37,14 @@ import qualified Pawl.Types.TapState as TapState
 --
 -- `attacking` is a Bool rather than an AttackTarget because the effect does not
 -- say WHAT the creature attacks; whom it attacks is chosen as it enters, by
--- Pawl.Engine.Combat.putOntoBattlefieldAttacking. CR 508.4's parenthetical case
--- of an effect that does specify has no card in the pool.
+-- Pawl.Engine.Combat.putOntoBattlefieldAttacking.
+--
+-- Not implemented: CR 508.4's parenthetical case, an effect that DOES specify
+-- what the entering creature attacks. CR 702.49c is that case and Ninja of the
+-- Deep Hours is it in the pool -- the arriving ninja should attack whatever the
+-- returned creature was attacking (#3019). A Bool cannot say it, and the field
+-- `blocking` one line down, which names a slot for CR 509.4's counterpart, is
+-- the shape this one would take.
 --
 -- `blocking` is CR 509.4's rider, and its ASYMMETRY with `attacking` one field
 -- up is the design call rather than an oversight. CR 509.4's parenthetical --

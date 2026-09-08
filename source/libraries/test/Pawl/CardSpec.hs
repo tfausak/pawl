@@ -2662,6 +2662,10 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.67a's payload is equip's, and so is this: the "target land you
   -- control" filter its minted ability carries is the ENGINE's, never a card's.
   Keyword.Fortify cost -> costFilters cost
+  -- CR 702.49a carries a whole Cost, so a Filter inside it is the card's. The
+  -- "unblocked attacking creature you control" filter its minted ability carries
+  -- is the ENGINE's, never a card's.
+  Keyword.Ninjutsu cost -> costFilters cost
   -- CR 702.24a carries a whole Cost, so a Filter inside it is the card's.
   Keyword.CumulativeUpkeep cost -> costFilters cost
   Keyword.FirstStrike -> []
