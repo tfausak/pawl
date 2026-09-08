@@ -187,6 +187,8 @@ rewriteModification pairs m =
         Modification.AddCreatureSubtype s -> Modification.AddCreatureSubtype (swap Subtype.isCreatureType from to s)
         -- Holds no word to swap: it names CR 205.3m's list, not a member of it.
         Modification.AddEveryCreatureSubtype -> acc
+        -- The removal over that same list, and no word to swap for the same reason.
+        Modification.LoseEveryCreatureSubtype -> acc
         -- Deliberately unrewritten. CR 612.2 changes only a word used in the
         -- correct way, and this arm carries no family to check the word against;
         -- the two family-tagged adds above are where a land-type or creature-type
