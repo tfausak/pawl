@@ -1070,7 +1070,7 @@ activateAbility pid srcId ability = do
                   --
                   -- After the payment for Cast.castSpell's reason: everything
                   -- above can still restore `before` and unwind the activation.
-                  Event.becameTarget abilId StackObjectKind.Ability pid chosen
+                  Event.becameTarget abilId StackObjectKind.ActivatedAbility pid chosen
                 -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason:
                 -- a mana ability tapped in the window this payment opened may
                 -- have shuffled or revealed, and this reject-not-repair

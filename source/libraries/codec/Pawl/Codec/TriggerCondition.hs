@@ -13,6 +13,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Codec.PermanentTappedForMana as PermanentTappedForMana
+import qualified Pawl.Codec.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Codec.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Codec.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -111,6 +112,7 @@ codec =
       Arm.nullary "SelfCast" TriggerCondition.SelfCast,
       Arm.payload "SelfBecomesTargeted" PlayerRelation.codec TriggerCondition.SelfBecomesTargeted (\x -> case x of TriggerCondition.SelfBecomesTargeted y -> Just y; _ -> Nothing),
       Arm.payload "ControllerBecomesTarget" ControllerBecomesTarget.codec TriggerCondition.ControllerBecomesTarget (\x -> case x of TriggerCondition.ControllerBecomesTarget y -> Just y; _ -> Nothing),
+      Arm.payload "PermanentsBecomeTargeted" PermanentsBecomeTargeted.codec TriggerCondition.PermanentsBecomeTargeted (\x -> case x of TriggerCondition.PermanentsBecomeTargeted y -> Just y; _ -> Nothing),
       Arm.payload "SelfHalfUnlocked" CardName.codec TriggerCondition.SelfHalfUnlocked (\x -> case x of TriggerCondition.SelfHalfUnlocked y -> Just y; _ -> Nothing),
       Arm.payload "RoomFullyUnlocked" PlayerRelation.codec TriggerCondition.RoomFullyUnlocked (\x -> case x of TriggerCondition.RoomFullyUnlocked y -> Just y; _ -> Nothing),
       Arm.payload "AnyOf" (Common.list codec) TriggerCondition.AnyOf (\x -> case x of TriggerCondition.AnyOf y -> Just y; _ -> Nothing),

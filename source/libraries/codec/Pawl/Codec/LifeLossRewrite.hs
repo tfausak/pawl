@@ -11,5 +11,6 @@ codec =
   Arm.tagged
     [ Arm.payload "LeaveAtLeast" Common.natural LifeLossRewrite.LeaveAtLeast (\x -> case x of LifeLossRewrite.LeaveAtLeast y -> Just y; _ -> Nothing),
       Arm.payload "Scaled" Scaling.codec LifeLossRewrite.Scaled (\x -> case x of LifeLossRewrite.Scaled y -> Just y; _ -> Nothing),
-      Arm.nullary "ExileFromTopOfYourLibrary" LifeLossRewrite.ExileFromTopOfYourLibrary
+      Arm.nullary "ExileFromTopOfYourLibrary" LifeLossRewrite.ExileFromTopOfYourLibrary,
+      Arm.nullary "GainInstead" LifeLossRewrite.GainInstead
     ]

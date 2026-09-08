@@ -100,6 +100,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
@@ -250,7 +251,7 @@ ownQuantities effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> [quantity]
     Discard.These {} -> []
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> [quantity]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]

@@ -173,6 +173,7 @@ import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
@@ -1703,11 +1704,11 @@ copyOnStackOf source = case source of
   -- reading pawl can observe; Pawl.PreparationSpec's "CR 722.3d Twincast copies
   -- the cast Jump and the copy is a Jump of its own" is what proves it.
   Source.OfCardCopy pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
-  Source.OfAbility a -> Just (Source.OfAbility a, StackObjectKind.Ability)
-  Source.OfTrigger t -> Just (Source.OfTrigger t, StackObjectKind.Ability)
+  Source.OfAbility a -> Just (Source.OfAbility a, StackObjectKind.ActivatedAbility)
+  Source.OfTrigger t -> Just (Source.OfTrigger t, StackObjectKind.TriggeredAbility)
   -- CR 725.2's sourceless triggered ability is a triggered ability all the same,
   -- and Pawl.Engine.Target.abilityRecipients offers it, so it copies like one.
-  Source.OfInherentTrigger t -> Just (Source.OfInherentTrigger t, StackObjectKind.Ability)
+  Source.OfInherentTrigger t -> Just (Source.OfInherentTrigger t, StackObjectKind.TriggeredAbility)
   -- CR 707.10 copies what is ON THE STACK, and none of these three ever is: a
   -- melded permanent and a token are put onto the battlefield (CR 701.42a, CR
   -- 111.1) and an emblem into the command zone (CR 114.1). CR 202.3c's copy of a
@@ -4061,7 +4062,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- for.
     Monad.forM_ mDiscarded $ \bound ->
       Monad.unless (null moved) (State.modify' (bindObjectsSlot resolving bound (Seq.fromList moved)))
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
+  Effect.LoseLife (LifeLoss.MkLifeLoss ref quantity cause) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -4091,13 +4092,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- in Pawl.Engine.Sba.
               --
               -- Through Event.resolveLifeLoss, CR 614.1's funnel for the class,
-              -- carrying LifeLossCause.ByEffect: a row scoped to damage does not
-              -- reach this road, which is Worship's own ruling ("Worship does not
-              -- prevent loss of life, so loss of life bypasses Worship") and what
+              -- carrying the opcode's own cause -- CR 119.3's ByEffect for every
+              -- printing, CR 728.1a's ByRadiation for the one ability
+              -- Pawl.Engine.Rad mints: a row scoped to damage does not reach this
+              -- road, which is Worship's own ruling ("Worship does not prevent loss
+              -- of life, so loss of life bypasses Worship") and what
               -- Pawl.ReplacementSpec's Worship group proves on a board where the
               -- same player at the same life survives 3 damage and dies to
               -- Stronghold Discipline's 3.
-              settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating n)
+              settled <- Event.resolveLifeLoss cause pid (Integer.toNaturalSaturating n)
               Event.changeLife pid (negate (toInteger settled))
         _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror but for the sign. The `n > 0` guard
@@ -4582,7 +4585,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- read it back off.
                 stampCopiable = case kind of
                   StackObjectKind.Spell -> Binding.setCopy (Event.copiedSnapshot original gs)
-                  StackObjectKind.Ability -> id
+                  StackObjectKind.ActivatedAbility -> id
+                  StackObjectKind.TriggeredAbility -> id
                 copy =
                   obj
                     { Object.source = copySource,

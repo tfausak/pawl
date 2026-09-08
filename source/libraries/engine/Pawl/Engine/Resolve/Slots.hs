@@ -96,6 +96,7 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
@@ -697,7 +698,7 @@ effectPlayerRefs effect = case effect of
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.Explore {} -> []
   Effect.Discard {} -> []
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.LoseLife (LifeLoss.MkLifeLoss ref _ _) -> [ref]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.ExchangeLifeTotals {} -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
@@ -899,7 +900,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
     -- every player the slot names.
     Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
     Discard.These {} -> Map.empty
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> quantitySlots quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
@@ -1447,7 +1448,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.slotsAreExhaustive quantity
     Discard.These {} -> True
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -1660,7 +1661,7 @@ readsX = any effectReadsX
       Effect.Discard subject -> case subject of
         Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
         Discard.These {} -> False
-      Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> Quantity.readsX quantity
       Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.ExchangeLifeTotals _ -> False
       Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity

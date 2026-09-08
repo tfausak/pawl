@@ -103,6 +103,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
+import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -2265,7 +2266,7 @@ representativeEvents cond =
         -- the targeting object's controller -- an event BOTH relations admit,
         -- since matchesTrigger reads `you` from the bearer's side and this list
         -- pins the binding rather than the match.
-        TriggerCondition.SelfBecomesTargeted _ -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived StackObjectKind.Ability S.alice))
+        TriggerCondition.SelfBecomesTargeted _ -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived StackObjectKind.ActivatedAbility S.alice))
         -- The same event one recipient over: a targeted PLAYER, which is the axis
         -- separating this condition from the arm above. The kind is taken FROM
         -- the condition so each inhabitant listed below gets an event it
@@ -2273,6 +2274,11 @@ representativeEvents cond =
         -- Safekeeping's Nothing, for which Spell is as representative as Ability.
         -- The controller is bob, an opponent of the targeted alice.
         TriggerCondition.ControllerBecomesTarget c -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToPlayer S.alice) arrived (Maybe.fromMaybe StackObjectKind.Spell (ControllerBecomesTarget.kind c)) S.bob))
+        -- The same event back on the OBJECT axis, the kind taken from the
+        -- condition for the sibling's reason: Professor Hojo's Just
+        -- ActivatedAbility. It binds nothing, CR 603.2c's batch naming no one
+        -- permanent, and the floor below pins that.
+        TriggerCondition.PermanentsBecomeTargeted c -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived (Maybe.fromMaybe StackObjectKind.Spell (PermanentsBecomeTargeted.kind c)) S.bob))
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
@@ -2578,6 +2584,9 @@ everyTriggerCondition =
     -- Safekeeping's pair first, then Dormant Gomazoa's.
     TriggerCondition.ControllerBecomesTarget (ControllerBecomesTarget.MkControllerBecomesTarget PlayerRelation.Opponent Nothing),
     TriggerCondition.ControllerBecomesTarget (ControllerBecomesTarget.MkControllerBecomesTarget PlayerRelation.AnyPlayer (Just StackObjectKind.Spell)),
+    -- Professor Hojo's own, the only inhabitant in the pool: a Filter and a kind
+    -- where the sibling above carries a relation and a kind.
+    TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted Filter.Type.IsSource (Just StackObjectKind.ActivatedAbility)),
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
     -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds
