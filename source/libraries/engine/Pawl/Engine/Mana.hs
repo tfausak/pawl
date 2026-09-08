@@ -1614,7 +1614,10 @@ canPayCommittingGiven subject capacity spending sources pcs pid committed claime
 -- Two GROUPS are still never mixed, since a source offers one option: a
 -- multi-mana yield cannot be taken on one activation and a one-mana yield on the
 -- next, nor can two groups that differ in what an activation costs. Not
--- implemented; no card in the pool has either shape (#1137).
+-- implemented; Cadaverous Bloom ("Exile a card from your hand: Add {B}{B} or
+-- {G}{G}") is the card in the pool that has the first shape, so two activations
+-- buy {B}{B}{B}{B} or {G}{G}{G}{G} and never {B}{B}{G}{G}. Understating supply
+-- only ever refuses a cast that was payable (#1137).
 --
 -- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3

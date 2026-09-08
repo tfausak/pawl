@@ -2265,6 +2265,11 @@ canPayComponent slots pid oid component gs = case component of
     not (null (putOntoBattlefieldCandidates slots pid oid criterion gs))
   -- CR 118.3: payable only if the hand holds a card the criterion admits, the
   -- arm above's reading. `claimOf` must agree.
+  --
+  -- REDUNDANT with that claim on every board Cadaverous Bloom can build, the
+  -- ReturnPermanents arm's note above: relaxing this arm to True leaves
+  -- Pawl.CostSpec's Cadaverous Bloom cases green, the empty claim pool refusing
+  -- the same activation. A FENCE, not proven behaviour.
   CostComponent.ExileCardFromHand criterion ->
     not (null (exileFromHandCandidates slots pid oid criterion gs))
   -- CR 702.29a: payable only while the card is in the paying player's hand.
