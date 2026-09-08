@@ -65,6 +65,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.MeldSource as MeldSource
+import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MovedBetween as MovedBetween
@@ -165,10 +166,10 @@ spec s registry = Spec.describe s "Meld" $ do
               { MeldSource.result = PrintingId.MkPrintingId 8,
                 MeldSource.components = garrison NonEmpty.:| [battlements]
               }
-    Spec.assertEqWith s "the two cards, in order" (Game.componentsOf township) (Seq.fromList [garrison, battlements])
+    Spec.assertEqWith s "the two cards, in order" (Game.componentsOf township) (Seq.fromList [MergeComponent.OfCard garrison, MergeComponent.OfCard battlements])
     -- CR 712.8g: the combined back face is NOT one of them, so a reader summing
     -- the components under CR 202.3c cannot pick up the result's own cost.
-    Spec.assertBool s (Seq.null (Seq.filter (== PrintingId.MkPrintingId 8) (Game.componentsOf township))) "the result is not a component"
+    Spec.assertBool s (Seq.null (Seq.filter (== MergeComponent.OfCard (PrintingId.MkPrintingId 8)) (Game.componentsOf township))) "the result is not a component"
     Spec.assertEqWith s "CR 108.2 an ordinary card represents only itself" (Game.componentsOf (Source.OfCard garrison)) Seq.empty
   -- CR 701.42a's keyword action, driven straight rather than through the card:
   -- the melding ability has its own cases above, and what is proven here is the
@@ -195,7 +196,7 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith
           s
           "both cards represent it"
-          (fmap (Maybe.mapMaybe (\pid -> fmap Printing.card (Game.printingOf pid after)) . Foldable.toList . Game.componentsOf . Object.source) (Game.lookupObject meldedId after))
+          (fmap (Maybe.mapMaybe (\pid -> fmap Printing.card (Game.printingOf pid after)) . Foldable.toList . componentPrintings . Object.source) (Game.lookupObject meldedId after))
           (Just [Printing.card battlements, Printing.card garrison])
         Spec.assertEqWith s "owned by the shared owner of the cards that represent it (CR 110.2)" (fmap Object.owner (Game.lookupObject meldedId after)) (Just S.alice)
         Spec.assertEqWith s "and controlled by the player the effect instructed (CR 110.2a)" (Projection.controllerOf meldedId after) (Just S.alice)
@@ -316,7 +317,7 @@ spec s registry = Spec.describe s "Meld" $ do
             Spec.assertEqWith
               s
               "CR 701.42a both cards represent it"
-              (fmap (Maybe.mapMaybe (\pid -> fmap Printing.card (Game.printingOf pid after)) . Foldable.toList . Game.componentsOf . Object.source) (Game.lookupObject meldedId after))
+              (fmap (Maybe.mapMaybe (\pid -> fmap Printing.card (Game.printingOf pid after)) . Foldable.toList . componentPrintings . Object.source) (Game.lookupObject meldedId after))
               (Just [Printing.card garrison, Printing.card battlements])
           other -> Spec.assertFailure s ("expected exactly one melded permanent, got " <> show (length other))
         -- Neither original is anywhere: the exile the card asked for happened, and
@@ -934,7 +935,7 @@ spec s registry = Spec.describe s "Meld" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
     let (mMelded, board) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
-    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . componentPrintings . Object.source) (Game.lookupObject meldedId board) of
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         [firstPid, secondPid] -> do
@@ -978,7 +979,7 @@ spec s registry = Spec.describe s "Meld" $ do
     let (mMelded, base) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
         (griptideId, withSpell) = S.addHandCard griptide S.alice base
         board = S.landsFor island S.alice 4 withSpell
-    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . componentPrintings . Object.source) (Game.lookupObject meldedId board) of
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         [firstPid, secondPid] -> do
@@ -1026,7 +1027,7 @@ spec s registry = Spec.describe s "Meld" $ do
     let (mMelded, base) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
         (griptideId, withSpell) = S.addHandCard griptide S.alice base
         board = S.landsFor island S.alice 4 withSpell
-    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . componentPrintings . Object.source) (Game.lookupObject meldedId board) of
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         firstPid : _ -> do
@@ -1058,7 +1059,7 @@ spec s registry = Spec.describe s "Meld" $ do
     let (mMelded, base) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
         (unsummonId, withSpell) = S.addHandCard unsummon S.alice base
         board = S.landsFor island S.alice 1 withSpell
-    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . componentPrintings . Object.source) (Game.lookupObject meldedId board) of
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         [firstPid, _] -> do
@@ -1089,7 +1090,7 @@ spec s registry = Spec.describe s "Meld" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
     let (mMelded, board) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
-    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . componentPrintings . Object.source) (Game.lookupObject meldedId board) of
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         firstPid : _ -> do
@@ -1348,3 +1349,10 @@ melded = meldedOn (Setup.emptyGame S.bothPlayers)
 
 thirdOf :: (a, b, c) -> c
 thirdOf (_, _, c) = c
+
+-- CR 712.21: the printings of the cards representing a melded permanent.
+-- Game.componentsOf answers in components, which carry CR 730.2d's card-or-token
+-- kind; a meld pair is two cards (CR 701.42b), so the kind says nothing here and
+-- the printing is the whole of what these cases read.
+componentPrintings :: Source.Source -> Seq.Seq PrintingId.PrintingId
+componentPrintings = fmap MergeComponent.printing . Game.componentsOf
