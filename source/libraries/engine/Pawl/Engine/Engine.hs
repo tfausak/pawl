@@ -441,6 +441,9 @@ runTurnBasedActions phase = do
       -- splice a second combat damage step in after it. CR 510.3's between-steps
       -- priority and its SBA check come free from the step machinery.
       needSecond <- Damage.dealCombatDamage
+      -- CR 614.1a: what a run-effects rewrite put in a replaced event's place
+      -- runs HERE, before the step's SBA check and before the riders below.
+      Resolve.runDamageRewriteEffects
       -- CR 615.5's "immediately afterward": a shield this wave spent runs its
       -- additional effect HERE, before the step's SBA check, so Test of Faith's
       -- +1/+1 counters are on the blocker before CR 704.5g asks about lethality.

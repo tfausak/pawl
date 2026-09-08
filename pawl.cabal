@@ -646,6 +646,8 @@ library codec
     Pawl.Codec.PayGateSpec
     Pawl.Codec.PayObligation
     Pawl.Codec.PayObligationSpec
+    Pawl.Codec.PendingDamageEffect
+    Pawl.Codec.PendingDamageEffectSpec
     Pawl.Codec.PendingEntryEffect
     Pawl.Codec.PendingEntryEffectSpec
     Pawl.Codec.PerCreature
@@ -1778,6 +1780,7 @@ library types
     Pawl.Types.PaymentMoment
     Pawl.Types.PaymentSubject
     Pawl.Types.PayObligation
+    Pawl.Types.PendingDamageEffect
     Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger
     Pawl.Types.PerCreature

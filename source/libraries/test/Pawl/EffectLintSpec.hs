@@ -561,7 +561,7 @@ engineOnlyOffends replacement = case replacement of
 --     RedirectDamage arm is the one producer (#2378).
 --
 -- A printed one either way would be a rule that does not exist.
-engineMintedDamage :: DamageRewrite.DamageRewrite -> Bool
+engineMintedDamage :: DamageRewrite.DamageRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 engineMintedDamage rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventRemovingShieldCounter -> True
@@ -580,6 +580,9 @@ engineMintedDamage rewrite = case rewrite of
   -- which is exactly the shape a card may print: Pariah's "dealt to enchanted
   -- creature instead" is a Filter and names no id.
   DamageRewrite.RedirectMatching _ -> False
+  -- CR 614.1a's "instead [do something]" is a card's own sentence: the effects
+  -- are card data and the rewrite names no id (Kill-Suit Cultist).
+  DamageRewrite.RunEffects _ -> False
 
 -- The destruction half of the same question. CR 701.19a's regeneration IS printed
 -- (Drudge Skeletons), where CR 122.1c's removal is minted.
@@ -655,7 +658,7 @@ riderWithoutPreventionOffends replacement = case replacement of
 -- shape, and the same classification Pawl.Engine.Replacement.prevents makes --
 -- restated here rather than imported so the lint holds even if that function is
 -- what a change gets wrong.
-preventsDamage :: DamageRewrite.DamageRewrite -> Bool
+preventsDamage :: DamageRewrite.DamageRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 preventsDamage rewrite = case rewrite of
   DamageRewrite.PreventAll -> True
   DamageRewrite.PreventNext _ -> True
@@ -666,6 +669,8 @@ preventsDamage rewrite = case rewrite of
   DamageRewrite.Redirect _ -> False
   DamageRewrite.RedirectNext _ _ -> False
   DamageRewrite.RedirectMatching _ -> False
+  -- Kill-Suit Cultist says "destroy that creature instead" and never "prevent".
+  DamageRewrite.RunEffects _ -> False
 
 -- The non-vacuity half of riderWithoutPreventionOffends' lint, isPhaseR's shape.
 hasRider :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
