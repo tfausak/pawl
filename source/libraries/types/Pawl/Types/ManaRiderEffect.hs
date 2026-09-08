@@ -32,9 +32,11 @@ data ManaRiderEffect
     -- NOT Pawl.Types.Counterability, which is CR 113.6g -- an object's OWN
     -- ability about itself, a field of its face that nothing writes at runtime.
     -- NOT Pawl.Types.PlayerEffect.CantBeCountered either, which is CR 613.11's
-    -- class-scoped rules modification (Prowling Serpopard); Pawl.Types.Filter
-    -- has no atom naming an arbitrary ObjectId, so no such stored effect can be
-    -- narrowed to the one spell this mana paid for.
+    -- class-scoped rules modification (Prowling Serpopard); its scope is a
+    -- Pawl.Types.Filter, which has no atom naming an arbitrary ObjectId, so
+    -- that carrier cannot be narrowed to the one spell this mana paid for.
+    -- (Pawl.Types.Affected's TheseObjects, which the arm below stores, is a
+    -- different axis and names one object exactly.)
     CantBeCountered
   | -- | CR 702.10 for a duration CR 514.2 ends: the spell the mana paid for
     -- gains haste until end of turn. Generator Servant's "if that mana is spent

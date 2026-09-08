@@ -70,8 +70,8 @@ uncounterable oid gs = case Game.lookupObject oid gs of
 -- The effect names the paid-for object as CR 611.2c's fixed set of one and
 -- rides CR 400.7a onto the permanent that spell becomes
 -- (Pawl.Engine.Event.carryOver). That crossing is the whole of what makes the
--- grant observable: haste on a spell is nothing, and Pawl.ManaSpec's Generator
--- Servant case reads the attack rather than the stored row.
+-- grant observable: haste on a spell is nothing, and Pawl.ManaSourceSpec's
+-- Generator Servant case reads the attack rather than the stored row.
 --
 -- `source` is the object being paid for and not the mana's own source, which
 -- Pawl.Types.ManaUnit deliberately does not carry -- mana outlives its source

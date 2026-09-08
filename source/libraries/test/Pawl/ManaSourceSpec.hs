@@ -1615,7 +1615,7 @@ counteredAfter filler cancel island alicesLands victim =
 -- whose payload EXISTS independently of the rule that asks about it, so the lazy
 -- read-back off Pawl.Types.Object.manaSpent is not equivalent and CR 106.6a's
 -- "a separate effect is created once for each mana produced" has to be minted at
--- payment. Generator Servant ({1}{R} Creature -- Elemental, Magic 2015, "{T},
+-- payment. Generator Servant ({1}{R} 2/1 Creature -- Elemental, Magic 2015, "{T},
 -- Sacrifice this creature: Add {C}{C}. If that mana is spent on a creature
 -- spell, it gains haste until end of turn.") is the printing. Nothing is omitted
 -- from the card.

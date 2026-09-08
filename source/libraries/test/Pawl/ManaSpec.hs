@@ -3261,7 +3261,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
 -- SLOT names nobody -- Mana.recipientsOf's own stated posture. Function-level
 -- because no card in data/cards/ pairs Pawl.Types.PlayerRef's EachPlayerExcept
 -- with an AddMana, and adding one to buy a gameplay board would be a card no
--- printing reaches (Scryfall o:"each other player adds", 2026-09-07, no hit;
+-- printing reaches (Scryfall o:"each other player adds", 2026-09-08, no hit;
 -- Yurlok of Scorch Thrash's "each player adds" is the nearest, and it names no
 -- slot).
 --
@@ -3279,7 +3279,7 @@ recipientsSpec s registry = Spec.describe s "recipientsOf" $ do
     Spec.assertEqWith s "CR 605.3b the excluding reference resolves to no recipient at all" (Mana.recipientsOf S.alice board excepting) []
     -- Behind the assertion above, and the guard against it passing because the
     -- board has no players to name: the slotless sibling names all three.
-    Spec.assertEqWith s "CR 106.4 while the slotless EachPlayer beside it names the whole table" (Mana.recipientsOf S.alice board PlayerRef.EachPlayer) [S.alice, S.bob, S.carol]
+    Spec.assertEqWith s "CR 102.1 while the slotless EachPlayer beside it names the whole table" (Mana.recipientsOf S.alice board PlayerRef.EachPlayer) [S.alice, S.bob, S.carol]
 
 -- CR 106.4's other half, which no printing reaches: a mana ability whose mana
 -- the ACTIVATOR can never get. "{T}: Each opponent adds {C}" -- one activated
