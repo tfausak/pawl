@@ -43,7 +43,9 @@
                                 "value": {
                                   "type": "CardArrivedIn",
                                   "value": {
-                                    "type": "Graveyard"
+                                    "to": {
+                                      "type": "Graveyard"
+                                    }
                                   }
                                 }
                               }

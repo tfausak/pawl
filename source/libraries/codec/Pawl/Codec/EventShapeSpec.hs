@@ -1,8 +1,10 @@
 module Pawl.Codec.EventShapeSpec where
 
+import qualified Data.Set as Set
 import qualified Pawl.Codec.EventShape as EventShape
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Zone as Zone
@@ -16,13 +18,15 @@ spec s = Spec.describe s "Pawl.Codec.EventShape" $ do
       EventShape.codec
       (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield Zone.Graveyard))
       " {\"type\":\"MovedBetween\",\"value\":{\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}}} "
-  -- CR 712.21e's second half: one zone, and it is the destination.
+  -- CR 712.21e's second half: the destination, and the origins that do not
+  -- count. Pawl.Codec.CardArrivedInSpec covers the payload's own two shapes;
+  -- this case is here for the tag the arm wraps it in.
   Spec.it s "CardArrivedIn" $
     Common.assertCodec
       s
       EventShape.codec
-      (EventShape.CardArrivedIn Zone.Graveyard)
-      " {\"type\":\"CardArrivedIn\",\"value\":{\"type\":\"Graveyard\"}} "
+      (EventShape.CardArrivedIn (CardArrivedIn.MkCardArrivedIn {CardArrivedIn.to = Zone.Graveyard, CardArrivedIn.excluding = Set.singleton Zone.Battlefield}))
+      " {\"type\":\"CardArrivedIn\",\"value\":{\"excluding\":[{\"type\":\"Battlefield\"}],\"to\":{\"type\":\"Graveyard\"}}} "
   -- CR 601.2i's cast: PAYLOADLESS, so the encoded form is the bare tag and a
   -- decoder that demanded a value would reject every card that names it.
   Spec.it s "SpellCast" $
