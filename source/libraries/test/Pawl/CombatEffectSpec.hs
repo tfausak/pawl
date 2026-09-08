@@ -17,6 +17,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
@@ -1756,6 +1757,50 @@ addForests forest n gs =
   let add (ids, g) _ = let (oid, g1) = S.addPermanent forest S.alice g in (ids <> [oid], g1)
    in List.foldl' add ([], gs) [1 .. n]
 
+-- CR 506.4's becomes-a-battle clause: "A permanent is removed from combat if ...
+-- it's an attacking or blocking creature that ... becomes a battle."
+--
+-- data/cards/synthetic-besiege-the-front.json is the producer -- "Until end of
+-- turn, target creature is a battle in addition to its other types. Put five
+-- defense counters on it." -- and it is synthetic because nothing printed adds
+-- the battle card type in addition to what a permanent already is (Scryfall
+-- o:/battle in addition/ and o:/becomes a battle/ both empty, 2026-09-08). The
+-- five defense counters are load-bearing: CR 310.4c reads a battle's defense off
+-- its counters and CR 704.5w buries a non-Siege battle at defense 0, which would
+-- take the permanent off the battlefield and make this the leaves-the-battlefield
+-- clause instead.
+--
+-- Two attacking Goblin Pikers, one of them granted the type after the
+-- declaration: the pair differs in that grant alone, so bob's life delta cannot
+-- be a failed declaration.
+battleGrantRemovalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+battleGrantRemovalSpec s registry = Spec.describe s "BattleGrantRemoval" $ do
+  Spec.it s "CR 506.4 whole cards: an attacking creature that becomes a battle is removed from combat" $ do
+    let mine =
+          (S.battlefield S.alice [S.settled "grantee" "Goblin Piker", S.settled "other" "Goblin Piker", S.settled "first" "Island", S.settled "second" "Island", S.settled "third" "Island"])
+            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
+            }
+        setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.beginningOfCombat
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "grantee")],
+              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
+            }
+        script =
+          S.turn
+            1
+            [ S.on S.declareAttackers S.alice (S.attack [S.aliasRef "grantee", S.aliasRef "other"]),
+              S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "spell") choices)
+            ]
+    after <- S.play s registry setup script S.combatGame
+    let pikers = S.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) after
+        battles = filter (\oid -> Projection.isBattleOf oid after) pikers
+    -- The discriminating assertion: without the clause the grantee is still an
+    -- attacking creature and bob takes both Pikers' two, for 16.
+    Spec.assertEqWith s "CR 510.1 bob takes only the Piker that stayed in combat" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "CR 508.1k both Pikers really were declared, so this is the removal and not a failed declaration" (length (S.attackerDeclarationsOf after)) 2
+    Spec.assertEqWith s "and the grantee is on the battlefield as a battle at defense five, so CR 704.5w did not bury it" (fmap (\oid -> (S.onBattlefield oid after, S.counterOf CounterKind.Defense oid after)) battles) [(True, 5)]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -1768,5 +1813,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   boundedDeclarationSpec s registry
   controlChangeRemovalSpec s registry
   typeChangeRemovalSpec s registry
+  battleGrantRemovalSpec s registry
   effectRemovalSpec s registry
   savePointSpec s registry
