@@ -745,8 +745,8 @@ standstillSpec s registry =
         standstill <- S.printingOf s registry "Standstill"
         boil <- S.printingOf s registry "Boil"
         piker <- S.printingOf s registry "Goblin Piker"
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
-            stock pid n g = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent mountain pid g2)) g [1 .. (n :: Int)]
+            stock pid n g = List.foldl' (\g2 _ -> snd (S.addLibraryCard piker pid g2)) g [1 .. (n :: Int)]
             (standstillId, withEnchantment) = S.addPermanent standstill S.alice S.threePlayerGame
             -- Four cards each for the two drawers, so CR 104.3c decks nobody.
             stocked = stock S.carol 4 (stock S.alice 4 (addLands S.bob 4 withEnchantment))
@@ -2952,14 +2952,14 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
       Just (stifleIds, _, activated) -> do
         let castAll g oid = S.runPure S.identityAnswer g (S.cast S.alice oid)
             bothCast = List.foldl' castAll activated stifleIds
-            first' = S.runPure S.identityAnswer bothCast Stack.resolveTop
-            second' = S.runPure S.identityAnswer first' Stack.resolveTop
+            first2 = S.runPure S.identityAnswer bothCast Stack.resolveTop
+            second2 = S.runPure S.identityAnswer first2 Stack.resolveTop
         Spec.assertEqWith s "two Stifles were cast onto the ability" (length (GameState.stack bothCast)) 3
-        Spec.assertEqWith s "the first counters the ability" (length (GameState.stack first')) 1
-        Spec.assertEqWith s "and the second fizzles off the stack" (GameState.stack second') []
-        Spec.assertEqWith s "both Stifles are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice second')) 2
-        Spec.assertEqWith s "bob's graveyard stayed empty throughout" (length (Game.zoneMembers Zone.Graveyard S.bob second')) 0
-        Spec.assertEqWith s "and alice never took the damage" (S.lifeOf S.alice second') (Just 20)
+        Spec.assertEqWith s "the first counters the ability" (length (GameState.stack first2)) 1
+        Spec.assertEqWith s "and the second fizzles off the stack" (GameState.stack second2) []
+        Spec.assertEqWith s "both Stifles are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice second2)) 2
+        Spec.assertEqWith s "bob's graveyard stayed empty throughout" (length (Game.zoneMembers Zone.Graveyard S.bob second2)) 0
+        Spec.assertEqWith s "and alice never took the damage" (S.lifeOf S.alice second2) (Just 20)
 
 -- CR 113.3b against CR 113.3c, one kind of ability at a time. Squelch ({1}{U}
 -- Instant, "Counter target activated ability. (Mana abilities can't be

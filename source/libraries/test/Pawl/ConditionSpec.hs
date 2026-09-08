@@ -72,8 +72,8 @@ boardOf :: Printing.Printing -> Integer -> (Count.ViewOf, GameState.GameState)
 boardOf swamp n =
   let gs0 = Setup.emptyGame S.bothPlayers
       step (ids, g) _ =
-        let (oid, g') = S.addPermanent swamp S.alice g
-         in (ids <> [oid], g')
+        let (oid, g2) = S.addPermanent swamp S.alice g
+         in (ids <> [oid], g2)
       (oids, gs) = foldl step ([], gs0) [1 .. n]
       table = fmap (\oid -> (oid, Set.empty, Set.singleton Subtype.Swamp, Just S.alice)) oids
    in (S.stubView table, gs)

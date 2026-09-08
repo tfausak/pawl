@@ -2613,8 +2613,8 @@ terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
         (pikerId, pikerBoard) = S.addHandCard piker S.alice g1
         after = S.runPure (aimAtPlayer S.bob) pikerBoard (S.cast S.alice pikerId >> Engine.priorityLoop)
         (_, g2) = S.addPermanent piker S.alice (S.landsFor mountain S.alice 5 (Setup.emptyGame S.bothPlayers))
-        (terrorId, terrorBoard') = S.addHandCard terror S.alice g2
-        itself = S.runPure (aimAtPlayer S.bob) terrorBoard' (S.cast S.alice terrorId >> Engine.priorityLoop)
+        (terrorId, terrorBoard2) = S.addHandCard terror S.alice g2
+        itself = S.runPure (aimAtPlayer S.bob) terrorBoard2 (S.cast S.alice terrorId >> Engine.priorityLoop)
     Spec.assertEqWith s "the Piker entered" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
     Spec.assertEqWith s "CR 603.2 and the Dragon dealt the Piker's 2 to bob" (S.lifeOf S.bob after) (Just 18)
     Spec.assertEqWith s "the Dragon entering beside a Piker already out dealt nothing" (S.lifeOf S.bob itself) (Just 20)

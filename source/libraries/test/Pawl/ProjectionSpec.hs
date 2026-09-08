@@ -358,13 +358,13 @@ bloodMoonUrborg forest urborg bloodMoon urborgFirst =
       place g =
         if urborgFirst
           then
-            let (u, g') = S.addPermanent urborg S.alice g
-                (_, g'') = S.addPermanent bloodMoon S.alice g'
-             in (u, g'')
+            let (u, g2) = S.addPermanent urborg S.alice g
+                (_, g3) = S.addPermanent bloodMoon S.alice g2
+             in (u, g3)
           else
-            let (_, g') = S.addPermanent bloodMoon S.alice g
-                (u, g'') = S.addPermanent urborg S.alice g'
-             in (u, g'')
+            let (_, g2) = S.addPermanent bloodMoon S.alice g
+                (u, g3) = S.addPermanent urborg S.alice g2
+             in (u, g3)
       (urborgId, gs) = place g1
    in (forestId, urborgId, gs)
 
@@ -386,13 +386,13 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
       place g =
         if ashayaFirst
           then
-            let (a, g') = S.addPermanent ashaya S.alice g
-                (_, g'') = S.addPermanent bloodMoon S.alice g'
-             in (a, g'')
+            let (a, g4) = S.addPermanent ashaya S.alice g
+                (_, g5) = S.addPermanent bloodMoon S.alice g4
+             in (a, g5)
           else
-            let (_, g') = S.addPermanent bloodMoon S.alice g
-                (a, g'') = S.addPermanent ashaya S.alice g'
-             in (a, g'')
+            let (_, g4) = S.addPermanent bloodMoon S.alice g
+                (a, g5) = S.addPermanent ashaya S.alice g4
+             in (a, g5)
       (ashayaId, gs) = place g3
    in (forestId, pikerId, tokenId, ashayaId, gs)
 
@@ -546,13 +546,13 @@ ascentGond ascent gond piker ascentFirst =
       place g =
         if ascentFirst
           then
-            let (_, g') = S.addPermanent ascent S.alice g
-                (gondId, g'') = S.addPermanent gond S.alice g'
-             in S.attach gondId pikerId g''
+            let (_, g3) = S.addPermanent ascent S.alice g
+                (gondId, g4) = S.addPermanent gond S.alice g3
+             in S.attach gondId pikerId g4
           else
-            let (gondId, g') = S.addPermanent gond S.alice g
-                (_, g'') = S.addPermanent ascent S.alice g'
-             in S.attach gondId pikerId g''
+            let (gondId, g3) = S.addPermanent gond S.alice g
+                (_, g4) = S.addPermanent ascent S.alice g3
+             in S.attach gondId pikerId g4
    in (pikerId, bareId, place g2, snd (S.addPermanent ascent S.alice g2))
 
 -- The printings the graveyard-dependency group below shares: Synthetic Charnel

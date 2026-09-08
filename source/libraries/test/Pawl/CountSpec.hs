@@ -418,7 +418,7 @@ aetherfluxReservoirSpec s registry =
       -- Six covers the four Fogs the turn-boundary case casts, none of which
       -- untaps: no untap step runs between them.
       board forest reservoir =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent forest pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent forest pid g2)) g [1 .. (n :: Int)]
             withLands = addLands S.bob 2 (addLands S.alice 6 S.threePlayerGame)
             (_, withReservoir) = S.addPermanent reservoir S.alice withLands
          in withReservoir
@@ -685,7 +685,7 @@ isDeath zc = ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.
 roothaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 roothaSpec s registry =
   let board rootha forest mountain island =
-        let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
+        let addLands printing pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent printing pid g2)) g [1 .. (n :: Int)]
             withLands = addLands island S.bob 8 (addLands mountain S.alice 6 (addLands forest S.alice 10 S.threePlayerGame))
             (_, withRootha) = S.addPermanent rootha S.alice withLands
          in withRootha
@@ -796,7 +796,7 @@ roothaSpec s registry =
 -- every other number in the group.
 mimingSlimeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 mimingSlimeSpec s registry =
-  let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
+  let addLands printing pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent printing pid g2)) g [1 .. (n :: Int)]
       board forest =
         (addLands forest S.alice 6 S.threePlayerGame)
           { GameState.phase = Phase.PrecombatMain,
@@ -1230,7 +1230,7 @@ aimedAt oid p = case p of
 -- collapsing onto the only candidate.
 flunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flunkSpec s registry =
-  let handOf printing pid n g = List.foldl' (\g' _ -> snd (S.addHandCard printing pid g')) g [1 .. (n :: Int)]
+  let handOf printing pid n g = List.foldl' (\g2 _ -> snd (S.addHandCard printing pid g2)) g [1 .. (n :: Int)]
       castAt flunkId target gs =
         let started = S.runPure (aimedAt target) gs (S.cast S.alice flunkId)
          in S.runPure (aimedAt target) started Engine.priorityLoop

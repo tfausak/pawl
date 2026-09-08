@@ -2878,7 +2878,7 @@ severanceBoard s registry names = do
   lands <- mapM (S.printingOf s registry) names
   piker <- S.printingOf s registry "Goblin Piker"
   severance <- S.printingOf s registry "Mana Severance"
-  let place (ids, g) printing = let (oid, g') = S.addLibraryCard printing S.alice g in (ids <> [oid], g')
+  let place (ids, g) printing = let (oid, g3) = S.addLibraryCard printing S.alice g in (ids <> [oid], g3)
       (landIds, g1) = List.foldl' place ([], S.landsInPlay island 2) lands
       (pikerId, g2) = S.addLibraryCard piker S.alice g1
       (gs, spellId) = S.handOne severance g2

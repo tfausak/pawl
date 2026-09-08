@@ -3318,10 +3318,10 @@ tapForManaWith perform inFlight oid = do
               -- (Pawl.Types.Mana) and CR 101.4's ordering rule is about
               -- CHOICES, of which the addition itself makes none.
               State.modify'
-                ( \gs' ->
+                ( \gs2 ->
                     List.foldl'
-                      (\acc (ref, mana) -> List.foldl' (\inner recipient -> Mana.addMana recipient (Mana.unitsOf mana) inner) acc (Mana.recipientsOf controller gs' ref))
-                      gs'
+                      (\acc (ref, mana) -> List.foldl' (\inner recipient -> Mana.addMana recipient (Mana.unitsOf mana) inner) acc (Mana.recipientsOf controller gs2 ref))
+                      gs2
                       (Map.toList (ManaOption.yield chosen))
                 )
               -- CR 405.6c: "if a mana ability both produces mana and has another

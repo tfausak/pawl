@@ -372,7 +372,7 @@ resolveSpellWith runSubgame oid = do
                         -- CR 608.2d's "or" next, and BEFORE the "may": Twiddle
                         -- prints one "may" over the pair, so a branch a player
                         -- did not announce has no "may" left to offer THEM.
-                        (announced, picked') <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
+                        (announced, picked2) <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
                         let branch = maybe True (not . Set.null) announced
                         taken <- if branch then exercises oid effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
                         -- CR 118.12: then the cost paid on resolution, against the
@@ -380,7 +380,7 @@ resolveSpellWith runSubgame oid = do
                         -- re-validation. Both maps are projected into THIS
                         -- instance's view (CR 700.2d) after legality is decided,
                         -- since deciding it after the rename would miss in `slots`.
-                        (admitted, answers') <-
+                        (admitted, answers2) <-
                           if taken
                             then
                               let chosenAtStart = Binding.targetsOf (Object.bindings obj)
@@ -396,7 +396,7 @@ resolveSpellWith runSubgame oid = do
                                     clause
                             else pure (False, answers)
                         Monad.when admitted (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause)))
-                        pure (answers', picked', recordTaken admitted cIdx ran)
+                        pure (answers2, picked2, recordTaken admitted cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
                     (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
@@ -581,14 +581,14 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- Pawl.ResolveSpec's "CR 608.2d announcing Teardrop Kami's
                       -- tap taps the untapped Piker", which reddens when this
                       -- conjunct is defeated.
-                      (announced, picked') <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
+                      (announced, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
                       let branch = maybe True (not . Set.null) announced
                       taken <- if branch then exercises stackId effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
                       -- START-of-resolution slots.
-                      (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
+                      (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
                       Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause)))
-                      pure (answers', picked', recordTaken admitted cIdx ran)
+                      pure (answers2, picked2, recordTaken admitted cIdx ran)
                   )
                   (Map.empty, Map.empty, Set.empty)
                   (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
@@ -857,14 +857,14 @@ payGateAdmits resolving source controller idx cIdx legal announced answers claus
   Nothing -> pure (True, answers)
   Just gate -> do
     let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
-    (asked, answers') <- case Map.lookup offerAt answers of
+    (asked, answers2) <- case Map.lookup offerAt answers of
       Just recorded -> pure (recorded, answers)
       Nothing -> do
         recorded <- payGatePaid resolving source controller idx cIdx legal announced gate
         pure (recorded, Map.insert offerAt recorded answers)
     let selected = Map.keysSet (Map.filter (branchTaken (PayGate.branch gate)) asked)
     State.modify' (bindPlayersSlot resolving Binding.gatePlayers selected)
-    pure (not (Set.null selected), answers')
+    pure (not (Set.null selected), answers2)
 
 -- Which branch of CR 118.12 a payment outcome selects, off the classification a
 -- card states -- never off what the payment DID.

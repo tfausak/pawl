@@ -456,7 +456,7 @@ counteringBoard island cancel stifle sorcerer victim permanents =
       (srcId, withSorcerer) = S.addPermanent sorcerer S.alice withLands
       -- CR 302.6: settled, so the Sorcerer's {T} may be activated at all.
       settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-      addPermanent (ids, g) (who, p) = let (oid, g') = S.addPermanent p who g in (oid : ids, g')
+      addPermanent (ids, g) (who, p) = let (oid, g2) = S.addPermanent p who g in (oid : ids, g2)
       (permanentIds, withPermanents) = List.foldl' addPermanent ([], settled) permanents
       (victimId, onStack) = S.spellOnStack victim S.alice withPermanents
       (cancelId, withCancel) = S.addHandCard cancel S.bob onStack

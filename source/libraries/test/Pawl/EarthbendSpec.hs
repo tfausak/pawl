@@ -100,7 +100,7 @@ lessonBoard :: Printing.Printing -> Printing.Printing -> [(Printing.Printing, In
 lessonBoard forest lesson extras others =
   let base = List.foldl' (\acc (printing, n) -> S.landsFor printing S.alice n acc) (S.landsInPlay forest 5) extras
       (withSpell, spell) = S.handOne lesson base
-      (otherIds, gs) = List.foldl' (\(acc, g) printing -> let (oid, g') = S.addHandCard printing S.alice g in (acc <> [oid], g')) ([], withSpell) others
+      (otherIds, gs) = List.foldl' (\(acc, g) printing -> let (oid, g2) = S.addHandCard printing S.alice g in (acc <> [oid], g2)) ([], withSpell) others
    in case reverse (forestsOf gs) of
         target : twin : _ -> (target, twin, spell, otherIds, sicken twin (sicken target gs))
         _ -> (S.noSource, S.noSource, spell, otherIds, gs)

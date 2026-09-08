@@ -89,7 +89,7 @@ board :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (
 board ransackedLab forest fog fogs =
   let (caseId, withCase) = S.addPermanent ransackedLab S.alice (S.landsInPlay forest 12)
       stocked = List.foldl' (\g _ -> snd (S.addLibraryCard fog S.alice g)) withCase [1 .. 10 :: Int]
-      (fogIds, filled) = List.foldl' (\(ids, g) _ -> let (i, g') = S.addHandCard fog S.alice g in (ids <> [i], g')) ([], stocked) [1 .. fogs]
+      (fogIds, filled) = List.foldl' (\(ids, g) _ -> let (i, g2) = S.addHandCard fog S.alice g in (ids <> [i], g2)) ([], stocked) [1 .. fogs]
    in ( caseId,
         fogIds,
         filled

@@ -188,7 +188,7 @@ tableBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m ([ObjectId.
 tableBoard s registry = do
   djinni <- S.printingOf s registry "Djinni Windseer"
   deck <- traverse (S.printingOf s registry) ["Goblin Piker", "Bird Maiden", "Mountain", "Forest", "Island", "Plains"]
-  let deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+  let deal (acc, gs) printing = let (oid, gs2) = S.addLibraryCard printing S.alice gs in (oid : acc, gs2)
       (ids, stocked) = List.foldl' deal ([], Setup.emptyGame S.bothPlayers) (reverse deck)
       (_, entered) = S.entersWithTrigger djinni S.alice stocked
   pure (ids, entered)
@@ -292,7 +292,7 @@ portentBoard s registry others = do
   filler <- S.printingOf s registry "Lightning Bolt"
   deck <- traverse (S.printingOf s registry) ["Goblin Piker", "Bird Maiden", "Mountain", "Forest", "Swamp", "Plains"]
   let (held, spell) = S.handOne portent (S.landsInPlay island 4)
-      deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+      deal (acc, gs) printing = let (oid, gs2) = S.addLibraryCard printing S.alice gs in (oid : acc, gs2)
       (ids, stocked) = List.foldl' deal ([], held) (reverse deck)
       pad gs _ = snd (S.addHandCard filler S.alice gs)
   pure (ids, spell, List.foldl' pad stocked [1 .. others])

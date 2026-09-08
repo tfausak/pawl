@@ -738,7 +738,7 @@ scryBoard s registry stock = do
   let (ballId, placed) = S.addPermanent crystalBall S.alice (S.landsInPlay forest 4)
       -- addLibraryCard puts its card ON TOP, so the deepest is stocked first.
       deck = reverse (take stock [piker, maiden, mountain, forest])
-      deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+      deal (acc, gs) printing = let (oid, gs2) = S.addLibraryCard printing S.alice gs in (oid : acc, gs2)
       (ids, stocked) = List.foldl' deal ([], placed) deck
   pure (ids, ballId, stocked {GameState.priority = Just S.alice})
 
@@ -907,7 +907,7 @@ surveilBoard s registry = do
   mountain <- S.printingOf s registry "Mountain"
   forest <- S.printingOf s registry "Forest"
   curate <- S.printingOf s registry "Curate"
-  let deal (acc, g) printing = let (oid, g') = S.addLibraryCard printing S.alice g in (oid : acc, g')
+  let deal (acc, g) printing = let (oid, g2) = S.addLibraryCard printing S.alice g in (oid : acc, g2)
       -- addLibraryCard puts its card ON TOP, so the deepest is stocked first and
       -- `ids` comes back top-first.
       (ids, stocked) = List.foldl' deal ([], S.landsInPlay island 2) [forest, mountain, maiden, piker]
@@ -1011,7 +1011,7 @@ surveilOpcodeBoard s registry stock = do
   maiden <- S.printingOf s registry "Bird Maiden"
   mountain <- S.printingOf s registry "Mountain"
   let (sourceId, base) = S.addPermanent piker S.alice (S.landsInPlay island 1)
-      deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+      deal (acc, gs) printing = let (oid, gs2) = S.addLibraryCard printing S.alice gs in (oid : acc, gs2)
       (ids, stocked) = List.foldl' deal ([], base) (reverse (take stock [maiden, mountain]))
   pure (ids, sourceId, stocked {GameState.priority = Just S.alice})
 
@@ -1082,7 +1082,7 @@ fatesealBoard s registry seats = do
   mountain <- S.printingOf s registry "Mountain"
   forest <- S.printingOf s registry "Forest"
   spin <- S.printingOf s registry "Spin into Myth"
-  let deal pid (acc, g) printing = let (oid, g') = S.addLibraryCard printing pid g in (oid : acc, g')
+  let deal pid (acc, g) printing = let (oid, g2) = S.addLibraryCard printing pid g in (oid : acc, g2)
       (creatureId, b1) = S.addPermanent piker S.alice (S.landsFor island S.alice 5 (Setup.emptyGame seats))
       (aliceLib, b2) = S.addLibraryCard forest S.alice b1
       (bobIds, b3) = List.foldl' (deal S.bob) ([], b2) [forest, mountain]

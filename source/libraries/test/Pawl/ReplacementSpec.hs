@@ -1641,10 +1641,10 @@ galvanicBlastSpec s registry =
 surgeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId])
 surgeBoard mountain splitter surge firebolt artifacts =
   let base = S.landsFor mountain S.alice 5 (Setup.emptyGame S.bothPlayers)
-      addArtifact (ids, g) _ = let (oid, g') = S.addPermanent splitter S.alice g in (ids <> [oid], g')
+      addArtifact (ids, g) _ = let (oid, g4) = S.addPermanent splitter S.alice g in (ids <> [oid], g4)
       (splitters, g1) = List.foldl' addArtifact ([], base) [1 .. artifacts]
       (surgeId, g2) = S.addHandCard surge S.alice g1
-      addBolt (ids, g) _ = let (oid, g') = S.addHandCard firebolt S.alice g in (ids <> [oid], g')
+      addBolt (ids, g) _ = let (oid, g4) = S.addHandCard firebolt S.alice g in (ids <> [oid], g4)
       (bolts, g3) = List.foldl' addBolt ([], g2) [1 :: Int, 2]
    in ( g3
           { GameState.phase = Phase.PrecombatMain,

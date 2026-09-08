@@ -2020,7 +2020,7 @@ stirCopyBoard swamp island stir twincast cards =
   let lands = S.landsFor island S.alice 2 (S.landsFor swamp S.alice 3 (Setup.emptyGame S.bothPlayers))
       (withStir, stirId) = S.handOne stir lands
       (twincastId, withBoth) = handAppend twincast S.alice withStir
-      add (acc, g) c = let (oid, g') = S.addGraveyardCard c S.alice g in (acc <> [oid], g')
+      add (acc, g) c = let (oid, g2) = S.addGraveyardCard c S.alice g in (acc <> [oid], g2)
       (ids, board) = List.foldl' add ([], withBoth) cards
    in (stirId, twincastId, ids, board {GameState.phase = Phase.PrecombatMain})
 

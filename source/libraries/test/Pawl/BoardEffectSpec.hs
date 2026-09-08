@@ -696,7 +696,7 @@ elvishPiperSpec s registry =
             (piperId, withPiper) = S.addPermanent piper S.alice mana
             (withMine, mineIds) =
               List.foldl'
-                (\(g, ids) printing -> let (oid, g') = S.addHandCard printing S.alice g in (g', ids <> [oid]))
+                (\(g, ids) printing -> let (oid, g2) = S.addHandCard printing S.alice g in (g2, ids <> [oid]))
                 (withPiper, [])
                 mine
             withTheirs = List.foldl' (\g printing -> snd (S.addHandCard printing S.bob g)) withMine theirs

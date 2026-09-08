@@ -4089,7 +4089,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       -- being the answer and CR 110.2's default -- the owner, which is what
       -- `Nothing` means to the funnel -- takes over. Undying and persist are what
       -- print it (CR 702.93a, CR 702.79a).
-      under' = if EntryRiders.underOwner riders then Nothing else under
+      under2 = if EntryRiders.underOwner riders then Nothing else under
       -- CR 708.3: "objects that are put onto the battlefield face down are
       -- turned face down BEFORE they enter the battlefield". Handed to the
       -- funnel rather than written after it for the tap state's reason, and the
@@ -4118,7 +4118,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       facing = if onto then maybe Facing.FaceUp Facing.FaceDown (EntryRiders.faceDown riders) else Facing.FaceUp
   if refused
     then pure Seq.empty
-    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried
+    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under2 shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being

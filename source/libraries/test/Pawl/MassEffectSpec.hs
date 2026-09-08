@@ -1896,7 +1896,7 @@ carthTheLionSpec s registry =
       -- nothing, and the offer is therefore [Jace Beleren, Chandra] where the
       -- group is all seven.
       stockNames = ["Swamp", "Bird Maiden", "Forest", "Chandra, Fire Artisan", "Goblin Piker", "Murder", "Jace Beleren", "Island"]
-      stock printings gs = List.mapAccumL (\g p -> let (oid, g') = S.addLibraryCard p S.alice g in (g', oid)) gs printings
+      stock printings gs = List.mapAccumL (\g p -> let (oid, g2) = S.addLibraryCard p S.alice g in (g2, oid)) gs printings
       -- The stocked card of a given name, by the id S.addLibraryCard minted for
       -- it: the permutation below is built from these rather than from the
       -- batch's own order.

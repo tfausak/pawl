@@ -892,7 +892,7 @@ replenishSpec s registry =
       -- below (the cast-gate vacuity trap).
       board plains replenish creatures buried =
         let withLands = S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers)
-            step add (acc, g) printing = let (oid, g') = add printing S.alice g in (acc <> [oid], g')
+            step add (acc, g) printing = let (oid, g2) = add printing S.alice g in (acc <> [oid], g2)
             (creatureIds, withCreatures) = List.foldl' (step S.addPermanent) ([], withLands) creatures
             (buriedIds, withBuried) = List.foldl' (step S.addGraveyardCard) ([], withCreatures) buried
             (ready, spell) = S.handOne replenish withBuried

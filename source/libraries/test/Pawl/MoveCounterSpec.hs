@@ -411,11 +411,11 @@ namedKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of a named
       -- not the first of however many, for the reason the Clue case above gives.
       activate target cache (asked, gs) = case Projection.abilitiesOf cache gs of
         [only] ->
-          let ((_, after), asked') =
+          let ((_, after), asked2) =
                 State.runState
                   (Engine.runGame (cacheAnswer target) gs (Activate.activateAbility S.alice cache only >> Stack.resolveTop))
                   asked
-           in Just (asked', after)
+           in Just (asked2, after)
         _ -> Nothing
   -- THE CASE THIS UNIT EXISTS FOR. The artifact bears two kinds, the card names
   -- one, and the answerer above would take the other if it were ever asked.
@@ -1277,7 +1277,7 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
   -- pair the case above would pass on a sweep that credited the destination a
   -- number of its own rather than what it took.
   Spec.it s "a board whose creatures bear no +1/+1 counter moves nothing and still asks nothing" $ do
-    (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, before) <- board [] (\_ _ bobPiker' aliceIsland' -> S.addCounter CounterKind.PlusOnePlusOne 6 aliceIsland' . S.addCounter CounterKind.Shield 5 bobPiker')
+    (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, before) <- board [] (\_ _ bobPiker2 aliceIsland2 -> S.addCounter CounterKind.PlusOnePlusOne 6 aliceIsland2 . S.addCounter CounterKind.Shield 5 bobPiker2)
     let (asked, after) = gathered (onStack before)
     Spec.assertEqWith s "the Cannibal still bears the one counter it entered with" (pairOn cannibalId after) (1, 0)
     Spec.assertEqWith s "alice's Wall bears none either way" (pairOn aliceWall after) (0, 0)

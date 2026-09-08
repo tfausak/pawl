@@ -3791,8 +3791,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Quantity.InSlot; bound even at zero, since zero is an answer. ONE number
     -- across every miller, as no Quantity has a per-player reader.
     Monad.forM_ mTally $ \tally -> do
-      gs' <- State.get
-      let tallyContext = effectContext gs' controller source legal (slotBindings resolving gs')
+      gs2 <- State.get
+      let tallyContext = effectContext gs2 controller source legal (slotBindings resolving gs2)
           viewOfMilled = Projection.viewsOf gs
           counted oid = Filter.matches tallyContext (viewOfMilled oid) (MillTally.filter tally)
       State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
@@ -4372,7 +4372,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- for the same reason: CR 614.16's replacement settles the COUNT
               -- first, and CR 506.3e / CR 509.4a's no-op conditions live in
               -- Pawl.Engine.Combat rather than here.
-              Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\made' -> Combat.putOntoBattlefieldBlocking made' attacker) made)
+              Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\made2 -> Combat.putOntoBattlefieldBlocking made2 attacker) made)
               pure made
         _ -> pure []
     case (mSlot, namesEveryToken quantity, minted) of

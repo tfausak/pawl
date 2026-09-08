@@ -3016,7 +3016,7 @@ stirTheGraveSpec s registry =
         swamp <- S.printingOf s registry "Swamp"
         cards <- traverse (S.printingOf s registry) graveyard
         let (gs0, stirId) = S.boltInHand swamp stir swamps Phase.PrecombatMain
-            (ids, gs1) = List.foldl' (\(acc, g) c -> let (oid, g') = S.addGraveyardCard c S.alice g in (acc <> [oid], g')) ([], gs0) cards
+            (ids, gs1) = List.foldl' (\(acc, g) c -> let (oid, g2) = S.addGraveyardCard c S.alice g in (acc <> [oid], g2)) ([], gs0) cards
         pure (stirId, ids, gs1)
    in Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
         -- CR 700.2a asked before CR 601.2b exists, as a pair of boards differing in

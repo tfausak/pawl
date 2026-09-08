@@ -961,7 +961,7 @@ performStateBasedActions = Event.simultaneously $ do
           let g1 = Game.removeFromZones (Object.owner obj) oid g
            in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}
       vanished = List.foldl' ceaseToExist departed vanishing
-      removeN n c = let c' = c - n in if c' == 0 then Nothing else Just c'
+      removeN n c = let c2 = c - n in if c2 == 0 then Nothing else Just c2
       balance g (oid, n) =
         let strip obj = obj {Object.counters = Map.update (removeN n) CounterKind.MinusOneMinusOne (Map.update (removeN n) CounterKind.PlusOnePlusOne (Object.counters obj))}
          in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}

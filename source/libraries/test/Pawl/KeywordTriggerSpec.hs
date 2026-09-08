@@ -588,7 +588,7 @@ prowessSpec s registry =
   let -- alice bears the Swiftspear and has four Mountains, bob four as well, so
       -- a negative never fails for want of mana; carol is the third seat.
       board mountain swiftspear =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent mountain pid g2)) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 (addLands S.alice 4 S.threePlayerGame)
             (spearId, withSpear) = S.addPermanent swiftspear S.alice withLands
          in ( spearId,

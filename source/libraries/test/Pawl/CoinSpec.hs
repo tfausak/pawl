@@ -262,7 +262,7 @@ statedBoard s registry withEdgar skies = do
       -- and replaces a hand size with a loss.
       stocked = repeatedly (snd . S.addLibraryCard mountain S.alice) 3 (repeatedly (snd . S.addLibraryCard mountain S.bob) 3 g4)
       landed = S.landsFor mountain S.alice (2 * skies + 2) stocked
-      addSky (ids, g) = let (i, g') = S.addHandCard sky S.alice g in (i : ids, g')
+      addSky (ids, g) = let (i, g5) = S.addHandCard sky S.alice g in (i : ids, g5)
       (skyIds, handed) = repeatedly addSky skies ([], landed)
    in pure (skyIds, atLife S.bob 17 handed)
 

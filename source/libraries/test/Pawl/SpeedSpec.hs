@@ -82,7 +82,7 @@ raceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Prin
 raceBoard raceway swamp signInBlood filler =
   let base = S.landsInPlay swamp 2
       (racewayId, withRaceway) = S.addPermanent raceway S.alice base
-      stock pid g = foldr (\_ g' -> snd (S.addLibraryCard filler pid g')) g [1 .. (4 :: Int)]
+      stock pid g = foldr (\_ g2 -> snd (S.addLibraryCard filler pid g2)) g [1 .. (4 :: Int)]
       (gs, spellId) = S.handOne signInBlood (stock S.alice (stock S.bob withRaceway))
    in (gs, racewayId, spellId)
 

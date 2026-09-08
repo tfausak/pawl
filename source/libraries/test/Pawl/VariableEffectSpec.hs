@@ -733,7 +733,7 @@ blightSimultaneitySpec s registry =
         swamp <- S.printingOf s registry "Swamp"
         let stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) game [1 .. 3 :: Int]
             withCensus = snd (S.addPermanent census S.alice stocked)
-            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g') = S.addPermanent wall pid g in (acc <> [oid], g')) ([], withCensus) opponents
+            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g2) = S.addPermanent wall pid g in (acc <> [oid], g2)) ([], withCensus) opponents
             (_, entered) = S.entersWithTrigger morcant S.alice withWalls
         pure (walls, snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority))
       -- Settle and resolve until the stack is empty: the Morcant's trigger puts the
@@ -842,7 +842,7 @@ perCreatureCountersSpec s registry =
         morcant <- S.printingOf s registry "High Perfect Morcant"
         wall <- S.printingOf s registry "Wall of Stone"
         let (toolsId, withTools) = S.addPermanent tools S.alice game
-            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g') = S.addPermanent wall pid g in (acc <> [oid], g')) ([], withTools) opponents
+            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g2) = S.addPermanent wall pid g in (acc <> [oid], g2)) ([], withTools) opponents
             (_, entered) = S.entersWithTrigger morcant S.alice withWalls
         pure (toolsId, walls, snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority))
       -- Settle and resolve until the stack is empty, blightSimultaneitySpec's copy:
@@ -992,7 +992,7 @@ sweptCountersSpec s registry =
           let stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. 6 :: Int]
               (_, withCensus) = S.addPermanent census S.alice stocked
               (toolsId, withTools) = S.addPermanent tools S.alice withCensus
-              (aliceWalls, withAlice) = List.foldl' (\(acc, g) _ -> let (oid, g') = S.addPermanent wall S.alice g in (acc <> [oid], g')) ([], withTools) [1 .. 3 :: Int]
+              (aliceWalls, withAlice) = List.foldl' (\(acc, g) _ -> let (oid, g2) = S.addPermanent wall S.alice g in (acc <> [oid], g2)) ([], withTools) [1 .. 3 :: Int]
               (bobWall, withBob) = S.addPermanent wall S.bob withAlice
               (snuffersId, entered) = S.entersWithTrigger snuffers S.alice withBob
               board = snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority)

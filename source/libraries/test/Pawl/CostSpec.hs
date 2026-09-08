@@ -433,7 +433,7 @@ wasAskedToChooseCost responses =
 villageRitesBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 villageRitesBoard swamp piker villageRites n =
   let base = S.landsInPlay swamp 1
-      addPiker (ids, gs) _ = let (oid, gs') = S.addPermanent piker S.alice gs in (ids <> [oid], gs')
+      addPiker (ids, gs) _ = let (oid, gs5) = S.addPermanent piker S.alice gs in (ids <> [oid], gs5)
       (pikers, withPikers) = List.foldl' addPiker ([], base) [1 .. n]
       (rites, gs1) = S.addHandCard villageRites S.alice withPikers
       (_, gs2) = S.addLibraryCard piker S.alice gs1
@@ -1359,7 +1359,7 @@ asmorFoodBoard ::
 asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight foods others =
   let addEach printing n gs0 =
         List.foldl'
-          (\(oids, g) _ -> let (oid, g') = S.addPermanent printing S.alice g in (oids <> [oid], g'))
+          (\(oids, g) _ -> let (oid, g2) = S.addPermanent printing S.alice g in (oids <> [oid], g2))
           ([], gs0)
           (replicate n ())
       (asmor, gs1) = S.addPermanent asmorPrinting S.alice (Setup.emptyGame S.bothPlayers)
@@ -2206,7 +2206,7 @@ thrastaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> I
 thrastaBoard forest glistenerElf thrastaPrinting forests elves =
   let base = S.landsInPlay forest forests
       (thrasta, gs1) = S.addHandCard thrastaPrinting S.alice base
-      addElf (oids, gs) _ = let (oid, gs') = S.addHandCard glistenerElf S.alice gs in (oid : oids, gs')
+      addElf (oids, gs) _ = let (oid, gs3) = S.addHandCard glistenerElf S.alice gs in (oid : oids, gs3)
       (elfIds, gs2) = List.foldl' addElf ([], gs1) [1 .. elves]
    in ( thrasta,
         reverse elfIds,

@@ -91,7 +91,7 @@ exhumeCase s registry = do
       -- cannot short-circuit past, and distinct so that no seat's card can stand
       -- in for another's. Returns (the spell, the four graveyard ids, the board).
       board exhume swamp buried cage =
-        let place (g, ids) (printing, pid) = let (oid, g') = S.addGraveyardCard printing pid g in (g', ids <> [oid])
+        let place (g, ids) (printing, pid) = let (oid, g4) = S.addGraveyardCard printing pid g in (g4, ids <> [oid])
             (g1, graves) = List.foldl' place (S.landsInPlay swamp 4, []) buried
             g2 = foldr (\c g -> snd (S.addPermanent c S.alice g)) g1 cage
             (g3, spell) = S.handOne exhume g2

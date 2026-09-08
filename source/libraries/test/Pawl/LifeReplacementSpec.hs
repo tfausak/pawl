@@ -668,7 +668,7 @@ collectorRaceAnswer preferred p = case p of
 -- from under an assertion (CR 104.3c).
 stockLibraries :: Printing.Printing -> GameState.GameState -> GameState.GameState
 stockLibraries piker gs =
-  let stock pid n g = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (n :: Int)]
+  let stock pid n g = List.foldl' (\g2 _ -> snd (S.addLibraryCard piker pid g2)) g [1 .. (n :: Int)]
    in stock S.bob 4 (stock S.alice 3 (stock S.carol 2 gs))
 
 -- alice holds the collector when `collecting`, carol holds Ancestral Recall and the

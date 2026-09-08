@@ -192,10 +192,10 @@ handWindowExcept cap acted field question perform pid = do
           Nothing -> pure ()
           Just action -> do
             perform (fst key) pid (HandAction.effects action)
-            let acted' = case cap of
+            let acted2 = case cap of
                   HandWindowCap.Repeatable -> acted
                   HandWindowCap.OncePerCard -> Set.insert (fst key) acted
-            handWindowExcept cap acted' field question perform pid
+            handWindowExcept cap acted2 field question perform pid
 
 -- CR 103.6: the starting player acts first, then each other player in turn
 -- order, which is exactly the order `owners` arrives in. A player who has left
@@ -239,10 +239,10 @@ mulliganRounds perform counts deciding = do
       -- CR 103.5 takes every mulligan simultaneously. pawl is sequential;
       -- because a hand is hidden information, applying them in turn order is
       -- observably equivalent.
-      counts' <- Monad.foldM takeMulligan counts mulliganers
+      counts2 <- Monad.foldM takeMulligan counts mulliganers
       -- Kept players have dropped out; only this round's mulliganers decide
       -- again.
-      mulliganRounds perform counts' mulliganers
+      mulliganRounds perform counts2 mulliganers
 
 -- CR 103.5c / CR 800.6: how many of a player's mulligans are free -- do not
 -- count toward the cards bottomed or the mulligans allowed.

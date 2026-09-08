@@ -323,7 +323,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- candidates: CR 601.2b's X belongs to the resolving object. Terminating
         -- despite the mutual recursion -- a Greatest's payload is a strictly smaller
         -- subterm.
-        Quantity.Count c -> Count.evaluate viewOf (\mOid' view -> evaluateAgainst viewOf context gs announcedOn mOid' (Just view)) context gs c
+        Quantity.Count c -> Count.evaluate viewOf (\mOid2 view -> evaluateAgainst viewOf context gs announcedOn mOid2 (Just view)) context gs c
         -- CR 106.4: the mana-pool fold (Pawl.Engine.ManaCount). Takes the ViewOf but
         -- not the second injection the Count arm above does: a mana unit has no
         -- characteristics for a projection to describe, so the view is there only to

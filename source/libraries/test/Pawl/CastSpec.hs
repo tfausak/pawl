@@ -2617,9 +2617,9 @@ lierSpec s registry = Spec.describe s "Lier" $ do
     (withLier, _) <- lierBoard s registry True
     (without, _) <- lierBoard s registry False
     let (bobs, protected) = S.addHandCard bolt S.bob withLier
-        (bobs', unprotected) = S.addHandCard bolt S.bob without
+        (bobs2, unprotected) = S.addHandCard bolt S.bob without
     Spec.assertBool s (PlayerEffect.cantBeCountered S.bob bobs protected) "an opponent's spell is uncounterable while Lier is out"
-    Spec.assertBool s (not (PlayerEffect.cantBeCountered S.bob bobs' unprotected)) "and counterable without it"
+    Spec.assertBool s (not (PlayerEffect.cantBeCountered S.bob bobs2 unprotected)) "and counterable without it"
 
 -- Synthetic Mirror of the Fallen {U}{U} Sorcery
 -- (data/cards/synthetic-mirror-of-the-fallen.json): "Target card in your
@@ -2956,8 +2956,8 @@ runPickpocket wanted =
         | n <= (0 :: Int) = pure g
         | not (S.inCombatPhase (GameState.phase g)) = pure g
         | otherwise = do
-            (_, g') <- Engine.runGame (pickpocketAnswer wanted) g Engine.runStep
-            go (n - 1) g'
+            (_, g2) <- Engine.runGame (pickpocketAnswer wanted) g Engine.runStep
+            go (n - 1) g2
    in \gs -> State.runState (go 24 gs) ([], [])
 
 pickpocketSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()

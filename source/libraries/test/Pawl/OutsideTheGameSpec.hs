@@ -91,7 +91,7 @@ wishBoard mountain wish sideboard =
   let (board, wishId) = S.handOne wish (S.landsInPlay mountain 4)
       -- Interned in LIST ORDER, so the ids ascend with the list and the case
       -- below can name what Prompt.ChooseFromOutsideTheGame offers last.
-      intern (printing, n) (acc, gs) = let (printingId, gs') = Game.intern printing gs in (acc <> [(printingId, n)], gs')
+      intern (printing, n) (acc, gs) = let (printingId, gs2) = Game.intern printing gs in (acc <> [(printingId, n)], gs2)
       (entries, interned) = List.foldl' (flip intern) ([], board) sideboard
       stock p = p {Player.outsideTheGame = Map.fromList entries}
    in (interned {GameState.players = Map.adjust stock S.alice (GameState.players interned)}, wishId)

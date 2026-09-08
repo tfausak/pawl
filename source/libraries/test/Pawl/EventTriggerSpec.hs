@@ -452,7 +452,7 @@ drawTriggerSpec s registry =
       wizard <- S.printingOf s registry "Erudite Wizard"
       let (wizardId, base, _) = drawBoard island piker think wizard 0
           withLands = S.landsFor island S.bob 4 base
-          addThink (ids, g) _ = let (oid, g') = S.addHandCard think S.bob g in (ids <> [oid], g')
+          addThink (ids, g) _ = let (oid, g2) = S.addHandCard think S.bob g in (ids <> [oid], g2)
           (bobsThinks, withHand) = List.foldl' addThink ([], withLands) [1 .. (2 :: Int)]
           gs = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.bob g)) withHand [1 .. (10 :: Int)]
       case bobsThinks of
@@ -477,7 +477,7 @@ drawBoard ::
   (ObjectId.ObjectId, GameState.GameState, [ObjectId.ObjectId])
 drawBoard island piker think wizard copies =
   let (wizardId, base) = S.addPermanent wizard S.alice (S.landsInPlay island (2 * copies))
-      addThink (ids, g) _ = let (oid, g') = S.addHandCard think S.alice g in (ids <> [oid], g')
+      addThink (ids, g) _ = let (oid, g2) = S.addHandCard think S.alice g in (ids <> [oid], g2)
       (thinkIds, withHand) = List.foldl' addThink ([], base) [1 .. copies]
       stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withHand [1 .. (10 :: Int)]
    in ( wizardId,
@@ -614,9 +614,9 @@ miracleBoard ::
   (GameState.GameState, [ObjectId.ObjectId])
 miracleBoard island mountain piker think thunder copies ahead =
   let lands = S.landsFor mountain S.alice 1 (S.landsInPlay island (2 * copies))
-      addThink (ids, g) _ = let (oid, g') = S.addHandCard think S.alice g in (ids <> [oid], g')
+      addThink (ids, g) _ = let (oid, g2) = S.addHandCard think S.alice g in (ids <> [oid], g2)
       (thinkIds, withHand) = List.foldl' addThink ([], lands) [1 .. copies]
-      pile g n = List.foldl' (\g' _ -> snd (S.addLibraryCard piker S.alice g')) g [1 .. n]
+      pile g n = List.foldl' (\g2 _ -> snd (S.addLibraryCard piker S.alice g2)) g [1 .. n]
       stocked = pile (snd (S.addLibraryCard thunder S.alice (pile withHand (10 :: Int)))) ahead
    in ( stocked
           { GameState.phase = Phase.PrecombatMain,
@@ -1154,7 +1154,7 @@ youngPyromancerSpec s registry =
       -- nothing at all. Four each is Boil's {3}{R}, and covers Goblin Piker's
       -- {2}{R} with one to spare.
       board mountain pyromancer =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent mountain pid g2)) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 (addLands S.alice 4 S.threePlayerGame)
             (_, withPyromancer) = S.addPermanent pyromancer S.alice withLands
          in withPyromancer
@@ -1246,9 +1246,9 @@ whisperingWizardSpec s registry =
         pure ()
       board island bearer n =
         let withLands = S.landsFor island S.alice 10 S.threePlayerGame
-            addBearer (ids, g) _ = let (oid, g') = S.addPermanent bearer S.alice g in (ids <> [oid], g')
+            addBearer (ids, g) _ = let (oid, g2) = S.addPermanent bearer S.alice g in (ids <> [oid], g2)
             (bearers, withBearers) = List.foldl' addBearer ([], withLands) [1 .. (n :: Int)]
-            stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard island pid g')) g [1 .. (12 :: Int)]
+            stock g pid = List.foldl' (\g2 _ -> snd (S.addLibraryCard island pid g2)) g [1 .. (12 :: Int)]
             stocked = List.foldl' stock withBearers [S.alice, S.bob, S.carol]
          in ( bearers,
               stocked
@@ -1422,7 +1422,7 @@ acrobaticCheerleaderSpec s registry =
       tapState oid g = fmap Object.tapped (Map.lookup oid (GameState.objects g))
       board cheerleader plains =
         let (oid, withCheerleader) = S.addPermanent cheerleader S.alice (Setup.emptyGame S.bothPlayers)
-            stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard plains pid g')) g [1 .. (12 :: Int)]
+            stock g pid = List.foldl' (\g2 _ -> snd (S.addLibraryCard plains pid g2)) g [1 .. (12 :: Int)]
             stocked = List.foldl' stock withCheerleader [S.alice, S.bob]
          in ( oid,
               S.tapObject
@@ -1509,7 +1509,7 @@ secondMainPhaseSpec s registry =
       board cheerleader mountain island assault =
         let (oid, withCheerleader) = S.addPermanent cheerleader S.alice (Setup.emptyGame S.bothPlayers)
             withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) withCheerleader [1 .. (4 :: Int)]
-            stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard island pid g')) g [1 .. (12 :: Int)]
+            stock g pid = List.foldl' (\g2 _ -> snd (S.addLibraryCard island pid g2)) g [1 .. (12 :: Int)]
             stocked = List.foldl' stock withLands [S.alice, S.bob]
             (spell, withSpell) = S.addHandCard assault S.alice stocked
          in ( oid,
@@ -1585,7 +1585,7 @@ twinnedVigilSpec s registry =
       board island vigil =
         let withLands = S.landsFor island S.alice 10 S.threePlayerGame
             (_, withVigil) = S.addPermanent vigil S.alice withLands
-            stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard island pid g')) g [1 .. (12 :: Int)]
+            stock g pid = List.foldl' (\g2 _ -> snd (S.addLibraryCard island pid g2)) g [1 .. (12 :: Int)]
             stocked = List.foldl' stock withVigil [S.alice, S.bob, S.carol]
          in stocked
               { GameState.phase = Phase.PrecombatMain,
@@ -1644,7 +1644,7 @@ clarionSpiritSpec s registry =
       -- Four Mountains per Boil, and no untap step runs in any of these cases,
       -- so alice's sixteen are exactly the four casts the longest one makes.
       board mountain clarion =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent mountain pid g2)) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 (addLands S.alice 16 S.threePlayerGame)
             (_, withClarion) = S.addPermanent clarion S.alice withLands
          in withClarion
@@ -1656,7 +1656,7 @@ clarionSpiritSpec s registry =
       -- n copies of Boil in a hand, returned in the order they were added.
       handOf boil pid n gs =
         List.foldl'
-          (\(oids, g) _ -> let (oid, g') = S.addHandCard boil pid g in (oids <> [oid], g'))
+          (\(oids, g) _ -> let (oid, g2) = S.addHandCard boil pid g in (oids <> [oid], g2))
           ([], gs)
           [1 .. (n :: Int)]
    in Spec.describe s "SpellCast, an ordinal" $ do
@@ -1804,7 +1804,7 @@ presenceOfTheMasterSpec s registry =
       -- Mountains, which is Bad Moon's {1}{B} and Goblin Piker's {1}{R} with
       -- room to spare. carol gets nothing: she is the third seat, not a caster.
       board swamp mountain presence =
-        let addLands pid n printing g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
+        let addLands pid n printing g = List.foldl' (\g2 _ -> snd (S.addPermanent printing pid g2)) g [1 .. (n :: Int)]
             withLands =
               addLands S.bob 3 mountain
                 . addLands S.bob 3 swamp
@@ -1896,7 +1896,7 @@ kambalSpec s registry =
       -- Boil's {3}{R} and Goblin Piker's {2}{R}. carol gets nothing at all: she
       -- is the third seat, not a caster.
       board mountain kambal =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent mountain pid g2)) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 S.threePlayerGame
             (_, withKambal) = S.addPermanent kambal S.alice withLands
          in withKambal
@@ -1971,7 +1971,7 @@ brinebornCutthroatSpec s registry =
       -- runs between the casts below, so the lands are not reused. bob and carol
       -- get nothing at all -- they are turns here, not casters.
       board forest cutthroat =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent forest pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent forest pid g2)) g [1 .. (n :: Int)]
             withLands = addLands S.alice 3 S.threePlayerGame
             (cutthroatId, withCutthroat) = S.addPermanent cutthroat S.alice withLands
          in ( cutthroatId,
@@ -2034,7 +2034,7 @@ brinebornCutthroatSpec s registry =
           mountain <- S.printingOf s registry "Mountain"
           cutthroat <- S.printingOf s registry "Brineborn Cutthroat"
           piker <- S.printingOf s registry "Goblin Piker"
-          let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
+          let addLands printing pid n g = List.foldl' (\g2 _ -> snd (S.addPermanent printing pid g2)) g [1 .. (n :: Int)]
               lands = addLands mountain S.alice 3 (addLands island S.alice 2 S.threePlayerGame)
               (cutthroatId, withCutthroat) = S.addHandCard cutthroat S.alice lands
               (pikerId, gs) = S.addHandCard piker S.alice withCutthroat

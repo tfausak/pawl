@@ -1626,7 +1626,7 @@ handOfThePraetorsSpec s registry =
       -- Elf's {G}) and two Mountains (Goblin Piker's {1}{R}). carol gets no
       -- land: she never casts, and is only ever a seat the counter must miss.
       board forest mountain hand =
-        let addLands pid n printing g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
+        let addLands pid n printing g = List.foldl' (\g2 _ -> snd (S.addPermanent printing pid g2)) g [1 .. (n :: Int)]
             withLands =
               addLands S.bob 2 mountain
                 . addLands S.bob 2 forest

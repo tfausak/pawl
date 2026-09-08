@@ -507,7 +507,7 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
     traveler <- S.printingOf s registry "Doomed Traveler"
     let (djinnId, _, gs) = plotBoard island djinn traveler
         (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId)) gs Engine.priorityLoop) [] of
-          ((_, g), log') -> (log', g)
+          ((_, g), log2) -> (log2, g)
     Spec.assertEqWith
       s
       "alice acts, alice is asked again, and only then is bob asked"
@@ -666,7 +666,7 @@ makePlotted s registry = Spec.describe s "CR 702.170c Kellan Joins Up" $ do
     djinn <- S.printingOf s registry "Djinn of Fool's Fall"
     let (pikerId, kellanId, djinnId, gs) = kellanBoard forest plains island piker kellan aloe djinn
         (asked, after) = case State.runState (Engine.runGame (kellanAnswers pikerId) gs (S.cast S.alice kellanId >> Engine.priorityLoop)) [] of
-          ((_, g), log') -> (log', g)
+          ((_, g), log2) -> (log2, g)
         -- CR 702.170d's "any turn AFTER the turn in which it became plotted",
         -- with the turn number moved and nothing else -- so every land is still
         -- tapped and a cast priced at anything could not be paid.
@@ -863,7 +863,7 @@ foretelling s registry = Spec.describe s "CR 116.2h Augury Raven" $ do
     traveler <- S.printingOf s registry "Doomed Traveler"
     let (ravenId, _, gs) = foretellBoard island raven traveler
         (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Foretell ravenId)) gs Engine.priorityLoop) [] of
-          ((_, g), log') -> (log', g)
+          ((_, g), log2) -> (log2, g)
     Spec.assertEqWith
       s
       "alice acts, alice is asked again, and only then is bob asked"

@@ -984,7 +984,7 @@ jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (C
         firebolt <- S.printingOf s registry "Firebolt"
         let withLands = S.landsFor mountain S.alice n S.threePlayerGame
             (jared, g1) = S.addPermanent jaredPrinting S.bob withLands
-            addOne (ids, g) _ = let (oid, g') = S.addHandCard firebolt S.alice g in (ids <> [oid], g')
+            addOne (ids, g) _ = let (oid, g3) = S.addHandCard firebolt S.alice g in (ids <> [oid], g3)
             (bolts, g2) = List.foldl' addOne ([], g1) [1 .. n]
         pure
           ( jared,

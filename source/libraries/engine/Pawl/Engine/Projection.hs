@@ -362,7 +362,7 @@ applyModification viewOf src gs oid unitTypes m pc =
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           let pairs = [(from, to)]
               keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc)
-              pc' =
+              pc2 =
                 pc
                   { PC.keywords = keywords,
                     PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
@@ -372,9 +372,9 @@ applyModification viewOf src gs oid unitTypes m pc =
                     PC.subtypeWordChanges = PC.subtypeWordChanges pc <> [ChangeSubtypeWord.MkChangeSubtypeWord from to],
                     PC.textChangedKeywords = keywords
                   }
-           in if Set.member from (PC.subtypes pc')
-                then pc' {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc'))}
-                else pc'
+           in if Set.member from (PC.subtypes pc2)
+                then pc2 {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc2))}
+                else pc2
         -- CR 613.1b layer 2: controllerOf reads GameState.continuousEffects
         -- directly. Identity here to keep gather/project's walk total.
         Modification.SetController _ -> pc
@@ -1944,15 +1944,15 @@ gatherStatic functioning src ts changes removed n sa =
         if null changes
           then StaticAbility.affected sa
           else rewriteAffected changes (StaticAbility.affected sa)
-      one m' =
+      one m2 =
         MkGathered
           { gEffect = key,
             gSource = src,
             gAffected = affected,
-            gLayer = layer m',
+            gLayer = layer m2,
             gLowest = lowest,
             gTimestamp = ts,
-            gModification = m'
+            gModification = m2
           }
       parts = fmap one (NonEmpty.toList ms)
       -- CR 604.2's clause, shared with setLandSubtypeEffects -- see staticLives.
@@ -3125,7 +3125,7 @@ projectDeciding admits cands =
                         uReads = definingReads cda,
                         uWrites = Set.singleton PowerA,
                         uMovable = Nothing,
-                        uApply = \viewOf o' pc -> applyCharacteristicPT viewOf gs o' pc
+                        uApply = \viewOf o2 pc -> applyCharacteristicPT viewOf gs o2 pc
                       }
                   -- CR 613.6's per-object half of movableAspects: an effect whose
                   -- set this object already settled cannot be moved at it.
@@ -3136,10 +3136,10 @@ projectDeciding admits cands =
                   -- Re-inserting an existing key rewrites the value just read.
                   applyOne viewOf o (pc, ds) u =
                     let answer = appliesTo viewOf o ds pc u
-                        ds' = case uEffect u of
+                        ds2 = case uEffect u of
                           Nothing -> ds
                           Just k -> Map.insert k answer ds
-                     in (if answer then uApply u viewOf o pc else pc, ds')
+                     in (if answer then uApply u viewOf o pc else pc, ds2)
                   -- Every OTHER battlefield object's state as this layer begins,
                   -- so all of them derive the same order. Lazy, and scanned after
                   -- the projected object. Terminates for projectUpTo's reason: a
@@ -3372,12 +3372,12 @@ projectDeciding admits cands =
                       -- CR 613.7a gives every part of one ability its source's
                       -- timestamp and List.sortOn is stable, so gatherStatic's
                       -- contiguity survives and effectUnits still finds each unit.
-                      let decided' = List.foldl' remember decided cands
+                      let decided2 = List.foldl' remember decided cands
                           applies c = case gEffect c of
                             Nothing -> affectsWith grants bounded (gSource c) oid (gAffected c) seeded gs
-                            Just k -> Map.findWithDefault False k decided'
+                            Just k -> Map.findWithDefault False k decided2
                           ordered = effectUnits (List.sortOn gTimestamp (filter applies here))
-                       in (List.foldl' (applyUnit bounded oid) seeded ordered, decided')
+                       in (List.foldl' (applyUnit bounded oid) seeded ordered, decided2)
             (folded, decisions) = List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers
          in (noncreaturePT oid gs folded, decisions)
    in forObject

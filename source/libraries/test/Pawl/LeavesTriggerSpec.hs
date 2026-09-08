@@ -226,7 +226,7 @@ permanentReturnedToHandSpec s registry =
         justice <- S.printingOf s registry "Justice, Vance Astrovik"
         piker <- S.printingOf s registry "Goblin Piker"
         let (justiceId, withJustice) = S.addPermanent justice S.alice lands
-            step (ids, gs) owner = let (oid, gs') = S.addPermanent piker owner gs in (ids <> [oid], gs')
+            step (ids, gs) owner = let (oid, gs2) = S.addPermanent piker owner gs in (ids <> [oid], gs2)
             (pikerIds, board) = Foldable.foldl' step ([], withJustice) owners
         pure (justiceId, pikerIds, board)
       -- Move one permanent to `zone` by hand, let CR 117.5's scan place whatever

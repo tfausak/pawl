@@ -739,7 +739,7 @@ brineBoard island savor brine piker =
       (carolPiker, g2) = S.addPermanent piker S.carol g1
       (savorId, g3) = S.addHandCard savor S.alice g2
       (brineId, g4) = S.addHandCard brine S.bob g3
-      stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (15 :: Int)]
+      stock g pid = List.foldl' (\g5 _ -> snd (S.addLibraryCard piker pid g5)) g [1 .. (15 :: Int)]
       stocked = List.foldl' stock g4 [S.alice, S.bob, S.carol]
    in ( (S.tapObject carolPiker (S.tapObject alicePiker stocked))
           { GameState.phase = Phase.PrecombatMain,

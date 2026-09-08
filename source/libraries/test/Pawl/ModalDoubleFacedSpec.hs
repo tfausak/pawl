@@ -111,8 +111,8 @@ readyForMain gs =
 handBoard :: [Printing.Printing] -> ([ObjectId.ObjectId], GameState.GameState)
 handBoard printings =
   let put (ids, gs) printing =
-        let (oid, gs') = S.addHandCard printing S.alice gs
-         in (ids <> [oid], gs')
+        let (oid, gs2) = S.addHandCard printing S.alice gs
+         in (ids <> [oid], gs2)
       (oids, filled) = List.foldl' put ([], Setup.emptyGame S.bothPlayers) printings
    in (oids, readyForMain filled)
 
