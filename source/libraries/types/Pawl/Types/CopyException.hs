@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
 -- | CR 707.9: one exception to the copying process, the "except ..." clause of a
@@ -33,10 +34,10 @@ import qualified Pawl.Types.Supertype as Supertype
 --
 -- Not implemented: CR 707.9c's exception that declines to copy a characteristic
 -- (Vesuvan Doppelganger's "except it doesn't copy that creature's color"), the
--- SUBTYPE and SUPERTYPE halves of CR 707.9b's ADDITIVE "in addition to its other
--- types" (Visage Bandit's "a Shapeshifter Rogue", Sakashima the Impostor's
--- "legendary"), and CR 707.9e's exception that is an additional effect rather
--- than a characteristic (Altered Ego's additional counters) (#1292).
+-- SUPERTYPE half of CR 707.9b's ADDITIVE "in addition to its other types"
+-- (Sakashima the Impostor's "legendary"), and CR 707.9e's exception that is an
+-- additional effect rather than a characteristic (Altered Ego's additional
+-- counters) (#1292).
 data CopyException
   = -- | CR 707.9b: the copy's power and toughness are these numbers instead of
     -- the copied object's ("except it's 7/7").
@@ -85,10 +86,10 @@ data CopyException
     -- Effect -- so it wants this type parametric in the ability the way
     -- Pawl.Types.EntryRewrite is parametric in the effect (#1292).
     --
-    -- Not implemented: the same words in an ACTIVATED ability (Dimir
-    -- Doppelganger's "{1}{U}: ... becomes a copy of that card, except it has this
-    -- ability"), which would write Pawl.Types.ProjectedCharacteristics'
-    -- activatedAbilities instead (#3325).
+    -- EITHER KIND of ability, since CR 707.9a names none: the words are read off
+    -- the resolving object's Pawl.Types.Source, so a triggered carrier joins the
+    -- copy's triggeredAbilities and an activated one its activatedAbilities
+    -- (Dimir Doppelganger's "{1}{U}{B}: ... except it has this ability").
     GainThisAbility
   | -- | CR 707.9b: the copy is these card types "in addition to its other types"
     -- (Phyrexian Metamorph's "except it's an artifact"), so they JOIN the copied
@@ -107,6 +108,23 @@ data CopyException
     -- SetPowerToughness above does, and it must not touch the keywords a CDA is
     -- written as -- a Metamorph copying a Tarmogoyf keeps the Goyf's CDA.
     AddCardTypes (Set.Set CardType.CardType)
+  | -- | CR 707.9b over CR 205.3's part of the type line: the copy is these
+    -- subtypes "in addition to its other types" (Wall of Stolen Identity's "a
+    -- Wall"), so they JOIN the copied subtypes.
+    --
+    -- A separate arm from AddCardTypes and not one Set over the whole type line,
+    -- because CR 205.1 makes card types, supertypes and subtypes three different
+    -- parts of it and Pawl.Types.ProjectedCharacteristics keeps three fields; one
+    -- printed clause naming two of them at once (Synth Infiltrator's "a Synth
+    -- artifact creature") is two exceptions in the same list, which is what the
+    -- list is for.
+    --
+    -- NOTHING ELSE MOVES, for AddCardTypes' reason: CR 707.9d's last two
+    -- sentences name subtype alongside card type in the carve-out, and its
+    -- Glasspool Mimic example is explicit that a copied changeling survives the
+    -- exception. So this arm must not clear characteristicPT and must not touch
+    -- the keywords a characteristic-defining ability is written as.
+    AddSubtypes (Set.Set Subtype.Subtype)
   | -- | CR 707.9b: the copy is NOT these supertypes, whatever the copied object's
     -- were ("except it isn't legendary", Multiversal Recruitment).
     --

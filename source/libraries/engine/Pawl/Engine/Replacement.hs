@@ -49,6 +49,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
@@ -126,10 +127,11 @@ import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
-import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
@@ -2017,19 +2019,22 @@ applyEntryOption oid option gs =
 -- is what proves the two apart: it reads 7/7 here and the copied Tarmogoyf's CDA
 -- under the layer reading.
 --
--- The first argument is what CR 707.9a's "this ability" points at -- the ability
--- the copy effect is written inside, which only the caller can know. Nothing on
--- the CR 707.5 entry road, where the copy effect is a replacement effect and no
--- printed card writes those two words (Scryfall
--- @o:"enter as a copy" o:"except it has this ability"@, 2026-09-06, no hit;
--- Copycrook would refute it by quoting an ability instead).
-applyCopyExceptions :: Maybe (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> [CopyException.CopyException] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
+-- The first argument is the RESOLVING object's Pawl.Types.Source -- what CR
+-- 707.9a's "this ability" points at is the ability the copy effect is written
+-- inside, and only the caller knows which object that is. A Source and not an
+-- ability, because CR 707.9a names no kind: the arm reads a triggered carrier
+-- and an activated one out of the same value, and every other arm of CR 113.3's
+-- classification has no ability to point at. Nothing on the CR 707.5 entry road,
+-- where the copy effect is a replacement effect and no printed card writes those
+-- two words (Scryfall @o:"enter as a copy" o:"except it has this ability"@,
+-- 2026-09-06, no hit; Copycrook would refute it by quoting an ability instead).
+applyCopyExceptions :: Maybe Source.Source -> [CopyException.CopyException] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
 applyCopyExceptions this exceptions snapshot = List.foldl' (applyCopyException this) snapshot exceptions
 
 -- One arm per CopyException constructor, no wildcard, for Event.apply's reason: a
 -- new exception shape must break the build here rather than silently copy without
 -- it.
-applyCopyException :: Maybe (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> PC.ProjectedCharacteristics -> CopyException.CopyException -> PC.ProjectedCharacteristics
+applyCopyException :: Maybe Source.Source -> PC.ProjectedCharacteristics -> CopyException.CopyException -> PC.ProjectedCharacteristics
 applyCopyException this snapshot exception = case exception of
   -- CR 707.9b sets the pair; CR 707.9d is the second write -- an exception that
   -- "provides a specific set of values for a certain characteristic" does not
@@ -2059,20 +2064,31 @@ applyCopyException this snapshot exception = case exception of
   CopyException.GainKeywords keywords ->
     snapshot {PC.keywords = Map.unionWith (+) (PC.keywords snapshot) (Map.fromSet (const 1) keywords)}
   -- CR 707.9a over a whole ability rather than a keyword: "this ability" is
-  -- appended to the copied ones for the arm above's reason, and Nothing appends
-  -- nothing -- a copy effect whose carrier has no ability to point at (#3325).
+  -- appended to the copied ones for the arm above's reason.
+  --
+  -- WHICH LIST is CR 113.3's classification of the carrier and never a question
+  -- about which ability it is, so the closed half stays closed: a triggered
+  -- carrier (Unstable Shapeshifter) joins triggeredAbilities and an activated one
+  -- (Dimir Doppelganger) activatedAbilities. Every other arm appends nothing --
+  -- a spell, an emblem and CR 725.2's sourceless trigger have no ability to point
+  -- at, and neither does the CR 707.5 entry road's Nothing.
   --
   -- The ability written here still CONTAINS this exception, which is what makes
   -- the reference self-renewing: the copy's own instance is what resolves next,
   -- and it points at itself again. Pawl.CopySpec's "the Shapeshifter copies a
-  -- second creature with the ability it kept" is what proves it.
+  -- second creature with the ability it kept" and "Dimir Doppelganger's
+  -- activated ability survives the copy it makes" prove it, one road each.
   --
   -- CR 604.3a is silent here and that is right: it makes a copy-acquired STATIC
-  -- ability characteristic-defining, and a triggered ability is neither static
-  -- nor defines a characteristic. CR 707.9d's strip is silent for the
-  -- GainKeywords arm's reason -- an ability provides no values.
-  CopyException.GainThisAbility ->
-    snapshot {PC.triggeredAbilities = PC.triggeredAbilities snapshot <> Maybe.maybeToList this}
+  -- ability characteristic-defining, and neither a triggered nor an activated
+  -- ability is static or defines a characteristic. CR 707.9d's strip is silent
+  -- for the GainKeywords arm's reason -- an ability provides no values.
+  CopyException.GainThisAbility -> case this of
+    Just (Source.OfTrigger triggered) ->
+      snapshot {PC.triggeredAbilities = PC.triggeredAbilities snapshot <> [TriggeredAbilitySource.ability triggered]}
+    Just (Source.OfAbility activated) ->
+      snapshot {PC.activatedAbilities = PC.activatedAbilities snapshot <> [ActivatedAbilitySource.ability activated]}
+    _ -> snapshot
   -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
   -- copied type line rather than the replacement CR 205.1a's own sentence would
   -- make. Phyrexian Metamorph copying a Goblin Piker is an artifact creature.
@@ -2087,6 +2103,20 @@ applyCopyException this snapshot exception = case exception of
   -- exception does not" is what proves it.
   CopyException.AddCardTypes types ->
     snapshot {PC.cardTypes = Set.union (PC.cardTypes snapshot) types}
+  -- CR 707.9b / 205.3: "a Wall in addition to its other types" (Wall of Stolen
+  -- Identity), the same union one part of the type line over. Into the snapshot
+  -- for the arms above's reason, which is what makes the added subtype survive a
+  -- second copy (CR 707.2 / 707.9b): Pawl.CopySpec's "a token copy of Wall of
+  -- Stolen Identity's copy is still a Wall" is what proves it, since a CR 613
+  -- layer-4 write over the Wall copy would be left behind on the token and no
+  -- "destroy target Wall" would find it.
+  --
+  -- Nothing else moves, for AddCardTypes' reason: CR 707.9d's carve-out names
+  -- subtype alongside card type, so the copied characteristic-defining ability
+  -- stays -- a copy of a creature with changeling still has every creature type
+  -- (CR 707.9d's Glasspool Mimic example).
+  CopyException.AddSubtypes subtypes ->
+    snapshot {PC.subtypes = Set.union (PC.subtypes snapshot) subtypes}
   -- CR 707.9b over CR 205.4a's part of the type line: "except it isn't legendary"
   -- (Multiversal Recruitment), so a DIFFERENCE rather than an empty set -- the
   -- clause names one supertype and a copy of a snow legendary permanent is still

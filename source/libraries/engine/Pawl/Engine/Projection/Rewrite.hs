@@ -7,6 +7,7 @@ module Pawl.Engine.Projection.Rewrite where
 import qualified Data.Char as Char
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Filter as Filter
@@ -1105,13 +1106,16 @@ rewriteDrawRewrite pairs rewrite = case rewrite of
 -- CR 612.1 through CR 707.9's "except ..." clause. Exhaustive for
 -- rewriteReplacementEffect's reason.
 --
--- NO BOARD OBSERVES IT, the ChoiceByCoinFlip arm's position below: only a
--- keyword that CARRIES a word changes, and neither producer of the CR 707.9a arm
--- names one (Dack's Duplicate grants haste and dethrone, Omni-Changeling
--- changeling). The arm is the rule rather than a proven behaviour -- an
--- "except it has islandwalk" would be what proves it. Neither of CR 707.9b's
--- arms names a word either: the pair is two literals, and the type clause names
--- CR 205.2a's card types, which CR 612.2's subtype swap does not reach.
+-- NO BOARD OBSERVES IT, the ChoiceByCoinFlip arm's position below: what changes
+-- is a keyword that CARRIES a word, or CR 707.9b's subtype clause, and no card in
+-- data/cards puts a text-changing effect on either -- neither producer of the CR
+-- 707.9a arm names a word (Dack's Duplicate grants haste and dethrone,
+-- Omni-Changeling changeling), and Wall of Stolen Identity's "a Wall" would need
+-- an Artificial Evolution aimed at it. The arms are the rule rather than a proven
+-- behaviour -- an "except it has islandwalk", or that Artificial Evolution, would
+-- be what proves them. CR 707.9b's other two arms name no word at all: the pair
+-- is two literals, and the type clause names CR 205.2a's card types, which CR
+-- 612.2's subtype swap does not reach.
 rewriteCopyException :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CopyException.CopyException -> CopyException.CopyException
 rewriteCopyException pairs exception = case exception of
   CopyException.SetPowerToughness _ -> exception
@@ -1119,8 +1123,13 @@ rewriteCopyException pairs exception = case exception of
   -- CR 707.9b's type clause names CARD types (CR 205.2a's list), and CR 612.2's
   -- swap reaches only subtypes, so there is nothing here for a pair to change.
   CopyException.AddCardTypes _ -> exception
-  -- CR 205.4a's supertypes for the same reason: CR 612.2's swap reaches subtypes
-  -- alone.
+  -- CR 707.9b's subtype clause DOES name a word CR 612.2's swap reaches -- "a
+  -- Wall in addition to its other types" is one of the "all instances of one
+  -- creature type" Artificial Evolution changes -- so the pairs apply, exactly as
+  -- they do to a Filter's HasSubtype atom (Filter.rewrite).
+  CopyException.AddSubtypes subtypes -> CopyException.AddSubtypes (Set.map (\t -> Maybe.fromMaybe t (lookup t pairs)) subtypes)
+  -- CR 205.4a's supertypes for the same reason CR 707.9b's card types are left
+  -- alone: CR 612.2's swap reaches subtypes alone.
   CopyException.RemoveSupertypes _ -> exception
   -- CR 707.9a's "this ability" carries no word of its own. The ability it points
   -- at is the resolving one, which the projection already rewrote where it was
