@@ -69,6 +69,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
+import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -5267,6 +5268,92 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Recipient.playerOf (BecameTarget.targeted t) == Just you
         && maybe True (== BecameTarget.kind t) (ControllerBecomesTarget.kind c)
         && PlayerRelation.holds (Game.teams gs) (ControllerBecomesTarget.relation c) you (BecameTarget.controller t)
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+  -- CR 603.2c's batch reading of the same rule from a BYSTANDER's side, and the
+  -- one of the three arms with a Filter: Professor Hojo asks nothing of the
+  -- targeting object's controller and everything of the permanents it named.
+  --
+  -- The KIND conjunct is the sibling's one limb narrower. "An ACTIVATED
+  -- ability" is CR 113.3b alone, where CR 603.3d brings CR 113.3c's to the same
+  -- rule 601.2c step, so a condition that did not ask would draw off a triggered
+  -- ability too. Pawl.LeavesTriggerSpec's activated-against-triggered pair is
+  -- what proves it.
+  --
+  -- CR 109.2 scopes the Filter to the BATTLEFIELD, which is the arm's other
+  -- rules content and belongs here rather than in each card's Filter: a target
+  -- is any Recipient, so a creature SPELL on the stack its controller named
+  -- would otherwise satisfy "creatures you control".
+  --
+  -- The LIVE view rather than viewWithLastKnown, and the same membership test
+  -- says so: CR 601.2c makes the object a target while it is still where the
+  -- announcement found it, and a permanent gone by the CR 117.5 boundary is one
+  -- this condition's printing no longer asks about.
+  --
+  -- Firing ONCE for the whole announcement is Event.Trigger.batchScoped's
+  -- answer and not this function's: matchesTriggerGiven sees one event at a
+  -- time and answers the same for both readings, which is its contract.
+  TriggerCondition.PermanentsBecomeTargeted c -> case event of
+    GameEvent.BecameTarget t -> case Recipient.objectOf (BecameTarget.targeted t) of
+      Nothing -> False
+      Just oid ->
+        Set.member oid (GameState.battlefield gs)
+          && maybe True (== BecameTarget.kind t) (PermanentsBecomeTargeted.kind c)
+          && Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) (Projection.viewOfObject oid gs) (PermanentsBecomeTargeted.filter c)
     GameEvent.BecameAttached {} -> False
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False

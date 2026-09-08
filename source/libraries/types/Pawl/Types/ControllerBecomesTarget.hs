@@ -21,16 +21,17 @@ data ControllerBecomesTarget = MkControllerBecomesTarget
     -- The relation the sibling condition SelfBecomesTargeted carries for rule
     -- 702.21a, read off the same field of the same event.
     relation :: PlayerRelation.PlayerRelation,
-    -- | Which of CR 601.2c's two announcement roads. Nothing is "a spell or
-    -- ability" -- CR 112.1's spell and CR 113.3's ability alike, which is Amulet
-    -- of Safekeeping's; Just Spell is Dormant Gomazoa's "a spell".
+    -- | Which of CR 601.2c's announcement roads. Nothing is "a spell or
+    -- ability" -- CR 112.1's spell and CR 113.3's two abilities alike, which is
+    -- Amulet of Safekeeping's; Just Spell is Dormant Gomazoa's "a spell".
     --
     -- Read off the event rather than off the board because the matcher has no
     -- GameState: CR 602.2b and CR 603.3d route an ability through the same rule
     -- 601.2c, so a condition that did not ask would fire Gomazoa on Ravenous
     -- Rats' targeted discard.
     --
-    -- Just Ability is representable and unprinted, admitted for the reason ward's
+    -- Just ActivatedAbility and Just TriggeredAbility are representable and
+    -- unprinted here, admitted for the reason ward's
     -- You relation is: the field is stated over
     -- Pawl.Types.StackObjectKind, not over the two printings that read it.
     kind :: Maybe StackObjectKind.StackObjectKind

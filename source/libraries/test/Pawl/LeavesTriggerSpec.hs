@@ -42,6 +42,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -2384,6 +2385,165 @@ hauntSpec s registry =
           Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack placed)) 0
           Spec.assertEqWith s "and no life total moved" (lives after) (Just 20, Just 20, Just 20)
 
+-- CR 601.2c read by a BYSTANDER, batched by CR 603.2c and narrowed to CR
+-- 113.3b's half of CR 113.3: Professor Hojo, {1}{G} Legendary Creature -- Human
+-- Scientist 2/2, "Whenever one or more creatures you control become the target
+-- of an activated ability, draw a card. This ability triggers only once each
+-- turn."
+--
+-- The first card in the pool that reads which KIND of ability targeted, and the
+-- reason Pawl.Types.StackObjectKind has three constructors rather than two: CR
+-- 602.2b and CR 603.3d bring an activated and a triggered ability to the same
+-- rule 601.2c step, so one Ability constructor would have drawn off both.
+--
+-- pawl's Hojo omits the card's FIRST line -- "the first activated ability you
+-- activate during your turn that targets a creature you control costs {2} less
+-- to activate" -- which no field of Pawl.Types.ReduceActivationCost can say
+-- (#3416). The omission leaves the card STRICTER than printed: alice pays each
+-- activation below in full, and no leg turns on what it cost.
+--
+-- THE HAND SIZE IS THE SIGNAL, and nothing else: the payload is a draw, so "the
+-- trigger fired" and "it did not" are exactly one card apart. alice's hand holds
+-- the Juggler and nothing else at every leg's start, which is what makes the
+-- readings below absolute rather than relative.
+--
+-- THE PAIR THAT PROVES THE SPLIT is Joraga Auxiliary against Rune-Brand Juggler:
+-- "{4}{G}{W}: Put a +1/+1 counter on each of up to two other target creatures"
+-- is CR 113.3b's road and "When this creature enters, suspect up to one target
+-- creature you control" is CR 113.3c's, and the two legs differ in NOTHING else
+-- -- the same board, and a creature alice controls named either way. A board
+-- carrying one kind alone cannot tell the conditions apart.
+--
+-- Joraga's "up to two" is also what makes the batch leg expressible at all: it
+-- is the pool's only activated ability that can name two creatures in one
+-- announcement.
+professorHojoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+professorHojoSpec s registry =
+  let -- Pins every target slot at the wanted recipients. The offered set is
+      -- INTERSECTED rather than replaced, gomazoaSpec's reason: a leg naming a
+      -- recipient the engine never offered chooses nothing instead of quietly
+      -- passing a target CR 608.2b's re-read would drop.
+      aiming :: Set.Set Recipient.Recipient -> Prompt.Prompt r -> r
+      aiming wanted p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.intersection candidates wanted) sets
+        _ -> S.identityAnswer p
+      -- THREE SEATS: alice controls the Hojo and everything that targets, bob
+      -- holds the creature she does not control, and carol is neither. Two would
+      -- collapse "a creature you control" onto "a creature".
+      board = do
+        forest <- S.printingOf s registry "Forest"
+        plains <- S.printingOf s registry "Plains"
+        swamp <- S.printingOf s registry "Swamp"
+        mountain <- S.printingOf s registry "Mountain"
+        hojo <- S.printingOf s registry "Professor Hojo"
+        joraga <- S.printingOf s registry "Joraga Auxiliary"
+        juggler <- S.printingOf s registry "Rune-Brand Juggler"
+        piker <- S.printingOf s registry "Goblin Piker"
+        -- Seven lands for the two producers, which never compete: one leg either
+        -- activates Joraga's {4}{G}{W} or casts the Juggler's {B}{R}.
+        let g0 = S.landsFor mountain S.alice 1 (S.landsFor swamp S.alice 1 (S.landsFor plains S.alice 1 (S.landsFor forest S.alice 4 S.threePlayerGame)))
+            (_hojoId, g1) = S.addPermanent hojo S.alice g0
+            (joragaId, g2) = S.addPermanent joraga S.alice g1
+            -- TWO Pikers under alice, which the batch leg needs and every other
+            -- leg leaves alone. Distinct ids, and the second is also what keeps
+            -- Joraga's "up to two" from short-circuiting on a one-candidate pool.
+            (firstPiker, g3) = S.addPermanent piker S.alice g2
+            (secondPiker, g4) = S.addPermanent piker S.alice g3
+            -- bob's, the CR 109.2 negative's other half: the same printing under
+            -- a seat that is not the Hojo's controller.
+            (bobsPiker, g5) = S.addPermanent piker S.bob g4
+            (jugglerId, g6) = S.addHandCard juggler S.alice g5
+            -- CR 104.3c: the Hojo draws, so an unstocked library is a loss
+            -- waiting rather than a reading.
+            stocked = List.foldl' (\g pid -> snd (S.addLibraryCard forest pid g)) g6 [S.alice, S.bob, S.carol, S.alice, S.bob, S.carol]
+        pure
+          ( joragaId,
+            firstPiker,
+            secondPiker,
+            bobsPiker,
+            jugglerId,
+            stocked
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          )
+      -- Down to the bottom: the Hojo's trigger sits above whatever announced the
+      -- targets, so a single resolution would leave the announcement unresolved
+      -- and the controls below unreadable. Stack.resolveTop is a no-op on an
+      -- empty stack, so the extra passes are harmless.
+      drain = Foldable.foldr (>>) (pure ()) (replicate 3 (Stack.resolveTop >> Engine.settleForPriority))
+      -- Activate Joraga's ability at `wanted`, settle so the Hojo's trigger
+      -- reaches the stack, then resolve everything. The answerer is written out
+      -- at each use rather than bound once: it is polymorphic in the prompt's
+      -- answer type, and a let-bound copy would be pinned to one.
+      activatedAt wanted joragaId gs = case Activate.abilitiesFor joragaId gs of
+        [ability] ->
+          let announced = S.runPure (aiming wanted) gs (Activate.activateAbility S.alice joragaId ability)
+           in Just (S.runPure (aiming wanted) (S.runPure (aiming wanted) announced Engine.settleForPriority) drain)
+        _ -> Nothing
+      -- The triggered road: cast the Juggler, resolve it so CR 603.6a's entry
+      -- trigger is gathered, and let CR 603.3d choose its target -- which is the
+      -- rule 601.2c announcement this leg is about.
+      triggeredAt wanted jugglerId gs =
+        let cast = S.runPure (aiming wanted) (S.runPure (aiming wanted) gs (S.cast S.alice jugglerId)) Engine.settleForPriority
+         in S.runPure (aiming wanted) cast drain
+   in Spec.describe s "CR 601.2c creatures becoming the target of an activated ability" $ do
+        -- The positive every negative below rests on.
+        Spec.it s "CR 113.3b whole card: an ACTIVATED ability targeting a creature you control draws" $ do
+          (joragaId, firstPiker, _, _, _, gs) <- board
+          Spec.assertEqWith s "alice's hand starts at the Juggler alone" (S.handSize S.alice gs) 1
+          case activatedAt (Set.singleton (Recipient.ToCreature firstPiker)) joragaId gs of
+            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activate.abilitiesFor joragaId gs)) 1
+            Just after -> do
+              Spec.assertEqWith s "CR 601.2c the Hojo's trigger drew a card" (S.handSize S.alice after) 2
+              -- The control: the ability really resolved onto the Piker, so a
+              -- leg that drew nothing at all cannot pass for a leg that did.
+              Spec.assertEqWith s "and the counter landed on the targeted Piker" (S.powerToughnessOf firstPiker after) (Just (3, 2))
+        -- CR 113.3c against the case above, and the whole of why
+        -- Pawl.Types.StackObjectKind splits: the SAME board and the SAME Piker
+        -- named, by an ability on the other side of rule 113.3.
+        Spec.it s "CR 113.3c a TRIGGERED ability naming the same creature draws nothing" $ do
+          (_, firstPiker, _, _, jugglerId, gs) <- board
+          let after = triggeredAt (Set.singleton (Recipient.ToCreature firstPiker)) jugglerId gs
+          Spec.assertEqWith s "CR 601.2c the Hojo's trigger did not fire" (S.handSize S.alice after) 0
+          -- The controls, which are what stop this leg passing because nothing
+          -- happened at all: the Juggler resolved, and its entry trigger really
+          -- named the Piker.
+          Spec.assertEqWith s "the Juggler reached the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Rune-Brand Juggler")) S.alice after) 1
+          Spec.assertEqWith s "and its trigger suspected the Piker it targeted" (fmap Object.designations (Game.lookupObject firstPiker after)) (Just (Set.singleton Designation.Suspected))
+        -- CR 603.2c's FIRST sentence: "one or more" names the whole rule 601.2c
+        -- announcement, so an activation that names two of alice's creatures is
+        -- one occurrence of the trigger event and not two.
+        --
+        -- The card's own "triggers only once each turn" rider MASKS the batch
+        -- reading here: Event.Trigger.batchScoped answering False would yield two
+        -- pending triggers and Engine.withinTurnLimit would drop the second
+        -- anyway, so this leg alone does not separate the two. Dropping the
+        -- card's TriggerLimit alongside that flip makes the reading below three
+        -- rather than two (2026-09-08). What the leg proves as it stands is the
+        -- printed sentence: two targets in one announcement draw ONE card.
+        Spec.it s "CR 603.2c one activation naming two of your creatures draws once" $ do
+          (joragaId, firstPiker, secondPiker, _, _, gs) <- board
+          case activatedAt (Set.fromList [Recipient.ToCreature firstPiker, Recipient.ToCreature secondPiker]) joragaId gs of
+            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activate.abilitiesFor joragaId gs)) 1
+            Just after -> do
+              Spec.assertEqWith s "one card drawn, not two" (S.handSize S.alice after) 2
+              -- The control: BOTH really were targeted, which is what makes the
+              -- reading above a batch rather than a single target.
+              Spec.assertEqWith s "and both Pikers took a counter" (S.powerToughnessOf firstPiker after, S.powerToughnessOf secondPiker after) (Just (3, 2), Just (3, 2))
+        -- CR 109.2: "creatures you control" is a Filter over the targeted
+        -- permanent, and bob's Piker fails it. The same activation as the
+        -- positive leg, differing in NOTHING but whose creature was named.
+        Spec.it s "CR 109.2 an activated ability naming a creature you do not control draws nothing" $ do
+          (joragaId, _, _, bobsPiker, _, gs) <- board
+          case activatedAt (Set.singleton (Recipient.ToCreature bobsPiker)) joragaId gs of
+            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activate.abilitiesFor joragaId gs)) 1
+            Just after -> do
+              Spec.assertEqWith s "alice's hand is still the Juggler alone" (S.handSize S.alice after) 1
+              Spec.assertEqWith s "and the counter landed on bob's Piker" (S.powerToughnessOf bobsPiker after) (Just (3, 2))
+
 soulshiftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulshiftSpec s registry =
   let ancestorName = CardName.MkCardName (Text.pack "Disowned Ancestor")
@@ -3525,6 +3685,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cutpurseSpec s registry
   gomazoaSpec s registry
   amuletSpec s registry
+  professorHojoSpec s registry
   soulshiftSpec s registry
   hauntSpec s registry
   screamsFromWithinSpec s registry

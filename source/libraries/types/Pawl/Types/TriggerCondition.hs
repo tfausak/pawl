@@ -14,6 +14,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
+import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -334,6 +335,10 @@ data TriggerCondition
   | -- | CR 601.2c from the player's side: "whenever you become the target of a
     -- spell or ability" (Dormant Gomazoa).
     ControllerBecomesTarget ControllerBecomesTarget.ControllerBecomesTarget
+  | -- | CR 603.2c's batch reading of the same rule read by a BYSTANDER:
+    -- "whenever one or more creatures you control become the target of an
+    -- activated ability" (Professor Hojo), once for the whole announcement.
+    PermanentsBecomeTargeted PermanentsBecomeTargeted.PermanentsBecomeTargeted
   | -- | CR 709.5h: "when you unlock this door", however the named half was
     -- unlocked. Self-scoped plus the half, which is what separates a Room's two
     -- doors.

@@ -404,6 +404,10 @@ looksBack condition = case condition of
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
   TriggerCondition.ControllerBecomesTarget {} -> False
+  -- Nor does the batch reading of the same rule: CR 601.2c makes a permanent a
+  -- target while it is still on the battlefield, so there is nothing gone for CR
+  -- 603.10a to look back at.
+  TriggerCondition.PermanentsBecomeTargeted {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   -- CR 603.3b's second class names no zone change at all -- its event is another
@@ -626,6 +630,20 @@ batchScoped condition = case condition of
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
   TriggerCondition.ControllerBecomesTarget {} -> False
+  -- A True beside PermanentsDie and PlayersGainLife, and the whole of what
+  -- separates this constructor from the two singular arms above: CR 603.2c's
+  -- FIRST sentence, "one or more creatures you control become the target of an
+  -- activated ability" naming the whole rule 601.2c announcement as one trigger
+  -- event, so an activation that names three of them contains one occurrence.
+  --
+  -- MASKED, not unproven: Professor Hojo, the only printing of this written
+  -- form, also prints "this ability triggers only once each turn", and
+  -- Engine.withinTurnLimit drops a batch's second firing whichever answer this
+  -- gives -- so flipping this arm alone leaves the suite green. Dropping the
+  -- card's TriggerLimit as well makes Pawl.LeavesTriggerSpec's "one card drawn,
+  -- not two" read three cards instead of two (2026-09-08), which is what says
+  -- the classification is load-bearing rather than decorative.
+  TriggerCondition.PermanentsBecomeTargeted {} -> True
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SagaFinalChapterTriggers _ -> False
@@ -2112,6 +2130,9 @@ zonesTriggeredFrom cond = case cond of
   -- Safekeeping an artifact, both watching their controller from the
   -- battlefield. Nothing on the stack reads its controller becoming a target.
   TriggerCondition.ControllerBecomesTarget {} -> battlefield
+  -- CR 113.6's default once again: Professor Hojo is a creature, watching the
+  -- creatures beside it from the battlefield.
+  TriggerCondition.PermanentsBecomeTargeted {} -> battlefield
   -- CR 113.6's default a last time: Historian's Boon is an enchantment watching
   -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
   TriggerCondition.SagaFinalChapterTriggers _ -> battlefield
@@ -2398,6 +2419,7 @@ stateTriggers gs
               TriggerCondition.SelfCast -> False
               TriggerCondition.SelfBecomesTargeted _ -> False
               TriggerCondition.ControllerBecomesTarget {} -> False
+              TriggerCondition.PermanentsBecomeTargeted {} -> False
               -- CR 709.5i is an EVENT trigger, for CR 709.5h's reason one arm up:
               -- it fires on the LAST designation arriving, and CR 709.5c leaves
               -- the permanent holding both thereafter, so a state read would fire

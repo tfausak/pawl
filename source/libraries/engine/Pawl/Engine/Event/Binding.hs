@@ -1560,6 +1560,14 @@ eventBindingSlots cond = case cond of
   -- reads the bearer and never this slot, and a slot promised but unread is
   -- harmless where the reverse is the failure this lint exists to catch.
   TriggerCondition.ControllerBecomesTarget {} -> Set.singleton Binding.targetingObject
+  -- Nothing, PermanentsDie's answer and for its reason: CR 603.2c makes the whole
+  -- announcement the trigger event, so neither the targeting object nor any one
+  -- of the permanents it named is the thing the condition is about. Professor
+  -- Hojo, the only printing of this written form, draws a card and names none of
+  -- them; a payload saying "that spell or ability" would refute this, and the
+  -- lint would reject it -- no member of eventBindingSlotsSometimes for
+  -- PermanentsDie's reason.
+  TriggerCondition.PermanentsBecomeTargeted {} -> Set.empty
   -- CR 603.3b's second class names two things and binds both: CR 113.7's Saga,
   -- which the chapter ability hangs on, under CR 400.7e's slot for the reason
   -- eventBindings' arm gives, and CR 603.3a's controller of that chapter ability

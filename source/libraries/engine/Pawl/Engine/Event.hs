@@ -5639,7 +5639,8 @@ counterOne source controller oid = do
 -- players in the same breath, so one event over a Recipient beats two events.
 --
 -- The KIND is passed in rather than derived. Rule 601.2c's parenthetical is about
--- spells (CR 112.1) while CR 602.2b and CR 603.3d bring abilities (CR 113.3) to
+-- spells (CR 112.1) while CR 602.2b and CR 603.3d bring CR 113.3b's and CR
+-- 113.3c's abilities to
 -- the same step, and only the caller knows which it is putting on the stack;
 -- the matcher that later reads this has no GameState to ask.
 --
@@ -6849,6 +6850,9 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
   TriggerCondition.ControllerBecomesTarget {} -> False
+  -- Nor is the batch reading of the same rule: CR 601.2c's announcement is not
+  -- an ability triggering however many permanents it named.
+  TriggerCondition.PermanentsBecomeTargeted {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SelfTurnedFaceUp -> False
@@ -7141,6 +7145,9 @@ controllerTurnScoped cond = case cond of
   -- Its player-side sibling likewise: a spell can name its controller on anybody's
   -- turn.
   TriggerCondition.ControllerBecomesTarget {} -> False
+  -- And the bystander batch reading likewise: an activated ability can name a
+  -- creature on anybody's turn.
+  TriggerCondition.PermanentsBecomeTargeted {} -> False
   -- CR 714.3c's turn-based action falls on the Saga controller's own turn, but
   -- nothing restricts this CONDITION to it: CR 714.3a's entry replacement can put
   -- a Saga's last lore counter on during anybody's turn, and the watcher is not
