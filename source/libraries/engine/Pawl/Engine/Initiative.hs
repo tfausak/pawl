@@ -89,7 +89,7 @@ ventureIntoUndercity = Effect.Venture (Just Subtype.Undercity)
 upkeepVenture :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 upkeepVenture =
   oneEffect
-    (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn))
+    (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn))
     ventureIntoUndercity
 
 -- CR 726.2, second: "whenever one or more creatures a player controls deal
@@ -122,7 +122,7 @@ initiativeAbilities = [upkeepVenture, combatHandoff, takeVenture]
 -- abilities triggered", so they are the "you" CR 109.5 would give a printed one.
 beginsHoldersUpkeep :: PlayerId -> GameState -> LoggedEvent.LoggedEvent -> Bool
 beginsHoldersUpkeep holder gs logged = case (TriggeredAbility.condition upkeepVenture, LoggedEvent.event logged) of
-  (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active)) ->
+  (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active)) ->
     began == wanted && Event.turnScopeAdmits (Game.teams gs) scope active holder
   _ -> False
 

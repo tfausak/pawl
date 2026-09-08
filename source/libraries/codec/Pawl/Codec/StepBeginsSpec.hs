@@ -17,7 +17,8 @@ spec s = Spec.describe s "Pawl.Codec.StepBegins" $ do
       s
       StepBegins.codec
       ( StepBegins.MkStepBegins
-          { StepBegins.phase = Phase.Ending EndingStep.EndStep,
+          { StepBegins.ordinal = Nothing,
+            StepBegins.phase = Phase.Ending EndingStep.EndStep,
             StepBegins.scope = TurnScope.EachTurn
           }
       )
@@ -30,9 +31,23 @@ spec s = Spec.describe s "Pawl.Codec.StepBegins" $ do
       s
       StepBegins.codec
       ( StepBegins.MkStepBegins
-          { StepBegins.phase = Phase.Beginning BeginningStep.Upkeep,
+          { StepBegins.ordinal = Nothing,
+            StepBegins.phase = Phase.Beginning BeginningStep.Upkeep,
             StepBegins.scope = TurnScope.ControllersTurn
           }
       )
       " {\"phase\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}},\"scope\":{\"type\":\"ControllersTurn\"}} "
+  -- CR 505.1b's ordinal, which Acrobatic Cheerleader's "your second main phase"
+  -- carries and no card that names its phase does.
+  Spec.it s "MkStepBegins, the controller's second main phase" $
+    Common.assertCodec
+      s
+      StepBegins.codec
+      ( StepBegins.MkStepBegins
+          { StepBegins.ordinal = Just 2,
+            StepBegins.phase = Phase.PostcombatMain,
+            StepBegins.scope = TurnScope.ControllersTurn
+          }
+      )
+      " {\"ordinal\":2,\"phase\":{\"type\":\"PostcombatMain\"},\"scope\":{\"type\":\"ControllersTurn\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s StepBegins.codec

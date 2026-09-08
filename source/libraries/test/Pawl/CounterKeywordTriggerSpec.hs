@@ -539,7 +539,7 @@ vanishingSpec s registry =
         -- assertion written that way says only that two copies are two copies,
         -- and a mint that dropped one of the pair would repair it silently.
         Spec.it s "CR 702.63c each instance is its own three abilities" $ do
-          let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
+          let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)
               emptied = TriggerCondition.SelfLastCounterRemoved CounterKind.Time
           Spec.assertEqWith
             s
@@ -636,7 +636,7 @@ numberlessVanishingSpec s registry =
         -- states the SAME two triggers as rule 702.63a and no entry ability, so
         -- the absent number changes exactly one of the two lists.
         Spec.it s "CR 702.63b keeps both triggers and mints no entry rewrite" $ do
-          let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
+          let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)
               emptied = TriggerCondition.SelfLastCounterRemoved CounterKind.Time
           Spec.assertEqWith
             s
@@ -753,7 +753,7 @@ fadingSpec s registry =
             s
             "fading 2 held twice mints two upkeep triggers"
             (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Fading 2) 2)))
-            (replicate 2 (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)))
+            (replicate 2 (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)))
           Spec.assertEqWith
             s
             "and two entry rewrites of two FADE counters each, never rule 702.63a's time counters"
