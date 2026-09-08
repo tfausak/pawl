@@ -46,10 +46,12 @@ data GameEvent
     -- strict snapshot of the moved object as it last existed in the zone it LEFT
     -- (CR 608.2h) rather than a re-derivation from the printed card.
     Moved Moved.Moved
-  | -- | CR 712.21: one of the CARDS a zone change put into a zone, other than
-    -- the one the Moved event above already names. The ZoneChange's `departed`
-    -- is the object that left and `to` is where this card landed, which CR
-    -- 903.9c can make a different zone from the Moved event's.
+  | -- | CR 712.21 / CR 730.3: one of the further OBJECTS a zone change put into
+    -- a zone, other than the one the Moved event above already names -- a melded
+    -- permanent's second card, and any component of a merged permanent, which
+    -- rule 730.3 lets be a token as well as a card. The ZoneChange's `departed`
+    -- is the object that left and `to` is where this one landed, which CR 903.9c
+    -- can make a different zone from the Moved event's.
     --
     -- Recorded only where one departure minted several arrivals, so CR 712.21's
     -- first clause keeps its arity -- one permanent left the battlefield, and a

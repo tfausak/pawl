@@ -765,6 +765,27 @@ copiableCharacteristicsFaceUp oid gs =
     oid
     gs {GameState.objects = Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects gs)}
 
+-- CR 730.2h: `copiableCharacteristicsFaceUp` above asked of a side that is
+-- FLIPPED -- "that component's alternative characteristics are used instead of
+-- its normal characteristics if the merged permanent is flipped". Equal to the
+-- face-up read for a side that is not a flip card, Game.resolveFaceFor's flipped
+-- arm needing a Card.flippedFace to fire, so Pawl.Engine.Event.merge asks it of
+-- BOTH sides and the rule's "if a merged permanent contains a flip card" falls
+-- out rather than being tested.
+--
+-- The same COUNTERFACTUAL BOARD the neighbour above is written as, and stacked
+-- on it: CR 110.5 makes flipped and face-down two of one rule's status
+-- categories, and the question here is what layer 1a would say of this side with
+-- both of them settled the way the merge needs. On a side that is already a
+-- MERGED permanent the counterfactual reaches `stampedSnapshotOf` below instead,
+-- which answers with the flipped reading that merge stamped -- so a merge onto a
+-- merged permanent carries the older merge's flip component forward.
+copiableCharacteristicsFlipped :: ObjectId -> GameState -> ProjectedCharacteristics
+copiableCharacteristicsFlipped oid gs =
+  copiableCharacteristicsFaceUp
+    oid
+    gs {GameState.objects = Map.adjust (\o -> o {Object.flipped = True}) oid (GameState.objects gs)}
+
 -- CR 707.3: the copy snapshot an object's copiable RULES TEXT is read from --
 -- Nothing for an object that is copying nothing, and Nothing again for one whose
 -- snapshot copied HALVES, whose rules text every reader must re-derive against
@@ -825,8 +846,23 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 -- ONE read of that binding, and only copiableSnapshotOf and derivesFromCopiedHalves
 -- above call it; Pawl.Engine.Game.halvesCardOf makes the other read in the
 -- engine, off the object it already holds.
+--
+-- CR 730.2h is the one fork: a FLIPPED merged permanent reads the flipped
+-- stamp its merge left beside the ordinary one, so each flip component
+-- contributes its alternative characteristics. CR 110.5a keeps status out of the
+-- characteristics, which is why this is a choice between two stamped readings
+-- rather than a CR 613 layer -- Pawl.Types.Object.flipped says the same of the
+-- unmerged road, where Game.resolveFaceFor makes the substitution at the face
+-- seam a merged permanent's stamp goes around.
 stampedSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
-stampedSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings)
+stampedSnapshotOf oid gs = do
+  object <- Game.lookupObject oid gs
+  let bindings = Object.bindings object
+  if Object.flipped object
+    then case Binding.flippedCopyOf bindings of
+      Just flipped -> Just flipped
+      Nothing -> Binding.copyOf bindings
+    else Binding.copyOf bindings
 
 -- CR 707.2a: the static abilities this object's copiable rules text gives it --
 -- its copy snapshot's when it has one, its printed face's otherwise. Equal to
@@ -1194,8 +1230,9 @@ withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupO
 -- of the characteristics, and CR 613.2b applies rule 708.2's substitution to the
 -- resulting permanent one sublayer later.
 --
--- Not implemented: a component whose own record is not the whole of what it
--- represents -- CR 730.2h's flip components (#874).
+-- CR 730.2h's flip component arrives here already read the way that rule asks
+-- for, Pawl.Engine.Event.merge folding a SECOND result out of both sides'
+-- flipped records; this function is the same fold either way.
 withMergedAbilities :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
 withMergedAbilities donor base =
   base

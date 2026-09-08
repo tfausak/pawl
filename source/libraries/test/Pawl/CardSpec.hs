@@ -2069,6 +2069,7 @@ reservedSlots =
     [ Binding.variableX,
       Binding.chosenModes,
       Binding.copySource,
+      Binding.flippedMergeSource,
       Binding.triggerSource,
       Binding.you,
       Binding.triggerPlayer,
