@@ -4295,6 +4295,12 @@ isBattleGiven pcs oid gs = Set.member CardType.Battle (cardTypesGiven pcs oid gs
 isCreatureFrom :: [Gathered] -> ObjectId -> GameState -> Bool
 isCreatureFrom cands oid gs = Set.member CardType.Creature (PC.cardTypes (projectFrom cands oid gs))
 
+-- CR 613.1d for the battle card type, off the same precomputed candidate list:
+-- Pawl.Engine.Combat.removeChanged asks it of the handful of permanents in
+-- combat, against the gather it already took for isCreatureFrom.
+isBattleFrom :: [Gathered] -> ObjectId -> GameState -> Bool
+isBattleFrom cands oid gs = Set.member CardType.Battle (PC.cardTypes (projectFrom cands oid gs))
+
 -- Membership, which DISCARDS the count -- right for every keyword whose extra
 -- instances the rules call redundant (CR 702.3c). totalToxic is the other shape.
 hasKeyword :: Keyword -> ObjectId -> GameState -> Bool

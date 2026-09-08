@@ -343,9 +343,6 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- dropped in attemptAttackDeclaration rather than here, which is the same
 -- posture and one step later.
 --
--- Not implemented: CR 508.1a's "they can't also be battles", which the creature
--- test below already covers (#898).
---
 -- canAttackGiven is the half a LOOP wants: `grants`, `pcs` and `restricted` are
 -- each one battlefield-wide walk, taken once per declaration pass. An
 -- absent projection is a cache miss the projection recovers from, while an absent
@@ -369,6 +366,12 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
       -- turn began.
       && Summoning.settledOrHastyGiven pcs pid oid gs
       && isCreatureObjectGiven pcs oid gs
+      -- CR 508.1a's "they can't also be battles". A separate conjunct from the
+      -- creature test above and not a consequence of it: CR 205.1b's "in addition
+      -- to its other types" leaves a permanent both, and Pawl.CombatSpec's
+      -- "CR 508.1a a creature that is also a battle is not offered as an attacker"
+      -- is the board.
+      && not (Projection.isBattleGiven pcs oid gs)
       -- CR 508.1c through CR 702.3b: a creature with defender can't attack. It may
       -- still block -- 702.3b says nothing about blocking.
       && not (Projection.hasKeywordGiven pcs Keyword.Defender oid gs)
@@ -802,6 +805,10 @@ canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs o
       && Set.member oid (GameState.battlefield gs)
       && Object.tapped obj == TapState.Untapped
       && isCreatureObjectGiven pcs oid gs
+      -- CR 509.1a's "they can't also be battles", the blocking twin of the
+      -- conjunct in canAttackGiven and separate from the creature test for the
+      -- same reason.
+      && not (Projection.isBattleGiven pcs oid gs)
       -- CR 509.1b: every per-creature blocking restriction in force -- printed
       -- (Pacifism), minted by rule 702 from a keyword (unleash, CR 702.98a), or
       -- stored by the resolution that said it (Zirda, the Dawnwaker).
@@ -1343,7 +1350,13 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- Pawl.Engine.Damage. Creatures only, which is what `combatants` gathers -- CR
 -- 506.4d falls out of that split (Pawl.CombatEffectSpec's CreaturePlaneswalkerInCombat
 -- is the proof), and the phases-out clause is Pawl.Engine.Phasing.phaseOut's. Not
--- implemented: CR 506.4e and the becomes-a-battle clause (#981).
+-- implemented: CR 506.4e, an attacked permanent that is both a planeswalker and a
+-- battle, which is about the ATTACKED object and so belongs to noteAttackingNothing
+-- below rather than to this creature-scoped fold (#981).
+--
+-- The becomes-a-battle clause IS here, and it is sampled like the other two: a
+-- combatant that IS a battle became one, since CR 508.1a and CR 509.1a both keep
+-- a battle out of the declaration it joined combat through.
 --
 -- The ATTACKED planeswalker or battle is noteAttackingNothing's, below, run on
 -- the state this fold leaves behind.
@@ -1360,8 +1373,10 @@ removeChanged gs =
         Nothing -> False
         Just who -> Projection.controllerOfGiven grants Set.empty oid gs /= Just who
       stoppedBeingCreature oid = not (Projection.isCreatureFrom cands oid gs)
+      -- CR 506.4's becomes-a-battle clause, against the same gather.
+      becameBattle oid = Projection.isBattleFrom cands oid gs
       onBattlefield oid = Set.member oid (GameState.battlefield gs)
-      changed oid = controlChanged oid || stoppedBeingCreature oid
+      changed oid = controlChanged oid || stoppedBeingCreature oid || becameBattle oid
       leaving = filter (\oid -> onBattlefield oid && changed oid) (Set.toList inCombat)
    in if Set.null inCombat
         then gs
