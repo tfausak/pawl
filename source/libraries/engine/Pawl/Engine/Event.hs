@@ -1456,10 +1456,10 @@ loop asOf batch applied prevented exiledBy shuffling event = do
         -- 5); a non-distributive rewrite reaching both halves would be what
         -- refutes it, and none has a producer.
         --
-        -- Not implemented: rejoining the two halves when the redirect's
-        -- destination IS the residue's recipient, so the one permanent is dealt
-        -- two events where the rules deal one and a "whenever this is dealt
-        -- damage" trigger fires twice (#3190).
+        -- The two halves may end up on the SAME recipient, which CR 120.4 deals
+        -- as one event; resolveDamage rejoins them once the loop is done
+        -- (Replacement.oneEventPerRecipient), rather than here, because a later
+        -- iteration can still move either half.
         Just candidate
           | Just covered <- Replacement.partialCoverage gs candidate event,
             Just (front, rest) <- Replacement.splitDamage covered event -> do
@@ -3560,10 +3560,17 @@ fullyUnlockedAfter halves card = case card of
 -- or more is CR 614.9's counted redirection having moved part of it (Harm's
 -- Way). The second answer is CR 615.13's, one entry per prevention effect that
 -- applied to THIS event and prevented some of it.
+--
+-- Replacement.oneEventPerRecipient undoes the split where it moved nothing: a
+-- counted redirect aimed AT the recipient its chosen source is already damaging
+-- lands both halves on that one permanent, and CR 120.4 deals it one event. This
+-- is the only funnel that sees a single proposal's whole outcome, which is the
+-- scope that collapse wants; the key's source component is what keeps a CR 510.2
+-- batch's separate dealers apart in any case.
 resolveDamage :: DamageEvent.DamageEvent -> Game ([DamageEvent.DamageEvent], [Prevention])
 resolveDamage de = do
   (outcome, prevented) <- applyReplacementsReporting Nothing Set.empty (ProposedEvent.WouldDealDamage de)
-  pure (Maybe.mapMaybe Replacement.asDamageEvent outcome, prevented)
+  pure (Replacement.oneEventPerRecipient (Maybe.mapMaybe Replacement.asDamageEvent outcome), prevented)
 
 -- CR 608.2f / 510.2: settle a whole batch of SIMULTANEOUS damage events, and
 -- answer the survivors. The typed door Pawl.Engine.Damage uses, so Damage never

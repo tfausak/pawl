@@ -18,7 +18,7 @@ data DealDamage = MkDealDamage
     --
     -- Two clauses naming ONE recipient are one event of the total, not two: CR
     -- 120.4's event is one source, one recipient, one moment, and
-    -- Pawl.Engine.Damage.oneEventPerRecipient is where the sum happens. Char
+    -- Pawl.Engine.Replacement.oneEventPerRecipient is where the sum happens. Char
     -- aimed at its own caster is the sentence, and Pawl.ReplacementSpec's Ajani
     -- Steadfast emblem case is the proof.
     parts :: Seq.Seq DamagePart.DamagePart,

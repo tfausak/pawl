@@ -2025,7 +2025,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- applyDamage as a single CR 608.2f batch rather than one per clause.
             --
             -- And one EVENT per recipient within that batch (CR 120.4), which is
-            -- Damage.oneEventPerRecipient's business: two clauses can name the
+            -- Replacement.oneEventPerRecipient's business: two clauses can name the
             -- same recipient -- Char aimed at its own caster -- and one source
             -- dealing damage to one recipient at one moment deals one event.
             aimed =
@@ -2040,7 +2040,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       (recipientsOf (DamagePart.ref part))
                 )
                 parts
-            events = Damage.oneEventPerRecipient aimed
+            events = Replacement.oneEventPerRecipient aimed
             -- CR 120.4a, and BEFORE applyDamage's CR 120.4b, against the same
             -- pre-effect state every amount was read against.
             rewritten = Damage.redirectExcess gs excess events
