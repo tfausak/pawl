@@ -463,10 +463,8 @@ rewriteEffect pairs effect = case effect of
   Effect.RemoveFromCombat ref -> Effect.RemoveFromCombat (rewriteObjectRef pairs ref)
   Effect.BecomesBlocked _ -> effect
   -- The riders' counter AMOUNTS are Quantities and take rewriteQuantity's
-  -- descent, PutCounters' case below.
-  --
-  -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
-  -- printed keyword through the swap (#1190).
+  -- descent, PutCounters' case below; their KEYS take rewriteEntryRiders' own,
+  -- which is what Pawl.CounterspellSpec's Synthetic Warded Homecoming proves.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position duration) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone (rewriteEntryRiders pairs riders) mSlot mOrigin position duration)
   Effect.Draw x -> Effect.Draw x {Draw.quantity = rewriteQuantity pairs (Draw.quantity x)}
   Effect.Mill (Mill.MkMill ref quantity mTally mSlot) ->
@@ -492,18 +490,16 @@ rewriteEffect pairs effect = case effect of
   Effect.DecreaseSpeed x -> Effect.DecreaseSpeed x {SpeedDecrease.quantity = rewriteQuantity pairs (SpeedDecrease.quantity x)}
   -- CR 612.2a: the token's creature types and its name are the same words, and
   -- they live in the defining card. The count and the riders' counter amounts are
-  -- Quantities and take rewriteQuantity's descent, PutCounters' case below.
-  --
-  -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
-  -- printed keyword (#1190).
+  -- Quantities and take rewriteQuantity's descent, PutCounters' case below, and
+  -- their keys rewriteEntryRiders' own. A REGRESSION FENCE on this arm: no card
+  -- in data/cards/ mints a token with a keyword counter rider, so the key
+  -- rewrite is proven through MoveToZone's arm above and not through this one.
   Effect.Create (Create.MkCreate quantity card riders slot creator) -> Effect.Create (Create.MkCreate (rewriteQuantity pairs quantity) (rewriteCard pairs card) (rewriteEntryRiders pairs riders) slot creator)
   Effect.Conjure (Conjure.MkConjure quantity card destination) -> Effect.Conjure (Conjure.MkConjure (rewriteQuantity pairs quantity) (rewriteCard pairs card) destination)
   -- CR 707.2 excludes text-changing effects from copiable values, so what the
   -- token becomes is not rewritten -- only the ref, the count and the riders'
-  -- counter amounts are.
-  --
-  -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
-  -- printed keyword, Create's arm above (#1190).
+  -- counter amounts and their keys are. A REGRESSION FENCE on this arm too,
+  -- Create's reason one opcode up.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders exceptions) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders) (fmap (rewriteCopyException pairs) exceptions))
   -- The exceptions ride this opcode too, and take the same walk AsCopy's do
   -- (rewriteEntryRewrite below).
@@ -595,33 +591,34 @@ rewriteEffect pairs effect = case effect of
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind amount from whatRecipient whoRecipient to chosenSource) ->
     Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (fmap (rewriteQuantity pairs) amount) (fmap (rewriteObjectRef pairs) from) (fmap (Filter.rewrite pairs) whatRecipient) whoRecipient (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
   Effect.Counter (Counter.MkCounter ref mSlot mSources) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources)
-  -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
-  -- printed keyword through the swap, where Filter's HasCounters arm rewrites
-  -- the same kind (#1840).
+  -- CR 612.1 through the KIND as well, where Filter's HasCounters arm rewrites
+  -- the same one: CR 122.1b's keyword counter carries a keyword, and a word
+  -- inside it is swapped like any other. Pawl.CounterspellSpec's Synthetic
+  -- Warding Sigil proves it.
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
-    Effect.PutCounters (PutCounters.MkPutCounters kind (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
-  -- The count is a Quantity and takes the same descent PutCounters' case above
-  -- makes.
+    Effect.PutCounters (PutCounters.MkPutCounters (Filter.rewriteCounterKind pairs kind) (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
+  -- The count and the kind both take the descent PutCounters' case above makes.
+  -- Pawl.CounterspellSpec's Synthetic Erode the Warding proves the kind's.
+  Effect.RemoveCounters x ->
+    Effect.RemoveCounters
+      x
+        { RemoveCounters.kind = Filter.rewriteCounterKind pairs (RemoveCounters.kind x),
+          RemoveCounters.quantity = rewriteQuantity pairs (RemoveCounters.quantity x)
+        }
+  -- The destination and the kind: CR 122.8 names no count, and its third
+  -- sentence lets the card settle which kinds cross, so that kind is printed
+  -- text PutCounters' case above reaches the same way.
   --
-  -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
-  -- printed keyword through the swap, PutCounters' case above (#1840).
-  Effect.RemoveCounters x -> Effect.RemoveCounters x {RemoveCounters.quantity = rewriteQuantity pairs (RemoveCounters.quantity x)}
-  -- Only the destination descends: CR 122.8 names no count, so the ObjectRef is
-  -- where a subtype word would otherwise hide.
-  --
-  -- Not implemented: a CR 122.1b keyword counter named in the kind -- rule
-  -- 122.8's third sentence, which lets the card settle which kinds cross --
-  -- keeps its printed keyword through the swap, PutCounters' case above (#1840).
+  -- A REGRESSION FENCE rather than a proven behaviour: every PutCountersFrom in
+  -- data/cards/ names all kinds or +1/+1, none of which carries a word CR 612.2
+  -- can swap, so mutating this line reddens nothing.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from kind ref) ->
-    Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from kind (rewriteObjectRef pairs ref))
+    Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from (fmap (Filter.rewriteCounterKind pairs) kind) (rewriteObjectRef pairs ref))
   -- BOTH refs and the count. Filter.rewrite renames no slot, so the bound slot is
   -- not rewritten, but either ref may carry a filter -- Spike Cannibal's "all
   -- creatures" on the first side, Forgotten Ancient's "other creatures" on the
   -- second -- and a subtype word there is as changeable as any other (CR 612.1);
-  -- the count is a Quantity and goes through rewriteMovedKinds, PutCounters' case
-  -- above.
-  -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
-  -- printed keyword through the swap, PutCounters' case above (#1840).
+  -- the count and the kind go through rewriteMovedKinds, PutCounters' case above.
   Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds slot to) ->
     Effect.MoveCounters (MoveCounters.MkMoveCounters (rewriteObjectRef pairs from) (rewriteMovedKinds pairs kinds) slot (rewriteObjectRef pairs to))
   -- A player counter kind is a closed list (CR 122.1f, CR 122.1i, CR 107.14, and
@@ -1471,18 +1468,23 @@ rewriteDuration pairs duration = case duration of
   Duration.UntilPaid _ -> duration
   Duration.UntilUsed -> duration
 
--- CR 612.1 through the counters a CR 122.5 move carries: the count is the only
--- place a subtype word can hide, since the kind is a CounterKind and Every,
--- AnyNumber and EachAbsentKind name nothing at all.
+-- CR 612.1 through the counters a CR 122.5 move carries: the count, and the
+-- kind wherever the CARD names one (MovedKinds.kindOf's three arms), since CR
+-- 122.1b's keyword counter carries a keyword. Every, Chosen, AnyNumber,
+-- AtLeastOne, EachAbsentKind and UpToOneChosen name no kind at all.
+--
+-- A REGRESSION FENCE on the three kind-bearing arms rather than a proven
+-- behaviour: every kind-naming move in data/cards/ names +1/+1, which carries no
+-- word CR 612.2 can swap, so mutating those lines reddens nothing.
 rewriteMovedKinds :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> MovedKinds.MovedKinds -> MovedKinds.MovedKinds
 rewriteMovedKinds pairs kinds = case kinds of
   MovedKinds.Every -> kinds
-  MovedKinds.Named kind quantity -> MovedKinds.Named kind (rewriteQuantity pairs quantity)
-  MovedKinds.EveryOfKind _ -> kinds
+  MovedKinds.Named kind quantity -> MovedKinds.Named (Filter.rewriteCounterKind pairs kind) (rewriteQuantity pairs quantity)
+  MovedKinds.EveryOfKind kind -> MovedKinds.EveryOfKind (Filter.rewriteCounterKind pairs kind)
   MovedKinds.Chosen quantity -> MovedKinds.Chosen (rewriteQuantity pairs quantity)
   MovedKinds.AnyNumber -> kinds
   MovedKinds.AtLeastOne -> kinds
-  MovedKinds.AnyNumberOfKind _ -> kinds
+  MovedKinds.AnyNumberOfKind kind -> MovedKinds.AnyNumberOfKind (Filter.rewriteCounterKind pairs kind)
   MovedKinds.EachAbsentKind -> kinds
   MovedKinds.UpToOneChosen -> kinds
 
@@ -1560,15 +1562,21 @@ rewriteDamagePart pairs part =
 rewritePlayerQuantity :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PlayerQuantity.PlayerQuantity -> PlayerQuantity.PlayerQuantity
 rewritePlayerQuantity pairs x = x {PlayerQuantity.quantity = rewriteQuantity pairs (PlayerQuantity.quantity x)}
 
--- CR 612.1 over an entry row's counter AMOUNTS -- "enters with a +1/+1 counter
--- for each Goblin you control" is a Count like any other. The keys are left as
--- printed, which is why this needs none of rewriteWithCounters' collision
--- combiner.
---
--- Not implemented: a CR 122.1b keyword counter named in a key keeps its printed
--- keyword (#1190).
+-- CR 612.1 over an entry row's counter AMOUNTS and KEYS -- "enters with a +1/+1
+-- counter for each Goblin you control" is a Count like any other, and CR 122.1b's
+-- keyword counter carries a keyword whose word rule 612 reaches.
+-- rewriteWithCounters' collision combiner comes with the key rewrite: CR 122.1's
+-- last sentence makes counters with the same name interchangeable, so a swap
+-- that collides two keys merges the rows rather than keeping an arbitrary
+-- survivor.
 rewriteEntryRiders :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRiders.EntryRiders Quantity.Type.Quantity -> EntryRiders.EntryRiders Quantity.Type.Quantity
-rewriteEntryRiders pairs riders = riders {EntryRiders.counters = fmap (rewriteQuantity pairs) (EntryRiders.counters riders)}
+rewriteEntryRiders pairs riders =
+  riders
+    { EntryRiders.counters =
+        Map.mapKeysWith (\greater lesser -> Quantity.Type.Plus (Plus.MkPlus lesser greater)) (Filter.rewriteCounterKind pairs)
+          . fmap (rewriteQuantity pairs)
+          $ EntryRiders.counters riders
+    }
 
 -- Greatest and Total are the Aggregations carrying a Quantity.
 rewriteAggregation :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Aggregation.Aggregation Quantity.Type.Quantity -> Aggregation.Aggregation Quantity.Type.Quantity
