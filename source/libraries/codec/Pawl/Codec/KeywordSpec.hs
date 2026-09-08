@@ -1010,6 +1010,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (mutate 4)
       " {\"type\":\"Mutate\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (mutate 4) /= Codec.encode Keyword.codec (bestowOf 4)) "the same cost under two keywords encodes differently"
+  -- CR 702.89b: the wire spelling is the CURRENT Oracle name, so a card printed
+  -- "totem armor" is transcribed as this.
+  Spec.it s "UmbraArmor" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.UmbraArmor
+      " {\"type\":\"UmbraArmor\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 

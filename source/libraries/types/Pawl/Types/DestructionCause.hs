@@ -24,7 +24,7 @@ data DestructionCause
     -- deathtouch damage, the only destructions the rules perform without an
     -- effect, both raised by Pawl.Engine.Sba through
     -- Pawl.Engine.Event.destroyInBatch. CR 122.1c's replacement does not reach
-    -- these; CR 701.19a's regeneration does, which is why the two arms of
-    -- Pawl.Types.DestructionRewrite read this differently.
+    -- these; CR 701.19a's regeneration and CR 702.89a's umbra armor do, which is
+    -- why the arms of Pawl.Types.DestructionRewrite read this differently.
     ByRule
   deriving (Eq, Ord, Show)

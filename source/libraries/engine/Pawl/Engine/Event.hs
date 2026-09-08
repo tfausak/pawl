@@ -2889,12 +2889,12 @@ apply batch candidate event =
             pure Nothing
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR {}, _) -> pure (Just event)
-    -- CR 701.19a / 122.1c: under either arm the DESTRUCTION does not happen, so
-    -- nothing downstream of it (a put-into-graveyard, and therefore Rest in Peace's
-    -- redirect) ever runs. What each does INSTEAD is all that separates them, and
-    -- the two do not overlap: regeneration removes marked damage, taps the
-    -- permanent and removes it from combat, where a shield counter's removal does
-    -- none of those.
+    -- CR 701.19a / 122.1c / 702.89a: under every arm the DESTRUCTION does not
+    -- happen, so nothing downstream of it (a put-into-graveyard, and therefore Rest
+    -- in Peace's redirect) ever runs. What each does INSTEAD is all that separates
+    -- them, and none of the three overlap: regeneration removes marked damage, taps
+    -- the permanent and removes it from combat; a shield counter's removal does none
+    -- of those; and umbra armor removes the damage and destroys the Aura.
     (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid _ _) -> case rewrite of
       DestructionRewrite.Regenerate -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
@@ -2922,6 +2922,28 @@ apply batch candidate event =
       -- reason.
       DestructionRewrite.RemoveShieldCounter -> do
         removeCounters oid CounterKind.Shield 1
+        pure Nothing
+      -- CR 702.89a: "instead remove all damage marked on it and destroy this
+      -- Aura", in that order and with nothing else -- rule 702.89a gives umbra
+      -- armor none of regeneration's tap or combat removal, so the enchanted
+      -- permanent keeps both.
+      --
+      -- `oid` is the enchanted permanent and the candidate's SOURCE is the Aura,
+      -- which is the whole difference from the two arms above; Replacement.scopes
+      -- is what paired them.
+      --
+      -- The Aura goes through the `destroy` funnel rather than being moved, so
+      -- rule 702.89a's own destruction is itself replaceable (a regeneration
+      -- shield on the Aura) and CR 400.7's graveyard incarnation is minted as on
+      -- any other road. ByEffect, because the destruction is a replacement
+      -- effect's and not a rule's (CR 609.1).
+      --
+      -- `consume` is skipped for the shield arm's reason: the row is the Aura's
+      -- own static ability, which CandidateId.OfPermanent makes a no-op, and the
+      -- Aura leaving the battlefield is what takes the row away.
+      DestructionRewrite.UmbraArmor -> do
+        State.modify' (\gs -> gs {GameState.objects = Map.adjust (\obj -> obj {Object.damage = 0}) oid (GameState.objects gs)})
+        destroy Regenerability.Regenerable [ReplacementCandidate.source candidate]
         pure Nothing
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
