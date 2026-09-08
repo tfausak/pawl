@@ -13,7 +13,13 @@ spec s = Spec.describe s "Pawl.Codec.ManaRiderEffect" $ do
       ManaRiderEffect.codec
       ManaRiderEffect.CantBeCountered
       " {\"type\":\"CantBeCountered\"} "
-  -- Arm.enum derives the arm list from the type, so this is what would catch a
-  -- second payload that encoded like the first.
+  Spec.it s "GainsHasteUntilEndOfTurn" $
+    Common.assertCodec
+      s
+      ManaRiderEffect.codec
+      ManaRiderEffect.GainsHasteUntilEndOfTurn
+      " {\"type\":\"GainsHasteUntilEndOfTurn\"} "
+  -- Arm.enum derives the arm list from the type, so this is what catches a
+  -- payload that encoded like another.
   Spec.it s "round trips every constructor" $ Common.assertEnumCodec s ManaRiderEffect.codec
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaRiderEffect.codec
