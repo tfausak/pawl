@@ -603,15 +603,15 @@ reacts = Event.reactsToAbilityTriggering . TriggeredAbility.condition . PendingT
 -- existing machinery applies unchanged. Only EVENT triggers are scanned. No
 -- artificial bound on the rounds, a pair of abilities each triggering off the
 -- other being a genuine loop in the rules too (CR 104.4b's draw). Every round is
--- filtered by `withinTurnLimit` first, the ONE place a "triggers only once each
--- turn" rider is spent.
+-- filtered by `withinTriggerLimit` first, the ONE place a "triggers only once"
+-- rider is spent.
 --
 -- Not implemented: a CR 603.7 DELAYED ability whose trigger event is another
 -- ability triggering (#1026).
 reactions :: [PendingTrigger.PendingTrigger] -> Game [PendingTrigger.PendingTrigger]
 reactions incoming = do
   before <- State.get
-  case withinTurnLimit before incoming of
+  case withinTriggerLimit before incoming of
     [] -> pure []
     batch -> do
       -- One CR 704.3 event group EACH, not one `Event.simultaneously` bracket
@@ -619,6 +619,10 @@ reactions incoming = do
       -- last time a player received priority" (CR 603.3b), which can have
       -- triggered off different events at different moments.
       State.modify' (\g -> List.foldl' (flip Event.recordEvent) g (fmap triggeredEvent batch))
+      -- The per-GAME rider's own record, written beside the log because the log
+      -- is cleared at the turn handoff. Only that rider's bearers are stored, so
+      -- the set stays the size of the rider's use rather than the game's.
+      State.modify' (\g -> g {GameState.triggeredThisGame = List.foldl' (flip Set.insert) (GameState.triggeredThisGame g) (Maybe.mapMaybe perGameRecord batch)})
       gs <- State.get
       let fresh = Event.reactionTriggers (Event.unscannedGrouped gs) gs
       -- The round's own events are consumed here, CR 603.10's samples with them.
@@ -632,18 +636,28 @@ reactions incoming = do
       rest <- reactions fresh
       pure (batch <> rest)
 
--- The printed rider "This ability triggers only once each turn"
--- (Pawl.Types.TriggerLimit), applied to one gathered batch: drop every entry
--- whose ability carries the rider and has already triggered this turn. No stored
--- flag -- the record is CR 603.3b's own log, and GameState.events is cleared at
--- the turn handoff, which makes "in the log" mean "this turn". CR 702.179d's
--- inherent twin is limited here like any other, the log recording a sourceless
--- trigger too. Keyed on the SOURCE and the ABILITY, so two permanents with the
--- same printed ability spend separate limits (CR 113.7), one that leaves and
--- returns re-arms (CR 400.7), and two DISTINCT abilities of one source spend
--- separate limits; a change of CONTROL spends nothing. Spent on TRIGGERING.
-withinTurnLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
-withinTurnLimit gs = go (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+-- The printed riders "This ability triggers only once each turn" and "This
+-- ability triggers only once" (Pawl.Types.TriggerLimit), applied to one gathered
+-- batch: drop every entry whose ability carries a rider and has already triggered
+-- inside that rider's window. The per-TURN window needs no stored flag -- the
+-- record is CR 603.3b's own log, and GameState.events is cleared at the turn
+-- handoff, which makes "in the log" mean "this turn". The per-GAME window reads
+-- GameState.triggeredThisGame, which survives that handoff and which `reactions`
+-- writes. The two are read as ONE spent set: the ability VALUE is part of the key
+-- and carries its own limit, so a per-turn key and a per-game key can never be
+-- equal. CR 702.179d's inherent twin is limited here like any other, the log
+-- recording a sourceless trigger too. Keyed on the SOURCE and the ABILITY, so two
+-- permanents with the same printed ability spend separate limits (CR 113.7), one
+-- that leaves and returns re-arms (CR 400.7), and two DISTINCT abilities of one
+-- source spend separate limits; a change of CONTROL spends nothing. Spent on
+-- TRIGGERING.
+withinTriggerLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
+withinTriggerLimit gs =
+  go
+    ( Set.union
+        (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+        (Set.map spentKey (GameState.triggeredThisGame gs))
+    )
   where
     spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
     go _ [] = []
@@ -684,7 +698,10 @@ limitKey src ctrl ability =
 limitedKey :: PendingTrigger.PendingTrigger -> Maybe LimitKey
 limitedKey pending = case TriggeredAbility.limit (PendingTrigger.ability pending) of
   TriggerLimit.Unlimited -> Nothing
-  TriggerLimit.OncePerTurn -> Just (limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending))
+  TriggerLimit.OncePerTurn -> Just key
+  TriggerLimit.OncePerGame -> Just key
+  where
+    key = limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending)
 
 -- `triggeredEvent` read back: the record an event carries if it is one ability
 -- triggering (CR 603.3b), and nothing otherwise.
@@ -760,6 +777,21 @@ triggeredEvent pending =
         AbilityTriggered.controller = PendingTrigger.controller pending,
         AbilityTriggered.ability = PendingTrigger.ability pending
       }
+
+-- `triggeredEvent`'s payload, kept only for an ability whose rider is per-GAME
+-- (Pawl.Types.TriggerLimit's OncePerGame). A classification of the ABILITY, never
+-- of its effect.
+perGameRecord :: PendingTrigger.PendingTrigger -> Maybe AbilityTriggered.AbilityTriggered
+perGameRecord pending = case TriggeredAbility.limit (PendingTrigger.ability pending) of
+  TriggerLimit.Unlimited -> Nothing
+  TriggerLimit.OncePerTurn -> Nothing
+  TriggerLimit.OncePerGame ->
+    Just
+      AbilityTriggered.MkAbilityTriggered
+        { AbilityTriggered.source = PendingTrigger.source pending,
+          AbilityTriggered.controller = PendingTrigger.controller pending,
+          AbilityTriggered.ability = PendingTrigger.ability pending
+        }
 
 -- Put one triggered ability from the ordered batch on the stack. What it hangs
 -- on decides how: an ability BORNE by an object goes through placeBorne, where

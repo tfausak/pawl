@@ -3201,6 +3201,7 @@ oneMountainState mountain ph =
           GameState.landsPlayed = mempty,
           GameState.drawsThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
+          GameState.triggeredThisGame = mempty,
           GameState.pendingControl = Map.empty,
           GameState.control = Map.empty,
           GameState.monarch = Nothing,

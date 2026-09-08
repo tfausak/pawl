@@ -3396,9 +3396,9 @@ tapForManaWith perform inFlight oid = do
 -- Sound only while every such ability's effect is order-independent, which every
 -- AddMana into a pool is (#1572).
 --
--- Not implemented: the printed "triggers only once each turn" rider
--- (Pawl.Types.TriggerLimit), which Engine.withinTurnLimit spends over the log for
--- a trigger that reaches the stack. No triggered mana ability prints one (#1572).
+-- Not implemented: the printed "triggers only once" riders
+-- (Pawl.Types.TriggerLimit), which Engine.withinTriggerLimit spends for a trigger
+-- that reaches the stack. No triggered mana ability prints one (#1572).
 applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game ()
 applyManaTriggers perform oid = do
   State.modify' (Event.recordEvent (GameEvent.TappedForMana oid))
