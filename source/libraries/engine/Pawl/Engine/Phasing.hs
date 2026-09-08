@@ -76,6 +76,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Prepare as Prepare
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import Pawl.Types.GameState (GameState)
@@ -102,10 +103,25 @@ import qualified Pawl.Types.Zone as Zone
 -- state-based action is checked -- CR 502.4 gives no player priority during the
 -- untap step, so the next check is the upkeep's. That is what lets this be a
 -- pure GameState -> GameState rather than a Game action.
+--
+-- CR 722.3c's "or phases in prepared" is the one thing that happens after the
+-- phasing itself: Pawl.Engine.Prepare.mintOnPhasedIn runs over the returning
+-- list once every return has been written, which is the rule's own order -- the
+-- copy is minted for a permanent that has phased in. The two halves cannot mint
+-- for each other whichever way round: a permanent phasing OUT in this event was
+-- phased in before it and is not on the returning list.
+--
+-- Nothing observes the order. Minting first answers the same on every board in
+-- the pool, because the two things the mint reads -- the permanent's controller
+-- and its copiable values -- are both derived off Pawl.Engine.Game.lookupObject
+-- rather than off battlefield membership, and #1866 is why: CR 702.26e is not
+-- implemented for the projection arms that carry no battlefield conjunct. So
+-- this order is the rule's, kept as a fence rather than proven.
 phasingEvent :: PlayerId -> GameState -> GameState
 phasingEvent pid gs =
   let returning = phasingIn pid gs
-   in foldr (phaseIn pid) (phaseOutSet pid (Set.fromList (phasingOut pid gs)) gs) returning
+      phased = foldr (phaseIn pid) (phaseOutSet pid (Set.fromList (phasingOut pid gs)) gs) returning
+   in foldr Prepare.mintOnPhasedIn phased returning
 
 -- | CR 702.26b: `hosts` phase out, and -- CR 702.26g -- so does everything
 -- attached to them. The whole of "phasing out" for both of the two things that
