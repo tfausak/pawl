@@ -2996,7 +2996,7 @@ leylineOfResonanceSpec s registry =
 -- Silent Arbiter ({4} Artifact Creature -- Construct 1/5, "No more than one
 -- creature can attack each combat. No more than one creature can block each
 -- combat") is the card, and its attack bound is what makes the rule readable off
--- a DECLARATION: that bound is one of CR 613.11's twelve rule-affecting families,
+-- a DECLARATION: that bound is one of CR 613.11's thirteen rule-affecting families,
 -- which Projection.ruleAbilitiesOf gathers off the copiable snapshot and no other
 -- read reaches. Cyber Conversion ({U}{U} Instant, "Turn target creature face
 -- down. It's a 2/2 Cyberman artifact creature") is the turner, chosen over
@@ -3027,7 +3027,7 @@ faceDownCopyBoard island arbiter clone piker cyber =
 
 faceDownCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 faceDownCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
-  -- THE PROVING TEST for the twelve rule-affecting families, read through
+  -- THE PROVING TEST for the thirteen rule-affecting families, read through
   -- Pawl.Engine.CombatRestriction off Projection.ruleAbilitiesOf.
   --
   -- THE PAIR: one board, one spell, and the only difference is whether bob's
@@ -3057,7 +3057,7 @@ faceDownCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
 
   -- The same fork one field over: the Conversion's listed 2/2 and CR 708.2's "no
   -- name" against the Arbiter's copied 1/5 and its copied name. Here because the
-  -- fork lives at Projection.copiableSnapshotOf rather than at the twelve families'
+  -- fork lives at Projection.copiableSnapshotOf rather than at the thirteen families'
   -- reader, so a fix confined to ruleAbilitiesOf leaves this case red.
   Spec.it s "CR 708.2 a face-down copy projects the listed 2/2 and no name" $ do
     island <- S.printingOf s registry "Island"

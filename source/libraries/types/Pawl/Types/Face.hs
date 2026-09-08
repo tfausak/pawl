@@ -34,6 +34,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Effect as Effect
@@ -429,6 +430,16 @@ data Face card = MkFace
     -- Object.doesNotUntapNext and Object.exertedBy, and neither reaches this
     -- field.
     untapRestrictions :: [UntapRestriction.UntapRestriction],
+    -- | CR 604.1/604.2 / 702.122d / 101.2: this face's printed CREW PROHIBITIONS
+    -- -- "enchanted creature can't attack, block, or crew Vehicles" (Revoke
+    -- Privileges); read by Pawl.Engine.CrewRestriction, rewritten by no layer,
+    -- for blockRequirements' CR 613.11 reason.
+    --
+    -- Its own field rather than an arm of combatRestrictions above even though
+    -- Revoke Privileges writes all three of its clauses in one sentence: rule
+    -- 702.122d forbids paying a COST, where CR 508.1c and CR 509.1b forbid a
+    -- combat declaration, so nothing that reads one may read the other.
+    crewRestrictions :: [CrewRestriction.CrewRestriction],
     -- | CR 604.1/604.2 / 303.4 / 301.5 / 101.2: this face's printed ATTACHMENT
     -- PROHIBITIONS -- "enchanted land ... can't be enchanted by other Auras"
     -- (Consecrate Land), "this creature can't be equipped" (Goblin Brawler);

@@ -724,6 +724,14 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
 -- Binding.triggerSource, so the Vehicle is named and never TARGETED (CR 115.10a):
 -- a targeted crew would fizzle to shroud and fire "becomes the target" triggers
 -- the printed ability does not.
+--
+-- `Not CantCrewVehicles` is CR 702.122d, and this is its ONLY minter: rule
+-- 702.122d forbids paying a crew cost and says nothing about any other cost that
+-- taps, so writing the atom into rule 702.122a's own criterion is what tells a
+-- crew cost from the same component printed outside one
+-- (data/cards/synthetic-crewed-battery.json). Pawl.Engine.Cost.tapCandidates is
+-- what supplies the set it reads, and Pawl.CrewSpec's "CR 702.122d a creature
+-- Revoke Privileges enchants is not offered to pay" is the proving test.
 crew :: Natural -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 crew n =
   let criterion =
@@ -731,7 +739,8 @@ crew n =
           [ Filter.HasCardType CardType.Creature,
             Filter.Not Filter.IsTapped,
             Filter.ControlledBy PlayerRelation.You,
-            Filter.Not Filter.IsSource
+            Filter.Not Filter.IsSource,
+            Filter.Not Filter.CantCrewVehicles
           ]
       becomes cardType =
         Effect.ModifyTarget
@@ -3293,6 +3302,7 @@ spiritToken =
               Face.untapRestrictions = [],
               Face.attachRestrictions = [],
               Face.counterRestrictions = [],
+              Face.crewRestrictions = [],
               Face.activationProhibitions = [],
               Face.entryRestrictions = [],
               Face.attackCosts = [],
@@ -3417,6 +3427,7 @@ servoToken =
               Face.untapRestrictions = [],
               Face.attachRestrictions = [],
               Face.counterRestrictions = [],
+              Face.crewRestrictions = [],
               Face.activationProhibitions = [],
               Face.entryRestrictions = [],
               Face.attackCosts = [],

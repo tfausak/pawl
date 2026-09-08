@@ -144,6 +144,7 @@ import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
 import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
+import qualified Pawl.Codec.CrewRestrictionSpec
 import qualified Pawl.Codec.CyclingSpec
 import qualified Pawl.Codec.DamageDirectionSpec
 import qualified Pawl.Codec.DamageEventSpec
@@ -805,6 +806,7 @@ spec s registry = do
   Pawl.Codec.EntryOptionSpec.spec s
   Pawl.Codec.EntryRSpec.spec s
   Pawl.Codec.CounterRestrictionSpec.spec s
+  Pawl.Codec.CrewRestrictionSpec.spec s
   Pawl.Codec.EntryRestrictionSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s

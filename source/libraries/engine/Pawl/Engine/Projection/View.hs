@@ -961,7 +961,7 @@ ruleAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
   -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
   Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)
 
--- The twelve lists a printed face declares. Its own function so that the seed
+-- The thirteen lists a printed face declares. Its own function so that the seed
 -- above and ruleAbilitiesOf's fallback cannot drift on what a face contributes.
 ruleAbilitiesOfFace :: Face.Face Card.Type.Card -> RuleAbilities.RuleAbilities
 ruleAbilitiesOfFace face =
@@ -975,6 +975,7 @@ ruleAbilitiesOfFace face =
       RuleAbilities.blockRequirements = Face.blockRequirements face,
       RuleAbilities.combatRestrictions = Face.combatRestrictions face,
       RuleAbilities.counterRestrictions = Face.counterRestrictions face,
+      RuleAbilities.crewRestrictions = Face.crewRestrictions face,
       RuleAbilities.entryRestrictions = Face.entryRestrictions face,
       RuleAbilities.sacrificeRestrictions = Face.sacrificeRestrictions face,
       RuleAbilities.untapRestrictions = Face.untapRestrictions face

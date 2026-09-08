@@ -1332,6 +1332,28 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.MilledThisTurn)) "player"
 
+  -- CR 702.122d, the one atom answered off the CONTEXT's gathered set rather
+  -- than off the candidate's own view: a prohibition is another permanent's
+  -- static ability, and Pawl.Engine.Cost.tapCandidates is the one caller that
+  -- gathers it.
+  Spec.describe s "CantCrewVehicles" $ do
+    Spec.it s "matches a candidate the context's set names" $ do
+      Spec.assertBool s (Filter.matches (self {Filter.cantCrewVehicles = Set.singleton (ObjectId.MkObjectId 7)}) blackCreature Filter.Type.CantCrewVehicles) "prohibited"
+
+    -- The set names ANOTHER object, so the atom is about which id it holds and
+    -- not about the set being non-empty.
+    Spec.it s "does not match a candidate the set does not name" $ do
+      Spec.assertBool s (not (Filter.matches (self {Filter.cantCrewVehicles = Set.singleton (ObjectId.MkObjectId 8)}) blackCreature Filter.Type.CantCrewVehicles)) "someone else is prohibited"
+
+    -- The vacuous direction, which every caller but one takes: an unfilled set
+    -- leaves the atom False, so `Not CantCrewVehicles` admits the candidate.
+    Spec.it s "is vacuously false where the context gathered nothing" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.CantCrewVehicles)) "nothing gathered"
+
+    -- CR 702.122d prohibits a CREATURE, and a player is not one.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (self {Filter.cantCrewVehicles = Set.singleton (ObjectId.MkObjectId 7)}) aPlayer Filter.Type.CantCrewVehicles)) "player"
+
   Spec.describe s "DealtDamageThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.dealtDamageThisTurn = True}) Filter.Type.DealtDamageThisTurn) "damaged"
