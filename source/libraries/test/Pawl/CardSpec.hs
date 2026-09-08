@@ -581,6 +581,7 @@ objectRefPositions =
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue), [plantedRef "oc"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced), [plantedRef "gp"]),
+        ("grant-look-at-exiled", Effect.GrantLookAtExiled (plantedRef "gl"), [plantedRef "gl"]),
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])
       ]
@@ -1130,6 +1131,7 @@ ownCounts effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
@@ -1425,6 +1427,7 @@ effectNestedEffects effect = case effect of
   Effect.Untap {} -> []
   Effect.Detain {} -> []
   Effect.Goad {} -> []
+  Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
@@ -1860,6 +1863,7 @@ effectReplacements effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
@@ -2262,6 +2266,7 @@ effectMintedFaces effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
@@ -4723,6 +4728,7 @@ effectFilters effect = case effect of
   Effect.Untap ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Detain ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Goad ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.GrantLookAtExiled ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.MakePlotted ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Transform ref -> frame SourceHostFramed (objectRefFilters ref)

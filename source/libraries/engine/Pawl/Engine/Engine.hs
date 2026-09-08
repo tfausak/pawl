@@ -854,6 +854,7 @@ placeBorne srcId pending = do
             Object.facing = Facing.FaceUp,
             Object.flipped = False,
             Object.exiledFaceDown = False,
+            Object.exileLookers = Set.empty,
             Object.damage = 0,
             Object.sickness = Sickness.Settled controller,
             Object.bindings = Map.empty,

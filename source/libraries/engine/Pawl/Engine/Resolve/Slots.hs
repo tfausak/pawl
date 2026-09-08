@@ -645,6 +645,7 @@ effectObjectRefs effect = case effect of
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _) -> [ref]
   Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ ref _) -> [ref]
+  Effect.GrantLookAtExiled ref -> [ref]
   Effect.MakePlotted ref -> [ref]
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
   Effect.ForEach (ForEach.MkForEach ref _ _) -> [ref]
@@ -788,6 +789,7 @@ effectPlayerRefs effect = case effect of
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _) -> [caster]
   Effect.GrantPlayFromExile {} -> []
+  Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
   Effect.ForEach {} -> []
 
@@ -1002,6 +1004,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Untap _ -> Map.empty
   Effect.Detain _ -> Map.empty
   Effect.Goad _ -> Map.empty
+  Effect.GrantLookAtExiled _ -> Map.empty
   Effect.MakePlotted _ -> Map.empty
   Effect.DoesNotUntapNext _ -> Map.empty
   Effect.Transform _ -> Map.empty
@@ -1502,6 +1505,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Untap _ -> True
   Effect.Detain _ -> True
   Effect.Goad _ -> True
+  Effect.GrantLookAtExiled _ -> True
   Effect.MakePlotted _ -> True
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
@@ -1698,6 +1702,7 @@ readsX =
         Effect.Untap _ -> False
         Effect.Detain _ -> False
         Effect.Goad _ -> False
+        Effect.GrantLookAtExiled _ -> False
         Effect.MakePlotted _ -> False
         Effect.DoesNotUntapNext _ -> False
         Effect.Transform _ -> False
@@ -1888,6 +1893,7 @@ boundSlots effect = case effect of
   Effect.Untap _ -> Set.empty
   Effect.Detain _ -> Set.empty
   Effect.Goad _ -> Set.empty
+  Effect.GrantLookAtExiled _ -> Set.empty
   Effect.MakePlotted _ -> Set.empty
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty

@@ -109,6 +109,20 @@ data Object = MkObject
     -- Per-incarnation: reset by newIncarnation (CR 400.7), the effect's own rider
     -- through Event.changeZoneEntering being CR 406.3's "otherwise".
     exiledFaceDown :: Bool,
+    -- | CR 406.3's exception to `exiledFaceDown` above: the players who "may
+    -- continue to look at that card until it leaves the exile zone", each put
+    -- here by the instruction that allowed it (Effect.GrantLookAtExiled).
+    --
+    -- A SET that only grows while the card sits in exile, which is the rule's
+    -- own shape: the permission survives the instruction that gave it -- "even
+    -- if the instruction allowing the player to do so no longer applies" -- so
+    -- nothing revokes an entry and no sweep is owed one. Rule 406.3's other
+    -- ending, the card joining a pile of cards that are shuffled, has nothing to
+    -- end; Pawl.Engine.Exile.pileOf's haddock argues that case.
+    --
+    -- Per-incarnation: reset by newIncarnation (CR 400.7), which is exactly the
+    -- rule's "until it leaves the exile zone".
+    exileLookers :: Set.Set PlayerId.PlayerId,
     -- | CR 120.3e: damage dealt to a creature is MARKED on it. A count and not a
     -- list of tagged units, every damage rider being consumed at deal time and CR
     -- 704.5g reading only the total. Removed at cleanup (CR 514.2), and
@@ -674,6 +688,7 @@ newIncarnation object =
       -- CR 406.3: exiled cards are kept face up by default, and every other zone
       -- is face up outright. Event.changeZoneEntering is the "otherwise".
       exiledFaceDown = False,
+      exileLookers = Set.empty,
       damage = 0,
       sickness = Sickness.Sick,
       bindings = Map.empty,

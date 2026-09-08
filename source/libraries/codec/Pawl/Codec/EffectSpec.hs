@@ -1469,6 +1469,22 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AnyType))
       " {\"type\":\"GrantPlayFromExile\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"spending\":{\"type\":\"AnyType\"}}} "
+  -- CR 406.3's look permission, the second BARE ObjectRef arm. It must not
+  -- collapse into MakePlotted below on the wire: the two write different fields
+  -- of the same exiled object.
+  Spec.it s "GrantLookAtExiled round-trips, and is not MakePlotted" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.GrantLookAtExiled (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
+      " {\"type\":\"GrantLookAtExiled\",\"value\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
+    Spec.assertBool
+      s
+      ( toJson (Effect.GrantLookAtExiled (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
+          /= toJson (Effect.MakePlotted (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
+      )
+      "GrantLookAtExiled and MakePlotted of the same slot encode differently"
   -- CR 702.170c, a BARE ObjectRef where its neighbour above carries a record: rule
   -- 702.170d fixes the beneficiary and the duration this one would otherwise
   -- state. The two must not collapse into each other on the wire, since they

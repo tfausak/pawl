@@ -62,6 +62,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.facing = Facing.FaceUp,
           Object.flipped = False,
           Object.exiledFaceDown = False,
+          Object.exileLookers = Set.empty,
           Object.damage = 0,
           Object.sickness = Sickness.Sick,
           Object.bindings = Map.empty,
@@ -108,8 +109,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
       )
   -- Every axis away from the case above, so no two same-typed fields hold the
   -- same value and a codec swapping a pair of them is caught: the six PlayerId
-  -- axes are six seats, the four Timestamp axes four numbers, and the three
-  -- Set PlayerId axes three different seats.
+  -- axes are six seats, the four Timestamp axes four numbers, and the four
+  -- Set PlayerId axes four different seats.
   --
   -- `counters` carries a kind at ZERO beside one at three. That is a state the
   -- engine really produces: Pawl.Engine.Damage takes CR 120.3c's loyalty
@@ -202,6 +203,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
               ],
           Object.announcedX = Just 20,
           Object.castFrom = Just Zone.Graveyard,
+          Object.exileLookers = Set.singleton (PlayerId.MkPlayerId 27),
           Object.detainedUntil = Set.singleton (PlayerId.MkPlayerId 21),
           Object.goadedBy = Set.singleton (PlayerId.MkPlayerId 22),
           Object.doesNotUntapNext = True,
@@ -238,7 +240,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
           <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null}]"
           <> ",\"announcedX\":20,\"castFrom\":{\"type\":\"Graveyard\"}"
-          <> ",\"detainedUntil\":[21],\"goadedBy\":[22]"
+          <> ",\"exileLookers\":[27],\"detainedUntil\":[21],\"goadedBy\":[22]"
           <> ",\"doesNotUntapNext\":true,\"exertedBy\":[23]"
           <> ",\"activatedOnce\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}"
           <> ",\"modal\":{\"modes\":[{}]}}]} "

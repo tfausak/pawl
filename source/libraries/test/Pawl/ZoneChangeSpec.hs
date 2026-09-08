@@ -105,7 +105,7 @@ handCards printing pid k gs =
   let addOne g =
         let (printingId, gP) = Game.intern printing g
             (oid, g1) = Game.freshObjectId gP
-            obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
+            obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
          in g1
               { GameState.objects = Map.insert oid obj (GameState.objects g1),
                 GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
