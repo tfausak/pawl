@@ -43,6 +43,7 @@ import qualified Pawl.Engine.Interchangeable as Interchangeable
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.ManaAbility as ManaAbility
+import qualified Pawl.Engine.ManaRider as ManaRider
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -3178,9 +3179,18 @@ payManaWindow perform inFlight record subject spending pid cost = window Set.emp
     -- knows which units went. An unpaid cost writes nothing: `payMana` restores
     -- the state it entered with, and this line is only reached once the payment
     -- has settled.
+    --
+    -- CR 106.6a's eagerly created effects go up beside the record and on the
+    -- same state, since this is the same "one place that knows which units
+    -- went": ManaRider.granted mints one continuous effect per unit whose rider
+    -- the paid-for object matches (Generator Servant). AFTER the record, so
+    -- that the condition is matched on the board CR 400.7d has already
+    -- described -- a rider clause reading the payment would otherwise see none.
     recordSpent spent gs = case record of
       Nothing -> gs
-      Just sid -> gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
+      Just sid ->
+        let recorded = gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
+         in ManaRider.granted sid spent recorded
 
 payMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payMana perform = payManaExcept perform Set.empty Nothing
@@ -3308,7 +3318,7 @@ tapForManaWith perform inFlight oid = do
               State.modify'
                 ( \gs' ->
                     List.foldl'
-                      (\acc (ref, mana) -> List.foldl' (\inner recipient -> Mana.addMana recipient (Mana.unitsOf mana) inner) acc (Mana.recipientsOf controller oid gs' ref))
+                      (\acc (ref, mana) -> List.foldl' (\inner recipient -> Mana.addMana recipient (Mana.unitsOf mana) inner) acc (Mana.recipientsOf controller gs' ref))
                       gs'
                       (Map.toList (ManaOption.yield chosen))
                 )

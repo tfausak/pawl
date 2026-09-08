@@ -7,6 +7,7 @@
 -- which keeps the machinery.
 module Pawl.ManaSourceSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -43,6 +44,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
@@ -1609,6 +1611,65 @@ counteredAfter filler cancel island alicesLands victim =
       answered = S.runPure S.identityAnswer cast_ (S.cast S.bob cancelId)
    in (victimId, List.foldl' (\gs _ -> S.runPure S.identityAnswer gs Stack.resolveTop) answered [1 .. 2 :: Int])
 
+-- CR 106.6's second shape again, on the road Boseiju above cannot reach: a rider
+-- whose payload EXISTS independently of the rule that asks about it, so the lazy
+-- read-back off Pawl.Types.Object.manaSpent is not equivalent and CR 106.6a's
+-- "a separate effect is created once for each mana produced" has to be minted at
+-- payment. Generator Servant ({1}{R} 2/1 Creature -- Elemental, Magic 2015, "{T},
+-- Sacrifice this creature: Add {C}{C}. If that mana is spent on a creature
+-- spell, it gains haste until end of turn.") is the printing. Nothing is omitted
+-- from the card.
+--
+-- ONE board and one turn, with two Goblin Pikers cast off mana that differs in
+-- exactly one thing -- whether the Servant made it. The Servant's {C} can never
+-- pay a {R}, so the split is forced by the costs and not by the answerer: the
+-- first Piker is paid from two Mountains with an empty pool, and the second from
+-- the Servant's {C}{C} plus the third Mountain's {R}.
+--
+-- The assertion is bob's LIFE after a combat both Pikers are offered to, which
+-- is three distinct numbers: 18 for the hasted one alone, 16 if summoning
+-- sickness (CR 302.6) were not stopping the other, 20 if the grant never
+-- happened. Pawl.Support's aggressiveAnswer attacks with everything the engine
+-- offers, so which creatures may attack is the engine's answer and not the
+-- script's.
+generatorServantSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+generatorServantSpec s registry = Spec.describe s "Generator Servant" $ do
+  Spec.it s "CR 106.6a the creature the Servant's mana paid for attacks the turn it arrives" $ do
+    servant <- S.printingOf s registry "Generator Servant"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (servantId, g1) = S.addPermanent servant S.alice (Setup.emptyGame S.bothPlayers)
+        (oneId, g2) = S.addPermanent mountain S.alice g1
+        (twoId, g3) = S.addPermanent mountain S.alice g2
+        (threeId, g4) = S.addPermanent mountain S.alice g3
+        (slowId, g5) = S.addHandCard piker S.alice g4
+        (hastyId, g6) = S.addHandCard piker S.alice g5
+        board = g6 {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain}
+        resolved gs = S.runPure S.identityAnswer gs Stack.resolveTop
+        -- The slow Piker FIRST and off the Mountains alone, so no Servant mana
+        -- is floating when it is paid for; the Servant is tapped only inside the
+        -- second payment's window (CR 605.3a).
+        slowCast = resolved (S.runPure (tapsOnly [oneId, twoId]) board (S.cast S.alice slowId))
+        hastyCast = resolved (S.runPure (tapsOnly [servantId, threeId]) slowCast (S.cast S.alice hastyId))
+        fought = S.runPure S.aggressiveAnswer hastyCast (Monad.replicateM_ 6 Engine.runStep)
+    Spec.assertEqWith s "CR 106.6a bob takes 2 from the Piker the Servant's mana paid for, and nothing from the one two Mountains paid for" (S.lifeOf S.bob fought) (Just 18)
+    -- Only now the proxy, behind the gameplay assertion: ONE of the two
+    -- otherwise identical Pikers carries the grant, which a board-wide grant
+    -- (two) and a missing one (zero) both fail. Read before combat, since CR
+    -- 514.2 ends the duration at cleanup.
+    Spec.assertEqWith s "CR 702.10 exactly one of the two Pikers carries the grant" (length (filter (\oid -> Projection.hasKeyword Keyword.Haste oid hastyCast) (Game.zoneMembers Zone.Battlefield S.alice hastyCast))) 1
+
+-- Takes the first of `wanted` a window offers and declines everywhere else, so
+-- WHICH sources pay each cost is pinned rather than searched: an answerer that
+-- took any legal source would spend a Mountain on the payment this case needs the
+-- Servant for, and one that searched for a payable line would find one again
+-- after a mutation.
+tapsOnly :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+tapsOnly wanted p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> List.find (`elem` NonEmpty.toList candidates) wanted
+  Prompt.ChooseExtraManaSource {} -> Nothing
+  _ -> S.identityAnswer p
+
 -- Was anything countered at all? The proxy the cases above read only after the
 -- gameplay-level assertion has already run.
 isSpellCountered :: GameEvent.GameEvent -> Bool
@@ -2050,6 +2111,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   lastingSpringSpec s registry
   omenHawkerSpec s registry
   boseijuSpec s registry
+  generatorServantSpec s registry
   delightedHalflingSpec s registry
   quirionSpec s registry
   interchangeableSourcesSpec s registry

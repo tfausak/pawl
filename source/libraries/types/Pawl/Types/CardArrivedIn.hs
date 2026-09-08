@@ -8,7 +8,7 @@ import qualified Pawl.Types.Zone as Zone
 -- which documents why the destination is the load-bearing half.
 data CardArrivedIn = MkCardArrivedIn
   { to :: Zone.Zone,
-    -- | CR 400.7: the origins an arrival is NOT counted from -- Dimir
+    -- | CR 712.21e: the origins an arrival is NOT counted from -- Dimir
     -- Strandcatcher's "from anywhere other than the battlefield". Empty is the
     -- rule's own default, "from anywhere", which is what CR 712.21e's "changed
     -- zones" puts no condition on and what every other producer in the pool

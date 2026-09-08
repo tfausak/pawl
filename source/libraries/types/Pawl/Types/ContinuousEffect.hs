@@ -14,8 +14,11 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- are re-derived each projection, from the object's copiable static abilities
 -- (Pawl.Engine.Projection.View.staticAbilitiesOf).
 --
--- Made by a spell or ability RESOLVING, all but one of them. The exception is
--- the one clause that turns a static ability's effect into a stored one:
+-- Made by a spell or ability RESOLVING, all but two of them. One exception is
+-- CR 106.6a's rider effect, which is created as the mana is SPENT and so lands
+-- inside a cost payment (Pawl.Engine.ManaRider.granted, from
+-- Pawl.Engine.Cost's recordSpent). The other is the one clause that turns a
+-- static ability's effect into a stored one:
 -- StaticAbility.lingers, Titania's Song's "if this enchantment leaves the
 -- battlefield, this effect continues until end of turn", which
 -- Pawl.Engine.Event.lingeringHandover hands over as the permanent goes -- by a
