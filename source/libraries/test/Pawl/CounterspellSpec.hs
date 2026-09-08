@@ -2646,13 +2646,16 @@ counterKindWard subtype = CounterKind.Keyword (Keyword.Hexproof (Just (Filter.Ty
 -- slot at all, so a False below is never a spell that could target nothing.
 --
 -- Tarfire ({R} Kindred Instant -- Goblin, "Tarfire deals 2 damage to any
--- target", oracle checked against Scryfall 2026-09-08) is the READER these three
--- groups need, and the only printing that can be one: CR 702.11d stops
--- "[quality] spells your opponents control", so telling a hexproof from Goblins
--- counter from a hexproof from Zombies one needs a spell that is a Goblin and
--- not a Zombie. Wings of Velis Vel, the pool's other Kindred instant, has
--- changeling and so is both at once, and no Goblin or Zombie permanent in
--- data/cards/ carries a targeted activated ability.
+-- target", oracle checked against Scryfall 2026-09-08) is the READER these
+-- groups need: CR 702.11d stops "[quality] spells your opponents control", so
+-- telling a hexproof from Goblins counter from a hexproof from Zombies one needs
+-- a spell that is a Goblin and not a Zombie. Wings of Velis Vel, the only other
+-- Kindred instant in data/cards/, has changeling and so is both at once.
+--
+-- CR 702.11d's other half -- an ability from a [quality] source -- would do as
+-- well, and Kill-Suit Cultist is the pool's Goblin permanent with a targeted
+-- ability; what its ability grants is a replacement effect, so a spell is the
+-- reader a board can read straight off.
 --
 -- bob casts it, so CR 702.11d's "your opponents control" is satisfied against
 -- alice's creature rather than being the reason for a negative.
