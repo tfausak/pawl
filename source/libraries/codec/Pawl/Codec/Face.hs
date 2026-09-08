@@ -33,6 +33,7 @@ import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.CostReduction as CostReduction
 import qualified Pawl.Codec.CounterRestriction as CounterRestriction
 import qualified Pawl.Codec.Counterability as Counterability
+import qualified Pawl.Codec.CrewRestriction as CrewRestriction
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.DungeonRoom as DungeonRoom
 import qualified Pawl.Codec.Effect as Effect
@@ -118,6 +119,7 @@ codec cardCodec = Fields.object $ do
   combatRestrictions <- Fields.defaulted "combatRestrictions" [] (Common.list CombatRestriction.codec) Face.combatRestrictions
   sacrificeRestrictions <- Fields.defaulted "sacrificeRestrictions" [] (Common.list SacrificeRestriction.codec) Face.sacrificeRestrictions
   untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) Face.untapRestrictions
+  crewRestrictions <- Fields.defaulted "crewRestrictions" [] (Common.list CrewRestriction.codec) Face.crewRestrictions
   attachRestrictions <- Fields.defaulted "attachRestrictions" [] (Common.list AttachRestriction.codec) Face.attachRestrictions
   counterRestrictions <- Fields.defaulted "counterRestrictions" [] (Common.list CounterRestriction.codec) Face.counterRestrictions
   activationProhibitions <- Fields.defaulted "activationProhibitions" [] (Common.list ActivationProhibition.codec) Face.activationProhibitions
@@ -172,6 +174,7 @@ codec cardCodec = Fields.object $ do
         Face.combatRestrictions = combatRestrictions,
         Face.sacrificeRestrictions = sacrificeRestrictions,
         Face.untapRestrictions = untapRestrictions,
+        Face.crewRestrictions = crewRestrictions,
         Face.attachRestrictions = attachRestrictions,
         Face.counterRestrictions = counterRestrictions,
         Face.activationProhibitions = activationProhibitions,

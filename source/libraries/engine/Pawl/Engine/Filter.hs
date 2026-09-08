@@ -970,6 +970,23 @@ data Context = MkContext
     -- in a wish's filter" is what keeps a card out of that position, and
     -- Pawl.OutsideTheGameSpec proves the atom answers nothing there.
     slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
+    -- CR 702.122d / 101.2: the objects an effect in force says CAN'T CREW
+    -- VEHICLES, for the one atom that asks (CantCrewVehicles). Supplied by the
+    -- caller for sourcePower's reason -- this module holds no game state and
+    -- cannot gather another permanent's static abilities -- and by ONE caller,
+    -- Pawl.Engine.Cost.tapCandidates, which is the single pool both CR 118.3's
+    -- payability gate and rule 702.122a's payment prompt read.
+    --
+    -- LAZY, and load-bearingly so: filling it walks the battlefield through
+    -- Pawl.Engine.CrewRestriction.cantCrew, and no filter that omits the atom
+    -- ever forces it -- which is what lets that one caller supply it for every
+    -- tapping cost while only a crew ability's criterion pays for it.
+    --
+    -- EMPTY in contextFor below and so in contextWithSlots and every other
+    -- builder, leaving the atom vacuously False and `Not CantCrewVehicles`
+    -- vacuously True: a position with no prohibition gathered admits every
+    -- candidate, which is the direction a prohibition nobody printed must take.
+    cantCrewVehicles :: Set.Set ObjectId.ObjectId,
     -- CR 201.1 / 709.4a: the NAMES of the objects the surrounding announcement's
     -- slots hold, for the one atom that compares a candidate's against them
     -- (SameNameAsBound, Harness the Storm). Supplied by the caller for
@@ -1205,12 +1222,19 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
 contextWithSlots :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Context
 contextWithSlots t p s m = (contextFor t p s) {slotObjects = m}
+
+-- The context Pawl.Engine.Cost.tapCandidates evaluates a cost component's
+-- criterion in: contextWithSlots above plus CR 702.122d's gathered prohibition,
+-- which only rule 702.122a's criterion asks about (CantCrewVehicles) and which
+-- is therefore unforced for every other component that pool serves.
+contextCrewing :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Set.Set ObjectId.ObjectId -> Context
+contextCrewing t p s m c = (contextWithSlots t p s m) {cantCrewVehicles = c}
 
 -- The ONE object a slot names, for the readers that can take no more than one --
 -- Quantity.AgainstSlot's evaluation, Count's IsControllerOfBound. Nothing where
@@ -1236,7 +1260,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1567,6 +1591,14 @@ matches context view predicate = case predicate of
   -- candidate can stop EXISTING -- CR 400.7 mints a new object the moment the
   -- milled card moves again, and the new one was not milled.
   Filter.MilledThisTurn -> milledThisTurn view
+  -- CR 702.122d with CR 101.2: membership of the set the CALLER gathered, the
+  -- reading IsBound takes and for its reason -- a prohibition is another
+  -- permanent's static ability, so no field of the candidate's own view could
+  -- answer it. Vacuously False for a view with no object behind it and for a
+  -- context that gathered nothing.
+  Filter.CantCrewVehicles -> case identity view of
+    Just oid -> Set.member oid (cantCrewVehicles context)
+    Nothing -> False
   -- CR 120.1 / 608.2i: the same look-back again, over the damage events. Like
   -- the two atoms above it cannot stop being true within a turn, and unlike
   -- either it is not the reading CR 120.3e's marked damage would give -- CR
@@ -1820,6 +1852,7 @@ rewrite pairs predicate = case predicate of
   Filter.DeclaredAttackedThisCombat -> predicate
   Filter.DeclaredBlockerThisCombat -> predicate
   Filter.MilledThisTurn -> predicate
+  Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
   -- Untouched for AttackedThisTurn's reason: the atom names no subtype.
   Filter.ControlledSinceTurnBegan -> predicate
@@ -2295,6 +2328,7 @@ bakeBound players predicate = case predicate of
   Filter.DeclaredAttackedThisCombat -> predicate
   Filter.DeclaredBlockerThisCombat -> predicate
   Filter.MilledThisTurn -> predicate
+  Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
   -- Untouched: the atom names no slot for CR 603.2's map to substitute into.
   Filter.ControlledSinceTurnBegan -> predicate
@@ -2431,6 +2465,7 @@ manaValueThresholds predicate = case predicate of
   Filter.DeclaredAttackedThisCombat -> []
   Filter.DeclaredBlockerThisCombat -> []
   Filter.MilledThisTurn -> []
+  Filter.CantCrewVehicles -> []
   Filter.DealtDamageThisTurn -> []
   Filter.ControlledSinceTurnBegan -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
@@ -2572,6 +2607,7 @@ statesAQuality predicate = case predicate of
   Filter.DeclaredAttackedThisCombat -> True
   Filter.DeclaredBlockerThisCombat -> True
   Filter.MilledThisTurn -> True
+  Filter.CantCrewVehicles -> True
   Filter.DealtDamageThisTurn -> True
   Filter.ControlledSinceTurnBegan -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to

@@ -35,15 +35,20 @@
 -- the CREWER, which neither Vehicle above can be, so crewsVehicleSpec below adds
 -- a creature that reads the relation from that side.
 --
--- Not covered here, because no card in the pool reaches them: rule 702.122c's
+-- CR 702.122d has its own fixture as well, Revoke Privileges: the prohibition is
+-- another permanent's static ability, so cantCrewSpec below adds an Aura rather
+-- than another case on the Dreadnought.
+--
+-- Not covered here, because no card in the pool reaches it: rule 702.122c's
 -- relation read LATER IN THE TURN, which Subterranean Schooner's "target creature
 -- that crewed it this turn" wants and which outlives the resolution these
--- fixtures watch, and CR 702.122d's "can't crew Vehicles".
+-- fixtures watch.
 module Pawl.CrewSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -130,6 +135,7 @@ spec s registry = Spec.describe s "Crew" $ do
   crewedVehicleSpec s registry
   becomesCrewedSpec s registry
   crewsVehicleSpec s registry
+  cantCrewSpec s registry
 
 -- CR 208.3 and CR 301.7a: the printed numbers are on the card and are not the
 -- permanent's characteristics until it is a creature.
@@ -466,3 +472,95 @@ crewingWith :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 crewingWith tappers p = case p of
   Prompt.ChooseTapsForTotalPower {} -> Set.fromList tappers
   _ -> S.identityAnswer p
+
+-- CR 702.122d: "can't crew Vehicles" -- an effect that forbids TAPPING a
+-- creature to pay a crew cost, carried by Pawl.Types.CrewRestriction and
+-- gathered by Pawl.Engine.CrewRestriction. Revoke Privileges {2}{W} is the
+-- pool's printing; its other two clauses ("can't attack, block") are Pacifism's
+-- and are proved where Pacifism's are.
+--
+-- THREE creatures on the positive board, one of them enchanted, because the
+-- reading this has to be told apart from is "the Aura stops the crew" rather than
+-- "the Aura stops THIS creature crewing": with the enchanted creature out, the
+-- other two still reach crew 6, so the Vehicle is crewed and the case can assert
+-- WHICH creatures paid.
+--
+-- The arithmetic is non-degenerate for the module header's reason. Blind-Spot
+-- Giant is 4/1 and Hill Giant is 3/3, so 4+3 = 7 pays crew 6 while either alone
+-- falls short -- and where three creatures are wanted the enchanted one is a
+-- SECOND Blind-Spot Giant, so the two power-4 creatures differ in the Aura and in
+-- nothing else.
+cantCrewSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cantCrewSpec s registry = Spec.describe s "CantCrew" $ do
+  -- The gate (CR 118.3): with the only power-4 creature enchanted, 3 untapped
+  -- power is left and crew 6 is out of reach. Both boards carry the same two
+  -- creatures, so the refusal is the Aura's and not an arithmetic accident.
+  Spec.it s "CR 702.122d an enchanted creature's power no longer reaches the threshold" $ do
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    revoke <- S.printingOf s registry "Revoke Privileges"
+    let (vehicleId, crewIds, gs) = board dreadnought [blindSpot, hillGiant]
+    case crewIds of
+      [bigId, _] -> do
+        let (auraId, unattached) = S.addPermanent revoke S.alice gs
+            enchanted = S.attach auraId bigId unattached
+        Spec.assertBool s (crewable vehicleId gs) "4 and 3 together pay crew 6"
+        Spec.assertBool s (crewable vehicleId unattached) "and an unattached Revoke Privileges changes nothing"
+        Spec.assertBool s (not (crewable vehicleId enchanted)) "with the 4 enchanted, 3 is short of 6"
+      _ -> Spec.assertFailure s "fixture should have exactly two crewers"
+  -- The payment (CR 702.122a), and the gameplay-level read of WHICH creatures
+  -- rule 702.122d left as candidates: the answerer taps everything it is
+  -- OFFERED, so a prohibition the pool ignored would show up as the enchanted
+  -- creature tapped.
+  Spec.it s "CR 702.122d a creature Revoke Privileges enchants is not offered to pay" $ do
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    revoke <- S.printingOf s registry "Revoke Privileges"
+    let (vehicleId, crewIds, gs) = board dreadnought [blindSpot, blindSpot, hillGiant]
+    case crewIds of
+      [enchantedId, otherBigId, giantId] -> do
+        let (auraId, unattached) = S.addPermanent revoke S.alice gs
+            after = crewWith takesEverythingOffered vehicleId (S.attach auraId enchantedId unattached)
+        Spec.assertBool s (isCreature vehicleId after) "the other two pay crew 6, so the Vehicle is crewed"
+        Spec.assertEqWith s "and the enchanted creature was never offered" (tapStateOf enchantedId after) (Just TapState.Untapped)
+        Spec.assertEqWith s "where the other power-4 creature was" (tapStateOf otherBigId after) (Just TapState.Tapped)
+        Spec.assertEqWith s "and so was the power-3 one" (tapStateOf giantId after) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should have exactly three crewers"
+  -- CR 702.122d names the CREW cost and nothing else, so the same cost component
+  -- printed outside a crew ability is untouched. Synthetic Crewed Battery's "{T},
+  -- tap another untapped creature you control, tap any number of other untapped
+  -- creatures you control with total power 2 or greater: add {C}" is the pool's
+  -- only such printing, and the enchanted Goblin Piker is the only creature on
+  -- the board whose power can reach that 2 -- Ornithopter's is 0, and it pays the
+  -- exact-count component instead. A prohibition that reached every
+  -- TapForTotalPower would leave the {1} spell uncastable.
+  Spec.it s "CR 702.122d the same component outside a crew ability is untouched" $ do
+    battery <- S.printingOf s registry "Synthetic Crewed Battery"
+    ornithopter <- S.printingOf s registry "Ornithopter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    drum <- S.printingOf s registry "Springleaf Drum"
+    revoke <- S.printingOf s registry "Revoke Privileges"
+    let (_, gs0) = S.addPermanent battery S.alice (Setup.emptyGame S.bothPlayers)
+        (_, gs1) = S.addPermanent ornithopter S.alice gs0
+        (pikerId, gs2) = S.addPermanent piker S.alice gs1
+        (auraId, gs3) = S.addPermanent revoke S.alice gs2
+        enchanted = S.attach auraId pikerId gs3
+    Spec.assertBool s (offersCast drum gs2) "the Battery pays for a {1} spell off the Piker's power 2"
+    Spec.assertBool s (offersCast drum enchanted) "and still does with the Piker enchanted"
+    Spec.assertBool s (not (offersCast drum gs1)) "where Ornithopter's power 0 alone cannot"
+
+-- Taps every crewer CR 702.122a's prompt offers, so what the board shows after is
+-- the candidate list itself.
+takesEverythingOffered :: Prompt.Prompt r -> r
+takesEverythingOffered p = case p of
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
+  _ -> S.identityAnswer p
+
+-- Would alice be offered a cast of this printing out of her hand? Pawl.ManaSpec's
+-- shape, duplicated rather than hoisted (docs/adding-a-module.md).
+offersCast :: Printing.Printing -> GameState.GameState -> Bool
+offersCast printing gs =
+  let (withSpell, oid) = S.handOne printing gs
+   in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)

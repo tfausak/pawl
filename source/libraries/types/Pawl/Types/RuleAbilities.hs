@@ -9,22 +9,23 @@ import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
+import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
 
 -- | CR 613.11: the ability families whose continuous effects "affect game rules
--- rather than objects" -- the twelve lists Pawl.Types.Face carries beside its
+-- rather than objects" -- the thirteen lists Pawl.Types.Face carries beside its
 -- keywords and its static abilities, and which no layer of CR 613 touches.
 --
--- ONE bundle rather than twelve fields on Pawl.Types.ProjectedCharacteristics,
--- because the twelve share a single posture down to the line: each is seeded
+-- ONE bundle rather than thirteen fields on Pawl.Types.ProjectedCharacteristics,
+-- because the thirteen share a single posture down to the line: each is seeded
 -- from the printed face, rewritten by no layer, and read by exactly one engine
 -- module outside the layer fold. Grouping them makes CR 702.140e's union one
--- `<>` and CR 707.2a's copy one field, so a thirteenth family cannot be added
+-- `<>` and CR 707.2a's copy one field, so a fourteenth family cannot be added
 -- to the record and left out of either; see #3373.
 --
--- Face keeps the twelve apart because a card's JSON names each one; nothing
+-- Face keeps the thirteen apart because a card's JSON names each one; nothing
 -- here needs that, since every reader asks for one field by name.
 data RuleAbilities = MkRuleAbilities
   { -- | CR 602.2: "its activated abilities can't be activated" (Arrest).
@@ -47,6 +48,9 @@ data RuleAbilities = MkRuleAbilities
     combatRestrictions :: [CombatRestriction.CombatRestriction],
     -- | CR 122.6: "counters can't be put on ..." (Solemnity).
     counterRestrictions :: [CounterRestriction.CounterRestriction],
+    -- | CR 702.122d: "enchanted creature can't ... crew Vehicles" (Revoke
+    -- Privileges).
+    crewRestrictions :: [CrewRestriction.CrewRestriction],
     -- | CR 400.4a: "creature cards in graveyards and libraries can't enter the
     -- battlefield" (Grafdigger's Cage).
     entryRestrictions :: [EntryRestriction.EntryRestriction],
@@ -60,8 +64,8 @@ data RuleAbilities = MkRuleAbilities
   deriving (Eq, Ord, Show)
 
 -- | CR 702.140e: a merged permanent has all abilities of each card representing
--- it, which for these twelve families is concatenation. Field by field rather
--- than a derived instance, so a thirteenth field cannot be added without
+-- it, which for these thirteen families is concatenation. Field by field rather
+-- than a derived instance, so a fourteenth field cannot be added without
 -- -Werror naming this site.
 instance Semigroup RuleAbilities where
   left <> right =
@@ -75,6 +79,7 @@ instance Semigroup RuleAbilities where
         blockRequirements = blockRequirements left <> blockRequirements right,
         combatRestrictions = combatRestrictions left <> combatRestrictions right,
         counterRestrictions = counterRestrictions left <> counterRestrictions right,
+        crewRestrictions = crewRestrictions left <> crewRestrictions right,
         entryRestrictions = entryRestrictions left <> entryRestrictions right,
         sacrificeRestrictions = sacrificeRestrictions left <> sacrificeRestrictions right,
         untapRestrictions = untapRestrictions left <> untapRestrictions right
@@ -95,6 +100,7 @@ instance Monoid RuleAbilities where
         blockRequirements = [],
         combatRestrictions = [],
         counterRestrictions = [],
+        crewRestrictions = [],
         entryRestrictions = [],
         sacrificeRestrictions = [],
         untapRestrictions = []

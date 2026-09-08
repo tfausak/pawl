@@ -260,6 +260,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.DeclaredAttackerThisCombat -> 0
   Filter.Type.DeclaredBlockerThisCombat -> 0
   Filter.Type.MilledThisTurn -> 0
+  Filter.Type.CantCrewVehicles -> 0
   Filter.Type.DealtDamageThisTurn -> 0
   Filter.Type.ControlledSinceTurnBegan -> 0
   -- A DESCENT and not a zero, unlike every other atom here: CR 303.4's atom
@@ -365,6 +366,10 @@ jsonAtoms tag value = case value of
 -- The CR 202.3 computed-bound tag, spelled once.
 manaValueAtMostAmountTag :: Text.Text
 manaValueAtMostAmountTag = Text.pack "ManaValueAtMostAmount"
+
+-- CR 702.122d's atom, which no card may write.
+cantCrewVehiclesTag :: Text.Text
+cantCrewVehiclesTag = Text.pack "CantCrewVehicles"
 
 -- How many CR 202.3 computed-bound atoms sit inside a target slot that NAMES an
 -- amount, counted off the encoding rather than off cardFilters: the position this
@@ -1341,6 +1346,31 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (timesKickedWithOffends face)) "the control: Gnarlid Pack as printed is accepted"
     Spec.assertBool s (timesKickedWithOffends (face {Face.keywords = Set.map respell (Face.keywords face)})) "a reordered multikicker cost is rejected"
     Spec.assertBool s (timesKickedWithOffends (face {Face.keywords = Set.empty})) "and so is a face that counts a kicker it prints none of"
+  -- CR 702.122d's Filter.CantCrewVehicles is the one atom here that no card may
+  -- write ANYWHERE, rather than one admitted at some positions: it is answerable
+  -- only where Pawl.Engine.Cost.tapCandidates gathers the prohibition, and it is
+  -- minted only by Pawl.Engine.Keyword's `crew` -- which is what confines rule
+  -- 702.122d to a crew cost, the same cost component being printable outside one
+  -- (data/cards/synthetic-crewed-battery.json). A card writing it would read as a
+  -- crew prohibition in a position that gathers none.
+  Spec.it s "CR 702.122d no card asks CantCrewVehicles" $ do
+    ps <- S.allPrintings s
+    let atomsOf tag = jsonAtoms tag . Codec.encode (Face.Codec.codec Card.codec) . S.combinedFace
+    Spec.assertEqWith s "the pool authors the atom nowhere" (fmap (S.nameOf . Printing.card) (filter ((/= 0) . atomsOf cantCrewVehiclesTag) ps)) []
+    -- NOT vacuous in the way an unreachable sweep would be: the tag the sweep
+    -- counts is the atom's own wire name, so a renamed constructor fails here
+    -- rather than passing by counting nothing.
+    Spec.assertEqWith
+      s
+      "and that tag is what the atom encodes as"
+      (jsonAtoms cantCrewVehiclesTag (Codec.encode (Filter.Codec.codec Keyword.Codec.codec) Filter.Type.CantCrewVehicles))
+      1
+    -- The traversal reaches a card's filters at all, which the zero above cannot
+    -- show: the same sweep over an atom the pool DOES author is non-zero.
+    Spec.assertBool
+      s
+      (sum (fmap (atomsOf (Text.pack "HasCardType")) ps) > 0)
+      "and the sweep reaches the filters a card does write"
   -- CR 115.10a's Filter.IsBound is the position lints' MIRROR: it is answerable
   -- wherever the evaluator hands over the resolution's slots and the candidate is
   -- an object, and unanswerable in the one card-authored position whose

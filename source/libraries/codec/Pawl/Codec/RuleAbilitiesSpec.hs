@@ -18,6 +18,7 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
+import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -50,6 +51,7 @@ testRuleAbilities =
       RuleAbilities.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing RequirementArity.EachSubject],
       RuleAbilities.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing)],
       RuleAbilities.counterRestrictions = [CounterRestriction.MkCounterRestriction Affected.Attached (Just CounterKind.MinusOneMinusOne)],
+      RuleAbilities.crewRestrictions = [CrewRestriction.MkCrewRestriction Affected.Attached],
       RuleAbilities.entryRestrictions = [EntryRestriction.MkEntryRestriction Affected.Attached (Set.singleton Zone.Graveyard)],
       RuleAbilities.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       RuleAbilities.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached]
@@ -66,13 +68,14 @@ testRuleAbilitiesJson =
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
     <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
     <> "\"counterRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"kind\":{\"type\":\"MinusOneMinusOne\"}}],"
+    <> "\"crewRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"entryRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"origins\":[{\"type\":\"Graveyard\"}]}],"
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.RuleAbilities" $ do
-  Spec.it s "MkRuleAbilities, every one of the twelve lists populated" $
+  Spec.it s "MkRuleAbilities, every one of the thirteen lists populated" $
     Common.assertCodec s RuleAbilities.codec testRuleAbilities testRuleAbilitiesJson
   Spec.it s "an empty bundle omits every key" $
     Common.assertCodec s RuleAbilities.codec mempty " {} "

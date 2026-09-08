@@ -41,6 +41,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
@@ -153,6 +154,7 @@ baseFace =
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
+      Face.crewRestrictions = [],
       Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
@@ -209,6 +211,7 @@ minimalFace =
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
+      Face.crewRestrictions = [],
       Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
@@ -374,6 +377,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "untapRestrictions (CR 502.3/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.untapRestrictions <$> decodeFace v) (Right [])
+    Spec.it s "crewRestrictions (CR 702.122d/101.2) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.crewRestrictions <$> decodeFace v) (Right [])
     Spec.it s "attachRestrictions (CR 303.4/301.5/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attachRestrictions <$> decodeFace v) (Right [])
@@ -505,6 +511,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached]}
         (init baseFaceJson <> ",\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}]}")
+    Spec.it s "crewRestrictions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.crewRestrictions = [CrewRestriction.MkCrewRestriction Affected.Attached]}
+        (init baseFaceJson <> ",\"crewRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}]}")
     Spec.it s "attachRestrictions" $
       Common.assertJsonCodec
         s
