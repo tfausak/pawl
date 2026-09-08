@@ -8,8 +8,8 @@ module Pawl.Types.TriggerFrequency where
 -- this type says so rather than manufacturing a citation.
 --
 -- Pawl.Types.TriggerLimit is the other half of that pair and NOT a synonym: it
--- rides the ABILITY and states "this ability triggers only once each turn",
--- where this narrows one condition's EVENT.
+-- rides the ABILITY and states "this ability triggers only once", each turn or
+-- each game, where this narrows one condition's EVENT.
 --
 -- Load-bearing on the one card that carries it: Aurelia adds a combat phase when
 -- she attacks (CR 500.8), so without the narrowing she attacks again in the phase

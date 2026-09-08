@@ -17,14 +17,16 @@ data TriggeredAbility card ability = MkTriggeredAbility
     -- AGAIN on resolution (CR 608.2a removes the ability from the stack if it has
     -- become false). Nothing for every ability without one.
     intervening :: Maybe Condition.Condition,
-    -- | Whispering Wizard's "This ability triggers only once each turn". A rider
-    -- on the ABILITY rather than a narrowing of the event, which is why it sits
-    -- here and not in the TriggerCondition beside it: the condition still
-    -- matches every occurrence, and the rider says the ability declines all but
-    -- the first. Unlimited for every ability that prints no such rider.
+    -- | Whispering Wizard's "This ability triggers only once each turn" and
+    -- Acrobatic Cheerleader's "This ability triggers only once". A rider on the
+    -- ABILITY rather than a narrowing of the event, which is why it sits here and
+    -- not in the TriggerCondition beside it: the condition still matches every
+    -- occurrence, and the rider says the ability declines all but the first.
+    -- Unlimited for every ability that prints no such rider.
     --
-    -- Enforced at Pawl.Engine.Engine.withinTurnLimit, over the turn-scoped log
-    -- rather than a stored flag.
+    -- Enforced at Pawl.Engine.Engine.withinTriggerLimit, off the turn-scoped log
+    -- for the per-turn rider and off Pawl.Types.GameState.triggeredThisGame for
+    -- the per-game one.
     limit :: TriggerLimit.TriggerLimit
   }
   deriving (Eq, Ord, Show)

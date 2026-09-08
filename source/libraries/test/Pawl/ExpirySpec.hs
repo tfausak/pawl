@@ -1885,9 +1885,10 @@ perpetualSpec s registry = Spec.describe s "Perpetual" $ do
   -- pawl's Pearl Collector omits the triggered ability entirely: "at the
   -- beginning of your second main phase, if you gained 4 or more life this turn,
   -- conjure a card named Mox Pearl into your hand. This ability triggers only
-  -- once" needs a once-per-GAME trigger limit, which Pawl.Types.TriggerLimit does
-  -- not have (#2655). The omission is stricter than printed -- alice gets no free
-  -- Mox Pearl -- and never weaker in the controller's favour.
+  -- once" needs a conjure that can duplicate a card already in the game (#2643);
+  -- the rider itself is Pawl.Types.TriggerLimit's OncePerGame and no longer the
+  -- obstacle. The omission is stricter than printed -- alice gets no free Mox
+  -- Pearl -- and never weaker in the controller's favour.
   Spec.it s "Pearl Collector's perpetual lifelink survives the graveyard, where an indefinite grant does not" $ do
     collector <- S.printingOf s registry "Pearl Collector"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
