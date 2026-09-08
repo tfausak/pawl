@@ -700,13 +700,8 @@ collectorBoard island piker collector recall collecting =
 -- just pay life as normal"; "Ashiok's first ability doesn't allow you to attempt
 -- to pay an amount of life greater than your current life total."
 --
--- The +1 and the -2 are Pawl.PlaneswalkerSpec's AshiokLoyalty group, which is
--- where the loyalty half of this card is read.
---
--- Not implemented: the -7, "target player exiles the top X cards of their library,
--- where X is the total mana value of cards you own in exile" -- that X is a sum
--- over a scope, which Pawl.Types.Aggregation has no arm for (#3108). pawl's card
--- is STRICTER than printed: it can do nothing its printing cannot.
+-- All three loyalty abilities are Pawl.PlaneswalkerSpec's AshiokLoyalty group,
+-- which is where the loyalty half of this card is read.
 --
 -- Greed ({3}{B} Enchantment, "{B}, Pay 2 life: Draw a card" -- checked the same
 -- day) is the payer, ReplacementSpec's Bloodletter group's choice for the same

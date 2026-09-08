@@ -1561,10 +1561,11 @@ rewritePlayerQuantity pairs x = x {PlayerQuantity.quantity = rewriteQuantity pai
 rewriteEntryRiders :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRiders.EntryRiders Quantity.Type.Quantity -> EntryRiders.EntryRiders Quantity.Type.Quantity
 rewriteEntryRiders pairs riders = riders {EntryRiders.counters = fmap (rewriteQuantity pairs) (EntryRiders.counters riders)}
 
--- Greatest is the only Aggregation carrying a Quantity.
+-- Greatest and Total are the Aggregations carrying a Quantity.
 rewriteAggregation :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Aggregation.Aggregation Quantity.Type.Quantity -> Aggregation.Aggregation Quantity.Type.Quantity
 rewriteAggregation pairs aggregation = case aggregation of
   Aggregation.Greatest q -> Aggregation.Greatest (rewriteQuantity pairs q)
+  Aggregation.Total q -> Aggregation.Total (rewriteQuantity pairs q)
   Aggregation.Members -> aggregation
   Aggregation.DistinctCardTypes -> aggregation
 

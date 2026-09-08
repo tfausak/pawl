@@ -60,8 +60,8 @@ type ViewOf = ObjectId -> Maybe Filter.View
 
 -- Reads a per-member quantity off one candidate. INJECTED for the same
 -- module-cycle reason ViewOf is: Pawl.Engine.Quantity imports this module and
--- ties the knot at its own Count arm. Every aggregation but
--- Aggregation.Greatest ignores it.
+-- ties the knot at its own Count arm. Only Aggregation.Greatest and
+-- Aggregation.Total read it; the other two ignore it.
 --
 -- BOTH the candidate's object and its view, because an InHistory candidate has
 -- only the second: its view is a CR 608.2h snapshot of a past event, so a
@@ -69,10 +69,10 @@ type ViewOf = ObjectId -> Maybe Filter.View
 -- candidate the view IS `viewOf` of the id beside it, so the two agree.
 type QuantityOf quantity = Maybe ObjectId -> Filter.View -> quantity -> Maybe Integer
 
--- Nothing when the count cannot be determined -- an unresolvable PlayerRef, or
--- (Aggregation.Greatest only) a maximum over a set that is empty or holds a
--- member with no value. It propagates, which is what every caller but one
--- wants: CR 208.2a's substituted 0 is a different rule, scoped to a
+-- Nothing when the count cannot be determined -- an unresolvable PlayerRef, a
+-- maximum over a set that is empty or holds a member with no value
+-- (Aggregation.Greatest), or a sum over a set holding one (Aggregation.Total).
+-- It propagates, which is what every caller but one wants: CR 208.2a's substituted 0 is a different rule, scoped to a
 -- characteristic-defining ability and applied by
 -- Pawl.Engine.Quantity.determine.
 evaluate :: ViewOf -> QuantityOf quantity -> Filter.Context -> GameState -> Count.Type.Count quantity -> Maybe Integer
@@ -449,13 +449,14 @@ keep predicate context mv = case mv of
 -- Each member carries the object it came from when there is one, and its view
 -- either way. An InHistory member has no object -- its view is a CR 608.2h
 -- snapshot of a past event rather than of anything on the battlefield now --
--- so Greatest hands the reader both and lets it answer from whichever it can.
+-- so Greatest and Total hand the reader both and let it answer from whichever
+-- it can.
 aggregate :: QuantityOf quantity -> Aggregation.Aggregation quantity -> [(Maybe ObjectId, Filter.View)] -> Maybe Integer
 aggregate quantityOf aggregation members = case aggregation of
   Aggregation.Members -> Just (toInteger (length members))
   Aggregation.DistinctCardTypes -> Just (toInteger (Set.size (Set.unions (fmap (Filter.cardTypes . snd) members))))
-  -- Total in both directions. A member whose quantity cannot be determined
-  -- makes the whole maximum undeterminable rather than being dropped, which
+  -- Undeterminable in both directions. A member whose quantity cannot be
+  -- determined makes the whole maximum undeterminable rather than being dropped, which
   -- would report the maximum of a set the card never named; and an EMPTY
   -- matched set has no maximum. Nothing, NOT 0: no rule gives a maximum over
   -- nothing a value, and where the CR wants an empty maximum to be 0 it
@@ -469,6 +470,14 @@ aggregate quantityOf aggregation members = case aggregation of
     case values of
       [] -> Nothing
       value : rest -> Just (Foldable.foldl' max value rest)
+  -- Undeterminable in the same direction as Greatest, and for the same reason:
+  -- a member whose quantity has no value makes the whole sum a sum over a set
+  -- the card never named. The EMPTY set differs -- 0, not Nothing -- because a
+  -- sum has an identity where a maximum has none, and "the total mana value of
+  -- cards you own in exile" with an empty exile is a number the card can use.
+  Aggregation.Total quantity -> do
+    values <- traverse (\(identity, view) -> quantityOf identity view quantity) members
+    pure (sum values)
 
 -- CR 400.1: whose copy of the zone -- and, for Pawl.Engine.ManaCount, whose
 -- mana pool, which CR 106.4 attaches to a player the same way. Nothing when the
