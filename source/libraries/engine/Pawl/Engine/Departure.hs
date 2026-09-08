@@ -491,8 +491,9 @@ nonCardStackObjectsCease pid gs =
           -- stack not represented by cards" does not reach it. It is never on the
           -- stack anyway (CR 701.42a).
           Source.OfMeld _ -> False
-          -- CR 730.2: represented by the cards its components are, and never on
-          -- the stack, so rule 800.4a does not reach it either.
+          -- CR 730.2 merges an object into a permanent on the battlefield, so a
+          -- merged permanent is never on the stack either and rule 800.4a does
+          -- not reach it -- whatever its components are (CR 730.2d).
           Source.OfMerge _ -> False
           Source.OfToken _ -> True
           Source.OfAbility _ -> True

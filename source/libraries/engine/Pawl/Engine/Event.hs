@@ -132,6 +132,7 @@ import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MeldSource as MeldSource
+import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MutateSide as MutateSide
@@ -4779,8 +4780,12 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               --
               -- Each component goes through the same `mkObj`, so CR 400.7's
               -- forgetting (Object.newIncarnation) is what the two cards arrive
-              -- with; only Object.source differs, since the cards represent
-              -- themselves again and not the permanent they were.
+              -- with; only Object.source differs, since each component
+              -- represents itself again and not the permanent it was. CR 730.3's
+              -- merged permanent can have a TOKEN component, which arrives as a
+              -- token (Game.sourceOfComponent) and is then removed by CR 111.7's
+              -- state-based action, rather than as a card that would sit in the
+              -- graveyard for ever.
               --
               -- CR 712.21d needs nothing here: the CR 616.1 replacement loop
               -- ran ONCE above, against the melded permanent, so a replacement
@@ -4809,11 +4814,11 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                   -- below, as a GameEvent.CardArrived naming the command zone,
                   -- which is how CR 903.9c's two arrivals in two different zones
                   -- are both said.
-                  (commandComponents, destComponents) = Seq.partition (\component -> Just component == splitOff) components
+                  (commandComponents, destComponents) = Seq.partition (\component -> Just (MergeComponent.printing component) == splitOff) components
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
-                        Just component -> (mkObj entrySeed ts) {Object.source = Source.OfCard component}
+                        Just component -> (mkObj entrySeed ts) {Object.source = Game.sourceOfComponent component}
                     )
                       { Object.zone = zone
                       }
@@ -5085,14 +5090,17 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 --
 -- FILTERED, NOT TRUSTED: Game.permute keeps the melded order for an answer that
 -- is not a permutation of the offered indices.
-arrangeComponents :: PlayerId -> Zone -> Seq.Seq PrintingId.PrintingId -> Game (Seq.Seq PrintingId.PrintingId)
+arrangeComponents :: PlayerId -> Zone -> Seq.Seq MergeComponent.MergeComponent -> Game (Seq.Seq MergeComponent.MergeComponent)
 arrangeComponents pid dest components =
   if Seq.length components < 2 || (dest /= Zone.Graveyard && dest /= Zone.Library)
     then pure components
     else do
       gs <- State.get
       let offered = Foldable.toList components
-      answer <- Game.choose (Prompt.OrderComponentCards (Decide.deciderFor pid gs) pid dest offered)
+      -- The PROMPT names printings, which is what a player picking an order sees;
+      -- the permutation is applied to the components themselves, so a token
+      -- component keeps its kind through the arrangement.
+      answer <- Game.choose (Prompt.OrderComponentCards (Decide.deciderFor pid gs) pid dest (fmap MergeComponent.printing offered))
       pure (Seq.fromList (Game.permute offered answer))
 
 -- CR 400.7a: effects that change a permanent spell's characteristics or
@@ -6247,21 +6255,21 @@ meldable victims gs = do
 -- already projects rule 702.140e's added abilities -- which is what lets a
 -- Cubwarden merged UNDER trigger at all.
 --
--- Not implemented: CR 730.2d's token-ness and CR 730.2e through 730.2j's
--- face-down, flip and double-faced components. A spell with no printing behind
--- it -- CR 707.10's copy of a mutating creature spell -- refuses here rather
--- than merging (#874).
+-- Not implemented: CR 730.2e through 730.2j's face-down, flip and double-faced
+-- components. A spell with no printing behind it -- CR 707.10's copy of a
+-- mutating creature spell -- refuses here rather than merging (#874).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
   case (Game.lookupObject sid gs, Game.lookupObject target gs) of
     (Just spell, Just permanent) -> case (Object.source spell, mergeComponents (Object.source permanent)) of
       (Source.OfCard pid, Just existing) -> do
-        let merged = case side of
-              MutateSide.Over -> pid NonEmpty.:| existing
+        let component = MergeComponent.OfCard pid
+            merged = case side of
+              MutateSide.Over -> component NonEmpty.:| existing
               MutateSide.Under -> case existing of
-                first : rest -> first NonEmpty.:| (rest <> [pid])
-                [] -> pid NonEmpty.:| []
+                first : rest -> first NonEmpty.:| (rest <> [component])
+                [] -> component NonEmpty.:| []
             -- What layer 1a had left each side, read off the PRE-merge board:
             -- the spell's own record and the permanent's, which is that
             -- permanent's copy snapshot where an earlier copy effect gave it one
@@ -6298,16 +6306,20 @@ merge sid target side = do
 -- order: one printing for an ordinary card (CR 108.2), and the existing stack
 -- for a permanent already merged.
 --
--- Not implemented: a TOKEN component, which CR 730.2d's token-ness rule is
--- about, and a MELDED component, whose characteristics come off an interned
--- combined face that is no component of it (CR 712.8g). Nothing answers for
--- either, so a mutating creature spell targeting one does not merge (#874).
-mergeComponents :: Source.Source -> Maybe [PrintingId.PrintingId]
+-- The TOKEN arm is CR 730.2d's own subject: a token is a component like any
+-- other, and what its being on top decides is only whether the merged permanent
+-- is a token, which Pawl.Engine.Game.sourceIsToken reads off the head.
+--
+-- Not implemented: a MELDED component, whose characteristics come off an
+-- interned combined face that is no component of it (CR 712.8g), so there is no
+-- component list to extend -- a mutating creature spell targeting one does not
+-- merge (#874).
+mergeComponents :: Source.Source -> Maybe [MergeComponent.MergeComponent]
 mergeComponents source = case source of
-  Source.OfCard pid -> Just [pid]
+  Source.OfCard pid -> Just [MergeComponent.OfCard pid]
   Source.OfMerge components -> Just (NonEmpty.toList components)
   Source.OfMeld _ -> Nothing
-  Source.OfToken _ -> Nothing
+  Source.OfToken pid -> Just [MergeComponent.OfToken pid]
   Source.OfAbility _ -> Nothing
   Source.OfTrigger _ -> Nothing
   Source.OfEmblem _ -> Nothing

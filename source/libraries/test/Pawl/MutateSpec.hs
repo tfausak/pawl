@@ -6,7 +6,9 @@
 -- Pawl.Engine.Cast's CR 601.2b stamp and CR 601.2c target, Pawl.Engine.Stack's
 -- CR 702.140b/702.140c fork, Pawl.Engine.Event.merge, Pawl.Types.Source's
 -- OfMerge arm and the projection read Pawl.Engine.Projection.View's
--- withMergedAbilities adds for CR 702.140e.
+-- withMergedAbilities adds for CR 702.140e. CR 730.2d's token components come
+-- through Pawl.Types.MergeComponent, whose two arms are what a merged
+-- permanent's token-ness and CR 730.3's departure each read.
 --
 -- Cubwarden is the producer: {3}{W} 3\/5 Creature -- Cat, "Mutate {2}{W}{W}",
 -- lifelink, "Whenever this creature mutates, create two 1\/1 white Cat creature
@@ -27,6 +29,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -56,6 +59,8 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.MeldSource as MeldSource
+import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
@@ -66,6 +71,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -278,17 +284,36 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "setup: it was doubled before the merge too" (countersOn (counted board)) (Just 2)
     Spec.assertEqWith s "setup: and the merged permanent is Cubwarden, which prints no replacement effect" (fmap S.nameOf (Game.cardOf host after)) (Just (CardName.MkCardName (Text.pack "Cubwarden")))
   -- CR 702.140c's choice is only put to a player where it decides something. A
-  -- token target is one the merge refuses (#874), so the side would be answered
-  -- and then thrown away -- an elided rule showing up as a real decision. A pair
-  -- of boards differing in exactly one thing: whether the creature the spell
-  -- targets is a token; see #3371.
+  -- MELDED target is one the merge refuses (#874) -- CR 712.8g gives such a
+  -- permanent only its combined back face, which is no component of it, so there
+  -- is no component list to extend -- and the side would be answered and then
+  -- thrown away, an elided rule showing up as a real decision. A pair of boards
+  -- differing in exactly one thing: whether the creature the spell targets is
+  -- represented by one card or by a meld; see #3371.
+  --
+  -- The melded permanent is HAND-BUILT, over Falcon Abomination's own printing so
+  -- that CR 702.140a still admits it as a target: driving the pool's one meld
+  -- pair belongs to Pawl.MeldSpec, and the question here is only which Source
+  -- Event.mergeable refuses.
   Spec.it s "CR 702.140c a merge the engine will refuse asks for no side" $ do
     plains <- S.printingOf s registry "Plains"
     falcon <- S.printingOf s registry "Falcon Abomination"
     cubwarden <- S.printingOf s registry "Cubwarden"
     let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
         (cardTarget, withCard) = S.addPermanent falcon S.alice base
-        (tokenTarget, withToken) = S.addToken (Printing.card falcon) S.alice base
+        (meldTarget, withMeldCard) = S.addPermanent falcon S.alice base
+        (falconPid, interned) = Game.intern falcon withMeldCard
+        (cubPid, bothInterned) = Game.intern cubwarden interned
+        melded =
+          Source.OfMeld
+            MeldSource.MkMeldSource
+              { MeldSource.result = falconPid,
+                MeldSource.components = falconPid NonEmpty.:| [cubPid]
+              }
+        withMeld =
+          bothInterned
+            { GameState.objects = Map.adjust (\obj -> obj {Object.source = melded}) meldTarget (GameState.objects bothInterned)
+            }
         counting :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
         counting host p = case p of
           Prompt.ChooseMutateSide {} -> do
@@ -299,13 +324,68 @@ spec s registry = Spec.describe s "Mutate" $ do
           let (board, spellId) = S.handOne cubwarden gs
               cast = S.runPure (mutatingAt MutateSide.Over host) board (S.cast S.alice spellId)
            in State.execState (Engine.runGame (counting host) cast (Monad.replicateM_ 6 (Engine.settleForPriority >> Stack.resolveTop))) 0
-    Spec.assertEqWith s "CR 702.140c a token target the merge refuses is asked no side" (asks tokenTarget withToken) 0
-    Spec.assertEqWith s "while a card target is asked exactly one" (asks cardTarget withCard) 1
-    -- The proxies, after the pair: the token really was a legal target of the
-    -- spell, so the 0 above is the refusal and not an unfillable slot.
-    Spec.assertBool s (Projection.isCreatureOf tokenTarget withToken) "setup: the token is a creature"
-    Spec.assertEqWith s "setup: which alice owns, and which is no Human" (fmap Object.owner (Game.lookupObject tokenTarget withToken)) (Just S.alice)
-    Spec.assertBool s (not (Set.member Subtype.Human (Projection.subtypesOf tokenTarget withToken))) "setup: and is no Human"
+    Spec.assertEqWith s "CR 702.140c a melded target the merge refuses is asked no side" (asks meldTarget withMeld) 0
+    Spec.assertEqWith s "while a one-card target is asked exactly one" (asks cardTarget withCard) 1
+    -- The proxies, after the pair: the melded permanent really was a legal target
+    -- of the spell, so the 0 above is the refusal and not an unfillable slot.
+    Spec.assertBool s (Projection.isCreatureOf meldTarget withMeld) "setup: the melded permanent is a creature"
+    Spec.assertEqWith s "setup: which alice owns" (fmap Object.owner (Game.lookupObject meldTarget withMeld)) (Just S.alice)
+    Spec.assertBool s (not (Set.member Subtype.Human (Projection.subtypesOf meldTarget withMeld))) "setup: and is no Human"
+  -- CR 730.2d: "if a merged permanent contains a token, the resulting permanent
+  -- is a token only if the topmost component is a token". A pair of boards
+  -- differing in exactly one thing -- which side of the token Cubwarden goes on
+  -- -- so an implementation reading ANY component, or reading none, answers both
+  -- alike and neither pair member is about the merge refusing.
+  --
+  -- The token is one a CARD made: Cubwarden's own CR 702.140d trigger creates
+  -- two 1/1 white Cat tokens with lifelink, and a Cat is no Human, so rule
+  -- 702.140a admits one as the second Cubwarden's mutate target.
+  --
+  -- Ashaya, Soul of the Wild ({3}{G}{G} Creature -- Elemental) is what READS the
+  -- answer at gameplay level: "each nontoken creature you control is a Forest
+  -- land in addition to its other types", a CR 613.1d type-changing effect that
+  -- passes a token by.
+  Spec.it s "CR 730.2d a merged permanent is a token only if its topmost component is" $ do
+    plains <- S.printingOf s registry "Plains"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    let base = S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers)
+        (host, withHost) = S.addPermanent falcon S.alice base
+        (_, withAshaya) = S.addPermanent ashaya S.alice withHost
+        (firstBoard, firstSpell) = S.handOne cubwarden withAshaya
+        catBoard = merging MutateSide.Over host firstBoard firstSpell
+        cat = catId catBoard
+        (secondBoard, secondSpell) = S.handOne cubwarden catBoard
+        onto side = merging side cat secondBoard secondSpell
+        isForest gs = Set.member Subtype.Forest (Projection.subtypesOf cat gs)
+    Spec.assertBool s (isForest (onto MutateSide.Over)) "CR 730.2d a card over a token is topmost, so the merged permanent is no token and Ashaya makes it a Forest"
+    Spec.assertBool s (not (isForest (onto MutateSide.Under))) "CR 730.2d while under it the token is topmost, so the merged permanent is a token and Ashaya passes it by"
+    -- The proxies, after the behaviours: the same two cards represent the
+    -- permanent either way, so the pair differs in the ORDER alone.
+    Spec.assertEqWith s "the token and the card represent one permanent, the card on top" (componentNames cat (onto MutateSide.Over)) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Cat Token")]
+    Spec.assertEqWith s "and the other way under" (componentNames cat (onto MutateSide.Under)) [CardName.MkCardName (Text.pack "Cat Token"), CardName.MkCardName (Text.pack "Cubwarden")]
+    Spec.assertBool s (not (isForest catBoard)) "setup: the Cat token was a token before anything merged with it, so Ashaya left it alone"
+  -- CR 730.3 over a component list that holds a token: "each of the individual
+  -- components are put into the appropriate zone", and CR 111.7 is what the
+  -- appropriate zone comes to for a token -- it ceases to exist. Cubwarden's own
+  -- Cat token is the component, and the card beside it is the control that says
+  -- the graveyard was reachable at all.
+  Spec.it s "CR 730.3/111.7 a merged permanent's token component ceases to exist while its card is put into the graveyard" $ do
+    plains <- S.printingOf s registry "Plains"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let base = S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers)
+        (host, withHost) = S.addPermanent falcon S.alice base
+        (firstBoard, firstSpell) = S.handOne cubwarden withHost
+        catBoard = merging MutateSide.Over host firstBoard firstSpell
+        cat = catId catBoard
+        (secondBoard, secondSpell) = S.handOne cubwarden catBoard
+        merged = merging MutateSide.Over cat secondBoard secondSpell
+        dead = S.runPure S.identityAnswer merged (Event.destroy Regenerability.Regenerable [cat] >> Engine.settleForPriority)
+    Spec.assertBool s (notElem (CardName.MkCardName (Text.pack "Cat Token")) (graveyardNames dead)) "CR 111.7 the token component does not stay in the graveyard"
+    Spec.assertBool s (elem (CardName.MkCardName (Text.pack "Cubwarden")) (graveyardNames dead)) "CR 730.3 while the card component is put there"
+    Spec.assertEqWith s "CR 730.3 and the merged permanent itself is gone" (Game.lookupObject cat dead) Nothing
   -- CR 730.3, which is CR 712.21 restated for a merged permanent and which
   -- Pawl.Engine.Game.componentsOf answers for both. One permanent leaves and two
   -- cards arrive.
@@ -578,7 +658,7 @@ graveyardNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) 
 componentNames :: ObjectId.ObjectId -> GameState.GameState -> [CardName.CardName]
 componentNames oid gs =
   foldMap
-    (Maybe.mapMaybe (\pid -> fmap (S.nameOf . Printing.card) (Game.printingOf pid gs)) . Foldable.toList . Game.componentsOf . Object.source)
+    (Maybe.mapMaybe (\component -> fmap (S.nameOf . Printing.card) (Game.printingOf (MergeComponent.printing component) gs)) . Foldable.toList . Game.componentsOf . Object.source)
     (Game.lookupObject oid gs)
 
 -- The same board with one permanent summoning sick, which S.addPermanent does
@@ -589,3 +669,13 @@ sickened oid gs =
     { GameState.objects =
         Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)
     }
+
+-- The first of the two Cat tokens CR 702.140d's trigger created, which is the
+-- token these cases merge with. By name, so nothing else on the board can stand
+-- in for it.
+catId :: GameState.GameState -> ObjectId.ObjectId
+catId gs =
+  Maybe.fromMaybe (ObjectId.MkObjectId 999) $
+    List.find
+      (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (CardName.MkCardName (Text.pack "Cat Token")))
+      (Game.zoneMembers Zone.Battlefield S.alice gs)
