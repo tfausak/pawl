@@ -2,6 +2,7 @@
 
 module Pawl.Codec.AttackerDeclared where
 
+import qualified Pawl.Codec.AttackTarget as AttackTarget
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -16,10 +17,12 @@ codec :: Codec.Codec AttackerDeclared.AttackerDeclared
 codec = Fields.object $ do
   attacker <- Fields.required "attacker" ObjectId.codec AttackerDeclared.attacker
   defender <- Fields.required "defender" PlayerId.codec AttackerDeclared.defender
+  target <- Fields.required "target" AttackTarget.codec AttackerDeclared.target
   count <- Fields.required "count" Common.natural AttackerDeclared.count
   pure
     AttackerDeclared.MkAttackerDeclared
       { AttackerDeclared.attacker = attacker,
         AttackerDeclared.defender = defender,
+        AttackerDeclared.target = target,
         AttackerDeclared.count = count
       }

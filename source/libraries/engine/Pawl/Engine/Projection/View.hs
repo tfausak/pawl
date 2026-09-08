@@ -301,7 +301,7 @@ printedToughness face = case Face.characteristicPT face of
 -- battlefield attacking stays out.
 declaredIt :: ObjectId -> GameEvent.GameEvent -> Bool
 declaredIt oid event = case event of
-  GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _) -> declared == oid
+  GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _ _) -> declared == oid
   _ -> False
 
 -- CR 701.17a: does this event record THIS object as one of a mill's cards? Only

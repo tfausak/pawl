@@ -6731,9 +6731,11 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerBecomesMonarch _ -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
+  TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
+  TriggerCondition.SelfIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.PlayerAttacksPlayer {} -> False
@@ -6983,12 +6985,14 @@ controllerTurnScoped cond = case cond of
   -- its thief's turn.
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
+  TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   -- CR 506.2 makes this one an OPPONENT's turn every time, which is not the
   -- controller's turn either -- StepBegins' OpponentsTurn arm above answers the
   -- same way for the same reason.
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
+  TriggerCondition.SelfIsAttacked -> False
   -- The only arm around here that can answer True, and only on one relation: CR
   -- 508.1 lets only the active player declare attackers, so the declarer named
   -- by the event is always the active player. You therefore pins the event to CR
