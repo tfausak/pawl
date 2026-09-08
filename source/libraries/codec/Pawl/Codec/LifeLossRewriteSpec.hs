@@ -30,4 +30,12 @@ spec s = Spec.describe s "Pawl.Codec.LifeLossRewrite" $ do
       LifeLossRewrite.codec
       LifeLossRewrite.ExileFromTopOfYourLibrary
       " {\"type\":\"ExileFromTopOfYourLibrary\"} "
+  -- Strong, the Brutish Thespian's "you gain life rather than lose life from
+  -- radiation".
+  Spec.it s "GainInstead" $
+    Common.assertCodec
+      s
+      LifeLossRewrite.codec
+      LifeLossRewrite.GainInstead
+      " {\"type\":\"GainInstead\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LifeLossRewrite.codec

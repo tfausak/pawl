@@ -57,6 +57,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.LifeLoss as LifeLoss
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -70,7 +72,6 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
@@ -418,9 +419,10 @@ theRingDrainsOnCombatDamage =
   where
     effect =
       Effect.LoseLife
-        ( PlayerQuantity.MkPlayerQuantity
+        ( LifeLoss.MkLifeLoss
             (PlayerRef.Relative PlayerRelation.Opponent)
             (Quantity.Literal 3)
+            LifeLossCause.ByEffect
         )
 
 -- | CR 701.54c's first clause, "Your Ring-bearer is legendary", as the emblem's one

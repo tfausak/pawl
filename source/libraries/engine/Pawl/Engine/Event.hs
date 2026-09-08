@@ -2941,8 +2941,9 @@ apply batch candidate event =
     (ReplacementEffect.UntapR _, _) -> pure (Just event)
     -- CR 614.1a: the RESIZING arms leave the event standing at a rewritten loss,
     -- which is what makes them composable: CR 616.2's next iteration re-collects
-    -- against the rewritten loss, and a second row can act on it again. The last
-    -- arm cancels instead, and is the exception the two above are read against.
+    -- against the rewritten loss, and a second row can act on it again. The two
+    -- arms after them cancel instead, and are the exception the resizing pair is
+    -- read against.
     --
     -- No arm here touches the DAMAGE, on the CR 120.4c road. By CR 120.4b it has
     -- already been dealt, and Pawl.Engine.Damage.applyDamage still gains a
@@ -2976,7 +2977,8 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         pure (Just (ProposedEvent.WouldLoseLife cause pid (Replacement.scale scaling n)))
       -- CR 614.6 with CR 119.4: Ashiok, Wicked Manipulator's "exile that many
-      -- cards from the top of your library instead". THE ONE ARM THAT CANCELS:
+      -- cards from the top of your library instead". A CANCELLING ARM, as
+      -- GainInstead below is:
       -- rule 614.6's "if an event is replaced, it never happens", so no life is
       -- lost, no CR 119.4 subtraction is made and no GameEvent.LifeLost is
       -- recorded -- Nothing, not a loss rewritten to nothing. What the payment
@@ -3006,6 +3008,23 @@ apply batch candidate event =
           Just you -> do
             Monad.mapM_ (`changeZone` Zone.Exile) (take (Natural.toIntSaturating n) (Game.zoneMembers Zone.Library you gs))
             pure Nothing
+      -- CR 614.6 with CR 728.1a: Strong, the Brutish Thespian's "you gain life
+      -- rather than lose life from radiation". THE SECOND ARM THAT CANCELS, the
+      -- one above for its reason: the loss never happens, so no life total goes
+      -- down and no GameEvent.LifeLost is recorded.
+      --
+      -- The gain goes through resolveLifeGain, CR 614.1's funnel for the gain
+      -- class -- the DrawR arm's GainLife road below and for its reason: the life
+      -- this rewrite substitutes is a life gain event like any other, so a
+      -- LifeGainR row resizes it.
+      --
+      -- The seat is the one the EVENT named, which for the producer is CR 109.5's
+      -- "you" as well: its pattern is LifeLossPattern's Yours.
+      LifeLossRewrite.GainInstead -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        settled <- resolveLifeGain pid n
+        changeLife pid (toInteger settled)
+        pure Nothing
     -- Unreachable: `applies` admits LifeLossR only against WouldLoseLife.
     (ReplacementEffect.LifeLossR {}, _) -> pure (Just event)
     -- CR 614.1a: Boon Reflection's "you gain twice that much life instead". The
