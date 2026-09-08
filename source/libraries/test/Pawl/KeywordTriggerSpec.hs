@@ -377,7 +377,7 @@ annihilatorSpec s registry =
         -- "defending player" reads. The falsifier is an arm that binds the
         -- attacking side instead.
         Spec.it s "CR 603.2 the defending player rides the declaration in the reserved slot" $ do
-          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 7) S.carol 1))
+          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 7) S.carol (AttackTarget.OfPlayer S.carol) 1))
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 613.8's dependency, read off the projection before any attack: WHICH
         -- permanents actually carry the granted keyword. Without this the two

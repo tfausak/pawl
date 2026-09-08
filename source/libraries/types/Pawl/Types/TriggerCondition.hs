@@ -101,6 +101,10 @@ data TriggerCondition
   | -- | CR 508.3a with a companion required -- rule 702.149a's training, the
     -- Filter asked existentially of everybody else the declaration named.
     SelfAttacksWithAnother (Filter.Filter Keyword.Keyword)
+  | -- | CR 508.3a's second sentence, self-scoped: "whenever this creature attacks
+    -- a battle" (Thrashing Frontliner), the Filter asked of the PERMANENT CR
+    -- 508.1b announced. AttackTarget.OfPlayer never satisfies it.
+    SelfAttacksPermanent (Filter.Filter Keyword.Keyword)
   | -- | CR 506.5 read by a bystander: "whenever a creature you control attacks
     -- alone" -- rule 702.83a's exalted.
     CreatureAttacksAlone (Filter.Filter Keyword.Keyword)
@@ -111,11 +115,14 @@ data TriggerCondition
   | -- | CR 508.3b: "whenever enchanted player is attacked" (Curse of Vitality),
     -- once per distinct target, the subject read off Object.attachedTo.
     --
-    -- Not implemented: rule 508.3b's planeswalker and battle subjects --
-    -- Scryfall o:"is attacked" o:"whenever", 2026-08-21, matches five cards and
-    -- all five are Curses enchanting a player, and GameEvent.BecameAttacked
-    -- already carries the permanent an arm for them would read (#2279).
+    -- Rule 508.3b's planeswalker and battle subjects are SelfIsAttacked below;
+    -- Scryfall o:"is attacked" o:"whenever", 2026-09-07, still matches only
+    -- these five Curses, so that arm's producer is synthetic.
     AttachedPlayerIsAttacked
+  | -- | CR 508.3b's other two subjects: "whenever this planeswalker is attacked"
+    -- (Synthetic Warded Sentinel), once per distinct target, the subject being
+    -- the ability's own source rather than what it is attached to.
+    SelfIsAttacked
   | -- | CR 508.3d: "whenever [a player] attacks" -- once per declaration,
     -- against GameEvent.AttackersDeclared, with the declaring player bound
     -- under Pawl.Engine.Binding.attackingPlayer.
