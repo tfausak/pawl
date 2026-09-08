@@ -159,14 +159,17 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Revealed (Revealed.MkRevealed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) RevealCause.ForMiracle ProjectedCharacteristicsSpec.testCharacteristics))
       ("{\"type\":\"Revealed\",\"value\":{\"player\":0,\"card\":7,\"cause\":{\"type\":\"ForMiracle\"},\"characteristics\":" <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "}}")
-  -- An object, a player and CR 506.5's declaration size. Three distinct numbers,
-  -- so a codec that permuted them would fail.
+  -- An object, a player, CR 508.1b's announcement and CR 506.5's declaration
+  -- size. Distinct numbers throughout, so a codec that permuted them would fail,
+  -- and the announcement is a PLANESWALKER rather than the defending player: the
+  -- two fields are what rule 508.3a's two sentences read apart, so a codec that
+  -- derived one from the other would not round-trip this.
   Spec.it s "AttackerDeclared" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1) 4))
-      " {\"type\":\"AttackerDeclared\",\"value\":{\"attacker\":3,\"defender\":1,\"count\":4}} "
+      (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1) (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 5)) 4))
+      " {\"type\":\"AttackerDeclared\",\"value\":{\"attacker\":3,\"defender\":1,\"target\":{\"type\":\"OfPlaneswalker\",\"value\":5},\"count\":4}} "
   -- AttackerDeclared's grouping sibling: the target and the player who declared,
   -- with no creature and no count -- CR 508.3b's subject beside CR 508.3e's.
   Spec.it s "BecameAttacked" $

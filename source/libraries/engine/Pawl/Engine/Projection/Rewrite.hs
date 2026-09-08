@@ -1341,9 +1341,13 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
   TriggerCondition.SelfAttacksWithAnother f -> TriggerCondition.SelfAttacksWithAnother (Filter.rewrite pairs f)
+  -- DESCENDS for the arm above's reason: rule 508.3a's second sentence names a
+  -- permanent, and a Filter over one can name a creature type CR 612.1 rewrites.
+  TriggerCondition.SelfAttacksPermanent f -> TriggerCondition.SelfAttacksPermanent (Filter.rewrite pairs f)
   TriggerCondition.CreatureAttacksAlone f -> TriggerCondition.CreatureAttacksAlone (Filter.rewrite pairs f)
   TriggerCondition.CreatureAttacksYou -> condition
   TriggerCondition.AttachedPlayerIsAttacked -> condition
+  TriggerCondition.SelfIsAttacked -> condition
   TriggerCondition.PlayerAttacks _ -> condition
   -- DESCENDS, where the arm above does not: rule 508.3c's Filter names a
   -- creature type, which is exactly what CR 612.1's text-changing effect

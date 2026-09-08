@@ -362,9 +362,11 @@ looksBack condition = case condition of
   TriggerCondition.PlayerDrawsNthCard {} -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
+  TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
+  TriggerCondition.SelfIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.PlayerAttacksPlayer {} -> False
@@ -561,9 +563,11 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerDrawsNthCard {} -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
+  TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
+  TriggerCondition.SelfIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.PlayerAttacksPlayer {} -> False
@@ -1957,9 +1961,14 @@ zonesTriggeredFrom cond = case cond of
   -- attacker, so CR 113.6k never reaches this.
   TriggerCondition.SelfAttacks _ -> battlefield
   TriggerCondition.SelfAttacksWithAnother _ -> battlefield
+  TriggerCondition.SelfAttacksPermanent _ -> battlefield
   TriggerCondition.CreatureAttacksAlone _ -> battlefield
   TriggerCondition.CreatureAttacksYou -> battlefield
   TriggerCondition.AttachedPlayerIsAttacked -> battlefield
+  -- CR 508.1b / 310.5: the announcement names a planeswalker the defending player
+  -- CONTROLS or a battle they protect, both battlefield permanents, so CR 113.6k
+  -- never reaches this one either.
+  TriggerCondition.SelfIsAttacked -> battlefield
   TriggerCondition.PlayerAttacks _ -> battlefield
   TriggerCondition.PlayerAttacksWith {} -> battlefield
   TriggerCondition.PlayerAttacksPlayer {} -> battlefield
@@ -2244,9 +2253,11 @@ stateTriggers gs
               TriggerCondition.OpponentLostLifeDuringYourTurn -> False
               TriggerCondition.SelfAttacks _ -> False
               TriggerCondition.SelfAttacksWithAnother _ -> False
+              TriggerCondition.SelfAttacksPermanent _ -> False
               TriggerCondition.CreatureAttacksAlone _ -> False
               TriggerCondition.CreatureAttacksYou -> False
               TriggerCondition.AttachedPlayerIsAttacked -> False
+              TriggerCondition.SelfIsAttacked -> False
               TriggerCondition.PlayerAttacks _ -> False
               TriggerCondition.PlayerAttacksWith {} -> False
               TriggerCondition.PlayerAttacksPlayer {} -> False

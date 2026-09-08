@@ -33,7 +33,8 @@
 --
 -- Goblin Piker and Bog Wraith join it for the combat cases, and are the pool's
 -- plainest bodies: a vanilla 2/1 and a 3/3 whose entire text is swampwalk. Neither
--- is a battle, so every case below reads rule 310 rather than the attacker.
+-- is a battle, so attackSpec's cases read rule 310 rather than the attacker.
+-- frontlinerSpec is the one group here that reads an attacker's text on purpose.
 --
 -- And how a battle is defeated: CR 310.6 / 120.3h's damage removing defense
 -- counters, CR 115.4's "any target" admitting one, CR 310.12b's intrinsic Siege
@@ -65,6 +66,12 @@
 -- counters" from "removed the right number". attackSpec borrows the Bolt too, cast
 -- twice inside the declare attackers step, since Firebolt is a sorcery and CR
 -- 307.1 keeps it out of combat.
+--
+-- And what a battle looks like from the ATTACKER's side of rule 508: Thrashing
+-- Frontliner's "whenever this creature attacks a battle" is frontlinerSpec below.
+-- It lives here rather than in Pawl.CardTriggerSpec because the board that tells
+-- the announcement apart from CR 508.5's defending player is attackSpec's, carol
+-- protecting the Siege and defending against it at once.
 --
 -- And the second half of CR 310.12b's sentence, "then you may cast it transformed
 -- without paying its mana cost": CR 608.2g's offered cast, CR 118.9's alternative
@@ -134,6 +141,7 @@ spec s registry = Spec.describe s "Battle" $ do
   candidateSpec s registry
   repairSpec s registry
   attackSpec s registry
+  frontlinerSpec s registry
   filterSpec s registry
   damageSpec s registry
   defeatSpec s registry
@@ -686,6 +694,37 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertEqWith s "CR 506.4: the battle's controller" (Map.lookup arrival (Combat.Type.attackedControlledBy combat)) (Just S.alice)
         Spec.assertEqWith s "CR 802.2a: its protector, and not the same player" (Map.lookup arrival (Combat.Type.attackedUnder combat)) (Just S.carol)
       _ -> Spec.assertFailure s "fixture should have exactly one creature"
+
+-- CR 508.3a's second sentence, the one clause in rule 508 that reads what a
+-- creature was DECLARED attacking rather than CR 508.5's defending player.
+--
+-- Thrashing Frontliner ({1}{R} Creature -- Phyrexian Lizard 2/2, trample,
+-- "Whenever this creature attacks a battle, it gets +1/+1 until end of turn") is
+-- the producer. attackSpec's board is what makes the two readings distinguishable:
+-- carol protects the Siege AND is the defending player (CR 310.9d), so a condition
+-- reading GameEvent.AttackerDeclared's `defender` pumps on BOTH legs below, where
+-- one reading its `target` pumps only on the first.
+frontlinerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+frontlinerSpec s registry = Spec.describe s "Attacking a battle" $ do
+  Spec.it s "CR 508.3a whole card: Thrashing Frontliner declared at the Siege gets +1/+1" $ do
+    (gs, battle, mine, _, _) <- battleCombatOf s registry S.carol S.carol ["Thrashing Frontliner"] [] []
+    case mine of
+      [frontliner] -> do
+        let after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackTheBattle battle) gs
+        Spec.assertEqWith s "the trigger resolved and the printed 2/2 is a 3/3" (Projection.powerOf frontliner after, Projection.toughnessOf frontliner after) (Just 3, Just 3)
+        Spec.assertEqWith s "CR 508.1b and the Siege really is what it was declared attacking" (Map.lookup frontliner (Combat.Type.attackers (GameState.combat after))) (Just (AttackTarget.OfBattle battle))
+      _ -> Spec.assertFailure s "fixture should have exactly one attacker"
+  Spec.it s "CR 508.3a the same creature declared at the battle's PROTECTOR is silent" $ do
+    -- THE FALSIFIER, and the reason the case above is not vacuous: one board, one
+    -- announcement apart. carol is CR 508.5's defending player on BOTH legs -- she
+    -- protects the Siege -- so a condition reading that field would pump here too.
+    (gs, _, mine, _, _) <- battleCombatOf s registry S.carol S.carol ["Thrashing Frontliner"] [] []
+    case mine of
+      [frontliner] -> do
+        let after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (S.attackTo S.carol) gs
+        Spec.assertEqWith s "still the printed 2/2" (Projection.powerOf frontliner after, Projection.toughnessOf frontliner after) (Just 2, Just 2)
+        Spec.assertEqWith s "and carol herself is what it was declared attacking" (Map.lookup frontliner (Combat.Type.attackers (GameState.combat after))) (Just (AttackTarget.OfPlayer S.carol))
+      _ -> Spec.assertFailure s "fixture should have exactly one attacker"
 
 -- CR 509.1a's and CR 802.4a's THIRD subject -- "a battle they protect" -- through
 -- the filter atom that asks it, Filter.IsAttackingBattle. Rule 310 rather than

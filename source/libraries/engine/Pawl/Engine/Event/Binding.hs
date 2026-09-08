@@ -382,20 +382,20 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- Read off the event rather than derived, which is what makes this arm possible
   -- at all: this function takes no game state, and both the planeswalker and the
   -- battle forms of CR 508.5 need the board.
-  (TriggerCondition.SelfAttacks _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _)) ->
+  (TriggerCondition.SelfAttacks _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _ _)) ->
     Binding.setTriggerPlayer defending Map.empty
   -- CR 702.83a's "that creature": the creature that attacked alone, which is the
   -- id the same event names -- and NOT the bearer, since rule 702.83a's condition
   -- watches every creature its controller has. The defending player the event
   -- also carries is not bound, because rule 702.83a names no player.
-  (TriggerCondition.CreatureAttacksAlone _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _)) ->
+  (TriggerCondition.CreatureAttacksAlone _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _)) ->
     Binding.setAttackingCreature attacker Map.empty
   -- The same slot off the same event, for Marchesa's Decree's "that creature's
   -- controller" -- again not the bearer, which is a bystanding enchantment. CR
   -- 508.5's defending player goes unbound here where the SelfAttacks arm above
   -- binds it: matchesTrigger has already required that player to be CR 109.5's
   -- "you", so a slot would be a second name for a seat the ability has.
-  (TriggerCondition.CreatureAttacksYou, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _)) ->
+  (TriggerCondition.CreatureAttacksYou, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _)) ->
     Binding.setAttackingCreature attacker Map.empty
   -- CR 508.3b's subject, under the same reserved slot every other "that player"
   -- takes: whom the Curse enchants, which matchesTrigger has already required the
@@ -1110,6 +1110,10 @@ eventBindingSlots cond = case cond of
   -- creature", so neither the companion that qualified nor CR 508.5's defending
   -- player is pointed at afterwards.
   TriggerCondition.SelfAttacksWithAnother _ -> Set.empty
+  -- NOTHING either, for the arm above's reason: Thrashing Frontliner's payload
+  -- says "it", which is the bearer, so neither the permanent attacked nor CR
+  -- 508.5's defending player is pointed at afterwards.
+  TriggerCondition.SelfAttacksPermanent _ -> Set.empty
   -- CR 506.5's lone attacker, which the same event names -- rule 702.83a's
   -- exalted is the reader. Where SelfAttacks above needs a slot for the PLAYER
   -- and gets the creature free (it is the bearer), this one needs a slot for the
@@ -1130,6 +1134,11 @@ eventBindingSlots cond = case cond of
   -- a set of creatures rather than one, and Curse of Vitality's payload says
   -- "that player" and nothing about them.
   TriggerCondition.AttachedPlayerIsAttacked -> Set.singleton Binding.triggerPlayer
+  -- NOTHING, unlike the arm above: rule 508.3b's other two subjects are
+  -- PERMANENTS, and the one attacked here is the ability's own source, already
+  -- bound as CR 113.7a's source. Synthetic Warded Sentinel's payload says "you",
+  -- so the declaring player the same event carries is not pointed at either.
+  TriggerCondition.SelfIsAttacked -> Set.empty
   -- The DECLARING player, and not the creatures: rule 508.3d names a SET of
   -- them, so there is no one attacker to point at, where the player the rule
   -- makes its subject is exactly one seat. Norn's Decree's "the attacking

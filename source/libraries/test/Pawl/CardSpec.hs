@@ -875,12 +875,18 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacks _ -> []
   -- CR 702.149a's Filter holds no Count for PermanentEnters' reason.
   TriggerCondition.SelfAttacksWithAnother _ -> []
+  -- Its Filter names the PERMANENT attacked and holds no Count for the arm
+  -- above's reason.
+  TriggerCondition.SelfAttacksPermanent _ -> []
   TriggerCondition.CreatureAttacksAlone _ -> []
   -- Nullary, so no Count either.
   TriggerCondition.CreatureAttacksYou -> []
   -- Nullary too, and rule 508.3b's "one or more" is the EVENT's grouping rather
   -- than a number this condition counts.
   TriggerCondition.AttachedPlayerIsAttacked -> []
+  -- The arm above's answer, over the same event: the subject is one permanent
+  -- and nothing here is counted.
+  TriggerCondition.SelfIsAttacked -> []
   -- A PlayerRelation holds no Count, and rule 508.3d's "one or more" is the
   -- EVENT's grouping for the arm above's reason, not a number this condition
   -- counts.
@@ -3303,6 +3309,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.149a names a quality the OTHER attackers must have, so this one DOES
   -- carry a Filter -- "power greater than this creature's power".
   TriggerCondition.SelfAttacksWithAnother f -> unframed [f]
+  -- CR 508.3a's second sentence names a quality the PERMANENT attacked must
+  -- have, so this one DOES carry a Filter -- Thrashing Frontliner's "a battle".
+  TriggerCondition.SelfAttacksPermanent f -> unframed [f]
   -- CR 506.5's condition names a quality the ATTACKER must have, so it carries a
   -- Filter -- rule 702.83a's "a creature you control".
   TriggerCondition.CreatureAttacksAlone f -> unframed [f]
@@ -3312,6 +3321,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 508.3b names no quality of anything: its subject is the ability's own
   -- attachment, so there is no Filter here either.
   TriggerCondition.AttachedPlayerIsAttacked -> []
+  -- Rule 508.3b's other two subjects name no quality either: the subject is the
+  -- ability's own source, matched by identity.
+  TriggerCondition.SelfIsAttacked -> []
   -- CR 508.3d names no quality of anything either: its subject is a player, its
   -- payload is a PlayerRelation and not a Filter, and the creatures it counts
   -- are the DECLARATION's.
@@ -3471,9 +3483,11 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerDrawsNthCard _ -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfAttacksWithAnother _ -> []
+  TriggerCondition.SelfAttacksPermanent _ -> []
   TriggerCondition.CreatureAttacksAlone _ -> []
   TriggerCondition.CreatureAttacksYou -> []
   TriggerCondition.AttachedPlayerIsAttacked -> []
+  TriggerCondition.SelfIsAttacked -> []
   TriggerCondition.PlayerAttacks _ -> []
   TriggerCondition.PlayerAttacksWith _ -> []
   TriggerCondition.PlayerAttacksPlayer _ -> []
