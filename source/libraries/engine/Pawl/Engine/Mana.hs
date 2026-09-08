@@ -404,7 +404,7 @@ manaSuppliesGiven capacity pcs pid oid gs =
           -- the triple would take the source off payableResolutionsGiven's
           -- `sequenceA` and with it every board, where an empty one is just a
           -- source that adds this player nothing.
-          Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid oid gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option))),
+          Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option))),
           -- CR 118.6's Nothing never survives the filter below, supplyCapacity
           -- answering 0 for it, so the empty stand-in is unreachable rather than
           -- a claim that such a route costs nothing.
@@ -524,11 +524,23 @@ yieldUnits option = concatMap unitsOf (Map.elems (ManaOption.yield option))
 -- ability makes binds nothing (CR 605.1a), so every one of them names nobody
 -- here. The injected view is Nothing for the same reason: the two arms that read
 -- one need a bound slot first (#3081).
-recipientsOf :: PlayerId -> ObjectId -> GameState -> PlayerRef.PlayerRef -> [PlayerId]
-recipientsOf controller oid gs ref =
+--
+-- The context carries NO SOURCE, which is what makes that true of
+-- EachPlayerExcept: Count.playersFor's arm reads "a slot naming nobody excludes
+-- nobody" off a live source object and answers EVERY player, and a route
+-- naming every player would put the excluded seat's share in
+-- manaSuppliesGiven's count of the payer's supply -- the over-count that
+-- function's own comment rules out. Unanswerable instead, which is this
+-- function's stated posture for every other slot-naming arm. No source is also
+-- the honest reading here rather than a lever: CR 605.3b's activation has no
+-- ability object, so there are no bindings for an exclusion to have been
+-- written against. Pawl.ManaSpec's "CR 605.3b an off-stack mana ability's
+-- EachPlayerExcept names nobody" is the proof.
+recipientsOf :: PlayerId -> GameState -> PlayerRef.PlayerRef -> [PlayerId]
+recipientsOf controller gs ref =
   Maybe.fromMaybe
     []
-    (Count.playersFor (const Nothing) (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) gs ref)
+    (Count.playersFor (const Nothing) (Filter.contextFor (Game.teams gs) (Just controller) Nothing) gs ref)
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
 -- adds will carry. THE one place they are decided; manaOptionsOfGiven just above
