@@ -39,8 +39,7 @@ data Deck = MkDeck
     -- legendary one, so two designations are two distinct printings.
     --
     -- Not implemented: CR 702.124i's partner—[text], CR 702.124j's partner with
-    -- [name], CR 702.124m's Doctor's companion, and CR 903.3a's "this card can
-    -- be your commander" (#939).
+    -- [name], and CR 903.3a's "this card can be your commander" (#939).
     commander :: Set.Set Printing.Printing,
     -- | CR 902.3: the vanguard card this player brings, which CR 313.2 keeps in
     -- the command zone for the whole game.
