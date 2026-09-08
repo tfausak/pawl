@@ -3,8 +3,9 @@
 
 -- Covers: Pawl.Engine.Rad (CR 728, "Rad Counters"), PlayerCounterKind.Rad on
 -- Player.counters (CR 122.1i), Pawl.Engine.Quantity's PlayerCounters arm, the
--- MillTally that Pawl.Engine.Resolve's Mill arm binds, and
--- Effect.RemovePlayerCounters.
+-- MillTally that Pawl.Engine.Resolve's Mill arm binds,
+-- Effect.RemovePlayerCounters, and CR 728.1a's LifeLossCause.ByRadiation with the
+-- LifeLossRewrite.GainInstead that reads it.
 --
 -- Gameplay-level. The Master, Transcendent is the producer -- {1}{B}{G}{U}
 -- Legendary Artifact Creature, "When The Master enters, target player gets two
@@ -29,6 +30,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -41,6 +43,8 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -61,6 +65,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Rad counters" $ do
   producerSpec s registry
   abilitySpec s registry
+  strongSpec s registry
   reanimationSpec s registry
 
 -- CR 122.1i through the card that hands the counters out.
@@ -183,6 +188,39 @@ abilitySpec s registry = Spec.describe s "CR 728.1's inherent ability" $ do
     Spec.assertEqWith s "bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob after)) 4
     Spec.assertEqWith s "bob loses no life" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "and keeps all three counters" (radOf S.bob after) 3
+
+-- CR 728.1a's "life loss from radiation", through the only printing that reads
+-- it: Strong, the Brutish Thespian's "You gain life rather than lose life from
+-- radiation" (CR 614.6's substituted action).
+--
+-- ONE BOARD, TWO LOSSES. The rad ability's loss and a Goblin Piker's 3 damage
+-- reach alice under the same row, and only the first is CR 728.1a's -- without
+-- the second the case would pass on a rewrite that never looked at the cause.
+-- Pawl.LifeReplacementSpec's Ashiok group states the same fence one cause over.
+--
+-- Every number differs: 2 life turned into a gain, 3 lost to damage, 20 -> 22 ->
+-- 19, so no two of them can be swapped without the assertions noticing.
+strongSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+strongSpec s registry = Spec.describe s "Strong, the Brutish Thespian" $ do
+  Spec.it s "CR 728.1a the loss from radiation becomes a gain, and damage on the same board still takes life" $ do
+    strong <- S.printingOf s registry "Strong, the Brutish Thespian"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let base = S.addPlayerCounter PlayerCounterKind.Rad 2 S.alice (Setup.emptyGame S.bothPlayers)
+        (_, withStrong) = S.addPermanent strong S.alice base
+        (bobsPiker, withPiker) = S.addPermanent piker S.bob withStrong
+        -- Two counters, two nonland cards, and a Mountain under them the mill
+        -- never reaches: the loss rule 728.1 proposes is 2.
+        stocked = libraryTopped [bolt, bolt, mountain] S.alice withPiker
+        after = S.runPure S.identityAnswer (precombatMainOf S.alice stocked) (Engine.runStep >> Engine.priorityLoop)
+        hit =
+          S.runPure
+            S.identityAnswer
+            after
+            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Noncombat])
+    Spec.assertEqWith s "CR 614.6 alice gains the 2 rather than losing it: 20 + 2 = 22" (S.lifeOf S.alice after) (Just 22)
+    Spec.assertEqWith s "CR 120.4c damage is not radiation, so the same row leaves it alone: 22 - 3 = 19" (S.lifeOf S.alice hit) (Just 19)
 
 -- CR 701.17a through the card that reads a mill back: The Master's "{T}: Put
 -- target creature card in a graveyard that was milled this turn onto the

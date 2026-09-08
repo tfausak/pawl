@@ -166,6 +166,8 @@ import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LifeLoss as LifeLoss
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -601,7 +603,7 @@ playerRefPositions =
     ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
     ("surveil", Effect.Surveil (playerQuantity "su"), [plantedPlayer "su"]),
     ("fateseal", Effect.Fateseal (playerQuantity "fs"), [plantedPlayer "fs"]),
-    ("lose-life", Effect.LoseLife (playerQuantity "ll"), [plantedPlayer "ll"]),
+    ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect), [plantedPlayer "ll"]),
     ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
     ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
     ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
@@ -1061,7 +1063,7 @@ ownCounts effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> quantityCounts quantity
     Discard.These {} -> []
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -1820,7 +1822,7 @@ effectReplacements effect = case effect of
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
   Effect.Discard {} -> []
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
@@ -2220,7 +2222,7 @@ effectMintedFaces effect = case effect of
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
   Effect.Discard {} -> []
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
@@ -4618,7 +4620,7 @@ effectFilters effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> frame Unframed (quantityFilters quantity)
     Discard.These ref -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> frame Unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)

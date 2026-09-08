@@ -528,6 +528,7 @@ library codec
     Pawl.Codec.LifeGainRewrite
     Pawl.Codec.LifeGainRewriteSpec
     Pawl.Codec.LifeGainRSpec
+    Pawl.Codec.LifeLoss
     Pawl.Codec.LifeLossCause
     Pawl.Codec.LifeLossCauseSpec
     Pawl.Codec.LifeLossPattern
@@ -536,6 +537,7 @@ library codec
     Pawl.Codec.LifeLossRewrite
     Pawl.Codec.LifeLossRewriteSpec
     Pawl.Codec.LifeLossRSpec
+    Pawl.Codec.LifeLossSpec
     Pawl.Codec.LimitUnless
     Pawl.Codec.LimitUnlessSpec
     Pawl.Codec.LoggedEvent
@@ -1711,6 +1713,7 @@ library types
     Pawl.Types.LifeChange
     Pawl.Types.LifeGainR
     Pawl.Types.LifeGainRewrite
+    Pawl.Types.LifeLoss
     Pawl.Types.LifeLossCause
     Pawl.Types.LifeLossPattern
     Pawl.Types.LifeLossR
