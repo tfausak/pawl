@@ -92,6 +92,11 @@ codec =
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
       -- comes from the combat record rather than from anything the card names.
       Arm.payload "OpponentsAttacked" PlayerRef.codec Quantity.OpponentsAttacked (\x -> case x of Quantity.OpponentsAttacked y -> Just y; _ -> Nothing),
+      -- CR 508.1a's declaration tally, with only a PlayerRef on the wire for the
+      -- arm above's reason: what is counted comes from the event log rather than
+      -- from anything the card names, and the turn is the log's extent rather than
+      -- a window a card could state. Rule 207.2c's raid is this against 1.
+      Arm.payload "AttackersDeclaredThisTurn" PlayerRef.codec Quantity.AttackersDeclaredThisTurn (\x -> case x of Quantity.AttackersDeclaredThisTurn y -> Just y; _ -> Nothing),
       -- CR 701.9a's tally, with only a PlayerRef on the wire for
       -- OpponentsAttacked's reason: what is counted comes from the event log
       -- rather than from anything the card names, and the turn is the log's

@@ -151,6 +151,8 @@ overSlots f quantity = case quantity of
   Quantity.OpponentsAttacked _ -> pure quantity
   -- And a tenth, CR 701.9a's tally having nothing beside its PlayerRef either.
   Quantity.CardsDiscardedThisTurn _ -> pure quantity
+  -- And another, CR 508.1a's declaration tally likewise.
+  Quantity.AttackersDeclaredThisTurn _ -> pure quantity
   -- And another, CR 119.3's life-gain tally likewise.
   Quantity.LifeGainedThisTurn _ -> pure quantity
   -- And another, CR 120.1's damage tally likewise.
@@ -291,6 +293,7 @@ nestedRefs quantity = case quantity of
   Quantity.WasBlocking -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked ref -> Set.singleton (Left ref)
+  Quantity.AttackersDeclaredThisTurn ref -> Set.singleton (Left ref)
   Quantity.CardsDiscardedThisTurn ref -> Set.singleton (Left ref)
   Quantity.LifeGainedThisTurn ref -> Set.singleton (Left ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Set.singleton (Left ref)
@@ -377,6 +380,7 @@ nestedCounts quantity = case quantity of
   Quantity.ObjectCounters _ -> []
   Quantity.ObjectCountersOfAnyKind -> []
   Quantity.OpponentsAttacked _ -> []
+  Quantity.AttackersDeclaredThisTurn _ -> []
   Quantity.CardsDiscardedThisTurn _ -> []
   Quantity.LifeGainedThisTurn _ -> []
   Quantity.PlayersDealtDamageThisTurn _ -> []
@@ -496,6 +500,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.IsActivePlayer ref -> Quantity.IsActivePlayer (f ref)
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (f ref) kind)
   Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
+  Quantity.AttackersDeclaredThisTurn ref -> Quantity.AttackersDeclaredThisTurn (f ref)
   Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
   Quantity.LifeGainedThisTurn ref -> Quantity.LifeGainedThisTurn (f ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
