@@ -19,6 +19,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -5050,9 +5051,76 @@ activatingNetter netterId named board = case Activate.abilitiesFor netterId boar
   [ability] -> S.runPure (namingTarget named) board (Activate.activateAbility S.alice netterId ability >> Stack.resolveTop)
   _ -> board
 
+-- CR 508.1a's "they can't also be battles", the one clause of that rule no
+-- printing could reach: nothing makes a permanent a creature and a battle at
+-- once. Scryfall o:/battle in addition/ and o:/becomes a battle/ were both empty
+-- and t:battle t:creature returned only Sieges matching on their creature BACK
+-- face (2026-09-08), so data/cards/synthetic-besiege-the-front.json is the
+-- producer: "Until end of turn, target creature is a battle in addition to its
+-- other types. Put five defense counters on it."
+--
+-- Two Goblin Pikers, one of them made a battle, on one board: the pair differs in
+-- the battle type and in nothing else, so "the Piker did not attack" cannot be
+-- summoning sickness or any other conjunct of canAttackGiven. The five defense
+-- counters keep CR 704.5w from burying the grantee before the declaration is
+-- asked.
+creatureBattleDeclarationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+creatureBattleDeclarationSpec s registry = Spec.describe s "CreatureBattleDeclaration" $ do
+  Spec.it s "CR 508.1a a creature that is also a battle is not offered as an attacker" $ do
+    let mine =
+          (S.battlefield S.alice [S.settled "grantee" "Goblin Piker", S.settled "other" "Goblin Piker", S.settled "first" "Island", S.settled "second" "Island", S.settled "third" "Island"])
+            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
+            }
+        setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.beginningOfCombat
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "grantee")],
+              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
+            }
+        script = S.turn 1 [S.on S.beginningOfCombat S.alice (S.castAction (S.aliasRef "spell") choices)]
+    granted <- S.play s registry setup script S.priorityGame
+    let pikers = S.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) granted
+        (battles, plain) = List.partition (\oid -> Projection.isBattleOf oid granted) pikers
+        fought = S.runCombat S.aggressiveAnswer granted
+    -- Gameplay level, and first. The life delta is NOT the discriminator here and
+    -- cannot be: an offer that still held the creature-battle would have it
+    -- declared, and CR 506.4's becomes-a-battle clause below would then pull it
+    -- straight back out, leaving bob at 18 either way. What survives the
+    -- declaration is CR 508.1f's tap, which is not undone by the removal.
+    Spec.assertEqWith s "CR 508.1f the creature-battle was never tapped to attack, and CR 510.1b bob takes only the plain Piker's two" (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid fought)) battles, S.lifeOf S.bob fought) ([Just TapState.Untapped], Just 18)
+    Spec.assertEqWith s "CR 508.1a the offer holds the Piker that is not a battle, and only it" (Set.fromList (Combat.legalAttackers S.alice granted)) (Set.fromList plain)
+    Spec.assertEqWith s "and the spell really left the other one a creature that is a battle" (length pikers, fmap (\oid -> Projection.isCreatureOf oid granted) battles) (2, [True])
+  Spec.it s "CR 509.1a a creature that is also a battle is not offered as a blocker either" $ do
+    -- The blocking twin, on bob's side of the same card. Here the OFFER is the
+    -- whole observable and the assertion comes first: a creature-battle that was
+    -- offered and declared as a blocker is pulled straight back out by CR 506.4's
+    -- becomes-a-battle clause, so it deals and is dealt nothing either way and no
+    -- damage reading can tell the two boards apart. alice's 3/4 Tapestry Warden
+    -- taking one 2/1 Piker's two and living is the control on the other axis.
+    let theirs =
+          (S.battlefield S.bob [S.settled "grantee" "Goblin Piker", S.settled "other" "Goblin Piker", S.settled "first" "Island", S.settled "second" "Island", S.settled "third" "Island"])
+            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
+            }
+        setup = S.board (S.battlefield S.alice [S.settled "warden" "Tapestry Warden"] NonEmpty.:| [theirs]) S.alice S.beginningOfCombat
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "grantee")],
+              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
+            }
+        script = S.turn 1 [S.on S.beginningOfCombat S.bob (S.castAction (S.aliasRef "spell") choices)]
+    granted <- S.play s registry setup script S.priorityGame
+    let pikers = S.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) granted
+        (battles, plain) = List.partition (\oid -> Projection.isBattleOf oid granted) pikers
+        fought = S.settleSba (S.runCombat S.aggressiveAnswer granted)
+        wardens = S.namedObjects (CardName.MkCardName (Text.pack "Tapestry Warden")) granted
+    Spec.assertEqWith s "CR 509.1a the offer holds the Piker that is not a battle, and only it" (Set.fromList (Combat.legalBlockers S.bob granted)) (Set.fromList plain)
+    Spec.assertEqWith s "CR 510.1c and one Piker really blocked, so the Warden took two and lived" (fmap (\oid -> (S.onBattlefield oid fought, S.damageOf oid fought)) wardens) [(True, Just 2)]
+    Spec.assertEqWith s "and the spell really left the other one a creature that is a battle" (length pikers, fmap (\oid -> Projection.isCreatureOf oid granted) battles) (2, [True])
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   declareSpec s registry
+  creatureBattleDeclarationSpec s registry
   combatDamageSpec s registry
   defenderSpec s registry
   defendingPlayerSpec s registry

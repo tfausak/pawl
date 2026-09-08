@@ -206,7 +206,9 @@ protectorSpec s registry = Spec.describe s "Protector" $ do
 -- these cases cannot pass against a Siege pawl does not actually build. The
 -- no-battle-types half is that same projection with its subtypes stripped, which
 -- has no printing to take it from: every battle printed so far has the Siege
--- subtype CR 310.12 describes.
+-- subtype CR 310.12 describes. data/cards/synthetic-besiege-the-front.json does
+-- reach that shape on a real board (Pawl.CombatEffectSpec's BattleGrantRemoval),
+-- so the arithmetic here is a sibling of a reachable state rather than of none.
 candidateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 candidateSpec s registry = Spec.describe s "Candidates" $ do
   Spec.it s "CR 310.12a a Siege offers its controller's opponents and not its controller" $ do
@@ -1127,8 +1129,10 @@ damageSpec s registry = Spec.describe s "Damage" $ do
 -- defense counter comes off. The first two rules are only jointly observable --
 -- 704.5v alone would send the Siege to a graveyard where 310.12b exiles it -- so
 -- every gameplay-level case here asserts the DESTINATION zone rather than merely
--- that the battle left. 704.5w's battle-type split has no printing to reach it, so
--- the three classifier cases at the end read Battle.defeated directly.
+-- that the battle left. 704.5w's battle-type split has no printing to reach it --
+-- data/cards/synthetic-besiege-the-front.json grants the card type but hands over
+-- five defense counters with it -- so the three classifier cases at the end read
+-- Battle.defeated directly.
 defeatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 defeatSpec s registry = Spec.describe s "Defeat" $ do
   Spec.it s "CR 310.12b a Siege has the intrinsic defeat ability" $ do
