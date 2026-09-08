@@ -2281,6 +2281,57 @@ splitDamage covered event = case event of
           )
   _ -> Nothing
 
+-- CR 120.4's damage EVENT, whose granularity is one source, one recipient, one
+-- moment: the events of one moment that name the same recipient are summed into
+-- one. Char's "4 damage to any target and 2 damage to you", aimed at its own
+-- caster, deals that caster one event of 6; Harm's Way pointed AT the permanent
+-- its chosen source is already damaging moves 2 of a 3 back where they started,
+-- and the recipient is dealt 3 once.
+--
+-- Nothing in the CR individuates simultaneous damage more finely than by source.
+-- CR 615.7 puts its allocation question only to damage dealt "by two or more
+-- applicable sources at the same time"; CR 120.4a computes excess against "damage
+-- from other sources that would be dealt at the same time"; CR 120.9 scopes a
+-- trigger's "damage dealt" to the sources it names. CR 701.14c is the rule's own
+-- worked instance of this collapse: a creature that fights itself "deals damage
+-- to itself equal to twice its power" -- one blow, not its power twice.
+--
+-- Keyed on the whole event but its amount, so two events merge only when their
+-- source, their recipient, their kind and every CR 702 deal-time rider agree --
+-- the source among them, so this could not merge two dealers' damage even if it
+-- were handed some. The first occurrence keeps its place: the batch's order is
+-- the order its events are offered in when CR 615.7 asks which of them a shield
+-- prevents.
+--
+-- TWO callers, each over one moment with one dealer -- which is why the key's
+-- source component is a fence rather than an observable: neither hands this a
+-- list with two dealers in it. A CR 510.2 batch does hold several, and it never
+-- comes here as a batch; two blockers striking one creature stay two events and
+-- fire enrage twice (Pawl.LifeTriggerSpec).
+--
+--   * Pawl.Engine.Resolve's DealDamage arm, over ONE instruction, which has
+--     exactly one dealer (CR 120.1) and one moment (CR 608.2f). Combat must NOT
+--     come through there -- two attacking creatures hitting one player are two
+--     sources, so CR 615.10's floor applies to each -- and neither must a fight,
+--     whose two blows have different dealers (CR 701.14a).
+--   * Event.resolveDamage, over what ONE proposal's CR 616.1 loop came out with:
+--     `splitDamage`'s inverse, rejoining the halves a counted redirect split off
+--     when both ended up on the same recipient. Without it that recipient is
+--     recorded as taking two events, and its "whenever this creature is dealt
+--     damage" trigger (Ripjaw Raptor), its CR 119.2 life loss and its CR 120.3c
+--     loyalty removal each read twice.
+--
+-- Observable at both. Pawl.ReplacementSpec's Ajani Steadfast emblem case proves
+-- the first: CR 615.10's floor applies once per event, so 4 and 2 at one
+-- recipient deal 1 as one event and would deal 2 as two. Pawl.DamageReplacementSpec's
+-- "a redirect onto the recipient it was already aimed at deals one event, not
+-- two" proves the second, off the one card Ripjaw Raptor's enrage draws.
+oneEventPerRecipient :: [DamageEvent.DamageEvent] -> [DamageEvent.DamageEvent]
+oneEventPerRecipient events =
+  let key event = event {DamageEvent.amount = 0}
+      total event = sum (fmap DamageEvent.amount (filter (\other -> key other == key event) events))
+   in fmap (\event -> event {DamageEvent.amount = total event}) (List.nubBy (\one two -> key one == key two) events)
+
 -- CR 615.1a: is this damage rewrite a PREVENTION effect, rather than one of CR
 -- 614.1a's replacements? "Effects that use the word 'prevent' are prevention
 -- effects", and that word is what CR 615.13's trigger watches for -- so a

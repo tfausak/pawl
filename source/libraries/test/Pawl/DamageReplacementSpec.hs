@@ -2889,6 +2889,49 @@ harmsWaySpec s registry = Spec.describe s "Harm's Way (CR 614.9, CR 615.7, CR 60
     Spec.assertEqWith s "and 1 more on bob" (S.lifeOf S.bob second) (Just 18)
     Spec.assertEqWith s "and once spent, the next 2 stays whole" (S.damageOf mine third) (Just 4)
     Spec.assertEqWith s "bob takes no more" (S.lifeOf S.bob third) (Just 18)
+  -- CR 120.4: the redirect's destination IS the recipient the chosen
+  -- source is already damaging, so both halves of the split come back to one
+  -- permanent and the rules deal it ONE event. Ripjaw Raptor ({2}{G}{G}
+  -- Creature -- Dinosaur 4/5, "Enrage -- Whenever this creature is dealt damage,
+  -- draw a card"; name, cost, type line and Oracle text checked against
+  -- api.scryfall.com 2026-09-07) is the observer: one event, one card.
+  --
+  -- 3 damage and not 5, so the 4/5 survives CR 704.5g and the priority loop
+  -- below has a Raptor to draw for. alice's library is stocked, or CR 104.3c
+  -- decks her before the assertion runs.
+  --
+  -- The COUNTERPART that keeps this from proving too much is in
+  -- Pawl.LifeTriggerSpec's enrage tests: two blockers striking the Raptor at once
+  -- are two events and draw TWO cards, which a collapse ignoring the dealer would
+  -- break.
+  Spec.it s "CR 120.4 a redirect onto the recipient it was already aimed at deals one event, not two" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    harmsWay <- S.printingOf s registry "Harm's Way"
+    raptor <- S.printingOf s registry "Ripjaw Raptor"
+    let base = S.landsInPlay plains 1
+        (raptorId, g1) = S.addPermanent raptor S.alice base
+        (omega, g2) = S.addPermanent piker S.bob g1
+        (harmsWayId, g3) = S.addHandCard harmsWay S.alice g2
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g3 [1 .. (5 :: Int)]
+        ready =
+          stocked
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        redirected = S.runPure (aimAndChoose raptorId omega) ready (S.cast S.alice harmsWayId Monad.>> Stack.resolveTop)
+        struck = S.runPure S.identityAnswer redirected (Damage.applyDamage [hit omega (Recipient.ToCreature raptorId) 3] Monad.>> Engine.settleForPriority)
+        after = snd (Engine.runGamePure S.identityAnswer struck Engine.priorityLoop)
+    -- THE gameplay assertion: enrage fired ONCE, so alice drew one card.
+    Spec.assertEqWith s "alice drew exactly one card" (S.handSize S.alice after) 1
+    -- And the whole 3 is on the Raptor either way, which is what makes the draw
+    -- the only reading that separates one event from two.
+    Spec.assertEqWith s "the Raptor took the whole 3" (S.damageOf raptorId after) (Just 3)
+    Spec.assertEqWith s "one event of 3, addressed to the Raptor" (zip (amounts after) (targets after)) [(3, Recipient.ToCreature raptorId)]
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: alice's hand is empty once Harm's Way has resolved" (S.handSize S.alice redirected) 0
+    Spec.assertEqWith s "setup: one counted row of 2, aimed at the Raptor and watching omega" (countedRedirectRows redirected) [(2, Nothing, Recipient.ToCreature raptorId, Just omega)]
   -- CR 609.7a: the row watches the ONE source alice chose.
   Spec.it s "CR 609.7a the unchosen source's damage to alice stays where it was aimed" $ do
     (_, alpha, _, _, redirected) <- board
