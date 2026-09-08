@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
+import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -669,10 +670,10 @@ snapshotView gs shape event = case event of
     -- CardArrived arm below. An ordinary move has no arrival after the leading
     -- one, so the two shapes agree about everything but a melded permanent.
     --
-    -- The DESTINATION alone, per the constructor's own note, and the origin is
-    -- not read at all.
-    EventShape.CardArrivedIn zone ->
-      if ZoneChange.to zc == zone then Just (departedView gs zc snapshot) else Nothing
+    -- The DESTINATION, per the constructor's own note, and the origin only where
+    -- the shape excludes one.
+    EventShape.CardArrivedIn arrival ->
+      if arrivalMatches arrival zc then Just (departedView gs zc snapshot) else Nothing
     EventShape.SpellCast -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   -- CR 615.13's record names two ids, a recipient and an amount, and snapshots no
@@ -697,7 +698,7 @@ snapshotView gs shape event = case event of
     -- became this spell shed whatever it carried on its way to the stack, so a
     -- cast records none. No CR 608.2h record to read them from either: nothing
     -- departed the battlefield here.
-    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) False Map.empty snapshot)
+    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) Nothing False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
     -- CR 601.2a moves a card to the STACK, so a cast IS a card arriving there --
     -- but the Moved event the same cast emits is what says so, and answering here
@@ -795,12 +796,25 @@ snapshotView gs shape event = case event of
     -- permanent it was part of, so a melded permanent's two components are
     -- indistinguishable here and Case of the Gorgon's Kiss cannot yet ask
     -- whether each was a creature card (#3152).
-    EventShape.CardArrivedIn zone ->
-      if ZoneChange.to zc == zone
+    EventShape.CardArrivedIn arrival ->
+      if arrivalMatches arrival zc
         then fmap (departedView gs zc . LastKnown.characteristics) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
         else Nothing
     EventShape.MovedBetween {} -> Nothing
     EventShape.SpellCast -> Nothing
+
+-- CR 712.21e's destination narrowed by the printed clause's origin: the arrival
+-- landed in the named zone, and it did not come from one this shape excludes. An
+-- empty exclusion is "from anywhere", which is every producer but Dimir
+-- Strandcatcher.
+--
+-- Read off the ARRIVAL's own zone change rather than the move's, which CR 903.9c
+-- makes different for a melded commander (Pawl.MeldSpec); the origin is the same
+-- for every arrival of one move, CR 712.21 having one permanent leave.
+arrivalMatches :: CardArrivedIn.CardArrivedIn -> ZoneChange.ZoneChange -> Bool
+arrivalMatches arrival zc =
+  ZoneChange.to zc == CardArrivedIn.to arrival
+    && Set.notMember (ZoneChange.from zc) (CardArrivedIn.excluding arrival)
 
 -- CR 608.2h: who controlled the moving object and what KIND of object it was,
 -- read from the record the move funnel filed under the DEPARTED id as the object
@@ -811,6 +825,11 @@ snapshotView gs shape event = case event of
 -- No record only where nothing departed: Event.recordTokenEntry's
 -- battlefield-to-battlefield pseudo-move for a new token, whose object is
 -- therefore still live and can be asked directly.
+--
+-- CR 108.3's owner rides the same record for `controller`'s reason: it is no more
+-- a characteristic than control is, and the object it would be read off is gone.
+-- Unlike control it never changed while the object lived, so this answers "your
+-- graveyard" over a past arrival -- Dimir Strandcatcher's clause (Pawl.CountSpec).
 --
 -- CR 122.2 / 400.7: the counters ceased to exist as the object moved, so they are
 -- a CR 608.2i look-back at what it HAD -- read off the same record `controller`
@@ -826,18 +845,19 @@ departedView gs zc snapshot =
   let lastKnown = Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs)
    in viewOfSnapshot
         (fmap LastKnown.controller lastKnown)
+        (fmap LastKnown.owner lastKnown)
         (maybe (Game.isToken (ZoneChange.object zc) gs) (Game.sourceIsToken . LastKnown.source) lastKnown)
         (maybe Map.empty LastKnown.counters lastKnown)
         snapshot
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a
--- snapshot says. The `controller`, the tokenhood flag and the counters are the
--- arm's to supply, since they are the three fields no ProjectedCharacteristics
--- carries (CR 109.3 / CR 111.6 / CR 122.1) and the events differ on where each
--- is recoverable from.
-viewOfSnapshot :: Maybe PlayerId -> Bool -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural -> PC.ProjectedCharacteristics -> Filter.View
-viewOfSnapshot mController isToken counters snapshot =
+-- snapshot says. The `controller`, the OWNER, the tokenhood flag and the counters
+-- are the arm's to supply, since they are the four fields no
+-- ProjectedCharacteristics carries (CR 109.3 / CR 108.3 / CR 111.6 / CR 122.1)
+-- and the events differ on where each is recoverable from.
+viewOfSnapshot :: Maybe PlayerId -> Maybe PlayerId -> Bool -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural -> PC.ProjectedCharacteristics -> Filter.View
+viewOfSnapshot mController mOwner isToken counters snapshot =
   Filter.MkView
     { -- CR 201.1 off the snapshot, which carries the set: this reads what the
       -- object's names were AT THE EVENT, which is the whole point of a snapshot.
@@ -863,11 +883,15 @@ viewOfSnapshot mController isToken counters snapshot =
       -- hand-built ProjectedCharacteristics rather than a rule's answer.
       Filter.manaValue = PC.manaValue snapshot,
       Filter.controller = mController,
-      -- CR 108.3: an owner is read off an OBJECT, and a ProjectedCharacteristics
-      -- carries none. Not implemented: `counters` below is supplied by the arm off
-      -- CR 608.2h's record, and an owner could ride the same way now that
-      -- LastKnown.owner holds one, but no arm passes it (#1069).
-      Filter.owner = Nothing,
+      -- CR 108.3: an owner is read off an OBJECT and a ProjectedCharacteristics
+      -- carries none, so it is the arm's to supply off CR 608.2h's record, as
+      -- `counters` below is. Dimir Strandcatcher's "put into YOUR graveyard" is
+      -- what reads it, CR 400.3 keying that zone by owner (Pawl.CountSpec).
+      --
+      -- Not implemented: the SpellCast arm has no such record to read and passes
+      -- Nothing, so "a spell an opponent owns was cast this turn" is vacuously
+      -- False (#1069).
+      Filter.owner = mOwner,
       -- CR 400.1: a snapshot records characteristics (CR 608.2h) and no zone, and
       -- the object it was taken of has since moved or ceased to exist, so IsInZone
       -- is vacuously False against one.
@@ -1052,7 +1076,7 @@ viewOfSnapshot mController isToken counters snapshot =
 -- LIVE here, and neither -Werror nor any test says so. Keep the two in step.
 overlaySnapshot :: PC.ProjectedCharacteristics -> Filter.View -> Filter.View
 overlaySnapshot snapshot live =
-  let sampled = viewOfSnapshot (Filter.controller live) (Filter.token live) (Filter.counters live) snapshot
+  let sampled = viewOfSnapshot (Filter.controller live) (Filter.owner live) (Filter.token live) (Filter.counters live) snapshot
    in live
         { Filter.names = Filter.names sampled,
           Filter.cardTypes = Filter.cardTypes sampled,

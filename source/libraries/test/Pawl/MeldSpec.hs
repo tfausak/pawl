@@ -43,6 +43,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -1244,14 +1245,15 @@ namedTownship gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just to
 -- into `zone` this turn, over every card alice's board can have moved. The
 -- filter admits everything a card is -- Pawl.Types.Filter.IsToken is how CR
 -- 111.6 keeps a token out, and Synthetic Grave Census writes it, but nothing on
--- these boards is one.
+-- these boards is one. The exclusion set is empty, which is "from anywhere":
+-- Dimir Strandcatcher is the one producer that names an origin (Pawl.CountSpec).
 cardsArrivingIn :: Zone.Zone -> GameState.GameState -> Maybe Integer
 cardsArrivingIn zone gs =
   S.countOf
     (S.stubView [])
     (Filter.contextFor Teams.none (Just S.alice) Nothing)
     gs
-    (Count.Type.MkCount (Scope.InHistory (EventShape.CardArrivedIn zone)) (Filter.Type.And []) Aggregation.Members)
+    (Count.Type.MkCount (Scope.InHistory (EventShape.CardArrivedIn (CardArrivedIn.MkCardArrivedIn zone Set.empty))) (Filter.Type.And []) Aggregation.Members)
 
 -- cardsArrivingIn's first-half twin (CR 712.21e): how many OBJECTS moved from the
 -- battlefield into `zone`, which is the shape Khabal Ghoul's "each creature that

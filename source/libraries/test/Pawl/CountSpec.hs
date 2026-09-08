@@ -40,6 +40,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -381,6 +382,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   keeningStoneSpec s registry
   tollOfTheSiegeSpec s registry
   priceOfKnowledgeSpec s registry
+  strandcatcherSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -1476,3 +1478,82 @@ priceOfKnowledgeSpec s registry =
           gs <- board
           let after = upkeepOf S.alice gs
           Spec.assertEqWith s "nobody took damage" (lives after) (Just 20, Just 20, Just 20)
+
+-- CR 608.2i with an ORIGIN on the fold: a card count that reads where the cards
+-- came from as well as where they arrived. GAMEPLAY LEVEL for the
+-- Aetherflux Reservoir group's reason -- what it proves is that the fold reads
+-- the zone changes Pawl.Engine.Event actually recorded.
+--
+-- Dimir Strandcatcher, {2}{U/B}{U/B} Creature -- Faerie Rogue 3/3: "Flying.
+-- Whenever you attack, surveil X, where X is the number of opponents being
+-- attacked. At the beginning of each end step, if three or more cards were put
+-- into your graveyard from anywhere other than the battlefield this turn, draw
+-- a card."
+--
+-- THREE boards, each putting exactly three cards into a graveyard this turn, so
+-- the arrival total is the same on all three and only the reading of the clause
+-- differs: three of alice's own spells; two spells beside her own creature's
+-- death; two of her spells beside bob's. A fold reading the destination alone
+-- draws on all three, and one reading the origin but not CR 400.3's owner draws
+-- on the last two.
+--
+-- Every library is stocked (CR 104.3c) -- the draw this group reads has to come
+-- from somewhere, and the priority loop would otherwise deck alice before the
+-- assertion.
+strandcatcherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+strandcatcherSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      library printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      -- The end step entered the way the trigger reads it: its
+      -- TriggerCondition.StepBegins matches the EVENT, so the fixture records one
+      -- beside setting the phase (priceOfKnowledgeSpec's upkeepOf).
+      endStepOf gs =
+        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep, GameState.activePlayer = S.alice})
+            settled = S.runPure S.identityAnswer began Engine.settleForPriority
+         in S.runPure S.identityAnswer settled Engine.priorityLoop
+      -- CR 608.2: cast and resolved, so the card reaches its owner's graveyard
+      -- from the STACK rather than being left there as a spell.
+      castAndResolve pid oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast pid oid)) Stack.resolveTop
+      -- The only route to a death here, so the battlefield arrival is the
+      -- engine's own (CR 704.5g) rather than a fixture write.
+      kill oid gs = S.runPure S.identityAnswer (S.markDamage oid 9 gs) Engine.priorityLoop
+      graveyard pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
+      board = do
+        strandcatcher <- S.printingOf s registry "Dimir Strandcatcher"
+        forest <- S.printingOf s registry "Forest"
+        fog <- S.printingOf s registry "Fog"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let lands = S.landsFor forest S.bob 1 (S.landsFor forest S.alice 3 (Setup.emptyGame S.bothPlayers))
+            (_, withCatcher) = S.addPermanent strandcatcher S.alice lands
+            stocked = library piker S.bob 5 (library piker S.alice 5 withCatcher)
+        pure (fog, piker, stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+   in Spec.describe s "Dimir Strandcatcher" $ do
+        Spec.it s "CR 608.2i three of alice's own spells reach her graveyard from the stack, so she draws" $ do
+          (fog, _, gs0) <- board
+          let (f1, g1) = S.addHandCard fog S.alice gs0
+              (f2, g2) = S.addHandCard fog S.alice g1
+              (f3, g3) = S.addHandCard fog S.alice g2
+              after = endStepOf (castAndResolve S.alice f3 (castAndResolve S.alice f2 (castAndResolve S.alice f1 g3)))
+          Spec.assertEqWith s "alice drew a card: her hand held nothing after the three casts" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "and the three Fogs really are in her graveyard" (graveyard S.alice after) 3
+        -- The ORIGIN leg, differing from the board above in ONE thing: the third
+        -- card reaches the same graveyard from the BATTLEFIELD, which the clause
+        -- excludes.
+        Spec.it s "CR 608.2i a creature that died is not a card put there from anywhere other than the battlefield" $ do
+          (fog, piker, gs0) <- board
+          let (p1, g1) = S.addPermanent piker S.alice gs0
+              (f1, g2) = S.addHandCard fog S.alice g1
+              (f2, g3) = S.addHandCard fog S.alice g2
+              after = endStepOf (kill p1 (castAndResolve S.alice f2 (castAndResolve S.alice f1 g3)))
+          Spec.assertEqWith s "alice drew nothing: only two of the three arrivals qualify" (S.handSize S.alice after) 0
+          Spec.assertEqWith s "and three cards did reach her graveyard, so a destination-only fold would have drawn" (graveyard S.alice after) 3
+        -- The OWNER leg, differing from the first board in ONE thing: the third
+        -- spell is bob's, so CR 400.3 puts its card in HIS graveyard.
+        Spec.it s "CR 400.3 a card put into bob's graveyard is not put into yours" $ do
+          (fog, _, gs0) <- board
+          let (f1, g1) = S.addHandCard fog S.alice gs0
+              (f2, g2) = S.addHandCard fog S.alice g1
+              (f3, g3) = S.addHandCard fog S.bob g2
+              after = endStepOf (castAndResolve S.bob f3 (castAndResolve S.alice f2 (castAndResolve S.alice f1 g3)))
+          Spec.assertEqWith s "alice drew nothing: bob's Fog is in bob's graveyard" (S.handSize S.alice after) 0
+          Spec.assertEqWith s "two cards in hers and one in his, three arrivals in all" (graveyard S.alice after, graveyard S.bob after) (2, 1)

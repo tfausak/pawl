@@ -1193,16 +1193,16 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
 -- exile before any ability could count it.
 --
 -- The -2's token clause reads EventShape.CardArrivedIn as an intervening "if":
--- the printed sentence names only where the card ARRIVED, so the origin is not
--- part of the question. The trigger board below exiles from a HAND, never a
+-- the printed sentence names only where the card ARRIVED, so its exclusion set is
+-- empty and the origin is not part of the question. The trigger board below exiles from a HAND, never a
 -- library, which is what separates "put into exile" from the library-to-exile
 -- move Ashiok's own replacement makes.
 --
 -- The count's filter is Not IsToken and not the empty one, because the printed
 -- word is "a CARD was put into exile" and CR 111.6 says a token is not one --
 -- data/cards/synthetic-grave-census.json's spelling of the same shape. The shape
--- itself cannot say so: EventShape.CardArrivedIn tests the destination alone, so
--- the card-versus-token half is the filter's. The CR 111.6 pair below is what
+-- itself cannot say so: EventShape.CardArrivedIn tests the destination and, where
+-- one is named, the origin, so the card-versus-token half is the filter's. The CR 111.6 pair below is what
 -- proves it: two boards holding the same objects, differing only in whether the
 -- one permanent exiled that turn was a card.
 ashiokPlusOne, ashiokMinusTwo, ashiokMinusSeven :: Int

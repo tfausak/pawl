@@ -1428,7 +1428,10 @@ candidateContext gs candidate =
 matchesTokenLot :: Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerId -> TokenLot.TokenLot -> Bool
 matchesTokenLot context filter_ pid lot =
   let view = case TokenLot.copy lot of
-        Just snapshot -> Count.viewOfSnapshot (Just pid) True Map.empty snapshot
+        -- No OWNER, matching the viewOfCard branch below, which has no object to
+        -- read CR 108.3 off either: a lot that named one would answer two ways
+        -- for the same token depending on whether it was a copy.
+        Just snapshot -> Count.viewOfSnapshot (Just pid) Nothing True Map.empty snapshot
         Nothing -> (Projection.viewOfCard (NonEmpty.head (Card.Type.faces (TokenLot.card lot)))) {Filter.controller = Just pid}
    in Filter.matches context view filter_
 

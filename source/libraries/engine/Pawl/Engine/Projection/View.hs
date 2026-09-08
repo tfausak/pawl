@@ -349,8 +349,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- `controller` parameter, since layer 2 has already moved control and
       -- nothing moves ownership. Nothing for an id naming nothing, which CR 608.2b
       -- wants of a gone target; viewWithLastKnownAnywhere writes CR 608.2h's answer
-      -- over it for the readers owed one (see #1069, whose other half is
-      -- Count.viewOfSnapshot's).
+      -- over it for the readers owed one (see #1069, whose remaining half is
+      -- Count.viewOfSnapshot's SpellCast arm).
       Filter.owner = fmap Object.owner (Game.lookupObject oid gs),
       -- CR 400.1 off the OBJECT beside its owner, and for `owner`'s reason: CR
       -- 109.3 counts no zone among the characteristics, so no projection carries
