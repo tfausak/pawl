@@ -183,6 +183,23 @@ data Keyword
     -- Spirit card with mana value N or less from your graveyard to your hand;
     -- each instance triggers separately (CR 702.46b).
     Soulshift Natural.Natural
+  | -- | 702.49a: ninjutsu [cost] -- an activated ability functioning only from a
+    -- hand, whose cost returns an unblocked attacker you control and whose effect
+    -- puts this card onto the battlefield tapped and attacking.
+    --
+    -- Rule 702.49a's "Reveal this card from your hand" is not a component of the
+    -- minted cost. CR 602.2a reveals the card anyway -- the ability is activated
+    -- from a hidden zone -- and CR 701.20a gives the two reveals the same
+    -- duration, so a second one would only reveal an already revealed card.
+    -- Pawl.Engine.Activate.revealIfHidden is where it happens.
+    --
+    -- Not implemented: CR 702.49c's rider, under which the arriving creature
+    -- attacks whatever the returned creature was attacking; the entering
+    -- creature's controller is asked instead (#3019).
+    --
+    -- Not implemented: CR 702.49d's commander ninjutsu, which also functions
+    -- from the command zone (#3436).
+    Ninjutsu (Cost.Cost Keyword)
   | -- | 702.54a: bloodthirst N -- if an opponent was dealt damage this turn, this
     -- permanent enters with N +1/+1 counters on it; a CR 614.1c entry replacement
     -- carrying its own condition, each instance applying separately (CR 702.54c).

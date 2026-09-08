@@ -88,6 +88,11 @@ data KeywordFamily
     Bushido
   | -- | CR 702.46a: soulshift N.
     Soulshift
+  | -- | CR 702.49a: ninjutsu [cost]. Silver-Fur Master's "ninjutsu abilities you
+    -- activate cost {1} less to activate" is the card asking, through
+    -- Pawl.Types.ReduceActivationCost's @grantedBy@ rather than through a Filter;
+    -- it is not in the pool yet, and the family is owed at the keyword.
+    Ninjutsu
   | -- | CR 702.54a: bloodthirst N, and CR 702.54b's bloodthirst X with it -- the
     -- family is what "a creature with bloodthirst" names, which is the shape a
     -- card would ask in.
