@@ -630,9 +630,10 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- layer 2, before the layer 7c this ability lands in, so a creature the
   -- enchanted player no longer controls is out of the set on the very next
   -- projection. Control Magic moves it: `data/cards/`'s control-changing Auras
-  -- are it and Confiscate, and Control Magic's creature-only enchant slot is the
-  -- narrower fit. Synthetic Goblin Dominion moves control too, but by a
-  -- predicate rather than an attachment, so it cannot be pointed at one creature.
+  -- are it, Confiscate and Synthetic Puppeteer's Yoke, and Control Magic's
+  -- creature-only enchant slot is the narrower fit. Synthetic Goblin Dominion
+  -- and the Yoke move control too, but by a predicate rather than by naming an
+  -- object, so neither can be pointed at one creature.
   Spec.it s "CR 613.1b: a creature stolen from the enchanted player leaves the Curse's affected set" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     curse <- S.printingOf s registry "Curse of Death's Hold"
@@ -645,6 +646,45 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
         stolen = S.attach steal creature withSteal
     Spec.assertEqWith s "bob controls it and it is shrunk" (S.powerToughnessOf creature cursed) (Just (1, 0))
     Spec.assertEqWith s "alice controls it now, so the Curse does not reach it" (S.powerToughnessOf creature stolen) (Just (2, 1))
+  -- SYNTHETIC. "Synthetic Puppeteer's Yoke" {3}{U}{U} Enchantment - Aura:
+  -- "Enchant player. You control all permanents enchanted player controls." The
+  -- control-granting twin of Curse of Death's Hold, and the only shape that
+  -- reaches Affected.AttachedPlayerControls through the CR 613.1b layer-2 fold
+  -- rather than through a later layer.
+  --
+  -- Scryfall with a User-Agent, 2026-09-08: o:"you control all permanents",
+  -- o:"permanents enchanted player controls" and o:"controls all permanents"
+  -- match nothing at all, and the eight hits for o:"enchanted player controls"
+  -- -o:"gain control" -t:instant -t:sorcery are every one of them
+  -- characteristic-modifying or triggered -- Curse of Death's Hold, Curse of
+  -- Conformity, Overwhelming Splendor, Trespasser's Curse and the rest. Nothing
+  -- printed hands control over through the enchanted player. Curse of Death's
+  -- Hold would refute this the moment its text said "you control" instead of
+  -- "get -1/-1".
+  --
+  -- Gameplay-level, and over two card types: bob's Piker moves and so does his
+  -- Forest, which is what "all permanents" says and a creature-only filter could
+  -- not show. CR 302.6: the Piker settles under bob first, so only alice's own
+  -- untap step lets her attack with it.
+  --
+  -- THREE SEATS, because the set is "enchanted player controls" and a two-player
+  -- board collapses that onto "not the Aura's controller": carol's own Piker is
+  -- what a set that dropped the controller conjunct would sweep up too.
+  Spec.it s "CR 613.1b/303.4m a static grant reached through the enchanted player hands over every permanent they control" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    yoke <- S.printingOf s registry "Synthetic Puppeteer's Yoke"
+    let (creature, withCreature) = S.addPermanent piker S.bob S.threePlayerGame
+        (land, withLand) = S.addPermanent forest S.bob withCreature
+        (hers, withHers) = S.addPermanent piker S.carol withLand
+        his = S.runPure S.identityAnswer withHers (Engine.settleAll S.bob)
+        (aura, withAura) = S.addPermanent yoke S.alice his
+        yoked = S.attachTo aura (Recipient.ToPlayer S.bob) withAura
+        settled = S.runPure S.identityAnswer yoked (Engine.settleAll S.alice)
+        gone = S.runPure S.identityAnswer settled (Event.changeZone aura Zone.Graveyard)
+    Spec.assertBool s (Combat.canAttack S.alice creature settled) "alice attacks with the creature the enchanted player owns"
+    Spec.assertEqWith s "his Forest is hers too -- permanents, not creatures -- and carol's Piker is nobody's business" (fmap (\oid -> Projection.controllerOf oid settled) [land, hers]) [Just S.alice, Just S.carol]
+    Spec.assertEqWith s "CR 604.2: the Yoke leaves and bob has his Piker back" (Projection.controllerOf creature gone) (Just S.bob)
   -- CR 704.5m's remaining clause, and the one only an enchant-player Aura can
   -- reach: CR 303.4c spells it out as "the player it was attached to has left
   -- the game". Three seats, because CR 104.2a ends a two-player game the
