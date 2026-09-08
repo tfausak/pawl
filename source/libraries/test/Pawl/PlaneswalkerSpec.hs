@@ -73,6 +73,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -95,9 +96,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -806,7 +805,7 @@ tappingFor wanted wantedType p = case p of
   Prompt.ChooseManaSource _ _ candidates ->
     Just (if elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates)
   Prompt.ChooseManaYield _ _ _ options ->
-    case filter (any ((==) wantedType . ManaUnit.manaType) . Mana.unwrap . ManaOption.yield) (NonEmpty.toList options) of
+    case filter (any ((==) wantedType . ManaUnit.manaType) . Mana.Engine.yieldUnits) (NonEmpty.toList options) of
       option : _ -> option
       [] -> NonEmpty.head options
   _ -> S.identityAnswer p

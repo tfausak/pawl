@@ -11,6 +11,7 @@ import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Claim as Claim
+import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -325,8 +326,10 @@ intrinsicManaAddition manaType =
 -- yields.
 --
 -- A Mana rather than a list of types because that is what a yield IS: some mana,
--- headed for a pool (CR 106.4). Pawl.Engine.Cost.tapForMana adds the chosen one
--- whole.
+-- headed for a pool (CR 106.4). RECIPIENT-BLIND, deliberately: CR 106.7 asks
+-- what a permanent could produce and not whose pool it would land in, so this
+-- flattens every share (yieldUnits below). manaSuppliesGiven is the reader that
+-- asks the other question.
 --
 -- Deduplicated by the WHOLE yield, and by it ALONE -- which is what separates
 -- this from manaOptionsOf below, where the cost rides along. The supply model
@@ -340,7 +343,7 @@ manaYieldsOf = manaYieldsOfGiven Map.empty
 -- The same yields against a pre-projected board, which is manaRoutesOfGiven's
 -- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
-manaYieldsOfGiven pcs oid gs = List.nub (fmap ManaOption.yield (manaOptionsOfGiven pcs oid gs))
+manaYieldsOfGiven pcs oid gs = List.nub (fmap (Mana.MkMana . yieldUnits) (manaOptionsOfGiven pcs oid gs))
 
 -- The same yields narrowed to the ones this player could actually get, each with
 -- HOW MANY TIMES they could get it, WHAT ONE of those activations spends, and
@@ -384,7 +387,20 @@ manaSuppliesGiven capacity pcs pid oid gs =
       supply = supplyCapacity capacity
       measured option =
         ( supply ForOffer pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs,
-          ManaOption.yield option,
+          -- CR 106.4: the PAYER's share alone. A route whose AddMana names
+          -- somebody else fills that player's pool and not this one's, so
+          -- counting its units here would offer a cast the payment cannot make
+          -- -- the direction that matters, since overstating supply offers an
+          -- unpayable spell where understating it only refuses a payable one.
+          -- Yurlok of Scorch Thrash's "Each player adds {B}{R}{G}" names the
+          -- payer among the rest, so its share is the whole yield; a route
+          -- naming an opponent alone supplies nothing.
+          --
+          -- Still a supply of NO units rather than no supply at all: dropping
+          -- the triple would take the source off payableResolutionsGiven's
+          -- `sequenceA` and with it every board, where an empty one is just a
+          -- source that adds this player nothing.
+          Mana.MkMana (concatMap (\(ref, mana) -> if List.elem pid (recipientsOf pid oid gs ref) then unitsOf mana else []) (Map.toList (ManaOption.yield option))),
           -- CR 118.6's Nothing never survives the filter below, supplyCapacity
           -- answering 0 for it, so the empty stand-in is unreachable rather than
           -- a claim that such a route costs nothing.
@@ -455,11 +471,60 @@ manaOptionsOfGiven pcs oid gs =
       -- group reads three units of one colour off one activation -- and Stadium
       -- Vendors says the same sentence as a triggered ability that resolves off
       -- the stack (Resolve's arm).
+      --
+      -- CR 106.4's RECIPIENT rides the same instruction, and this is where the
+      -- option learns it: an addition names whose pool its units go to, so the
+      -- units are grouped under that reference rather than poured into one flat
+      -- yield. Two additions naming ONE reference append in printed order --
+      -- Shizuko, Caller of Autumn's three {G} additions are one entry of three
+      -- units -- which is why the combine is flipped: Map.insertWith hands the
+      -- NEW value first.
       expand (cost, restrictions, ability, additions, others) =
         fmap
-          (\units -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.ability = ability, ManaOption.yield = Mana.MkMana (concat units), ManaOption.effects = others})
-          (traverse (\addition -> fmap (replicate (Natural.toIntSaturating (ManaAddition.count addition)) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
+          (\parts -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.ability = ability, ManaOption.yield = List.foldl' (\acc (ref, units) -> Map.insertWith (\new old -> Mana.MkMana (unitsOf old <> unitsOf new)) ref (Mana.MkMana units) acc) Map.empty parts, ManaOption.effects = others})
+          (traverse (\addition -> fmap ((,) (ManaAddition.player addition) . replicate (Natural.toIntSaturating (ManaAddition.count addition)) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
    in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
+
+-- Every unit one option adds, whoever gets it, in printed order within each
+-- recipient's share (Pawl.Types.ManaOption.yield).
+--
+-- CR 106.7's question and CR 106.12a's are both recipient-BLIND -- "the type of
+-- mana a permanent could produce", and whether an activation produced mana at
+-- all -- so both read this rather than the map. Whose pool it lands in is
+-- recipientsOf's question, and only the payment and the supply model ask it.
+yieldUnits :: ManaOption -> [ManaUnit]
+yieldUnits option = concatMap unitsOf (Map.elems (ManaOption.yield option))
+
+-- CR 106.4: which players one AddMana's recipient reference names, for a mana
+-- ability activated OFF THE STACK -- CR 605.3b's road, where the ability has no
+-- object and nothing has been bound.
+--
+-- THE one resolver, read by both roads: Pawl.Engine.Cost.tapForManaWith adds
+-- each share to the players it names, and manaSuppliesGiven below keeps the
+-- share that names the payer. They cannot disagree about whose pool a route
+-- fills because there is one answer -- `spendableAmong` and
+-- payableResolutionsGiven are the same arrangement.
+--
+-- Count.playersFor and not a fold of this module's own, so a reference means the
+-- same thing here as it does under a Scope or a ManaCount. The perspective is
+-- the ability's CONTROLLER (CR 109.5 / 110.2), which is what makes @Relative
+-- You@ the controller rather than the permanent's owner.
+--
+-- Unanswerable reads as NOBODY rather than as everybody: a reference this path
+-- cannot resolve puts its mana in no pool, which is the honest answer and loses
+-- nothing the rules give.
+--
+-- Not implemented: a reference that names a BINDING SLOT -- EachPlayerExcept,
+-- InSlot, EachInSlot, ControllerOfBound, Attacking. CR 605.3b gives this
+-- activation no object to have bound one, and the CR 601.2c announcement a mana
+-- ability makes binds nothing (CR 605.1a), so every one of them names nobody
+-- here. The injected view is Nothing for the same reason: the two arms that read
+-- one need a bound slot first (#3081).
+recipientsOf :: PlayerId -> ObjectId -> GameState -> PlayerRef.PlayerRef -> [PlayerId]
+recipientsOf controller oid gs ref =
+  Maybe.fromMaybe
+    []
+    (Count.playersFor (const Nothing) (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) gs ref)
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
 -- adds will carry. THE one place they are decided; manaOptionsOfGiven just above

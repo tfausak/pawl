@@ -1453,8 +1453,7 @@ prefersLongYieldFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 prefersLongYieldFrom wanted p = case p of
   Prompt.ChooseManaYield _ _ oid candidates
     | oid == wanted ->
-        let size option = case ManaOption.yield option of
-              Mana.Type.MkMana units -> length units
+        let size = length . Mana.yieldUnits
          in List.maximumBy (\a b -> compare (size a) (size b)) (NonEmpty.toList candidates)
   _ -> S.identityAnswer p
 
@@ -1860,10 +1859,10 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
         buysBlack :: Bool -> Prompt.Prompt r -> r
         buysBlack printed p = case p of
           Prompt.ChooseManaYield _ _ _ candidates ->
-            let wanted option = ManaOption.yield option == black && (ManaOption.cost option /= Mana.intrinsicManaCost) == printed
+            let wanted option = Mana.yieldUnits option == Mana.unitsOf black && (ManaOption.cost option /= Mana.intrinsicManaCost) == printed
              in Maybe.fromMaybe (NonEmpty.head candidates) (List.find wanted (NonEmpty.toList candidates))
           _ -> S.identityAnswer p
-        blacks = filter ((==) black . ManaOption.yield) (optionsOffered confluenceId gs)
+        blacks = filter ((==) (Mana.unitsOf black) . Mana.yieldUnits) (optionsOffered confluenceId gs)
         free = S.runPure (buysBlack False) gs (Cost.tapForMana S.manaPerformer confluenceId)
         bought = S.runPure (buysBlack True) gs (Cost.tapForMana S.manaPerformer confluenceId)
     Spec.assertEqWith s "both ways of adding black are offered" (length blacks) 2
@@ -1901,7 +1900,7 @@ optionsOffered oid gs =
 -- The colours of those candidates alone, for a caller that is asking what the
 -- source could produce rather than what it charges.
 yieldsOffered :: ObjectId.ObjectId -> GameState.GameState -> [[ManaType.ManaType]]
-yieldsOffered oid gs = fmap (fmap ManaUnit.manaType . Mana.unitsOf . ManaOption.yield) (optionsOffered oid gs)
+yieldsOffered oid gs = fmap (fmap ManaUnit.manaType . Mana.yieldUnits) (optionsOffered oid gs)
 
 -- CR 118.3: "A player can't pay a cost without having the necessary resources to
 -- pay it fully", and CR 602.2b makes a mana ability's activation cost one of
@@ -2674,8 +2673,7 @@ blueType = ManaType.Colored Color.Blue
 takesGate :: [ManaType.ManaType] -> Maybe ManaType.ManaType -> Prompt.Prompt r -> r
 takesGate wanted half p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    let typesOf option = case ManaOption.yield option of
-          Mana.Type.MkMana units -> fmap ManaUnit.manaType units
+    let typesOf = fmap ManaUnit.manaType . Mana.yieldUnits
      in Maybe.fromMaybe (NonEmpty.head candidates) (List.find ((==) wanted . typesOf) (NonEmpty.toList candidates))
   Prompt.AnnounceHybridHalf _ _ _ _ offers -> Maybe.fromMaybe (NonEmpty.head offers) (List.find (\o -> Just o == half) (NonEmpty.toList offers))
   _ -> S.identityAnswer p
@@ -3255,6 +3253,107 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   wildGrowthSpec s registry
   autumnWillowSpec s registry
   drainPowerSpec s registry
+  yurlokSpec s registry
+  almsEngineSpec s registry
+
+-- CR 106.4's other half, which no printing reaches: a mana ability whose mana
+-- the ACTIVATOR can never get. "{T}: Each opponent adds {C}" -- one activated
+-- mana ability, an addition naming Relative Opponent, nothing else. Legitimate
+-- under CR 605.1a (a mana ability is one whose effect could add mana to "a
+-- player's" pool -- not its controller's) and CR 106.4, with Yurlok of Scorch
+-- Thrash as the printed sibling. Scryfall oracle:"opponent adds", 2026-09-07,
+-- no hit; Spectral Searchlight and Valleymaker choose a player, so their
+-- activator can name themself.
+--
+-- What only this shape can prove is the SUPPLY road: whether the offer counts a
+-- route's mana as the payer's before the payment finds out it is not. Yurlok
+-- cannot -- "each player" includes its controller, so its share is the whole
+-- yield and both readings agree.
+almsEngineSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+almsEngineSpec s registry = Spec.describe s "Synthetic Alms Engine" $ do
+  -- THREE seats, so "each opponent" cannot collapse onto the one other player
+  -- and a route naming a set is told apart from one naming a seat.
+  --
+  -- The negative is a PAIR of boards differing in exactly one thing: the same
+  -- alice, the same Meekstone, the same phase, and one {C} of her own in the
+  -- pool on the second. So the cast being unoffered on the first is about whose
+  -- mana the Engine makes and not about timing, the stack or the board.
+  Spec.it s "CR 118.3 a route whose mana goes to somebody else supplies its activator nothing" $ do
+    engine <- S.printingOf s registry "Synthetic Alms Engine"
+    meekstone <- S.printingOf s registry "Meekstone"
+    let (engineId, g1) = S.addPermanent engine S.alice S.threePlayerGame
+        (stoneId, g2) = S.addHandCard meekstone S.alice g1
+        board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+        withOwn = Mana.addMana S.alice [unitOf ManaType.Colorless] board
+        offers g = length (filter (S.isCastOf stoneId) (Action.legalActions S.alice g))
+        tapped = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer engineId)
+    Spec.assertEqWith s "CR 118.3 the Meekstone is castable only off a {C} of her own, the Engine's being no supply of hers" (fmap offers [board, withOwn]) [0, 1]
+    Spec.assertEqWith s "CR 106.4 and the {C} the Engine does make reaches each opponent instead" (fmap (\pid -> poolTypes pid tapped) [S.alice, S.bob, S.carol]) [[], [ManaType.Colorless], [ManaType.Colorless]]
+
+-- CR 106.4: "adds that mana" says nothing about whose pool, and CR 106.3's
+-- "instructs a player to add" is the sentence a card fills in. Yurlok of Scorch
+-- Thrash ({1}{B}{R}{G} Legendary Creature -- Lizard Shaman, Commander Legends)
+-- is the pool's first printing whose ACTIVATED mana ability fills a pool that is
+-- not its controller's: "{1}, {T}: Each player adds {B}{R}{G}."
+--
+-- The card is landed with its middle line OMITTED -- "A player losing unspent
+-- mana causes that player to lose that much life" -- for want of any carrier for
+-- a static that charges life as a pool empties (#3401). Symmetric across seats:
+-- it takes the controller's payoff away with every other seat's risk, so this
+-- Yurlok is stricter than printed for nobody's benefit in particular. Vigilance
+-- and the mana ability are printed as written.
+yurlokSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+yurlokSpec s registry = Spec.describe s "Yurlok of Scorch Thrash" $ do
+  -- THREE seats, and each of them casts or holds something different. Two would
+  -- collapse "each player" onto "your opponent", and a board where only the
+  -- payer's own pool is read cannot tell "each player" from "you" at all: alice
+  -- is one of "each player", so her share of the yield is the same under both
+  -- readings and her cast succeeds either way.
+  --
+  -- Bob SPENDS his share rather than merely holding it, which is what the title
+  -- of #1673 is about: mana added to somebody else's pool is that player's to
+  -- pay with. Trumpet Blast is {2}{R} and an instant, so it is payable exactly
+  -- once from {B}{R}{G} -- the {R} is the only red he has -- and legal to cast
+  -- with alice's creature spell still on the stack.
+  --
+  -- The mana is added DURING A COST PAYMENT (CR 605.3a's second window), not at
+  -- priority: alice announces Mayhem Devil and taps the Yurlok inside the
+  -- window, whose own {1} the Forest pays in a window nested inside that one.
+  Spec.it s "CR 106.4 a mana ability's named recipient may spend what it adds mid-payment" $ do
+    yurlok <- S.printingOf s registry "Yurlok of Scorch Thrash"
+    forest <- S.printingOf s registry "Forest"
+    devil <- S.printingOf s registry "Mayhem Devil"
+    blast <- S.printingOf s registry "Trumpet Blast"
+    let (yurlokId, g1) = S.addPermanent yurlok S.alice S.threePlayerGame
+        (forestId, g2) = S.addPermanent forest S.alice g1
+        (devilId, g3) = S.addHandCard devil S.alice g2
+        (blastId, g4) = S.addHandCard blast S.bob g3
+        board = g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+        castByAlice = S.runPure (tapsYurlok yurlokId forestId) board (S.cast S.alice devilId)
+        after = S.runPure (tapsYurlok yurlokId forestId) castByAlice (S.cast S.bob blastId)
+    -- CR 108.4 off the stack objects rather than the two hand ids: CR 601.2a
+    -- moves the card and pawl mints the spell its own object, so who CONTROLS
+    -- what is on the stack is the question, and it is the one the rule asks.
+    Spec.assertEqWith s "CR 106.4 bob pays for his own instant out of the {B}{R}{G} the Yurlok put in HIS pool while alice was paying for hers" (fmap (\oid -> Projection.controllerOf oid after) (GameState.stack after)) [Just S.bob, Just S.alice]
+    Spec.assertEqWith s "CR 106.4 and carol, who spent none of hers, is still holding the same three" (poolTypes S.carol after) [ManaType.Colored Color.Black, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
+
+-- Takes the Yurlok wherever it is offered and the Forest wherever it is not --
+-- which is the two windows exactly: the Yurlok is mid-activation inside its own
+-- (CR 605.3c), so the Forest is the only candidate there.
+--
+-- PINNED, not searched. An answerer taking any legal source would spend the
+-- Forest on alice's own cost at the outer window and never reach the Yurlok, and
+-- an answerer that searched for a payable line would find one again after the
+-- mutation. Declining where neither is offered, so a window that has nothing
+-- left closes instead of looping.
+tapsYurlok :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+tapsYurlok yurlokId forestId p = case p of
+  Prompt.ChooseManaSource _ _ candidates
+    | elem yurlokId (NonEmpty.toList candidates) -> Just yurlokId
+    | elem forestId (NonEmpty.toList candidates) -> Just forestId
+    | otherwise -> Nothing
+  Prompt.ChooseExtraManaSource {} -> Nothing
+  _ -> S.identityAnswer p
 
 -- The units of Alice's pool, so a test can look at a mana's TAGS and not only at
 -- its type -- which is the whole of what CR 107.4h reads.
@@ -3324,7 +3423,7 @@ lootAnswer p = case p of
   Prompt.ChooseManaYield _ _ _ options ->
     Maybe.fromMaybe
       (NonEmpty.head options)
-      (List.find (elem (ManaType.Colored Color.Red) . fmap ManaUnit.manaType . Mana.unitsOf . ManaOption.yield) (NonEmpty.toList options))
+      (List.find (elem (ManaType.Colored Color.Red) . fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList options))
   Prompt.ChooseTargets _ _ _ slots -> fmap (\(_, recipients) -> Set.filter ((==) (Just S.bob) . Recipient.playerOf) recipients) slots
   _ -> S.identityAnswer p
 

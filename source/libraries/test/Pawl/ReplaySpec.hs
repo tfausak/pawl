@@ -66,6 +66,8 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
@@ -92,7 +94,9 @@ oneMana color =
       ManaOption.ability = Nothing,
       -- CR 305.6's intrinsic ability, which says nothing beyond its mana.
       ManaOption.effects = [],
-      ManaOption.yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]
+      -- CR 109.5's "you", which is what a basic land's intrinsic ability means
+      -- by "add" (Pawl.Codec.ManaAddition.defaultPlayer).
+      ManaOption.yield = Map.singleton (PlayerRef.Relative PlayerRelation.You) (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}])
     }
 
 combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
