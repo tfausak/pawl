@@ -29,9 +29,8 @@
 -- difference back out, and Riftsweeper's printed "face-up exiled card" is the
 -- third reading -- a card whose own words refuse what rule 406.4 offers. Runic
 -- Repetition is the fourth: a restriction a pile only half satisfies, which is
--- what the draw runs over the whole pile for. Windbrisk Heights is the fifth,
--- and the one whose look nobody cast a spell to get: CR 702.75a's keyword names
--- the permanent's controller.
+-- what the draw runs over the whole pile for. Windbrisk Heights is the reading
+-- no spell reaches: CR 702.75a's keyword names the permanent's controller.
 --
 -- Each group shares ONE board across its readings, which is the point: exile
 -- holds the same cards either way, and only how they got there differs.
@@ -467,7 +466,7 @@ castExtractPower s registry = do
       (_, g5) = S.addLibraryCard sentry S.bob g4
   pure (S.runPure S.identityAnswer (S.runPure S.identityAnswer g5 (S.cast S.alice powerId)) Engine.priorityLoop)
 
--- CR 702.75a's hideaway N, the THIRD instruction-given look in this file:
+-- CR 702.75a's hideaway N, an instruction-given look that no spell gives:
 -- "When this permanent enters, look at the top N cards of your library. Exile one
 -- of them face down and put the rest on the bottom of your library in a random
 -- order. The exiled card gains 'The player who controls the permanent that
@@ -540,6 +539,8 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
 -- the fifth is the one the look never reaches and every name below says which
 -- card ended where. Passing a copier's name puts a Windbrisk Heights on the
 -- battlefield already and plays that card instead, entering as a copy of it.
+-- That one is PLACED rather than played (S.addPermanent fires no entry event),
+-- so its own hideaway never triggers and one card is hidden either way.
 --
 -- The choice is pinned to the SECOND card of the offered four rather than
 -- searched for, so a mutation cannot be silently repaired, and the random order
