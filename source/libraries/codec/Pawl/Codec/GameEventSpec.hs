@@ -27,6 +27,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -43,6 +44,7 @@ import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
@@ -57,6 +59,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -530,18 +533,19 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       (Codec.encode GameEvent.codec (GameEvent.BecameUntapped (ObjectId.MkObjectId 8)) /= Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 8)))
       "an untap and a tap of the same object encode differently"
-  -- CR 106.12a. BecameTapped's payload exactly, so the TAG is the whole
-  -- difference -- and it is the difference between two events one mana
-  -- activation writes about the same permanent.
+  -- CR 106.12a. BecameTapped's permanent plus the mana that activation produced,
+  -- which is what that rule's "of a specified type" narrowing reads -- and the
+  -- two events one mana activation writes about the same permanent stay
+  -- distinguishable.
   Spec.it s "TappedForMana" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.TappedForMana (ObjectId.MkObjectId 9))
-      " {\"type\":\"TappedForMana\",\"value\":9} "
+      (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = ObjectId.MkObjectId 9, TappedForMana.mana = Set.singleton (ManaType.Colored Color.Green)}))
+      " {\"type\":\"TappedForMana\",\"value\":{\"mana\":[{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}],\"permanent\":9}} "
     Spec.assertBool
       s
-      (Codec.encode GameEvent.codec (GameEvent.TappedForMana (ObjectId.MkObjectId 9)) /= Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 9)))
+      (Codec.encode GameEvent.codec (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = ObjectId.MkObjectId 9, TappedForMana.mana = Set.singleton (ManaType.Colored Color.Green)})) /= Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 9)))
       "a tap for mana and a plain tap of the same object encode differently"
   -- CR 701.3a's two ends, and the ORDER is what the distinct ids prove: the
   -- attachment first, then what it went onto. A swap would credit the host with

@@ -63,6 +63,8 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.ManaSpecification as ManaSpecification
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
@@ -89,6 +91,7 @@ import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
+import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Transformed as Transformed
 import Pawl.Types.TriggerCondition (TriggerCondition)
@@ -3747,7 +3750,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana tapped ->
       let hostOfBearer = Object.attachedTo =<< Game.lookupObject bearer gs
-       in (Recipient.objectOf =<< hostOfBearer) == Just tapped
+       in (Recipient.objectOf =<< hostOfBearer) == Just (TappedForMana.permanent tapped)
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -3804,10 +3807,12 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CardArrived _ -> False
   -- CR 106.12a read by a BYSTANDER, where the arm above reads it off an
   -- attachment link: Autumn Willow, Harmony's "whenever you tap a land creature
-  -- for mana". Both halves of the printed sentence are compared, the
+  -- for mana". Every part of the printed sentence is compared, the
   -- PermanentSacrificed arm's posture -- the tapping player against CR 109.5's
-  -- `you`, and the permanent against the Filter -- and a wording that narrows
-  -- neither spells itself out as AnyPlayer over the trivial Filter.
+  -- `you`, the permanent against the Filter, and the mana produced against that
+  -- rule's "of a specified type" (producedSpecified) -- and a wording that
+  -- narrows none of them spells itself out as AnyPlayer over the trivial Filter
+  -- with ManaSpecification.AnyMana.
   --
   -- The TAPPING player is the tapped permanent's controller: CR 602.2's default
   -- gives an activated ability to its object's controller, and
@@ -3820,16 +3825,16 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- the permanent standing tapped on the battlefield. viewWithLastKnown all the
   -- same, so a permanent that left between the tap and the gather is answered
   -- for rather than silently missed.
-  TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana relation f) -> case event of
+  TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana relation f specified) -> case event of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana tapped -> case Projection.View.controllerOf tapped gs of
+    GameEvent.TappedForMana tapped -> case Projection.View.controllerOf (TappedForMana.permanent tapped) gs of
       -- Nothing is a permanent that is gone, about which no relation can
       -- honestly answer -- the PermanentSacrificed arm's closing note.
       Nothing -> False
       Just tapper
-        | PlayerRelation.holds (Game.teams gs) relation you tapper ->
-            case Projection.viewWithLastKnown tapped gs tapped of
+        | PlayerRelation.holds (Game.teams gs) relation you tapper && producedSpecified gs bearer specified (TappedForMana.mana tapped) ->
+            case Projection.viewWithLastKnown (TappedForMana.permanent tapped) gs (TappedForMana.permanent tapped) of
               Nothing -> False
               Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
         | otherwise -> False
@@ -7619,3 +7624,29 @@ isPlayerRecipient r = case r of
   Recipient.ToBattle _ -> False
   Recipient.ToObject _ -> False
   Recipient.ToPile _ -> False
+
+-- CR 106.12a's second half: did an activation that produced @produced@ produce
+-- the mana this condition specified? The narrowing half of the
+-- PermanentTappedForMana arm above, where PlayerRelation.holds and
+-- Filter.matches are the other two.
+--
+-- CR 607.2d's link is resolved by reading Object.chosenColor off the BEARER,
+-- which is the object the triggered ability is on: Gauntlet of Power's "of the
+-- chosen color" means the colour its own "As this artifact enters, choose a
+-- color" settled. Pawl.Engine.Mana.producedTypes resolves ManaProduction.Chosen
+-- the same way and off the same field, and a permanent with nothing chosen
+-- narrows to nothing here for that function's reason -- a colour the engine
+-- invented would be a player's choice made for them.
+--
+-- EXHAUSTIVE with no wildcard: a specification the rule adds owes an answer
+-- here, and -Werror is what makes it.
+producedSpecified :: GameState -> ObjectId -> ManaSpecification.ManaSpecification -> Set.Set ManaType.ManaType -> Bool
+producedSpecified gs bearer specified produced = case specified of
+  -- CR 106.12a's first half, "is tapped for mana": Pawl.Engine.Cost.applyManaTriggers
+  -- records the event only where the activation produced mana, so there is
+  -- nothing left to ask.
+  ManaSpecification.AnyMana -> True
+  ManaSpecification.ChosenColor ->
+    case Game.lookupObject bearer gs >>= Object.chosenColor of
+      Nothing -> False
+      Just color -> Set.member (ManaType.Colored color) produced

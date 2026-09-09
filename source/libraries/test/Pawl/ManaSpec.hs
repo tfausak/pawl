@@ -3074,6 +3074,77 @@ autumnWillowBoard s registry = do
        in pure (aliceArbor, aliceForest, bobArbor, withWillow)
     _ -> Spec.assertFailure s "fixture should give alice exactly one Forest" >> pure (S.noSource, S.noSource, S.noSource, S.landsInPlay forest 1)
 
+-- CR 106.12a's SECOND half, "or is tapped for mana of a specified type", which
+-- the two groups above leave untouched: Gauntlet of Power ({5} Artifact, "As
+-- this artifact enters, choose a color." / "Whenever a basic land is tapped for
+-- mana of the chosen color, its controller adds an additional one mana of that
+-- color."). Its narrowing is CR 607.2d's link, so the colour is the one its own
+-- entry chose.
+--
+-- FOUR permanents can be tapped for mana on the one board, and each is the
+-- others' control: alice's Forest is a basic land producing the chosen colour,
+-- her Mountain is a basic land producing another, her Dryad Arbor produces the
+-- chosen colour but carries no Basic supertype, and bob's Forest is the first
+-- again under another seat. A board of only the first could tell the mana
+-- specification from the Filter from the PlayerRelation not at all.
+--
+-- Not transcribed: the printed "Creatures of the chosen color get +1/+1", which
+-- wants a Filter arm reading Object.chosenColor (gap #3441). pawl's Gauntlet of
+-- Power is that much STRICTER than the printing, never weaker.
+gauntletOfPowerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+gauntletOfPowerSpec s registry = Spec.describe s "Gauntlet of Power" $ do
+  Spec.it s "CR 106.12a a basic land tapped for the CHOSEN colour adds the Gauntlet's additional mana" $ do
+    (aliceForest, aliceMountain, aliceArbor, bobForest, board) <- gauntletBoard s registry
+    let forest = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceForest)
+        -- The same board differing in exactly one thing: the mana the tap
+        -- produced. A Mountain is as basic a land as the Forest.
+        mountain = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceMountain)
+        -- And in exactly one other: the Basic supertype. A Dryad Arbor is a land
+        -- producing the same {G} (CR 305.6) with no supertype at all.
+        arbor = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceArbor)
+        -- And in exactly one other again: whose land it was.
+        theirs = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer bobForest)
+        -- CR 605.4a from the other side, the Wild Growth group's reason.
+        settled = resolveDown (S.runPure S.identityAnswer forest Engine.settleForPriority)
+    Spec.assertEqWith s "CR 106.12a alice's pool holds the Forest's {G} and the Gauntlet's additional one" (poolTypes S.alice forest) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
+    Spec.assertEqWith s "the specification: her Mountain produced red and not the chosen colour, so its {R} stands alone" (poolTypes S.alice mountain) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "the Filter: her Dryad Arbor produced the chosen colour but is no BASIC land, so its {G} stands alone" (poolTypes S.alice arbor) [ManaType.Colored Color.Green]
+    -- CR 106.4: "its controller", read through PlayerRef.ControllerOfBound off
+    -- the tapped land, is bob -- not alice, who controls the Gauntlet.
+    Spec.assertEqWith s "the PlayerRelation: bob's basic Forest fires it too, and the additional mana is HIS" (poolTypes S.bob theirs) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
+    Spec.assertEqWith s "and alice, whose Gauntlet watched it, is given none of it" (poolTypes S.alice theirs) []
+    Spec.assertEqWith s "CR 605.4a and the triggered mana ability never reached the stack" (length (GameState.stack forest)) 0
+    Spec.assertEqWith s "CR 605.4a and settling for priority does not place a second copy of it to resolve" (poolTypes S.alice settled) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
+
+-- alice CASTS a Gauntlet of Power off five Plains and names green at CR 614.1c's
+-- choice, and the four permanents that will be tapped are added afterwards --
+-- otherwise the {5} could pay itself with the Forest or the Mountain the
+-- assertions rest on. Returns alice's Forest, her Mountain, her Dryad Arbor,
+-- bob's Forest and the board.
+--
+-- Cast rather than placed, so the chosen colour is a player's answer travelling
+-- CR 614.1c's entry rewrite rather than a fixture write: the case asserts the
+-- Gauntlet reached the battlefield before it reads a pool.
+gauntletBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+gauntletBoard s registry = do
+  plains <- S.printingOf s registry "Plains"
+  forest <- S.printingOf s registry "Forest"
+  mountain <- S.printingOf s registry "Mountain"
+  arbor <- S.printingOf s registry "Dryad Arbor"
+  gauntlet <- S.printingOf s registry "Gauntlet of Power"
+  let (withCard, cardId) = S.handOne gauntlet (S.landsInPlay plains 5)
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseColor {} -> Color.Green
+        _ -> S.identityAnswer p
+      resolved = S.runPure answer (S.runPure answer withCard (S.cast S.alice cardId)) Stack.resolveTop
+      (aliceForest, withForest) = S.addPermanent forest S.alice resolved
+      (aliceMountain, withMountain) = S.addPermanent mountain S.alice withForest
+      (aliceArbor, withArbor) = S.addPermanent arbor S.alice withMountain
+      (bobForest, withBob) = S.addPermanent forest S.bob withArbor
+  Spec.assertEqWith s "the fixture: the Gauntlet resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Gauntlet of Power") S.alice withBob) 1
+  pure (aliceForest, aliceMountain, aliceArbor, bobForest, withBob)
+
 -- Resolve the whole stack down, so a board that placed a triggered mana ability
 -- CR 605.4a forbids the stack reads differently from one that placed nothing: a
 -- reading taken with the trigger still waiting could not tell them apart at
@@ -3252,6 +3323,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   activationAdjustmentSpec s registry
   wildGrowthSpec s registry
   autumnWillowSpec s registry
+  gauntletOfPowerSpec s registry
   drainPowerSpec s registry
   yurlokSpec s registry
   almsEngineSpec s registry

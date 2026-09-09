@@ -1,0 +1,91 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 5
+        }
+      ],
+      "name": "Gauntlet of Power",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "ChooseColor"
+              }
+            }
+          }
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PermanentTappedForMana",
+            "value": {
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasSupertype",
+                    "value": {
+                      "type": "Basic"
+                    }
+                  },
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Land"
+                    }
+                  }
+                ]
+              },
+              "mana": {
+                "type": "ChosenColor"
+              },
+              "player": {
+                "type": "AnyPlayer"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "player": {
+                            "type": "ControllerOfBound",
+                            "value": "thatManaSource"
+                          },
+                          "production": {
+                            "type": "Chosen"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

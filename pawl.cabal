@@ -570,6 +570,8 @@ library codec
     Pawl.Codec.ManaRiderEffectSpec
     Pawl.Codec.ManaRiderSpec
     Pawl.Codec.ManaSpec
+    Pawl.Codec.ManaSpecification
+    Pawl.Codec.ManaSpecificationSpec
     Pawl.Codec.ManaSpending
     Pawl.Codec.ManaSpendingSpec
     Pawl.Codec.ManaSymbol
@@ -875,6 +877,8 @@ library codec
     Pawl.Codec.TakeExtraTurnSpec
     Pawl.Codec.TapForTotalPower
     Pawl.Codec.TapForTotalPowerSpec
+    Pawl.Codec.TappedForMana
+    Pawl.Codec.TappedForManaSpec
     Pawl.Codec.TapPermanents
     Pawl.Codec.TapPermanentsSpec
     Pawl.Codec.TapState
@@ -1741,6 +1745,7 @@ library types
     Pawl.Types.ManaRetention
     Pawl.Types.ManaRider
     Pawl.Types.ManaRiderEffect
+    Pawl.Types.ManaSpecification
     Pawl.Types.ManaSpending
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType
@@ -1915,6 +1920,7 @@ library types
     Pawl.Types.Suspend
     Pawl.Types.TakeExtraTurn
     Pawl.Types.TapForTotalPower
+    Pawl.Types.TappedForMana
     Pawl.Types.TapPermanents
     Pawl.Types.TapState
     Pawl.Types.TargetCount
