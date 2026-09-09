@@ -24,8 +24,9 @@ import Pawl.Types.SlotName (SlotName)
 -- (Pawl.Engine.Binding.targetsOf) rather than as a bare id list, so the caller
 -- that merges it into an object's bindings writes one field and the readers that
 -- already answer "which object does this slot name" need no second shape. Empty
--- for every component that binds nothing, which is all of them but the two that
--- reserve a name (Pawl.Engine.Cost's Sacrifice and TapPermanents arms).
+-- for every component that binds nothing, which is all of them but the ones
+-- Pawl.Engine.Cost's payComponent gives a reserved name (its Sacrifice,
+-- TapPermanents, TapForTotalPower and RevealCardFromHand arms).
 data Payment
   = Paid (Map SlotName (Set Recipient))
   | Unpaid

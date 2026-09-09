@@ -367,7 +367,10 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 -- "each opponent loses life equal to the sacrificed creature's power". Stamped
 -- by Pawl.Engine.Activate as the activation's payment returns (CR 601.2h at the
 -- position CR 602.2b gives it), which is why the ability object holds it and its
--- source permanent does not.
+-- source permanent does not. Pawl.Engine.Cast stamps a SPELL's payment onto the
+-- spell the same way; no printing in `data/cards/` sacrifices as an additional
+-- cost and then reads what it sacrificed, so nothing reads this slot there
+-- (Fling is the producer, #1872).
 --
 -- The permanent is in a graveyard by the time the ability resolves, so every
 -- read of it is CR 608.2h's last known information; Pawl.Engine.Resolve.Slots.effectViewOf
@@ -385,8 +388,10 @@ sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 -- CR 601.2f: the reserved slot under which the permanents a COST payment TAPPED
 -- are bound -- "the tapped creature" in Unerring Sling's "deals damage equal to
 -- the tapped creature's power". Stamped by Pawl.Engine.Activate off the payment
--- CR 601.2h makes, sacrificedPermanent's route exactly, and so readable by an
--- activated ability only.
+-- CR 601.2h makes, sacrificedPermanent's route exactly. Pawl.Engine.Cast stamps a
+-- spell's payment the same way, so the slot is readable on either carrier; no
+-- printing puts this component on a spell's additional cost, so nothing reads it
+-- there.
 --
 -- Unlike sacrificedPermanent, the permanent is still on the battlefield when the
 -- ability resolves -- CR 601.2h taps it, and tapping is not a zone change -- so
