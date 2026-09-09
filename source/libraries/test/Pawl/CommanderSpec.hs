@@ -51,6 +51,14 @@
 -- whose text reads the designation back, which is what makes CR 702.124k
 -- observable at gameplay level rather than only in the command zone.
 --
+-- The Doctor's companion group takes that same fixture and a fourth pool: Rose
+-- Noble ({3}{U} Legendary Creature -- Human 2\/3, "Ward {2} \/ Whenever you cast
+-- a Doctor spell or creature spell with doctor's companion, draw a card. \/
+-- Doctor's companion") and The Fugitive Doctor ({3}{R}{G} Legendary Creature --
+-- Time Lord Doctor 4\/4), which was already in the pool. Rose Noble's own
+-- trigger reads the keyword back, which is what gives CR 702.124m a second
+-- observer besides the command zone.
+--
 -- The Bounce group adds two of bob's spells and the Islands to cast them with:
 -- Unsummon ({U} Instant, "return target creature to its owner's hand") for rule
 -- 903.9b's hand half and Griptide ({3}{U} Instant, "put target creature on top of
@@ -147,6 +155,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   taxSpec s registry
   partnerSpec s registry
   backgroundSpec s registry
+  doctorsCompanionSpec s registry
   bounceSpec s registry
   commanderDamageSpec s registry
   brawlSpec s registry
@@ -573,6 +582,80 @@ backgroundSpec s registry = Spec.describe s "Choose a Background" $ do
     Spec.assertBool s (Set.member Subtype.Type.Bear (Projection.subtypesOf designatedId designated)) "in addition to the Bear he is printed as (CR 205.1b)"
     Spec.assertEqWith s "negative leg: the same enchantment leaves an undesignated Wilson at his printed 2/2" (S.powerToughnessOf refusedId refused) (Just (2, 2))
     Spec.assertBool s (not (Set.member Subtype.Type.Giant (Projection.subtypesOf refusedId refused))) "and no Giant"
+
+doctorsCompanionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+doctorsCompanionSpec s registry = Spec.describe s "Doctor's companion" $ do
+  -- CR 702.124m: "you may designate two legendary creature cards as your
+  -- commander rather than one if one of them is this card and the other is a
+  -- legendary Time Lord Doctor creature card that has no other creature types",
+  -- and CR 702.124b starts both in the command zone.
+  Spec.it s "CR 702.124m the Doctor is designated beside their companion" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    rose <- S.printingOf s registry "Rose Noble"
+    doctor <- S.printingOf s registry "The Fugitive Doctor"
+    let gs = partnerBoard mountain plains 6 [rose, doctor]
+    Spec.assertEqWith s "both are in the command zone" (List.sort (commandZoneNames gs)) (List.sort [S.nameOf (Printing.card rose), S.nameOf (Printing.card doctor)])
+    Spec.assertEqWith s "and both are commanders" (fmap (\oid -> Commander.isCommander oid gs) (inCommandZone gs)) [True, True]
+    Spec.assertEqWith s "she is designated both" (fmap (List.sort . commanderPrintingsOf gs) (Map.lookup S.alice (GameState.players gs))) (Just (List.sort [rose, doctor]))
+  -- Rule 702.124m names the OTHER card exactly -- "a legendary Time Lord Doctor
+  -- creature card" -- and CR 702.124f keeps this limb from combining with any
+  -- other partner ability. Each leg is the control board with ONE printing
+  -- swapped.
+  --
+  -- Rule 702.124m is one-sided where rule 702.124k is not: it forbids no Doctor
+  -- named alone, so the last two legs are the CR 903.3 designation each card
+  -- still gets by itself.
+  --
+  -- The clause this board cannot reach is "has no other creature types". Every
+  -- printed Time Lord Doctor is exactly a Time Lord Doctor -- Scryfall
+  -- t:legendary t:"time lord" t:doctor, 2026-09-08, no card with a third
+  -- creature type -- so `Commander.isTheDoctor`'s equality is a regression fence
+  -- on that clause rather than a proven path. Susan Foreman, a legendary Time
+  -- Lord that is no Doctor, is the printing that would prove the other half of
+  -- the same equality, and she is not in the pool.
+  Spec.it s "CR 702.124m the pair admits only a Doctor" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    rose <- S.printingOf s registry "Rose Noble"
+    doctor <- S.printingOf s registry "The Fugitive Doctor"
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let board = partnerBoard mountain plains 6
+    Spec.assertEqWith s "control leg: Rose Noble beside the Doctor designates both" (List.length (commandZoneNames (board [rose, doctor]))) 2
+    Spec.assertEqWith s "CR 702.124m: Rose Noble beside a legendary creature that is no Time Lord Doctor designates neither" (commandZoneNames (board [rose, shimatsu])) []
+    Spec.assertEqWith s "CR 702.124f: a partner ability is not this one, so Akiri beside the Doctor designates neither" (commandZoneNames (board [akiri, doctor])) []
+    Spec.assertEqWith s "CR 903.3: the Doctor named alone is still designated, which rule 702.124m does not forbid" (commandZoneNames (board [doctor])) [S.nameOf (Printing.card doctor)]
+    Spec.assertEqWith s "and so is Rose Noble alone" (commandZoneNames (board [rose])) [S.nameOf (Printing.card rose)]
+  -- Rose Noble's own trigger, which is what gives the keyword an observer inside
+  -- the game: "whenever you cast a Doctor spell or creature spell with doctor's
+  -- companion, draw a card". Two boards differing in ONE thing, the spell cast --
+  -- a second Rose Noble, which the trigger reads, against Rograkh, whose partner
+  -- ability CR 702.124n keeps out of it.
+  --
+  -- Rograkh's {0} is what makes the pair fair: the same four Islands pay for
+  -- either cast, so a leg that failed to draw cannot have failed to cast.
+  Spec.it s "CR 702.124m a card reads the keyword back" $ do
+    island <- S.printingOf s registry "Island"
+    rose <- S.printingOf s registry "Rose Noble"
+    rograkh <- S.printingOf s registry "Rograkh, Son of Rohgahh"
+    let base =
+          (S.landsInPlay island 4)
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        cast spell =
+          let (_, withRose) = S.addPermanent rose S.alice base
+              (_, stocked) = S.addLibraryCard island S.alice withRose
+              (oid, ready) = S.addObjectIn Zone.Hand spell S.alice stocked
+              announced = S.runPure S.identityAnswer ready (S.cast S.alice oid)
+              settled = S.runPure S.identityAnswer announced Engine.settleForPriority
+           in S.runPure S.identityAnswer settled Stack.resolveTop
+        librarySize gs = length (Game.zoneMembers Zone.Library S.alice gs)
+    Spec.assertEqWith s "casting a creature spell with doctor's companion draws the card" (librarySize (cast rose)) 0
+    Spec.assertEqWith s "negative leg: Rograkh is a creature spell with a partner ability that is not this one, so nothing is drawn" (librarySize (cast rograkh)) 1
+    Spec.assertEqWith s "control leg: the negative leg really cast its spell, so it did not merely fail to draw for want of a cast" (S.handSize S.alice (cast rograkh)) 0
 
 -- Answers CR 903.9b's offer with Returns for exactly one seat and Leaves for every
 -- other, which is what tells "asked alice" apart from "asked bob" and from "never

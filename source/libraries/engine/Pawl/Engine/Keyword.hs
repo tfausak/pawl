@@ -294,6 +294,7 @@ abilitiesFor keyword count = case keyword of
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
   Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
   Keyword.Riot -> []
   Keyword.Unleash -> []
@@ -430,6 +431,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
   Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -773,6 +775,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
   Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1266,6 +1269,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
   Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1974,6 +1978,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
   Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -2182,6 +2187,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
   Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -2358,6 +2364,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
   Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -2525,6 +2532,8 @@ familyOf keyword = case keyword of
   Keyword.Partner -> Nothing
   -- CR 702.124k carries none either.
   Keyword.ChooseABackground -> Nothing
+  -- CR 702.124m carries none either.
+  Keyword.DoctorsCompanion -> Nothing
   Keyword.Escalate _ -> Just KeywordFamily.Escalate
   Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing

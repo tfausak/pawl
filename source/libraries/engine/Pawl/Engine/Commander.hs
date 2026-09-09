@@ -21,9 +21,9 @@
 --
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
---   * CR 702.124's partner limbs other than CR 702.124h's plain one and CR
---     702.124k's Background, and CR 903.3a's "this card can be your commander"
---     (#939).
+--   * CR 702.124's partner limbs other than CR 702.124h's plain one, CR
+--     702.124k's Background and CR 702.124m's Doctor's companion, and CR
+--     903.3a's "this card can be your commander" (#939).
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
 module Pawl.Engine.Commander where
 
@@ -37,6 +37,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Deck as Deck
@@ -68,7 +69,9 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- commanders. One designation is rule 903.3's; two are rule 702.124h's, and
 -- only when EACH of them has partner -- "you can have two commanders if both
 -- have partner" -- or rule 702.124k's, and only when one has "choose a
--- Background" and the other is a legendary Background enchantment card.
+-- Background" and the other is a legendary Background enchantment card, or rule
+-- 702.124m's, and only when one has "Doctor's companion" and the other is a
+-- legendary Time Lord Doctor creature card with no other creature types.
 --
 -- Read off the FRONT FACE's printed keywords and type line rather than through
 -- the projection, which is CR 702.124a: a partner ability "modifies the rules
@@ -78,7 +81,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 --
 -- More than two is empty for CR 702.124g: "no partner ability or combination of
 -- partner abilities can ever let a player have more than two commanders". CR
--- 702.124f is why the two limbs are separate disjuncts rather than one
+-- 702.124f is why the three limbs are separate disjuncts rather than one
 -- predicate: "different partner abilities are distinct from one another and
 -- cannot be combined", so a card with partner beside a Background is no pair.
 --
@@ -96,9 +99,15 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- no channel to refuse one, so a pair rule 702.124 does not allow designates
 -- neither card and starts no commander in the command zone.
 --
--- Not implemented: CR 702.124i's partner—[text], CR 702.124j's partner with
--- [name] and CR 702.124m's Doctor's companion, each of which admits a different
--- pair; and CR 903.3a's "this card can be your commander" (#939).
+-- Rule 702.124m's requirement is one-sided where rule 702.124k's is not. Rule
+-- 702.124k forbids a Background named alone; rule 702.124m says nothing of the
+-- kind about a Doctor, and a Doctor is a legendary creature card CR 903.3
+-- designates on its own like any other. So the ONE-card case is gated for a
+-- Background and not for a Doctor.
+--
+-- Not implemented: CR 702.124i's partner—[text] and CR 702.124j's partner with
+-- [name], each of which admits a different pair; and CR 903.3a's "this card can
+-- be your commander" (#939).
 designations :: Deck.Deck -> Set.Set Printing.Printing
 designations deck =
   let named = Deck.commander deck
@@ -109,6 +118,8 @@ designations deck =
         [_, _] | all hasPartner named -> named
         [a, b] | choosesBackground a && isBackground b -> named
         [a, b] | choosesBackground b && isBackground a -> named
+        [a, b] | isDoctorsCompanion a && isTheDoctor b -> named
+        [a, b] | isDoctorsCompanion b && isTheDoctor a -> named
         _ -> Set.empty
 
 -- | CR 702.124h's requirement of one card of a pair.
@@ -131,6 +142,36 @@ isBackground printing =
    in Set.member Supertype.Legendary (TypeLine.supertypes typeLine)
         && Set.member CardType.Enchantment (TypeLine.types typeLine)
         && Set.member Subtype.Background (TypeLine.subtypes typeLine)
+
+-- | CR 702.124m's requirement of the card that names the other: "this card",
+-- which rule 702.124m also has be a legendary creature card, since it designates
+-- "two legendary creature cards".
+isDoctorsCompanion :: Printing.Printing -> Bool
+isDoctorsCompanion printing = legendaryCreature printing && printedKeyword Keyword.DoctorsCompanion printing
+
+-- | CR 702.124m's requirement of the card that is named: "a legendary Time Lord
+-- Doctor creature card that has no other creature types".
+--
+-- The last clause is why this counts the creature types rather than testing two
+-- memberships: Susan Foreman is a legendary Time Lord that is no Doctor, and a
+-- legendary Time Lord Doctor Warrior would satisfy both memberships and still be
+-- refused. Subtype.isCreatureType is what keeps an artifact creature's Equipment
+-- or a Vehicle's subtypes out of the count -- rule 702.124m bounds the CREATURE
+-- types, not the subtypes.
+isTheDoctor :: Printing.Printing -> Bool
+isTheDoctor printing =
+  let face = Card.frontFace (Printing.card printing)
+      creatureTypes = Set.filter Subtype.Engine.isCreatureType (TypeLine.subtypes (Face.typeLine face))
+   in legendaryCreature printing && creatureTypes == Set.fromList [Subtype.TimeLord, Subtype.Doctor]
+
+-- | CR 702.124m's "two legendary CREATURE cards", which both halves of that
+-- rule's pair must be. Rule 702.124h asks only for a legendary card and rule
+-- 702.124k for a legendary enchantment, so neither limb above shares this.
+legendaryCreature :: Printing.Printing -> Bool
+legendaryCreature printing =
+  let typeLine = Face.typeLine (Card.frontFace (Printing.card printing))
+   in Set.member Supertype.Legendary (TypeLine.supertypes typeLine)
+        && Set.member CardType.Creature (TypeLine.types typeLine)
 
 -- | CR 702.124a: a partner ability is read off the printed front face, for the
 -- reason `designations` gives.

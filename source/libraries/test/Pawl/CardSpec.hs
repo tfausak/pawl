@@ -2626,10 +2626,12 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.118b names no quality either: the comparison is against the skulking
   -- creature's own power, written into the rule rather than into the keyword.
   Keyword.Skulk -> []
-  -- CR 702.124h and CR 702.124k name no quality either: both are read before the
-  -- game begins, by Pawl.Engine.Commander.designations, and mint no Filter at all.
+  -- CR 702.124h, CR 702.124k and CR 702.124m name no quality either: all three
+  -- are read before the game begins, by Pawl.Engine.Commander.designations, and
+  -- mint no Filter at all.
   Keyword.Partner -> []
   Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
   -- CR 702.121a names no quality: the bonus is computed from the combat record
   -- by the ability Pawl.Engine.Keyword mints, not from anything the card prints.
   Keyword.Melee -> []
