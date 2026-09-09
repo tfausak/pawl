@@ -3584,8 +3584,8 @@ servoToken =
 -- writes it.
 --
 -- Effect.GrantLookAtExiled writes rule 702.75a's granted look as CR 109.5's "you",
--- which for a triggered ability is its controller and so the permanent's (CR
--- 113.7a).
+-- which for a triggered ability is the controller the object had when the
+-- ability triggered.
 --
 -- Not implemented: rule 702.75a states the look of "the player who controls the
 -- permanent that exiled this card", a live read that follows a later change of
