@@ -651,10 +651,10 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
   -- instruction allowing the player to do so no longer applies". Bob's look came
   -- from rule 702.75a's control read alone, so losing the land takes it back
   -- unless the permission it once gave him was recorded. Aura Graft {1}{U}
-  -- Instant -- "Gain
-  -- control of target Aura that's attached to a permanent. Attach it to another
-  -- permanent it can enchant" (Oracle text checked 2026-09-09) -- takes the
-  -- Confiscate back off, and alice controls the land again.
+  -- Instant -- "Gain control of target Aura that's attached to a permanent.
+  -- Attach it to another permanent it can enchant" (Oracle text checked
+  -- 2026-09-09) -- takes the Confiscate back off, and alice controls the land
+  -- again.
   --
   -- A PAIR off ONE board differing in exactly which land bob took, on the Vesuva
   -- board so the permanent that exiled the card is a COPY: either the Vesuva
@@ -671,6 +671,9 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
     let copied = case Set.toList (Set.delete copy (GameState.battlefield board)) of
           [only] -> only
           _ -> S.noSource
+        -- Two Islands for the Graft's {1}{U}, and a third for it to move the
+        -- Confiscate onto -- a permanent alice already controls, so the move
+        -- changes nothing but which land bob is holding.
         stocked = foldr (\_ g -> snd (S.addPermanent island S.alice g)) board [1 .. (2 :: Int)]
         (perch, g1) = S.addPermanent island S.alice stocked
         (spell, g2) = S.addHandCard graft S.alice g1
