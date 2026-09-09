@@ -1201,7 +1201,8 @@ data Context = MkContext
     -- but that one -- sourceAttachedTo's posture rather than slotControllers'.
     --
     -- Not implemented: the lint that would keep a card from asking the atom in the
-    -- positions this is empty in, which its five siblings above each have (#3449).
+    -- positions this is empty in, which sourcePower, slotNames, sourceAttachedTo,
+    -- sourceChosenNames and carrierChosenPlayer above each have (#3449).
     sourceChosenColor :: Maybe Color.Color
   }
   deriving (Eq, Ord, Show)
