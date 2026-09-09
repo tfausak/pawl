@@ -10,10 +10,8 @@ data ExileLooker
   = -- | CR 406.3: the seat the instruction named, stored (Extract Power).
     ThePlayer PlayerId.PlayerId
   | -- | CR 702.75a: whoever controls the permanent that exiled the card, asked
-    -- afresh each time (Windbrisk Heights). CR 607.2's link is where that
-    -- permanent is written down, so this arm carries no object of its own:
-    -- 'Pawl.Types.GameState.exiledWith' already answers "which permanent exiled
-    -- this card" for the exile the same instruction made.
+    -- afresh each time (Windbrisk Heights). It carries no object, CR 607.2's
+    -- link ('Pawl.Types.GameState.exiledWith') already naming that permanent.
     --
     -- Not implemented: the rule's grant is sticky, CR 406.3 letting a player who
     -- was once allowed to look continue to -- so a player who controlled the
