@@ -56,9 +56,10 @@ import Pawl.Types.PlayerId (PlayerId)
 -- look names both cards, and the owner who was shown nothing gets their pile" is
 -- what proves the two seats come apart.
 --
--- CR 702.75a's hideaway states the same permission of a permanent's controller
--- rather than of the effect's, and no card in `data/cards/` has hideaway
--- (gap #3033).
+-- Not implemented: CR 702.75a's hideaway states the same permission of the
+-- player who CONTROLS the exiling permanent, a live read that follows a change
+-- of control, where this set holds the seat the grant named. Windbrisk Heights
+-- writes it through Effect.GrantLookAtExiled all the same (#3443).
 mayLookAt :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 mayLookAt pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs

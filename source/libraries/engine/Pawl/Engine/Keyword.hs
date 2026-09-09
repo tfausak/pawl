@@ -34,6 +34,7 @@ import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -77,8 +78,10 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal
@@ -287,6 +290,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Changeling -> []
+  -- CR 603.2: rule 702.75a states no "each instance" clause, so the general
+  -- reason gives one ability per instance.
+  Keyword.Hideaway n -> List.genericReplicate count (hideaway n)
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
@@ -359,6 +365,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
+  Keyword.Hideaway _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -767,6 +774,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
+  Keyword.Hideaway _ -> []
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
@@ -1261,6 +1269,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
+  Keyword.Hideaway _ -> []
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
@@ -1970,6 +1979,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
+  Keyword.Hideaway _ -> []
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
@@ -2214,6 +2224,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Persist -> []
   Keyword.Undying -> []
   Keyword.Changeling -> []
+  Keyword.Hideaway _ -> []
   Keyword.Reinforce {} -> []
   -- CR 702.184a restricts no attack or block; CR 721.2b's threshold is what
   -- decides whether the permanent is a creature at all.
@@ -2387,6 +2398,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Persist -> []
   Keyword.Undying -> []
   Keyword.Changeling -> []
+  Keyword.Hideaway _ -> []
   Keyword.Reinforce {} -> []
   -- CR 702.184a attaches nothing.
   Keyword.Station -> []
@@ -2457,6 +2469,7 @@ familyOf keyword = case keyword of
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
   Keyword.Soulshift _ -> Just KeywordFamily.Soulshift
   Keyword.Bloodthirst _ -> Just KeywordFamily.Bloodthirst
+  Keyword.Hideaway _ -> Just KeywordFamily.Hideaway
   Keyword.Reinforce {} -> Just KeywordFamily.Reinforce
   Keyword.Modular _ -> Just KeywordFamily.Modular
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
@@ -3556,6 +3569,92 @@ servoToken =
               Face.specialActions = []
             }
     }
+
+-- CR 702.75a: hideaway N. "When this permanent enters, look at the top N cards of
+-- your library. Exile one of them face down and put the rest on the bottom of your
+-- library in a random order. The exiled card gains 'The player who controls the
+-- permanent that exiled this card may look at this card in the exile zone.'"
+-- Fabricate's mint over CR 603.6a's entry event, so the condition is
+-- TriggerCondition.SelfEnters; Windbrisk Heights is the printing.
+--
+-- THREE CLAUSES, and "the rest" needs no opcode of its own: the third reads the
+-- same slot the look bound and finds the exiled card gone, CR 400.7 having minted
+-- a new object for it on the way to exile. Pawl.Types.EachCardFromAmong's haddock
+-- is where that reading is stated, and Ancestral Memories is the card that already
+-- writes it.
+--
+-- Effect.GrantLookAtExiled writes rule 702.75a's granted look as CR 109.5's "you",
+-- which for a triggered ability is its controller and so the permanent's (CR
+-- 113.7a).
+--
+-- Not implemented: rule 702.75a states the look of "the player who controls the
+-- permanent that exiled this card", a live read that follows a later change of
+-- control, where Object.exileLookers stores the seat the grant named (#3443).
+--
+-- CR 702.75b's "enters tapped" is NOT minted here: the errata gives the older
+-- cards that ability as printed text of their own, which Windbrisk Heights states
+-- as an entry replacement.
+hideaway :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+hideaway n =
+  let plain =
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Untapped,
+            EntryRiders.attacking = False,
+            EntryRiders.blocking = Nothing,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.empty,
+            EntryRiders.underOwner = False,
+            EntryRiders.exiledFaceDown = False,
+            EntryRiders.faceDown = Nothing
+          }
+      look =
+        Effect.LookAt
+          ( LookAt.MkLookAt
+              (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal (toInteger n))))
+              hideawaySeen
+          )
+      hide =
+        Effect.MoveToZone
+          ( MoveToZone.MkMoveToZone
+              (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong hideawaySeen (Filter.And []) (Quantity.Literal 1) (PlayerRef.Relative PlayerRelation.You)))
+              Zone.Exile
+              plain {EntryRiders.exiledFaceDown = True}
+              (Just hideawayExiled)
+              Nothing
+              LibraryPlacement.defaultValue
+              Nothing
+          )
+      allow = Effect.GrantLookAtExiled (ObjectRef.InSlot hideawayExiled)
+      rest =
+        Effect.MoveToZone
+          ( MoveToZone.MkMoveToZone
+              (ObjectRef.InSlot hideawaySeen)
+              Zone.Library
+              plain
+              Nothing
+              Nothing
+              (LibraryPlacement.RandomOrder LibraryPosition.Bottom)
+              Nothing
+          )
+      clause effects = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects)
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.fromList [clause [look], clause [hide, allow], clause [rest]]) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slot rule 702.75a's look binds its N cards into.
+hideawaySeen :: SlotName.SlotName
+hideawaySeen = SlotName.MkSlotName (Text.pack "hidden away")
+
+-- The slot the exiled one of them is bound into, so the grant one effect later
+-- names that card and not the whole look.
+hideawayExiled :: SlotName.SlotName
+hideawayExiled = SlotName.MkSlotName (Text.pack "hidden")
 
 -- CR 702.46a: soulshift N. "When this permanent is put into a graveyard from the
 -- battlefield, you may return target Spirit card with mana value N or less from

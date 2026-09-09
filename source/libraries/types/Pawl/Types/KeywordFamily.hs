@@ -112,6 +112,8 @@ data KeywordFamily
     Frenzy
   | -- | CR 702.70a: poisonous N.
     Poisonous
+  | -- | CR 702.75a: hideaway N.
+    Hideaway
   | -- | CR 702.77a: reinforce N-[cost].
     Reinforce
   | -- | CR 702.86a: annihilator N.

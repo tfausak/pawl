@@ -2085,6 +2085,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Renown _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
+  -- CR 702.75a's N is a number and not a word, so CR 612.2 has nothing to swap;
+  -- the look and the exile are in the ability Pawl.Engine.Keyword.hideaway mints.
+  Keyword.Type.Hideaway _ -> keyword
   Keyword.Type.Infect -> keyword
   Keyword.Type.Wither -> keyword
   Keyword.Type.Exalted -> keyword
