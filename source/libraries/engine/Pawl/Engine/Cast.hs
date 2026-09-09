@@ -2364,11 +2364,21 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                         -- candidate carried it -- and is stamped on the object,
                         -- because "if this spell was kicked" is read at
                         -- resolution.
-                        -- Not implemented: the slots the payment bound are
-                        -- dropped, so a spell whose additional cost sacrifices a
-                        -- permanent cannot read it (#1872). Activation is the
-                        -- half that folds them on (Pawl.Engine.Activate).
-                        Payment.Paid _ -> do
+                        Payment.Paid bound -> do
+                          -- CR 601.2f: the slots the PAYMENT bound -- the card a
+                          -- RevealCardFromHand component showed -- folded onto
+                          -- the spell, so "the revealed card's mana value" has a
+                          -- name to read at resolution (Living Destiny). After
+                          -- the payment because that is when the payment knows
+                          -- them, and onto the SPELL because that is the object
+                          -- whose effects read it, Pawl.Engine.Activate's route
+                          -- one carrier over.
+                          --
+                          -- Not implemented: the OTHER payers still drop the map
+                          -- -- a CR 118.12 cost paid during a resolution cannot
+                          -- be read by a later clause of the same resolution
+                          -- (#1872).
+                          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setPaid bound (Object.bindings o)}) sid (GameState.objects g)})
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement
                           -- records nothing.

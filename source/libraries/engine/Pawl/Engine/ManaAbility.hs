@@ -179,7 +179,9 @@ costMovesLibraryCard component = case component of
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.ExileCardFromHand _ -> False
-  -- These move no card at all.
+  -- These move no card at all -- CR 701.20b leaves a revealed card in the zone it
+  -- was shown from.
+  CostComponent.RevealCardFromHand _ -> False
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
   CostComponent.TapForTotalPower {} -> False

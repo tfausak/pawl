@@ -367,7 +367,10 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 -- "each opponent loses life equal to the sacrificed creature's power". Stamped
 -- by Pawl.Engine.Activate as the activation's payment returns (CR 601.2h at the
 -- position CR 602.2b gives it), which is why the ability object holds it and its
--- source permanent does not.
+-- source permanent does not. Pawl.Engine.Cast stamps a SPELL's payment onto the
+-- spell the same way; no printing in `data/cards/` sacrifices as an additional
+-- cost and then reads what it sacrificed, so nothing reads this slot there
+-- (Fling is the producer, #1872).
 --
 -- The permanent is in a graveyard by the time the ability resolves, so every
 -- read of it is CR 608.2h's last known information; Pawl.Engine.Resolve.Slots.effectViewOf
@@ -385,8 +388,10 @@ sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 -- CR 601.2f: the reserved slot under which the permanents a COST payment TAPPED
 -- are bound -- "the tapped creature" in Unerring Sling's "deals damage equal to
 -- the tapped creature's power". Stamped by Pawl.Engine.Activate off the payment
--- CR 601.2h makes, sacrificedPermanent's route exactly, and so readable by an
--- activated ability only.
+-- CR 601.2h makes, sacrificedPermanent's route exactly. Pawl.Engine.Cast stamps a
+-- spell's payment the same way, so the slot is readable on either carrier; no
+-- printing puts this component on a spell's additional cost, so nothing reads it
+-- there.
 --
 -- Unlike sacrificedPermanent, the permanent is still on the battlefield when the
 -- ability resolves -- CR 601.2h taps it, and tapping is not a zone change -- so
@@ -430,6 +435,27 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- card's targetSlots may name it" sweep as tappedPermanent above.
 tappedForTotalPower :: SlotName
 tappedForTotalPower = SlotName.MkSlotName (Text.pack "thatTappedForTotalPower")
+
+-- CR 601.2f once more, for the component that CHOOSES a card and moves nothing:
+-- the card a CostComponent.RevealCardFromHand payment revealed -- "the revealed
+-- card" in Living Destiny's "you gain life equal to the revealed card's mana
+-- value". Stamped by Pawl.Engine.Cast off the payment CR 601.2h makes, which is
+-- sacrificedPermanent's route on the CASTING side rather than the activating one.
+--
+-- The card is still in the payer's hand when the spell resolves -- CR 701.20b
+-- moves nothing, and CR 701.20a keeps it revealed until the spell leaves the
+-- stack -- so CR 608.2h's last-known clause is never reached: the card neither
+-- left the zone it was expected in nor was moved out of a public one. Every read
+-- is CURRENT information, tappedPermanent's posture rather than
+-- sacrificedPermanent's, and Pawl.Engine.Resolve.Slots.effectViewOf needs no arm.
+--
+-- SINGULAR: every printing of this cost reveals one card, so Binding.onlyOne
+-- answers it.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no card's
+-- targetSlots may name it" sweep as the slots above.
+revealedCard :: SlotName
+revealedCard = SlotName.MkSlotName (Text.pack "thatRevealedCard")
 
 -- CR 702.122b: the reserved slot under which the VEHICLE a creature just crewed
 -- is bound -- the "that Vehicle" in Gearshift Ace's "whenever this creature crews
