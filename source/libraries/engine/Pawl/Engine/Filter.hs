@@ -1181,10 +1181,10 @@ data Context = MkContext
     -- CR 105.2: the colour the SOURCE chose as it entered (CR 614.1c), for the one
     -- atom that asks whether a candidate wears it (HasChosenColor, Gauntlet of
     -- Power). Supplied by the caller for slotNames' reason, and by ONE:
-    -- Pawl.Engine.Projection.affectsWith, the one funnel every Affected question
-    -- goes through, at each of its four arms that match a filter -- CR 607.2d links the choosing ability to
-    -- the affected clause beside it, so a static ability's own affected set is the
-    -- position the link is written in.
+    -- Pawl.Engine.Projection.affectsWith, the funnel every Affected question goes
+    -- through, at each of its four arms that match a filter. CR 607.2d links the
+    -- choosing ability to the affected clause beside it, so a static ability's own
+    -- affected set is the position the link is written in.
     --
     -- The SOURCE's, sourceChosenNames' direction rather than carrierChosenPlayer's:
     -- the permanent whose static ability wrote the affected set is the permanent
@@ -1193,8 +1193,8 @@ data Context = MkContext
     --
     -- Read LIVE off the board, carrierChosenPlayer's posture: a permanent's static
     -- ability is asked afresh every time, and Object.chosenColor is per-incarnation
-    -- (CR 707.2 leaves it out of the copiable values), so two Gauntlets naming two
-    -- colours answer differently on the one board.
+    -- (CR 707.6 does not copy it), so two Gauntlets naming two colours answer
+    -- differently on the one board.
     --
     -- Nothing in contextFor below and so in contextWithSlots and
     -- contextComparingPower too, so the atom is vacuously False in every position

@@ -311,8 +311,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   -- atom apart from "any chosen colour on the battlefield": each pumps the
   -- creature of ITS colour and neither pumps the other's. Cast rather than
   -- placed, so each colour is a player's answer travelling CR 614.1c's entry
-  -- rewrite; Object.chosenColor is per-incarnation (CR 707.2 keeps it out of the
-  -- copiable values), which is what makes the two answers survive on one board.
+  -- rewrite; Object.chosenColor is per-incarnation and CR 707.6 does not copy it,
+  -- which is what makes the two answers survive on one board.
   -- The colourless Myr is the third creature neither may reach.
   Spec.it s "CR 607.2d two Gauntlets of Power each pump the creatures of their OWN chosen colour" $ do
     plains <- S.printingOf s registry "Plains"

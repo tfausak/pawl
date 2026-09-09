@@ -648,8 +648,8 @@ affectsWith grants peers source oid a partial gs = case a of
 -- source's controller, and CR 607.2d's link puts the SOURCE's entry choice (CR
 -- 614.1c) beside it, since the ability that chose and the affected clause that
 -- reads the choice are printed on the one permanent. Read off the OBJECT and not
--- its card: Object.chosenColor is per-incarnation, CR 707.2 leaving it out of the
--- copiable values, so two permanents of the one printing answer differently.
+-- its card: Object.chosenColor is per-incarnation, and CR 707.6 leaves a copy to
+-- make its own choice, so two permanents of the one printing answer differently.
 affectedContext :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Filter.Context
 affectedContext source perspective gs =
   (Filter.contextFor (Game.teams gs) perspective (Just source))
@@ -2337,8 +2337,9 @@ filterReads f = case f of
   -- chosen half is not a projection at all, and no Modification writes the other.
   Filter.Type.HasChosenName -> Set.empty
   -- Reads the candidate's COLOURS, HasColor's answer above: the chosen half is no
-  -- projection, and layer 5 writes the other -- which is what makes Painter's
-  -- Servant and Gauntlet of Power a CR 613.8a dependency rather than a race.
+  -- projection at all, and CR 613.1e's layer writes the other, so an effect that
+  -- recolours a creature (Painter's Servant) moves an affected set written with
+  -- this atom.
   Filter.Type.HasChosenColor -> Set.singleton Colors
   -- Reads the candidate's CONTROLLER, SameControllerAsBound's answer above: rule
   -- 702.16k's other half is an owner, which CR 108.3 never projects.
