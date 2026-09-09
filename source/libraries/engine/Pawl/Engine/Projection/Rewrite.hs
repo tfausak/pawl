@@ -353,6 +353,10 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantPlayLands f -> PlayerEffect.CantPlayLands (Filter.rewrite pairs f)
   PlayerEffect.CastFrom grant -> PlayerEffect.CastFrom grant {CastFromZone.matching = Filter.rewrite pairs (CastFromZone.matching grant)}
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
+  -- CR 702.16a's quality where the CARD states it, so a subtype word in it is a
+  -- word on the card and CR 612.1 swaps it; the chosen-name sibling below is the
+  -- arm CR 612.2's second sentence keeps a swap off.
+  PlayerEffect.HasProtectionFrom f -> PlayerEffect.HasProtectionFrom (Filter.rewrite pairs f)
   -- The rest name no word a subtype pair could reach. The two chosen-name arms
   -- carry nothing at all -- CR 201.4's names are read off the source's
   -- Object.chosenNames -- and CR 612.2's second sentence says a subtype swap

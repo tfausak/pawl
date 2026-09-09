@@ -49,6 +49,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -1883,6 +1884,165 @@ runedHaloSpec s registry =
       Spec.assertEqWith s "carol takes the whole 2 with the same name chosen -- the Halo protects its controller alone" (S.lifeOf S.carol atCarol) (fmap (subtract 2) (S.lifeOf S.carol beforeCarol))
       Spec.assertEqWith s "and with the Curse named instead, so does alice" (S.lifeOf S.alice other) (fmap (subtract 2) (S.lifeOf S.alice beforeOther))
 
+-- The Stasis Coffin {3} Legendary Artifact: "{2}, {T}, Exile The Stasis Coffin:
+-- You gain protection from everything until your next turn." The pool's one card
+-- that gives a PLAYER protection from a quality the CARD states
+-- (PlayerEffect.HasProtectionFrom), where Runed Halo above states CR 201.4's
+-- chosen name instead -- and CR 702.16j's "everything" is that quality written as
+-- the empty conjunction.
+--
+-- The STORED carrier, which is the half Runed Halo cannot reach: the Coffin
+-- exiles itself to pay for its own ability (CR 601.2h), so by the time any of the
+-- three prohibitions is read the source is in exile and the quality can only have
+-- come off the row.
+--
+-- Curse of Vitality is the enchant-PLAYER Aura on the other side of rules 702.16b
+-- and 702.16c, as it is for Runed Halo; the Goblin Piker is rule 702.16e's
+-- attacker.
+--
+-- THREE SEATS, for runedHaloBoard's reason: alice holds the Coffin, bob holds the
+-- Curse and the Piker, and carol holds nothing, so "bob may not target alice" is
+-- told apart from "bob may not target anybody".
+--
+-- alice's two Plains are exactly the ability's {2} and bob's three are exactly the
+-- Curse's {2}{W}, so no case below can turn on an unaffordable cost.
+stasisCoffinBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+stasisCoffinBoard plains coffin curse piker =
+  let lands = S.landsFor plains S.bob 3 (S.landsFor plains S.alice 2 S.threePlayerGame)
+      (coffinId, g1) = S.addPermanent coffin S.alice lands
+      (curseId, g2) = S.addHandCard curse S.bob g1
+      (pikerId, g3) = S.addPermanent piker S.bob g2
+   in ( coffinId,
+        curseId,
+        pikerId,
+        g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Activate the Coffin's one ability and let it resolve. The ability is read off
+-- the PROJECTION rather than the printed face, Pawl.AuraSpec's fortify cases'
+-- spelling.
+activateCoffin :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+activateCoffin coffinId gs = case Projection.abilitiesOf coffinId gs of
+  [ability] -> S.runPure S.identityAnswer gs (Activate.activateAbility S.alice coffinId ability >> Stack.resolveTop)
+  _ -> gs
+
+-- Every recipient offered to every target slot of `game`, in offer order. The
+-- offered SET and not the answer, which is what rule 702.16b is about: a
+-- protected player is out of the candidates CR 601.2c draws from, and an answerer
+-- that picked a legal one for itself would hide that.
+offeredRecipients :: GameState.GameState -> Game.Type.Game a -> [Recipient.Recipient]
+offeredRecipients gs game =
+  let answer :: Prompt.Prompt r -> State.State [Recipient.Recipient] r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> do
+          State.modify' (<> concatMap (Set.toList . snd) (Map.elems sets))
+          pure (S.preferring (const True) sets)
+        _ -> pure (S.identityAnswer p)
+   in State.execState (Engine.runGame answer gs game) []
+
+-- stasisCoffinBoard carried through one combat, runedHaloCombat's shape: bob's
+-- Goblin Piker attacks `defender` alone and the pair (before, after) comes back so
+-- a case can read the life it cost.
+--
+-- COMBAT damage for runedHaloCombat's reason -- rule 702.16b stops a burn spell
+-- from ever TARGETING a protected player, so a case built on one would stay green
+-- with rule 702.16e's shield deleted.
+stasisCoffinCombat ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Bool ->
+  PlayerId.PlayerId ->
+  (GameState.GameState, GameState.GameState)
+stasisCoffinCombat plains coffin curse piker activated defender =
+  let (coffinId, _, _, base) = stasisCoffinBoard plains coffin curse piker
+      before =
+        (if activated then activateCoffin coffinId base else base)
+          { GameState.activePlayer = S.bob,
+            GameState.priority = Just S.bob,
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [defender]}
+          }
+      fight = Combat.declareAttackers S.manaPerformer S.bob >> Combat.declareBlockers S.manaPerformer >> Damage.dealCombatDamage
+   in (before, S.settleSba (S.runPure (S.attackTo defender) before fight))
+
+stasisCoffinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stasisCoffinSpec s registry =
+  Spec.describe s "TheStasisCoffin" $ do
+    -- CR 702.16j with CR 702.16b: "such a permanent or player can't be targeted
+    -- by spells or abilities." Read at the OFFER, since that is where CR 601.2c
+    -- draws its candidates.
+    --
+    -- Two boards differing in one thing -- whether the ability resolved -- and
+    -- carol on both, so "alice is gone from the offer" is told apart from "the
+    -- offer collapsed".
+    Spec.it s "CR 702.16j / 702.16b a player with protection from everything is not offered to an enchant-player Aura" $ do
+      plains <- S.printingOf s registry "Plains"
+      coffin <- S.printingOf s registry "The Stasis Coffin"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (coffinId, curseId, _, base) = stasisCoffinBoard plains coffin curse piker
+          offered gs = offeredRecipients gs (S.cast S.bob curseId)
+          protected = offered (activateCoffin coffinId base)
+      Spec.assertBool s (notElem (Recipient.ToPlayer S.alice) protected) "alice is out of the Curse's offered players"
+      Spec.assertBool s (elem (Recipient.ToPlayer S.carol) protected) "carol, who has no protection, is still in it"
+      Spec.assertBool s (elem (Recipient.ToPlayer S.alice) (offered base)) "and on the same board without the ability she is in it"
+    -- CR 702.16j with CR 702.16c's second sentence: "such Auras attached to the
+    -- permanent or player with protection will be put into their owners'
+    -- graveyards as a state-based action" (CR 704.5m), which
+    -- Pawl.Engine.Sba.fallsOff answers through
+    -- Pawl.Engine.PlayerEffect.protectedFrom.
+    --
+    -- The Curse is attached BEFORE the ability resolves, which is the order the
+    -- rule is about.
+    Spec.it s "CR 702.16j / 702.16c an Aura already enchanting alice is buried once she gains protection from everything" $ do
+      plains <- S.printingOf s registry "Plains"
+      coffin <- S.printingOf s registry "The Stasis Coffin"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (coffinId, _, _, base) = stasisCoffinBoard plains coffin curse piker
+          (aura, withAura) = S.addPermanent curse S.bob base
+          cursed = S.attachTo aura (Recipient.ToPlayer S.alice) withAura
+          after = S.settleSba (activateCoffin coffinId cursed)
+      Spec.assertBool s (not (S.onBattlefield aura after)) "the Curse is off the battlefield after one pass"
+      Spec.assertEqWith s "in its OWNER's graveyard, and bob owns it" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+      Spec.assertBool s (S.onBattlefield aura (S.settleSba cursed)) "and without the ability it stays where it is"
+    -- CR 702.16j with CR 702.16e: "all damage that would be dealt to such a
+    -- permanent or player is prevented", the CR 615.1 shield
+    -- Pawl.Engine.Replacement.collect mints off
+    -- Pawl.Engine.PlayerEffect.protectionCarriers -- whose quality is now the
+    -- row's own Filter rather than the carrier's chosen names.
+    --
+    -- THREE combats, each differing from the first in one thing: alice takes none
+    -- of the Piker's 2; carol takes all of it off the same activated board, so the
+    -- shield is scoped to the Coffin's controller and is not a Fog; and alice
+    -- takes all of it when the ability never resolved.
+    --
+    -- The Coffin is in EXILE by then -- its own cost put it there -- so the
+    -- shield's quality can only have come off the stored row.
+    Spec.it s "CR 702.16j / 702.16e combat damage to the protected player is prevented, and the same attacker otherwise connects" $ do
+      plains <- S.printingOf s registry "Plains"
+      coffin <- S.printingOf s registry "The Stasis Coffin"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let combat = stasisCoffinCombat plains coffin curse piker
+          (beforeAlice, atAlice) = combat True S.alice
+          (beforeCarol, atCarol) = combat True S.carol
+          (beforeOther, other) = combat False S.alice
+      Spec.assertEqWith s "with the ability resolved, alice takes none of the Piker's 2" (S.lifeOf S.alice atAlice) (S.lifeOf S.alice beforeAlice)
+      Spec.assertEqWith s "carol takes the whole 2 off the same board -- the Coffin protects its controller alone" (S.lifeOf S.carol atCarol) (fmap (subtract 2) (S.lifeOf S.carol beforeCarol))
+      Spec.assertEqWith s "and without the ability, so does alice" (S.lifeOf S.alice other) (fmap (subtract 2) (S.lifeOf S.alice beforeOther))
+
 -- Conjurer's Ban {W}{B} Sorcery: "Choose a card name. Until your next turn,
 -- spells with the chosen name can't be cast and lands with the chosen name can't
 -- be played. Draw a card."
@@ -2037,6 +2197,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   nullChamberSpec s registry
   runedHaloSpec s registry
+  stasisCoffinSpec s registry
   conjurersBanSpec s registry
   cityInABottleSpec s registry
   silenceSpec s registry
