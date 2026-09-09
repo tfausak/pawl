@@ -403,12 +403,12 @@ resolveCardBacked runSubgame oid rest printingId = do
                 -- CR 730.2a makes the two answers differ in the merged
                 -- permanent's every characteristic.
                 --
-                -- A merge that REFUSES (Event.mergeable's own note: a spell with
-                -- no printing behind it) falls through to the ordinary entry
-                -- below, so the spell resolves as the creature spell it also is
-                -- rather than being lost (#3431). Asked BEFORE the side is, so a
-                -- player is never put a question whose answer the refusal would
-                -- then discard.
+                -- A merge that REFUSES (Event.mergeable's own note: a spell rule
+                -- 730.2's "card or copy" cannot name) falls through to the
+                -- ordinary entry below, so the spell resolves as the creature
+                -- spell it also is rather than being lost. Asked BEFORE the side
+                -- is, so a player is never put a question whose answer the
+                -- refusal would then discard.
                   case mutatingTarget oid gs1 of
                     Just victim | Event.mergeable oid victim gs1 -> do
                       side <- Game.choose (Prompt.ChooseMutateSide (Decide.deciderFor controller gs1) controller oid victim)

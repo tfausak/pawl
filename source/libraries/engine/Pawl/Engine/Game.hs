@@ -501,8 +501,8 @@ cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
 -- FLATTENED past a melded component (CR 730.2's mutate onto a melded permanent):
 -- CR 730.3 puts "each of the individual components" into the appropriate zone
 -- and CR 712.21 says a melded permanent is two cards there, so the answer stays
--- a list of cards and tokens and no reader of it has to compose the two rules
--- itself. The unflattened list, which CR 730.2a's topmost read wants, is
+-- a list of cards, tokens and copies and no reader of it has to compose the two
+-- rules itself. The unflattened list, which CR 730.2a's topmost read wants, is
 -- `mergeComponentsOf` below.
 componentsOf :: Source.Source -> Seq.Seq MergeComponent.MergeComponent
 componentsOf source = case source of
@@ -528,6 +528,7 @@ cardComponentsOf component = case component of
   MergeComponent.OfMeld meld -> meldCardComponents meld
   MergeComponent.OfCard _ -> Seq.singleton component
   MergeComponent.OfToken _ -> Seq.singleton component
+  MergeComponent.OfSpellCopy _ -> Seq.singleton component
 
 -- CR 701.42a's two cards as components of their own. Shared by the two arms that
 -- need them so that a melded permanent and a melded COMPONENT cannot come to
@@ -550,6 +551,11 @@ printingOfComponent :: MergeComponent.MergeComponent -> PrintingId.PrintingId
 printingOfComponent component = case component of
   MergeComponent.OfCard pid -> pid
   MergeComponent.OfToken pid -> pid
+  -- CR 707.2: the copiable values a copy of a spell reports are the copied
+  -- spell's, so the printing it names is the one its characteristics come off --
+  -- Pawl.Types.Source's OfSpellCopy arm carries the same payload for the same
+  -- reason.
+  MergeComponent.OfSpellCopy pid -> pid
   MergeComponent.OfMeld meld -> MeldSource.result meld
 
 -- `cardOf` for a member of a HAND. An emblem answers Nothing where `cardOf`
@@ -1415,6 +1421,32 @@ componentIsToken component = case component of
   -- CR 108.2b / 701.42b: both cards of a meld pair are Magic cards, and a token
   -- cannot be one of them. `sourceIsToken`'s OfMeld arm answers the same.
   MergeComponent.OfMeld _ -> False
+  -- CR 608.3f gives a copy of a permanent spell its token-ness only "as it is put
+  -- onto the battlefield", and CR 702.140c's merge never puts it there --
+  -- `sourceIsToken`'s OfSpellCopy arm answers the same for the same rule. A
+  -- REGRESSION FENCE rather than a proved answer: only a merged permanent whose
+  -- TOPMOST component is a copy reads it, and answering True leaves the suite
+  -- green (2026-09-09).
+  MergeComponent.OfSpellCopy _ -> False
+
+-- CR 108.2 / 903.9c: is this component of a merged permanent a CARD? Not
+-- `componentIsToken` negated, which is the reading CR 730.2d asks for and not
+-- this one: rule 730.2's "the card or copy" admits a component that is neither a
+-- card nor a token (Pawl.Types.MergeComponent's OfSpellCopy arm), and only a
+-- card answers True here.
+--
+-- Its two readers are the two rules that name a component's CARD --
+-- Pawl.Engine.Commander's rule 903.9c search for "the card that represents it
+-- and is a commander", and Pawl.Engine.Event's CR 903.9c split of a departing
+-- merged permanent -- so neither can find a commander in a copy interned to the
+-- commander's own printing.
+componentIsCard :: MergeComponent.MergeComponent -> Bool
+componentIsCard component = case component of
+  MergeComponent.OfCard _ -> True
+  -- CR 701.42b again: both components of a meld pair are Magic cards.
+  MergeComponent.OfMeld _ -> True
+  MergeComponent.OfToken _ -> False
+  MergeComponent.OfSpellCopy _ -> False
 
 -- CR 730.2/730.3: what a component of a merged permanent represents once it is
 -- an object of its own again -- the card representing itself (CR 108.2), or the
@@ -1424,6 +1456,10 @@ sourceOfComponent :: MergeComponent.MergeComponent -> Source.Source
 sourceOfComponent component = case component of
   MergeComponent.OfCard pid -> Source.OfCard pid
   MergeComponent.OfToken pid -> Source.OfToken pid
+  -- The copy it still is, so CR 704.5e removes it in whatever zone CR 730.3 put
+  -- it -- the same road the token arm above takes to CR 111.7, one rule over.
+  -- Pawl.Engine.Sba's OfSpellCopy arm is what performs it.
+  MergeComponent.OfSpellCopy pid -> Source.OfSpellCopy pid
   -- The melded permanent it still is (CR 730.2c). Neither reader can be handed
   -- one: both take `componentsOf`, which has already expanded a melded component
   -- into CR 712.21's two cards, so this arm is the type's answer rather than a

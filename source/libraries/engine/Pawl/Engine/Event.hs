@@ -4881,7 +4881,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- merged permanent can have a TOKEN component, which arrives as a
               -- token (Game.sourceOfComponent) and is then removed by CR 111.7's
               -- state-based action, rather than as a card that would sit in the
-              -- graveyard for ever.
+              -- graveyard for ever. CR 730.2's copy component arrives as the copy
+              -- it is and CR 704.5e removes it there, one rule over.
               --
               -- CR 712.21d needs nothing here: the CR 616.1 replacement loop
               -- ran ONCE above, against the melded permanent, so a replacement
@@ -4911,13 +4912,15 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                   -- which is how CR 903.9c's two arrivals in two different zones
                   -- are both said.
                   --
-                  -- A TOKEN component never goes to the command zone, whatever
-                  -- printing it was interned under: CR 903.9c splits off "the
-                  -- card that represents it and is a commander", and CR 111.6
-                  -- says a token is not a card. Commander.commanderPrintingOf
-                  -- filters the same way on the way in, so the two agree about
-                  -- which component the designation can sit on.
-                  (commandComponents, destComponents) = Seq.partition (\component -> not (Game.componentIsToken component) && Just (Game.printingOfComponent component) == splitOff) components
+                  -- Only a CARD component goes to the command zone, whatever
+                  -- printing the others were interned under: CR 903.9c splits off
+                  -- "the card that represents it and is a commander", and neither
+                  -- a token (CR 111.6) nor CR 730.2's copy (CR 707.10, "no spell
+                  -- card associated with it") is one. Game.componentIsCard is
+                  -- that read, and Commander.commanderPrintingOf takes it on the
+                  -- way in, so the two agree about which component the
+                  -- designation can sit on.
+                  (commandComponents, destComponents) = Seq.partition (\component -> Game.componentIsCard component && Just (Game.printingOfComponent component) == splitOff) components
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
@@ -6401,17 +6404,14 @@ meldable victims gs = do
 -- decided here or nowhere.
 --
 -- Not implemented: CR 730.2g's instant or sorcery component, which cannot be
--- turned face up (#3392); CR 730.2i/730.2j's double-faced components (#3428). A
--- spell with no printing behind it -- CR 707.10's copy of a mutating creature
--- spell -- refuses here rather than merging (#3431).
+-- turned face up (#3392); CR 730.2i/730.2j's double-faced components (#3428).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
   case (Game.lookupObject sid gs, Game.lookupObject target gs) of
-    (Just spell, Just permanent) -> case (Object.source spell, mergeComponents (Object.source permanent)) of
-      (Source.OfCard pid, Just existing) -> do
-        let component = MergeComponent.OfCard pid
-            merged = case side of
+    (Just spell, Just permanent) -> case (mergingComponent (Object.source spell), mergeComponents (Object.source permanent)) of
+      (Just component, Just existing) -> do
+        let merged = case side of
               MutateSide.Over -> component NonEmpty.:| existing
               MutateSide.Under -> case existing of
                 first : rest -> first NonEmpty.:| (rest <> [component])
@@ -6490,18 +6490,50 @@ mergeComponents source = case source of
   Source.OfCardCopy _ -> Nothing
   Source.OfInherentTrigger _ -> Nothing
 
+-- CR 730.2's OTHER side: "the card or copy that represented that object", which
+-- is what the merging spell contributes to the component list. Two of rule
+-- 730.2's three nouns, since only these two can be a spell on the stack -- a
+-- token is never one (CR 111.1) and a melded permanent is put onto the
+-- battlefield (CR 701.42a).
+--
+-- The COPY arm is CR 707.10's own sentence: "a copy of a spell is itself a
+-- spell", so a copy of a mutating creature spell is a mutating creature spell
+-- and CR 702.140c merges it like the original. It stays a copy through the
+-- merge because CR 608.3f turns one into a token only "as it is put onto the
+-- battlefield", which rule 702.140c is the resolution that never does.
+--
+-- Nothing where the object is no spell at all, which `merge` and `mergeable`
+-- both report as a refusal.
+mergingComponent :: Source.Source -> Maybe MergeComponent.MergeComponent
+mergingComponent source = case source of
+  Source.OfCard pid -> Just (MergeComponent.OfCard pid)
+  Source.OfSpellCopy pid -> Just (MergeComponent.OfSpellCopy pid)
+  -- CR 722.3c's copy of a card is a spell once cast, but it "has only the
+  -- characteristics of that permanent's prepare spell", so rule 702.140a's
+  -- mutate is not among them and no such spell is ever a mutating creature
+  -- spell. CR 730.2's list names a card and a copy and no third thing.
+  Source.OfCardCopy _ -> Nothing
+  Source.OfMeld _ -> Nothing
+  Source.OfMerge _ -> Nothing
+  Source.OfToken _ -> Nothing
+  Source.OfAbility _ -> Nothing
+  Source.OfTrigger _ -> Nothing
+  Source.OfEmblem _ -> Nothing
+  Source.OfInherentTrigger _ -> Nothing
+
 -- `merge` above's refusal, asked BEFORE its side is chosen: CR 702.140c's
 -- over-or-under is a real decision, and a question whose answer the next line
 -- discards is not one the engine should put to a player. Pawl.Engine.Stack asks
 -- this first and takes the ordinary entry when it answers False, so the prompt
 -- is raised only where the merge will actually happen.
 --
--- The same two reads `merge` makes, and no other: a spell with a printing behind
--- it, and a target whose components can be named.
+-- The same two reads `merge` makes, and no other: a spell rule 730.2's "card or
+-- copy" can name (`mergingComponent`), and a target whose components can be
+-- named.
 mergeable :: ObjectId -> ObjectId -> GameState -> Bool
 mergeable sid target gs = case (Game.lookupObject sid gs, Game.lookupObject target gs) of
-  (Just spell, Just permanent) -> case (Object.source spell, mergeComponents (Object.source permanent)) of
-    (Source.OfCard _, Just _) -> True
+  (Just spell, Just permanent) -> case (mergingComponent (Object.source spell), mergeComponents (Object.source permanent)) of
+    (Just _, Just _) -> True
     _ -> False
   _ -> False
 
