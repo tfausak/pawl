@@ -31,6 +31,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -476,9 +477,10 @@ data GameEvent
     -- write that event and not this one. The two always co-occur here, {T}
     -- (CR 107.5) being payable only by an untapped permanent.
     --
-    -- The id alone. CR 106.12a's "of a specified type" narrowing would want the
-    -- produced mana here as well; no card in data/cards/ prints it.
-    TappedForMana ObjectId.ObjectId
+    -- Carries the produced mana as well as the id, which is what CR 106.12a's
+    -- "of a specified type" narrowing reads -- Gauntlet of Power's "whenever a
+    -- basic land is tapped for mana of the chosen color".
+    TappedForMana TappedForMana.TappedForMana
   | -- | CR 705.1: a player flipped a coin, and CR 705.2 decided whether they won
     -- it -- or left it winnerless. Recorded by both roads that flip:
     -- Pawl.Engine.Resolve's Effect.FlipCoin arm, after the outcome is settled and

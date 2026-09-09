@@ -85,6 +85,8 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.ManaSpecification as ManaSpecification
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -124,6 +126,7 @@ import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -2346,11 +2349,11 @@ representativeEvents cond =
         -- pins the floor for a matching pair too, this arm binding nothing
         -- either way.
         TriggerCondition.SelfBecomesUntapped -> one (GameEvent.BecameUntapped departed)
-        TriggerCondition.AttachedPermanentTappedForMana -> one (GameEvent.TappedForMana departed)
+        TriggerCondition.AttachedPermanentTappedForMana -> one (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = departed, TappedForMana.mana = Set.singleton (ManaType.Colored Color.Green)}))
         -- The same event for the bystander reading, on `departed` for the arm
         -- above's reason: the arm stamps the tapped permanent under every
         -- relation it admits, so the floor is the same whether the pair matches.
-        TriggerCondition.PermanentTappedForMana {} -> one (GameEvent.TappedForMana departed)
+        TriggerCondition.PermanentTappedForMana {} -> one (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = departed, TappedForMana.mana = Set.singleton (ManaType.Colored Color.Green)}))
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
@@ -2613,9 +2616,14 @@ everyTriggerCondition =
     -- an eventBindings arm that had cased on the relation and stamped nothing
     -- under one of them would go unseen if only one were listed. Autumn Willow,
     -- Harmony prints the You form.
-    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.You (Filter.Type.And [])),
-    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.Opponent (Filter.Type.And [])),
-    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.AnyPlayer (Filter.Type.And [])),
+    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.You (Filter.Type.And []) ManaSpecification.AnyMana),
+    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.Opponent (Filter.Type.And []) ManaSpecification.AnyMana),
+    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.AnyMana),
+    -- CR 106.12a's narrowed form beside the three above, listed for their
+    -- reason applied to the other field: an eventBindings arm that had cased on
+    -- the specification and stamped nothing under this one would go unseen.
+    -- Gauntlet of Power prints it.
+    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.ChosenColor),
     TriggerCondition.SelfTrains,
     TriggerCondition.SelfBecomesCrewed,
     TriggerCondition.SelfCrewsVehicle,
