@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Exile as Exile
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Foretell as Foretell
@@ -1075,9 +1076,10 @@ settleForPriority = Monad.void performSettle
 -- CR 117.5: each time a player would receive priority, sweep expired "for as
 -- long as" effects, perform state-based actions, then put triggered abilities on
 -- the stack, repeating until none of the three does anything. Every pass also
--- pays five samples of derived state (sampleWorldSince for CR 704.5k,
--- sampleControl for CR 603.2, checkControlContinuity for CR 302.6,
--- Combat.removeChanged for CR 506.4, Ring.endOnControlChange for CR 701.54a).
+-- pays a sample of derived state for each rule that stores what a projection
+-- answers live -- sampleWorldSince for CR 704.5k, sampleControl for CR 603.2,
+-- Exile.accrueLookers for CR 406.3, checkControlContinuity for CR 302.6,
+-- Combat.removeChanged for CR 506.4, Ring.endOnControlChange for CR 701.54a.
 --
 -- CR 704.3 makes "whenever a player would get priority" the coarsest moment
 -- anything could observe CR 611.2b's condition, so settling here is
@@ -1104,10 +1106,16 @@ performSettle = do
   -- Also before the SBA pass: a permanent that just became world must be stamped
   -- before CR 704.5k reads the clock. No reason to loop.
   sampleWorldSince
-  -- Unlike the four other samples here it MAKES WORK: a GameEvent.ControlChanged
+  -- Unlike the other samples here it MAKES WORK: a GameEvent.ControlChanged
   -- it mints has to be scanned, so it runs before placePendingTriggers and joins
   -- the recursion guard below.
   sampledControl <- sampleControl
+  -- CR 406.3's continuing look, sampled off the control sampleControl just read
+  -- and for the same reason it is sampled: nothing announces a control change a
+  -- grant could hang on. Stamp-only, so its position among the passes does not
+  -- matter -- a change any later step here makes is seen on the next pass, and a
+  -- pass on which nothing acted is one on which control did not move.
+  State.modify' Exile.accrueLookers
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   -- Last, and for the same reason the conditional sweep runs first: all three read
