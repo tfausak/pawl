@@ -227,6 +227,7 @@ import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstan
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -2686,8 +2687,9 @@ keywordPayloadFilters keyword = case keyword of
   -- the damage event, not the keyword.
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
-  -- CR 702.16a's "[quality]", which every protection ability states.
-  Keyword.Protection quality -> [quality]
+  -- CR 702.16a's "[quality]", which every protection ability states, and CR
+  -- 702.16n's exception, which Spectra Ward alone states.
+  Keyword.Protection protection -> Protection.quality protection : Maybe.maybeToList (Protection.spares protection)
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []

@@ -5,7 +5,10 @@
         {
           "type": "Protection",
           "value": {
-            "type": "OfChosenPlayer"
+            "quality": {
+              "type": "OfChosenPlayer"
+            },
+            "spares": null
           }
         }
       ],

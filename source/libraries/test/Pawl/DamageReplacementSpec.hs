@@ -64,6 +64,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -2277,7 +2278,7 @@ phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 6
             batch = [hit garrison (Recipient.ToCreature vindicator) 4]
             (mintedDealt, mintedAfter) = strikeAndSettleWith (raceProtection True onlyBob) protected batch
             (printedDealt, printedAfter) = strikeAndSettleWith (raceProtection False onlyBob) protected batch
-        Spec.assertBool s (Projection.hasKeyword (Keyword.Protection (Filter.Type.HasCardType CardType.Artifact)) vindicator protected) "setup: the Tower's ability really did grant protection from artifacts"
+        Spec.assertBool s (Projection.hasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasCardType CardType.Artifact, Protection.spares = Nothing}) vindicator protected) "setup: the Tower's ability really did grant protection from artifacts"
         -- The gameplay assertion, ahead of every proxy: rule 702.16e's prevention
         -- fires nothing, so bob keeps his life, and the very same board choosing
         -- the printed prevention instead takes 4 off him.

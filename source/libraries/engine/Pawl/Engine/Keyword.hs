@@ -110,6 +110,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
@@ -1875,13 +1876,13 @@ mintedReplacementsFor keyword count = case keyword of
   -- Pawl.Engine.Target.targetable states for CR 702.16b -- so the player half is
   -- minted from the CR 613.11 axis instead, by Pawl.Engine.Replacement.collect's
   -- third segment.
-  Keyword.Protection quality ->
+  Keyword.Protection protection ->
     [ ReplacementEffect.DamageR
         DamageR.MkDamageR
           { DamageR.matching =
               DamagePattern.MkDamagePattern
                 { DamagePattern.whichKind = Nothing,
-                  DamagePattern.whatSource = quality,
+                  DamagePattern.whatSource = Protection.quality protection,
                   DamagePattern.whatRecipient = Just Filter.IsSource,
                   DamagePattern.whoRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing,
@@ -2131,11 +2132,11 @@ mintedCombatRestrictionsFor keyword = case keyword of
   --
   -- Ungated (Nothing), rule 702.16f stating no condition, and membership rather
   -- than a count for the type's own reason.
-  Keyword.Protection quality ->
+  Keyword.Protection protection ->
     [ CombatRestriction.CantBeBlockedBy
         CantBeBlockedBy.MkCantBeBlockedBy
           { CantBeBlockedBy.affected = Affected.Matching Filter.IsSource,
-            CantBeBlockedBy.blockers = quality,
+            CantBeBlockedBy.blockers = Protection.quality protection,
             CantBeBlockedBy.unless = Nothing,
             CantBeBlockedBy.name = Nothing
           }
@@ -2253,6 +2254,39 @@ mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
 mintedAttachRestrictionsOf :: Map Keyword Natural -> [AttachRestriction.AttachRestriction]
 mintedAttachRestrictionsOf = concatMap mintedAttachRestrictionsFor . Map.keys
 
+-- The same rows asked of the STANDING halves instead -- CR 704.5m's bury and CR
+-- 704.5n's detach, which Pawl.Engine.AttachRestriction.removesGiven serves,
+-- where the function above serves CR 701.3a's move. The two questions differ on
+-- exactly one sentence in rule 702, so this narrows those rows rather than
+-- restating two hundred keyword arms.
+mintedRemovalRestrictionsOf :: Map Keyword Natural -> [AttachRestriction.AttachRestriction]
+mintedRemovalRestrictionsOf = concatMap mintedRemovalRestrictionsFor . Map.keys
+
+-- CR 702.16n: an Aura that grants protection and says "this effect doesn't
+-- remove" the named Auras means they "aren't put into their owners' graveyards
+-- as a state-based action" -- and says nothing about what may BECOME attached,
+-- which is why this is a second mint rather than a change to the row above. Rule
+-- 702.16p, which does state a becoming-attached sentence, is the contrast.
+--
+-- A Not conjoined into the row's attachers, in the HOST's frame -- the frame
+-- Pawl.Engine.AttachRestriction.refuses's haddock states for a minted row.
+-- Rule 702.16n's last sentence needs nothing here: a second protection instance
+-- from the same quality is a distinct key in the keyword map when its exception
+-- differs, so its own unnarrowed row still removes what this one spares.
+--
+-- The WILDCARD is right rather than absorbing: rule 702.16n is the only sentence
+-- in rule 702 that parts removal from refusal, so every other keyword removes
+-- exactly what it refuses.
+mintedRemovalRestrictionsFor :: Keyword -> [AttachRestriction.AttachRestriction]
+mintedRemovalRestrictionsFor keyword =
+  let rows = mintedAttachRestrictionsFor keyword
+      sparing spared row = row {AttachRestriction.attachers = Filter.And [AttachRestriction.attachers row, Filter.Not spared]}
+   in case keyword of
+        Keyword.Protection protection -> case Protection.spares protection of
+          Nothing -> rows
+          Just spared -> fmap (sparing spared) rows
+        _ -> rows
+
 -- Exhaustive for `abilitiesFor`'s reason: the next keyword that forbids an
 -- attachment must break this build rather than silently forbid nothing.
 mintedAttachRestrictionsFor :: Keyword -> [AttachRestriction.AttachRestriction]
@@ -2308,15 +2342,19 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- Pawl.Engine.Attach.attachmentFor and Pawl.Engine.Sba.fallsOff through
   -- Pawl.Engine.PlayerEffect.protectedFrom. Rule 702.16d has no player half.
   --
-  -- Not implemented: rule 702.16n's and rule 702.16p's exceptions, where an AURA
-  -- grants protection from a quality and says the effect does not remove Auras,
-  -- or does not remove what is already attached. The pool's one grant is an
-  -- activated ability (Tower of the Magistrate) and carries no such rider, so
-  -- nothing here can either (#3046).
-  Keyword.Protection quality ->
+  -- The QUALITY alone, rule 702.16n's exception being about removal and not
+  -- about becoming attached: mintedRemovalRestrictionsFor above narrows this row
+  -- for the state-based halves, and Spectra Ward is the card.
+  --
+  -- Not implemented: rule 702.16n's "this Aura" form (White Ward) and rule
+  -- 702.16p (Benevolent Blessing). The first needs the projection to keep which
+  -- grant put a keyword on a permanent, since no Filter atom in the host's frame
+  -- names the Aura that granted it; the second adds "already attached to", a
+  -- moment rather than a state (#3046).
+  Keyword.Protection protection ->
     [ AttachRestriction.MkAttachRestriction
         { AttachRestriction.affected = Affected.Matching Filter.IsSource,
-          AttachRestriction.attachers = quality
+          AttachRestriction.attachers = Protection.quality protection
         }
     ]
   Keyword.Reach -> []

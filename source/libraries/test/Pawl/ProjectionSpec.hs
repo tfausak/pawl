@@ -88,6 +88,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -758,13 +759,13 @@ dealToPlayer src victim amount gs =
 
 -- CR 702.16's quality: red, the colour Goblin Piker is and Cabal Evangel is not.
 fromRed :: Keyword.Keyword
-fromRed = Keyword.Protection (Filter.Type.HasColor Color.Red)
+fromRed = Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasColor Color.Red, Protection.spares = Nothing}
 
 -- CR 702.16a's other quality, the one Tower of the Magistrate grants and
 -- Synthetic Grave Bulwark writes: Icehide Golem is an artifact and Cabal
 -- Evangel is not.
 fromArtifacts :: Keyword.Keyword
-fromArtifacts = Keyword.Protection (Filter.Type.HasCardType CardType.Artifact)
+fromArtifacts = Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasCardType CardType.Artifact, Protection.spares = Nothing}
 
 -- Aim every target slot at the first of `wanted` the offered set actually
 -- holds. The offered set is FILTERED rather than a recipient built by hand: CR

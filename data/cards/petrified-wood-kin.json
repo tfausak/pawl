@@ -8,10 +8,13 @@
         {
           "type": "Protection",
           "value": {
-            "type": "HasCardType",
-            "value": {
-              "type": "Instant"
-            }
+            "quality": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Instant"
+              }
+            },
+            "spares": null
           }
         },
         {

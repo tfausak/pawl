@@ -27,6 +27,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
@@ -1156,7 +1157,7 @@ data Context = MkContext
     -- caller for slotNames' reason, and by the four positions rule 702.16 reads a
     -- quality in: Pawl.Engine.Replacement.candidateContext (rule 702.16e's
     -- shield), Pawl.Engine.Target.targetable (rule 702.16b),
-    -- Pawl.Engine.AttachRestriction.refusesGiven (rules 702.16c and 702.16d) and
+    -- Pawl.Engine.AttachRestriction.barredBy (rules 702.16c and 702.16d) and
     -- Pawl.Engine.CombatRestriction.cantBeBlockedBy (rule 702.16f).
     --
     -- The CARRIER's and not `source`'s, which is what separates it from
@@ -1986,8 +1987,15 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.16a's "[quality]", which CR 612.2 asks the same question of: a
   -- protection quality naming a creature type is swapped, and Apostle of
   -- Purifying Light's colour comes back unchanged. Rule 702.16a always states a
-  -- quality, so there is no Nothing to leave standing.
-  Keyword.Type.Protection quality -> Keyword.Type.Protection (rewrite pairs quality)
+  -- quality, so there is no Nothing to leave standing there; rule 702.16n's
+  -- exception is the Nothing, which `fmap` leaves standing, and it is a word on
+  -- the same card so CR 612.2 reaches it too.
+  Keyword.Type.Protection protection ->
+    Keyword.Type.Protection
+      Protection.MkProtection
+        { Protection.quality = rewrite pairs (Protection.quality protection),
+          Protection.spares = fmap (rewrite pairs) (Protection.spares protection)
+        }
   Keyword.Type.Deathtouch -> keyword
   Keyword.Type.Defender -> keyword
   Keyword.Type.DoubleStrike -> keyword

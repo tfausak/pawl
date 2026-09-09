@@ -16,6 +16,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MorphVariant as MorphVariant
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.Subtype as Subtype
@@ -180,22 +181,22 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Protection (Filter.HasColor Color.Black))
-      " {\"type\":\"Protection\",\"value\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}}} "
+      (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.HasColor Color.Black, Protection.spares = Nothing})
+      " {\"type\":\"Protection\",\"value\":{\"quality\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}},\"spares\":null}} "
     -- CR 702.16a's "any characteristic value or information": protection from
     -- artifacts is as printed as protection from black.
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Protection (Filter.HasCardType CardType.Artifact))
-      " {\"type\":\"Protection\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}} "
+      (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.HasCardType CardType.Artifact, Protection.spares = Nothing})
+      " {\"type\":\"Protection\",\"value\":{\"quality\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},\"spares\":null}} "
     Spec.assertBool
       s
-      (Codec.encode Keyword.codec (Keyword.Protection (Filter.HasColor Color.Black)) /= Codec.encode Keyword.codec (Keyword.Hexproof (Just (Filter.HasColor Color.Black))))
+      (Codec.encode Keyword.codec (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.HasColor Color.Black, Protection.spares = Nothing}) /= Codec.encode Keyword.codec (Keyword.Hexproof (Just (Filter.HasColor Color.Black))))
       "protection from black and hexproof from black encode differently"
     Spec.assertBool
       s
-      (Codec.encode Keyword.codec (Keyword.Protection (Filter.HasColor Color.Black)) /= Codec.encode Keyword.codec (Keyword.Protection (Filter.HasColor Color.White)))
+      (Codec.encode Keyword.codec (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.HasColor Color.Black, Protection.spares = Nothing}) /= Codec.encode Keyword.codec (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.HasColor Color.White, Protection.spares = Nothing}))
       "and so do protection from black and protection from white"
   Spec.it s "Reach" $
     Common.assertCodec
