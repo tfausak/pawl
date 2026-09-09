@@ -1,8 +1,10 @@
 module Pawl.Codec.MergeComponentSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Codec.MergeComponent as MergeComponent
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.PrintingId as PrintingId
 
@@ -23,5 +25,13 @@ spec s = Spec.describe s "Pawl.Codec.MergeComponent" $ do
       MergeComponent.codec
       (MergeComponent.OfToken (PrintingId.MkPrintingId 12))
       " {\"type\":\"OfToken\",\"value\":12} "
+  -- CR 701.42a / 712.8g: the arm whose payload is not a printing at all -- the
+  -- combined back face beside the two cards representing the component.
+  Spec.it s "OfMeld" $
+    Common.assertCodec
+      s
+      MergeComponent.codec
+      (MergeComponent.OfMeld MeldSource.MkMeldSource {MeldSource.result = PrintingId.MkPrintingId 13, MeldSource.components = PrintingId.MkPrintingId 14 NonEmpty.:| [PrintingId.MkPrintingId 15]})
+      " {\"type\":\"OfMeld\",\"value\":{\"components\":[14,15],\"result\":13}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s MergeComponent.codec

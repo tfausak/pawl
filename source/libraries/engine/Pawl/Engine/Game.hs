@@ -167,7 +167,7 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   -- CR 730.2a: "a merged permanent has only the characteristics of its topmost
   -- component", so the head of the component list is the printing every
   -- characteristic read of a merged permanent resolves through.
-  Just (Source.OfMerge components) -> printingOf (MergeComponent.printing (NonEmpty.head components)) gs
+  Just (Source.OfMerge components) -> printingOf (printingOfComponent (NonEmpty.head components)) gs
   Just (Source.OfToken pid) -> printingOf pid gs
   Just (Source.OfAbility _) -> Nothing
   Just (Source.OfTrigger _) -> Nothing
@@ -452,7 +452,7 @@ cardOfSource gs mSource = case mSource of
     -- reader past this point needs to know nothing about merging. The rest are
     -- read by `componentsOf` below and -- for CR 702.140e's added abilities --
     -- by Pawl.Engine.Projection.View.withMergedAbilities.
-    Source.OfMerge components -> cardOfPrinting (MergeComponent.printing (NonEmpty.head components)) gs
+    Source.OfMerge components -> cardOfPrinting (printingOfComponent (NonEmpty.head components)) gs
     Source.OfToken pid -> cardOfPrinting pid gs
     Source.OfAbility _ -> Nothing
     Source.OfTrigger _ -> Nothing
@@ -475,8 +475,8 @@ cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
 
 -- Which cards represent this object, for the rules that look past the
 -- characteristics `cardOfSource` answers with to the cards themselves. Empty for
--- every source but a melded permanent, whose components it lists in the order
--- the meld recorded them.
+-- every source but a melded permanent and a merged one, whose components it
+-- lists in the order the meld or the merge recorded them.
 --
 -- A CLASSIFIER over Source rather than a case on OfMeld at each reader, because
 -- the readers are shared: CR 730.3 through 730.3d restate CR 712.21 through
@@ -496,14 +496,21 @@ cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
 -- COMPONENTS rather than bare printings, since CR 730.2d asks which of them is a
 -- token and CR 730.3 puts a token one somewhere else than a card one
 -- (`sourceOfComponent`). A reader that wants only the printings maps
--- `MergeComponent.printing` over these.
+-- `printingOfComponent` over these.
+--
+-- FLATTENED past a melded component (CR 730.2's mutate onto a melded permanent):
+-- CR 730.3 puts "each of the individual components" into the appropriate zone
+-- and CR 712.21 says a melded permanent is two cards there, so the answer stays
+-- a list of cards and tokens and no reader of it has to compose the two rules
+-- itself. The unflattened list, which CR 730.2a's topmost read wants, is
+-- `mergeComponentsOf` below.
 componentsOf :: Source.Source -> Seq.Seq MergeComponent.MergeComponent
 componentsOf source = case source of
   -- CR 701.42b keeps a token out of a meld pair, so both components are cards.
-  Source.OfMeld meld -> fmap MergeComponent.OfCard (Seq.fromList (NonEmpty.toList (MeldSource.components meld)))
+  Source.OfMeld meld -> meldCardComponents meld
   -- CR 730.2, in top-to-bottom order, which is the order CR 730.3a's arrangement
   -- prompt offers and CR 702.140e's ability fold reads.
-  Source.OfMerge components -> Seq.fromList (NonEmpty.toList components)
+  Source.OfMerge components -> foldMap cardComponentsOf (Seq.fromList (NonEmpty.toList components))
   Source.OfCard _ -> Seq.empty
   Source.OfToken _ -> Seq.empty
   Source.OfAbility _ -> Seq.empty
@@ -512,6 +519,38 @@ componentsOf source = case source of
   Source.OfSpellCopy _ -> Seq.empty
   Source.OfCardCopy _ -> Seq.empty
   Source.OfInherentTrigger _ -> Seq.empty
+
+-- One component's cards, which is `componentsOf`'s flattening one component at a
+-- time: a melded component is CR 712.21's two cards, and every other component
+-- is itself.
+cardComponentsOf :: MergeComponent.MergeComponent -> Seq.Seq MergeComponent.MergeComponent
+cardComponentsOf component = case component of
+  MergeComponent.OfMeld meld -> meldCardComponents meld
+  MergeComponent.OfCard _ -> Seq.singleton component
+  MergeComponent.OfToken _ -> Seq.singleton component
+
+-- CR 701.42a's two cards as components of their own. Shared by the two arms that
+-- need them so that a melded permanent and a melded COMPONENT cannot come to
+-- answer differently.
+meldCardComponents :: MeldSource.MeldSource -> Seq.Seq MergeComponent.MergeComponent
+meldCardComponents meld = fmap MergeComponent.OfCard (Seq.fromList (NonEmpty.toList (MeldSource.components meld)))
+
+-- The printing one component's characteristics are read off: the card or token
+-- itself, and for a melded component CR 712.8g's combined back face, which is no
+-- card of it. The total read Pawl.Types.MergeComponent's record field used to
+-- be, in this module for `componentIsToken`'s and `sourceOfComponent`'s reason.
+--
+-- The MELD arm is a regression fence rather than a proved answer: every
+-- characteristic of a merged permanent is read off the copiable record CR 730.2a
+-- stamps at the merge (Pawl.Engine.Binding.setMergeCopy), and `componentsOf`
+-- has already expanded a melded component before CR 730.3's departure sees it,
+-- so no case in the suite reddens when this arm answers a component card
+-- instead. It is CR 712.8g's own sentence, which is why it stands.
+printingOfComponent :: MergeComponent.MergeComponent -> PrintingId.PrintingId
+printingOfComponent component = case component of
+  MergeComponent.OfCard pid -> pid
+  MergeComponent.OfToken pid -> pid
+  MergeComponent.OfMeld meld -> MeldSource.result meld
 
 -- `cardOf` for a member of a HAND. An emblem answers Nothing where `cardOf`
 -- answers a card: CR 114.5 keeps an emblem off the battlefield, and CR 114.1
@@ -846,9 +885,14 @@ manaCostFacesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- Its two readers are `facesOfWithLastKnown` and `cardsOfWithLastKnown` below,
 -- for CR 702.140e's abilities. Every other rule that looks past the topmost
 -- component takes `componentsOf`, which CR 712.21 and CR 730.3 share.
+--
+-- UNFLATTENED where `componentsOf` expands a melded component into its two
+-- cards: rule 702.140e reads the abilities each component contributes, and CR
+-- 712.8g gives a melded one only its combined back face's -- which is what
+-- `printingOfComponent` answers with.
 mergeComponentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
 mergeComponentsOf source = case source of
-  Source.OfMerge components -> fmap MergeComponent.printing (Seq.fromList (NonEmpty.toList components))
+  Source.OfMerge components -> fmap printingOfComponent (Seq.fromList (NonEmpty.toList components))
   Source.OfMeld _ -> Seq.empty
   -- CR 722.3c: such a copy is never on the battlefield to be merged INTO, which
   -- is Pawl.Engine.Event.mergeComponents' own arm for it.
@@ -874,6 +918,10 @@ mergeComponentsOf source = case source of
 meldComponentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
 meldComponentsOf source = case source of
   Source.OfMeld meld -> Seq.fromList (NonEmpty.toList (MeldSource.components meld))
+  -- A merged permanent answers nothing here even when its topmost component is
+  -- a MELDED one: CR 730.2a's copiable effect carries that component's mana
+  -- value onto the permanent at the merge (Pawl.Engine.Binding.setMergeCopy), so
+  -- rule 202.3c is read where the meld itself was and not again here.
   Source.OfMerge _ -> Seq.empty
   Source.OfCard _ -> Seq.empty
   Source.OfToken _ -> Seq.empty
@@ -1364,6 +1412,9 @@ componentIsToken :: MergeComponent.MergeComponent -> Bool
 componentIsToken component = case component of
   MergeComponent.OfToken _ -> True
   MergeComponent.OfCard _ -> False
+  -- CR 108.2b / 701.42b: both cards of a meld pair are Magic cards, and a token
+  -- cannot be one of them. `sourceIsToken`'s OfMeld arm answers the same.
+  MergeComponent.OfMeld _ -> False
 
 -- CR 730.2/730.3: what a component of a merged permanent represents once it is
 -- an object of its own again -- the card representing itself (CR 108.2), or the
@@ -1373,6 +1424,11 @@ sourceOfComponent :: MergeComponent.MergeComponent -> Source.Source
 sourceOfComponent component = case component of
   MergeComponent.OfCard pid -> Source.OfCard pid
   MergeComponent.OfToken pid -> Source.OfToken pid
+  -- The melded permanent it still is (CR 730.2c). Neither reader can be handed
+  -- one: both take `componentsOf`, which has already expanded a melded component
+  -- into CR 712.21's two cards, so this arm is the type's answer rather than a
+  -- road the engine drives.
+  MergeComponent.OfMeld meld -> Source.OfMeld meld
 
 -- CR 111.8: a token that has LEFT the battlefield -- one waiting for the state-
 -- based action CR 111.7 and CR 704.5d state. Two rules read it and must agree:

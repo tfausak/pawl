@@ -4917,7 +4917,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                   -- says a token is not a card. Commander.commanderPrintingOf
                   -- filters the same way on the way in, so the two agree about
                   -- which component the designation can sit on.
-                  (commandComponents, destComponents) = Seq.partition (\component -> not (Game.componentIsToken component) && Just (MergeComponent.printing component) == splitOff) components
+                  (commandComponents, destComponents) = Seq.partition (\component -> not (Game.componentIsToken component) && Just (Game.printingOfComponent component) == splitOff) components
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
@@ -5203,7 +5203,7 @@ arrangeComponents pid dest components =
       -- The PROMPT names printings, which is what a player picking an order sees;
       -- the permutation is applied to the components themselves, so a token
       -- component keeps its kind through the arrangement.
-      answer <- Game.choose (Prompt.OrderComponentCards (Decide.deciderFor pid gs) pid dest (fmap MergeComponent.printing offered))
+      answer <- Game.choose (Prompt.OrderComponentCards (Decide.deciderFor pid gs) pid dest (fmap Game.printingOfComponent offered))
       pure (Seq.fromList (Game.permute offered answer))
 
 -- CR 400.7a: effects that change a permanent spell's characteristics or
@@ -6470,15 +6470,15 @@ merge sid target side = do
 -- other, and what its being on top decides is only whether the merged permanent
 -- is a token, which Pawl.Engine.Game.sourceIsToken reads off the head.
 --
--- Not implemented: a MELDED component, whose characteristics come off an
--- interned combined face that is no component of it (CR 712.8g), so there is no
--- component list to extend -- a mutating creature spell targeting one does not
--- merge (#3430).
+-- The MELD arm is one component and not two, which is the reading CR 730.2a can
+-- answer -- Pawl.Types.MergeComponent's OfMeld arm derives it -- so a melded
+-- permanent that is mutated under keeps CR 712.8g's combined back face and one
+-- that is mutated over contributes that face's abilities (CR 702.140e).
 mergeComponents :: Source.Source -> Maybe [MergeComponent.MergeComponent]
 mergeComponents source = case source of
   Source.OfCard pid -> Just [MergeComponent.OfCard pid]
   Source.OfMerge components -> Just (NonEmpty.toList components)
-  Source.OfMeld _ -> Nothing
+  Source.OfMeld melded -> Just [MergeComponent.OfMeld melded]
   Source.OfToken pid -> Just [MergeComponent.OfToken pid]
   Source.OfAbility _ -> Nothing
   Source.OfTrigger _ -> Nothing

@@ -7,8 +7,9 @@
 -- CR 702.140b/702.140c fork, Pawl.Engine.Event.merge, Pawl.Types.Source's
 -- OfMerge arm and the projection read Pawl.Engine.Projection.View's
 -- withMergedAbilities adds for CR 702.140e. CR 730.2d's token components come
--- through Pawl.Types.MergeComponent, whose two arms are what a merged
--- permanent's token-ness and CR 730.3's departure each read.
+-- through Pawl.Types.MergeComponent, whose arms are what a merged permanent's
+-- token-ness and CR 730.3's departure each read -- and whose melded arm is what
+-- lets a melded permanent be mutated onto at all.
 --
 -- Cubwarden is the producer: {3}{W} 3\/5 Creature -- Cat, "Mutate {2}{W}{W}",
 -- lifelink, "Whenever this creature mutates, create two 1\/1 white Cat creature
@@ -46,6 +47,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
@@ -85,6 +87,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
@@ -366,19 +369,18 @@ spec s registry = Spec.describe s "Mutate" $ do
     -- The BEFORE half of the pair, after the behaviour.
     Spec.assertEqWith s "setup: it was doubled before the merge too" (countersOn (counted board)) (Just 2)
     Spec.assertEqWith s "setup: and the merged permanent is Cubwarden, which prints no replacement effect" (fmap S.nameOf (Game.cardOf host after)) (Just (CardName.MkCardName (Text.pack "Cubwarden")))
-  -- CR 702.140c's choice is only put to a player where it decides something. A
-  -- MELDED target is one the merge refuses (#3430) -- CR 712.8g gives such a
-  -- permanent only its combined back face, which is no component of it, so there
-  -- is no component list to extend -- and the side would be answered and then
-  -- thrown away, an elided rule showing up as a real decision. A pair of boards
-  -- differing in exactly one thing: whether the creature the spell targets is
-  -- represented by one card or by a meld; see #3371.
+  -- CR 702.140c's choice is put to a player exactly once per merge that will
+  -- happen, and Pawl.Engine.Stack asks it only after Event.mergeable has said the
+  -- merge will. A pair of boards differing in exactly one thing -- whether the
+  -- creature the spell targets is represented by one card or by a meld -- so a
+  -- component list read that a meld silently emptied would show up here as a
+  -- prompt that was never raised; see #3371.
   --
   -- The melded permanent is HAND-BUILT, over Falcon Abomination's own printing so
-  -- that CR 702.140a still admits it as a target: driving the pool's one meld
-  -- pair belongs to Pawl.MeldSpec, and the question here is only which Source
-  -- Event.mergeable refuses.
-  Spec.it s "CR 702.140c a merge the engine will refuse asks for no side" $ do
+  -- that CR 702.140a still admits it as a target: the gameplay reading of a
+  -- merge with the pool's meld pair is the case below, and the question here is
+  -- only how many times the side is asked.
+  Spec.it s "CR 702.140c a merge asks for its side exactly once, whatever represents the target" $ do
     plains <- S.printingOf s registry "Plains"
     falcon <- S.printingOf s registry "Falcon Abomination"
     cubwarden <- S.printingOf s registry "Cubwarden"
@@ -407,13 +409,71 @@ spec s registry = Spec.describe s "Mutate" $ do
           let (board, spellId) = S.handOne cubwarden gs
               cast = S.runPure (mutatingAt MutateSide.Over host) board (S.cast S.alice spellId)
            in State.execState (Engine.runGame (counting host) cast (Monad.replicateM_ 6 (Engine.settleForPriority >> Stack.resolveTop))) 0
-    Spec.assertEqWith s "CR 702.140c a melded target the merge refuses is asked no side" (asks meldTarget withMeld) 0
-    Spec.assertEqWith s "while a one-card target is asked exactly one" (asks cardTarget withCard) 1
+    Spec.assertEqWith s "CR 702.140c a melded target is asked exactly one side" (asks meldTarget withMeld) 1
+    Spec.assertEqWith s "and so is a one-card target" (asks cardTarget withCard) 1
     -- The proxies, after the pair: the melded permanent really was a legal target
-    -- of the spell, so the 0 above is the refusal and not an unfillable slot.
+    -- of the spell, so the count above is the merge's own prompt and not an
+    -- unfillable slot.
     Spec.assertBool s (Projection.isCreatureOf meldTarget withMeld) "setup: the melded permanent is a creature"
     Spec.assertEqWith s "setup: which alice owns" (fmap Object.owner (Game.lookupObject meldTarget withMeld)) (Just S.alice)
     Spec.assertBool s (not (Set.member Subtype.Human (Projection.subtypesOf meldTarget withMeld))) "setup: and is no Human"
+  -- CR 730.2 with a MELDED target, driven through the pool's own meld pair. The
+  -- two cards of that pair represent ONE component of the merged permanent and
+  -- not two: CR 701.42a puts them down as "a single object", giving them no order
+  -- between them, so CR 730.2a's "topmost component" would otherwise have two
+  -- heads and no tie-break, and CR 730.2c keeps the meld intact across the merge
+  -- -- "a merged permanent is the same object that it was before" -- so CR 712.8g
+  -- still gives that component only the combined back face.
+  --
+  -- Hanweir, the Writhing Township is a Legendary Creature -- Eldrazi Ooze and no
+  -- Human, so CR 702.140a admits it as Cubwarden's target. Its 7/4 box, its haste
+  -- and trample, and CR 202.3c's mana value of 3 all differ from Cubwarden's 3/5,
+  -- its lifelink and its {3}{W}, so no reading of the merged permanent can be
+  -- mistaken for the other; a merge that REFUSED would leave the Township at 7/4
+  -- with no lifelink and Cubwarden beside it.
+  --
+  -- The side is the pair's one difference, and CR 730.3's departure is read by
+  -- KILLING the merged permanent rather than off the component list: rule 712.21
+  -- is what makes the melded component two cards in the graveyard, and only the
+  -- death drives that composition.
+  Spec.it s "CR 730.2a/712.8g Cubwarden merges with a melded permanent, over and under" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    case townshipOn battlements garrison mountain of
+      Nothing -> Spec.assertFailure s "the pair should have melded into Hanweir, the Writhing Township"
+      Just (township, melded) -> do
+        let (board, spellId) = S.handOne cubwarden (S.landsFor plains S.alice 4 melded)
+            over = merging MutateSide.Over township board spellId
+            under = merging MutateSide.Under township board spellId
+            dead = S.runPure S.identityAnswer under (Event.destroy Regenerability.Regenerable [township] >> Engine.settleForPriority)
+        Spec.assertEqWith s "CR 730.2a mutating over the melded permanent, the box is Cubwarden's" (S.powerToughnessOf township over) (Just (3, 5))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink township under) "CR 702.140e mutating under, lifelink comes up from the component below"
+        Spec.assertEqWith s "CR 712.8g while the box stays the combined back face's, not either meld card's" (S.powerToughnessOf township under) (Just (7, 4))
+        Spec.assertEqWith
+          s
+          "CR 730.3/712.21 and it dies as three cards, the melded component put down as its two"
+          (List.sort (graveyardNames dead))
+          (List.sort [CardName.MkCardName (Text.pack "Hanweir Garrison"), CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Cubwarden")])
+        -- A REGRESSION FENCE rather than a proved behaviour: CR 730.2a's copiable
+        -- effect stamps the melded permanent's own mana value onto the merged
+        -- one at the merge (Pawl.Engine.Binding.setMergeCopy), so no read in
+        -- Pawl.Engine.Game answers this line and mutating one leaves it green.
+        Spec.assertEqWith s "CR 202.3c through CR 730.2a, the topmost component being a melded one" (PC.manaValue (Projection.project township under)) (Just 3)
+        -- The proxies, after the behaviour: the permanent the spell targeted was
+        -- the melded one, with the combined face's box and neither the lifelink
+        -- nor the third card the merge adds.
+        Spec.assertEqWith s "setup: the target was the melded permanent" (fmap Object.source (Game.lookupObject township board)) (fmap Object.source (Game.lookupObject township melded))
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Lifelink township board)) "setup: which had no lifelink of its own"
+        Spec.assertEqWith
+          s
+          "setup: and was represented by the pair's two cards alone"
+          (componentNames township board)
+          [ CardName.MkCardName (Text.pack "Hanweir Garrison"),
+            CardName.MkCardName (Text.pack "Hanweir Battlements")
+          ]
   -- CR 730.2d: "if a merged permanent contains a token, the resulting permanent
   -- is a token only if the topmost component is a token". A pair of boards
   -- differing in exactly one thing -- which side of the token Cubwarden goes on
@@ -896,8 +956,47 @@ graveyardNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) 
 componentNames :: ObjectId.ObjectId -> GameState.GameState -> [CardName.CardName]
 componentNames oid gs =
   foldMap
-    (Maybe.mapMaybe (\component -> fmap (S.nameOf . Printing.card) (Game.printingOf (MergeComponent.printing component) gs)) . Foldable.toList . Game.componentsOf . Object.source)
+    (Maybe.mapMaybe (\component -> fmap (S.nameOf . Printing.card) (Game.printingOf (Game.printingOfComponent component) gs)) . Foldable.toList . Game.componentsOf . Object.source)
     (Game.lookupObject oid gs)
+
+-- alice's Hanweir Battlements and Hanweir Garrison melded into Hanweir, the
+-- Writhing Township through the PRINTED melding ability (CR 712.4a), with her
+-- five Mountains paying for it: the melded permanent, and the board it stands
+-- on. Pawl.MeldSpec drives every other reading of that pair; what this board is
+-- for is a mutate target no single card represents.
+--
+-- Nothing at all when the pair did not meld, which the case above fails on
+-- rather than asserting past.
+townshipOn :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe (ObjectId.ObjectId, GameState.GameState)
+townshipOn battlements garrison mountain =
+  let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent garrison S.alice g1
+      board =
+        (S.landsFor mountain S.alice 5 g2)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+   in case Projection.abilitiesOf bId board of
+        [_, _, melding] ->
+          let after = S.runPure (sparing bId) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+           in fmap (\oid -> (oid, after)) (List.find (\oid -> Set.member townshipName (Projection.namesOf oid after)) (Game.zoneMembers Zone.Battlefield S.alice after))
+        _ -> Nothing
+
+-- The name printed on Hanweir Battlements' combined back face, which is card
+-- data no printing in the pool exposes under a name of its own.
+townshipName :: CardName.CardName
+townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
+
+-- CR 605.3a's mana window offers Hanweir Battlements itself, whose own "{T}: Add
+-- {C}" sits on the permanent whose {T} the melding ability still needs (CR
+-- 107.5). So the payer takes the first offer that is not that permanent, named
+-- by identity rather than by index -- Pawl.MeldSpec's `sparing` is the same
+-- answerer for the same reason.
+sparing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+sparing oid p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> List.find (/= oid) (NonEmpty.toList candidates)
+  _ -> S.identityAnswer p
 
 -- The same board with one permanent summoning sick, which S.addPermanent does
 -- not leave anything: CR 302.6's state is the paired boards' one difference.

@@ -68,7 +68,6 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.MeldSource as MeldSource
-import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -2401,7 +2400,7 @@ namedIs wanted gs mo =
           Source.OfMeld meld -> named (MeldSource.result meld)
           -- CR 730.2a: the topmost component is where a merged permanent's name
           -- comes from, so the head of the list answers.
-          Source.OfMerge components -> named (MergeComponent.printing (NonEmpty.head components))
+          Source.OfMerge components -> named (Game.printingOfComponent (NonEmpty.head components))
           Source.OfToken printingId -> named printingId
           Source.OfAbility _ -> False
           Source.OfTrigger _ -> False
