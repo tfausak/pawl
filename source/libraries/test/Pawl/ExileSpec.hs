@@ -43,6 +43,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Exile as Exile
@@ -55,6 +56,8 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
@@ -62,6 +65,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Pile as Pile
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -69,6 +73,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -507,10 +512,14 @@ castExtractPower s registry = do
 -- three or more creatures this turn" (Oracle text checked 2026-09-08) -- is the
 -- producer.
 --
--- Pawl's Windbrisk Heights is STRICTER than printed: the {W}, {T} ability is not
--- transcribed at all. Its permission's cost waiver can now be spelled -- Extract
--- Power above writes it -- but its "if you attacked with three or more creatures
--- this turn" condition cannot (#3447). Only hideaway itself is proved here.
+-- The ability printed under it is Effect.OfferCast over
+-- ObjectRef.EachCardExiledWithSource -- CR 607.2a's linked set -- under a
+-- Clause.condition comparing Quantity.AttackersDeclaredThisTurn against 3.
+--
+-- Not implemented: CR 116.2a's land drop, which CR 305.2a reaches during a
+-- resolution where Effect.OfferCast reaches only CR 601's cast, so a hidden LAND
+-- cannot be played and pawl's Windbrisk Heights is stricter than printed there
+-- (#3347).
 --
 -- Not implemented: rule 702.75a's look belongs to whoever controls the exiling
 -- permanent at the moment the question is asked, and pawl stamps the seat that
@@ -565,6 +574,178 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
       "the copy's hideaway ran, and the card its controller named is in exile face down"
       (namesOf (faceDownExiled board) board)
       (Set.singleton hidden)
+
+  -- CR 608.2h: "the answer is determined only once, when the effect is applied",
+  -- which for this card is the ability's own resolution -- so the threshold is a
+  -- Clause.condition rather than an activation restriction, and the land taps
+  -- either way. The pair differs in ONE thing: how many of alice's three
+  -- creatures she declared, three being the printed threshold and two one short.
+  Spec.it s "CR 608.2h the play ability reads the turn's declarations as it resolves, so two attackers is one short and three is not" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    (_, land, leg) <- attackedHeights s registry Nothing
+    let declared = leg 3 land
+        refused = leg 2 land
+    -- GAMEPLAY FIRST. The Piker costs {1}{R} and alice controls one Plains, so
+    -- the leg that put it onto the battlefield took CR 118.9's waiver as well.
+    Spec.assertEqWith
+      s
+      "CR 608.2h: with three attackers declared the hidden Goblin Piker was played, and with two it was not"
+      (fmap (pikersFor piker) [declared, refused])
+      [1, 0]
+    -- Proxy, AFTER the behaviour: the ability was activated on BOTH legs, so what
+    -- the two boards differ in is the clause's condition and not the activation.
+    Spec.assertEqWith
+      s
+      "CR 601.2h via 602.2b: the {W} and the {T} were paid either way"
+      (fmap (tapStateOf land) [declared, refused])
+      [Just TapState.Tapped, Just TapState.Tapped]
+
+  -- CR 607.2a's link and the copy tripwire in one pair. Vesuva entered as a copy
+  -- of the Windbrisk Heights already on the battlefield, so it is the COPY whose
+  -- hideaway ran and the copy the exiled card is filed against; the printed
+  -- Windbrisk Heights beside it exiled nothing, having been placed rather than
+  -- played. Both offer the same {W}, {T} ability and both are activated with the
+  -- same three attackers declared, so the linked set is the only difference: an
+  -- ability reading "any card in exile" plays the Piker off either land, and one
+  -- reading Game.cardOf finds no ability on Vesuva at all.
+  Spec.it s "CR 607.2a the play ability names only what THIS permanent exiled, and a copy names what the copy exiled" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    (original, copy, leg) <- attackedHeights s registry (Just "Vesuva")
+    let viaCopy = leg 3 copy
+        viaOriginal = leg 3 original
+    Spec.assertEqWith
+      s
+      "CR 607.2a / 707.2: the Vesuva that exiled the Piker plays it, and the Windbrisk Heights that exiled nothing plays nothing"
+      (fmap (pikersFor piker) [viaCopy, viaOriginal])
+      [1, 0]
+    Spec.assertEqWith
+      s
+      "and the card is still in exile on the leg that found no link, so the ability resolved and named nothing"
+      (fmap (length . faceDownExiled) [viaCopy, viaOriginal])
+      [0, 1]
+    -- Proxy, AFTER the behaviour: each leg really paid its own {W} and {T}.
+    Spec.assertEqWith
+      s
+      "CR 601.2h via 602.2b: both lands paid the same cost"
+      [tapStateOf copy viaCopy, tapStateOf original viaOriginal]
+      [Just TapState.Tapped, Just TapState.Tapped]
+
+-- How many of that printing alice has on the battlefield.
+pikersFor :: Printing.Printing -> GameState.GameState -> Int
+pikersFor piker = S.countOnBattlefieldByName (S.printingName piker) S.alice
+
+-- The tap state of one object, Nothing where it is not on the battlefield at all
+-- -- which an assertion about a tap cost must be able to say apart from
+-- "untapped".
+tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
+tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+
+-- The objects on the battlefield whose PRINTED card carries that name. Printed
+-- and not projected on purpose: this is how the fixture tells Vesuva from the
+-- Windbrisk Heights it copied, which no rules read may do.
+battlefieldNamed :: String -> GameState.GameState -> [ObjectId.ObjectId]
+battlefieldNamed name gs =
+  let wanted = CardName.MkCardName (Text.pack name)
+   in filter
+        (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just wanted)
+        (Set.toAscList (GameState.battlefield gs))
+
+-- ONE board, replayed from alice's beginning of combat: playHeights' library and
+-- hideaway choice, plus a Plains for the {W}, three creatures to attack with, and
+-- a second turn so the land that entered tapped (CR 702.75b) has untapped.
+--
+-- Returns the Windbrisk Heights PLACED on the battlefield (S.noSource where the
+-- caller asked for no copier), the land alice PLAYED, and a leg: how many
+-- attackers she declares, which land she then activates in her postcombat main
+-- phase, and the board that comes back.
+attackedHeights ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Maybe String ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, Int -> ObjectId.ObjectId -> GameState.GameState)
+attackedHeights s registry copier = do
+  heights <- S.printingOf s registry "Windbrisk Heights"
+  played <- maybe (pure heights) (S.printingOf s registry) copier
+  plains <- S.printingOf s registry "Plains"
+  evangel <- S.printingOf s registry "Cabal Evangel"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  cancel <- S.printingOf s registry "Cancel"
+  think <- S.printingOf s registry "Think Twice"
+  let base = Setup.emptyGame S.bothPlayers
+      -- playHeights' library, bottom first: the look reaches four of the five and
+      -- `hiding` pins its choice to the second of them, the Goblin Piker.
+      (_, g1) = S.addLibraryCard think S.alice base
+      (_, g2) = S.addLibraryCard cancel S.alice g1
+      (_, g3) = S.addLibraryCard sentry S.alice g2
+      (_, g4) = S.addLibraryCard piker S.alice g3
+      (_, g5) = S.addLibraryCard bolt S.alice g4
+      (original, g6) = case copier of
+        Nothing -> (S.noSource, g5)
+        Just _ -> S.addPermanent heights S.alice g5
+      (plainsId, g7) = S.addPermanent plains S.alice g6
+      g8 = foldr (\_ g -> snd (S.addPermanent evangel S.alice g)) g7 [1 .. (3 :: Int)]
+      (_, g9) = S.addHandCard played S.alice g8
+      before =
+        g9
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      -- PLAYED and not placed, so CR 603.6a's entry event fires and hideaway
+      -- runs. `original` was placed, so its own hideaway never triggered.
+      afterPlay = S.runPure (hiding original) before Engine.priorityLoop
+      landId = case battlefieldNamed (Maybe.fromMaybe "Windbrisk Heights" copier) afterPlay of
+        [only] -> only
+        _ -> S.noSource
+      -- CR 502.3 on a later turn: the land entered tapped, so nothing can pay its
+      -- {T} until alice's next untap step. Two handoffs and that step's
+      -- turn-based actions alone, which is ManaSpec's nextTurnOfAlice -- a whole
+      -- turn of priority would draw this fixture's library empty (CR 104.3c).
+      untapped =
+        S.runPure
+          S.identityAnswer
+          (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob afterPlay))
+          (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+      combatReady =
+        untapped
+          { GameState.phase = S.beginningOfCombat,
+            GameState.remaining = S.phasesAfterThroughPostcombatMain S.beginningOfCombat,
+            GameState.priority = Just S.alice
+          }
+      leg attackers activated =
+        S.runPure
+          (activating activated plainsId)
+          (S.runCombat (attackingWith attackers) combatReady)
+          Engine.priorityLoop
+  pure (original, landId, leg)
+
+-- Declares the first `n` creatures CR 508.1a offers and takes no other action:
+-- the legs of a pair differ in this number and in nothing else.
+attackingWith :: Int -> Prompt.Prompt r -> r
+attackingWith n p = case p of
+  Prompt.DeclareAttackers _ _ candidates -> take n candidates
+  _ -> S.identityAnswer p
+
+-- Activates that permanent's one non-mana ability, pays the {W} from that Plains
+-- rather than from whatever the engine offers first, and takes CR 601.3's offer.
+-- The source is PINNED because the hideaway land's own "{T}: Add {W}" is a
+-- candidate too, and tapping it for the mana would spend the cost's own {T}.
+activating :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+activating landId plainsId p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    Maybe.fromMaybe A.Pass (List.find (isActivationOf landId) actions)
+  Prompt.ChooseManaSource _ _ candidates ->
+    Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== plainsId) (NonEmpty.toList candidates)))
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+isActivationOf :: ObjectId.ObjectId -> A.Action -> Bool
+isActivationOf oid action = case action of
+  A.Activate candidate _ -> candidate == oid
+  _ -> False
 
 -- alice plays a land with hideaway 4 with FIVE distinct cards in her library, so
 -- the fifth is the one the look never reaches and every name below says which
