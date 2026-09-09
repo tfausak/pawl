@@ -82,6 +82,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
@@ -640,7 +641,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   Effect.Detain ref -> Effect.Detain (rewriteObjectRef pairs ref)
   Effect.Goad ref -> Effect.Goad (rewriteObjectRef pairs ref)
-  Effect.GrantLookAtExiled ref -> Effect.GrantLookAtExiled (rewriteObjectRef pairs ref)
+  Effect.GrantLookAtExiled grant -> Effect.GrantLookAtExiled grant {GrantLookAtExiled.cards = rewriteObjectRef pairs (GrantLookAtExiled.cards grant)}
   Effect.MakePlotted ref -> Effect.MakePlotted (rewriteObjectRef pairs ref)
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)

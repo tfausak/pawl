@@ -94,6 +94,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -1216,7 +1217,7 @@ effectObjectRefs effect =
         Effect.Untap ref -> read_ [ref]
         Effect.Detain ref -> read_ [ref]
         Effect.Goad ref -> read_ [ref]
-        Effect.GrantLookAtExiled ref -> read_ [ref]
+        Effect.GrantLookAtExiled grant -> read_ [GrantLookAtExiled.cards grant]
         Effect.MakePlotted ref -> read_ [ref]
         Effect.DoesNotUntapNext ref -> read_ [ref]
         Effect.Transform ref -> [(AsksTransformGather, ref)]
