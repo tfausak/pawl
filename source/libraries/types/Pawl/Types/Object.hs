@@ -111,10 +111,12 @@ data Object = MkObject
     -- through Event.changeZoneEntering being CR 406.3's "otherwise".
     exiledFaceDown :: Bool,
     -- | CR 406.3's exception to `exiledFaceDown` above: the grants of permission
-    -- to look at this card, each put here by the instruction that allowed it
-    -- (Effect.GrantLookAtExiled). An ExileLooker rather than a PlayerId, since
-    -- rule 702.75a's grant names no seat at all -- it names whoever controls the
-    -- permanent that exiled the card, which is a live read.
+    -- to look at this card, put here by the instruction that allowed it
+    -- (Effect.GrantLookAtExiled) or by the sample that records rule 406.3's
+    -- continuing permission (Pawl.Engine.Exile.accrueLookers). An ExileLooker
+    -- rather than a PlayerId, since rule 702.75a's grant names no seat at all --
+    -- it names whoever controls the permanent that exiled the card, which is a
+    -- live read.
     --
     -- A SET that only grows while the card sits in exile, which is the rule's
     -- own shape: the permission survives the instruction that gave it -- "even

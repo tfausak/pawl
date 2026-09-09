@@ -64,7 +64,10 @@ import Pawl.Types.PlayerId (PlayerId)
 -- permanent that is comes off CR 607.2's link (GameState.exiledWith), written by
 -- the same instruction's exile. Pawl.ExileSpec's "CR 702.75a the look follows
 -- control of the land that exiled the card, and CR 406.3's does not" is what
--- proves the read is live.
+-- proves the read is live. Live and STICKY are not in tension: `accrueLookers`
+-- below turns each seat that read into an ExileLooker.ThePlayer of its own, which
+-- is CR 406.3's continuing permission rather than a second reading of rule
+-- 702.75a.
 mayLookAt :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 mayLookAt pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
@@ -75,22 +78,68 @@ mayLookAt pid oid gs = Maybe.fromMaybe False $ do
     )
 
 -- One grant of CR 406.3's look permission, asked about one player.
---
--- The battlefield test in rule 702.75a's arm is a REGRESSION FENCE rather than
--- proven behaviour: the rule names a PERMANENT (CR 110.1) and CR 108.4 gives a
--- controller to nothing else, but dropping the test leaves the suite green.
--- Nothing observes it, since a hideaway permanent that leaves the battlefield
--- lands in a zone where CR 108.4 answers its OWNER -- who, hideaway having
--- instructed that same player to look at the card before exiling it face down,
--- is already an ExileLooker.ThePlayer of it.
 looksAt :: PlayerId -> ObjectId -> GameState.GameState -> ExileLooker.ExileLooker -> Bool
 looksAt pid oid gs looker = case looker of
   ExileLooker.ThePlayer p -> p == pid
-  ExileLooker.TheExiler -> case Map.lookup oid (GameState.exiledWith gs) of
-    Nothing -> False
-    Just exiler ->
-      Set.member exiler (GameState.battlefield gs)
-        && View.controllerOf exiler gs == Just pid
+  ExileLooker.TheExiler -> exilerController oid gs == Just pid
+
+-- CR 702.75a's "the player who controls the permanent that exiled this card",
+-- read off CR 607.2's link. Both `looksAt` above and `accrueLookers` below ask
+-- through this, so the live read and the sample it feeds cannot disagree about
+-- who that is.
+--
+-- The battlefield test is a REGRESSION FENCE rather than proven behaviour: the
+-- rule names a PERMANENT (CR 110.1) and CR 108.4 gives a controller to nothing
+-- else, but dropping the test leaves the suite green. Nothing observes it, since
+-- a hideaway permanent that leaves the battlefield lands in a zone where CR
+-- 108.4 answers its OWNER -- who, hideaway having instructed that same player to
+-- look at the card before exiling it face down, is already an
+-- ExileLooker.ThePlayer of it.
+exilerController :: ObjectId -> GameState.GameState -> Maybe PlayerId
+exilerController oid gs = do
+  exiler <- Map.lookup oid (GameState.exiledWith gs)
+  Monad.guard (Set.member exiler (GameState.battlefield gs))
+  View.controllerOf exiler gs
+
+-- | CR 406.3's second sentence, as a SAMPLE: "once a player is allowed to look at
+-- a card exiled face down, that player may continue to look at that card until
+-- it leaves the exile zone ... even if the instruction allowing the player to do
+-- so no longer applies". ExileLooker.TheExiler is the one grant here that can
+-- stop applying, control of the exiling permanent being read live, so this
+-- stamps whoever holds that control as an ExileLooker.ThePlayer of their own and
+-- the permission then outlives the control.
+--
+-- STAMP-ONLY, which is the rule: nothing here ever removes a looker, and the
+-- grant it writes is the same one Pawl.Engine.Resolve.Effect's
+-- Effect.GrantLookAtExiled writes for the instruction's own controller.
+--
+-- SAMPLED rather than hooked for Pawl.Engine.Engine.checkControlContinuity's
+-- reason -- control is DERIVED (CR 613.1b), so no resolution announces the
+-- change a grant could hang on -- and CR 117.5's settle is where
+-- Pawl.Engine.Engine takes it, CR 704.3's "whenever a player would get priority"
+-- being the coarsest moment a player could act on the permission.
+--
+-- Not gated on the card being face down, Effect.GrantLookAtExiled's reason: a
+-- stamp on a face-up exiled card is inert, `mayLookAt` reading Object.exileLookers
+-- only where CR 406.3's face-up default has not already answered yes.
+--
+-- Pawl.ExileSpec's "CR 406.3 the look bob had while he controlled the land
+-- survives losing it, and a land that exiled nothing gives him none" is what
+-- proves the stamp outlives the control.
+accrueLookers :: GameState.GameState -> GameState.GameState
+accrueLookers gs =
+  let accrue oid objs = case Map.lookup oid objs of
+        Nothing -> objs
+        Just obj
+          | not (Set.member ExileLooker.TheExiler (Object.exileLookers obj)) -> objs
+          | otherwise -> case exilerController oid gs of
+              Nothing -> objs
+              Just pid ->
+                Map.insert
+                  oid
+                  obj {Object.exileLookers = Set.insert (ExileLooker.ThePlayer pid) (Object.exileLookers obj)}
+                  objs
+   in gs {GameState.objects = foldr accrue (GameState.objects gs) (Set.toList (GameState.exile gs))}
 
 -- | CR 406.4's first half: may this player choose this exiled card SPECIFICALLY?
 --

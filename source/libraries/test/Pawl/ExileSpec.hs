@@ -6,7 +6,8 @@
 -- Pawl.Engine.Event.changeZoneEntering reads,
 -- CR 406.3's instruction-given look permission -- Object.exileLookers as
 -- Effect.GrantLookAtExiled writes it, whether a spell's own effect writes it or
--- CR 702.75a's hideaway does --
+-- CR 702.75a's hideaway does, and as Pawl.Engine.Exile.accrueLookers samples rule
+-- 406.3's continuing permission onto it --
 -- CR 406.4's two halves over Pawl.Engine.Target's Pool.CardsInExile arm -- the
 -- permission Pawl.Engine.Exile.mayLookAt answers, the pile
 -- Pawl.Engine.Exile.pileOf sorts a card into and Pawl.Engine.Target's piledOffer
@@ -30,7 +31,8 @@
 -- third reading -- a card whose own words refuse what rule 406.4 offers. Runic
 -- Repetition is the fourth: a restriction a pile only half satisfies, which is
 -- what the draw runs over the whole pile for. Windbrisk Heights is the reading
--- no spell reaches: CR 702.75a's keyword names the permanent's controller.
+-- no spell reaches: CR 702.75a's keyword names the permanent's controller, and
+-- rule 406.3 then keeps the look with every seat that read has ever named.
 --
 -- Each group shares ONE board across its readings, which is the point: exile
 -- holds the same cards either way, and only how they got there differs.
@@ -643,6 +645,73 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
           [Just S.bob, Just S.bob]
       Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
 
+  -- CR 406.3's second sentence, the STICKY half of the live read above: "once a
+  -- player is allowed to look at a card exiled face down, that player may
+  -- continue to look at that card until it leaves the exile zone ... even if the
+  -- instruction allowing the player to do so no longer applies". Bob's look came
+  -- from rule 702.75a's control read alone, so losing the land takes it back
+  -- unless the permission it once gave him was recorded. Aura Graft {1}{U}
+  -- Instant -- "Gain control of target Aura that's attached to a permanent.
+  -- Attach it to another permanent it can enchant" (Oracle text checked
+  -- 2026-09-09) -- takes the Confiscate back off, and alice controls the land
+  -- again.
+  --
+  -- A PAIR off ONE board differing in exactly which land bob took, on the Vesuva
+  -- board so the permanent that exiled the card is a COPY: either the Vesuva
+  -- whose hideaway ran, or the Windbrisk Heights it copied, which exiled nothing.
+  -- Both legs END with alice controlling every permanent, so no live read of
+  -- control can tell them apart -- what differs is only who was ever allowed to
+  -- look.
+  Spec.it s "CR 406.3 the look bob had while he controlled the land survives losing it, and a land that exiled nothing gives him none" $ do
+    reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+    confiscate <- S.printingOf s registry "Confiscate"
+    graft <- S.printingOf s registry "Aura Graft"
+    island <- S.printingOf s registry "Island"
+    (_, _, _, copy, board) <- playHeights s registry (Just "Vesuva")
+    let copied = case Set.toList (Set.delete copy (GameState.battlefield board)) of
+          [only] -> only
+          _ -> S.noSource
+        -- Two Islands for the Graft's {1}{U}, and a third for it to move the
+        -- Confiscate onto -- a permanent alice already controls, so the move
+        -- changes nothing but which land bob is holding.
+        stocked = foldr (\_ g -> snd (S.addPermanent island S.alice g)) board [1 .. (2 :: Int)]
+        (perch, g1) = S.addPermanent island S.alice stocked
+        (spell, g2) = S.addHandCard graft S.alice g1
+        -- bob holds the land through a CR 117.5 settle, which is the moment CR
+        -- 406.3's permission is recorded; then alice's Aura Graft moves the
+        -- Confiscate onto an Island of hers and the land comes home.
+        leg host =
+          let (aura, taken) = stealing confiscate host g2
+              held = S.runPure S.identityAnswer taken Engine.settleForPriority
+           in S.runPure (grafting aura perch) held $ do
+                S.cast S.alice spell
+                Stack.resolveTop
+                Engine.settleForPriority
+        tookCopy = leg copy
+        tookCopied = leg copied
+    case S.spellTargetSlot reclamation of
+      Just theSlot -> do
+        -- GAMEPLAY FIRST, and the pair is the negative: bob controls nothing on
+        -- either leg, so a live read of rule 702.75a offers him the pile on both.
+        Spec.assertEqWith
+          s
+          "CR 406.3: bob held the land that exiled the card through a settle, so he is still offered it by name after losing it"
+          (offerTo S.bob theSlot tookCopy)
+          (Set.fromList (fmap Recipient.ToObject (faceDownExiled tookCopy)))
+        Spec.assertEqWith
+          s
+          "and having held the land that exiled NOTHING he is offered the pile instead (CR 406.4)"
+          (offerTo S.bob theSlot tookCopied)
+          (Set.fromList (fmap Recipient.ToPile (pilesIn tookCopied)))
+        -- Anti-vacuity, AFTER the behaviour: the Graft really put both lands back
+        -- under alice, so nothing bob controls answers rule 702.75a on either leg.
+        Spec.assertEqWith
+          s
+          "CR 613.1b the Aura came off, so alice controls the land again on both legs"
+          [Projection.controllerOf copy tookCopy, Projection.controllerOf copied tookCopied]
+          [Just S.alice, Just S.alice]
+      Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
+
   -- CR 608.2h: "the answer is determined only once, when the effect is applied",
   -- which for this card is the ability's own resolution -- so the threshold is a
   -- Clause.condition rather than an activation restriction, and the land taps
@@ -874,9 +943,24 @@ playHeights s registry copier = do
 -- rather than cast: CR 702.75a reads control of the land, and how it moved is
 -- not part of the question. Settled so no state-based action undoes it.
 steal :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-steal confiscate host gs =
+steal confiscate host gs = snd (stealing confiscate host gs)
+
+-- `steal`, also naming the Aura it placed -- which a test that then moves the
+-- Aura off again has to pin its target to.
+stealing :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+stealing confiscate host gs =
   let (aura, g1) = S.addPermanent confiscate S.bob gs
-   in S.settleSba (S.attachTo aura (Recipient.ToObject host) g1)
+   in (aura, S.settleSba (S.attachTo aura (Recipient.ToObject host) g1))
+
+-- Choose `aura` for Aura Graft's one target slot and `destination` for the host
+-- CR 701.3a then moves it to. FILTERED rather than replaced, so a leg whose slot
+-- does not admit the Aura takes no target at all rather than succeeding on a
+-- hand-built recipient. Pawl.BattleSpec holds its own copy for its battle pair.
+grafting :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+grafting aura destination p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just aura) . Recipient.objectOf) legal) sets
+  Prompt.ChooseAttachment _ _ _ offered -> if List.elem destination (NonEmpty.toList offered) then destination else NonEmpty.head offered
+  _ -> S.aggressiveAnswer p
 
 -- Plays whatever land the board offers, copies the named permanent when one is
 -- passed, pins hideaway's choice to the SECOND card offered, and rotates the
