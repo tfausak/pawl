@@ -442,6 +442,8 @@ library codec
     Pawl.Codec.ExileCardsFromGraveyardSpec
     Pawl.Codec.ExileHaunting
     Pawl.Codec.ExileHauntingSpec
+    Pawl.Codec.ExileLooker
+    Pawl.Codec.ExileLookerSpec
     Pawl.Codec.ExilePlayPermission
     Pawl.Codec.ExilePlayPermissionSpec
     Pawl.Codec.Expansion
@@ -487,6 +489,8 @@ library codec
     Pawl.Codec.GameState
     Pawl.Codec.GrantedAbility
     Pawl.Codec.GrantedAbilitySpec
+    Pawl.Codec.GrantLookAtExiled
+    Pawl.Codec.GrantLookAtExiledSpec
     Pawl.Codec.GrantPlayFromExile
     Pawl.Codec.GrantPlayFromExileSpec
     Pawl.Codec.HalfUnlocked
@@ -1673,6 +1677,7 @@ library types
     Pawl.Types.ExchangeSides
     Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
+    Pawl.Types.ExileLooker
     Pawl.Types.ExilePlayPermission
     Pawl.Types.Expansion
     Pawl.Types.Expiry
@@ -1697,6 +1702,7 @@ library types
     Pawl.Types.GameSettings
     Pawl.Types.GameState
     Pawl.Types.GrantedAbility
+    Pawl.Types.GrantLookAtExiled
     Pawl.Types.GrantPlayFromExile
     Pawl.Types.HalfUnlocked
     Pawl.Types.Halved

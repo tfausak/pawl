@@ -71,6 +71,7 @@ import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
 import Pawl.Types.Keyword (Keyword)
@@ -3622,13 +3623,12 @@ servoToken =
 -- is where that reading is stated, and Ancestral Memories is the card that already
 -- writes it.
 --
--- Effect.GrantLookAtExiled writes rule 702.75a's granted look as CR 109.5's "you",
--- which for a triggered ability is the controller the object had when the
--- ability triggered.
---
--- Not implemented: rule 702.75a states the look of "the player who controls the
--- permanent that exiled this card", a live read that follows a later change of
--- control, where Object.exileLookers stores the seat the grant named (#3443).
+-- Effect.GrantLookAtExiled writes BOTH looks the clause gives. Rule 702.75a's
+-- granted ability names "the player who controls the permanent that exiled this
+-- card", which is the payload's followsExiler rider and a live read; CR 406.3's
+-- own sentence gives the player instructed to look at the cards and then exile
+-- one face down a look that outlives any change of control, which is the same
+-- opcode's CR 109.5 "you".
 --
 -- CR 702.75b's "enters tapped" is NOT minted here: the errata gives the older
 -- cards that ability as printed text of their own, which Windbrisk Heights states
@@ -3663,7 +3663,12 @@ hideaway n =
               LibraryPlacement.defaultValue
               Nothing
           )
-      allow = Effect.GrantLookAtExiled (ObjectRef.InSlot hideawayExiled)
+      allow =
+        Effect.GrantLookAtExiled
+          ( GrantLookAtExiled.MkGrantLookAtExiled
+              (ObjectRef.InSlot hideawayExiled)
+              True
+          )
       rest =
         Effect.MoveToZone
           ( MoveToZone.MkMoveToZone

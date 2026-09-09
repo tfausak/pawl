@@ -50,6 +50,7 @@ import qualified Pawl.Engine.Exile as Exile
 import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -521,11 +522,6 @@ castExtractPower s registry = do
 -- cannot be played and pawl's Windbrisk Heights is stricter than printed there
 -- (#3347).
 --
--- Not implemented: rule 702.75a's look belongs to whoever controls the exiling
--- permanent at the moment the question is asked, and pawl stamps the seat that
--- controlled it as the ability resolved (#3443). The two agree on this board,
--- where control never changes.
---
 -- Where Extract Power above tells the look apart from OWNERSHIP, this group
 -- tells it apart from CONTROL OF THE SPELL: the looker is named by a keyword
 -- ability nobody cast.
@@ -533,7 +529,7 @@ windbriskHeights :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -
 windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
   Spec.it s "CR 702.75a hideaway 4 hides the card its controller named and bottoms the other three, and only she may name it afterwards" $ do
     reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
-    (fifth, hidden, bottomed, board) <- playHeights s registry Nothing
+    (fifth, hidden, bottomed, _, board) <- playHeights s registry Nothing
     case S.spellTargetSlot reclamation of
       Just theSlot -> do
         Spec.assertEqWith
@@ -568,12 +564,84 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
   -- A read of Game.cardOf anywhere on this path answers "Vesuva", which has no
   -- keywords at all, and nothing is exiled.
   Spec.it s "CR 707.2 a land that entered as a copy of Windbrisk Heights hides a card of its own" $ do
-    (_, hidden, _, board) <- playHeights s registry (Just "Vesuva")
+    (_, hidden, _, _, board) <- playHeights s registry (Just "Vesuva")
     Spec.assertEqWith
       s
       "the copy's hideaway ran, and the card its controller named is in exile face down"
       (namesOf (faceDownExiled board) board)
       (Set.singleton hidden)
+
+  -- CR 702.75a's granted ability names whoever controls the exiling permanent
+  -- when the question is ASKED, so a steal moves the look with the land.
+  -- Confiscate {4}{U}{U} Enchantment -- Aura -- "Enchant permanent / You control
+  -- enchanted permanent" (Oracle text checked 2026-09-09) -- is the pool's steal
+  -- that reaches a land; it is placed and attached rather than cast, control of
+  -- the land being all the rule reads.
+  --
+  -- Alice keeps her look through the steal, and CR 406.3 is why: she was
+  -- instructed to look at the four cards and then exiled one of them face down,
+  -- which is that rule's own continuing permission and owes the land nothing.
+  Spec.it s "CR 702.75a the look follows control of the land that exiled the card, and CR 406.3's does not" $ do
+    reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+    confiscate <- S.printingOf s registry "Confiscate"
+    (_, _, _, land, board) <- playHeights s registry Nothing
+    let stolen = steal confiscate land board
+    case S.spellTargetSlot reclamation of
+      Just theSlot -> do
+        Spec.assertEqWith
+          s
+          "bob, who controls the land now, is offered the card it exiled by name"
+          (offerTo S.bob theSlot stolen)
+          (Set.fromList (fmap Recipient.ToObject (faceDownExiled stolen)))
+        Spec.assertEqWith
+          s
+          "CR 406.3 and alice, who looked at the card before exiling it face down, still is"
+          (offerTo S.alice theSlot stolen)
+          (Set.fromList (fmap Recipient.ToObject (faceDownExiled stolen)))
+        -- Proxies, AFTER the behaviour: control really moved, and the same board
+        -- offered bob the pile before it did.
+        Spec.assertEqWith s "CR 613.1b the Aura moved control of the land" (Projection.controllerOf land stolen) (Just S.bob)
+        Spec.assertEqWith
+          s
+          "and before the steal bob was offered the pile instead (CR 406.4)"
+          (offerTo S.bob theSlot board)
+          (Set.fromList (fmap Recipient.ToPile (pilesIn board)))
+      Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
+
+  -- THE COPY TRIPWIRE for the read above, as a PAIR of boards differing in which
+  -- land bob takes: the Vesuva that copied Windbrisk Heights and exiled the card,
+  -- or the Windbrisk Heights it copied, which exiled nothing. Rule 702.75a names
+  -- "the permanent that exiled this card" and not a permanent with hideaway, so
+  -- only the first gives bob the look.
+  Spec.it s "CR 707.2 the look follows the copy that exiled the card, not the Windbrisk Heights it copied" $ do
+    reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+    confiscate <- S.printingOf s registry "Confiscate"
+    (_, _, _, copy, board) <- playHeights s registry (Just "Vesuva")
+    let copied = case Set.toList (Set.delete copy (GameState.battlefield board)) of
+          [only] -> only
+          _ -> S.noSource
+        tookCopy = steal confiscate copy board
+        tookCopied = steal confiscate copied board
+    case S.spellTargetSlot reclamation of
+      Just theSlot -> do
+        Spec.assertEqWith
+          s
+          "taking the copy whose hideaway exiled the card hands bob the look"
+          (offerTo S.bob theSlot tookCopy)
+          (Set.fromList (fmap Recipient.ToObject (faceDownExiled tookCopy)))
+        Spec.assertEqWith
+          s
+          "taking the land it copied leaves him the pile (CR 406.4)"
+          (offerTo S.bob theSlot tookCopied)
+          (Set.fromList (fmap Recipient.ToPile (pilesIn tookCopied)))
+        -- Proxy, AFTER the pair: both boards really moved control, so what they
+        -- differ in is which permanent bob took.
+        Spec.assertEqWith
+          s
+          "CR 613.1b both steals landed"
+          [Projection.controllerOf copy tookCopy, Projection.controllerOf copied tookCopied]
+          [Just S.bob, Just S.bob]
+      Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
 
   -- CR 608.2h: "the answer is determined only once, when the effect is applied",
   -- which for this card is the ability's own resolution -- so the threshold is a
@@ -762,9 +830,10 @@ isActivationOf oid action = case action of
 -- discriminate -- settleArrivals reverses the answer again to perform the moves
 -- from the stated end inward, and the two cancel.
 --
--- Returns the name of the card left on top, the name alice hid, and the names of
--- the three bottomed cards in the order they end up in.
-playHeights :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe String -> m (CardName.CardName, CardName.CardName, [CardName.CardName], GameState.GameState)
+-- Returns the name of the card left on top, the name alice hid, the names of the
+-- three bottomed cards in the order they end up in, and the land that was
+-- played -- which on the copier's board is the copy and not the land it copied.
+playHeights :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe String -> m (CardName.CardName, CardName.CardName, [CardName.CardName], ObjectId.ObjectId, GameState.GameState)
 playHeights s registry copier = do
   heights <- S.printingOf s registry "Windbrisk Heights"
   played <- maybe (pure heights) (S.printingOf s registry) copier
@@ -793,7 +862,21 @@ playHeights s registry copier = do
             GameState.priority = Just S.alice
           }
       after = S.runPure (hiding copiedId) before Engine.priorityLoop
-  pure (S.printingName think, S.printingName piker, [S.printingName bolt, S.printingName cancel, S.printingName sentry], after)
+      -- The land alice played is the battlefield's one member the copier's
+      -- board did not start with; on the plain board copiedId is on no
+      -- battlefield at all and the deletion is a no-op.
+      landed = case Set.toList (Set.delete copiedId (GameState.battlefield after)) of
+        [only] -> only
+        _ -> S.noSource
+  pure (S.printingName think, S.printingName piker, [S.printingName bolt, S.printingName cancel, S.printingName sentry], landed, after)
+
+-- bob takes one permanent with a Confiscate of his own, placed and attached
+-- rather than cast: CR 702.75a reads control of the land, and how it moved is
+-- not part of the question. Settled so no state-based action undoes it.
+steal :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+steal confiscate host gs =
+  let (aura, g1) = S.addPermanent confiscate S.bob gs
+   in S.settleSba (S.attachTo aura (Recipient.ToObject host) g1)
 
 -- Plays whatever land the board offers, copies the named permanent when one is
 -- passed, pins hideaway's choice to the SECOND card offered, and rotates the

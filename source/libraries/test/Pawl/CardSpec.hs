@@ -157,6 +157,7 @@ import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
@@ -582,7 +583,7 @@ objectRefPositions =
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue), [plantedRef "oc"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced False), [plantedRef "gp"]),
-        ("grant-look-at-exiled", Effect.GrantLookAtExiled (plantedRef "gl"), [plantedRef "gl"]),
+        ("grant-look-at-exiled", Effect.GrantLookAtExiled (GrantLookAtExiled.MkGrantLookAtExiled (plantedRef "gl") False), [plantedRef "gl"]),
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])
       ]
@@ -4747,7 +4748,7 @@ effectFilters effect = case effect of
   Effect.Untap ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Detain ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Goad ref -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.GrantLookAtExiled ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.GrantLookAtExiled grant -> frame SourceHostFramed (objectRefFilters (GrantLookAtExiled.cards grant))
   Effect.MakePlotted ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Transform ref -> frame SourceHostFramed (objectRefFilters ref)

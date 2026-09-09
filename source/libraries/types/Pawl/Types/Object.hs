@@ -12,6 +12,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.ExileLooker as ExileLooker
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -109,9 +110,11 @@ data Object = MkObject
     -- Per-incarnation: reset by newIncarnation (CR 400.7), the effect's own rider
     -- through Event.changeZoneEntering being CR 406.3's "otherwise".
     exiledFaceDown :: Bool,
-    -- | CR 406.3's exception to `exiledFaceDown` above: the players who "may
-    -- continue to look at that card until it leaves the exile zone", each put
-    -- here by the instruction that allowed it (Effect.GrantLookAtExiled).
+    -- | CR 406.3's exception to `exiledFaceDown` above: the grants of permission
+    -- to look at this card, each put here by the instruction that allowed it
+    -- (Effect.GrantLookAtExiled). An ExileLooker rather than a PlayerId, since
+    -- rule 702.75a's grant names no seat at all -- it names whoever controls the
+    -- permanent that exiled the card, which is a live read.
     --
     -- A SET that only grows while the card sits in exile, which is the rule's
     -- own shape: the permission survives the instruction that gave it -- "even
@@ -122,7 +125,7 @@ data Object = MkObject
     --
     -- Per-incarnation: reset by newIncarnation (CR 400.7), which is exactly the
     -- rule's "until it leaves the exile zone".
-    exileLookers :: Set.Set PlayerId.PlayerId,
+    exileLookers :: Set.Set ExileLooker.ExileLooker,
     -- | CR 120.3e: damage dealt to a creature is MARKED on it. A count and not a
     -- list of tagged units, every damage rider being consumed at deal time and CR
     -- 704.5g reading only the total. Removed at cleanup (CR 514.2), and

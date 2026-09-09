@@ -78,6 +78,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
@@ -1469,19 +1470,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AnyType False))
       " {\"type\":\"GrantPlayFromExile\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"spending\":{\"type\":\"AnyType\"}}} "
-  -- CR 406.3's look permission, the second BARE ObjectRef arm. It must not
-  -- collapse into MakePlotted below on the wire: the two write different fields
-  -- of the same exiled object.
+  -- CR 406.3's look permission, whose record carries CR 702.75a's rider besides.
+  -- It must not collapse into MakePlotted below on the wire: the two write
+  -- different fields of the same exiled object.
   Spec.it s "GrantLookAtExiled round-trips, and is not MakePlotted" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GrantLookAtExiled (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
-      " {\"type\":\"GrantLookAtExiled\",\"value\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
+      (Effect.GrantLookAtExiled (GrantLookAtExiled.MkGrantLookAtExiled (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) False))
+      " {\"type\":\"GrantLookAtExiled\",\"value\":{\"cards\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
     Spec.assertBool
       s
-      ( toJson (Effect.GrantLookAtExiled (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
+      ( toJson (Effect.GrantLookAtExiled (GrantLookAtExiled.MkGrantLookAtExiled (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) False))
           /= toJson (Effect.MakePlotted (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
       )
       "GrantLookAtExiled and MakePlotted of the same slot encode differently"

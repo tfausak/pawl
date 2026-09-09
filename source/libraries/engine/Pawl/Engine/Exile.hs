@@ -9,7 +9,7 @@
 --
 -- THE INVARIANT: this is the closed half. CR 406.3's default and CR 702.143a's
 -- grant are both rulebook, so reading Object.foretold here is the same act as
--- reading a Phase. Object.exileLookers is a set of players an effect wrote, read
+-- reading a Phase. Object.exileLookers is a set of grants an effect wrote, read
 -- without asking which effect. Nothing here asks which CARD is in exile.
 module Pawl.Engine.Exile where
 
@@ -18,6 +18,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection.View as View
+import qualified Pawl.Types.ExileLooker as ExileLooker
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -48,26 +50,47 @@ import Pawl.Types.PlayerId (PlayerId)
 --
 -- Object.exileLookers is rule 406.3's OTHER grant, the one an instruction makes
 -- -- "once a player is allowed to look at a card exiled face down, that player
--- may continue to look at that card" -- and it is stored because the rule keeps
--- it alive past the instruction that gave it, which leaves nothing to derive it
--- from. It names a player who need not be the OWNER: Extract Power looks at each
--- player's top card and exiles them, so the caster may look at a card somebody
--- else owns. Pawl.ExileSpec's "CR 406.3 the player the exiling instruction let
--- look names both cards, and the owner who was shown nothing gets their pile" is
--- what proves the two seats come apart.
+-- may continue to look at that card" -- and ExileLooker.ThePlayer is stored
+-- because the rule keeps it alive past the instruction that gave it, which
+-- leaves nothing to derive it from. It names a player who need not be the OWNER:
+-- Extract Power looks at each player's top card and exiles them, so the caster
+-- may look at a card somebody else owns. Pawl.ExileSpec's "CR 406.3 the player
+-- the exiling instruction let look names both cards, and the owner who was shown
+-- nothing gets their pile" is what proves the two seats come apart.
 --
--- Not implemented: CR 702.75a's hideaway states the same permission of the
--- player who CONTROLS the exiling permanent, a live read that follows a change
--- of control, where this set holds the seat the grant named. Windbrisk Heights
--- writes it through Effect.GrantLookAtExiled all the same (#3443).
+-- ExileLooker.TheExiler is CR 702.75a's, and it is the one grant that is NOT
+-- stored as a seat: hideaway's granted ability names "the player who controls
+-- the permanent that exiled this card", so control is read afresh here. Which
+-- permanent that is comes off CR 607.2's link (GameState.exiledWith), written by
+-- the same instruction's exile. Pawl.ExileSpec's "CR 702.75a the look follows
+-- control of the land that exiled the card, and CR 406.3's does not" is what
+-- proves the read is live.
 mayLookAt :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 mayLookAt pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
   pure
     ( not (Object.exiledFaceDown obj)
         || (Maybe.isJust (Object.foretold obj) && Object.owner obj == pid)
-        || Set.member pid (Object.exileLookers obj)
+        || any (looksAt pid oid gs) (Object.exileLookers obj)
     )
+
+-- One grant of CR 406.3's look permission, asked about one player.
+--
+-- The battlefield test in rule 702.75a's arm is a REGRESSION FENCE rather than
+-- proven behaviour: the rule names a PERMANENT (CR 110.1) and CR 108.4 gives a
+-- controller to nothing else, but dropping the test leaves the suite green.
+-- Nothing observes it, since a hideaway permanent that leaves the battlefield
+-- lands in a zone where CR 108.4 answers its OWNER -- who, hideaway having
+-- instructed that same player to look at the card before exiling it face down,
+-- is already an ExileLooker.ThePlayer of it.
+looksAt :: PlayerId -> ObjectId -> GameState.GameState -> ExileLooker.ExileLooker -> Bool
+looksAt pid oid gs looker = case looker of
+  ExileLooker.ThePlayer p -> p == pid
+  ExileLooker.TheExiler -> case Map.lookup oid (GameState.exiledWith gs) of
+    Nothing -> False
+    Just exiler ->
+      Set.member exiler (GameState.battlefield gs)
+        && View.controllerOf exiler gs == Just pid
 
 -- | CR 406.4's first half: may this player choose this exiled card SPECIFICALLY?
 --
