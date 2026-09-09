@@ -14,6 +14,7 @@ import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
+import qualified Pawl.Codec.ExileLooker as ExileLooker
 import qualified Pawl.Codec.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Codec.Facing as Facing
 import qualified Pawl.Codec.GrantedAbility as GrantedAbility
@@ -132,7 +133,7 @@ codec = Fields.object $ do
   manaSpent <- Fields.defaulted "manaSpent" (Mana.Type.MkMana []) Mana.codec Object.manaSpent
   announcedX <- Fields.defaulted "announcedX" Nothing (Common.maybe Common.natural) Object.announcedX
   castFrom <- Fields.defaulted "castFrom" Nothing (Common.maybe Zone.codec) Object.castFrom
-  exileLookers <- Fields.defaulted "exileLookers" Set.empty (Common.set PlayerId.codec) Object.exileLookers
+  exileLookers <- Fields.defaulted "exileLookers" Set.empty (Common.set ExileLooker.codec) Object.exileLookers
   detainedUntil <- Fields.defaulted "detainedUntil" Set.empty (Common.set PlayerId.codec) Object.detainedUntil
   goadedBy <- Fields.defaulted "goadedBy" Set.empty (Common.set PlayerId.codec) Object.goadedBy
   doesNotUntapNext <- Fields.defaulted "doesNotUntapNext" False Common.boolean Object.doesNotUntapNext

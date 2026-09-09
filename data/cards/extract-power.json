@@ -60,8 +60,10 @@
                   {
                     "type": "GrantLookAtExiled",
                     "value": {
-                      "type": "InSlot",
-                      "value": "exiled"
+                      "cards": {
+                        "type": "InSlot",
+                        "value": "exiled"
+                      }
                     }
                   },
                   {

@@ -148,6 +148,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
+import qualified Pawl.Types.ExileLooker as ExileLooker
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
@@ -166,6 +167,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
@@ -3604,16 +3606,22 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 grant o = o {Object.playableFromExile = Just permission}
              in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}
   -- CR 406.3: write the look permission onto every object the ObjectRef names,
-  -- as CR 109.5's "you".
+  -- as CR 109.5's "you", plus CR 702.75a's ExileLooker.TheExiler where the
+  -- payload asks for it. BOTH, and rule 702.75a's hideaway wants both: the
+  -- player it instructed to look at the cards before exiling one face down is
+  -- rule 406.3's continuing looker whatever happens to the permanent afterwards.
   --
   -- NOT gated on the object being in exile, nor on its being face down,
   -- Effect.GrantPlayFromExile's reason one rule over: a stamp that landed
   -- anywhere else is inert, since Pawl.Engine.Exile.mayLookAt reads it only
   -- where CR 406.3's default does not already answer yes.
-  Effect.GrantLookAtExiled ref ->
+  Effect.GrantLookAtExiled grant ->
     State.modify' $ \gs ->
-      let allow o = o {Object.exileLookers = Set.insert controller (Object.exileLookers o)}
-       in gs {GameState.objects = foldr (Map.adjust allow) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)}
+      let granted =
+            Set.insert (ExileLooker.ThePlayer controller) $
+              if GrantLookAtExiled.followsExiler grant then Set.singleton ExileLooker.TheExiler else Set.empty
+          allow o = o {Object.exileLookers = Set.union granted (Object.exileLookers o)}
+       in gs {GameState.objects = foldr (Map.adjust allow) (GameState.objects gs) (objectRefObjects legal resolving controller source gs (GrantLookAtExiled.cards grant))}
   -- CR 702.170c: each named card becomes plotted -- the stamp CR 702.170d reads
   -- and the GameEvent.Plotted entry a "when this card becomes plotted" trigger
   -- reads, both through Pawl.Engine.Plot.becomePlotted, so this route and CR

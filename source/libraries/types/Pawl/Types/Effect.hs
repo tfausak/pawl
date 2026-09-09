@@ -35,6 +35,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.LifeLoss as LifeLoss
@@ -616,14 +617,16 @@ data Effect card ability
     -- pawl cannot yet spell.
     GrantPlayFromExile GrantPlayFromExile.GrantPlayFromExile
   | -- | CR 406.3: CR 109.5's "you" may look at the face-down exiled cards the
-    -- ObjectRef names, for as long as they remain in exile (Extract Power).
+    -- payload names, for as long as they remain in exile (Extract Power), and
+    -- CR 702.75a's rider names the exiling permanent's controller besides
+    -- (Windbrisk Heights).
     --
     -- A separate opcode from GrantPlayFromExile above, and rule 406.3 is why the
     -- two do not merge: the permission it states outlives the instruction that
     -- gave it, where a play permission takes CR 611.2a's stated duration, and
     -- the printings come apart as well (Rogue Class grants the look at level 1
     -- and the play at level 3).
-    GrantLookAtExiled ObjectRef.ObjectRef
+    GrantLookAtExiled GrantLookAtExiled.GrantLookAtExiled
   | -- | CR 702.170c: the objects the ObjectRef names each become plotted
     -- (Kellan Joins Up). Not named Plot, CR 702.170e reserving that verb for CR
     -- 116.2k's special action; CR 702.170d fixes the beneficiary and the timing.

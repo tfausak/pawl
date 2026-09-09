@@ -14,6 +14,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.ExileLooker as ExileLooker
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
@@ -204,7 +205,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
               ],
           Object.announcedX = Just 20,
           Object.castFrom = Just Zone.Graveyard,
-          Object.exileLookers = Set.singleton (PlayerId.MkPlayerId 27),
+          Object.exileLookers = Set.singleton (ExileLooker.ThePlayer (PlayerId.MkPlayerId 27)),
           Object.detainedUntil = Set.singleton (PlayerId.MkPlayerId 21),
           Object.goadedBy = Set.singleton (PlayerId.MkPlayerId 22),
           Object.doesNotUntapNext = True,
@@ -241,7 +242,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
           <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null}]"
           <> ",\"announcedX\":20,\"castFrom\":{\"type\":\"Graveyard\"}"
-          <> ",\"exileLookers\":[27],\"detainedUntil\":[21],\"goadedBy\":[22]"
+          <> ",\"exileLookers\":[{\"type\":\"ThePlayer\",\"value\":27}],\"detainedUntil\":[21],\"goadedBy\":[22]"
           <> ",\"doesNotUntapNext\":true,\"exertedBy\":[23]"
           <> ",\"activatedOnce\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}"
           <> ",\"modal\":{\"modes\":[{}]}}]} "
