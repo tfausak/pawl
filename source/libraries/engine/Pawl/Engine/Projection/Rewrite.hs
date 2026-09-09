@@ -1118,9 +1118,10 @@ rewriteDrawRewrite pairs rewrite = case rewrite of
 -- Omni-Changeling changeling), and Wall of Stolen Identity's "a Wall" would need
 -- an Artificial Evolution aimed at it. The arms are the rule rather than a proven
 -- behaviour -- an "except it has islandwalk", or that Artificial Evolution, would
--- be what proves them. CR 707.9b's other two arms name no word at all: the pair
--- is two literals, and the type clause names CR 205.2a's card types, which CR
--- 612.2's subtype swap does not reach.
+-- be what proves them. CR 707.9b's remaining arms name no word CR 612.2's
+-- subtype swap reaches: the pair is two literals, the type clause names CR
+-- 205.2a's card types, the supertype clauses CR 205.4a's supertypes, and the name
+-- clause a name, which CR 612.2's last sentence puts out of reach outright.
 rewriteCopyException :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CopyException.CopyException -> CopyException.CopyException
 rewriteCopyException pairs exception = case exception of
   CopyException.SetPowerToughness _ -> exception
@@ -1134,8 +1135,14 @@ rewriteCopyException pairs exception = case exception of
   -- they do to a Filter's HasSubtype atom (Filter.rewrite).
   CopyException.AddSubtypes subtypes -> CopyException.AddSubtypes (Set.map (\t -> Maybe.fromMaybe t (lookup t pairs)) subtypes)
   -- CR 205.4a's supertypes for the same reason CR 707.9b's card types are left
-  -- alone: CR 612.2's swap reaches subtypes alone.
+  -- alone, whichever direction the clause runs: CR 612.2's swap reaches subtypes
+  -- alone.
+  CopyException.AddSupertypes _ -> exception
   CopyException.RemoveSupertypes _ -> exception
+  -- CR 201.1's name is the one CR 612.2 rules out in so many words: "an effect
+  -- that changes a color word or a subtype can't change a card name". CR 612.7's
+  -- Spy Kit is the effect that does change one, and it is unimplemented (#887).
+  CopyException.SetName _ -> exception
   -- CR 707.9a's "this ability" carries no word of its own. The ability it points
   -- at is the resolving one, which the projection already rewrote where it was
   -- read (rewriteTriggeredAbility).

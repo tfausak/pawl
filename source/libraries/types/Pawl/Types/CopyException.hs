@@ -1,6 +1,7 @@
 module Pawl.Types.CopyException where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
@@ -33,11 +34,9 @@ import qualified Pawl.Types.Supertype as Supertype
 -- "other effects").
 --
 -- Not implemented: CR 707.9c's exception that declines to copy a characteristic
--- (Vesuvan Doppelganger's "except it doesn't copy that creature's color"), the
--- SUPERTYPE half of CR 707.9b's ADDITIVE "in addition to its other types"
--- (Sakashima the Impostor's "legendary"), and CR 707.9e's exception that is an
--- additional effect rather than a characteristic (Altered Ego's additional
--- counters) (#1292).
+-- (Vesuvan Doppelganger's "except it doesn't copy that creature's color") and CR
+-- 707.9e's exception that is an additional effect rather than a characteristic
+-- (Altered Ego's additional counters) (#1292).
 data CopyException
   = -- | CR 707.9b: the copy's power and toughness are these numbers instead of
     -- the copied object's ("except it's 7/7").
@@ -125,13 +124,33 @@ data CopyException
     -- exception. So this arm must not clear characteristicPT and must not touch
     -- the keywords a characteristic-defining ability is written as.
     AddSubtypes (Set.Set Subtype.Subtype)
+  | -- | CR 707.9b / 205.1b over CR 205.4a's part of the type line: the copy is
+    -- these supertypes "in addition to its other types" (Sakashima the
+    -- Impostor's "legendary"), so they JOIN the copied supertypes.
+    --
+    -- A UNION for CR 205.4b's reason, which is RemoveSupertypes' reason one
+    -- direction over: an object that gains a supertype "retains any other
+    -- supertypes it had", so a Sakashima copying a snow permanent is snow AND
+    -- legendary.
+    --
+    -- A Set, and its own arm rather than a share of AddSubtypes, for AddSubtypes'
+    -- reason: CR 205.1 makes the three parts of the type line three fields on
+    -- Pawl.Types.ProjectedCharacteristics, and Moritte of the Frost's "legendary
+    -- and snow in addition to its other types" names two supertypes in one
+    -- clause.
+    --
+    -- NOTHING ELSE MOVES, for AddCardTypes' reason: CR 707.9d's last two
+    -- sentences name supertype in the carve-out, so the copied
+    -- characteristic-defining ability stays -- and there would be nothing to
+    -- strip in any case, RemoveSupertypes' reason below.
+    AddSupertypes (Set.Set Supertype.Supertype)
   | -- | CR 707.9b: the copy is NOT these supertypes, whatever the copied object's
     -- were ("except it isn't legendary", Multiversal Recruitment).
     --
     -- A DIFFERENCE and not a replacement of the whole supertype set, which is CR
     -- 205.4b: an object that loses a supertype "retains any other supertypes it
     -- had", so a copy of a snow legendary permanent is still snow. The arm is the
-    -- subtractive counterpart of AddCardTypes rather than a SetSupertypes.
+    -- subtractive counterpart of AddSupertypes rather than a SetSupertypes.
     --
     -- A Set for AddCardTypes' reason, though every printing names Legendary
     -- alone; CR 205.4a lists five supertypes and none of the sentence's shape
@@ -143,4 +162,18 @@ data CopyException
     -- supertype -- Pawl.Types.ProjectedCharacteristics carries characteristicPT
     -- and reaches subtypes through CR 702.73a's changeling, and nothing else.
     RemoveSupertypes (Set.Set Supertype.Supertype)
+  | -- | CR 707.9b over CR 201.1's characteristic: the copy's name is this one
+    -- rather than the copied object's ("except its name is Sakashima the
+    -- Impostor").
+    --
+    -- ONE CardName where Pawl.Types.ProjectedCharacteristics keeps a SET, so the
+    -- arm replaces the whole set with it. CR 709.4a's two names are a split
+    -- card's, and no printed exception states more than one, so a copy that took
+    -- this exception has exactly the name the clause says -- which is what CR
+    -- 704.5j then reads.
+    --
+    -- CR 707.9d's strip has nothing to take, RemoveSupertypes' reason: it drops
+    -- the characteristic-defining ability that DEFINES the excepted
+    -- characteristic, and no pawl characteristic-defining ability defines a name.
+    SetName CardName.CardName
   deriving (Eq, Ord, Show)

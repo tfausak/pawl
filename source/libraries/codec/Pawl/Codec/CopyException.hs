@@ -1,5 +1,6 @@
 module Pawl.Codec.CopyException where
 
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.SetPowerToughness as SetPowerToughness
@@ -26,7 +27,13 @@ codec =
       Arm.payload "AddSubtypes" (Common.set Subtype.codec) CopyException.AddSubtypes $ \x -> case x of
         CopyException.AddSubtypes y -> Just y
         _ -> Nothing,
+      Arm.payload "AddSupertypes" (Common.set Supertype.codec) CopyException.AddSupertypes $ \x -> case x of
+        CopyException.AddSupertypes y -> Just y
+        _ -> Nothing,
       Arm.payload "RemoveSupertypes" (Common.set Supertype.codec) CopyException.RemoveSupertypes $ \x -> case x of
         CopyException.RemoveSupertypes y -> Just y
+        _ -> Nothing,
+      Arm.payload "SetName" CardName.codec CopyException.SetName $ \x -> case x of
+        CopyException.SetName y -> Just y
         _ -> Nothing
     ]

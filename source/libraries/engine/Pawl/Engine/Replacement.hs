@@ -2153,6 +2153,20 @@ applyCopyException this snapshot exception = case exception of
   -- (CR 707.9d's Glasspool Mimic example).
   CopyException.AddSubtypes subtypes ->
     snapshot {PC.subtypes = Set.union (PC.subtypes snapshot) subtypes}
+  -- CR 707.9b / 205.1b over CR 205.4a's part of the type line: "it's legendary in
+  -- addition to its other types" (Sakashima the Impostor), so a UNION where the
+  -- arm below takes a difference. CR 205.4b says the same one object at a time --
+  -- one that gains a supertype keeps the ones it had.
+  --
+  -- Into the snapshot for the arms above's reason, and read at gameplay level by
+  -- CR 704.5j: Pawl.CopySpec's "two Sakashimas copying different creatures are one
+  -- legend rule apart" is what proves the supertype arrived, since two copies that
+  -- did not gain it would both stand.
+  --
+  -- Nothing else moves, for AddCardTypes' reason: CR 707.9d's carve-out names
+  -- supertype, and no pawl characteristic-defining ability defines one anyway.
+  CopyException.AddSupertypes supertypes ->
+    snapshot {PC.supertypes = Set.union (PC.supertypes snapshot) supertypes}
   -- CR 707.9b over CR 205.4a's part of the type line: "except it isn't legendary"
   -- (Multiversal Recruitment), so a DIFFERENCE rather than an empty set -- the
   -- clause names one supertype and a copy of a snow legendary permanent is still
@@ -2169,6 +2183,14 @@ applyCopyException this snapshot exception = case exception of
   -- supertype (Pawl.Types.CopyException's arm).
   CopyException.RemoveSupertypes supertypes ->
     snapshot {PC.supertypes = Set.difference (PC.supertypes snapshot) supertypes}
+  -- CR 707.9b over CR 201.1's name: "except its name is Sakashima the Impostor",
+  -- so the clause's one name REPLACES whatever the copied object's were (CR
+  -- 709.4a's pair among them).
+  --
+  -- Into the snapshot for the arms above's reason. CR 707.9d has nothing to
+  -- strip: no pawl characteristic-defining ability defines a name.
+  CopyException.SetName name ->
+    snapshot {PC.names = Set.singleton name}
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- permanents matching the rewrite's printed noun phrase, other than itself, minus
