@@ -3700,6 +3700,8 @@ filterSlotsReadSingly predicate = case predicate of
   -- Reads the whole set too, one field further over.
   Filter.Type.SameControllerAsBound _ -> []
   Filter.Type.HasChosenName -> []
+  -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.
+  Filter.Type.HasChosenColor -> []
   -- Reads no slot at all: rule 702.16k's player arrives on Filter.Context.
   Filter.Type.OfChosenPlayer -> []
   Filter.Type.IsPlayer _ -> []

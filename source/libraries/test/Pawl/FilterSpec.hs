@@ -865,6 +865,32 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a nameless candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches (named ["Chromatic Star"]) blackCreature Filter.Type.HasChosenName)) "no names"
 
+  -- CR 105.2: what the SOURCE chose as it entered, against the colours the
+  -- candidate wears. Membership, so a multicoloured candidate matches on any one
+  -- of them.
+  Spec.describe s "HasChosenColor" $ do
+    let chose c = self {Filter.sourceChosenColor = Just c}
+        wearing cs = blackCreature {Filter.colors = Set.fromList cs}
+    Spec.it s "matches a candidate wearing the chosen colour" $ do
+      Spec.assertBool s (Filter.matches (chose Color.Black) blackCreature Filter.Type.HasChosenColor) "the chosen colour"
+
+    Spec.it s "does not match a candidate of some other colour" $ do
+      Spec.assertBool s (not (Filter.matches (chose Color.Red) blackCreature Filter.Type.HasChosenColor)) "a different colour"
+
+    Spec.it s "CR 105.2 matches a candidate wearing the chosen colour among others" $ do
+      Spec.assertBool s (Filter.matches (chose Color.Red) (wearing [Color.Blue, Color.Red]) Filter.Type.HasChosenColor) "one of two colours"
+
+    -- CR 105.2's "no color at all": a colourless candidate wears none, so it
+    -- shares none.
+    Spec.it s "a colourless candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (chose Color.Black) (wearing []) Filter.Type.HasChosenColor)) "no colours"
+
+    -- This atom's vacuous direction, and the reason #3449's position lint is
+    -- owed: outside the affected set that fills the field this is False rather
+    -- than an error.
+    Spec.it s "a source that chose nothing is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.HasChosenColor)) "contextFor leaves it Nothing"
+
   -- CR 702.16k: what the carrier's chosen player CONTROLS, plus what they OWN
   -- that no other player controls. `blackCreature` is controlled by player 0 and
   -- owned by player 1, which is the one view that tells the two halves apart.

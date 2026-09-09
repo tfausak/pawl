@@ -163,9 +163,10 @@ data Object = MkObject
     -- `attachedViews`), so there is no reverse index to keep consistent.
     attachedTo :: Maybe Recipient.Recipient,
     -- | CR 614.1c: a colour this object's controller chose as it entered
-    -- (Painter's Servant). Read by Modification.AddChosenColor off the effect's
-    -- SOURCE, never off the affected object. NOT a copiable value, so a copy runs
-    -- the copied ability and makes its own new choice (CR 707.5, CR 707.6).
+    -- (Painter's Servant). Read by Modification.AddChosenColor and by
+    -- Filter.HasChosenColor (Gauntlet of Power) off the effect's SOURCE, never off
+    -- the affected object. NOT a copiable value, so a copy runs the copied ability
+    -- and makes its own new choice (CR 707.5, CR 707.6).
     -- Per-incarnation: reset by newIncarnation (CR 400.7).
     --
     -- One of FOUR `chosen` fields -- chosenSubtype, chosenNames and chosenPlayer

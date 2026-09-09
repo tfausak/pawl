@@ -245,6 +245,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.SameNameAsBound _ -> 0
   Filter.Type.SameControllerAsBound _ -> 0
   Filter.Type.HasChosenName -> 0
+  Filter.Type.HasChosenColor -> 0
   Filter.Type.OfChosenPlayer -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   -- Zero for the nullary atoms' reason, a payload over: CR 400.1's card count is

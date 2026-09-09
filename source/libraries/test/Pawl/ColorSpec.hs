@@ -25,6 +25,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Engine as Engine
@@ -139,6 +140,15 @@ abilityAt i p = case drop i (Face.activatedAbilities (S.combinedFace p)) of
 choosingBlue :: Prompt.Prompt r -> r
 choosingBlue p = case p of
   Prompt.ChooseColor {} -> Color.Blue
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  _ -> S.identityAnswer p
+
+-- choosingBlue for the Gauntlet of Power case below, whose two permanents must
+-- choose two DIFFERENT colours to show that each reads its own.
+choosingBlack :: Prompt.Prompt r -> r
+choosingBlack p = case p of
+  Prompt.ChooseColor {} -> Color.Black
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
   _ -> S.identityAnswer p
@@ -292,6 +302,44 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     Spec.assertEqWith s "the black Rats are 2/2" (Projection.powerOf ratsId gs) $ Just 2
     Spec.assertEqWith s "the red Piker is unchanged at 2" (Projection.powerOf pikerId gs) $ Just 2
     Spec.assertEqWith s "the red Piker's toughness is unchanged at 1" (Projection.toughnessOf pikerId gs) $ Just 1
+
+  -- Bad Moon's shape with the colour read off the SOURCE instead of the card (CR
+  -- 607.2d): Gauntlet of Power's "creatures of the chosen color get +1/+1",
+  -- Filter.HasChosenColor.
+  --
+  -- TWO Gauntlets, choosing two different colours, because one could not tell the
+  -- atom apart from "any chosen colour on the battlefield": each pumps the
+  -- creature of ITS colour and neither pumps the other's. Cast rather than
+  -- placed, so each colour is a player's answer travelling CR 614.1c's entry
+  -- rewrite; Object.chosenColor is per-incarnation and CR 707.6 does not copy it,
+  -- which is what makes the two answers survive on one board.
+  -- The colourless Myr is the third creature neither may reach.
+  Spec.it s "CR 607.2d two Gauntlets of Power each pump the creatures of their OWN chosen colour" $ do
+    plains <- S.printingOf s registry "Plains"
+    gauntlet <- S.printingOf s registry "Gauntlet of Power"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    piker <- S.printingOf s registry "Goblin Piker"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    -- Ten Plains: {5} apiece, and white reaches neither chosen colour.
+    let base = S.landsInPlay plains 10
+        (firstInHand, firstId) = S.handOne gauntlet base
+        castBlack = snd (Engine.runGamePure choosingBlack firstInHand (S.cast S.alice firstId))
+        blackOut = snd (Engine.runGamePure choosingBlack castBlack Stack.resolveTop)
+        (secondInHand, secondId) = S.handOne gauntlet blackOut
+        castRed = snd (Engine.runGamePure choosingRed secondInHand (S.cast S.alice secondId))
+        bothOut = snd (Engine.runGamePure choosingRed castRed Stack.resolveTop)
+        (ratsId, withRats) = S.addPermanent typhoidRats S.alice bothOut
+        (pikerId, withPiker) = S.addPermanent piker S.alice withRats
+        (myrId, gs) = S.addPermanent darksteelMyr S.alice withPiker
+    Spec.assertEqWith s "the black Rats are 2/2: the Gauntlet that chose black, and not the one that chose red" (Projection.powerOf ratsId gs) $ Just 2
+    Spec.assertEqWith s "the black Rats' toughness is 2 for the same reason" (Projection.toughnessOf ratsId gs) $ Just 2
+    Spec.assertEqWith s "the red Piker is 3/2: the other Gauntlet's, and not both" (Projection.powerOf pikerId gs) $ Just 3
+    Spec.assertEqWith s "the red Piker's toughness is 2 for the same reason" (Projection.toughnessOf pikerId gs) $ Just 2
+    Spec.assertEqWith s "CR 105.2 the colourless Myr wears neither colour and stays 0/1" (Projection.powerOf myrId gs) $ Just 0
+    Spec.assertEqWith s "and its toughness stays 1" (Projection.toughnessOf myrId gs) $ Just 1
+    -- The fixture, LAST: an assertion ahead of the six above would absorb a
+    -- mutation to the atom and report itself instead.
+    Spec.assertEqWith s "the fixture: both Gauntlets resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Gauntlet of Power")) S.alice gs) 2
 
   Spec.it s "CR 702.114a Bad Moon does not pump a devoid creature with a black mana cost" $ do
     -- FALSIFIER, reader (b) half: a naive "colours are the mana cost's

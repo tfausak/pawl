@@ -614,16 +614,16 @@ affectsWith grants peers source oid a partial gs = case a of
         -- consults no liveness gate and so cannot re-enter this function.
         perspective = controllerOfGiven grants Set.empty source gs
      in Set.member oid (GameState.battlefield gs)
-          && Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct.
   Affected.MatchingAnywhere f ->
     let perspective = controllerOfGiven grants Set.empty source gs
-     in Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
+     in Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- Matching's body with that conjunct NEGATED rather than dropped.
   Affected.MatchingOffBattlefield f ->
     let perspective = controllerOfGiven grants Set.empty source gs
      in not (Set.member oid (GameState.battlefield gs))
-          && Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. The Filter's perspective stays the source's controller (CR 109.5), not
   -- the enchanted player's. The candidate's controller is bound once and used
@@ -641,8 +641,20 @@ affectsWith grants peers source oid a partial gs = case a of
       let controller = controllerOfGiven grants Set.empty oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
-            && Filter.matches (Filter.contextFor (Game.teams gs) (controllerOfGiven grants Set.empty source gs) (Just source)) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
+            && Filter.matches (affectedContext source (controllerOfGiven grants Set.empty source gs) gs) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
     Nothing -> False
+
+-- The Filter.Context an affected set is matched through: CR 109.5's "you" is the
+-- source's controller, and CR 607.2d's link puts the SOURCE's entry choice (CR
+-- 614.1c) beside it, since the ability that chose and the affected clause that
+-- reads the choice are printed on the one permanent. Read off the OBJECT and not
+-- its card: Object.chosenColor is per-incarnation, and CR 707.6 leaves a copy to
+-- make its own choice, so two permanents of the one printing answer differently.
+affectedContext :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Filter.Context
+affectedContext source perspective gs =
+  (Filter.contextFor (Game.teams gs) perspective (Just source))
+    { Filter.sourceChosenColor = Game.lookupObject source gs >>= Object.chosenColor
+    }
 
 -- The characteristics view of an object: its CR 613 projection and its projected
 -- controller (CR 613.1b; Nothing when the id is unknown). Rule 613.1 names no
@@ -2324,6 +2336,11 @@ filterReads f = case f of
   -- Reads NAMES at both ends too, HasName's answer one indirection along: the
   -- chosen half is not a projection at all, and no Modification writes the other.
   Filter.Type.HasChosenName -> Set.empty
+  -- Reads the candidate's COLOURS, HasColor's answer above: the chosen half is no
+  -- projection at all, and CR 613.1e's layer writes the other, so an effect that
+  -- recolours a creature (Painter's Servant) moves an affected set written with
+  -- this atom.
+  Filter.Type.HasChosenColor -> Set.singleton Colors
   -- Reads the candidate's CONTROLLER, SameControllerAsBound's answer above: rule
   -- 702.16k's other half is an owner, which CR 108.3 never projects.
   Filter.Type.OfChosenPlayer -> Set.singleton Controller
@@ -2592,6 +2609,10 @@ filterReadsPeers f = case f of
   -- Pawl.Engine.Target.slotContext -- no peer projection is read here.
   Filter.Type.SameControllerAsBound _ -> False
   Filter.Type.HasChosenName -> False
+  -- The source's chosen colour arrives on the Context, read off Object.chosenColor
+  -- rather than off a projection; the candidate's own colours come from its
+  -- partial, so no PEER is projected.
+  Filter.Type.HasChosenColor -> False
   -- The carrier's chosen player arrives on the Context; the candidate's own
   -- controller and owner are read off its view, so no PEER is projected.
   Filter.Type.OfChosenPlayer -> False

@@ -1177,7 +1177,33 @@ data Context = MkContext
     -- no card asks OfChosenPlayer outside a keyword's own filter", the sweep
     -- sourcePower's, slotNames', sourceAttachedTo's and sourceChosenNames'
     -- siblings each have.
-    carrierChosenPlayer :: Maybe PlayerId.PlayerId
+    carrierChosenPlayer :: Maybe PlayerId.PlayerId,
+    -- CR 105.2: the colour the SOURCE chose as it entered (CR 614.1c), for the one
+    -- atom that asks whether a candidate wears it (HasChosenColor, Gauntlet of
+    -- Power). Supplied by the caller for slotNames' reason, and by ONE:
+    -- Pawl.Engine.Projection.affectsWith, the funnel every Affected question goes
+    -- through, at each of its four arms that match a filter. CR 607.2d links the
+    -- choosing ability to the affected clause beside it, so a static ability's own
+    -- affected set is the position the link is written in.
+    --
+    -- The SOURCE's, sourceChosenNames' direction rather than carrierChosenPlayer's:
+    -- the permanent whose static ability wrote the affected set is the permanent
+    -- that made the choice, and the candidate is what the filter is matched
+    -- against.
+    --
+    -- Read LIVE off the board, carrierChosenPlayer's posture: a permanent's static
+    -- ability is asked afresh every time, and Object.chosenColor is per-incarnation
+    -- (CR 707.6 does not copy it), so two Gauntlets naming two colours answer
+    -- differently on the one board.
+    --
+    -- Nothing in contextFor below and so in contextWithSlots and
+    -- contextComparingPower too, so the atom is vacuously False in every position
+    -- but that one -- sourceAttachedTo's posture rather than slotControllers'.
+    --
+    -- Not implemented: the lint that would keep a card from asking the atom in the
+    -- positions this is empty in, which sourcePower, slotNames, sourceAttachedTo,
+    -- sourceChosenNames and carrierChosenPlayer above each have (#3449).
+    sourceChosenColor :: Maybe Color.Color
   }
   deriving (Eq, Ord, Show)
 
@@ -1212,6 +1238,11 @@ data Context = MkContext
 -- reads a protection quality in -- see carrierChosenPlayer above for the list and
 -- for the lint that keeps a card to them.
 --
+-- CR 105.2's chosen-colour atom (Gauntlet of Power) is a further one a CARD may
+-- write, and it reads the Nothing here in every position but the affected set CR
+-- 607.2d links the choice to -- see sourceChosenColor above, and #3449 for the
+-- lint that would keep a card to it.
+--
 -- CR 110.2's same-controller atom (Bioshift) is the one whose unfilled read does
 -- NOT match nothing, so the paragraphs above are a finding per atom rather than
 -- one argument about this record: `slotControllers` is empty here, and the
@@ -1223,7 +1254,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1261,7 +1292,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1492,6 +1523,12 @@ matches context view predicate = case predicate of
   -- nothing, and a candidate with no name at all (CR 708.2a), each leave one side
   -- empty and answer False without a case of their own.
   Filter.HasChosenName -> not (Set.disjoint (names view) (sourceChosenNames context))
+  -- CR 105.2 read off the PROJECTION, the HasColor arm above with the colour
+  -- arriving on the Context: whatever layer 5 left the candidate wearing is what
+  -- CR 607.2d's link is compared against, so Painter's Servant's blue reaches this
+  -- as readily as a printed cost does. A source that has chosen none matches
+  -- nothing.
+  Filter.HasChosenColor -> maybe False (`Set.member` colors view) (sourceChosenColor context)
   -- CR 702.16k's two halves in one disjunction: what the chosen player CONTROLS,
   -- and what they OWN that no other player controls -- which is the second half's
   -- whole content, CR 108.4 leaving a card outside the battlefield and the stack
@@ -1836,6 +1873,7 @@ rewrite pairs predicate = case predicate of
   Filter.SameNameAsBound _ -> predicate
   Filter.SameControllerAsBound _ -> predicate
   Filter.HasChosenName -> predicate
+  Filter.HasChosenColor -> predicate
   Filter.OfChosenPlayer -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
@@ -2329,6 +2367,7 @@ bakeBound players predicate = case predicate of
   Filter.SameNameAsBound _ -> predicate
   Filter.SameControllerAsBound _ -> predicate
   Filter.HasChosenName -> predicate
+  Filter.HasChosenColor -> predicate
   Filter.OfChosenPlayer -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
@@ -2469,6 +2508,7 @@ manaValueThresholds predicate = case predicate of
   Filter.SameNameAsBound _ -> []
   Filter.SameControllerAsBound _ -> []
   Filter.HasChosenName -> []
+  Filter.HasChosenColor -> []
   Filter.OfChosenPlayer -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
@@ -2608,6 +2648,9 @@ statesAQuality predicate = case predicate of
   -- description is a card name whichever way the name was arrived at, so a search
   -- whose filter is this one may decline to find what it can see.
   Filter.HasChosenName -> True
+  -- CR 701.23b's "stated quality" for HasColor's reason, one indirection along:
+  -- the description is a colour whichever way the colour was arrived at.
+  Filter.HasChosenColor -> True
   -- CR 701.23b's "stated quality" too, and rule 702.16k's own "regardless of
   -- that object's characteristic values" is not a counter-argument: the rule
   -- excuses the PROTECTION from reading characteristics, where this predicate
