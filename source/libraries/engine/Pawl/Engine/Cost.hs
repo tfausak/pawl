@@ -402,7 +402,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- Scoped to the permission's OWN holder, CR 109.5's "you" as
                 -- Pawl.Types.ExilePlayPermission baked it in: a second player
                 -- casting the same card under some other permission is priced
-                -- by the arm below.
+                -- by the `_` arm below.
                 Zone.Exile
                   | any
                       (\permission -> ExilePlayPermission.withoutPayingManaCost permission && ExilePlayPermission.player permission == pid)
