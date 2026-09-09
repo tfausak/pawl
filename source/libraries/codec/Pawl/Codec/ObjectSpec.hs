@@ -170,6 +170,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                   ExilePlayPermission.source = ObjectId.MkObjectId 14,
                   ExilePlayPermission.expiry = Expiry.AtCleanup,
                   ExilePlayPermission.spending = ManaSpending.AnyType,
+                  ExilePlayPermission.withoutPayingManaCost = True,
                   ExilePlayPermission.origin = PlayPermissionOrigin.Granted
                 },
           Object.plotted = Just 0,
@@ -225,7 +226,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"timestamp\":10,\"face\":\"Delver of Secrets\",\"turnedOverAt\":11"
           <> ",\"worldSince\":12"
           <> ",\"playableFromExile\":{\"player\":13,\"source\":14,\"expiry\":{\"type\":\"AtCleanup\"}"
-          <> ",\"spending\":{\"type\":\"AnyType\"},\"origin\":{\"type\":\"Granted\"}}"
+          <> ",\"spending\":{\"type\":\"AnyType\"},\"withoutPayingManaCost\":true,\"origin\":{\"type\":\"Granted\"}}"
           <> ",\"plotted\":0,\"foretold\":15,\"preparedCopyOf\":26"
           <> ",\"ringBearerFor\":16,\"protector\":17"
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"

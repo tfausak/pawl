@@ -644,7 +644,7 @@ effectObjectRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> [ref]
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _) -> [ref]
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ ref _) -> [ref]
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ ref _ _) -> [ref]
   Effect.GrantLookAtExiled ref -> [ref]
   Effect.MakePlotted ref -> [ref]
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.

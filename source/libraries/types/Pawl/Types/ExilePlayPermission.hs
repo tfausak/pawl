@@ -51,6 +51,17 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- (Pawl.Types.CastOffer.spending) by Pawl.Engine.Cast.spendingWith -- and
 -- Pawl.Engine.Mana.relax is what acts on the value it hands back.
 --
+-- `withoutPayingManaCost` is CR 118.9's "you may cast [this object] without
+-- paying its mana cost" said of the cards this permission covers, printed in the
+-- same sentence as the permission itself (Extract Power) -- an alternative cost
+-- of nothing, which CR 118.5 still makes the caster announce rather than paying
+-- itself. It rides the permission rather than the exiled card for CR 118.14's
+-- scoping reason one field up: the waiver belongs to the effect that granted the
+-- play, so the same card played under some other permission pays its printed
+-- cost. Pawl.Engine.Cost.candidateCostsGiven's exile arm is the one reader, and
+-- it REPLACES the printed cost there rather than joining it, since this
+-- permission is the only thing making the cast legal at all.
+--
 -- `origin` is which rule granted this permission, and CR 715.3d's closing clause
 -- is the one place it is read: "it can't be cast as an Adventure this way,
 -- ALTHOUGH OTHER EFFECTS that allow a player to cast it may allow a player to
@@ -71,6 +82,7 @@ data ExilePlayPermission = MkExilePlayPermission
     source :: ObjectId.ObjectId,
     expiry :: Expiry.Expiry,
     spending :: ManaSpending.ManaSpending,
+    withoutPayingManaCost :: Bool,
     origin :: PlayPermissionOrigin.PlayPermissionOrigin
   }
   deriving (Eq, Ord, Show)

@@ -19,9 +19,16 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- the grant rather than the card being exiled, which is rule 118.14's own
 -- scoping: the permission is the granting effect's, so the same card cast under
 -- some other permission pays its printed colours.
+--
+-- `withoutPayingManaCost` is CR 118.9's "you may cast [this object] without
+-- paying its mana cost", printed in the same sentence as the permission on
+-- Extract Power. It rides the grant for `spending`'s reason: the waiver is the
+-- granting effect's, so the same card played under some other permission pays.
+-- Pawl.Types.ExilePlayPermission's field of the same name is where it lands.
 data GrantPlayFromExile = MkGrantPlayFromExile
   { duration :: Duration.Duration,
     ref :: ObjectRef.ObjectRef,
-    spending :: ManaSpending.ManaSpending
+    spending :: ManaSpending.ManaSpending,
+    withoutPayingManaCost :: Bool
   }
   deriving (Eq, Ord, Show)

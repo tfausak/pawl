@@ -326,7 +326,7 @@ dirtied pid object =
       Object.worldSince = Just (Timestamp.MkTimestamp 2),
       -- The origin is inert here: newIncarnation clears playableFromExile
       -- outright, so no value of it makes this fixture more or less honest.
-      Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never ManaSpending.AnyType PlayPermissionOrigin.Granted),
+      Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never ManaSpending.AnyType False PlayPermissionOrigin.Granted),
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
       Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna")),
