@@ -458,8 +458,9 @@ newGame perform matchup = do
 -- Object.newIncarnation is CR 400.7's forgetting, the same one `toLibraryCard`
 -- performs below; only Object.source differs between the two cards, since each
 -- represents itself again and not the permanent they were. A merged permanent's
--- TOKEN component (CR 730.2d) is minted as the token it is, which the funnel
--- below then drops for CR 727.2's own reason: a token is not a card. CR 712.21a's
+-- TOKEN component (CR 730.2d) is minted as the token it is, and its copy
+-- component (CR 730.2, CR 707.10) as the copy it is, which the funnel below then
+-- drops for CR 727.2's own reason: neither is a card. CR 712.21a's
 -- arrangement is not asked: both callers shuffle what they build (CR 103.5, CR
 -- 729.5), so the order the two cards are placed in is not observable.
 splitComponents :: ObjectId -> Map.Map ObjectId Object.Object -> (Map.Map ObjectId Object.Object, ObjectId)

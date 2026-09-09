@@ -48,6 +48,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
@@ -474,6 +475,79 @@ spec s registry = Spec.describe s "Mutate" $ do
           [ CardName.MkCardName (Text.pack "Hanweir Garrison"),
             CardName.MkCardName (Text.pack "Hanweir Battlements")
           ]
+  -- CR 730.2's "or copy", which is the only component a card can put there that
+  -- is neither a card nor a token: CR 707.10's "a copy of a spell is itself a
+  -- spell", so a copy of a mutating creature spell is one too and CR 702.140c
+  -- merges it.
+  --
+  -- Double Major ({G}{U} Instant, "copy target creature spell you control,
+  -- except it isn't legendary if the spell is legendary") is the pool's
+  -- producer, and the mutating Cubwarden on the stack is a creature spell for it
+  -- to name. Both merges happen on the SAME board -- the copy resolves first,
+  -- then the original -- so the merged permanent ends up carrying one component
+  -- of each kind and the assertion can tell them apart by position.
+  --
+  -- Not implemented: that card's printed exception, which CR 707.10's opcode has
+  -- nowhere to carry (#3458). Cubwarden is not legendary, so the clause is inert
+  -- on this board; omitting it leaves pawl's card stricter than printed.
+  --
+  -- What a REFUSING merge would leave is the discriminating half: CR 608.3f
+  -- makes a copy of a permanent spell a token "as it is put onto the
+  -- battlefield", so the copy would arrive as a second Cubwarden of its own and
+  -- rule 702.140d's trigger would fire once instead of three times.
+  --
+  -- THREE times, not twice: CR 702.140e gives the mutated permanent the
+  -- abilities of every component, so the second merge happens to a permanent
+  -- already carrying one Cubwarden trigger and gains a second, and CR 603.2
+  -- triggers each of them. Two Cats, then four.
+  Spec.it s "CR 730.2/707.10 a copy of a mutating creature spell merges, as a copy and not as a card" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    doubleMajor <- S.printingOf s registry "Double Major"
+    let base = S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)))
+        (host, withHost) = S.addPermanent falcon S.alice base
+        (withSpell, spellId) = S.handOne cubwarden withHost
+        (board, copyId) = S.handOne doubleMajor withSpell
+        cast = S.runPure (doublingAt host) board (S.cast S.alice spellId >> S.cast S.alice copyId)
+        -- EIGHT passes over a stack that never holds more than three, so every
+        -- assertion reads a drained stack: Double Major, the copy, the original,
+        -- and rule 702.140d's trigger after each merge.
+        after = S.runPure (doublingAt host) cast (Monad.replicateM_ 8 (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+        -- CR 730.3's departure over the same permanent, which is where the copy
+        -- component's KIND is read a second time: the two cards are put into the
+        -- graveyard and CR 704.5e removes the copy there.
+        dead = S.runPure S.identityAnswer after (Event.destroy Regenerability.Regenerable [host] >> Engine.settleForPriority)
+    Spec.assertEqWith
+      s
+      "CR 730.2 the copy represents the merged permanent as a copy, between the card that merged after it and the creature underneath"
+      (componentKinds host after)
+      [ (Text.pack "OfCard", CardName.MkCardName (Text.pack "Cubwarden")),
+        (Text.pack "OfSpellCopy", CardName.MkCardName (Text.pack "Cubwarden")),
+        (Text.pack "OfCard", CardName.MkCardName (Text.pack "Falcon Abomination"))
+      ]
+    Spec.assertEqWith
+      s
+      "CR 702.140c/608.3f the copy did not enter the battlefield, so no second Cubwarden stands beside the merged one"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Cubwarden")) S.alice after)
+      1
+    Spec.assertEqWith
+      s
+      "CR 702.140d/702.140e both merges fired the mutate trigger, the second one twice"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Cat Token")) S.alice after)
+      6
+    Spec.assertEqWith
+      s
+      "CR 730.3/704.5e the merged permanent dies as its two cards, the copy component ceasing to exist rather than sitting in the graveyard"
+      (List.sort (filter (/= CardName.MkCardName (Text.pack "Double Major")) (graveyardNames dead)))
+      (List.sort [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Falcon Abomination")])
+    -- The proxies, after the behaviours: the copy really was made, and the board
+    -- really did start with one card representing the creature.
+    Spec.assertEqWith s "and nothing is left on the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "setup: the creature was one card before either merge" (componentNames host board) []
+    Spec.assertEqWith s "setup: and Double Major left the stack for alice's graveyard" (filter (== CardName.MkCardName (Text.pack "Double Major")) (graveyardNames after)) [CardName.MkCardName (Text.pack "Double Major")]
   -- CR 730.2d: "if a merged permanent contains a token, the resulting permanent
   -- is a token only if the topmost component is a token". A pair of boards
   -- differing in exactly one thing -- which side of the token Cubwarden goes on
@@ -593,36 +667,37 @@ spec s registry = Spec.describe s "Mutate" $ do
       (Projection.hasKeyword protectionFromRed host merged, Projection.hasKeyword Keyword.Haste host merged)
       (False, True)
     Spec.assertEqWith s "setup: the 3/5 connected, which is what fired the trigger" (S.lifeOf S.bob after) (Just 17)
-  -- CR 903.9c's split names "the card that represents it and is a commander",
-  -- and CR 111.6 says a token is not a card -- so a merged commander's TOKEN
-  -- component is put into the appropriate zone with every other non-commander
-  -- component, whatever printing it was interned under.
+  -- CR 903.9c's split names "the card that represents it and is a commander" --
+  -- and neither CR 111.6's token nor CR 707.10's copy of a spell is a card, so a
+  -- merged commander's token and copy components are put into the appropriate
+  -- zone with every other non-commander component, whatever printing they were
+  -- interned under.
   --
   -- HAND-BUILT, and the only case in this file that is: the component list is
-  -- given a card and a token under ONE printing, which is what makes the two
-  -- readings of the split differ, and no printing in data/cards/ mints a token
-  -- copy of a card for a mutate spell to merge with. An audit fold-in from
-  -- #3390 rather than a rule this pool can reach.
-  Spec.it s "CR 903.9c/111.6 a merged commander's token component is not split off to the command zone" $ do
+  -- given one component of each of rule 730.2's kinds under ONE printing, which
+  -- is what makes the two readings of the split differ, and no printing in
+  -- data/cards/ mints a token copy of a card for a mutate spell to merge with.
+  -- An audit fold-in from #3390 rather than a rule this pool can reach.
+  Spec.it s "CR 903.9c/111.6/707.10 a merged commander's token and copy components are not split off to the command zone" $ do
     cubwarden <- S.printingOf s registry "Cubwarden"
     let (oid, base) = S.addPermanent cubwarden S.alice (Setup.emptyGame S.bothPlayers)
     case Game.lookupObject oid base >>= (printingBehind . Object.source) of
       Nothing -> Spec.assertFailure s "the fixture did not put a card onto the battlefield"
       Just pid -> do
         let board =
-              (asMergeOfCardAndToken oid pid base)
-                { GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton pid}) S.alice (GameState.players (asMergeOfCardAndToken oid pid base))
+              (asMergeOfEveryKind oid pid base)
+                { GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton pid}) S.alice (GameState.players (asMergeOfEveryKind oid pid base))
                 }
             after = snd (S.runPureWith returningCommander board (Event.changeZoneReturning oid Zone.Hand))
         Spec.assertEqWith
           s
-          "CR 903.9c one card goes to the command zone, and the token component interned under the same printing does not follow it"
+          "CR 903.9c one card goes to the command zone, and the token and copy components interned under the same printing do not follow it"
           (Maybe.mapMaybe (\c -> fmap Object.source (Game.lookupObject c after)) (Set.toList (GameState.command after)))
           [Source.OfCard pid]
         -- The fixture facts, after it: the permanent really was a merge of a
-        -- card and a token under one printing, and CR 903.9b's offer really was
-        -- accepted.
-        Spec.assertEqWith s "setup: the components were a card and a token under one printing" (fmap (Foldable.toList . Game.componentsOf . Object.source) (Game.lookupObject oid board)) (Just [MergeComponent.OfCard pid, MergeComponent.OfToken pid])
+        -- card, a token and a copy under one printing, and CR 903.9b's offer
+        -- really was accepted.
+        Spec.assertEqWith s "setup: the components were a card, a token and a copy of a spell under one printing" (fmap (Foldable.toList . Game.componentsOf . Object.source) (Game.lookupObject oid board)) (Just [MergeComponent.OfCard pid, MergeComponent.OfToken pid, MergeComponent.OfSpellCopy pid])
         Spec.assertEqWith s "setup: the merged permanent left the battlefield" (Game.lookupObject oid after) Nothing
   -- CR 730.3 over a component list that holds a token: "each of the individual
   -- components are put into the appropriate zone", and CR 111.7 is what the
@@ -935,6 +1010,40 @@ mutatingAt side host p = case p of
   Prompt.ChooseMutateSide {} -> side
   _ -> S.identityAnswer p
 
+-- The copy case's answerer: Cubwarden's mutate cost named rather than indexed,
+-- and the two target slots told apart BY NAME. Rule 702.140a's own slot is
+-- filtered down to `host` -- CR 608.2b's re-read is what makes a hand-built
+-- recipient the wrong answer -- and Double Major's is taken as offered, since a
+-- creature spell on the stack is a new object (CR 400.7) whose id no caller
+-- holds, and rule 702.140c's Cubwarden is the only one there.
+doublingAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+doublingAt host p = case p of
+  Prompt.ChooseCost _ _ _ candidates ->
+    Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just mutateCost) . Cost.Type.mana) candidates)
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.mapWithKey
+      (\slot (_, offered) -> if slot == Card.mutateSlot then Set.filter ((== Just host) . Recipient.objectOf) offered else offered)
+      sets
+  Prompt.ChooseMutateSide {} -> MutateSide.Over
+  _ -> S.identityAnswer p
+
+-- The components of one permanent, top first, as the KIND of component each is
+-- beside the name its printing carries. `componentNames` above cannot tell CR
+-- 730.2's "card or copy" apart, both answering through the same printing.
+componentKinds :: ObjectId.ObjectId -> GameState.GameState -> [(Text.Text, CardName.CardName)]
+componentKinds oid gs =
+  foldMap
+    (Maybe.mapMaybe (\component -> fmap ((,) (componentKind component) . S.nameOf . Printing.card) (Game.printingOf (Game.printingOfComponent component) gs)) . Foldable.toList . Game.componentsOf . Object.source)
+    (Game.lookupObject oid gs)
+
+-- Which of CR 730.2's nouns a component is, named so an assertion can read it.
+componentKind :: MergeComponent.MergeComponent -> Text.Text
+componentKind component = case component of
+  MergeComponent.OfCard _ -> Text.pack "OfCard"
+  MergeComponent.OfToken _ -> Text.pack "OfToken"
+  MergeComponent.OfMeld _ -> Text.pack "OfMeld"
+  MergeComponent.OfSpellCopy _ -> Text.pack "OfSpellCopy"
+
 -- Cubwarden's mutate cost, {2}{W}{W}, written as the announcement names it.
 mutateCost :: ManaCost.ManaCost
 mutateCost = ManaCost.MkManaCost [ManaSymbol.Generic 2, theWhite, theWhite]
@@ -1025,16 +1134,16 @@ printingBehind source = case source of
   Source.OfCard pid -> Just pid
   _ -> Nothing
 
--- One permanent rewritten into a merged permanent whose components are a CARD
--- and a TOKEN under the same printing. Written by hand because no card in
--- data/cards/ mints a token copy of a card, so no merge in this file's other
--- cases can produce the pair.
-asMergeOfCardAndToken :: ObjectId.ObjectId -> PrintingId.PrintingId -> GameState.GameState -> GameState.GameState
-asMergeOfCardAndToken oid pid gs =
+-- One permanent rewritten into a merged permanent holding a CARD, a TOKEN and a
+-- COPY OF A SPELL, all under the SAME printing, which is what makes the two
+-- readings of rule 903.9c's split differ. Written by hand because no card in data/cards/ mints a token
+-- copy of a card, so no merge in this file's other cases can assemble the three.
+asMergeOfEveryKind :: ObjectId.ObjectId -> PrintingId.PrintingId -> GameState.GameState -> GameState.GameState
+asMergeOfEveryKind oid pid gs =
   gs
     { GameState.objects =
         Map.adjust
-          (\o -> o {Object.source = Source.OfMerge (MergeComponent.OfCard pid NonEmpty.:| [MergeComponent.OfToken pid])})
+          (\o -> o {Object.source = Source.OfMerge (MergeComponent.OfCard pid NonEmpty.:| [MergeComponent.OfToken pid, MergeComponent.OfSpellCopy pid])})
           oid
           (GameState.objects gs)
     }

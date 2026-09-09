@@ -24,9 +24,6 @@ import qualified Pawl.Types.PrintingId as PrintingId
 -- characteristics come off (CR 712.8g). Pawl.Engine.Game.printingOfComponent is
 -- the total read that field used to be, beside the other classifiers over this
 -- type.
---
--- Not implemented: CR 707.10's copy of a mutating creature spell, which rule
--- 730.2's "or copy" admits as a component (#3431).
 data MergeComponent
   = -- | CR 108.2: a card component, named by its entry in GameState.printings.
     OfCard PrintingId.PrintingId
@@ -49,4 +46,16 @@ data MergeComponent
     -- Pawl.Engine.Game.componentsOf expands this arm into rule 712.21's two
     -- cards, so every reader of that classifier keeps quantifying over cards.
     OfMeld MeldSource.MeldSource
+  | -- | CR 730.2's "or copy": a copy of a spell as a component, which CR 702.140c
+    -- puts here when a copy of a mutating creature spell resolves.
+    --
+    -- NEITHER of the two arms above, and CR 608.3f is why: a copy of a permanent
+    -- spell "will become a token permanent as it is put onto the battlefield",
+    -- and rule 702.140c's merge is the one resolution that puts it nowhere -- so
+    -- the copy is still a copy here, and it is no card either (CR 707.10, "even
+    -- though it has no spell card associated with it"). Pawl.Engine.Game's
+    -- componentIsToken answers False for it under CR 730.2d and componentIsCard
+    -- answers False under CR 108.2, which is what keeps CR 903.9c from finding a
+    -- commander in it.
+    OfSpellCopy PrintingId.PrintingId
   deriving (Eq, Ord, Show)

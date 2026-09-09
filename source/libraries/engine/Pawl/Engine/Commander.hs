@@ -225,10 +225,18 @@ commanderPrintingOf oid gs = do
   let cards = case Object.source obj of
         Source.OfCard printingId -> Seq.singleton printingId
         -- CR 903.9c names "the card that represents it and is a commander", so a
-        -- merged permanent's TOKEN component (CR 730.2d) is filtered out rather
-        -- than compared: a token is not a card (CR 111.6), and one interned to
-        -- the same printing as a designated card would otherwise match.
-        source -> fmap Game.printingOfComponent (Seq.filter (not . Game.componentIsToken) (Game.componentsOf source))
+        -- merged permanent's component that is no card is filtered out rather
+        -- than compared: neither a token (CR 111.6) nor CR 730.2's copy of a
+        -- spell (CR 707.10) is one, and either interned to the same printing as a
+        -- designated card would otherwise match.
+        --
+        -- The COPY half of that is a regression fence: `Foldable.find` below
+        -- answers the same printing whether or not a copy interned under it is in
+        -- the list, so only Pawl.Engine.Event's rule 903.9c split observes the
+        -- filter -- Pawl.MutateSpec's "CR 903.9c/111.6/707.10 a merged
+        -- commander's token and copy components are not split off to the command
+        -- zone" is that case.
+        source -> fmap Game.printingOfComponent (Seq.filter Game.componentIsCard (Game.componentsOf source))
   -- CR 702.124e: with two designations this answers WHICH of them this object
   -- is, and no object can be both -- rule 903.5b's singleton deck gives each
   -- designation a distinct printing.
