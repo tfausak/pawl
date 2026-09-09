@@ -195,6 +195,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.ExileCardFromHand (Filter.And []))
       " {\"type\":\"ExileCardFromHand\",\"value\":{\"type\":\"And\",\"value\":[]}} "
+  -- CR 701.20a out of the hand: a bare criterion, one card.
+  Spec.it s "RevealCardFromHand" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.RevealCardFromHand (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"RevealCardFromHand\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 118.12's hand-to-battlefield cost: a bare criterion, one card.
   Spec.it s "PutCardFromHandOntoBattlefield" $
     Common.assertCodec

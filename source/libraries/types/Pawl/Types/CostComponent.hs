@@ -113,6 +113,10 @@ data CostComponent keyword
     -- exiles one card matching the Filter from their own hand, which the payer
     -- chooses.
     ExileCardFromHand (Filter.Filter keyword)
+  | -- | CR 701.20a as a cost / Living Destiny: the paying player reveals one card
+    -- matching the Filter from their own hand, which the payer chooses. CR 701.20b
+    -- leaves the card in the hand, so this component spends nothing.
+    RevealCardFromHand (Filter.Filter keyword)
   | -- | CR 701.17a as a cost / Millikin: the paying player mills this many cards.
     -- The only component that moves a card out of a library, which CR 605.1a reads
     -- to bar a mana ability and CR 601.2h reads to put the payment in its second

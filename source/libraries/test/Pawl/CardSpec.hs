@@ -1257,6 +1257,18 @@ triggeredAbilityCounts ability =
 declaresVariable :: Cost.Type.Cost Keyword.Keyword -> Bool
 declaresVariable = Cost.hasVariable
 
+-- Does this cost REVEAL a card the payer chooses? declaresVariable's shape: CR
+-- 601.2h's payment binds Binding.revealedCard (Pawl.Engine.Cost.payComponent's
+-- RevealCardFromHand arm, folded onto the spell by Pawl.Engine.Cast), so a spell
+-- whose cost has such a component may read the slot and one whose cost has not
+-- may not.
+revealsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+revealsAsCost =
+  let isReveal component = case component of
+        CostComponent.RevealCardFromHand _ -> True
+        _ -> False
+   in any isReveal . Cost.Type.components
+
 -- The costs a SPELL can be announced against: the printed one -- mana cost plus
 -- CR 118.8's additional costs -- and each alternative cost the card offers, which
 -- is the candidate list Pawl.Engine.Cost.costsFor builds. Any one of them
@@ -2104,6 +2116,7 @@ reservedSlots =
       Binding.sacrificedPermanent,
       Binding.tappedPermanent,
       Binding.tappedForTotalPower,
+      Binding.revealedCard,
       Binding.crewedVehicle,
       Binding.manaSource,
       Binding.castSpell,
@@ -2865,6 +2878,8 @@ costComponentFilters component = case component of
   CostComponent.PutCardFromHandOntoBattlefield f -> [f]
   -- CR 406.2 out of the hand: Cadaverous Bloom's "a card".
   CostComponent.ExileCardFromHand f -> [f]
+  -- CR 701.20a out of the hand: Living Destiny's "a creature card".
+  CostComponent.RevealCardFromHand f -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
@@ -5150,12 +5165,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         --     declares X" lint, now falling out of the ordinary comparison
         --     instead of needing its own pass. activatedAbilityOffends says the
         --     same thing about an activation cost.
+        --   * Binding.revealedCard, and only when the cost reveals a card the
+        --     payer chooses, per `revealsAsCost`. CR 601.2h's payment binds it
+        --     and Pawl.Engine.Cast folds it onto the spell, so Living Destiny's
+        --     "the revealed card's mana value" is an ordinary slot read.
+        --     activatedAbilityOffends offers no such exemption: no printing puts
+        --     this component on an activation cost.
         cardOffends card =
-          let castBound =
+          let announcedX =
                 if any declaresVariable (spellCostsOf card)
-                  then Set.fromList [Binding.you, Binding.variableX]
-                  else Set.singleton Binding.you
-           in modalSlotsOffend castBound (Face.spell card)
+                  then Set.singleton Binding.variableX
+                  else Set.empty
+              revealed =
+                if any revealsAsCost (spellCostsOf card)
+                  then Set.singleton Binding.revealedCard
+                  else Set.empty
+           in modalSlotsOffend (Set.unions [Set.singleton Binding.you, announcedX, revealed]) (Face.spell card)
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

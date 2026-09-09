@@ -2252,7 +2252,8 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
 -- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents,
--- ExileCardFromHand and PutCardFromHandOntoBattlefield arms are a regression
+-- ExileCardFromHand, RevealCardFromHand and PutCardFromHandOntoBattlefield arms
+-- are a regression
 -- fence: no printing pairs any of them with a basic land type, so no test can
 -- falsify them. Magmatic
 -- Insight's "discard a land card" and Hakbal of the Surging Soul's "a land card
@@ -2269,6 +2270,7 @@ rewriteComponent pairs component = case component of
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> CostComponent.DiscardCards (DiscardCards.MkDiscardCards n (rewrite pairs criterion))
   CostComponent.PutCardFromHandOntoBattlefield criterion -> CostComponent.PutCardFromHandOntoBattlefield (rewrite pairs criterion)
   CostComponent.ExileCardFromHand criterion -> CostComponent.ExileCardFromHand (rewrite pairs criterion)
+  CostComponent.RevealCardFromHand criterion -> CostComponent.RevealCardFromHand (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component

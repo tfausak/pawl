@@ -431,6 +431,25 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 tappedForTotalPower :: SlotName
 tappedForTotalPower = SlotName.MkSlotName (Text.pack "thatTappedForTotalPower")
 
+-- CR 601.2f once more, for the component that CHOOSES a card and moves nothing:
+-- the card a CostComponent.RevealCardFromHand payment revealed -- "the revealed
+-- card" in Living Destiny's "you gain life equal to the revealed card's mana
+-- value". Stamped by Pawl.Engine.Cast off the payment CR 601.2h makes, which is
+-- sacrificedPermanent's route on the CASTING side rather than the activating one.
+--
+-- The card is still in the payer's hand when the spell resolves -- CR 701.20b
+-- moves nothing -- so CR 608.2h's first clause applies and every read is CURRENT
+-- information, tappedPermanent's posture rather than sacrificedPermanent's.
+-- Pawl.Engine.Resolve.Slots.effectViewOf needs no arm for this slot.
+--
+-- SINGULAR: every printing of this cost reveals one card, so Binding.onlyOne
+-- answers it.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no card's
+-- targetSlots may name it" sweep as the slots above.
+revealedCard :: SlotName
+revealedCard = SlotName.MkSlotName (Text.pack "thatRevealedCard")
+
 -- CR 702.122b: the reserved slot under which the VEHICLE a creature just crewed
 -- is bound -- the "that Vehicle" in Gearshift Ace's "whenever this creature crews
 -- a Vehicle, that Vehicle gains first strike until end of turn". Stamped by
