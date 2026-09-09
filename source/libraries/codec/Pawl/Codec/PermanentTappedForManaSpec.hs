@@ -26,8 +26,9 @@ spec s = Spec.describe s "Pawl.Codec.PermanentTappedForMana" $ do
           }
       )
       " {\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"mana\":{\"type\":\"AnyMana\"}} "
-  -- Gauntlet of Power's, whose third key is the one that differs: a codec that
-  -- defaulted the narrowing rather than reading it would encode the two alike.
+  -- Gauntlet of Power's narrowing, on a payload differing from the one above in
+  -- all three keys: a codec that defaulted the mana rather than reading it would
+  -- encode the two alike.
   Spec.it s "MkPermanentTappedForMana, a narrowed one" $
     Common.assertCodec
       s
