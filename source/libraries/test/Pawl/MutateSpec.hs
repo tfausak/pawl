@@ -86,6 +86,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
@@ -884,7 +885,7 @@ theWhite = ManaSymbol.OfType (ManaType.Colored Color.White)
 -- Tok-Tok, Volcano Born's printed keyword, which the flip cases read to tell the
 -- alternative half apart from the normal one.
 protectionFromRed :: Keyword.Keyword
-protectionFromRed = Keyword.Protection (Filter.Type.HasColor Color.Red)
+protectionFromRed = Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasColor Color.Red, Protection.spares = Nothing}
 
 -- What CR 730.3's split puts into alice's graveyard, by name.
 graveyardNames :: GameState.GameState -> [CardName.CardName]

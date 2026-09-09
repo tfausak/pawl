@@ -80,10 +80,13 @@
         {
           "type": "Protection",
           "value": {
-            "type": "HasColor",
-            "value": {
-              "type": "Red"
-            }
+            "quality": {
+              "type": "HasColor",
+              "value": {
+                "type": "Red"
+              }
+            },
+            "spares": null
           }
         }
       ],

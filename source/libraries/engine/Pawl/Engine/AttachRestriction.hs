@@ -22,8 +22,13 @@
 -- rulebook states are two state-based actions: an Aura is buried
 -- (Pawl.Engine.Sba.fallsOff, CR 704.5m with CR 303.4c and CR 702.16c) and an
 -- Equipment merely detaches (Pawl.Engine.Sba.becomesUnattached, CR 704.5n with
--- CR 301.5c and CR 702.16d). Nothing here knows which is which: this answers one
--- Bool about a pair, and Sba's own classification picks the outcome.
+-- CR 301.5c and CR 702.16d). Nothing here knows which is which: `removesGiven`
+-- answers one Bool about a pair, and Sba's own classification picks the outcome.
+--
+-- TWO ENTRY POINTS rather than one, and rule 702.16n is the whole reason: an
+-- Aura that says "this effect doesn't remove Auras" spares them from the two
+-- state-based actions and says nothing about what may become attached, so
+-- `refuses` and `removesGiven` differ in their mint and in nothing else.
 --
 -- TARGETING is not one of the three, and that is the rule rather than an
 -- omission: CR 702.5a gives the enchant ability both jobs and this restriction is
@@ -36,7 +41,8 @@
 --
 -- TWO SOURCES of rows, where every sibling above reads printed card data alone:
 -- a face's own Face.attachRestrictions, and the rows rule 702 MINTS for a
--- permanent holding a keyword (Pawl.Engine.Keyword.mintedAttachRestrictionsOf).
+-- permanent holding a keyword (Pawl.Engine.Keyword.mintedAttachRestrictionsOf,
+-- and mintedRemovalRestrictionsOf for the standing half).
 -- Protection is the pool's minter, rule 702.16c and rule 702.16d being the
 -- rulebook's own instances of this type's shape.
 --
@@ -49,6 +55,7 @@ module Pawl.Engine.AttachRestriction where
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -58,6 +65,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -88,25 +96,39 @@ import qualified Pawl.Types.RuleAbilities as RuleAbilities
 -- rule 702.16d expressible in this shape at all: the restricting permanent is
 -- the destination itself, where every printed producer is a third permanent.
 refuses :: ObjectId -> ObjectId -> GameState -> Bool
-refuses = refusesGiven Map.empty
+refuses = barredBy Keyword.mintedAttachRestrictionsOf Map.empty
 
--- `refuses` against a pre-computed projection, Pawl.Engine.Projection's own
+-- CR 704.5m and CR 704.5n's question rather than CR 701.3a's: does anything in
+-- force right now REMOVE `subject` from `host`, once it is attached anyway? The
+-- same rows as `refuses` for every producer but one -- CR 702.16n's "this effect
+-- doesn't remove [those Auras]" parts the two, and Pawl.Engine.Keyword's
+-- mintedRemovalRestrictionsOf is where that narrowing lives. Two askers, both in
+-- Pawl.Engine.Sba, for the reason this module's header gives.
+--
+-- Against a pre-computed projection, Pawl.Engine.Projection's own
 -- hasKeywordGiven/hasKeyword pairing: Pawl.Engine.Sba asks this once per attached
 -- permanent on every state-based pass and already holds the CR 704.3 pre-pass map,
 -- so the host's keywords come out of that map rather than out of a fresh gather
 -- per attached permanent per pass -- fallsOff's haddock names that cost for its
 -- own enchant read. Pawl.Engine.Attach.attachmentFor holds no such map and passes
--- Map.empty, exactly as every other *Of/*Given pair in the tree does.
+-- Map.empty to `refuses`, exactly as every other *Of/*Given pair in the tree does.
 --
 -- Threading one down to it was considered and declined; see #2396. No caller of
 -- attachmentFor holds a map either, and attachmentFor projects the same host
--- again beside this call (Projection.isCreatureOf, Projection.cardTypesOf) where
+-- again beside that call (Projection.isCreatureOf, Projection.cardTypesOf) where
 -- Attach.hostsFor projects it a third time (Projection.viewOfObject), so a map
--- here would drop one projection of several. Measured 2026-09-01 by making
+-- there would drop one projection of several. Measured 2026-09-01 by making
 -- `refuses` throw: no Pawl.Benchmark scenario reaches it, the Aura pair included,
 -- since CR 608.3c attaches an Aura spell without going through attachmentFor.
-refusesGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
-refusesGiven pcs subject host gs =
+removesGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
+removesGiven = barredBy Keyword.mintedRemovalRestrictionsOf
+
+-- The body both questions share, and the one `refuses`'s haddock above describes
+-- gate for gate. The MINT is the only difference: a PRINTED row is words on a
+-- card that says nothing about the distinction, so the two questions read the
+-- same face data and differ only in the rows rule 702 adds.
+barredBy :: (Map Keyword.Type.Keyword Natural -> [AttachRestriction.AttachRestriction]) -> Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
+barredBy mint pcs subject host gs =
   let setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
       -- Forced at most once, and only by a board on which some permanent
@@ -146,8 +168,9 @@ refusesGiven pcs subject host gs =
       -- CR 702: the rows rule 702 gives the HOST for holding a keyword, which
       -- until protection (CR 702.16c, CR 702.16d) nothing produced -- every row
       -- here was printed card data.
-      -- Pawl.Engine.Keyword.mintedAttachRestrictionsOf is the mint, beside the
-      -- one that gives rule 702.16f its combat restriction.
+      -- The `mint` argument is that mint, beside the one that gives rule 702.16f
+      -- its combat restriction: mintedAttachRestrictionsOf for CR 701.3a's move,
+      -- mintedRemovalRestrictionsOf for the two state-based actions.
       --
       -- Only the HOST's keywords, where the printed rows walk the whole
       -- battlefield: rule 702.16c and rule 702.16d put the prohibition on the
@@ -172,5 +195,5 @@ refusesGiven pcs subject host gs =
       fromKeywords =
         any
           (fromRestriction host [])
-          (Keyword.mintedAttachRestrictionsOf (Projection.keywordsGiven pcs host gs))
+          (mint (Projection.keywordsGiven pcs host gs))
    in fromKeywords || any fromPermanent (Set.toList (GameState.battlefield gs))

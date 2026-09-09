@@ -6,6 +6,7 @@ import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Morph as Morph
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.Suspend as Suspend
@@ -90,7 +91,12 @@ data Keyword
     -- Not implemented: a LINT over the "from each" shorthands of rules 702.16h
     -- and 702.16i, which expand to one instance of this constructor per quality
     -- and so are a transcription nothing checks (#3200).
-    Protection (Filter.Filter Keyword)
+    --
+    -- Rule 702.16n's exception is the payload's second field rather than a
+    -- variant constructor: Spectra Ward writes it, and Pawl.AuraSpec's "CR
+    -- 702.16n" proves that the spared Aura stays and an unspared attachment
+    -- still goes.
+    Protection (Protection.Protection Keyword)
   | Reach -- 702.17
   | -- | 702.18a: this permanent or player can't be the target of spells or
     -- abilities.

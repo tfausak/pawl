@@ -66,10 +66,13 @@
                             "value": {
                               "type": "Protection",
                               "value": {
-                                "type": "HasCardType",
-                                "value": {
-                                  "type": "Artifact"
-                                }
+                                "quality": {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Artifact"
+                                  }
+                                },
+                                "spares": null
                               }
                             }
                           },

@@ -46,6 +46,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Protection as Protection
 import Pawl.Types.Quantity (Quantity)
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
@@ -711,9 +712,15 @@ hexproofQuality keyword = case keyword of
 -- 702.11b's plain hexproof states none. Rule 702.16j's "protection from
 -- everything" is not that variant either: Filter.And [] is a quality like any
 -- other here, and matches every object.
+--
+-- The quality alone: rule 702.16n's exception is about what an ATTACHED
+-- permanent stops doing (CR 702.16c's second sentence), and rule 702.16b names
+-- no attachment, so an Aura the effect spares still may not target its host.
+-- Spectra Ward's Gatherer ruling says as much -- the enchanted creature can't be
+-- the target of further coloured Aura spells.
 protectionQuality :: Keyword.Keyword -> Maybe (Filter.Type.Filter Keyword.Keyword)
 protectionQuality keyword = case keyword of
-  Keyword.Protection quality -> Just quality
+  Keyword.Protection protection -> Just (Protection.quality protection)
   _ -> Nothing
 
 -- Every base pool that is a function of the GAME STATE alone, taken once and

@@ -54,10 +54,13 @@
         {
           "type": "Protection",
           "value": {
-            "type": "HasColor",
-            "value": {
-              "type": "Black"
-            }
+            "quality": {
+              "type": "HasColor",
+              "value": {
+                "type": "Black"
+              }
+            },
+            "spares": null
           }
         }
       ],
