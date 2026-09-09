@@ -409,10 +409,9 @@ foretoldBoard s registry = do
 -- that spell exiles cards face down without looking at them first, and its
 -- owner may name none of them.
 --
--- Pawl's Extract Power is STRICTER than printed, and this group proves only the
--- look. Nothing here can spell "without paying their mana costs" for a
--- permission granted over an exiled card (#3433), so its GrantPlayFromExile
--- makes the cards playable at their cost.
+-- The card is transcribed whole: its GrantPlayFromExile carries CR 118.9's
+-- waiver, which the second case below proves by casting one of the exiled cards
+-- off a board with no untapped land on it.
 --
 -- Not implemented: CR 406.3a's turn face up as the card is played. Both cards
 -- ARE offered and cast today -- Pawl.Engine.Cast.proposedFace branches on
@@ -420,7 +419,7 @@ foretoldBoard s registry = do
 -- Object.exiledFaceDown -- so what is missing is the ordering: the cast is
 -- announced while the card is still exiled face down, and nothing consults CR
 -- 406.3b or CR 601.3f there (#3434).
-extractPower :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+extractPower :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 extractPower s registry = Spec.describe s "Extract Power" $ do
   Spec.it s "CR 406.3 the player the exiling instruction let look names both cards, and the owner who was shown nothing gets their pile" $ do
     reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
@@ -448,6 +447,38 @@ extractPower s registry = Spec.describe s "Extract Power" $ do
           (Set.fromList (Maybe.mapMaybe (\oid -> fmap Object.owner (Game.lookupObject oid board)) (faceDownExiled board)))
           (Set.fromList [S.alice, S.bob])
       Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
+  -- CR 118.9's other clause of the same sentence: "You may play them WITHOUT
+  -- PAYING THEIR MANA COSTS for as long as they remain exiled". The permission
+  -- Pawl.Engine.Cost prices the cast from is the only thing making it legal, so
+  -- the waiver replaces the printed cost rather than joining it.
+  --
+  -- The board is the group's own, which is what makes the claim about the COST
+  -- rather than about mana: Extract Power {5}{U} took every one of alice's six
+  -- Islands, so she has nothing at all to spend, and the Goblin Piker she
+  -- exiled off her own library prints {1}{R} -- a cost those Islands could not
+  -- have paid even untapped. Casting it is therefore possible only because
+  -- nothing is owed.
+  Spec.it s "CR 118.9 the exiled card is cast for nothing, off a board with no untapped land and no red source" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    board <- castExtractPower s registry
+    case filter (\oid -> fmap S.nameOf (Game.cardOf oid board) == Just (S.printingName piker)) (faceDownExiled board) of
+      [pikerId] -> do
+        let resolved = S.runPure S.castAnswer board (S.cast S.alice pikerId >> Stack.resolveTop)
+        -- The GATE and the CAST are two roads through Cost.candidateCostsGiven
+        -- and both are asserted, so a waiver honoured by one and not the other
+        -- cannot pass. Each was mutated red on its own: the gate here, and the
+        -- battlefield below with this line ordered after it.
+        Spec.assertBool s (S.castable S.alice pikerId board) "the cast is offered: CR 601.3's permission with a cost alice can pay"
+        Spec.assertEqWith
+          s
+          "and the Goblin Piker is on the battlefield, so the announcement found that cost too"
+          (S.countOnBattlefieldByName (S.printingName piker) S.alice resolved)
+          1
+        -- A proxy, AFTER both behavioural assertions so neither can absorb a
+        -- mutation: the six Islands that paid for Extract Power are still the
+        -- only tapped permanents alice has.
+        Spec.assertEqWith s "alice's six Islands are still the only tapped permanents she has" (S.tappedCount S.alice resolved) 6
+      _ -> Spec.assertFailure s "Extract Power should exile alice's Goblin Piker face down"
 
 -- alice casts Extract Power off six Islands. Each library's top card is a
 -- DIFFERENT one, so a failure names which seat's card came out where, and each
@@ -477,9 +508,9 @@ castExtractPower s registry = do
 -- producer.
 --
 -- Pawl's Windbrisk Heights is STRICTER than printed: the {W}, {T} ability is not
--- transcribed at all, because nothing can spell "without paying its mana cost"
--- for a permission granted over an exiled card (#3433). Only hideaway itself is
--- proved here.
+-- transcribed at all. Its permission's cost waiver can now be spelled -- Extract
+-- Power above writes it -- but its "if you attacked with three or more creatures
+-- this turn" condition cannot (#3447). Only hideaway itself is proved here.
 --
 -- Not implemented: rule 702.75a's look belongs to whoever controls the exiling
 -- permanent at the moment the question is asked, and pawl stamps the seat that

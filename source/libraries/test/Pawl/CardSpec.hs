@@ -580,7 +580,7 @@ objectRefPositions =
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue), [plantedRef "oc"]),
-        ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced), [plantedRef "gp"]),
+        ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced False), [plantedRef "gp"]),
         ("grant-look-at-exiled", Effect.GrantLookAtExiled (plantedRef "gl"), [plantedRef "gl"]),
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])

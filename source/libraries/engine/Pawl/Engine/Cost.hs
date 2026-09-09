@@ -76,6 +76,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -374,9 +375,10 @@ candidateCostsGiven permitted pid name oid gs =
                         <> (if permitted || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then fmap untagged (printed : alternatives) else [])
                 -- CR 702.170d: a PLOTTED card is cast "without paying its mana
                 -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
-                -- rule 702.170d being the only thing permitting this cast. The zone's
-                -- other permissions (CR 715.3d, Effect.GrantPlayFromExile) state no
-                -- cost and fall through to the `_` arm.
+                -- rule 702.170d being the only thing permitting this cast. CR
+                -- 715.3d's permission states no cost and falls through to the `_`
+                -- arm; Effect.GrantPlayFromExile's states one only when it carries
+                -- CR 118.9's waiver, which is the arm two below.
                 Zone.Exile
                   | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
                 -- CR 702.143a: a FORETOLD card is cast for its foretell cost, CR
@@ -389,6 +391,23 @@ candidateCostsGiven permitted pid name oid gs =
                 Zone.Exile
                   | Maybe.isJust (Object.foretold obj) ->
                       fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
+                -- CR 118.9: a CR 601.3 permission that says "without paying its
+                -- mana cost" (Extract Power) is an alternative cost of nothing,
+                -- and REPLACES the printed cost for the plotted arm's reason --
+                -- that permission is the only thing making this cast legal, so
+                -- the cost it states is the only route to it. CR 118.5 still
+                -- makes the caster announce the {0}, which is what casting the
+                -- card at all is.
+                --
+                -- Scoped to the permission's OWN holder, CR 109.5's "you" as
+                -- Pawl.Types.ExilePlayPermission baked it in: a second player
+                -- casting the same card under some other permission is priced
+                -- by the arm below.
+                Zone.Exile
+                  | any
+                      (\permission -> ExilePlayPermission.withoutPayingManaCost permission && ExilePlayPermission.player permission == pid)
+                      (Object.playableFromExile obj) ->
+                      [untagged (withoutPayingManaCost face)]
                 -- CR 118.9's other half, "applied to it from another effect", as a
                 -- STANDING grant (Omniscience): a player-scoped alternative cost no
                 -- per-card list can hold. APPENDED to the hand's ordinary list rather

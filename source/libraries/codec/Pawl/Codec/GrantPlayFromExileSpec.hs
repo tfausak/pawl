@@ -14,7 +14,7 @@ import qualified Pawl.Types.SlotName as SlotName
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
   -- Victor Mancha, Runaway's grant: a permission that says nothing about mana,
-  -- so the rider key is absent in both directions.
+  -- so neither rider key is present in either direction.
   Spec.it s "MkGrantPlayFromExile, an ordinary permission omits the rider" $
     Common.assertCodec
       s
@@ -22,7 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
       ( GrantPlayFromExile.MkGrantPlayFromExile
           { GrantPlayFromExile.duration = Duration.UntilEndOfTurn,
             GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
-            GrantPlayFromExile.spending = ManaSpending.AsProduced
+            GrantPlayFromExile.spending = ManaSpending.AsProduced,
+            GrantPlayFromExile.withoutPayingManaCost = False
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
@@ -34,11 +35,26 @@ spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
       ( GrantPlayFromExile.MkGrantPlayFromExile
           { GrantPlayFromExile.duration = Duration.UntilEndOfTurn,
             GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
-            GrantPlayFromExile.spending = ManaSpending.AnyType
+            GrantPlayFromExile.spending = ManaSpending.AnyType,
+            GrantPlayFromExile.withoutPayingManaCost = False
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"spending\":{\"type\":\"AnyType\"}} "
-  Spec.it s "a missing spending key decodes as AsProduced" $
+  -- Extract Power's: CR 118.9's waiver written out, and no CR 118.14 rider --
+  -- the two ride the same grant and no card in the pool prints both.
+  Spec.it s "MkGrantPlayFromExile, CR 118.9's waiver" $
+    Common.assertCodec
+      s
+      GrantPlayFromExile.codec
+      ( GrantPlayFromExile.MkGrantPlayFromExile
+          { GrantPlayFromExile.duration = Duration.Indefinite,
+            GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
+            GrantPlayFromExile.spending = ManaSpending.AsProduced,
+            GrantPlayFromExile.withoutPayingManaCost = True
+          }
+      )
+      " {\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"withoutPayingManaCost\":true} "
+  Spec.it s "a missing spending or withoutPayingManaCost key decodes as the default" $
     Common.assertFromJson
       s
       (Codec.decode GrantPlayFromExile.codec)
@@ -46,7 +62,8 @@ spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
       ( GrantPlayFromExile.MkGrantPlayFromExile
           { GrantPlayFromExile.duration = Duration.Indefinite,
             GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
-            GrantPlayFromExile.spending = ManaSpending.AsProduced
+            GrantPlayFromExile.spending = ManaSpending.AsProduced,
+            GrantPlayFromExile.withoutPayingManaCost = False
           }
       )
   Spec.it s "has a schema" $ Common.assertHasSchema s GrantPlayFromExile.codec

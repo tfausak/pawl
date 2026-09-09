@@ -25,9 +25,10 @@ spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
           ExilePlayPermission.source = ObjectId.MkObjectId 2,
           ExilePlayPermission.expiry = Expiry.Never,
           ExilePlayPermission.spending = ManaSpending.AsProduced,
+          ExilePlayPermission.withoutPayingManaCost = False,
           ExilePlayPermission.origin = PlayPermissionOrigin.Adventure
         }
-      " {\"player\":1,\"source\":2,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"origin\":{\"type\":\"Adventure\"}} "
+      " {\"player\":1,\"source\":2,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"withoutPayingManaCost\":false,\"origin\":{\"type\":\"Adventure\"}} "
   -- CR 601.3 with CR 118.14's rider, the shape Dire Fleet Daredevil writes: a
   -- granted permission lasting until end of turn, mana of any type spendable on
   -- it.
@@ -40,8 +41,25 @@ spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
           ExilePlayPermission.source = ObjectId.MkObjectId 4,
           ExilePlayPermission.expiry = Expiry.AtCleanup,
           ExilePlayPermission.spending = ManaSpending.AnyType,
+          ExilePlayPermission.withoutPayingManaCost = False,
           ExilePlayPermission.origin = PlayPermissionOrigin.Granted
         }
-      " {\"player\":3,\"source\":4,\"expiry\":{\"type\":\"AtCleanup\"},\"spending\":{\"type\":\"AnyType\"},\"origin\":{\"type\":\"Granted\"}} "
+      " {\"player\":3,\"source\":4,\"expiry\":{\"type\":\"AtCleanup\"},\"spending\":{\"type\":\"AnyType\"},\"withoutPayingManaCost\":false,\"origin\":{\"type\":\"Granted\"}} "
+  -- CR 118.9's waiver, the shape Extract Power writes: a granted permission
+  -- lasting as long as the card remains exiled, with the mana cost waived. The
+  -- two riders are independent, so this one carries CR 118.14's default.
+  Spec.it s "a granted permission with CR 118.9's waiver" $
+    Common.assertCodec
+      s
+      ExilePlayPermission.codec
+      ExilePlayPermission.MkExilePlayPermission
+        { ExilePlayPermission.player = PlayerId.MkPlayerId 5,
+          ExilePlayPermission.source = ObjectId.MkObjectId 6,
+          ExilePlayPermission.expiry = Expiry.Never,
+          ExilePlayPermission.spending = ManaSpending.AsProduced,
+          ExilePlayPermission.withoutPayingManaCost = True,
+          ExilePlayPermission.origin = PlayPermissionOrigin.Granted
+        }
+      " {\"player\":5,\"source\":6,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"withoutPayingManaCost\":true,\"origin\":{\"type\":\"Granted\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ExilePlayPermission.codec
