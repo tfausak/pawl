@@ -852,6 +852,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.DamageCantBeRedirected _ -> scope /= AffectedPlayers.Scoped PlayerScope.EachPlayer
   PlayerEffect.CantSearchLibraries _ -> False
   PlayerEffect.HasProtectionFromChosenName -> False
+  PlayerEffect.HasProtectionFrom _ -> False
   PlayerEffect.CantBecomeMonarch -> False
   -- Every other arm IS asked about a player, so its scope is read exactly as
   -- written and any of the three is legitimate: Rule of Law and Thalia say
@@ -917,6 +918,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.DamageCantBeRedirected pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_) || Maybe.isJust (DamagePattern.whichSource pattern_)
   PlayerEffect.CantSearchLibraries _ -> False
   PlayerEffect.HasProtectionFromChosenName -> False
+  PlayerEffect.HasProtectionFrom _ -> False
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.IncreaseSpellCost {} -> False
   PlayerEffect.IncreaseActivationCost {} -> False

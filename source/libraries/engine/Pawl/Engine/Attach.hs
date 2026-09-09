@@ -112,7 +112,8 @@ attachmentFor src destination gs
   -- CR 702.16c's player half, which the object-shaped restriction above cannot
   -- carry: a player has no keywords for Pawl.Engine.Keyword to mint a row from,
   -- so the prohibition rides the CR 613.11 player axis instead
-  -- (Pawl.Types.PlayerEffect.HasProtectionFromChosenName). Rule 702.16d states
+  -- (Pawl.Types.PlayerEffect.HasProtectionFromChosenName and its Filter-carrying
+  -- sibling). Rule 702.16d states
   -- no player half, and rule 701.3b makes a permanent that is neither Aura,
   -- Equipment nor Fortification unattachable anyway, so this needs no
   -- subtype conjunct for the same reason the minted row needs none.

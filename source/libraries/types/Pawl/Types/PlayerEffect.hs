@@ -105,12 +105,14 @@ data PlayerEffect
   | -- | CR 702.16c / 702.16b / Runed Halo: this player has protection from the
     -- card name the source has chosen. Rule 702.16e's prevention reaches the
     -- player through Pawl.Engine.PlayerEffect.protectionCarriers, proven by
-    -- Pawl.PlayerEffectSpec's "CR 702.16e" Runed Halo case.
-    --
-    -- Not implemented: protection from a quality the card itself states, which
-    -- would want a Filter-carrying sibling and has no player-side producer
-    -- (#3048).
+    -- Pawl.CastProhibitionSpec's "CR 702.16e" Runed Halo case.
     HasProtectionFromChosenName
+  | -- | CR 702.16a / 702.16j / The Stasis Coffin: this player has protection from
+    -- the quality the CARD states, where the sibling above reads CR 201.4's
+    -- chosen name off the source. Rule 702.16j's "protection from everything" is
+    -- the quality @Filter.And []@, the spelling Progenitus writes for the
+    -- permanent half.
+    HasProtectionFrom (Filter.Filter Keyword.Keyword)
   | -- | CR 601.3b / Vedalken Orrery: this player may cast a matching spell as
     -- though it had flash.
     CastAsThoughItHadFlash (Filter.Filter Keyword.Keyword)

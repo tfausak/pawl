@@ -2337,7 +2337,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- The PERMANENT half of rule 702.16c only. That rule reaches "a permanent or
   -- player with protection", and a player has no keywords for this mint to read,
   -- so the player half rides the CR 613.11 axis instead --
-  -- Pawl.Types.PlayerEffect.HasProtectionFromChosenName, read by
+  -- Pawl.Types.PlayerEffect.HasProtectionFromChosenName and
+  -- Pawl.Types.PlayerEffect.HasProtectionFrom, read by
   -- Pawl.Engine.Attach.attachmentFor and Pawl.Engine.Sba.fallsOff through
   -- Pawl.Engine.PlayerEffect.protectedFrom. Rule 702.16d has no player half.
   --

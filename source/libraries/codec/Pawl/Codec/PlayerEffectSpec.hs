@@ -350,6 +350,14 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.HasProtectionFromChosenName
       " {\"type\":\"HasProtectionFromChosenName\"} "
+  -- CR 702.16j / The Stasis Coffin: "protection from everything" as the empty
+  -- conjunction.
+  Spec.it s "HasProtectionFrom" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.HasProtectionFrom (Filter.And []))
+      " {\"type\":\"HasProtectionFrom\",\"value\":{\"type\":\"And\",\"value\":[]}} "
   -- CR 725 / Jared Carthalion, True Heir.
   Spec.it s "CantBecomeMonarch" $
     Common.assertCodec

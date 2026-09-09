@@ -61,6 +61,7 @@ import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
+import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
@@ -581,6 +582,7 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- CR 601.3a's other quality shape: a Filter over the spell's own
         -- characteristics rather than over its name, read off the proposal's
@@ -744,6 +746,7 @@ prohibitsPlayingLand pid names oid gs =
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- CR 305.1 once more: Damping Engine's own cast half stops no land play,
         -- however its Filter reads -- which is exactly why its one printed
@@ -781,6 +784,7 @@ prohibitsSearching pid owner causeController gs =
         -- CR 702.16 states no clause about searching, its consequences being
         -- targeting, enchanting, equipping, blocking and damage.
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         -- Every other arm is about casting, playing, targeting, countering,
         -- paying, keeping mana or how a coin flip came out. CR 701.23's search is
         -- an action a player takes
@@ -846,6 +850,7 @@ prohibitsCounters pid kind gs =
         -- stops the spell, never the counters a resolved one puts on a player.
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
@@ -933,6 +938,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -1177,6 +1183,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -1218,6 +1225,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -1262,6 +1270,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -1410,6 +1419,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -1464,6 +1474,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -1516,6 +1527,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -1623,6 +1635,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.DamageCantBeRedirected _ -> Nothing
   PlayerEffect.CantSearchLibraries _ -> Nothing
   PlayerEffect.HasProtectionFromChosenName -> Nothing
+  PlayerEffect.HasProtectionFrom _ -> Nothing
   PlayerEffect.CantBecomeMonarch -> Nothing
   PlayerEffect.CantCastMatching _ -> Nothing
   PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -1801,6 +1814,7 @@ mayCastFrom pid zone oid gs =
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- A PROHIBITION, and CR 601.3 asks the two halves separately:
         -- prohibitsCasting above is where Damping Engine and Silence are read.
@@ -1892,6 +1906,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- The PROHIBITIONS, read at their own gate (prohibitsCasting above): CR
         -- 101.2 makes a "can't" beat any cost this offers, and folding them here
@@ -1957,6 +1972,7 @@ playLandPiles pid gs =
         PlayerEffect.DamageCantBeRedirected _ -> []
         PlayerEffect.CantSearchLibraries _ -> []
         PlayerEffect.HasProtectionFromChosenName -> []
+        PlayerEffect.HasProtectionFrom _ -> []
         PlayerEffect.CantBecomeMonarch -> []
         -- The PROHIBITIONS, which prohibitsPlayingLand above is what reads: CR
         -- 101.2 makes a "can't" beat this permission, and the two are folded at
@@ -2042,6 +2058,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -2087,6 +2104,12 @@ protectedFromGiven rows oid gs =
   let names = Filter.names (Projection.viewOfObject oid gs)
       stops (source, effect) = case effect of
         PlayerEffect.HasProtectionFromChosenName -> not (Set.null (Set.intersection (chosenNamesOf source gs) names))
+        -- CR 702.16a's other kind of quality: one the CARD states rather than
+        -- one the source chose, matched through the identity-blind
+        -- matchesObjectFrom against the same projected view `names` above is
+        -- read off. CR 702.16j's "protection from everything" is the empty
+        -- conjunction, which matches every source.
+        PlayerEffect.HasProtectionFrom quality -> matchesObjectFrom source quality oid gs
         -- CR 702.18a and CR 702.11c are a different immunity, and a narrower
         -- one: they stop TARGETING alone, where rule 702.16 also bars an Aura
         -- and, by rule 702.16e, prevents damage. Read at their own gate
@@ -2130,7 +2153,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.StateCoinFlip _ -> False
    in any stops rows
 
--- CR 702.16e's damage half, as the (protected player, carrier) pairs
+-- CR 702.16e's damage half, as the (protected player, carrier, quality) rows
 -- Pawl.Engine.Replacement.collect mints a CR 615.1 shield from: "any damage that
 -- would be dealt by sources that have the stated quality to a permanent or player
 -- with protection is prevented."
@@ -2142,26 +2165,32 @@ protectedFromGiven rows oid gs =
 -- is proposed. So this returns the CARRIER and leaves the row to that module,
 -- which is where every other prevention shield is built.
 --
--- The carrier and not the names, deliberately: the shield's source side is CR
--- 201.4's chosen names read off it through chosenNamesOf, so the names stay a
--- LIVE read at the damage event (CR 609.7b's recheck) rather than a set frozen
--- when the pair was gathered.
+-- The QUALITY as the row wrote it, never the set of things it currently matches:
+-- for HasProtectionFromChosenName that quality is Filter.HasChosenName, which the
+-- shield's Context answers off the carrier, so CR 201.4's names stay a LIVE read
+-- at the damage event (CR 609.7b's recheck) rather than a set frozen when the row
+-- was gathered. A card-stated quality needs the same treatment for CR 613's sake
+-- and gets it for free, being a Filter either way.
 --
--- A row with no carrier makes no pair, which costs nothing today -- both carriers
--- on this axis name their source (see `applying`) -- and is the honest answer
--- rather than a shield from nowhere.
+-- A row with no carrier makes no row here, which costs nothing today -- both
+-- carriers on this axis name their source (see `applying`) -- and is the honest
+-- answer rather than a shield from nowhere.
 --
--- ONE PAIR PER (player, carrier), which is CR 702.16m's redundancy arriving for
+-- ONE ROW PER (player, carrier), which is CR 702.16m's redundancy arriving for
 -- free on the far side: two carriers naming one card give the player two
 -- PreventAll rows, and the second has nothing left to prevent.
 --
 -- A walk per SEAT, which is what `applying` is, rather than one gather over the
 -- axis: CR 116.2d's ignore and every scope in Pawl.Types.PlayerScope are asked
 -- about a particular player, so a single-pass version would restate both.
-protectionCarriers :: GameState -> [(PlayerId, ObjectId)]
+protectionCarriers :: GameState -> [(PlayerId, ObjectId, Filter Keyword)]
 protectionCarriers gs =
   let carrier pid (source, effect) = case effect of
-        PlayerEffect.HasProtectionFromChosenName -> fmap (\oid -> (pid, oid)) source
+        PlayerEffect.HasProtectionFromChosenName -> fmap (\oid -> (pid, oid, Filter.Type.HasChosenName)) source
+        -- The quality the CARD states, handed on as written: the shield's source
+        -- side is this Filter, so the three consequences of rule 702.16 read one
+        -- quality (protectedFromGiven above is the other two).
+        PlayerEffect.HasProtectionFrom quality -> fmap (\oid -> (pid, oid, quality)) source
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
@@ -2256,6 +2285,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -2337,6 +2367,7 @@ maximumHandSize pid gs =
         PlayerEffect.DamageCantBeRedirected _ -> current
         PlayerEffect.CantSearchLibraries _ -> current
         PlayerEffect.HasProtectionFromChosenName -> current
+        PlayerEffect.HasProtectionFrom _ -> current
         PlayerEffect.CantBecomeMonarch -> current
         PlayerEffect.CantCastMatching _ -> current
         PlayerEffect.CastOnlyAtSorcerySpeed -> current
@@ -2403,6 +2434,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -2460,6 +2492,7 @@ spendManaAsThough pid gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -2534,6 +2567,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -2594,6 +2628,7 @@ unpreventable gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -2658,6 +2693,7 @@ unredirectable gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -2741,6 +2777,7 @@ statedFlips pid gs =
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
@@ -2819,6 +2856,7 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.SpendManaAsThough _ -> pure effect
   PlayerEffect.CantBeTargetedBy _ -> pure effect
   PlayerEffect.HasProtectionFromChosenName -> pure effect
+  PlayerEffect.HasProtectionFrom _ -> pure effect
   PlayerEffect.CastAsThoughItHadFlash _ -> pure effect
   PlayerEffect.MayPlayAsThoughItHadFlash _ -> pure effect
   PlayerEffect.CantBeCountered _ -> pure effect
@@ -2880,6 +2918,7 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.SpendManaAsThough _ -> pure effect
   PlayerEffect.CantBeTargetedBy _ -> pure effect
   PlayerEffect.HasProtectionFromChosenName -> pure effect
+  PlayerEffect.HasProtectionFrom _ -> pure effect
   PlayerEffect.CastAsThoughItHadFlash _ -> pure effect
   PlayerEffect.MayPlayAsThoughItHadFlash _ -> pure effect
   PlayerEffect.CantBeCountered _ -> pure effect

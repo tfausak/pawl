@@ -572,7 +572,8 @@ poolHeldLastKnown pool view =
 -- and are folded by the CR 613.1-613.7 layers, so the player halves ride the CR
 -- 613.10/613.11 player axis: PlayerEffect.CantBeTargetedBy for shroud and
 -- hexproof (Ivory Mask, Leyline of Sanctity) and
--- PlayerEffect.HasProtectionFromChosenName for rule 702.16b (Runed Halo).
+-- PlayerEffect.HasProtectionFromChosenName and PlayerEffect.HasProtectionFrom
+-- for rule 702.16b (Runed Halo, The Stasis Coffin).
 -- PlayerEffect.protectedFromTargeting and PlayerEffect.protectedFromGiven are
 -- the typed questions; this module never sees either constructor, and hands both
 -- one gathered row list so that a player candidate is walked once. The two halves are
