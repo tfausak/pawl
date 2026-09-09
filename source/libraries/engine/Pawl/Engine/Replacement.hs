@@ -268,7 +268,7 @@ collect sources floating =
       -- prevented." The permanent half is a row rule 702.16 mints onto the
       -- permanent (Pawl.Engine.Keyword.mintedReplacementsOf); a player has no
       -- keywords, so its half rides the CR 613.11 axis and is minted here, where
-      -- the pairs PlayerEffect.protectionCarriers gathers can be read.
+      -- the rows PlayerEffect.protectionCarriers gathers can be read.
       --
       -- CandidateId.OfPermanent with a MINTED provenance rather than a third arm
       -- of that type, and the fit is exact rather than a reuse: CR 614.5's
@@ -287,32 +287,32 @@ collect sources floating =
       --
       -- CR 109.5's "you" is the CARRIER's controller, not the protected player --
       -- the two differ the moment a scope wider than PlayerScope.You appears --
-      -- and nothing in the row reads it: the pattern's source side is
+      -- and nothing the pool writes in the row reads it: Runed Halo's quality is
       -- Filter.HasChosenName, which reads the carrier's own chosen names off the
-      -- Context rather than a perspective, and its recipient side is a baked id,
-      -- so no atom here is perspective-relative.
+      -- Context rather than a perspective, The Stasis Coffin's is the empty
+      -- conjunction, and the recipient side is a baked id.
       --
-      -- That same atom is why the effect value no longer varies with WHICH names
-      -- the carrier holds, where the literal disjunction it replaced did. The
-      -- identity above is unharmed: the carrier's id is its own component, so two
-      -- carriers protecting one seat stay two instances, and this segment is
-      -- re-derived from the board every iteration (see below), so a row can never
-      -- outlive the names it was built from.
+      -- That atom is also why Runed Halo's effect value no longer varies with
+      -- WHICH names the carrier holds, where the literal disjunction it replaced
+      -- did. The identity above is unharmed: the carrier's id is its own
+      -- component, so two carriers protecting one seat stay two instances, and
+      -- this segment is re-derived from the board every iteration (see below), so
+      -- a row can never outlive what it was built from.
       --
       -- Nothing to consume and no rider: this segment is re-derived from the board
       -- every iteration, exactly as segment 1 is, and CR 615.10 leaves a static
       -- shield unreduced.
-      fromProtectedPlayer (pid, src) =
+      fromProtectedPlayer (pid, src, quality) =
         ReplacementCandidate.MkReplacementCandidate
           { ReplacementCandidate.identity =
               CandidateId.OfPermanent
                 PermanentCandidate.MkPermanentCandidate
                   { PermanentCandidate.source = src,
                     PermanentCandidate.provenance = ReplacementProvenance.Minted,
-                    PermanentCandidate.effect = protectionShield pid,
+                    PermanentCandidate.effect = protectionShield pid quality,
                     PermanentCandidate.ordinal = InstanceOrdinal.MkInstanceOrdinal 0
                   },
-            ReplacementCandidate.effect = protectionShield pid,
+            ReplacementCandidate.effect = protectionShield pid quality,
             ReplacementCandidate.source = src,
             ReplacementCandidate.controller = Projection.controllerOf src sources,
             ReplacementCandidate.lifetime = Nothing,
@@ -322,16 +322,17 @@ collect sources floating =
           }
       -- Rule 702.16e's row for one (protected player, carrier) pair.
       --
-      -- The quality is CR 201.4's chosen names, spelled as Filter.HasChosenName
-      -- -- the same set intersection PlayerEffect.protectedFromGiven asks for the
-      -- targeting and Aura bars, so the three consequences of rule 702.16 cannot
-      -- disagree about which sources carry the quality. A carrier that has chosen
-      -- nothing intersects with nothing and matches no source, rather than
-      -- shielding against everything.
+      -- The quality is the row's own, handed over by protectionCarriers -- the
+      -- SAME Filter PlayerEffect.protectedFromGiven matches for the targeting and
+      -- Aura bars, so the three consequences of rule 702.16 cannot disagree about
+      -- which sources carry it. Runed Halo's is CR 201.4's chosen names spelled as
+      -- Filter.HasChosenName, so a carrier that has chosen nothing matches no
+      -- source rather than shielding against everything; The Stasis Coffin's is
+      -- rule 702.16j's empty conjunction, which matches every source.
       --
-      -- The atom answers here because candidateContext fills
+      -- That atom answers here because candidateContext fills
       -- Filter.sourceChosenNames off the carrier; it is what makes the read LIVE
-      -- at the damage event (CR 609.7b) rather than frozen when this pair was
+      -- at the damage event (CR 609.7b) rather than frozen when this row was
       -- gathered.
       --
       -- `whichRecipient` and not `whoRecipient`, though both name a player: the
@@ -342,13 +343,13 @@ collect sources floating =
       -- No kind, rule 702.16e saying "any damage", and no printed recipient half
       -- at all -- `whatRecipient` is the permanent half's spelling and this row is
       -- the other one.
-      protectionShield pid =
+      protectionShield pid quality =
         ReplacementEffect.DamageR
           DamageR.MkDamageR
             { DamageR.matching =
                 DamagePattern.MkDamagePattern
                   { DamagePattern.whichKind = Nothing,
-                    DamagePattern.whatSource = Filter.Type.HasChosenName,
+                    DamagePattern.whatSource = quality,
                     DamagePattern.whatRecipient = Nothing,
                     DamagePattern.whoRecipient = Nothing,
                     DamagePattern.whichRecipient = Just (Recipient.ToPlayer pid),

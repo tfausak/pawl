@@ -3849,6 +3849,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- Filter for the same reason the two chosen-name prohibitions above carry
   -- none.
   PlayerEffect.HasProtectionFromChosenName -> []
+  -- CR 702.16a's other quality IS a Filter the card writes (The Stasis Coffin's
+  -- rule 702.16j "everything"), so it is linted like every other written one.
+  PlayerEffect.HasProtectionFrom f -> [f]
   -- CR 725 names no quality either: the designation has no parts (Jared
   -- Carthalion, True Heir).
   PlayerEffect.CantBecomeMonarch -> []
