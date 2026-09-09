@@ -50,7 +50,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
-import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -229,7 +228,7 @@ commanderPrintingOf oid gs = do
         -- merged permanent's TOKEN component (CR 730.2d) is filtered out rather
         -- than compared: a token is not a card (CR 111.6), and one interned to
         -- the same printing as a designated card would otherwise match.
-        source -> fmap MergeComponent.printing (Seq.filter (not . Game.componentIsToken) (Game.componentsOf source))
+        source -> fmap Game.printingOfComponent (Seq.filter (not . Game.componentIsToken) (Game.componentsOf source))
   -- CR 702.124e: with two designations this answers WHICH of them this object
   -- is, and no object can be both -- rule 903.5b's singleton deck gives each
   -- designation a distinct printing.

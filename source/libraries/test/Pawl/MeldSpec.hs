@@ -1357,4 +1357,4 @@ thirdOf (_, _, c) = c
 -- kind; a meld pair is two cards (CR 701.42b), so the kind says nothing here and
 -- the printing is the whole of what these cases read.
 componentPrintings :: Source.Source -> Seq.Seq PrintingId.PrintingId
-componentPrintings = fmap MergeComponent.printing . Game.componentsOf
+componentPrintings = fmap Game.printingOfComponent . Game.componentsOf

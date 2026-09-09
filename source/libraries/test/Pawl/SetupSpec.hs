@@ -45,7 +45,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaSpending as ManaSpending
-import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OutsideObject as OutsideObject
@@ -644,7 +643,7 @@ sparing oid p = case p of
 -- The printings representing `oid` on `gs`, which for a melded permanent is CR
 -- 701.42a's two cards and for anything else is nothing.
 componentsOn :: Maybe ObjectId.ObjectId -> GameState.GameState -> [PrintingId.PrintingId]
-componentsOn oid gs = foldMap (fmap MergeComponent.printing . Foldable.toList . Game.componentsOf . Object.source) (oid >>= (`Game.lookupObject` gs))
+componentsOn oid gs = foldMap (fmap Game.printingOfComponent . Foldable.toList . Game.componentsOf . Object.source) (oid >>= (`Game.lookupObject` gs))
 
 -- What each of `oids` is made of on `gs`, for an assertion that a component card
 -- came back as an ordinary card object of its own.
