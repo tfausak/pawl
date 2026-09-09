@@ -5,7 +5,8 @@
 -- reads them, the EntryRiders.exiledFaceDown rider
 -- Pawl.Engine.Event.changeZoneEntering reads,
 -- CR 406.3's instruction-given look permission -- Object.exileLookers as
--- Effect.GrantLookAtExiled writes it --
+-- Effect.GrantLookAtExiled writes it, whether a spell's own effect writes it or
+-- CR 702.75a's hideaway does --
 -- CR 406.4's two halves over Pawl.Engine.Target's Pool.CardsInExile arm -- the
 -- permission Pawl.Engine.Exile.mayLookAt answers, the pile
 -- Pawl.Engine.Exile.pileOf sorts a card into and Pawl.Engine.Target's piledOffer
@@ -28,7 +29,8 @@
 -- difference back out, and Riftsweeper's printed "face-up exiled card" is the
 -- third reading -- a card whose own words refuse what rule 406.4 offers. Runic
 -- Repetition is the fourth: a restriction a pile only half satisfies, which is
--- what the draw runs over the whole pile for.
+-- what the draw runs over the whole pile for. Windbrisk Heights is the reading
+-- no spell reaches: CR 702.75a's keyword names the permanent's controller.
 --
 -- Each group shares ONE board across its readings, which is the point: exile
 -- holds the same cards either way, and only how they got there differs.
@@ -77,6 +79,7 @@ spec s registry = Spec.describe s "Face-down exile" $ do
   foretold s registry
   runicRepetition s registry
   extractPower s registry
+  windbriskHeights s registry
   Spec.describe s "Ignorant Bliss" $ do
     -- CR 406.3a and CR 406.4's first half, read through the pool that offers
     -- exiled cards as targets. The board is deliberately one board: alice's two
@@ -462,6 +465,140 @@ castExtractPower s registry = do
       (_, g4) = S.addLibraryCard bolt S.bob g3
       (_, g5) = S.addLibraryCard sentry S.bob g4
   pure (S.runPure S.identityAnswer (S.runPure S.identityAnswer g5 (S.cast S.alice powerId)) Engine.priorityLoop)
+
+-- CR 702.75a's hideaway N, an instruction-given look that no spell gives:
+-- "When this permanent enters, look at the top N cards of your library. Exile one
+-- of them face down and put the rest on the bottom of your library in a random
+-- order. The exiled card gains 'The player who controls the permanent that
+-- exiled this card may look at this card in the exile zone.'" Windbrisk Heights
+-- Land -- "Hideaway 4 ... This land enters tapped. {T}: Add {W}. {W}, {T}: You
+-- may play the exiled card without paying its mana cost if you attacked with
+-- three or more creatures this turn" (Oracle text checked 2026-09-08) -- is the
+-- producer.
+--
+-- Pawl's Windbrisk Heights is STRICTER than printed: the {W}, {T} ability is not
+-- transcribed at all, because nothing can spell "without paying its mana cost"
+-- for a permission granted over an exiled card (#3433). Only hideaway itself is
+-- proved here.
+--
+-- Not implemented: rule 702.75a's look belongs to whoever controls the exiling
+-- permanent at the moment the question is asked, and pawl stamps the seat that
+-- controlled it as the ability resolved (#3443). The two agree on this board,
+-- where control never changes.
+--
+-- Where Extract Power above tells the look apart from OWNERSHIP, this group
+-- tells it apart from CONTROL OF THE SPELL: the looker is named by a keyword
+-- ability nobody cast.
+windbriskHeights :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
+  Spec.it s "CR 702.75a hideaway 4 hides the card its controller named and bottoms the other three, and only she may name it afterwards" $ do
+    reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+    (fifth, hidden, bottomed, board) <- playHeights s registry Nothing
+    case S.spellTargetSlot reclamation of
+      Just theSlot -> do
+        Spec.assertEqWith
+          s
+          "the card alice named out of the four she looked at is the one in exile face down"
+          (namesOf (faceDownExiled board) board)
+          (Set.singleton hidden)
+        Spec.assertEqWith
+          s
+          "the other three sit under the card the look never reached, in the order the random-order channel handed back"
+          (orderedNames (Game.zoneMembers Zone.Library S.alice board) board)
+          (fifth : bottomed)
+        Spec.assertEqWith
+          s
+          "and alice, who controls the land that exiled it, is the one seat offered the card by name"
+          (offerTo S.alice theSlot board)
+          (Set.fromList (fmap Recipient.ToObject (faceDownExiled board)))
+        -- Proxies, AFTER the three behavioural assertions so none of them can
+        -- absorb a mutation: bob is the seat rule 702.75a does not name, and one
+        -- card of the four went to exile rather than four or none.
+        Spec.assertEqWith
+          s
+          "bob controls nothing that exiled it, so he is offered the pile instead (CR 406.4)"
+          (offerTo S.bob theSlot board)
+          (Set.fromList (fmap Recipient.ToPile (pilesIn board)))
+        Spec.assertEqWith s "exactly one card is in exile face down" (length (faceDownExiled board)) 1
+      Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
+
+  -- THE COPY TRIPWIRE. Vesuva enters as a copy of the Windbrisk Heights already
+  -- on the battlefield, so its hideaway is read off CR 707.2's copiable values
+  -- rather than off the printed card -- which Vesuva's own face does not have.
+  -- A read of Game.cardOf anywhere on this path answers "Vesuva", which has no
+  -- keywords at all, and nothing is exiled.
+  Spec.it s "CR 707.2 a land that entered as a copy of Windbrisk Heights hides a card of its own" $ do
+    (_, hidden, _, board) <- playHeights s registry (Just "Vesuva")
+    Spec.assertEqWith
+      s
+      "the copy's hideaway ran, and the card its controller named is in exile face down"
+      (namesOf (faceDownExiled board) board)
+      (Set.singleton hidden)
+
+-- alice plays a land with hideaway 4 with FIVE distinct cards in her library, so
+-- the fifth is the one the look never reaches and every name below says which
+-- card ended where. Passing a copier's name puts a Windbrisk Heights on the
+-- battlefield already and plays that card instead, entering as a copy of it.
+-- That one is PLACED rather than played (S.addPermanent fires no entry event),
+-- so its own hideaway never triggers and one card is hidden either way.
+--
+-- The choice is pinned to the SECOND card of the offered four rather than
+-- searched for, so a mutation cannot be silently repaired, and the random order
+-- is answered by ROTATING the batch: a rotation of three is neither the identity
+-- nor its own inverse, so an engine that never consulted the channel bottoms the
+-- three in a different order, which the assertion reads. Reversing would not
+-- discriminate -- settleArrivals reverses the answer again to perform the moves
+-- from the stated end inward, and the two cancel.
+--
+-- Returns the name of the card left on top, the name alice hid, and the names of
+-- the three bottomed cards in the order they end up in.
+playHeights :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe String -> m (CardName.CardName, CardName.CardName, [CardName.CardName], GameState.GameState)
+playHeights s registry copier = do
+  heights <- S.printingOf s registry "Windbrisk Heights"
+  played <- maybe (pure heights) (S.printingOf s registry) copier
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  cancel <- S.printingOf s registry "Cancel"
+  think <- S.printingOf s registry "Think Twice"
+  let base = Setup.emptyGame S.bothPlayers
+      -- S.addLibraryCard puts each new card on top, so this stocks the library
+      -- bottom first: Think Twice is the fifth card, under the four the look
+      -- reaches.
+      (_, g1) = S.addLibraryCard think S.alice base
+      (_, g2) = S.addLibraryCard cancel S.alice g1
+      (_, g3) = S.addLibraryCard sentry S.alice g2
+      (_, g4) = S.addLibraryCard piker S.alice g3
+      (_, g5) = S.addLibraryCard bolt S.alice g4
+      (copiedId, g6) = case copier of
+        Nothing -> (S.noSource, g5)
+        Just _ -> S.addPermanent heights S.alice g5
+      (_, g7) = S.addHandCard played S.alice g6
+      before =
+        g7
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      after = S.runPure (hiding copiedId) before Engine.priorityLoop
+  pure (S.printingName think, S.printingName piker, [S.printingName bolt, S.printingName cancel, S.printingName sentry], after)
+
+-- Plays whatever land the board offers, copies the named permanent when one is
+-- passed, pins hideaway's choice to the SECOND card offered, and rotates the
+-- batch the random order asks about.
+hiding :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+hiding copied p = case p of
+  Prompt.ChooseCopyTarget {} -> Just copied
+  Prompt.ChooseCardFromAmong _ _ _ offered ->
+    Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop 1 (NonEmpty.toList offered)))
+  Prompt.Shuffle ids -> case ids of
+    h : t -> t <> [h]
+    [] -> []
+  _ -> S.playLandAnswer p
+
+-- namesOf, keeping the order it was given -- which is a library's own (CR 401.2).
+orderedNames :: [ObjectId.ObjectId] -> GameState.GameState -> [CardName.CardName]
+orderedNames oids gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) oids
 
 -- CR 406.4's draw runs over the WHOLE pile, and the spell's own restriction is
 -- judged on the card the draw named rather than before it: Runic Repetition

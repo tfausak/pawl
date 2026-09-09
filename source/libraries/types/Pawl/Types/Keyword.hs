@@ -246,6 +246,12 @@ data Keyword
   | -- | 702.73a: "This object is every creature type." A characteristic-defining
     -- ability (CR 604.3) landing in layer 4.
     Changeling
+  | -- | 702.75a: hideaway N -- a triggered ability. On entry, look at the top N
+    -- cards of your library, exile one of them face down and put the rest on the
+    -- bottom in a random order; the exiled card gains a look for whoever controls
+    -- the permanent that exiled it. CR 702.75b's "enters tapped" is that rule's
+    -- errata on the older cards rather than part of the keyword.
+    Hideaway Natural.Natural
   | -- | 702.77a: reinforce N-[cost] -- "[Cost], Discard this card: Put N +1/+1
     -- counters on target creature", functioning only while the card is in a
     -- player's hand.

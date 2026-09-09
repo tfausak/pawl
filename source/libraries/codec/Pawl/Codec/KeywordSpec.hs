@@ -665,6 +665,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Soulshift 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "soulshift 3 is not bushido 3"
+  -- CR 702.75a's N is a DEPTH into a library rather than a count of anything on
+  -- the board, so a collision with a same-numbered keyword would be a real
+  -- misread.
+  Spec.it s "Hideaway carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Hideaway 4)
+      " {\"type\":\"Hideaway\",\"value\":4} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Hideaway 4) /= Codec.encode Keyword.codec (Keyword.Fading 4))
+      "hideaway 4 is not fading 4"
   -- CR 702.54a's N is a count of +1/+1 counters, so a collision with a
   -- same-numbered keyword would be a real misread here too.
   Spec.it s "Bloodthirst carries its N" $ do
