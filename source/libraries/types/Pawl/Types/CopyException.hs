@@ -124,9 +124,9 @@ data CopyException
     -- exception. So this arm must not clear characteristicPT and must not touch
     -- the keywords a characteristic-defining ability is written as.
     AddSubtypes (Set.Set Subtype.Subtype)
-  | -- | CR 707.9b over CR 205.4a's part of the type line: the copy is these
-    -- supertypes "in addition to its other types" (Sakashima the Impostor's
-    -- "legendary"), so they JOIN the copied supertypes.
+  | -- | CR 707.9b / 205.1b over CR 205.4a's part of the type line: the copy is
+    -- these supertypes "in addition to its other types" (Sakashima the
+    -- Impostor's "legendary"), so they JOIN the copied supertypes.
     --
     -- A UNION for CR 205.4b's reason, which is RemoveSupertypes' reason one
     -- direction over: an object that gains a supertype "retains any other

@@ -1104,7 +1104,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         let minted = castAndResolve (targetingKeepingLegend survivorId survivorId) counterpart excepted
             plain = castAndResolve (targetingKeepingLegend pikerId pikerId) counterpart excepted
         Spec.assertEqWith s "a token copy of the survivor is a same-named legend too, so CR 704.5j takes it (CR 707.2)" (length (tokensOnBattlefield minted)) 0
-        Spec.assertEqWith s "where a token copy of the Piker it copied stands" (length (tokensOnBattlefield plain)) 1
+        Spec.assertEqWith s "where a token copy of the nonlegendary Piker beside it stands" (length (tokensOnBattlefield plain)) 1
       others -> Spec.assertFailure s ("expected exactly one Sakashima, got " <> show (length others))
 
   -- THE PROVING TEST for the copiable stamp. The target is itself a copy, so

@@ -2153,10 +2153,10 @@ applyCopyException this snapshot exception = case exception of
   -- (CR 707.9d's Glasspool Mimic example).
   CopyException.AddSubtypes subtypes ->
     snapshot {PC.subtypes = Set.union (PC.subtypes snapshot) subtypes}
-  -- CR 707.9b over CR 205.4a's part of the type line the other direction: "it's
-  -- legendary in addition to its other types" (Sakashima the Impostor), so a
-  -- UNION where the arm below takes a difference. CR 205.4b is why it is not a
-  -- replacement -- an object that gains a supertype keeps the ones it had.
+  -- CR 707.9b / 205.1b over CR 205.4a's part of the type line: "it's legendary in
+  -- addition to its other types" (Sakashima the Impostor), so a UNION where the
+  -- arm below takes a difference. CR 205.4b says the same one object at a time --
+  -- one that gains a supertype keeps the ones it had.
   --
   -- Into the snapshot for the arms above's reason, and read at gameplay level by
   -- CR 704.5j: Pawl.CopySpec's "two Sakashimas copying different creatures are one
