@@ -220,7 +220,7 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
           hostIsCreature = hostCardType CardType.Creature
           hostIsLand = hostCardType CardType.Land
           hostIsIllegal = (isEquipment && not hostIsCreature) || (isFortification && not hostIsLand)
-          hostRefuses = Maybe.maybe False (\h -> AttachRestriction.refusesGiven pcs oid h gs) (Recipient.objectOf host)
+          hostRefuses = Maybe.maybe False (\h -> AttachRestriction.removesGiven pcs oid h gs) (Recipient.objectOf host)
        in (isEquipment || isFortification) && (hostIsIllegal || hostRefuses)
 
 -- CR 704.5p: a battle or creature attached to an object or player becomes
@@ -363,10 +363,11 @@ fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
             -- player with protection will be put into their owners' graveyards
             -- as a state-based action" -- because the prohibition it states is
             -- minted into that same AttachRestriction
-            -- (Pawl.Engine.Keyword.mintedAttachRestrictionsFor). CR 704.5n's
-            -- becomesUnattached carries rule 702.16d's sentence for the same
-            -- reason, off the same answer.
-            || Maybe.maybe False (\host -> AttachRestriction.refusesGiven pcs oid host gs) (Recipient.objectOf recipient)
+            -- (Pawl.Engine.Keyword.mintedRemovalRestrictionsFor, which narrows
+            -- the row Attach.attachmentFor reads by rule 702.16n's exception).
+            -- CR 704.5n's becomesUnattached carries rule 702.16d's sentence for
+            -- the same reason, off the same answer.
+            || Maybe.maybe False (\host -> AttachRestriction.removesGiven pcs oid host gs) (Recipient.objectOf recipient)
             -- CR 702.16c's second sentence again, for a PLAYER host. The clause
             -- above cannot carry it: a player has no keywords for
             -- Pawl.Engine.Keyword to mint an AttachRestriction row from, so the

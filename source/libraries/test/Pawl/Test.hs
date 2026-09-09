@@ -344,6 +344,7 @@ import qualified Pawl.Codec.PrintingIdSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProductionTagSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
+import qualified Pawl.Codec.ProtectionSpec
 import qualified Pawl.Codec.PrototypeSpec
 import qualified Pawl.Codec.PutCountersFromSpec
 import qualified Pawl.Codec.PutCountersSpec
@@ -967,6 +968,7 @@ spec s registry = do
   Pawl.Codec.MoveCountersSpec.spec s
   Pawl.Codec.MoveManaSpec.spec s
   Pawl.Codec.MovedKindsSpec.spec s
+  Pawl.Codec.ProtectionSpec.spec s
   Pawl.Codec.PrototypeSpec.spec s
   Pawl.Codec.PutCountersFromSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s

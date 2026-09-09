@@ -740,6 +740,8 @@ library codec
     Pawl.Codec.ProductionTagSpec
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.ProjectedCharacteristicsSpec
+    Pawl.Codec.Protection
+    Pawl.Codec.ProtectionSpec
     Pawl.Codec.Prototype
     Pawl.Codec.PrototypeSpec
     Pawl.Codec.PutCounters
@@ -1846,6 +1848,7 @@ library types
     Pawl.Types.ProjectedCharacteristics
     Pawl.Types.Prompt
     Pawl.Types.ProposedEvent
+    Pawl.Types.Protection
     Pawl.Types.Prototype
     Pawl.Types.PutCounters
     Pawl.Types.PutCountersFrom

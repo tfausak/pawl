@@ -20,6 +20,7 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -1057,8 +1058,8 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertEqWith
         s
         "protection from Goblins became protection from Zombies"
-        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Protection (Filter.Type.HasSubtype Subtype.Goblin))))
-        (Filter.Type.HasKeyword (Keyword.Protection (Filter.Type.HasSubtype Subtype.Zombie)))
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasSubtype Subtype.Goblin, Protection.spares = Nothing})))
+        (Filter.Type.HasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasSubtype Subtype.Zombie, Protection.spares = Nothing}))
 
     -- The colour Apostle of Purifying Light actually prints: no subtype word
     -- inside it, so the swap reaches nothing.
@@ -1066,8 +1067,8 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertEqWith
         s
         "protection from black untouched"
-        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Black))))
-        (Filter.Type.HasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Black)))
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasColor Color.Black, Protection.spares = Nothing})))
+        (Filter.Type.HasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasColor Color.Black, Protection.spares = Nothing}))
 
   Spec.describe s "AttackedThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do

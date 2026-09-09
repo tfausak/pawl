@@ -83,6 +83,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -332,7 +333,7 @@ fortifyBoard s registry = do
 -- CR 702.16a's "protection from artifacts", the quality Tower of the Magistrate
 -- grants and the one Darksteel Garrison has.
 protectionFromArtifacts :: Keyword.Keyword
-protectionFromArtifacts = Keyword.Protection (Filter.Type.HasCardType CardType.Artifact)
+protectionFromArtifacts = Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasCardType CardType.Artifact, Protection.spares = Nothing}
 
 -- CR 301.6 / 702.67: Fortifications, the Equipment group above one card type
 -- over -- a Fortification attaches to a LAND, and CR 301.6 says the two are
@@ -2338,7 +2339,7 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
         (gs, spell) = S.handOne graft board
         cast = snd (Engine.runGamePure (moveAura auraId protected) gs (S.cast S.alice spell))
         after = snd (Engine.runGamePure (moveAura auraId protected) cast Stack.resolveTop)
-    Spec.assertBool s (Projection.hasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Black)) protected board) "before: the Apostle has protection from black"
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasColor Color.Black, Protection.spares = Nothing}) protected board) "before: the Apostle has protection from black"
     Spec.assertBool s (Set.member Color.Black (Projection.colorsOf auraId board)) "and Unholy Strength is a black Aura"
     Spec.assertEqWith s "before: it sits on the Piker" (fmap Object.attachedTo (Game.lookupObject auraId board)) (Just (Just (Recipient.ToCreature host)))
     -- The gameplay-level assertion: the answerer asked for the protected
@@ -2347,9 +2348,54 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     Spec.assertEqWith s "CR 702.16c: the Aura lands on the Mammoth, not the protected creature" (fmap Object.attachedTo (Game.lookupObject auraId after)) (Just (Just (Recipient.ToCreature willing)))
     Spec.assertEqWith s "so the Mammoth carries the +2/+1" (S.powerToughnessOf willing after) (Just (5, 4))
     Spec.assertEqWith s "and the Apostle is untouched" (S.powerToughnessOf protected after) (Just (2, 1))
+  -- CR 702.16n: "Some Auras both give the enchanted creature protection from a
+  -- quality and say 'this effect doesn't remove' either that specific Aura or
+  -- all Auras. This means that the specified Auras aren't put into their owners'
+  -- graveyards as a state-based action." Spectra Ward is the pool's only "all
+  -- Auras" printing, and it is WHITE on a creature it gives protection from
+  -- white to, so the exception is the whole reason it survives its own
+  -- state-based pass.
+  --
+  -- The second half is the design call this case exists to pin: rule 702.16n
+  -- says only that the named Auras are not REMOVED, where rule 702.16p states a
+  -- becoming-attached sentence of its own, so the warded creature still refuses
+  -- a coloured Aura MOVING onto it. Aura Graft reaches that gate without
+  -- targeting the creature, the route the CR 702.16c case above takes.
+  --
+  -- TWO other creatures for that case's reason: the answerer demands the warded
+  -- Mammoth on both legs and never gets it, so the one remaining candidate is
+  -- elided onto the Spider. Distinct printed sizes throughout, so no reading
+  -- shares a number with another.
+  Spec.it s "CR 702.16n whole cards: Spectra Ward stays on the creature it protects, and still keeps a black Aura off it" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    spider <- S.printingOf s registry "Giant Spider"
+    spectra <- S.printingOf s registry "Spectra Ward"
+    strength <- S.printingOf s registry "Unholy Strength"
+    graft <- S.printingOf s registry "Aura Graft"
+    let base0 = S.landsInPlay island 2
+        (host, base1) = S.addPermanent piker S.alice base0
+        (protected, base2) = S.addPermanent mammoth S.alice base1
+        (willing, base3) = S.addPermanent spider S.alice base2
+        (wardId, base4) = S.addPermanent spectra S.alice base3
+        warded = S.attach wardId protected base4
+        (auraId, base5) = S.addPermanent strength S.alice warded
+        board = S.attach auraId host base5
+        (gs, spell) = S.handOne graft board
+        cast = snd (Engine.runGamePure (moveAura auraId protected) gs (S.cast S.alice spell))
+        after = S.settleSba (snd (Engine.runGamePure (moveAura auraId protected) cast Stack.resolveTop))
+    Spec.assertBool s (Set.member Color.White (Projection.colorsOf wardId board)) "setup: Spectra Ward is itself white"
+    Spec.assertBool s (Set.member Color.Black (Projection.colorsOf auraId board)) "and Unholy Strength is a black Aura"
+    -- The gameplay-level assertions, read after a state-based pass -- `board` has
+    -- run none, and CR 702.16n is about a state-based action.
+    Spec.assertEqWith s "CR 702.16n: the state-based pass leaves the Ward on the creature it protects" (fmap Object.attachedTo (Game.lookupObject wardId after)) (Just (Just (Recipient.ToCreature protected)))
+    Spec.assertBool s (S.onBattlefield wardId after) "and on the battlefield rather than in its owner's graveyard"
+    Spec.assertEqWith s "CR 702.16c: the black Aura lands on the Spider, not the warded creature" (fmap Object.attachedTo (Game.lookupObject auraId after)) (Just (Just (Recipient.ToCreature willing)))
+    Spec.assertEqWith s "so the Mammoth still carries its +2/+2" (S.powerToughnessOf protected after) (Just (5, 5))
   -- CR 702.16k's Aura sentence: "Such a permanent or player ... can't be
   -- enchanted by Auras that player controls." True-Name Nemesis, whose quality is
-  -- Filter.OfChosenPlayer -- read by Pawl.Engine.AttachRestriction.refusesGiven
+  -- Filter.OfChosenPlayer -- read by Pawl.Engine.AttachRestriction.barredBy
   -- off Filter.Context.carrierChosenPlayer, which it fills off the minted row's
   -- source (the protected host itself).
   --
@@ -2414,7 +2460,7 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     Spec.assertBool s (Set.member equipId (GameState.battlefield after)) "CR 702.16d / 704.5n: the black Equipment stays on the battlefield"
     Spec.assertEqWith s "and it is unattached" (fmap Object.attachedTo (Game.lookupObject equipId after)) (Just Nothing)
     Spec.assertBool s (not (Set.member auraId (GameState.battlefield after))) "the Aura left the battlefield, where the Equipment did not"
-    Spec.assertBool s (Projection.hasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Black)) shifter after) "the copy is what gave the Shapeshifter protection from black"
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasColor Color.Black, Protection.spares = Nothing}) shifter after) "the copy is what gave the Shapeshifter protection from black"
     Spec.assertEqWith s "so it is the Apostle's printed 2/1, with neither bonus left" (S.powerToughnessOf shifter after) (Just (2, 1))
 
 -- The one battlefield object of alice's whose card carries this name. Every

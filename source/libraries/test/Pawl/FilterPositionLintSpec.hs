@@ -109,6 +109,7 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -562,7 +563,7 @@ ofChosenPlayerCounts card =
 -- Filter.Context.carrierChosenPlayer is filled, and the four fillers are the four
 -- positions rule 702.16 reads a protection QUALITY in
 -- (Pawl.Engine.Replacement.candidateContext, Pawl.Engine.Target.targetable,
--- Pawl.Engine.AttachRestriction.refusesGiven,
+-- Pawl.Engine.AttachRestriction.barredBy,
 -- Pawl.Engine.CombatRestriction.cantBeBlockedBy). Every one of them takes the
 -- filter off a keyword, so a target slot, an affected set, a Count filter or a
 -- cost criterion asking this atom is a silent False rather than a rejected card.
@@ -1019,7 +1020,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         buried = Filter.Type.And [Filter.Type.Or [creatures, Filter.Type.OfChosenPlayer]]
         equipping quality = Keyword.Equip (Equip.MkEquip (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) quality)
         offending = base {Face.keywords = Set.singleton (equipping (Just buried))}
-        protecting = base {Face.keywords = Set.singleton (Keyword.Protection buried)}
+        protecting = base {Face.keywords = Set.singleton (Keyword.Protection Protection.MkProtection {Protection.quality = buried, Protection.spares = Nothing})}
     -- Ordered FIRST, and the assertion this framing exists for.
     Spec.assertBool s (ofChosenPlayerOffends offending) "OfChosenPlayer in an equip quality offends"
     Spec.assertEqWith s "counted outside the keyword bucket" (ofChosenPlayerCounts offending) (0, 1)

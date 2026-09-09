@@ -5,8 +5,11 @@
         {
           "type": "Protection",
           "value": {
-            "type": "And",
-            "value": []
+            "quality": {
+              "type": "And",
+              "value": []
+            },
+            "spares": null
           }
         }
       ],

@@ -1,0 +1,189 @@
+{
+  "faces": [
+    {
+      "enchant": [
+        {
+          "pool": {
+            "type": "Creatures"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Spectra Ward",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "HasAttached",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": {
+                "power": {
+                  "type": "Literal",
+                  "value": 2
+                },
+                "toughness": {
+                  "type": "Literal",
+                  "value": 2
+                }
+              }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Protection",
+                "value": {
+                  "quality": {
+                    "type": "HasColor",
+                    "value": {
+                      "type": "White"
+                    }
+                  },
+                  "spares": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Aura"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Protection",
+                "value": {
+                  "quality": {
+                    "type": "HasColor",
+                    "value": {
+                      "type": "Blue"
+                    }
+                  },
+                  "spares": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Aura"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Protection",
+                "value": {
+                  "quality": {
+                    "type": "HasColor",
+                    "value": {
+                      "type": "Black"
+                    }
+                  },
+                  "spares": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Aura"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Protection",
+                "value": {
+                  "quality": {
+                    "type": "HasColor",
+                    "value": {
+                      "type": "Red"
+                    }
+                  },
+                  "spares": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Aura"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Protection",
+                "value": {
+                  "quality": {
+                    "type": "HasColor",
+                    "value": {
+                      "type": "Green"
+                    }
+                  },
+                  "spares": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Aura"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

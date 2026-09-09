@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Cycling as Cycling
 import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Morph as Morph
+import qualified Pawl.Codec.Protection as Protection
 import qualified Pawl.Codec.Prototype as Prototype
 import qualified Pawl.Codec.Reinforce as Reinforce
 import qualified Pawl.Codec.Suspend as Suspend
@@ -43,7 +44,7 @@ codec =
       Arm.nullary "Lifelink" Keyword.Lifelink,
       Arm.nullary "LivingMetal" Keyword.LivingMetal,
       Arm.payload "MoreThanMeetsTheEye" (Cost.codec codec) Keyword.MoreThanMeetsTheEye (\x -> case x of Keyword.MoreThanMeetsTheEye y -> Just y; _ -> Nothing),
-      Arm.payload "Protection" (Filter.codec codec) Keyword.Protection (\x -> case x of Keyword.Protection y -> Just y; _ -> Nothing),
+      Arm.payload "Protection" (Protection.codec codec) Keyword.Protection (\x -> case x of Keyword.Protection y -> Just y; _ -> Nothing),
       Arm.nullary "Reach" Keyword.Reach,
       Arm.nullary "Shroud" Keyword.Shroud,
       Arm.nullary "Trample" Keyword.Trample,

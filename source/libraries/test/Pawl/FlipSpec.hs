@@ -59,6 +59,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -81,7 +82,7 @@ halfReadings oid gs =
     S.powerToughnessOf oid gs,
     Projection.subtypesOf oid gs,
     Projection.supertypesOf oid gs,
-    Projection.hasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Red)) oid gs
+    Projection.hasKeyword (Keyword.Protection Protection.MkProtection {Protection.quality = Filter.Type.HasColor Color.Red, Protection.spares = Nothing}) oid gs
   )
 
 normalHalf, alternativeHalf :: (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Set.Set Supertype.Supertype, Bool)
