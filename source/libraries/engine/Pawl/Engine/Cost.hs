@@ -95,6 +95,7 @@ import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -120,6 +121,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.Zone as Zone
 
@@ -3376,13 +3378,19 @@ tapForManaWith perform inFlight oid = do
               -- whether the activation PRODUCED mana, which it did whoever's
               -- pool it went to.
               Monad.when (List.elem CostComponent.TapThis (Cost.components (ManaOption.cost chosen)) && not (null (Mana.yieldUnits chosen))) $
-                applyManaTriggers perform oid
+                applyManaTriggers perform oid (Set.fromList (fmap ManaUnit.manaType (Mana.yieldUnits chosen)))
               pure True
 
 -- CR 605.4a: record CR 106.12a's event and apply, where they stand, the
 -- triggered mana abilities it fired -- "a triggered mana ability doesn't go on
 -- the stack ... it resolves immediately after the mana ability that triggered
 -- it, without waiting for priority".
+--
+-- `produced` is the set of mana TYPES the activation yielded, which CR 106.12a's
+-- "or is tapped for mana of a specified type" narrowing reads -- Gauntlet of
+-- Power's "for mana of the chosen color". Recorded on the event because nothing
+-- else can answer for it afterwards: the mana is a Pawl.Types.ManaUnit in a pool
+-- carrying no reference to its source.
 --
 -- The event is recorded whatever it fires, since an ordinary triggered ability
 -- watching the same moment is CR 603.3's business and reaches the stack through
@@ -3410,9 +3418,9 @@ tapForManaWith perform inFlight oid = do
 -- Not implemented: the printed "triggers only once" riders
 -- (Pawl.Types.TriggerLimit), which Engine.withinTriggerLimit spends for a trigger
 -- that reaches the stack. No triggered mana ability prints one (#1572).
-applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game ()
-applyManaTriggers perform oid = do
-  State.modify' (Event.recordEvent (GameEvent.TappedForMana oid))
+applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Set.Set ManaType.ManaType -> Game ()
+applyManaTriggers perform oid produced = do
+  State.modify' (Event.recordEvent (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = oid, TappedForMana.mana = produced})))
   gs <- State.get
   let recorded = Foldable.toList (Seq.drop (Seq.length (GameState.events gs) - 1) (GameState.events gs))
       fired = filter (ManaAbility.isTriggeredManaAbility . PendingTrigger.ability) (Event.reactionTriggers recorded gs)

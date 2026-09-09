@@ -260,6 +260,7 @@ import qualified Pawl.Codec.ManaRetentionSpec
 import qualified Pawl.Codec.ManaRiderEffectSpec
 import qualified Pawl.Codec.ManaRiderSpec
 import qualified Pawl.Codec.ManaSpec
+import qualified Pawl.Codec.ManaSpecificationSpec
 import qualified Pawl.Codec.ManaSpendingSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
@@ -413,6 +414,7 @@ import qualified Pawl.Codec.TakeExtraTurnSpec
 import qualified Pawl.Codec.TapForTotalPowerSpec
 import qualified Pawl.Codec.TapPermanentsSpec
 import qualified Pawl.Codec.TapStateSpec
+import qualified Pawl.Codec.TappedForManaSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TeamIdSpec
@@ -879,6 +881,7 @@ spec s registry = do
   Pawl.Codec.ManaRiderEffectSpec.spec s
   Pawl.Codec.ManaRiderSpec.spec s
   Pawl.Codec.ManaSpec.spec s
+  Pawl.Codec.ManaSpecificationSpec.spec s
   Pawl.Codec.ManaSpendingSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
@@ -1034,6 +1037,7 @@ spec s registry = do
   Pawl.Codec.TapForTotalPowerSpec.spec s
   Pawl.Codec.TapPermanentsSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
+  Pawl.Codec.TappedForManaSpec.spec s
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s
   Pawl.Codec.TeamIdSpec.spec s

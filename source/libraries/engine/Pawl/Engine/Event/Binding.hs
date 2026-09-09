@@ -43,6 +43,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.TappedForMana as TappedForMana
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -729,7 +730,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- reason: matchesTrigger accepts only a GameEvent.TappedForMana whose
   -- permanent IS the bearer's host, so the id is always there.
   (TriggerCondition.AttachedPermanentTappedForMana, GameEvent.TappedForMana tapped) ->
-    Binding.setManaSource tapped Map.empty
+    Binding.setManaSource (TappedForMana.permanent tapped) Map.empty
   -- The same slot for the bystander reading: Autumn Willow, Harmony's "add an
   -- additional {G}" goes to CR 109.5's "you", but a printing of this shape whose
   -- recipient is the tapping player instead reads the source through
@@ -739,7 +740,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- Unconditional given a match, the arm above's reason: matchesTrigger accepts
   -- only a GameEvent.TappedForMana, which carries the permanent outright.
   (TriggerCondition.PermanentTappedForMana {}, GameEvent.TappedForMana tapped) ->
-    Binding.setManaSource tapped Map.empty
+    Binding.setManaSource (TappedForMana.permanent tapped) Map.empty
   -- CR 725.1's newly crowned player: Garland, Royal Kidnapper's "that player",
   -- whose creature the trigger then targets and whose crown its duration watches.
   -- Bound whichever relation matched, for the reason the PlayerLosesLife arm
