@@ -2,7 +2,8 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Pawl.Engine.PlayerEffect over effects that forbid casting (CR 601.3): Silence
--- and its conditional forms, Liliana, Null Chamber, Runed Halo, Conjurer's Ban.
+-- and its conditional forms, Liliana, Null Chamber, Runed Halo, The Stasis
+-- Coffin, Conjurer's Ban.
 -- Split out of Pawl.PlayerEffectSpec, which keeps the machinery.
 module Pawl.CastProhibitionSpec where
 
@@ -1701,9 +1702,10 @@ isPlay action = case action of
 
 -- Runed Halo {W}{W} Enchantment: "As this enchantment enters, choose a card
 -- name. You have protection from the chosen card name." The pool's one card that
--- gives a PLAYER a rule 702.16 protection ability, and so the producer of both
--- halves this group proves: CR 702.16b's targeting bar and CR 702.16c's
--- enchanting bar, each read off Pawl.Engine.PlayerEffect.protectedFrom.
+-- gives a PLAYER protection from a CHOSEN NAME -- The Stasis Coffin below states
+-- its quality on the card instead -- and so the producer of both halves this
+-- group proves: CR 702.16b's targeting bar and CR 702.16c's enchanting bar, each
+-- read off Pawl.Engine.PlayerEffect.protectedFrom.
 --
 -- Curse of Vitality is the Aura on the other side, and it has to be an
 -- enchant-PLAYER one (CR 702.5d): rule 702.16c's player half is the clause under
@@ -2020,8 +2022,8 @@ stasisCoffinSpec s registry =
     -- CR 702.16j with CR 702.16e: "all damage that would be dealt to such a
     -- permanent or player is prevented", the CR 615.1 shield
     -- Pawl.Engine.Replacement.collect mints off
-    -- Pawl.Engine.PlayerEffect.protectionCarriers -- whose quality is now the
-    -- row's own Filter rather than the carrier's chosen names.
+    -- Pawl.Engine.PlayerEffect.protectionCarriers, whose rows carry the quality
+    -- as a Filter.
     --
     -- THREE combats, each differing from the first in one thing: alice takes none
     -- of the Piker's 2; carol takes all of it off the same activated board, so the
