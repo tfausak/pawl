@@ -1,0 +1,96 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Sakashima the Impostor",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "AsCopy",
+                "value": {
+                  "eligible": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  "exceptions": [
+                    {
+                      "type": "SetName",
+                      "value": "Sakashima the Impostor"
+                    },
+                    {
+                      "type": "AddSupertypes",
+                      "value": [
+                        {
+                          "type": "Legendary"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Rogue"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
