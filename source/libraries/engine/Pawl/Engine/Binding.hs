@@ -443,9 +443,11 @@ tappedForTotalPower = SlotName.MkSlotName (Text.pack "thatTappedForTotalPower")
 -- sacrificedPermanent's route on the CASTING side rather than the activating one.
 --
 -- The card is still in the payer's hand when the spell resolves -- CR 701.20b
--- moves nothing -- so CR 608.2h's first clause applies and every read is CURRENT
--- information, tappedPermanent's posture rather than sacrificedPermanent's.
--- Pawl.Engine.Resolve.Slots.effectViewOf needs no arm for this slot.
+-- moves nothing, and CR 701.20a keeps it revealed until the spell leaves the
+-- stack -- so CR 608.2h's last-known clause is never reached: the card neither
+-- left the zone it was expected in nor was moved out of a public one. Every read
+-- is CURRENT information, tappedPermanent's posture rather than
+-- sacrificedPermanent's, and Pawl.Engine.Resolve.Slots.effectViewOf needs no arm.
 --
 -- SINGULAR: every printing of this cost reveals one card, so Binding.onlyOne
 -- answers it.
