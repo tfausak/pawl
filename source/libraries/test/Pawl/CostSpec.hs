@@ -1976,6 +1976,95 @@ hatredSpec s registry =
       Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.PayEnergyX])) "it is a CR 107.3 variable"
       Spec.assertBool s (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.PayEnergyX])) "whose demand grows, so the board itself refuses a big enough value"
 
+-- Living Destiny {3}{G} Instant: "As an additional cost to cast this spell,
+-- reveal a creature card from your hand. You gain life equal to the revealed
+-- card's mana value." (Oracle checked against Scryfall 2026-09-09.)
+--
+-- The gate card for CostComponent.RevealCardFromHand, the first component that
+-- CHOOSES a card out of a zone and moves nothing (CR 701.20b), and the first
+-- spell to read what its own cost bound -- Pawl.Engine.Cast folds the payment's
+-- slots onto the spell for it.
+--
+-- TWO creature cards in hand with DISTINCT mana values, so the payment is a real
+-- choice and the life gained names the card revealed rather than "a creature
+-- card": Berserkers of Blood Ridge is {4}{R} and Goblin Piker {1}{R}, and 25 and
+-- 22 are apart from each other and from the 20 a payment that bound nothing would
+-- leave. Neither is ever cast, so nothing but the reveal reads either.
+--
+-- Four Forests pay {3}{G} on EVERY board here, the refusing one included, so its
+-- refusal cannot be unaffordable mana; the two Forests in hand there are what
+-- makes the negative differ from the positive in the card TYPE alone.
+livingDestinySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+livingDestinySpec s registry =
+  Spec.describe s "Living Destiny" $ do
+    Spec.it s "CR 701.20a the revealed card's mana value is the life gained" $ do
+      forest <- S.printingOf s registry "Forest"
+      destiny <- S.printingOf s registry "Living Destiny"
+      piker <- S.printingOf s registry "Goblin Piker"
+      berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+      let (spell, _, berserker, gs) = livingDestinyBoard forest destiny piker berserkers
+          resolved = S.runPure (revealing berserker) (S.runPure (revealing berserker) gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 601.2f alice gained the revealed card's mana value" (S.lifeOf S.alice resolved) (Just 25)
+      Spec.assertBool s (List.elem berserker (Game.zoneMembers Zone.Hand S.alice resolved)) "CR 701.20b and the card she revealed never left her hand"
+      Spec.assertBool s (any (S.isCastOf spell) (Action.legalActions S.alice gs)) "and CR 118.3 offered the cast on this board, which is what the refusing case below differs from"
+    -- The same board with the payment pinned to the OTHER creature card, which is
+    -- what makes the case above an assertion about the card alice chose rather
+    -- than about any creature card in her hand.
+    Spec.it s "CR 601.2h the payer chooses which card pays" $ do
+      forest <- S.printingOf s registry "Forest"
+      destiny <- S.printingOf s registry "Living Destiny"
+      piker <- S.printingOf s registry "Goblin Piker"
+      berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+      let (spell, pikerId, _, gs) = livingDestinyBoard forest destiny piker berserkers
+          resolved = S.runPure (revealing pikerId) (S.runPure (revealing pikerId) gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 601.2f the Piker's mana value is what she gained" (S.lifeOf S.alice resolved) (Just 22)
+    -- CR 118.3 with the same mana and the same hand size: two LAND cards in place
+    -- of the two creature cards, so nothing in the hand answers the criterion and
+    -- CR 601.2 rewinds the whole cast.
+    Spec.it s "CR 118.3 a hand with no creature card cannot pay" $ do
+      forest <- S.printingOf s registry "Forest"
+      destiny <- S.printingOf s registry "Living Destiny"
+      let (spell, _, _, gs) = livingDestinyBoard forest destiny forest forest
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+      Spec.assertEqWith s "CR 118.3 the cast is not offered at all" (filter (S.isCastOf spell) (Action.legalActions S.alice gs)) []
+      Spec.assertEqWith s "and taking it anyway gains nothing" (S.lifeOf S.alice cast) (Just 20)
+      Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack cast)) 0
+      Spec.assertBool s (List.elem spell (Game.zoneMembers Zone.Hand S.alice cast)) "so the Destiny is still in her hand"
+
+-- The Destiny in alice's hand over `first` and `second`, with four Forests to pay
+-- its {3}{G}. Both hand ids come back so a case can pin the payment to one of
+-- them BY IDENTITY: an answerer that searched the offer for the card it wanted
+-- would find it again after any mutation to what the payment offers.
+livingDestinyBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+livingDestinyBoard forest destiny first second =
+  let base = S.landsFor forest S.alice 4 (Setup.emptyGame S.bothPlayers)
+      (firstId, gs0) = S.addHandCard first S.alice base
+      (secondId, gs1) = S.addHandCard second S.alice gs0
+      (spellId, gs2) = S.addHandCard destiny S.alice gs1
+   in ( spellId,
+        firstId,
+        secondId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The payment's answer pinned to one card: `which` where the engine offered it,
+-- and S.identityAnswer everywhere else -- the liar pattern, so a case that reads
+-- `which` back is reading the engine's own offer rather than a fallback.
+revealing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+revealing which p = case p of
+  Prompt.ChooseCardInHand _ _ _ candidates
+    | List.elem which (NonEmpty.toList candidates) -> which
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
@@ -1988,6 +2077,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   spitefulSpec s registry
   headlessSkaabSpec s registry
   cadaverousBloomSpec s registry
+  livingDestinySpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry
   putridRaptorSpec s registry

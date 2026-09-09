@@ -339,8 +339,10 @@ sacrificesAsCost =
 -- CostComponent.TapForTotalPower is counted by tapsForTotalPowerAsCost below
 -- instead, under a slot of its own.
 --
--- Not offered on the CAST side (cardOffends below): Cast.castSpell discards the
--- payment map, so a spell reading the slot would silently no-op.
+-- Not offered on the CAST side (cardOffends below), though Cast.castSpell now
+-- folds a payment's slots onto the spell: no printing in `data/cards/` taps as an
+-- additional cost to cast, so the exemption would fence nothing. Living Destiny's
+-- reveal is the one cast-side payment slot that lint admits.
 tapsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 tapsAsCost =
   let isTap component = case component of
