@@ -2716,6 +2716,10 @@ keywordPayloadFilters keyword = case keyword of
   -- may do, and "mana ability" is CR 605.1a's classification rather than a
   -- Filter.
   Keyword.SplitSecond -> []
+  -- CR 702.75a names no quality either: "the top N cards of your library" is a
+  -- position and a count, and both are written into the ability
+  -- Pawl.Engine.Keyword.hideaway mints.
+  Keyword.Hideaway _ -> []
   -- CR 702.77a's cost can carry one, as cycling's can; its N and "target
   -- creature" are written into the ability Pawl.Engine.Keyword mints.
   Keyword.Reinforce (Reinforce.MkReinforce _ cost) -> costFilters cost
