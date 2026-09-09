@@ -185,6 +185,12 @@ data Filter keyword
     -- Set intersection, for CR 201.4g's interchangeable names as much as CR
     -- 709.4a's, and vacuously False where the source has chosen no name.
     HasChosenName
+  | -- | CR 105.2: the candidate's colours include the one the SOURCE chose as it
+    -- entered (CR 614.1c), the two abilities linked by CR 607.2d -- Gauntlet of
+    -- Power's "creatures of the chosen color". HasColor above with the colour
+    -- read off the source instead of written on the card, and vacuously False
+    -- where the source has chosen none.
+    HasChosenColor
   | -- | CR 702.16k: the candidate is an object the protection carrier's chosen
     -- player controls, or one they own that no other player controls.
     OfChosenPlayer

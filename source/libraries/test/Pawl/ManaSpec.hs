@@ -3088,9 +3088,9 @@ autumnWillowBoard s registry = do
 -- again under another seat. A board of only the first could tell the mana
 -- specification from the Filter from the PlayerRelation not at all.
 --
--- Not transcribed: the printed "Creatures of the chosen color get +1/+1", which
--- wants a Filter arm reading Object.chosenColor (gap #3441). pawl's Gauntlet of
--- Power is that much STRICTER than the printing, never weaker.
+-- The printed "Creatures of the chosen color get +1/+1" is the card's other
+-- reader of the same choice, and Pawl.ColorSpec's "CR 607.2d two Gauntlets of
+-- Power each pump the creatures of their OWN chosen colour" is what proves it.
 gauntletOfPowerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 gauntletOfPowerSpec s registry = Spec.describe s "Gauntlet of Power" $ do
   Spec.it s "CR 106.12a a basic land tapped for the CHOSEN colour adds the Gauntlet's additional mana" $ do

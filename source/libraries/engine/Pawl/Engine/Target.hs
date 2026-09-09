@@ -400,7 +400,12 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- read off a PROTECTION quality, and a target slot's filter is
             -- neither of the four positions rule 702.16 reads one in.
             -- Pawl.CardSpec's position lint is what keeps a card out of the slot.
-            Filter.carrierChosenPlayer = Nothing
+            Filter.carrierChosenPlayer = Nothing,
+            -- Nothing, for the reason one field up: CR 607.2d links the chosen
+            -- colour to the affected clause printed beside the choice, and a
+            -- target slot's filter is not one -- so HasChosenColor is vacuously
+            -- False here (#3449).
+            Filter.sourceChosenColor = Nothing
           }
       evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated
