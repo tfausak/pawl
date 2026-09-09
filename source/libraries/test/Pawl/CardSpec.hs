@@ -3878,15 +3878,17 @@ playerEffectFilters playerEffect = case playerEffect of
 
 -- CR 707.9's "except ..." clauses. Only the GainKeywords arm reaches a Filter,
 -- and only through the keyword it names; CR 707.9b's other arms name a pair of
--- literals and three sets over the parts of CR 205.1's type line, none of which
--- narrows anything.
+-- literals, a name, and sets over the parts of CR 205.1's type line, none of
+-- which narrows anything.
 copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 copyExceptionFilters exception = case exception of
   CopyException.SetPowerToughness _ -> []
   CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
   CopyException.AddCardTypes _ -> []
   CopyException.AddSubtypes _ -> []
+  CopyException.AddSupertypes _ -> []
   CopyException.RemoveSupertypes _ -> []
+  CopyException.SetName _ -> []
   -- CR 707.9a's "this ability" carries no payload, so nothing to narrow. The
   -- ability it points at is the resolving one, which this walk reaches where the
   -- card prints it.

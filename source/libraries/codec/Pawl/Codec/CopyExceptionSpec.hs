@@ -7,6 +7,7 @@ import qualified Pawl.Codec.CopyException as CopyException
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Keyword as Keyword
@@ -56,12 +57,26 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
       (CopyException.AddSubtypes (Set.fromList [Subtype.Shapeshifter, Subtype.Rogue]))
       " {\"type\":\"AddSubtypes\",\"value\":[{\"type\":\"Rogue\"},{\"type\":\"Shapeshifter\"}]} "
 
+  Spec.it s "AddSupertypes round-trips, ascending by supertype" $
+    Common.assertCodec
+      s
+      CopyException.codec
+      (CopyException.AddSupertypes (Set.fromList [Supertype.Snow, Supertype.Legendary]))
+      " {\"type\":\"AddSupertypes\",\"value\":[{\"type\":\"Legendary\"},{\"type\":\"Snow\"}]} "
+
   Spec.it s "RemoveSupertypes round-trips, ascending by supertype" $
     Common.assertCodec
       s
       CopyException.codec
       (CopyException.RemoveSupertypes (Set.fromList [Supertype.Snow, Supertype.Legendary]))
       " {\"type\":\"RemoveSupertypes\",\"value\":[{\"type\":\"Legendary\"},{\"type\":\"Snow\"}]} "
+
+  Spec.it s "SetName round-trips as a bare string" $
+    Common.assertCodec
+      s
+      CopyException.codec
+      (CopyException.SetName (CardName.MkCardName (Text.pack "Sakashima the Impostor")))
+      " {\"type\":\"SetName\",\"value\":\"Sakashima the Impostor\"} "
 
   -- CR 707.9a's second arm is NULLARY, so the tag alone is the whole value.
   Spec.it s "GainThisAbility round-trips as a bare tag" $
