@@ -1722,7 +1722,7 @@ foretellCost keywords =
 -- Asked per SYMBOL because rule 702.51a answers differently for the two kinds it
 -- names: a colored mana wants a creature OF THAT COLOR and a generic mana any
 -- creature. Every other symbol answers Nothing, and two of them are worth
--- naming: CR 107.4b's {C} is colorless and so is not colored mana, and CR
+-- naming: CR 107.4c's {C} is colorless and so is not colored mana, and CR
 -- 107.4h's {S} is separated from generic mana by its own sentence. CR 601.2b has
 -- settled the hybrid and Phyrexian symbols before any caller asks
 -- (Pawl.Engine.Mana.announce), so a cost reaching here holds neither.

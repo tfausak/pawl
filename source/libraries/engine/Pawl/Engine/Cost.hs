@@ -674,7 +674,9 @@ totalManas adjustments =
 --
 -- The keywords are read off the object's own face rather than through the
 -- projection, selfReductions' posture and for its reason (#1859): this is the
--- half Cast.asProposed stamped.
+-- half Cast.asProposed stamped. So this reads the PRINTED face, and a spell that
+-- is a copy of a convoke spell finds no convoke here -- the pre-existing bound
+-- that carrier has, see #1859, and not something this function narrows.
 tapSubstitutions :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
 tapSubstitutions slots pid oid gs manaCost =
   let keywords = maybe Set.empty Face.keywords (Game.faceOf oid gs)
