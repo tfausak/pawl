@@ -141,6 +141,10 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   --
   -- CR 109.5's "your" is `pid`, the same player every arm above answers "your"
   -- with, and CR 109.4a pins it to the permanent's controller on the mana path.
+  --
+  -- Nimbus Maze is the producer on that path -- "{T}: Add {W}. Activate only if
+  -- you control an Island" -- and Pawl.ManaSpec's Nimbus Maze group is what proves
+  -- this arm gates both of CR 605.3a's windows.
   ActivationRestriction.OnlyIf condition ->
     Condition.holds
       (Projection.fullView gs)

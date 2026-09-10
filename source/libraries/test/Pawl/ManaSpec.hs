@@ -1200,7 +1200,8 @@ towerBoard tower victim =
 -- Ornitier and every other hit ride on "only once each turn" -- which is
 -- ActivationRestriction.OnlyOnceEachTurn and names no window either
 -- (translatorSpec below is where that arm is exercised on this road) -- or on
--- "only if <condition>", which is its OnlyIf arm and names no window, so neither
+-- "only if <condition>", which is its OnlyIf arm and names no window either
+-- (nimbusMazeSpec below is where that arm is exercised on this road), so neither
 -- kind reaches the phase axis this pair is about.
 --
 -- The two cases below are the SAME board at two moments, and the phase is the
@@ -1335,6 +1336,61 @@ laviniaBoard lavinia wretch piker active =
       (wretchId, g2) = S.addPermanent wretch S.alice g1
       (_, g3) = S.addGraveyardCard piker S.bob g2
    in (wretchId, g3 {GameState.activePlayer = active, GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- CR 602.5's board condition on the MANA path, which nothing in `data/cards/`
+-- reached before Nimbus Maze: "{T}: Add {W}. Activate only if you control an
+-- Island", beside an unridden "{T}: Add {C}" and a second ridden route on the
+-- same land. Barbarian Ring carries the arm on an ability CR 605.1a makes no
+-- mana ability, so ActivationRestriction.OnlyIf was asked at CR 605.3a's two
+-- windows by no card at all.
+--
+-- TWO BOARDS one SUBTYPE apart -- an Island against a Swamp, alice's and TAPPED
+-- on both, so the Maze is the only untapped source either board has and the
+-- refusal is the rider's rather than the supply's. A tapped land still answers
+-- CR 602.5's condition, which asks what she CONTROLS. Luminesce's printed cost
+-- is exactly {W}, so the Maze's own {C} route -- live on both boards -- pays
+-- nothing here.
+--
+-- NEITHER condition is one CR 601.2a's move can falsify: a card leaving a hand
+-- for the stack changes no permanent alice controls, so the gate's optimistic
+-- read of this arm and the payment's real one agree here, and this pair cannot
+-- observe the divergence #3192 is about.
+nimbusMazeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+nimbusMazeSpec s registry = Spec.describe s "Nimbus Maze" $ do
+  Spec.it s "CR 602.5 a board condition gates the ridden mana route at both of CR 605.3a's windows" $ do
+    maze <- S.printingOf s registry "Nimbus Maze"
+    luminesce <- S.printingOf s registry "Luminesce"
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    let board other =
+          let (otherId, withOther) = S.addPermanent other S.alice (S.landsInPlay maze 1)
+           in S.handOne luminesce ((S.tapObject otherId withOther) {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+        stillInHand other =
+          let (gs, oid) = board other
+           in elem oid (Game.zoneMembers Zone.Hand S.alice (snd (Engine.runGamePure paysWithWhite gs (S.cast S.alice oid))))
+        gate other = let (gs, oid) = board other in S.castable S.alice oid gs
+    -- The gameplay-level assertions: CR 601.2h's payment found the {W} on the one
+    -- board whose rider admits the route.
+    Spec.assertBool s (not (stillInHand island)) "CR 601.2a controlling an Island the rider admits the {W} and Luminesce leaves her hand"
+    Spec.assertBool s (stillInHand swamp) "CR 602.5 with a Swamp there instead the payment finds no {W} and it stays"
+    -- The offer gate on the same two boards: a window that disagreed with the
+    -- payment would show up as this list disagreeing with the pair above.
+    Spec.assertEqWith s "CR 118.3 the cast gate agrees with the payment on both boards" (fmap gate [island, swamp]) [True, False]
+
+-- CR 601.2g's two questions, asked while Luminesce's {W} is being paid: take the
+-- source offered -- the Maze is the board's only untapped one -- and tap it for
+-- the white yield. S.identityAnswer DECLINES a Prompt.ChooseManaSource, which
+-- makes every board fail to pay and the negative above pass vacuously.
+-- S.optionYielding falls back to the head of the offer, so a board that offers no
+-- {W} pays nothing rather than being repaired here.
+paysWithWhite :: Prompt.Prompt r -> r
+paysWithWhite p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  Prompt.ChooseManaYield _ _ _ candidates ->
+    S.optionYielding
+      (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}])
+      candidates
+  _ -> S.identityAnswer p
 
 isManaActivation :: Action.Type.Action -> Bool
 isManaActivation action = case action of
@@ -3310,6 +3366,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   lootSpec s registry
   translatorSpec s registry
   laviniaTurnRiderSpec s registry
+  nimbusMazeSpec s registry
   wellspringSpec s registry
   manaConfluenceSpec s registry
   phyrexianTowerSpec s registry
