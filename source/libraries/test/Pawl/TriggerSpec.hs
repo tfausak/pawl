@@ -1239,9 +1239,9 @@ delayedSpec s registry =
           Spec.assertEqWith s "and was evicted" (Seq.length survivors) 0
         -- Synthetic Deferred Rally {W} Instant: "At the beginning of the next
         -- end step, if you control a creature, you gain 2 life." A LABELED
-        -- CRUTCH (#851): every printed delayed ability with an intervening "if"
-        -- asks whether a named card was cast, played or is still in some zone,
-        -- and neither Quantity nor Filter can name a card. CR 603.4 and
+        -- CRUTCH: every printed delayed ability with an intervening "if" asks
+        -- whether a named card was cast, played or is still in some zone, and
+        -- neither Quantity nor Filter can name a card. CR 603.4 and
         -- CR 603.7b meeting on one ability: the first end step's event matches,
         -- but the intervening "if" is false, so the ability does not TRIGGER --
         -- and CR 603.7b bounds how many times it triggers, not how many events
