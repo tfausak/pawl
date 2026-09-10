@@ -343,11 +343,12 @@ reaches is a capability the design forbids building anyway.
 - **Measure the suite count, never infer it.** Report before -> after, and say
   so again after any merge from `origin/main` moved the baseline.
 - **Landing a capability a census tracks means editing the census in the same
-  PR** --- #876 (CR 701 keyword actions) and #877 (CR 702 keyword abilities).
-  Nothing checks the two bodies, so every row is
-  yours: the eponymous case, a row landed under another name, and a row under
-  no constructor of the tracked type at all. Re-read the row as it stands --- a
-  PR earlier in the same session may already have edited it.
+  PR** --- #876 (CR 701 keyword actions). Nothing checks its body, so every row
+  is yours: the eponymous case, a row landed under another name, and a row
+  under no constructor of the tracked type at all. Re-read the row as it stands
+  --- a PR earlier in the same session may already have edited it. CR 702's
+  keyword abilities are one issue each rather than a census; closing one means
+  closing that issue.
 - **Landing a capability means reading what it unblocked**; `CLAUDE.md` has the
   query. Say in the PR which dependents are now workable.
 - **Closing #N means re-deriving every inline `(#N)` in the tree**, not just
