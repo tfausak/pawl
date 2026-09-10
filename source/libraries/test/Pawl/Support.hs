@@ -3445,6 +3445,10 @@ stubView table oid =
                 Filter.declaredBlockerThisCombat = False,
                 Filter.milledThisTurn = False,
                 Filter.dealtDamageThisTurn = False,
+                -- CR 702.122c: the table registers no crewing, and no Count in
+                -- the pool filters by one, so CrewedSourceThisTurn is vacuously
+                -- False against this stub.
+                Filter.crewedThisTurn = Set.empty,
                 -- CR 302.6: the table registers no sickness, and no Count in the
                 -- pool filters by one, so ControlledSinceTurnBegan is vacuously
                 -- False against this stub.
