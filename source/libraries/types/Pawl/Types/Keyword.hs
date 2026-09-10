@@ -206,6 +206,16 @@ data Keyword
     -- Not implemented: CR 702.49d's commander ninjutsu, which also functions
     -- from the command zone (#3436).
     Ninjutsu (Cost.Cost Keyword)
+  | -- | 702.51a: for each colored mana in this spell's total cost you may tap an
+    -- untapped creature of that color you control rather than pay that mana, and
+    -- for each generic mana an untapped creature you control. CR 702.51b puts it
+    -- after the total cost is determined, so the offer lives in
+    -- Pawl.Engine.Cost.tapSubstitutions rather than among the candidate costs;
+    -- CR 702.51d makes a second instance redundant, which a Set already is.
+    --
+    -- Not implemented: CR 702.51c's record of which creatures convoked the spell,
+    -- which Venerated Loxodon's entry trigger reads (#3583).
+    Convoke
   | -- | 702.54a: bloodthirst N -- if an opponent was dealt damage this turn, this
     -- permanent enters with N +1/+1 counters on it; a CR 614.1c entry replacement
     -- carrying its own condition, each instance applying separately (CR 702.54c).
@@ -375,6 +385,12 @@ data Keyword
     -- types." A deck-construction ability like Partner above, read by
     -- Pawl.Engine.Commander.designations.
     DoctorsCompanion
+  | -- | 702.126a: for each generic mana in this spell's total cost you may tap an
+    -- untapped artifact you control rather than pay that mana. Convoke's
+    -- neighbour above in every respect -- CR 702.126b places it where CR 702.51b
+    -- places that one and CR 702.126c makes a second instance redundant -- and
+    -- narrower in two: artifacts rather than creatures, and no colored mana.
+    Improvise
   | -- | 702.127a: three static abilities in one word -- cast this half from your
     -- graveyard, never from anywhere else, and exile it as it leaves the stack.
     Aftermath

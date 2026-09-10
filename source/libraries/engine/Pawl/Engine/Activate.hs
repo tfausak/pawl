@@ -457,13 +457,13 @@ payableCostGiven aimable sources pcs = payableCostAtGiven aimable sources pcs 0
 -- announcement exposes.
 payableCostAt :: [Map.Map SlotName (Set.Set ObjectId)] -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt aimable x family pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) Cost.noTapSubstitutions (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven aimable sources pcs x family pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) Cost.noTapSubstitutions (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
 
 -- CR 601.2f's totalling asked where CR 601.2c's targets do not exist yet: the
 -- predicate holds if SOME aiming this activation could still take leaves the

@@ -86,6 +86,8 @@ import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -334,6 +336,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Station -> []
   -- CR 702.89a states a REPLACEMENT and nothing else; see mintedReplacementsFor.
   Keyword.UmbraArmor -> []
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
 
 -- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
 -- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
@@ -481,6 +485,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   -- battlefieldAbilitiesFor and not to this hand roster.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
@@ -827,6 +833,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- crew's reading above.
   Keyword.Station -> List.genericReplicate count station
   Keyword.UmbraArmor -> []
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
 
 -- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
@@ -1337,6 +1345,12 @@ permissionsFor cardTypes keyword = case keyword of
   -- CR 702.184a permits no casting; the station card is cast for its own cost.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
+  -- CR 702.51b and CR 702.126b grant no permission and mint no ability: each is
+  -- a substitute for part of a total cost already determined, which is CR 601.2h
+  -- and not CR 601.3. Pawl.Engine.Cost.tapSubstitutions is where the offer lives,
+  -- Bestow's arm above and for its reason.
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
@@ -1700,6 +1714,55 @@ foretellCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
+-- CR 702.51a / 702.126a: the permanents these keywords let the caster TAP rather
+-- than pay ONE stated mana of a spell's total cost, as a criterion over the
+-- battlefield -- Nothing where no keyword here offers a substitute for that
+-- symbol, which is every symbol on a spell with neither keyword.
+--
+-- Asked per SYMBOL because rule 702.51a answers differently for the two kinds it
+-- names: a colored mana wants a creature OF THAT COLOR and a generic mana any
+-- creature. Every other symbol answers Nothing, and two of them are worth
+-- naming: CR 107.4c's {C} is colorless and so is not colored mana, and CR
+-- 107.4h's {S} is separated from generic mana by its own sentence. CR 601.2b has
+-- settled the hybrid and Phyrexian symbols before any caller asks
+-- (Pawl.Engine.Mana.announce), so a cost reaching here holds neither.
+--
+-- The criterion is MINTED here rather than printed, rule 702's own words being
+-- what says which permanents are eligible -- so CR 612.2 has no word of a card's
+-- to swap in it (Pawl.Engine.Filter's rewriteKeyword), and Pawl.CardSpec's
+-- filter traversals never see it.
+--
+-- Or'd where a spell carries BOTH keywords, since either ability may pay a given
+-- generic mana; CR 702.51d and CR 702.126c make a second instance of ONE of them
+-- redundant, which a Set already is.
+--
+-- The case is a WILDCARD, morphCost's caveat and for its reason: a new keyword
+-- stating this kind of substitute owes an arm here, and -Werror will not ask for
+-- it.
+tapSubstituteFor :: ManaSymbol.ManaSymbol -> Set Keyword -> Maybe (Filter Keyword)
+tapSubstituteFor symbol keywords =
+  let untapped cardType narrower =
+        Filter.And
+          ( [ Filter.HasCardType cardType,
+              Filter.Not Filter.IsTapped,
+              Filter.ControlledBy PlayerRelation.You
+            ]
+              <> narrower
+          )
+      criterionOf keyword = case keyword of
+        Keyword.Convoke -> case symbol of
+          ManaSymbol.Generic _ -> Just (untapped CardType.Creature [])
+          ManaSymbol.OfType (ManaType.Colored color) -> Just (untapped CardType.Creature [Filter.HasColor color])
+          _ -> Nothing
+        Keyword.Improvise -> case symbol of
+          ManaSymbol.Generic _ -> Just (untapped CardType.Artifact [])
+          _ -> Nothing
+        _ -> Nothing
+   in case Maybe.mapMaybe criterionOf (Set.toAscList keywords) of
+        [] -> Nothing
+        [one] -> Just one
+        many -> Just (Filter.Or many)
+
 -- The one exile CR 702.34a, CR 702.127a and CR 702.133a all print, in the same
 -- words. Filter.IsSource, because the rule says "this card". `whenDestination =
 -- Nothing` is the rule's "instead of putting it anywhere else" -- every
@@ -2062,6 +2125,8 @@ mintedReplacementsFor keyword count = case keyword of
   -- apiece, and the two rows are equal values told apart by the instance ordinal
   -- Replacement.collect assigns.
   Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR DestructionRewrite.UmbraArmor)
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
@@ -2243,6 +2308,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- decides whether the permanent is a creature at all.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
@@ -2457,6 +2524,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- CR 702.89a says nothing about what the Aura may enchant; each printing
   -- states its own "enchant creature".
   Keyword.UmbraArmor -> []
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
 -- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
@@ -2619,6 +2688,8 @@ familyOf keyword = case keyword of
   Keyword.Station -> Nothing
   -- CR 702.89a carries no parameter, so there is no family to name it by.
   Keyword.UmbraArmor -> Nothing
+  Keyword.Convoke -> Nothing
+  Keyword.Improvise -> Nothing
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.
@@ -3917,9 +3988,9 @@ stackTriggeredAbilitiesOf keywords =
 -- comes of the second read -- the walk stops at the first match, so exactly one
 -- exiled card can satisfy it, and EachCardFromAmong asks nobody anything.
 --
--- Filter.ManaValueLessThanSource and not a literal, because "this spell's mana
--- value" is read off the SPELL (CR 202.3): a cascade an effect grants to an X
--- spell reads the announced X, which no minter could have baked.
+-- Filter.ManaValueLessThanSource and not a literal, because CR 613.2a moves the
+-- spell's mana cost under layer 1: a cascade spell that is a copy of something
+-- else measures the copied cost, which no minter could have baked.
 --
 -- Not implemented: CR 702.85b's "as you cascade" window, the action another
 -- effect takes over the exiled batch between the walk and the cast decision
