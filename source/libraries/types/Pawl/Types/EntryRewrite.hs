@@ -99,8 +99,9 @@ data EntryRewrite effect
     -- payload's CounterKind names, or is read back through a
     -- characteristic-defining ability where that is Nothing (Wood Elemental).
     --
-    -- Not implemented: CR 702.82a's devour, which is this shape with a
-    -- per-permanent multiplier (#3486).
+    -- CR 702.82a's devour is this shape with a per-permanent multiplier, minted
+    -- from the projection by Pawl.Engine.Keyword.mintedReplacementsFor rather
+    -- than written by a card.
     SacrificeAnyNumber SacrificeAnyNumber.SacrificeAnyNumber
   | -- | CR 614.1c / 614.13 / Living Lore: exile one card matching the Filter out
     -- of the entering permanent's controller's graveyard as it enters. CR 614.14

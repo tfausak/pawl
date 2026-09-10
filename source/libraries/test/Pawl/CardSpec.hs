@@ -2760,6 +2760,10 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Infect -> []
   -- CR 702.80a names no quality either: what it changes is where damage goes.
   Keyword.Wither -> []
+  -- CR 702.82a names no quality: rule 702.82a's "creatures" is written into the
+  -- row Pawl.Engine.Keyword mints, not into the keyword. CR 702.82c's quality
+  -- variant is what would put one here (#3599).
+  Keyword.Devour _ -> []
   -- CR 702.83a names no quality: "a creature you control" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Exalted -> []
@@ -4002,7 +4006,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- BOTH fields: the permanents the sacrifice may take, and CR 122.1b's kind
   -- the entering permanent takes one of per sacrifice, which may be a whole
   -- Keyword carrying a Filter; see #2728.
-  EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f kind) -> unframed [f] <> concatMap counterKindFilters (Maybe.maybeToList kind)
+  EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f kind _) -> unframed [f] <> concatMap counterKindFilters (Maybe.maybeToList kind)
   -- CR 614.1c's as-enters effects hold no Filter of their own; the ones inside
   -- them are reached as ordinary effect filters, through cardResolutionEffects.
   EntryRewrite.RunEffects _ -> []

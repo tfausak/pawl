@@ -35,6 +35,7 @@
               "rewrite": {
                 "type": "SacrificeAnyNumber",
                 "value": {
+                  "each": 1,
                   "filter": {
                     "type": "And",
                     "value": [

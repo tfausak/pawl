@@ -118,6 +118,8 @@ data KeywordFamily
     Hideaway
   | -- | CR 702.77a: reinforce N-[cost].
     Reinforce
+  | -- | CR 702.82a: devour N.
+    Devour
   | -- | CR 702.84a: unearth [cost]. The family a card writing "a creature card
     -- with unearth" names, as against unearth {B}; no card in the pool asks yet,
     -- and it is owed at the keyword rather than at the first asker.

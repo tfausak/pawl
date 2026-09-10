@@ -284,6 +284,12 @@ data Keyword
     -- instead its controller puts that many -1/-1 counters on that creature (CR
     -- 120.3d).
     Wither
+  | -- | 702.82a: devour N -- as this object enters, you may sacrifice any number
+    -- of creatures, and it enters with N +1/+1 counters for each.
+    --
+    -- Not implemented: CR 702.82c's devour [quality], whose sacrifice names a
+    -- quality rather than "creature" -- Caprichrome's devour artifact (#3599).
+    Devour Natural.Natural
   | -- | 702.83a: whenever a creature you control attacks alone, that creature
     -- gets +1/+1 until end of turn. Two instances are two abilities.
     Exalted

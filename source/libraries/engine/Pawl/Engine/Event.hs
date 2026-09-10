@@ -2218,7 +2218,7 @@ apply batch candidate event =
       -- and CAN be unpayable (Frankenstein's Monster's X) would need the forward
       -- check the rule literally describes; no EntryRewrite arm carries one
       -- (#1395).
-      EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber criterion kind) -> do
+      EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber criterion kind each) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         case Projection.controllerOf oid gs of
@@ -2263,7 +2263,11 @@ apply batch candidate event =
             State.modify' $ \gs2 ->
               let note obj = obj {Object.bindings = Map.insert Binding.sacrificedCount (Binding.toAmount many) (Object.bindings obj)}
                in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
-            Monad.mapM_ (\k -> addEnteringCounters oid k many) kind
+            -- CR 702.82a's "N +1/+1 counters ... for each creature sacrificed this
+            -- way": the multiplier scales the COUNTERS, never the recorded count,
+            -- which rule 702.82b keeps as the number of permanents. Shimatsu the
+            -- Bloodcloaked's "that many" is this with `each` at 1.
+            Monad.mapM_ (\k -> addEnteringCounters oid k (each * many)) kind
             pure (Just event)
       -- CR 614.1c: "as this creature enters, exile an instant or sorcery card from
       -- your graveyard" (Living Lore). The arm above one zone over -- what it
