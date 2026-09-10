@@ -4302,15 +4302,16 @@ data Framing
     -- filter" to that lint, and a stored Effect.Replace's row would otherwise
     -- appear on one side of the comparison and not the other.
     ReplacementRowFramed
-  | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's -- and CR 201.4a's
-    -- naming restriction, Effect.ChooseCardName's: the two card-authored
-    -- positions whose candidates are never objects in the game. The first is
-    -- matched by Pawl.Engine.Event.eligible and the second by
-    -- Pawl.Interpreter.legalCardName, both against a printed FACE
-    -- (Pawl.Engine.Projection.View.viewOfCard). Marked not because their
+  | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's -- CR 201.4a's
+    -- naming restriction, Effect.ChooseCardName's, and CR 702.85a's offer
+    -- restriction, CastOffer.restriction's: the card-authored positions whose
+    -- candidate is a printed FACE rather than an object in the game: matched by
+    -- Pawl.Engine.Event.eligible, by Pawl.Interpreter.legalCardName and by
+    -- Pawl.Engine.Resolve.Effect.offerCast, each against
+    -- Pawl.Engine.Projection.View.viewOfCard. Marked not because their
     -- evaluators FILL a field the others leave empty but because that candidate
     -- view leaves one empty which every other position fills -- `identity` -- so
-    -- Filter.IsBound is a silent False in these two and nowhere else.
+    -- Filter.IsBound is a silent False in these and nowhere else.
     OutsideTheGameFramed
   | -- | A KEYWORD's own Filter -- CR 702.29e's typecycling predicate, CR 702.11d's
     -- "hexproof from", a cost-carrying keyword's CostComponent.Sacrifice, and CR
@@ -4494,8 +4495,8 @@ standingHosted = fmap ((,) StandingHostFramed)
 searchFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 searchFramed = fmap ((,) SearchFramed)
 
--- Tag a Filter position as a WISH's, the one position matched against a printed
--- face rather than against an object (CR 400.11c).
+-- Tag a Filter position as a WISH's -- matched against a printed face rather than
+-- against an object (CR 400.11c), which CR 702.85a's offer restriction is too.
 outsideTheGameFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 outsideTheGameFramed = fmap ((,) OutsideTheGameFramed)
 
@@ -4831,8 +4832,8 @@ effectFilters effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
-  -- Both halves the opcode can hold a Filter in: the reference, and CR 118.9's
-  -- stated alternative cost. The cost half is SlotlessCostFramed, and NOT because
+  -- All THREE positions the opcode can hold a Filter in: the reference, CR 118.9's
+  -- stated alternative cost, and CR 702.85a's `restriction`. The cost half is SlotlessCostFramed, and NOT because
   -- the announcement has no slots: CR 608.2g sends the offered cast through rule
   -- 601.2a-i, so Cast.castSpellWith stamps rule 601.2c's targets before Cost.pay
   -- reads them through Cost.announcedSlots -- which is why alternativeCostFilters
@@ -4845,9 +4846,17 @@ effectFilters effect = case effect of
   -- all three pass, so neutralising it shrinks the suite without reddening it. It
   -- is here so the card that writes a filter this lint would reject cannot escape
   -- through the one Filter position the opcode's own arm did not report.
+  -- The restriction is OutsideTheGameFramed, the WISH's framing, for that
+  -- constructor's own reason rather than by analogy: offerCast matches it against
+  -- Projection.View.viewOfCard of the half being offered (CR 709.3a), so the
+  -- candidate is a printed face and Filter.IsBound is a silent False here as it is
+  -- in a wish. The resolution's slots ARE supplied -- the context is
+  -- Resolve.Slots.effectContext's -- so the singular-slot sweep that framing
+  -- carries can only reject more.
   Effect.OfferCast offer ->
     frame SourceHostFramed (objectRefFilters (OfferCast.ref offer))
       <> slotlessCost (foldMap costFilters (CastOffer.payingInstead (OfferCast.offer offer)))
+      <> outsideTheGameFramed (Maybe.maybeToList (CastOffer.restriction (OfferCast.offer offer)))
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
   -- take them out of the lint without failing anything.

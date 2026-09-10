@@ -3921,6 +3921,10 @@ stackTriggeredAbilitiesOf keywords =
 -- value" is read off the SPELL (CR 202.3): a cascade an effect grants to an X
 -- spell reads the announced X, which no minter could have baked.
 --
+-- Not implemented: CR 702.85b's "as you cascade" window, the action another
+-- effect takes over the exiled batch between the walk and the cast decision
+-- (#3580).
+--
 -- The offer carries the SAME atom as CR 702.85a's second condition, and that is
 -- the whole of its work: the card's mana value is already less by the walk, so
 -- what is left to ask is the RESULTING spell's -- an adventurer card's other
