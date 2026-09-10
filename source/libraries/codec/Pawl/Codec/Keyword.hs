@@ -104,6 +104,7 @@ codec =
       Arm.nullary "Infect" Keyword.Infect,
       Arm.nullary "Wither" Keyword.Wither,
       Arm.nullary "Exalted" Keyword.Exalted,
+      Arm.payload "Unearth" (Cost.codec codec) Keyword.Unearth (\x -> case x of Keyword.Unearth y -> Just y; _ -> Nothing),
       Arm.nullary "Mentor" Keyword.Mentor,
       Arm.payload "Afterlife" Common.natural Keyword.Afterlife (\x -> case x of Keyword.Afterlife y -> Just y; _ -> Nothing),
       Arm.nullary "Provoke" Keyword.Provoke,

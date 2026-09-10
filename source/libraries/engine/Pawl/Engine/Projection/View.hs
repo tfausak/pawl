@@ -255,15 +255,16 @@ viewOfCard face =
           -- printed face.
           Filter.manaSpentTags = Set.empty,
           -- CR 602.1 / 605.1a off the PRINTED face: the card's printed abilities
-          -- plus rule 702's HAND ones (CR 702.29b, CR 702.77b), not the
-          -- battlefield ones, which are minted from the post-layer keyword map.
+          -- plus rule 702's HAND ones (CR 702.29b, CR 702.77b) and GRAVEYARD ones
+          -- (CR 702.84a), not the battlefield ones, which are minted from the
+          -- post-layer keyword map.
           Filter.nonManaActivatedAbility =
             not
               ( all
                   ManaAbility.isManaAbility
-                  (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face))
+                  (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face) <> Keyword.graveyardAbilitiesOf (Face.keywords face))
               ),
-          -- CR 602.1 over the same two lists, without CR 605.1a's exclusion --
+          -- CR 602.1 over the same three lists, without CR 605.1a's exclusion --
           -- Zirda, the Dawnwaker's companion condition is read here, since a card
           -- outside the game has no object to project.
           --
@@ -271,7 +272,7 @@ viewOfCard face =
           -- view builder shares: a Mountain must answer the same here as it does
           -- on the battlefield.
           Filter.hasActivatedAbility =
-            not (null (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face)))
+            not (null (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face) <> Keyword.graveyardAbilitiesOf (Face.keywords face)))
               || Subtype.intrinsicManaAbility (TypeLine.types typeLine) (TypeLine.subtypes typeLine),
           -- CR 702.184c reaches a permanent's CONTROLLER; this builder describes
           -- a printed FACE with no controller and no board to grant it one.
@@ -1404,9 +1405,10 @@ functionsFromZone zone sa =
 -- abilitiesGiven with the projection already in hand -- the half
 -- viewOfCharacteristics calls.
 --
--- CR 702.29b and CR 702.77b are why handAbilitiesOf is in this list: a cycling
--- or reinforce ability exists in every zone, so the object HAS it here; it just
--- cannot be activated here (CR 113.6m).
+-- CR 702.29b and CR 702.77b are why handAbilitiesOf is in this list, and CR
+-- 702.84a why graveyardAbilitiesOf is beside it: a cycling, reinforce or unearth
+-- ability exists in every zone, so the object HAS it here; it just cannot be
+-- activated here (CR 113.6m).
 --
 -- CR 613.1: the gate's board comes in as a parameter. Taking fullView here would
 -- not terminate for a caller inside the fold -- it re-enters `gather`, with no
@@ -1435,6 +1437,7 @@ abilitiesFromCharacteristics peers pc oid gs =
         ( PC.activatedAbilities pc
             <> Keyword.battlefieldAbilitiesOf (PC.keywords pc)
             <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords pc))
+            <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords pc))
         )
 
 -- CR 115.1: what a stack object TARGETS -- the recipients under its declared

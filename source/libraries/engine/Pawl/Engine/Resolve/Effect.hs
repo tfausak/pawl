@@ -4454,10 +4454,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
         -- Three of the four arrivals are no zone change -- the card was in no
-        -- zone to leave -- so nothing triggers and nothing is revealed. The
-        -- BATTLEFIELD is the exception and takes its own road below, because CR
-        -- 616.1's entry loop and CR 603.6a's trigger scan both have to see a
-        -- permanent enter.
+        -- zone to leave -- so nothing triggers and nothing is revealed. The rule
+        -- behind that: CR 603.6 makes a "put into a graveyard from anywhere"
+        -- ability a zone-change trigger, CR 603.6c's last sentence naming that
+        -- wording outright, and CR 400.6's event moves an object from one zone to
+        -- another, so a materialization is no event such a trigger or a CR 614.1
+        -- replacement can see. Pawl.ConjureSpec's Planar Void case proves it,
+        -- against a cast Think Twice reaching the same graveyard on the same
+        -- board.
+        --
+        -- The BATTLEFIELD is the exception and takes its own road below, because
+        -- CR 616.1's entry loop and CR 603.6a's trigger scan both have to see a
+        -- permanent enter: that scan reads the event that PUTS a permanent there
+        -- rather than a zone change, CR 111.2's token being the CR's own object
+        -- that enters having left no zone.
         --
         -- Not implemented: a stated library position. Every arrival takes
         -- LibraryPosition.defaultValue, which is the BOTTOM, and the printings

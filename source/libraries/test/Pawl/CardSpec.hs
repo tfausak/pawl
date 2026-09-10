@@ -2751,6 +2751,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.BattleCry -> []
   -- CR 702.107a's payload is a COST, and a cost's Filters are its components'.
   Keyword.LevelUp cost -> costFilters cost
+  Keyword.Unearth cost -> costFilters cost
   Keyword.Outlast cost -> costFilters cost
   -- CR 702.108a names no quality either: the "+1/+1" and the noncreature-spell
   -- condition are written into the ability Pawl.Engine.Keyword mints, not into

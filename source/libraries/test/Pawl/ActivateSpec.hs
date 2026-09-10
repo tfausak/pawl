@@ -143,6 +143,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   textChangedTargetSpec s registry
   textChangedOfferedCostSpec s registry
   graveyardEffectZoneSpec s registry
+  unearthSpec s registry
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
   activationCostReductionSpec s registry
@@ -2952,6 +2953,130 @@ graveyardEffectZoneSpec s registry = Spec.describe s "GraveyardEffectZone" $ do
         -- about the Skeleton by name rather than about the battlefield at large.
         Spec.assertEqWith s "returned tapped (CR 110.5b)" (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid after)) skeletons) [Just TapState.Tapped]
       abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
+
+-- alice with a Dregscape Zombie in her graveyard, a SECOND Dregscape Zombie
+-- already on the battlefield, one untapped Swamp and priority in her postcombat
+-- main phase, with the end step and the cleanup step still scheduled. Returns the
+-- graveyard card's id and the battlefield twin's.
+--
+-- The twin is the control every case below leans on: the same card, the same
+-- controller, the same board, differing only in having reached the battlefield
+-- without rule 702.84a's ability. Without it "the Zombie has haste", "the Zombie
+-- was exiled" and "the Zombie is gone at the end step" are all facts about
+-- Dregscape Zombies rather than about unearth.
+zombieBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+zombieBoard zombie swamp =
+  let (twinId, withTwin) = S.addPermanent zombie S.alice (S.landsInPlay swamp 1)
+      (gyId, withCard) = S.addGraveyardCard zombie S.alice withTwin
+   in ( gyId,
+        twinId,
+        withCard
+          { GameState.priority = Just S.alice,
+            GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PostcombatMain,
+            GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+          }
+      )
+
+-- Is this object a Dregscape Zombie? namedSkeleton's reason one card over: CR
+-- 400.7 mints a fresh id as the card leaves the graveyard.
+namedZombie :: GameState.GameState -> ObjectId.ObjectId -> Bool
+namedZombie gs oid = case Game.faceOf oid gs of
+  Nothing -> False
+  Just face -> Face.name face == CardName.MkCardName (Text.pack "Dregscape Zombie")
+
+-- Activate the one ability the graveyard card offers and resolve it, then find the
+-- permanent it returned -- by name and not by id (CR 400.7), excluding the ids the
+-- caller already knows about. The roster is matched on exactly one ability, so a
+-- board that offered none or two fails here rather than silently elsewhere.
+unearthZombie :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId] -> (GameState.GameState, [ObjectId.ObjectId])
+unearthZombie gyId gs excluded =
+  case Activate.abilitiesFor gyId gs of
+    [ability] ->
+      let after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+          arrivals = filter (\oid -> namedZombie after oid && notElem oid excluded) (Game.zoneMembers Zone.Battlefield S.alice after)
+       in (after, arrivals)
+    _ -> (gs, [])
+
+-- How many Dregscape Zombies alice owns in `zone`. Counted by NAME rather than by
+-- id because CR 400.7 mints a fresh one on every zone change, so neither the
+-- unearthed permanent nor the twin keeps its id on the way out of the battlefield.
+zombiesIn :: Zone.Zone -> GameState.GameState -> Int
+zombiesIn zone gs = length (filter (namedZombie gs) (Game.zoneMembers zone S.alice gs))
+
+-- Mark `n` damage on one permanent, which is all a 2/1 needs for CR 704.5g to
+-- reach it once state-based actions are checked.
+withDamage :: Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withDamage n oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.damage = n}) oid (GameState.objects gs)}
+
+-- CR 702.84a, every sentence of it: "[Cost]: Return this card from your graveyard
+-- to the battlefield. It gains haste. Exile it at the beginning of the next end
+-- step. If it would leave the battlefield, exile it instead of putting it anywhere
+-- else. Activate only as a sorcery."
+--
+-- Dregscape Zombie {1}{B} Creature -- Zombie 2/1, "Unearth {B}" (Oracle text
+-- checked against Scryfall). Chosen because its printed text is that keyword and
+-- nothing else, so no second ability's effects have to be told apart from rule
+-- 702.84a's.
+--
+-- Reassembling Skeleton proves the CR 113.6m half of the same offer at
+-- graveyardEffectZoneSpec above; what is new here is that the ability is MINTED
+-- from a keyword rather than printed, and that three of its four sentences act on
+-- the permanent the first one created.
+unearthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+unearthSpec s registry = Spec.describe s "Unearth (CR 702.84)" $ do
+  -- The offer and the first two sentences.
+  Spec.it s "CR 702.84a unearth returns the card from the graveyard with haste" $ do
+    zombie <- S.printingOf s registry "Dregscape Zombie"
+    swamp <- S.printingOf s registry "Swamp"
+    let (gyId, twinId, gs) = zombieBoard zombie swamp
+    Spec.assertBool s (any (isActivationOf gyId) (Action.legalActions S.alice gs)) "the unearth activation is offered from the graveyard"
+    -- CR 113.6m, which the twin on the SAME board is the control for: the ability
+    -- the projection now hands a battlefield creature with unearth (CR 702.84a's
+    -- ability exists in every zone, cycling's reading) is still offered to nobody
+    -- there, because rule 702.84a's return names the graveyard as its origin.
+    Spec.assertBool s (not (any (isActivationOf twinId) (Action.legalActions S.alice gs))) "CR 113.6m but not from the battlefield"
+    -- CR 602.5d, rule 702.84a's last sentence. Same board, same priority, same
+    -- Swamp -- only the phase differs, so nothing but the timing restriction can
+    -- withhold it.
+    Spec.assertBool
+      s
+      (not (any (isActivationOf gyId) (Action.legalActions S.alice (gs {GameState.phase = Phase.Ending EndingStep.EndStep}))))
+      "CR 602.5d and not in the end step"
+    case unearthZombie gyId gs [twinId] of
+      (after, [backId]) -> do
+        Spec.assertBool s (Projection.hasKeyword Keyword.Haste backId after) "CR 702.84a the returned permanent has haste"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste twinId after)) "while the Dregscape Zombie beside it does not"
+        Spec.assertEqWith s "and the graveyard is empty" (Game.zoneMembers Zone.Graveyard S.alice after) []
+      (_, other) -> Spec.assertEqWith s "exactly one Zombie returned to the battlefield" (length other) 1
+  -- CR 702.84a's fourth sentence, through CR 704.5g. The twin takes the same one
+  -- damage on the same board, so "a dead 2/1 is exiled" cannot pass this.
+  Spec.it s "CR 702.84a the unearthed permanent that dies is exiled instead" $ do
+    zombie <- S.printingOf s registry "Dregscape Zombie"
+    swamp <- S.printingOf s registry "Swamp"
+    let (gyId, twinId, gs) = zombieBoard zombie swamp
+    case unearthZombie gyId gs [twinId] of
+      (after, [backId]) -> do
+        let dead = S.settleSba (withDamage 1 twinId (withDamage 1 backId after))
+        Spec.assertEqWith s "CR 702.84a the unearthed Zombie is in exile" (zombiesIn Zone.Exile dead) 1
+        Spec.assertEqWith s "CR 704.5g while the one beside it went to the graveyard" (zombiesIn Zone.Graveyard dead) 1
+        Spec.assertEqWith s "and neither is on the battlefield" (zombiesIn Zone.Battlefield dead) 0
+      (_, other) -> Spec.assertEqWith s "exactly one Zombie returned to the battlefield" (length other) 1
+  -- CR 702.84a's third sentence and CR 513.2 behind it: the delayed ability was
+  -- created during the postcombat main phase, so the END STEP of this same turn is
+  -- the "next" one. Two steps run -- the rest of the main phase and the end step
+  -- itself, whose priority is where the triggered ability resolves.
+  Spec.it s "CR 513.2 the unearthed permanent is exiled at the beginning of the next end step" $ do
+    zombie <- S.printingOf s registry "Dregscape Zombie"
+    swamp <- S.printingOf s registry "Swamp"
+    let (gyId, twinId, gs) = zombieBoard zombie swamp
+    case unearthZombie gyId gs [twinId] of
+      (after, [_]) -> do
+        let ended = List.foldl' (\g _ -> S.runPure S.identityAnswer g Engine.runStep) after [1 .. (2 :: Int)]
+        Spec.assertEqWith s "CR 702.84a the unearthed Zombie is in exile" (zombiesIn Zone.Exile ended) 1
+        Spec.assertBool s (S.onBattlefield twinId ended) "while the Dregscape Zombie beside it is still on the battlefield"
+        Spec.assertEqWith s "and the delayed ability is spent" (Seq.length (GameState.delayedTriggers ended)) 0
+      (_, other) -> Spec.assertEqWith s "exactly one Zombie returned to the battlefield" (length other) 1
 
 -- alice with Jarad, Golgari Lich Lord in her graveyard, one untapped Bayou, and
 -- one extra land per printing in `extras`, holding priority.
