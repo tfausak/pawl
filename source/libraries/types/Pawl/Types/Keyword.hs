@@ -427,6 +427,14 @@ data Keyword
     -- counter on it. If you don't, it gains haste." A CR 614.1c as-enters
     -- replacement; each instance works separately (CR 702.136b).
     Riot
+  | -- | 702.138a: "escape--[cost]" -- you may cast this card from your graveyard
+    -- by paying [cost] rather than paying its mana cost, which CR 601.2b and CR
+    -- 601.2f-h price as an alternative cost.
+    --
+    -- Not implemented: CR 702.138b's "escaped" designation, and with it CR
+    -- 702.138c's "escapes with [counters]" and CR 702.138d's "escapes with
+    -- [ability]" (#3603).
+    Escape (Cost.Cost Keyword)
   | -- | 702.139a: "Companion--[Condition]" -- reveal this card from outside the
     -- game before the game begins if your starting deck fulfills the condition
     -- (CR 103.2b), then once during the game pay {3} to put it into your hand (CR
