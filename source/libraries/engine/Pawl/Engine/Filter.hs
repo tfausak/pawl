@@ -2208,6 +2208,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Ninjutsu cost -> Keyword.Type.Ninjutsu (rewriteCost pairs cost)
   Keyword.Type.CumulativeUpkeep cost -> Keyword.Type.CumulativeUpkeep (rewriteCost pairs cost)
   Keyword.Type.LevelUp cost -> Keyword.Type.LevelUp (rewriteCost pairs cost)
+  Keyword.Type.Unearth cost -> Keyword.Type.Unearth (rewriteCost pairs cost)
   Keyword.Type.Outlast cost -> Keyword.Type.Outlast (rewriteCost pairs cost)
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword

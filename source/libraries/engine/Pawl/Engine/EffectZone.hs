@@ -67,9 +67,11 @@ import Pawl.Types.Zone (Zone)
 -- Not implemented: rule 702's own delayed abilities
 -- (Pawl.Engine.Keyword.mintedDelayedAbilities), which Resolve falls back to and
 -- no caller unions in here, so an arm naming one reads as a name no face
--- declares. Inert as that roster stands -- decayed's is a sacrifice, which every
--- arm below answers Nothing for -- and a minted ability that MOVED its object
--- out of a zone is what would want the union (#3083).
+-- declares. Inert as that roster stands -- decayed's is a sacrifice and unearth's
+-- exile moves a slot the arming ability BOUND rather than the reserved source
+-- slot, both of which every arm below answers Nothing for -- and a minted ability
+-- that MOVED its object out of a zone through that slot is what would want the
+-- union (#3083).
 zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
 zoneFunctionedFrom delayed effect = case effect of
   -- Only an InSlot naming the reserved source slot can be "the object it's on".

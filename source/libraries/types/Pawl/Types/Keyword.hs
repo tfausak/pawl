@@ -287,6 +287,12 @@ data Keyword
   | -- | 702.83a: whenever a creature you control attacks alone, that creature
     -- gets +1/+1 until end of turn. Two instances are two abilities.
     Exalted
+  | -- | 702.84a: "[Cost]: Return this card from your graveyard to the
+    -- battlefield. It gains haste. Exile it at the beginning of the next end step.
+    -- If it would leave the battlefield, exile it instead of putting it anywhere
+    -- else. Activate only as a sorcery." An activated ability that functions in a
+    -- graveyard, so Pawl.Engine.Keyword.graveyardAbilitiesFor mints it.
+    Unearth (Cost.Cost Keyword)
   | -- | 702.85a: cascade -- a triggered ability that functions only while the
     -- spell with cascade is on the stack. When you cast the spell, exile cards
     -- from the top of your library until you exile a nonland card whose mana
