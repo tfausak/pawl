@@ -2835,6 +2835,8 @@ keywordPayloadFilters keyword = case keyword of
   -- into the keyword.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]

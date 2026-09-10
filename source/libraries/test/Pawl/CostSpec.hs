@@ -2103,6 +2103,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   reversalSpec s registry
   shufflingReversalSpec s registry
   reversalRigSpec s registry
+  siegeWurmSpec s registry
+  foundryAssemblerSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -4021,3 +4023,111 @@ reversalRigSpec s registry = Spec.describe s "Synthetic Reversal Rig" $ do
     Spec.assertBool s (libraryOrder S.alice after /= original) "which is not the pre-shuffle order the reversed activation still would be"
     Spec.assertEqWith s "nothing of alice's was discarded" (S.handSize S.alice after) 2
     Spec.assertEqWith s "and the unpayable activation never reached the stack" (length (GameState.stack after)) 0
+
+-- `n` copies of one printing onto alice's battlefield, ids in creation order.
+addPermanents :: Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.ObjectId], GameState.GameState)
+addPermanents printing n gs =
+  List.foldl'
+    (\(ids, acc) _ -> let (oid, next) = S.addPermanent printing S.alice acc in (ids <> [oid], next))
+    ([], gs)
+    (replicate n ())
+
+-- alice controls `reds` Goblin Pikers and `greens` Giant Spiders, holds `card`,
+-- and has priority in her own precombat main phase so a creature spell is
+-- castable (CR 302.1). NO LAND ON ANY BOARD, omniscienceBoard's posture: a cast
+-- that succeeds can only have been paid by tapping creatures.
+convokeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+convokeBoard piker spider card reds greens =
+  let (redIds, gs1) = addPermanents piker reds (Setup.emptyGame S.bothPlayers)
+      (_, gs2) = addPermanents spider greens gs1
+      (spell, gs3) = S.addHandCard card S.alice gs2
+   in ( spell,
+        redIds,
+        gs3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Answer Prompt.ChooseCost with the tap substitution whose residual mana part is
+-- `wanted` (CR 702.51b), and Prompt.ChooseTaps with the named permanents. BOTH
+-- FILTERED against the offer, `tapping`'s posture above and for its reason: an
+-- answer the engine did not offer is rejected rather than repaired, so filtering
+-- is what keeps the assertion about the engine's own candidates. A `wanted` no
+-- entry matches leaves Cost.firstOffered's unpayable cost, which fails the
+-- payment visibly rather than picking some other entry.
+convoking :: ManaCost.ManaCost -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+convoking wanted tapped p = case p of
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter ((== Just wanted) . Cost.Type.mana) candidates)
+  Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (`elem` tapped) candidates)
+  _ -> S.identityAnswer p
+
+-- Siege Wurm {5}{G}{G} Creature -- Wurm 5/5: "Convoke. Trample."
+--
+-- CR 702.51a's two clauses on one card, and the cheapest printing that states
+-- convoke and nothing else. The GENERIC clause is paid by Goblin Pikers, which
+-- are red, and the COLORED clause by Giant Spiders, which are green -- so the
+-- colour half is what the pair below varies and nothing else is.
+siegeWurmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+siegeWurmSpec s registry = Spec.describe s "Siege Wurm" $ do
+  -- The headline. Seven creatures, no land, no mana: {5} comes off five Pikers
+  -- and {G}{G} off two Spiders, which is rule 702.51a's whole sentence paying a
+  -- whole cost.
+  Spec.it s "CR 702.51a convoke pays a Siege Wurm's whole cost by tapping seven creatures" $ do
+    wurm <- S.printingOf s registry "Siege Wurm"
+    piker <- S.printingOf s registry "Goblin Piker"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (spell, pikerIds, gs) = convokeBoard piker spider wurm 5 2
+        -- The entry that substitutes for every symbol, named by the mana it
+        -- leaves: {0} is an empty mana part and not Nothing (CR 118.5a).
+        answer :: Prompt.Prompt r -> r
+        answer = convoking (ManaCost.MkManaCost []) pikerIds
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "the Wurm resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Siege Wurm")) S.alice resolved) 1
+    -- The taps themselves, which the assertion above does not see: a cast that
+    -- paid {5}{G}{G} out of nowhere would also have left the Wurm on the
+    -- battlefield.
+    Spec.assertEqWith s "and every one of the seven creatures is tapped" (S.tappedCount S.alice resolved) 7
+  -- The pair, varying the COLOUR of two creatures and nothing else: same seats,
+  -- same count of creatures, same absence of mana. CR 702.51a's colored clause
+  -- names "an untapped creature of that color", so seven red creatures pay the
+  -- {5} and neither {G}.
+  Spec.it s "CR 702.51a a colored mana wants a creature of that color" $ do
+    wurm <- S.printingOf s registry "Siege Wurm"
+    piker <- S.printingOf s registry "Goblin Piker"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (withGreens, _, greenBoard) = convokeBoard piker spider wurm 5 2
+        (allRed, _, redBoard) = convokeBoard piker spider wurm 7 0
+    Spec.assertBool s (S.castable S.alice withGreens greenBoard) "five Pikers and two Spiders pay {5}{G}{G}"
+    Spec.assertBool s (not (S.castable S.alice allRed redBoard)) "seven Pikers and no green creature do not"
+
+-- Foundry Assembler {5} Artifact Creature -- Assembly-Worker 3/3: "Improvise."
+--
+-- CR 702.126a's one clause, and the cheapest printing that states improvise and
+-- nothing else. The artifacts tapped are three more Assemblers, so the pool the
+-- criterion admits is exactly the count and Prompt.ChooseTaps is elided -- which
+-- is Cost.payComponent's existing rule and nothing this keyword decides.
+foundryAssemblerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+foundryAssemblerSpec s registry = Spec.describe s "Foundry Assembler" $ do
+  Spec.it s "CR 702.126a improvise pays {3} of a Foundry Assembler's {5} by tapping three artifacts" $ do
+    assembler <- S.printingOf s registry "Foundry Assembler"
+    forest <- S.printingOf s registry "Forest"
+    let (artifacts, gs1) = addPermanents assembler 3 (S.landsInPlay forest 2)
+        (spell, gs2) = S.addHandCard assembler S.alice gs1
+        gs =
+          gs2
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- Three of the five generic mana substituted for, leaving {2} for the
+        -- two Forests. CR 702.126a reaches the generic mana and nothing else,
+        -- so there is no coloured entry to name.
+        answer :: Prompt.Prompt r -> r
+        answer = convoking (ManaCost.MkManaCost [ManaSymbol.Generic 2]) artifacts
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "a fourth Assembler resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Foundry Assembler")) S.alice resolved) 4
+    Spec.assertEqWith s "and the three artifacts joined the two Forests in being tapped" (S.tappedCount S.alice resolved) 5

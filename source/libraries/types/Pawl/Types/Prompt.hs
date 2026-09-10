@@ -438,9 +438,13 @@ data Prompt r where
   -- printed "you may attach it"; never elided, declining leaving it to CR
   -- 704.5m.
   ChooseTurnUpAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
-  -- | CR 601.2b: which of the payable alternative or additional costs is paid,
-  -- after modes and before X and targets (CR 118.9b makes an alternative cost
-  -- optional).
+  -- | Which of several costs this object\'s controller pays. Asked at two
+  -- moments, both of them "which cost", which is why one constructor serves
+  -- both: CR 601.2b\'s payable alternative and additional costs, after modes and
+  -- before X and targets (CR 118.9b makes an alternative cost optional), and CR
+  -- 702.51b\'s and CR 702.126b\'s tap substitutes once the total cost is locked
+  -- in (Pawl.Engine.Cost.announceTapSubstitutions). The candidates are filtered
+  -- by payability at both, and an answer outside them is rejected.
   ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost Keyword.Keyword] -> Prompt (Cost.Cost Keyword.Keyword)
   -- | CR 601.2h: the order the non-mana components of a total cost are paid in,
   -- a permutation of their printed indices, once per pass
