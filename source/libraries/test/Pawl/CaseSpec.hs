@@ -28,9 +28,12 @@
 -- carries the limb because the rule prints it, but deleting it leaves every case
 -- below green: Object.designations is a Set and Pawl.Engine.Resolve's Designate
 -- arm writes only on a transition, so a to-solve trigger that fired again at a
--- later end step would change nothing and emit nothing. That is the same fence
--- Resolve's own comment records for renown and monstrosity, and it is a fence
--- here too rather than coverage.
+-- later end step would change nothing and emit nothing. The limb is still
+-- observable through the trigger's own existence -- CR 601.2c gives Lithoform
+-- Engine's "copy target activated or triggered ability you control" no legal
+-- target at an end step where the solved Case did not trigger -- and both cards
+-- are in data/cards/, so this is a board nobody has built rather than a fence
+-- (gap #3550).
 --
 -- CR 719.3c makes the Solved ability not EXIST while the Case is unsolved, and
 -- the card writes it as an ability that exists and declines to trigger (CR

@@ -179,7 +179,7 @@ data Keyword
     --
     -- A Natural and not a Quantity: CR 702.44c's "Modular--Sunburst" (Arcbound
     -- Wanderer) is the one printing whose N is another keyword's count, and
-    -- sunburst itself has no representation yet (#877).
+    -- sunburst itself has no representation yet (#3466).
     Modular Natural.Natural
   | -- | 702.45a: whenever this creature blocks or becomes blocked, it gets +N/+N
     -- until end of turn (CR 509.3a, CR 509.3c); each instance triggers separately
@@ -471,7 +471,7 @@ data Keyword
     --
     -- Not implemented: CR 702.154's enlist, rule 508.1g's other optional cost to
     -- attack, whose cost is tapping a filtered creature rather than a yes-or-no
-    -- (#877).
+    -- (#3519).
     Exert
   | -- | 702.103a: "As you cast this spell, you may choose to cast it bestowed. If
     -- you do, you pay [cost] rather than its mana cost." CR 702.103b's rewrite

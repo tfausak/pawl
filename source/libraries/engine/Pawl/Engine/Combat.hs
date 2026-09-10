@@ -1748,7 +1748,7 @@ attemptAttackDeclaration perform pid rejected = do
         --
         -- Not implemented: CR 702.154's enlist, rule 508.1g's other optional cost
         -- to attack, whose cost is tapping a filtered untapped creature rather than
-        -- a yes-or-no and whose trigger reads that creature's power (#877).
+        -- a yes-or-no and whose trigger reads that creature's power (#3519).
         --
         Monad.forM_ attacking $ \oid -> do
           gsExert <- State.get

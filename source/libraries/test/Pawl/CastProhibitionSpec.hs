@@ -397,7 +397,7 @@ blossomingCalmHandoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
 -- (CR 109.5) and Expiry.dropAtTurnOf ends it at alice's seat, two handoffs later.
 --
 -- Not implemented: the card's third line is rebound (CR 702.88), which pawl has
--- no representation for (#877). The omission runs against the controller -- pawl's
+-- no representation for (#3489). The omission runs against the controller -- pawl's
 -- Blossoming Calm is cast once where the printed one is cast twice -- so nothing
 -- here is weaker than printed.
 blossomingCalmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

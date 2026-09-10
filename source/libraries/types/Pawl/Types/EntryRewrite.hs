@@ -100,7 +100,7 @@ data EntryRewrite effect
     -- characteristic-defining ability where that is Nothing (Wood Elemental).
     --
     -- Not implemented: CR 702.82a's devour, which is this shape with a
-    -- per-permanent multiplier (#877).
+    -- per-permanent multiplier (#3486).
     SacrificeAnyNumber SacrificeAnyNumber.SacrificeAnyNumber
   | -- | CR 614.1c / 614.13 / Living Lore: exile one card matching the Filter out
     -- of the entering permanent's controller's graveyard as it enters. CR 614.14
