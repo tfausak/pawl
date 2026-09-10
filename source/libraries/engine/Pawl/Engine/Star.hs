@@ -53,6 +53,7 @@ substituteStar star quantity = case quantity of
   Quantity.TimesKickedWith _ -> quantity
   Quantity.TagWasSpent {} -> quantity
   Quantity.WasToken -> quantity
+  Quantity.WasAttacking -> quantity
   Quantity.WasBlocking -> quantity
   Quantity.DamageDealtToThisTurn -> quantity
   Quantity.OpponentsAttacked _ -> quantity

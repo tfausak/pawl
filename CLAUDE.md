@@ -251,6 +251,13 @@ to agents as written. What it doesn't say:
     suite, which absorbs it in argument order. Grep every construction site of
     the type by hand.
 
+    A RECORD UPDATE is the other one, and `-Werror`'s missing-fields check does
+    not name it: an update keeps the old value of the field you added, so a
+    descent that rebuilds a record silently drops it. The recurring site is
+    `Pawl.Engine.Projection.Rewrite`'s `rewriteEffect`, CR 612.1's text-change
+    walk. Grep `{ SomeRecord.field = ` over the tree beside the construction
+    sites, and say in the PR which you checked.
+
     A NEW READ OF A PERMANENT'S CARD goes through the projection
     (`Pawl.Engine.Projection.View`) or the copiable record it stamps
     (`Binding.copyOf`), never `Game.cardOf` or `Game.faceOf`, which answer the
@@ -270,10 +277,10 @@ to agents as written. What it doesn't say:
     function's callers, and say in the PR body which paths you drove and which
     you did not.
 
-5.  There is no census left to edit. CR 701's keyword actions and CR 702's
-    keyword abilities are one issue each --- `gh issue list --label
-    area:keywords --label gap` --- so landing one means closing that issue and
-    grepping its bare number, nothing more.
+5.  There is no keyword census anywhere. Every CR 701 keyword action and CR 702
+    keyword ability carries its own issue --- `gh issue list --label
+    area:keywords --label gap` is the enumeration --- so landing one means
+    closing that one issue and grepping its bare number, nothing more.
 
 ## Code conventions
 

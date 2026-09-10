@@ -3,6 +3,9 @@
     {
       "keywords": [
         {
+          "type": "Convoke"
+        },
+        {
           "type": "Changeling"
         }
       ],

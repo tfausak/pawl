@@ -73,6 +73,7 @@ blackCreature =
       Filter.declaredBlockerThisCombat = False,
       Filter.milledThisTurn = False,
       Filter.dealtDamageThisTurn = False,
+      Filter.crewedThisTurn = Set.empty,
       Filter.controlledSinceTurnBegan = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
@@ -137,6 +138,7 @@ devoidBigCreature =
       Filter.declaredBlockerThisCombat = False,
       Filter.milledThisTurn = False,
       Filter.dealtDamageThisTurn = False,
+      Filter.crewedThisTurn = Set.empty,
       Filter.controlledSinceTurnBegan = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
@@ -521,6 +523,29 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
   Spec.it s "ManaValueAtMost is False for a player" $ do
     Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.ManaValueAtMost 99))) "player"
+
+  -- CR 702.85a's comparison, PowerLessThanSource's shape one characteristic over:
+  -- the bound is the Context's source mana value rather than a literal the atom
+  -- carries. blackCreature's mana value is 3.
+  Spec.describe s "ManaValueLessThanSource" $ do
+    let sourced n = self {Filter.sourceManaValue = Just n}
+    Spec.it s "holds below the source's mana value and fails above it" $ do
+      Spec.assertBool s (Filter.matches (sourced 4) blackCreature Filter.Type.ManaValueLessThanSource) "3 < 4"
+      Spec.assertBool s (not (Filter.matches (sourced 4) (blackCreature {Filter.manaValue = Just 5}) Filter.Type.ManaValueLessThanSource)) "5 is not < 4"
+
+    -- STRICTLY less, rule 702.85a's own word: a cascade off a mana value of 3
+    -- does not reach another 3.
+    Spec.it s "is False at equal mana value" $
+      Spec.assertBool s (not (Filter.matches (sourced 3) blackCreature Filter.Type.ManaValueLessThanSource)) "3 is not < 3"
+
+    -- The two vacuity postures PowerLessThanSource takes, on the same two sides.
+    Spec.it s "is False when either mana value is absent" $ do
+      let noCost = blackCreature {Filter.manaValue = Nothing}
+      Spec.assertBool s (not (Filter.matches (sourced 4) noCost Filter.Type.ManaValueLessThanSource)) "no candidate mana value"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ManaValueLessThanSource)) "no source mana value"
+
+    Spec.it s "is False for a player" $
+      Spec.assertBool s (not (Filter.matches (sourced 4) aPlayer Filter.Type.ManaValueLessThanSource)) "player"
 
   -- CR 202.3 read for parity: Void Winnower's "spells with even mana values",
   -- whose reminder text settles the boundary -- "(Zero is even.)"
@@ -1380,6 +1405,39 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 702.122d prohibits a CREATURE, and a player is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches (self {Filter.cantCrewVehicles = Set.singleton (ObjectId.MkObjectId 7)}) aPlayer Filter.Type.CantCrewVehicles)) "player"
+
+  -- CR 702.122c relates TWO objects, which is why this atom reads a view field
+  -- and the context together rather than one flag. Vehicle 11 is the source on
+  -- every case below and Vehicle 12 the one the candidate crewed instead, so
+  -- "crewed it" and "crewed a Vehicle" answer differently here.
+  Spec.describe s "CrewedSourceThisTurn" $ do
+    let crewedBy ns = blackCreature {Filter.crewedThisTurn = Set.fromList (fmap ObjectId.MkObjectId ns)}
+        asked n = self {Filter.source = Just (ObjectId.MkObjectId n)}
+
+    Spec.it s "matches a creature that crewed the source this turn" $ do
+      Spec.assertBool s (Filter.matches (asked 11) (crewedBy [11]) Filter.Type.CrewedSourceThisTurn) "crewed it"
+
+    Spec.it s "does not match a creature that crewed another Vehicle" $ do
+      Spec.assertBool s (not (Filter.matches (asked 11) (crewedBy [12]) Filter.Type.CrewedSourceThisTurn)) "crewed something else"
+
+    Spec.it s "does not match a creature that crewed nothing" $ do
+      Spec.assertBool s (not (Filter.matches (asked 11) blackCreature Filter.Type.CrewedSourceThisTurn)) "crewed nothing"
+
+    -- Membership and not one crewing: CR 702.122c's relation admits a creature
+    -- that paid for two crew abilities this turn, and each Vehicle asks for
+    -- itself.
+    Spec.it s "matches on any of several crewings" $ do
+      Spec.assertBool s (Filter.matches (asked 11) (crewedBy [11, 12]) Filter.Type.CrewedSourceThisTurn) "the first Vehicle"
+      Spec.assertBool s (Filter.matches (asked 12) (crewedBy [11, 12]) Filter.Type.CrewedSourceThisTurn) "and the second"
+
+    -- The vacuous direction: with no source there is no "it" for the relation's
+    -- other end, whatever the candidate crewed.
+    Spec.it s "is vacuously false where the context has no source" $ do
+      Spec.assertBool s (not (Filter.matches self (crewedBy [11]) Filter.Type.CrewedSourceThisTurn)) "no source"
+
+    -- CR 702.122b crews with a CREATURE, and a player is not one.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (asked 11) aPlayer Filter.Type.CrewedSourceThisTurn)) "player"
 
   Spec.describe s "DealtDamageThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do

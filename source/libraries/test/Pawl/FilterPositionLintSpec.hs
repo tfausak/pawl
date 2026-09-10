@@ -226,6 +226,7 @@ canHostSubjects predicate = case predicate of
   -- author to reach.
   Filter.Type.ControlledByRecipient -> 0
   Filter.Type.ManaValueAtMost _ -> 0
+  Filter.Type.ManaValueLessThanSource -> 0
   Filter.Type.ManaValueIsEven -> 0
   Filter.Type.ManaValueAtMostAmount -> 0
   Filter.Type.ControlledBy _ -> 0
@@ -264,6 +265,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.MilledThisTurn -> 0
   Filter.Type.CantCrewVehicles -> 0
   Filter.Type.DealtDamageThisTurn -> 0
+  Filter.Type.CrewedSourceThisTurn -> 0
   Filter.Type.ControlledSinceTurnBegan -> 0
   -- A DESCENT and not a zero, unlike every other atom here: CR 303.4's atom
   -- carries the host's description, which a card author writes exactly as they
@@ -1846,6 +1848,29 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
+  -- CR 702.85a's comparison is the pair above's one characteristic over, and
+  -- narrower still: Filter.Context.sourceManaValue is filled by
+  -- Pawl.Engine.Resolve.Slots.effectContext alone, so the atom is answerable only
+  -- inside a resolution's own references and would be a silent False in a card's
+  -- target slot, affected set, Count filter or search filter. Only
+  -- Pawl.Engine.Keyword's cascade writes it, and this is what keeps that true.
+  Spec.it s "CR 702.85a no card writes a source-mana-value comparison" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "ManaValueLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c)
+        offenders = filter (anyFace (\c -> atoms c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous, the sweep above's reason: the same counter over a hand-built
+    -- face that DOES carry the atom finds it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ManaValueLessThanSource]]
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- CR 508.5's atom is answerable only where the CONTEXT supplies a defending
   -- player, and exactly two callers fill Filter.Context.defendingPlayer:
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.39a's provoke) and

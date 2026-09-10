@@ -97,6 +97,7 @@ codec =
       Arm.payload "Frenzy" Common.natural Keyword.Frenzy (\x -> case x of Keyword.Frenzy y -> Just y; _ -> Nothing),
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous (\x -> case x of Keyword.Poisonous y -> Just y; _ -> Nothing),
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator (\x -> case x of Keyword.Annihilator y -> Just y; _ -> Nothing),
+      Arm.nullary "Cascade" Keyword.Cascade,
       Arm.payload "Hideaway" Common.natural Keyword.Hideaway (\x -> case x of Keyword.Hideaway y -> Just y; _ -> Nothing),
       Arm.payload "Reinforce" (Reinforce.codec codec) Keyword.Reinforce (\x -> case x of Keyword.Reinforce y -> Just y; _ -> Nothing),
       Arm.nullary "Persist" Keyword.Persist,
@@ -147,5 +148,7 @@ codec =
       Arm.payload "Bestow" (Cost.codec codec) Keyword.Bestow (\x -> case x of Keyword.Bestow y -> Just y; _ -> Nothing),
       Arm.nullary "Station" Keyword.Station,
       Arm.payload "Mutate" (Cost.codec codec) Keyword.Mutate (\x -> case x of Keyword.Mutate y -> Just y; _ -> Nothing),
-      Arm.nullary "UmbraArmor" Keyword.UmbraArmor
+      Arm.nullary "UmbraArmor" Keyword.UmbraArmor,
+      Arm.nullary "Convoke" Keyword.Convoke,
+      Arm.nullary "Improvise" Keyword.Improvise
     ]

@@ -991,6 +991,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.Toxic 1)
       " {\"type\":\"Toxic\",\"value\":1} "
     Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Toxic 1) /= Codec.encode Keyword.codec (Keyword.Toxic 2)) "toxic 1 and toxic 2 encode differently"
+  -- CR 702.85a. Nullary, and the tag is the whole encoding: the mana value the
+  -- rule compares against is the spell's, read at resolution.
+  Spec.it s "Cascade" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Cascade
+      " {\"type\":\"Cascade\"} "
   Spec.it s "Persist" $
     Common.assertCodec
       s
@@ -1049,6 +1057,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.UmbraArmor
       " {\"type\":\"UmbraArmor\"} "
+  -- CR 702.51d and CR 702.126c make a second instance redundant, so neither
+  -- keyword carries a count on the wire either.
+  Spec.it s "Convoke" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Convoke
+      " {\"type\":\"Convoke\"} "
+  Spec.it s "Improvise" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Improvise
+      " {\"type\":\"Improvise\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 

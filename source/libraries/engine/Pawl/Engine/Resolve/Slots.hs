@@ -2434,7 +2434,18 @@ effectContext gs controller source legal bindings =
           -- against -- Petra Sphinx's "if that card has the chosen name" over the
           -- card its own reveal bound. CR 608.2h's last-known reader is inside
           -- chosenNamesOf, for the source that has already left (Conjurer's Ban).
-          Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) gs
+          Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) gs,
+          -- CR 202.3 off the SOURCE, for the one atom that compares a candidate
+          -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade).
+          -- The ONE filler of that field, which is what makes it a
+          -- resolution-position atom: it is Nothing everywhere else, and
+          -- Pawl.FilterPositionLintSpec is what keeps a card out of those
+          -- positions.
+          --
+          -- Through CR 608.2h's last-known reader, slotNames' reason: a cascade
+          -- spell countered while its trigger is still on the stack has left, and
+          -- "this spell's mana value" is a reference the trigger already made.
+          Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnownAnywhere gs source
         }
 
 -- The ONE object each of a resolution's TARGET slots names, shared by

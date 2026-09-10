@@ -1,6 +1,7 @@
 module Pawl.Types.CastOffer where
 
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaSpending as ManaSpending
 
@@ -47,6 +48,22 @@ data CastOffer = MkCastOffer
     -- both. Rule 118.14's last sentence is why it rides the offer rather than the
     -- card -- the permission is the offering effect's, so the same card cast any
     -- other way pays its printed colours.
-    spending :: ManaSpending.ManaSpending
+    spending :: ManaSpending.ManaSpending,
+    -- | CR 702.85a's second condition -- "if the RESULTING SPELL's mana value is
+    -- less than this spell's mana value" -- as a quality the half being offered
+    -- must have. Nothing is the unmarked case every other offer takes.
+    --
+    -- A rider of its own, `payingInstead`'s reason: rule 702.85a states it in a
+    -- sentence separate from the permission, and it narrows neither the payment
+    -- nor the face-up-ness but WHICH HALF may be taken. Asked per castable half
+    -- for CR 709.3a's and CR 712.11c's reason, which is the whole point of it:
+    -- the CARD's mana value already passed the walk that exiled it, and an
+    -- adventurer card's other half (Fae of Wishes' Granted, {3}{U} behind a
+    -- {1}{U} creature) is the spell whose mana value the rule asks about second.
+    --
+    -- Matched in Pawl.Engine.Resolve.Effect.offerCast against the FACE's own view
+    -- and the resolution's Filter.Context, so Filter.ManaValueLessThanSource
+    -- reads the same source mana value here that the exiling walk read.
+    restriction :: Maybe (Filter.Filter Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)

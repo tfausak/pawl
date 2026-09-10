@@ -751,23 +751,35 @@ rewriteEffect pairs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect
-  -- TWO places, and both descend. A Filter the ObjectRef carries is card text
-  -- (GrantPlayFromExile's arm below); so is CR 118.9's STATED alternative cost,
-  -- which is a whole Cost and not a flag, printed in the same text box rule 612
-  -- reaches -- Filter.rewriteCost's own reading, and the reason
-  -- ActivatedAbility.cost and PayGate.cost descend through it.
+  -- THREE places, and all three descend. A Filter the ObjectRef carries is card
+  -- text (GrantPlayFromExile's arm below); so is CR 118.9's STATED alternative
+  -- cost, which is a whole Cost and not a flag, printed in the same text box rule
+  -- 612 reaches -- Filter.rewriteCost's own reading, and the reason
+  -- ActivatedAbility.cost and PayGate.cost descend through it. CR 702.85a's
+  -- `restriction` is the third, and it is a bare Filter, so the first reason
+  -- covers it unchanged.
   --
   -- The rest name no word a subtype pair could reach: the caster is a PlayerRef,
   -- `transformed` is CR 712.11a's Bool, `withoutPayingManaCost` is CR 118.9's
   -- other wording and states no cost of its own, and `spending` is CR 118.14's
   -- ManaSpending, which speaks of mana types rather than of subtypes.
+  --
+  -- A RECORD UPDATE, so -Werror's missing-fields check does not name a field
+  -- added to either record later: a new Filter or Cost here owes its own descent,
+  -- and nothing but this comment asks for it.
+  --
+  -- The `restriction` descent is a REGRESSION FENCE and not a proved path: the
+  -- only value written there today is rule 702.85a's own nullary atom, which
+  -- Filter.rewrite returns unchanged, so no board tells the descent from its
+  -- absence. A card writing a subtype-bearing filter there is what would.
   Effect.OfferCast oc ->
     Effect.OfferCast
       oc
         { OfferCast.ref = rewriteObjectRef pairs (OfferCast.ref oc),
           OfferCast.offer =
             (OfferCast.offer oc)
-              { CastOffer.payingInstead = fmap (Filter.rewriteCost pairs) (CastOffer.payingInstead (OfferCast.offer oc))
+              { CastOffer.payingInstead = fmap (Filter.rewriteCost pairs) (CastOffer.payingInstead (OfferCast.offer oc)),
+                CastOffer.restriction = fmap (Filter.rewrite pairs) (CastOffer.restriction (OfferCast.offer oc))
               }
         }
   Effect.GrantPlayFromExile grant ->
@@ -1551,6 +1563,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.TimesKickedWith _ -> quantity
   Quantity.Type.TagWasSpent {} -> quantity
   Quantity.Type.WasToken -> quantity
+  Quantity.Type.WasAttacking -> quantity
   Quantity.Type.WasBlocking -> quantity
   Quantity.Type.DamageDealtToThisTurn -> quantity
   Quantity.Type.PlayerCounters {} -> quantity

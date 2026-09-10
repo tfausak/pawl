@@ -34,6 +34,7 @@ import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
@@ -91,6 +92,7 @@ lastKnownView peers oid gs lk =
   (viewOfCharacteristics peers oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
     { Filter.owner = Just (LastKnown.owner lk),
       Filter.token = Game.sourceIsToken (LastKnown.source lk),
+      Filter.attacking = LastKnown.attacking lk,
       Filter.blocking = LastKnown.blocking lk
     }
 
@@ -178,6 +180,10 @@ viewOfCard face =
           -- a permanent. viewOfCharacteristics is the view that holds an id and
           -- answers.
           Filter.dealtDamageThisTurn = False,
+          -- CR 702.122c relates a creature to a Vehicle it crewed, and this
+          -- builder describes a printed FACE rather than either --
+          -- `milledThisTurn` above's reason.
+          Filter.crewedThisTurn = Set.empty,
           -- CR 302.6 asks about an OBJECT a player controls; this builder
           -- describes a printed FACE, which is none -- `milledThisTurn` above's
           -- reason.
@@ -316,6 +322,16 @@ milledIt oid event = case event of
   GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
   _ -> False
 
+-- CR 702.122c: if this event records a crewing THIS object paid for, which
+-- Vehicle it crewed. Only Pawl.Engine.Resolve appends one, off the crew ability
+-- resolving, so rule 702.122b's earlier moment -- the tap that pays the cost --
+-- is not what is read here (#915).
+crewedByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
+crewedByIt oid event = case event of
+  GameEvent.BecameCrewed crewed
+    | Set.member oid (BecameCrewed.crewedBy crewed) -> Just (BecameCrewed.vehicle crewed)
+  _ -> Nothing
+
 -- CR 302.6: has `controller` had this object under their control continuously
 -- since their most recent turn began? Object.sickness is the engine's record of
 -- rule 302.6's condition, and it names a PLAYER because the rule's subject is
@@ -387,8 +403,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.targetViews = maybe Map.empty (targetViewsOfStackObject peers gs) (Game.lookupObject oid gs),
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
-      -- CR 508.1k: a combat status, not a characteristic (CR 109.3).
-      Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs)),
+      -- CR 508.1k: a combat status, not a characteristic (CR 109.3). CR 506.4 takes
+      -- a departed creature out of the record, so lastKnownView above writes CR
+      -- 608.2h's answer over this one.
+      Filter.attacking = Game.isAttacking oid gs,
       -- CR 508.1b: the same map's VALUE, kept only when it names a player. A
       -- creature attacking a planeswalker or a battle answers Nothing here and
       -- True above, which is CR 509.1a's and CR 802.4a's own three-way split --
@@ -541,6 +559,11 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- 120.3d/120.3e mark none at all for wither or infect, and either creature
       -- was still dealt damage this turn.
       Filter.dealtDamageThisTurn = any ((== Just oid) . Game.damagedObject . LoggedEvent.event) (GameState.events gs),
+      -- CR 702.122c / 608.2i: the same log once more, read for the crewings this
+      -- candidate paid for. The VEHICLES, which is the half of the relation a
+      -- candidate can answer; Pawl.Engine.Filter's CrewedSourceThisTurn compares
+      -- them against the source it is evaluating for.
+      Filter.crewedThisTurn = Set.fromList (Maybe.mapMaybe (crewedByIt oid . LoggedEvent.event) (Foldable.toList (GameState.events gs))),
       -- CR 302.6: Object.sickness, compared against the PROJECTED controller
       -- rather than read as a bare flag -- rule 302.6's subject is a player, so
       -- `Settled` names one, and Pawl.Engine.Engine.checkControlContinuity drops a

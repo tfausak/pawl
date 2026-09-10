@@ -274,6 +274,15 @@ data View = MkView
     -- regeneration and CR 120.3d/120.3e mark none at all for a wither or infect
     -- source, so the marks are a strict subset of what was dealt.
     dealtDamageThisTurn :: Bool,
+    -- CR 702.122c: which objects did this candidate crew earlier this turn? The
+    -- same log the three fields above read, and LAZY for their reason -- nothing
+    -- forces it unless a Filter contains CrewedSourceThisTurn.
+    --
+    -- The VEHICLES rather than a Bool, because rule 702.122c's relation has two
+    -- ends: this half is the candidate's, and the other end -- which Vehicle the
+    -- card means by "it" -- is the source on the Context, which the builders that
+    -- fill this field do not hold.
+    crewedThisTurn :: Set.Set ObjectId.ObjectId,
     -- CR 302.6: has this candidate's CONTROLLER controlled it continuously since
     -- their most recent turn began? Read from Object.sickness, the field CR
     -- 302.6's own gates on attacking and the tap symbol are read from, and
@@ -743,6 +752,9 @@ playerView pid =
       -- Pawl.Engine.Target.admittedGiven's Recipient.ToPlayer arm -- build the
       -- view through it. Pawl.DamageSpec's Needle Drop case is what proves it.
       dealtDamageThisTurn = False,
+      -- CR 702.122b crews with a CREATURE, and a player is not one -- CR 506.3
+      -- rules the combat fields above out for the same kind of reason.
+      crewedThisTurn = Set.empty,
       -- CR 302.6's continuity is about a creature a player CONTROLS, and a player
       -- is not one -- False is the answer here rather than a default.
       controlledSinceTurnBegan = False,
@@ -860,6 +872,21 @@ data Context = MkContext
     -- Nothing wherever the atom cannot appear, which `contextFor` below is the
     -- spelling of.
     sourcePower :: Maybe Integer,
+    -- CR 202.3: the SOURCE's mana value, for the one atom that compares a
+    -- candidate against it (ManaValueLessThanSource, CR 702.85a). sourcePower's
+    -- sibling one characteristic over, and undrivable from `source` here for that
+    -- field's reason -- this module holds no game state -- so the caller that has
+    -- the board supplies it: Pawl.Engine.Resolve.Slots.effectContext for a
+    -- resolution's own references, which is where rule 702.85a's walk and its
+    -- offer both read it.
+    --
+    -- LAZY, sourcePower's posture and load-bearingly so: filling it costs a
+    -- projection of the source, and no filter that omits the atom ever forces it.
+    --
+    -- Nothing wherever the atom cannot appear, which `contextFor` below is the
+    -- spelling of, and the atom then matches nothing. What keeps a CARD out of
+    -- those positions is Pawl.FilterPositionLintSpec's lint, sourcePower's pair.
+    sourceManaValue :: Maybe Integer,
     -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
     -- as its mana-value bound, for the one atom that asks
     -- (ManaValueAtMostAmount) -- Celestine, the Living Saint's "where X is the
@@ -1254,7 +1281,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1292,7 +1319,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1356,6 +1383,13 @@ matches context view predicate = case predicate of
   -- reversed, and False on an absent power at either end for the same reason.
   Filter.PowerGreaterThanSource -> case (power view, sourcePower context) of
     (Just p, Just s) -> p > s
+    _ -> False
+  -- CR 702.85a's "mana value that's less than this spell's mana value", the two
+  -- arms above's comparison one characteristic over, and False on an absent mana
+  -- value at either end for their reason: a context that supplied none names no
+  -- bound to be less than.
+  Filter.ManaValueLessThanSource -> case (manaValue view, sourceManaValue context) of
+    (Just v, Just s) -> v < s
     _ -> False
   -- CR 208.1 against a number an earlier clause of the resolution bound --
   -- Localized Destruction's "power equal to the amount of {E} paid this way".
@@ -1645,6 +1679,13 @@ matches context view predicate = case predicate of
   -- CantCrewVehicles sits between them and is neither: a prohibition lifts the
   -- moment its source leaves.
   Filter.DealtDamageThisTurn -> dealtDamageThisTurn view
+  -- CR 702.122c: the same look-back asked of a RELATION rather than of one
+  -- subject -- the candidate's own field says which Vehicles it crewed, and the
+  -- SOURCE on the context says which one the card's "it" names. Vacuously False
+  -- for a context with no source, where "crewed it" names nothing at all.
+  Filter.CrewedSourceThisTurn -> case source context of
+    Just src -> Set.member src (crewedThisTurn view)
+    Nothing -> False
   -- CR 302.6: not a look-back over the log at all, unlike AttackedThisTurn,
   -- MilledThisTurn and DealtDamageThisTurn -- the engine keeps the answer as
   -- Object.sickness, written at the untap step and cleared whenever control
@@ -1845,6 +1886,9 @@ rewrite pairs predicate = case predicate of
   Filter.PowerIsAmountInSlot _ -> predicate
   Filter.PowerAtLeastAmountInSlot _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
+  -- Untouched for the source-power atoms' reason above: the atom names a
+  -- comparison, and CR 612.1 finds no word in it to swap.
+  Filter.ManaValueLessThanSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
@@ -1896,6 +1940,7 @@ rewrite pairs predicate = case predicate of
   Filter.MilledThisTurn -> predicate
   Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
+  Filter.CrewedSourceThisTurn -> predicate
   -- Untouched for AttackedThisTurn's reason: the atom names no subtype.
   Filter.ControlledSinceTurnBegan -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: the nested filter describes
@@ -2129,6 +2174,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Frenzy _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
   Keyword.Type.Renown _ -> keyword
+  -- CR 702.85a is payload-free, so CR 612.2 has nothing to swap; the walk's
+  -- nonland filter is in the ability Pawl.Engine.Keyword.cascade mints.
+  Keyword.Type.Cascade -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
   -- CR 702.75a's N is a number and not a word, so CR 612.2 has nothing to swap;
@@ -2216,6 +2264,12 @@ rewriteKeyword pairs keyword = case keyword of
   -- on the card, so CR 612.2 has no printed word here to swap.
   Keyword.Type.Station -> keyword
   Keyword.Type.UmbraArmor -> keyword
+  -- CR 702.51a and CR 702.126a name "creature", "artifact" and a mana symbol's
+  -- own color, all the rules' own vocabulary, and the criterion they produce is
+  -- written in Pawl.Engine.Keyword rather than on the card -- so CR 612.2 has no
+  -- printed word here to swap.
+  Keyword.Type.Convoke -> keyword
+  Keyword.Type.Improvise -> keyword
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is
@@ -2347,6 +2401,10 @@ bakeBound players predicate = case predicate of
   Filter.PowerIsAmountInSlot _ -> predicate
   Filter.PowerAtLeastAmountInSlot _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
+  -- Untouched for the source-power atoms' reason: CR 603.2's map holds PLAYERS,
+  -- and this atom names no slot at all -- the source's mana value rides the
+  -- Context.
+  Filter.ManaValueLessThanSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
@@ -2392,6 +2450,7 @@ bakeBound players predicate = case predicate of
   Filter.MilledThisTurn -> predicate
   Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
+  Filter.CrewedSourceThisTurn -> predicate
   -- Untouched: the atom names no slot for CR 603.2's map to substitute into.
   Filter.ControlledSinceTurnBegan -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: a ControlledByBound written
@@ -2468,6 +2527,14 @@ manaValueThresholds predicate = case predicate of
   -- Reads the mana value and compares it against NO literal, so it bounds
   -- nothing: parity is what the sample's two-past-the-greatest tail is for.
   Filter.ManaValueIsEven -> []
+  -- Reads the mana value and compares it against a bound that is another
+  -- OBJECT's, so there is no literal to report, and position is what keeps the
+  -- caller's argument whole -- the arm below's reasoning: CR 601.3a's lookahead
+  -- reads a player ability's prohibition filter, while this atom is written only
+  -- into a resolution's own references (Pawl.Engine.Resolve.Slots.effectContext
+  -- is the one filler of Context's sourceManaValue), and
+  -- Pawl.FilterPositionLintSpec is what keeps a card from writing it anywhere.
+  Filter.ManaValueLessThanSource -> []
   -- Reads the mana value and compares it against a bound this function cannot
   -- see -- the number is on the SLOT, and is a board reading rather than a
   -- literal -- so there is no threshold to report and reporting none is not the
@@ -2530,6 +2597,7 @@ manaValueThresholds predicate = case predicate of
   Filter.MilledThisTurn -> []
   Filter.CantCrewVehicles -> []
   Filter.DealtDamageThisTurn -> []
+  Filter.CrewedSourceThisTurn -> []
   Filter.ControlledSinceTurnBegan -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
   -- literals inside bound the HOST's mana value and never the candidate's. Only
@@ -2606,6 +2674,9 @@ statesAQuality predicate = case predicate of
   -- 701.23b applies and no descent could change that.
   Filter.ControlsMoreThanYou _ -> True
   Filter.ManaValueAtMost _ -> True
+  -- A quality like the literal bound's, the source-power atoms' answer: "a
+  -- nonland card with mana value less than this spell's" describes the card.
+  Filter.ManaValueLessThanSource -> True
   Filter.ManaValueIsEven -> True
   -- A quality like the literal bound's, one atom over: "with mana value X or
   -- less" describes the card as much when X is computed as when it is printed.
@@ -2675,6 +2746,7 @@ statesAQuality predicate = case predicate of
   Filter.MilledThisTurn -> True
   Filter.CantCrewVehicles -> True
   Filter.DealtDamageThisTurn -> True
+  Filter.CrewedSourceThisTurn -> True
   Filter.ControlledSinceTurnBegan -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to
   -- something" is itself a stated quality under CR 701.23b, so even the trivial

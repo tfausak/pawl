@@ -16,7 +16,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Ten things rather than the characteristics alone, because the other nine
+-- Eleven things rather than the characteristics alone, because the other ten
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -30,11 +30,11 @@ import qualified Pawl.Types.Source as Source
 -- names "what an Aura enchants" as an example of what is not one. Nor are the
 -- CHOSEN NAMES, the sixth, for the reason its own field gives. Nor is the
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
--- its own field gives. Nor is the COMBAT STATUS, the eighth, for the reason its
--- own field gives. Nor is the PROTECTOR, the ninth, for the reason its own field
--- gives.
+-- its own field gives. Nor is either half of the COMBAT STATUS, the eighth and
+-- ninth, for the reason their own fields give. Nor is the PROTECTOR, the tenth,
+-- for the reason its own field gives.
 --
--- All ten fields STRICT (!): entries are keyed by an id that no longer exists
+-- All eleven fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -122,6 +122,30 @@ data LastKnown = MkLastKnown
     -- changes nothing the projection folds. So it sits beside them for
     -- `controller`'s reason.
     chosenNames :: !(Set.Set CardName.CardName),
+    -- | CR 508.1k: was it attacking as it left -- the same membership
+    -- Pawl.Engine.Filter.View's `attacking` reports, through the one classifier
+    -- Game.isAttacking, read off GameState.combat before the object ceased.
+    --
+    -- Not a characteristic either (CR 109.3's list has no combat status), and not
+    -- recoverable from anything above, for `blocking`'s reason turned to the other
+    -- side of the declaration: CR 506.4 takes a departed creature out of combat,
+    -- so the live read is unavailable exactly when CR 608.2h still asks for it --
+    -- Garna, Bloodfist of Keld's "draw a card if it was attacking", an ordinary
+    -- English "if" gating one clause (CR 608.2c) rather than CR 603.4's
+    -- intervening one.
+    --
+    -- A Bool rather than what it was attacking, for `blocking`'s reason: that is
+    -- the whole of what Filter.attacking reports, and the three neighbouring
+    -- fields that follow the same GameState.combat lookup to the ATTACKED
+    -- permanent (Filter.attackingPlayer, attackingPlaneswalkerController,
+    -- attackingBattleProtector) go on reading live. Scryfall o:"it was attacking
+    -- you" and o:"it was attacking a", 2026-09-10, no hit -- no printing asks any
+    -- of the three about a permanent that is gone, and Fyndhorn Druid's "if it was
+    -- blocked this turn" is a CR 608.2i fold over GameState.events rather than a
+    -- question for this record. A printing whose leaves-the-battlefield trigger
+    -- asked WHICH player, planeswalker or battle the departed creature had been
+    -- attacking would refute that and want this field widened.
+    attacking :: !Bool,
     -- | CR 509.1g: was it blocking as it left -- the same membership
     -- Pawl.Engine.Filter.View's `blocking` reports, read off GameState.combat
     -- before the object ceased.

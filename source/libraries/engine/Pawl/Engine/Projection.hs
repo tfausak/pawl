@@ -744,12 +744,17 @@ viewWithLastKnown src gs oid =
 -- makes is False for exactly the creature CR 603.4's intervening "if" on a
 -- dies-trigger asks about (Guildsworn Prowler).
 --
--- Not implemented: the record carries no `attacking`, so that field and the
--- three that hang off the same GameState.combat lookup still read live and
--- answer for a gone creature as though it had never been in combat (#991).
--- The neighbouring `attackedThisTurn` needs no record at all: CR 608.2i makes it
--- a fold over GameState.events, which CR 511.3 does not clear and the death does
--- not touch.
+-- And so is the ATTACKING status, off the record's own field, for the blocking
+-- status' reason on the other side of the declaration: Garna, Bloodfist of Keld's
+-- "draw a card if it was attacking" reads it about the creature CR 400.7 deleted.
+--
+-- The three fields that follow the SAME GameState.combat lookup on to the attacked
+-- permanent -- attackingPlayer, attackingPlaneswalkerController and
+-- attackingBattleProtector -- are left reading live, and Pawl.Types.LastKnown's
+-- `attacking` records the query behind that. So is `blocked`, whose one printing
+-- asks a CR 608.2i question. The neighbouring `attackedThisTurn` needs no record
+-- either: CR 608.2i makes it a fold over GameState.events, which CR 511.3 does not
+-- clear and the death does not touch.
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
@@ -2405,6 +2410,7 @@ filterReads f = case f of
   -- handed in on the context, so it is a fixed input to any single projection.
   Filter.Type.CantCrewVehicles -> Set.empty
   Filter.Type.DealtDamageThisTurn -> Set.empty
+  Filter.Type.CrewedSourceThisTurn -> Set.empty
   -- Reads the CONTROLLER, which layer 2 moves: CR 302.6's continuity claim is
   -- about a player, and Pawl.Engine.Engine.checkControlContinuity drops the settle when
   -- that player stops controlling the object.
@@ -2517,6 +2523,7 @@ filterReads f = case f of
   Filter.Type.HasCountersOfAnyKind -> Set.empty
   -- CR 202.3 reads the printed mana cost, which no Modification writes.
   Filter.Type.ManaValueAtMost _ -> Set.empty
+  Filter.Type.ManaValueLessThanSource -> Set.empty
   Filter.Type.ManaValueIsEven -> Set.empty
   Filter.Type.ManaValueAtMostAmount -> Set.empty
   Filter.Type.And fs -> foldMap filterReads fs
@@ -2632,6 +2639,7 @@ filterReadsPeers f = case f of
   -- peer's view, so no second projection can change its answer.
   Filter.Type.CantCrewVehicles -> False
   Filter.Type.DealtDamageThisTurn -> False
+  Filter.Type.CrewedSourceThisTurn -> False
   Filter.Type.ControlledSinceTurnBegan -> False
   Filter.Type.IsAttachedToSource -> False
   Filter.Type.IsHostOfSource -> False
@@ -2651,6 +2659,9 @@ filterReadsPeers f = case f of
   Filter.Type.HasCounters _ -> False
   Filter.Type.HasCountersOfAnyKind -> False
   Filter.Type.ManaValueAtMost _ -> False
+  -- The SOURCE's mana value arrives on the Context, PowerLessThanSource's answer
+  -- above: no projection of a second object is read.
+  Filter.Type.ManaValueLessThanSource -> False
   Filter.Type.ManaValueIsEven -> False
   Filter.Type.ManaValueAtMostAmount -> False
 
@@ -2851,6 +2862,7 @@ quantityReads q = case q of
   Quantity.Type.TimesKickedWith _ -> Set.empty
   Quantity.Type.TagWasSpent {} -> Set.empty
   Quantity.Type.WasToken -> Set.empty
+  Quantity.Type.WasAttacking -> Set.empty
   Quantity.Type.WasBlocking -> Set.empty
   Quantity.Type.DamageDealtToThisTurn -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty

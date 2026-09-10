@@ -327,11 +327,17 @@ payableCost = payableCostAt 0
 -- and its cost skips the search (#2959), exactly as on the activation road. No
 -- cost adjustment in `data/cards/` adds a component with a criterion naming a
 -- slot.
+--
+-- CR 702.51b's and CR 702.126b's tap substitutes are part of this question and
+-- not a later one: a Siege Wurm is castable off six creatures and no land, so a
+-- gate that measured the mana alone would refuse the cast convoke is printed to
+-- allow. Cost.tapSubstitutions is the offer, and castProposed asks the payer to
+-- pick among the same entries.
 payableCostAt :: Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x spending pid oid gs cost =
   let adjustments = Cost.spellAdjustments pid oid gs
       substituted = Cost.substituteX x cost
-      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.plusComponents adjustments substituted) gs
+      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.tapSubstitutions slots pid oid gs) (Cost.plusComponents adjustments substituted) gs
    in if Cost.readsBoundSlot substituted
         then any (any ask . Target.aimings) (castAimable pid oid gs)
         else ask Map.empty
@@ -2201,7 +2207,11 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- Cost.totalManas is handed in so that the routes offered are the
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
                   -- payableCost gated this cast on, read from the same
-                  -- `bestowedGs` the total below is.
+                  -- `bestowedGs` the total below is. Under CR 702.51b's and CR
+                  -- 702.126b's substitutes as well, for the reason
+                  -- Cost.tapSubstitutedManas gives: the gate counts them, so an
+                  -- announcement that did not would find no payable half on a
+                  -- spell convoke alone can pay.
                   --
                   -- CR 601.2f's additional components are on the cost by this
                   -- point (Cost.plusComponents), which is what payableCost
@@ -2211,7 +2221,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- Swamp" in view would be offered against a board that has one
                   -- Swamp too many.
                   let gathered = Cost.spellAdjustments pid sid bestowedGs
-                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.tapSubstitutedManas (Cost.totalManas gathered) pid sid bestowedGs) (Cost.plusComponents gathered announcedAtX)
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.kicked`'s
@@ -2343,7 +2353,13 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                       let lateCost = Cost.plusComponents adjustments announcedAtX
                           announcedSuffix = Cost.Type.components announcedCost List.\\ Cost.Type.components (Cost.plusComponents gathered announcedAtX)
                           paidCost = Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix}
-                      payment <- Cost.pay perform PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid paidCost
+                      -- CR 702.51b / 702.126b: convoke and improvise apply once
+                      -- the total cost is determined, so the payer is offered the
+                      -- substitutes HERE -- after `paidCost` and before CR
+                      -- 601.2h's payment, which is the same list the gate above
+                      -- measured.
+                      substituted <- Cost.announceTapSubstitutions pid sid paidCost
+                      payment <- Cost.pay perform PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid substituted
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed

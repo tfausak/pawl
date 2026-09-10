@@ -114,6 +114,9 @@ data Quantity
   | -- | CR 111.6 / 608.2h: 1 if the object this quantity is evaluated against
     -- was a token, else 0.
     WasToken
+  | -- | CR 508.1k / 608.2h: 1 if the object this quantity is evaluated against
+    -- was attacking, else 0.
+    WasAttacking
   | -- | CR 509.1g / 608.2h: 1 if the object this quantity is evaluated against
     -- was blocking, else 0.
     WasBlocking

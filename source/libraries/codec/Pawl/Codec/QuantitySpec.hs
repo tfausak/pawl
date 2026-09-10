@@ -274,6 +274,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.WasToken
       " {\"type\":\"WasToken\"} "
+  Spec.it s "WasAttacking" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.WasAttacking
+      " {\"type\":\"WasAttacking\"} "
   Spec.it s "WasBlocking" $
     Common.assertCodec
       s

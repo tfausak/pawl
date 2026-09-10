@@ -83,10 +83,11 @@ codec =
       -- the card names, and the object is whichever one the quantity is
       -- evaluated against.
       Arm.payload "TagWasSpent" ProductionTag.codec Quantity.TagWasSpent (\x -> case x of Quantity.TagWasSpent y -> Just y; _ -> Nothing),
-      -- CR 111.6's status and CR 509.1g's combat fact, both with nothing on the
-      -- wire for WasKicked's reason: the object is whichever one the quantity is
-      -- evaluated against.
+      -- CR 111.6's status and CR 508.1k / 509.1g's two combat facts, all with
+      -- nothing on the wire for WasKicked's reason: the object is whichever one the
+      -- quantity is evaluated against.
       Arm.nullary "WasToken" Quantity.WasToken,
+      Arm.nullary "WasAttacking" Quantity.WasAttacking,
       Arm.nullary "WasBlocking" Quantity.WasBlocking,
       Arm.nullary "ClassLevel" Quantity.ClassLevel,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted

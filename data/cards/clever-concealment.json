@@ -1,6 +1,11 @@
 {
   "faces": [
     {
+      "keywords": [
+        {
+          "type": "Convoke"
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",

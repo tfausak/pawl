@@ -90,6 +90,12 @@ data Filter keyword
   | -- | CR 202.3: the object's mana value is <= this literal. Answerable off the
     -- battlefield, rule 202.3 reading the printed mana cost.
     ManaValueAtMost Integer
+  | -- | CR 202.3 compared against the SOURCE rather than a literal: the object's
+    -- mana value is strictly less than the mana value of the object the
+    -- evaluation comes from (CR 702.85a's cascade). PowerLessThanSource's
+    -- reading one characteristic over -- read off Pawl.Engine.Filter.Context's
+    -- sourceManaValue, and vacuously False where either mana value is absent.
+    ManaValueLessThanSource
   | -- | CR 202.3 read for its PARITY rather than against a bound -- Void
     -- Winnower's "spells with even mana values", whose reminder text settles the
     -- boundary case: "(Zero is even.)" CR 202.3e is what makes it interesting off
@@ -296,6 +302,17 @@ data Filter keyword
     -- Pawl.FilterPositionLintSpec's "CR 702.122d no card asks
     -- CantCrewVehicles" is what keeps a card out of the position.
     CantCrewVehicles
+  | -- | CR 702.122c: the candidate is a creature that crewed the SOURCE earlier
+    -- this turn -- Subterranean Schooner's "target creature that crewed it this
+    -- turn". AttackedThisTurn's look-back read, over (GameEvent.BecameCrewed) and
+    -- narrowed to the crewings of the object the surrounding evaluation is FOR,
+    -- which is what makes it "crewed it" rather than "crewed a Vehicle".
+    --
+    -- Not implemented: rule 702.122b's own timing, which makes a creature crew as
+    -- it is TAPPED. The event this reads is recorded where the crew ability
+    -- resolves, so a crew ability that is countered leaves a creature this atom
+    -- says crewed nothing (#915).
+    CrewedSourceThisTurn
   | -- | CR 120.1 / 608.2i: the candidate -- an object or a player, since CR 120.1
     -- has damage dealt to both -- was DEALT DAMAGE earlier this turn.
     -- AttackedThisTurn's look-back read one event arm over

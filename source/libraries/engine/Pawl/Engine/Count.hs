@@ -316,6 +316,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.PowerIsAmountInSlot _ -> predicate
         Filter.Type.PowerAtLeastAmountInSlot _ -> predicate
         Filter.Type.ManaValueAtMost _ -> predicate
+        Filter.Type.ManaValueLessThanSource -> predicate
         Filter.Type.ManaValueIsEven -> predicate
         Filter.Type.ManaValueAtMostAmount -> predicate
         Filter.Type.ControlledBy _ -> predicate
@@ -357,6 +358,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.MilledThisTurn -> predicate
         Filter.Type.CantCrewVehicles -> predicate
         Filter.Type.DealtDamageThisTurn -> predicate
+        Filter.Type.CrewedSourceThisTurn -> predicate
         Filter.Type.ControlledSinceTurnBegan -> predicate
         -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
         -- call rather than an omission: `candidate` here is a PLAYER (the sole caller
@@ -936,6 +938,9 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- CR 120.1 damages an OBJECT, and this view describes a snapshot rather
       -- than one -- there is no id here for the turn's damage to have named.
       Filter.dealtDamageThisTurn = False,
+      -- CR 702.122c relates two OBJECTS, and this view describes a snapshot
+      -- rather than one -- `milledThisTurn` above's reason again.
+      Filter.crewedThisTurn = Set.empty,
       -- CR 302.6 asks about an OBJECT under a player's control; this view
       -- describes a snapshot rather than one -- `milledThisTurn` above's reason.
       Filter.controlledSinceTurnBegan = False,
