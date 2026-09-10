@@ -1053,7 +1053,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
                   { CastOffer.Type.transformed = True,
                     CastOffer.Type.withoutPayingManaCost = True,
                     CastOffer.Type.payingInstead = Nothing,
-                    CastOffer.Type.spending = ManaSpending.AsProduced
+                    CastOffer.Type.spending = ManaSpending.AsProduced,
+                    CastOffer.Type.restriction = Nothing
                   }
             }
       )

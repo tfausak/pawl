@@ -1,3 +1,6 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- Covers CR 715 end to end: Pawl.Types.Layout's Adventure arm, the two
 -- Pawl.Engine.Card arms that read it (CR 715.4's combined view and CR 715.3's
 -- castable halves) plus Card.isAdventure, Pawl.Engine.Resolve.finishSpell (CR
@@ -12,6 +15,8 @@
 -- through S.soleFaceName and errors on a card with more than one castable half.
 module Pawl.AdventureSpec where
 
+import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -19,9 +24,11 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -30,9 +37,15 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastObligation as CastObligation
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -260,3 +273,54 @@ spec s registry = Spec.describe s "Adventure" $ do
         fizzled = snd (Engine.runGamePure S.identityAnswer gone Stack.resolveTop)
     Spec.assertEqWith s "nothing in exile" (Game.zoneMembers Zone.Exile S.alice fizzled) []
     Spec.assertEqWith s "the card and its target are both in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice fizzled)) 2
+  -- CR 702.85a's SECOND condition, which an adventurer card is the only thing in
+  -- the pool that can tell from its first: "you may cast that card without paying
+  -- its mana cost IF THE RESULTING SPELL's mana value is less than this spell's
+  -- mana value". Rule 715.3's two halves have two mana values -- the creature's 2
+  -- and the Adventure's 1 -- so a bound of 3 admits both and a bound of 2 admits
+  -- only the Adventure, which is the offer's restriction being asked per half (CR
+  -- 709.3a's posture).
+  --
+  -- ONE board and ONE answerer through both legs, differing in that number alone;
+  -- the answerer always prefers the creature half, so what accounts for the two
+  -- outcomes is which halves were offered. TWO artifacts, so the Adventure has a
+  -- legal target either way and an absent offer is never about targeting.
+  --
+  -- Pawl.Engine.Resolve.Effect.offerCast directly rather than through a cascade,
+  -- because no printing is both cheap enough for Bloodbraid Elf's walk to find and
+  -- expensive enough on its other half for the bound to bite (gap #3578).
+  Spec.it s "CR 702.85a an offer's restriction is asked of each castable half" $ do
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (_, oneArtifact) = S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 3)
+        (_, board) = S.addPermanent bonesplitter S.alice oneArtifact
+        (exiledId, gs) = S.addExiledCard shieldbreaker S.alice board
+        offer =
+          CastOffer.MkCastOffer
+            { CastOffer.transformed = False,
+              CastOffer.withoutPayingManaCost = True,
+              CastOffer.payingInstead = Nothing,
+              CastOffer.spending = ManaSpending.AsProduced,
+              CastOffer.restriction = Just Filter.Type.ManaValueLessThanSource
+            }
+        context bound = (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing) {Filter.sourceManaValue = Just bound}
+        under bound = S.runPure preferringTheCreature gs (Resolve.offerCast (context bound) [exiledId] S.alice CastObligation.Optional offer)
+        resolved bound = S.runPure preferringTheCreature (under bound) Stack.resolveTop
+        knights g = filter (\o -> Set.member Subtype.Knight (Projection.subtypesOf o g)) (Set.toList (GameState.battlefield g))
+        artifacts g = filter (\o -> Set.member CardType.Artifact (Projection.cardTypesOf o g)) (Set.toList (GameState.battlefield g))
+    Spec.assertEqWith s "a bound of 3 reaches the creature half, which enters" (length (knights (resolved 3))) 1
+    Spec.assertEqWith s "and a bound of 2 reaches only the Adventure, which destroys an artifact" (length (knights (resolved 2)), length (artifacts (resolved 2))) (0, 1)
+    -- The proxy, after both: the bound of 3 left both artifacts alone, so the
+    -- difference above is which half was cast rather than which target was chosen.
+    Spec.assertEqWith s "both artifacts survive the creature's cast" (length (artifacts (resolved 3))) 2
+
+-- Takes CR 608.2g's offer and, where both halves are offered, the creature's --
+-- pinned by name rather than searched for, so a mutation cannot be repaired by an
+-- answerer that finds the other half legal.
+preferringTheCreature :: Prompt.Prompt r -> r
+preferringTheCreature p = case p of
+  Prompt.ChooseOfferedCastSpell _ _ options ->
+    Maybe.fromMaybe (NonEmpty.head options) (List.find ((== shieldbreakerName) . snd) (NonEmpty.toList options))
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p

@@ -277,6 +277,12 @@ data Keyword
   | -- | 702.83a: whenever a creature you control attacks alone, that creature
     -- gets +1/+1 until end of turn. Two instances are two abilities.
     Exalted
+  | -- | 702.85a: cascade -- a triggered ability that functions only while the
+    -- spell with cascade is on the stack. When you cast the spell, exile cards
+    -- from the top of your library until you exile a nonland card whose mana
+    -- value is less than the spell's, you may cast that card without paying its
+    -- mana cost, and the rest go on the bottom of your library in a random order.
+    Cascade
   | -- | 702.86a: whenever this creature attacks, defending player (CR 508.5)
     -- sacrifices N permanents; each instance triggers separately (CR 702.86b).
     Annihilator Natural.Natural

@@ -1328,11 +1328,19 @@ eventTriggers events gs =
       -- condition that functions on the stack and watches some other event is
       -- what would widen this.
       --
+      -- The KEYWORD-MINTED abilities join the printed ones and are NOT filtered by
+      -- `functionsIn`, `exileCandidate`'s split above and for its reason: CR
+      -- 702.85a states the zone itself -- "functions only while the spell with
+      -- cascade is on the stack" -- so rule 113.6's default has already been
+      -- overridden by the rule that mints it.
+      -- Pawl.Engine.Keyword.stackTriggeredAbilitiesOf is what decides which
+      -- keywords reach this, and cascade is the only one.
+      --
       -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#1859).
       spellCast event = case event of
         GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
-          Just face -> case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) of
+          Just face -> case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) <> Keyword.stackTriggeredAbilitiesOf (Face.keywords face) of
             [] -> Map.empty
             abilities -> Map.singleton spell (caster, abilities)
         GameEvent.Discarded {} -> Map.empty
