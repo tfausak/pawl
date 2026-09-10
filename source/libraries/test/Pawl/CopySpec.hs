@@ -753,7 +753,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- creature enter as a copy of any creature on the battlefield, except it has
   -- changeling."
   --
-  -- Not implemented: convoke (#877), so pawl's Omni-Changeling pays {3}{U}{U} in
+  -- Not implemented: convoke (#3470), so pawl's Omni-Changeling pays {3}{U}{U} in
   -- full -- stricter than printed, and nothing below turns on the cost.
   --
   -- The copy's own printed changeling is GONE (CR 707.2 replaced it with the
