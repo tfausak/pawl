@@ -1602,10 +1602,11 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
 -- asks. Both go back through controllerOfGiven, never through the projection
 -- (see controlGrants).
 --
--- Not implemented: MatchingAnywhere and MatchingOffBattlefield, which stay empty
--- and so grant nothing (#1927). CR 109.4 gives a controller only to an object on
--- the battlefield or the stack, so the part of either set a control grant could
--- observe is the part those two arms share with Matching's own.
+-- MatchingAnywhere and MatchingOffBattlefield stay empty and so grant nothing,
+-- which is what the rule asks rather than an elision: CR 109.4 gives a
+-- controller only to an object on the battlefield or the stack, so the part of
+-- either set a control grant could observe is the part those two arms share
+-- with Matching's own.
 controlNames :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Affected.Affected -> Set ObjectId
 controlNames grants visited gs source a = case a of
   Affected.TheseObjects s -> s
