@@ -62,6 +62,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -137,6 +138,7 @@ import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
+import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -214,6 +216,10 @@ abilitiesFor keyword count = case keyword of
   Keyword.Frenzy n -> List.genericReplicate count (frenzy n)
   -- CR 702.43a's SECOND ability, one per instance (CR 702.43b).
   Keyword.Modular _ -> List.genericReplicate count modular
+  -- Rule 702.85a's ability functions only while the spell is on the STACK, so
+  -- stackTriggeredAbilitiesOf mints it and this roster stays empty -- suspend's
+  -- shape one zone over.
+  Keyword.Cascade -> []
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
@@ -418,6 +424,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Cascade -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -761,6 +768,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Cascade -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1256,6 +1264,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Cascade -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1966,6 +1975,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Cascade -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2178,6 +2188,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Cascade -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2394,6 +2405,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Cascade -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2534,6 +2546,7 @@ familyOf keyword = case keyword of
   -- CR 702.16a's parameterized keyword: "a creature with protection" drops the
   -- stated quality.
   Keyword.Protection _ -> Just KeywordFamily.Protection
+  Keyword.Cascade -> Nothing
   Keyword.Deathtouch -> Nothing
   Keyword.Defender -> Nothing
   Keyword.DoubleStrike -> Nothing
@@ -3807,7 +3820,7 @@ miracle cost =
               -- trigger's controller, and a "may".
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced}
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing}
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfRevealedForMiracle,
@@ -3870,6 +3883,121 @@ exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbili
 exileTriggeredAbilitiesOf keywords = case suspend keywords of
   Nothing -> []
   Just _ -> [suspendUpkeep, suspendLastCounter]
+
+-- CR 702.85a's ability, "a triggered ability that functions only while the spell
+-- with cascade is on the stack" -- the roster the cast scan in
+-- Pawl.Engine.Event.Trigger mints, `exileTriggeredAbilitiesOf`'s sibling one zone
+-- over and ungated by CR 113.6 for that function's reason: rule 702.85a states
+-- the zone itself, so asking `functionsIn` would only re-derive it from a
+-- condition (a cast) that says nothing about the stack.
+--
+-- A SET, `exileTriggeredAbilitiesOf`'s reading. Not implemented: CR 702.85c's
+-- separate trigger per instance, which a printed keyword set cannot count
+-- (#3577).
+stackTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+stackTriggeredAbilitiesOf keywords =
+  if Set.member Keyword.Cascade keywords then [cascade] else []
+
+-- CR 702.85a: "When you cast this spell, exile cards from the top of your library
+-- until you exile a nonland card whose mana value is less than this spell's mana
+-- value. You may cast that card without paying its mana cost if the resulting
+-- spell's mana value is less than this spell's mana value. Then put all cards
+-- exiled this way that weren't cast on the bottom of your library in a random
+-- order."
+--
+-- THREE CLAUSES, hideaway's shape one zone and one opcode over: the walk that
+-- ends AT its match is ObjectRef.TopOfLibraryUntil (Treasure Hunt's), the offer
+-- is CR 608.2g's, and "the rest" needs no opcode of its own -- the third clause
+-- reads the same slot and finds the cast card gone, casting having deleted the
+-- exiled incarnation the way CR 400.7 deletes a moved one.
+--
+-- ONE FILTER, written twice for two questions the rule asks separately: it ENDS
+-- the walk (so the match is the last card exiled, CR 702.85a's first sentence)
+-- and then picks that one card back out of the batch for the offer. No prompt
+-- comes of the second read -- the walk stops at the first match, so exactly one
+-- exiled card can satisfy it, and EachCardFromAmong asks nobody anything.
+--
+-- Filter.ManaValueLessThanSource and not a literal, because "this spell's mana
+-- value" is read off the SPELL (CR 202.3): a cascade an effect grants to an X
+-- spell reads the announced X, which no minter could have baked.
+--
+-- Not implemented: CR 702.85b's "as you cascade" window, the action another
+-- effect takes over the exiled batch between the walk and the cast decision
+-- (#3580).
+--
+-- The offer carries the SAME atom as CR 702.85a's second condition, and that is
+-- the whole of its work: the card's mana value is already less by the walk, so
+-- what is left to ask is the RESULTING spell's -- an adventurer card's other
+-- half, whose mana value may exceed the card's (Fae of Wishes' Granted).
+cascade :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+cascade =
+  let plain =
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Untapped,
+            EntryRiders.attacking = False,
+            EntryRiders.blocking = Nothing,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.empty,
+            EntryRiders.underOwner = False,
+            EntryRiders.exiledFaceDown = False,
+            EntryRiders.faceDown = Nothing
+          }
+      match = Filter.And [Filter.Not (Filter.HasCardType CardType.Land), Filter.ManaValueLessThanSource]
+      exile =
+        Effect.MoveToZone
+          ( MoveToZone.MkMoveToZone
+              (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) match (Quantity.Literal 1)))
+              Zone.Exile
+              plain
+              (Just cascadeExiled)
+              Nothing
+              LibraryPlacement.defaultValue
+              Nothing
+          )
+      offer =
+        Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.ref = ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong cascadeExiled match),
+              -- Rule 702.85a's "YOU may cast it": the caster, who is the
+              -- trigger's controller.
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = CastObligation.Optional,
+              OfferCast.offer =
+                CastOffer.MkCastOffer
+                  { CastOffer.transformed = False,
+                    CastOffer.withoutPayingManaCost = True,
+                    CastOffer.payingInstead = Nothing,
+                    CastOffer.spending = ManaSpending.AsProduced,
+                    CastOffer.restriction = Just Filter.ManaValueLessThanSource
+                  }
+            }
+      rest =
+        Effect.MoveToZone
+          ( MoveToZone.MkMoveToZone
+              (ObjectRef.InSlot cascadeExiled)
+              Zone.Library
+              plain
+              Nothing
+              Nothing
+              (LibraryPlacement.RandomOrder LibraryPosition.Bottom)
+              Nothing
+          )
+      clause effect = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect)
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfCast,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.fromList [clause exile, clause offer, clause rest]) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slot rule 702.85a's walk binds every card it exiled into, the match
+-- included -- hideawaySeen's position, read twice: once for the offer and once
+-- for what goes to the bottom.
+cascadeExiled :: SlotName.SlotName
+cascadeExiled = SlotName.MkSlotName (Text.pack "cascaded")
 
 -- "At the beginning of your upkeep, if this card is suspended, remove a time
 -- counter from it."
@@ -3952,7 +4080,7 @@ suspendLastCounter =
               -- trigger's controller, and a "may".
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced}
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing}
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,

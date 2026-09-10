@@ -44,7 +44,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                 { CastOffer.Type.transformed = True,
                   CastOffer.Type.withoutPayingManaCost = True,
                   CastOffer.Type.payingInstead = Nothing,
-                  CastOffer.Type.spending = ManaSpending.AsProduced
+                  CastOffer.Type.spending = ManaSpending.AsProduced,
+                  CastOffer.Type.restriction = Nothing
                 }
           }
       )
@@ -64,7 +65,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                 { CastOffer.Type.transformed = False,
                   CastOffer.Type.withoutPayingManaCost = True,
                   CastOffer.Type.payingInstead = Nothing,
-                  CastOffer.Type.spending = ManaSpending.AsProduced
+                  CastOffer.Type.spending = ManaSpending.AsProduced,
+                  CastOffer.Type.restriction = Nothing
                 }
           }
       )
