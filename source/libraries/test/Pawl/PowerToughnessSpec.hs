@@ -2191,10 +2191,10 @@ livingLoreSpec s registry = Spec.describe s "Living Lore" $ do
         after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
     Spec.assertEqWith s "the 0/0 Living Lore is gone" (newestNamed "Living Lore" after) Nothing
 
--- The printed box of every object on the battlefield whose card carries this
--- name, read off the finished layer fold. A list rather than a Maybe so the
--- assertion also says HOW MANY such permanents there were: a doubling that
--- somehow left two is a different failure from one that doubled wrong.
+-- The PROJECTED box -- the finished layer fold, never the printed values -- of
+-- every object whose card carries this name. A list rather than a Maybe so the
+-- assertion also says HOW MANY such objects there were: a doubling that somehow
+-- left two is a different failure from one that doubled wrong.
 boxesOfNamed :: String -> GameState.GameState -> [Maybe (Integer, Integer)]
 boxesOfNamed name gs = fmap (`S.powerToughnessOf` gs) (S.namedObjects (CardName.MkCardName (Text.pack name)) gs)
 
