@@ -563,7 +563,7 @@ minusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOn
 --
 -- WHY MORCANT and not Champion of the Weird, which #1491's body nominates: that
 -- card's "As an additional cost to cast this spell, behold a Goblin and exile it"
--- is CR 701.4's keyword action, which pawl does not have (gap #876). Dropping an
+-- is CR 701.4's keyword action, which pawl does not have (gap #3551). Dropping an
 -- additional cost would leave pawl's card WEAKER than printed, which disqualifies
 -- it.
 --
