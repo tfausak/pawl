@@ -9,14 +9,16 @@
 -- Gameplay-level throughout: the first two cases put a printed Emporium
 -- Thopterist on the battlefield and begin its controller's upkeep so the printed
 -- trigger fires and resolves; the third declares a printed Toralf's Disciple as
--- an attacker; the fourth enters a printed Shellfish Scholar; the fifth casts a
--- noncreature spell under a printed Lam, Storm Crane Elder.
+-- an attacker; the fourth and fifth enter a printed Shellfish Scholar; the sixth
+-- casts a noncreature spell under a printed Lam, Storm Crane Elder.
 --
 -- The first four CAST what the conjure created, which is the point -- conjure
 -- creates a CARD and not CR 111.1's token, and a token in a hand, a library or a
 -- graveyard would be swept up by CR 111.7 before any cast. The BATTLEFIELD case
 -- proves the entry rather than the cardness: rule 111.7 sweeps up nothing there,
--- so no board of that shape tells a conjured card from a token.
+-- so no board of that shape tells a conjured card from a token. The fifth is the
+-- graveyard arrival's SHAPE rather than its cardness, read off a printed Planar
+-- Void that watches the graveyard.
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
@@ -240,6 +242,45 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "exactly one Think Twice reached alice's graveyard and none reached her hand"
       (length inYard, length (namedIn thinkTwice Zone.Hand conjured))
       (1, 0)
+  -- The same conjure watched by a bystander, which is what makes the arrival's
+  -- SHAPE observable: Planar Void ({B} Enchantment, "Whenever another card is put
+  -- into a graveyard from anywhere, exile that card"), Oracle text verified on
+  -- Scryfall 2026-09-10. Pawl.ZoneTriggerSpec's Planar Void group is where it
+  -- fires on a card put into a graveyard from a HAND.
+  --
+  -- One board, two Think Twices, differing in exactly one thing -- how each
+  -- reached the graveyard. The conjured one is materialized there in no zone
+  -- change, so CR 603.6's zone-change trigger has no event to match (CR 400.6)
+  -- and the Void leaves it alone; the cast one is put there from the stack and
+  -- the Void exiles it. The second assertion is what keeps the first from
+  -- passing because the Void is dead on this board.
+  Spec.it s "CR 603.6 a conjure into a graveyard is no zone change, so a graveyard trigger does not see it" $ do
+    islandPrinting <- S.printingOf s registry "Island"
+    scholar <- S.printingOf s registry "Shellfish Scholar"
+    planarVoid <- S.printingOf s registry "Planar Void"
+    twicePrinting <- S.printingOf s registry "Think Twice"
+    let (_, withVoid) = S.addPermanent planarVoid S.alice (S.landsInPlay islandPrinting 3)
+        (handCard, withHand) = S.addHandCard twicePrinting S.alice withVoid
+        -- Think Twice draws, and CR 104.3c would lose alice the game out from
+        -- under the assertions on an empty library.
+        (_, stocked) = S.addLibraryCard islandPrinting S.alice withHand
+        (_, entered) = S.entersWithTrigger scholar S.alice stocked
+        conjured = settleTriggers entered
+        inYard = namedIn thinkTwice Zone.Graveyard conjured
+        -- CR 304.1: an instant needs only priority, and the cast is what puts the
+        -- SECOND Think Twice into the graveyard out of a zone the card was in.
+        main_ = conjured {GameState.phase = Phase.PrecombatMain}
+        cast_ = settleTriggers (S.runPure S.identityAnswer main_ (S.cast S.alice handCard >> Stack.resolveTop))
+    Spec.assertEqWith
+      s
+      "CR 603.6 the Void saw no arrival, so the conjured Think Twice stayed in the graveyard and nothing was exiled"
+      (length inYard, namesIn Zone.Exile conjured)
+      (1, [])
+    Spec.assertEqWith
+      s
+      "CR 603.6 the CAST one was put into the graveyard from the stack, and the same Void exiled that one alone"
+      (namedIn thinkTwice Zone.Graveyard cast_, length (namedIn thinkTwice Zone.Exile cast_))
+      (inYard, 1)
   -- Lam, Storm Crane Elder ({2}{W}{W} Legendary Creature -- Human Monk, 3/3,
   -- "Prowess. Whenever you cast a noncreature spell, conjure a card named
   -- Monastery Mentor onto the battlefield."), the one destination that is an
