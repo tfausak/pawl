@@ -25,7 +25,9 @@
 -- 607.2a's linked exile pile read from a static ability, where there is no
 -- resolution slot to aim at (Phyrexian Ingester), and CR 614.14's linked pile,
 -- filled by an as-enters exile out of a graveyard and read by a CDA (Living
--- Lore).
+-- Lore), and CR 701.10's and CR 701.11's arithmetic on a creature's box, which
+-- rules 701.10b-c and 701.11b-c define as a layer-7c modification read off the
+-- fold (Unleash Fury, Synthetic Threefold Growth).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -35,6 +37,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -638,6 +641,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   bioplasmSpec s registry
   ingesterSpec s registry
   livingLoreSpec s registry
+  unleashFurySpec s registry
+  threefoldGrowthSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -2185,3 +2190,139 @@ livingLoreSpec s registry = Spec.describe s "Living Lore" $ do
     let (gs, held) = S.handOne livingLore (S.landsInPlay island 4)
         after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
     Spec.assertEqWith s "the 0/0 Living Lore is gone" (newestNamed "Living Lore" after) Nothing
+
+-- The printed box of every object on the battlefield whose card carries this
+-- name, read off the finished layer fold. A list rather than a Maybe so the
+-- assertion also says HOW MANY such permanents there were: a doubling that
+-- somehow left two is a different failure from one that doubled wrong.
+boxesOfNamed :: String -> GameState.GameState -> [Maybe (Integer, Integer)]
+boxesOfNamed name gs = fmap (`S.powerToughnessOf` gs) (S.namedObjects (CardName.MkCardName (Text.pack name)) gs)
+
+-- Unleash Fury ({1}{R} Instant -- "Double the power of target creature until end
+-- of turn", Oracle text verified against Scryfall 2026-09-10).
+--
+-- CR 701.10b DEFINES the instruction rather than adding a game action to it:
+-- "that creature gets +X\/+0, where X is that creature's power as the spell or
+-- ability that doubles its power resolves". So doubling needs no opcode of its
+-- own. It is Effect.ModifyTarget carrying CR 613.4c's layer-7c
+-- Modification.ModifyPowerToughness, with the power leg Quantity.AgainstSlot of
+-- Quantity.Power and the toughness leg a literal 0 -- the pair Rush of Blood
+-- already writes -- and CR 611.2d's freeze at resolution is exactly what "as the
+-- spell resolves" means. CR 701.10a is the same sentence read as a
+-- classification: the effect MODIFIES and does not set, which is what keeps it
+-- out of layer 7b.
+--
+-- CR 701.10c needs no second shape either: X there is the difference between 0
+-- and a negative power, which is that power, and Quantity's Integer already
+-- carries the sign (CR 107.1b). The second case below is that branch.
+unleashFurySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+unleashFurySpec s registry = Spec.describe s "Unleash Fury" $ do
+  -- THE PROVING CASE, and the reason an anthem is on the board: the power
+  -- doubled is the one the layer fold has already produced, not the printed box.
+  -- A Goblin Piker (2\/1) under Glorious Anthem is a 3\/2, so CR 701.10b's X is
+  -- 3 and the right answer is 6\/2. Falsifiers, all distinct: a freeze reading
+  -- the printed 2 gives 5\/2; a board with no anthem gives 4\/1; +X\/+X gives
+  -- 6\/5.
+  Spec.it s "CR 701.10b/613.4c the doubled power is the one layer 7c already built, not the printed one" $ do
+    let furyBoard anthems =
+          let mine =
+                ( S.battlefield
+                    S.alice
+                    ( anthems
+                        <> [ S.aliased "victim" (S.permanent "Goblin Piker"),
+                             S.aliased "first" (S.permanent "Mountain"),
+                             S.aliased "second" (S.permanent "Mountain")
+                           ]
+                    )
+                )
+                  { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Unleash Fury"))
+                  }
+           in S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "victim")],
+              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
+            }
+        script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
+    after <- S.play s registry (furyBoard [S.permanent "Glorious Anthem"]) script S.priorityGame
+    control <- S.play s registry (furyBoard []) script S.priorityGame
+    Spec.assertEqWith s "the Piker is a 6/2: +3/+0 off the anthem's 3, never +2/+0 off the printed 2" (boxesOfNamed "Goblin Piker" after) [Just (6, 2)]
+    Spec.assertEqWith s "and 4/1 on the board that differs only in the anthem, so the doubled value moved with layer 7c" (boxesOfNamed "Goblin Piker" control) [Just (4, 1)]
+    Spec.assertEqWith s "two Mountains paid {1}{R}" (S.tappedCount S.alice after) 2
+    Spec.assertEqWith s "Unleash Fury resolved out of hand" (S.handSize S.alice after) 0
+  -- CR 701.10c, the other branch of the same rule: a power below 0 is doubled by
+  -- a NEGATIVE modification. Silent Arbiter (1\/5) under four -1\/-1 counters is
+  -- a -3\/1 (CR 122.1a, the same layer 7c), so X is -3 and the right answer is
+  -- -6\/1. Falsifiers: a clamp at 0 leaves -3\/1; the printed 1 read instead
+  -- gives -2\/1; rule 701.10b's bare reading taken as an absolute value gives
+  -- 0\/1. The Arbiter's toughness stays at 1 throughout, so CR 704.5f never
+  -- takes the board away from the assertion.
+  Spec.it s "CR 701.10c/107.1b doubling a power below zero modifies it downwards" $ do
+    let arbiter =
+          (S.aliased "victim" (S.permanent "Silent Arbiter"))
+            { S.objectCounters = Map.singleton CounterKind.MinusOneMinusOne 4
+            }
+        mine =
+          (S.battlefield S.alice [arbiter, S.aliased "first" (S.permanent "Mountain"), S.aliased "second" (S.permanent "Mountain")])
+            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Unleash Fury"))
+            }
+        setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "victim")],
+              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
+            }
+        script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
+    after <- S.play s registry setup script S.priorityGame
+    Spec.assertEqWith s "the Arbiter is a -6/1: -3/-0 added to the -3/1 the counters made" (boxesOfNamed "Silent Arbiter" after) [Just (-6, 1)]
+    Spec.assertEqWith s "and it is still on the battlefield, so CR 704.5f did not decide this" (S.creaturesInPlay S.alice after) 1
+
+-- Synthetic Threefold Growth ({2}{G} Instant -- "Triple target creature's power
+-- and toughness until end of turn"). SYNTHETIC because nothing printed triples a
+-- creature's box: Scryfall oracle:triple, 2026-09-10, answers triple DAMAGE
+-- (Fiery Emancipation), triple strike, and card names, and nothing else. Rules
+-- 701.11a-c state the effect in full and rule 613.4c places it, so a printing
+-- that used it would be ordinary; none has been made. Unnatural Growth or
+-- Choose Your Weapon is what would refute that, with "triple" for "double".
+--
+-- The point of the card is that tripling takes NO opcode beyond doubling's. CR
+-- 701.11b's X is "twice that creature's power", which is
+-- Quantity.Plus of two Powers against the same slot, and CR 701.11c's negative
+-- branch is the same sum over a negative Integer. The multiplier is a
+-- PARAMETER of the data, not a second instruction, so rules 701.10 and 701.11
+-- are one shape.
+threefoldGrowthSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+threefoldGrowthSpec s registry = Spec.describe s "Synthetic Threefold Growth" $ do
+  -- BOTH branches on one board, which is what picking the negative creature
+  -- buys: Silent Arbiter (1\/5) under four -1\/-1 counters is a -3\/1, so CR
+  -- 701.11c's power leg is -6 (twice the difference between 0 and -3, downwards)
+  -- and CR 701.11b's toughness leg is +2. The right answer is -9\/3.
+  -- Falsifiers, all distinct: DOUBLING instead gives -6\/2; a Plus that read
+  -- only its left half gives the same -6\/2; the printed 1\/5 read instead of
+  -- the folded box gives -1\/11; a clamp at 0 gives -3\/3.
+  Spec.it s "CR 701.11b/701.11c tripling is doubling's shape with the multiplier moved" $ do
+    let arbiter =
+          (S.aliased "victim" (S.permanent "Silent Arbiter"))
+            { S.objectCounters = Map.singleton CounterKind.MinusOneMinusOne 4
+            }
+        mine =
+          ( S.battlefield
+              S.alice
+              [ arbiter,
+                S.aliased "first" (S.permanent "Forest"),
+                S.aliased "second" (S.permanent "Forest"),
+                S.aliased "third" (S.permanent "Forest")
+              ]
+          )
+            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Threefold Growth"))
+            }
+        setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "victim")],
+              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
+            }
+        script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
+    after <- S.play s registry setup script S.priorityGame
+    Spec.assertEqWith s "the Arbiter is a -9/3: twice -3 down and twice 1 up, off the folded box" (boxesOfNamed "Silent Arbiter" after) [Just (-9, 3)]
+    Spec.assertEqWith s "three Forests paid {2}{G}" (S.tappedCount S.alice after) 3
