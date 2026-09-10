@@ -490,10 +490,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- rather than Game.isToken: reading the object directly answers False for an
         -- id naming nothing, which is the whole case this arm exists for; see #1102.
         Quantity.WasToken -> fmap (\view -> if Filter.token view then 1 else 0) mView
-        -- CR 509.1g's combat fact as a 0/1, WasToken's arm in every respect --
+        -- CR 508.1k's combat fact as a 0/1, WasToken's arm in every respect --
         -- including the reader, since a creature that has died is out of
-        -- GameState.combat as well as out of GameState.objects; see #991, whose
-        -- LastKnown blocking half is what makes this arm answer at all.
+        -- GameState.combat as well as out of GameState.objects, and
+        -- Pawl.Types.LastKnown.attacking is what makes this arm answer at all.
+        Quantity.WasAttacking -> fmap (\view -> if Filter.attacking view then 1 else 0) mView
+        -- CR 509.1g's other half of the declaration, the arm above in every
+        -- respect, reading Pawl.Types.LastKnown.blocking through the same view.
         Quantity.WasBlocking -> fmap (\view -> if Filter.blocking view then 1 else 0) mView
         -- CR 120.1's damage as a total, read off the event log for the object the
         -- quantity is aimed at (Game.damageDealtToThisTurn) rather than off its view:
@@ -984,6 +987,7 @@ objectSlots quantity = case quantity of
   Quantity.TimesKickedWith _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
   Quantity.WasToken -> Set.empty
+  Quantity.WasAttacking -> Set.empty
   Quantity.WasBlocking -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
@@ -1206,6 +1210,7 @@ readsX quantity = case quantity of
   Quantity.TimesKickedWith _ -> False
   Quantity.TagWasSpent {} -> False
   Quantity.WasToken -> False
+  Quantity.WasAttacking -> False
   Quantity.WasBlocking -> False
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False

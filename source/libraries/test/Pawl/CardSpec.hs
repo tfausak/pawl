@@ -3114,6 +3114,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.TimesKickedWith {} -> []
   Quantity.Type.TagWasSpent {} -> []
   Quantity.Type.WasToken -> []
+  Quantity.Type.WasAttacking -> []
   Quantity.Type.WasBlocking -> []
   Quantity.Type.DamageDealtToThisTurn -> []
   -- CR 122.1's PER-PLAYER tally, whose kind is a Pawl.Types.PlayerCounterKind --

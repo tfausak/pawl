@@ -577,8 +577,9 @@ lastKnownBlockingSpec s registry =
            in k prowlerId declared killed (S.runPure S.identityAnswer onStack Stack.resolveTop)
         _ -> Spec.assertFailure s "combatBoardOf should place exactly one Prowler"
    in Spec.describe s "LastKnownBlocking" $ do
-        -- THE PROVING TEST for #991. A live read of the dead id answers "it wasn't
-        -- blocking" and bob draws off a creature that spent the step blocking.
+        -- THE PROVING TEST for CR 509.1g's half of the record. A live read of the
+        -- dead id answers "it wasn't blocking" and bob draws off a creature that
+        -- spent the step blocking; lastKnownAttackingSpec below is CR 508.1k's.
         Spec.it s "CR 608.2h a blocking Guildsworn Prowler that dies draws nothing" $ do
           giant <- S.printingOf s registry "Hill Giant"
           prowler <- S.printingOf s registry "Guildsworn Prowler"
@@ -599,6 +600,73 @@ lastKnownBlockingSpec s registry =
             Spec.assertEqWith s "bob drew his one library card" (S.handSize S.bob after) 1
             Spec.assertEqWith s "off a Prowler that was never blocking" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just False)
             Spec.assertEqWith s "and died the same way" (Set.member prowlerId (GameState.battlefield killed)) False
+
+-- Declares exactly `victim` as an attacker, or nobody at all: the ONE thing the
+-- two legs of lastKnownAttackingSpec differ in. Filters the offered set rather
+-- than naming the id, so a board that never offers it fails rather than passing
+-- vacuously.
+attackingOnly :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackingOnly attacks victim p = case p of
+  Prompt.DeclareAttackers _ _ ids -> if attacks then List.filter (== victim) ids else []
+  _ -> S.aggressiveAnswer p
+
+-- CR 608.2h read for CR 508.1k's combat status, on an ordinary English "if"
+-- gating one clause of a resolution (CR 608.2c) rather than on CR 603.4's
+-- intervening one.
+--
+-- Garna, Bloodfist of Keld {1}{B}{R}{R} 4/3 Legendary Human Berserker: "Whenever
+-- another creature you control dies, draw a card if it was attacking. Otherwise,
+-- Garna deals 1 damage to each opponent."
+-- (data/cards/garna-bloodfist-of-keld.json; Oracle text checked against
+-- api.scryfall.com, 2026-09-10.) CR 400.7 deletes the Hill Giant's id before the
+-- ability resolves and CR 506.4 takes it out of GameState.combat, so the live
+-- read answers "not attacking" for exactly the creature that was.
+--
+-- The two legs are one board differing in ONE thing -- whether alice declares the
+-- Giant as an attacker. It dies to the SAME three marked damage either way (CR
+-- 704.5g on a 3/3), so the draw cannot be the kill's doing, and Garna is never
+-- declared, so the card that reads the record is not itself in combat.
+--
+-- Both halves of the printed sentence are asserted on each leg, which is what
+-- makes the pair a proof rather than two one-sided reads: the draw AND bob's life
+-- total, since "otherwise" means exactly one of them moves.
+--
+-- Combat damage is never dealt: the fixture stops at the top of the combat damage
+-- step, so the attacking leg's Giant does not hit bob and his life total answers
+-- for Garna's 1 damage alone.
+lastKnownAttackingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownAttackingSpec s registry =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      run garna giant swamp attacks k = case S.combatBoardOf [garna, giant] [] of
+        (base, [_, giantId], _) ->
+          let (_, stocked) = S.addLibraryCard swamp S.alice base
+              declared = S.runToStep (Phase.Combat CombatStep.CombatDamage) (attackingOnly attacks giantId) stocked
+              killed = S.settleSba (S.markDamage giantId 3 declared)
+              onStack = settle killed
+           in k giantId killed (S.runPure S.identityAnswer onStack Stack.resolveTop)
+        _ -> Spec.assertFailure s "combatBoardOf should place Garna and one Hill Giant"
+   in Spec.describe s "LastKnownAttacking" $ do
+        Spec.it s "CR 608.2h an attacking Hill Giant that dies draws Garna a card" $ do
+          garna <- S.printingOf s registry "Garna, Bloodfist of Keld"
+          giant <- S.printingOf s registry "Hill Giant"
+          swamp <- S.printingOf s registry "Swamp"
+          run garna giant swamp True $ \giantId killed after -> do
+            Spec.assertEqWith s "alice drew her one library card" (S.handSize S.alice after) 1
+            Spec.assertEqWith s "and bob is untouched, so the otherwise clause was skipped" (S.lifeOf S.bob after) (Just 20)
+            Spec.assertEqWith s "off a Giant CR 608.2h still says was attacking" (fmap Filter.attacking (Projection.viewWithLastKnownAnywhere killed giantId)) (Just True)
+            Spec.assertEqWith s "and it really did die" (Set.member giantId (GameState.battlefield killed)) False
+
+        -- The positive's twin, and the control it is read against: alice declines
+        -- the attack and the same kill takes bob's life instead of filling her hand.
+        Spec.it s "CR 508.1k the same Giant that never attacked deals bob 1 instead" $ do
+          garna <- S.printingOf s registry "Garna, Bloodfist of Keld"
+          giant <- S.printingOf s registry "Hill Giant"
+          swamp <- S.printingOf s registry "Swamp"
+          run garna giant swamp False $ \giantId killed after -> do
+            Spec.assertEqWith s "bob took Garna's 1 damage" (S.lifeOf S.bob after) (Just 19)
+            Spec.assertEqWith s "and alice's hand is empty, so the draw clause was skipped" (S.handSize S.alice after) 0
+            Spec.assertEqWith s "off a Giant that was never attacking" (fmap Filter.attacking (Projection.viewWithLastKnownAnywhere killed giantId)) (Just False)
+            Spec.assertEqWith s "and died the same way" (Set.member giantId (GameState.battlefield killed)) False
 
 -- Aims a target slot at one OBJECT by filtering the offered set, `bouncing`'s
 -- shape for a slot that must be answered: a hand-built recipient could miss CR
@@ -762,4 +830,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   foreignGraveyardCastSpec s registry
   lastKnownTokenSpec s registry
   lastKnownBlockingSpec s registry
+  lastKnownAttackingSpec s registry
   damageDealtToItSpec s registry

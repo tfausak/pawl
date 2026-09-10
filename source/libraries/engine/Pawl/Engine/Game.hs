@@ -322,6 +322,16 @@ removeFromCombat oid gs =
           }
    in gs {GameState.combat = c1}
 
+-- CR 508.1k: is this creature attacking? A key lookup in Combat.attackers, which
+-- the declaration keys by ATTACKER -- the line isBlocking below is careful not to
+-- be.
+--
+-- The ONE lookup, for isBlocking's reason: Pawl.Engine.Projection's live
+-- Filter.attacking and the CR 608.2h record Pawl.Types.LastKnown.attacking keeps
+-- must not answer it differently.
+isAttacking :: ObjectId -> GameState -> Bool
+isAttacking oid gs = Map.member oid (Combat.attackers (GameState.combat gs))
+
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup.
 --
