@@ -270,12 +270,10 @@ to agents as written. What it doesn't say:
     function's callers, and say in the PR body which paths you drove and which
     you did not.
 
-5.  Closing #N means moving every census row that cites it. #876 annotates
-    implemented rows with the issue numbers of what those rows still don't do,
-    and nothing checks its body against anything. Read it for the issue number
-    before opening the PR, and edit the row in the same PR; landing a
-    capability a census tracks means that same edit. CR 702's keywords are one
-    issue each instead --- `gh issue list --label area:keywords --label gap`.
+5.  There is no census left to edit. CR 701's keyword actions and CR 702's
+    keyword abilities are one issue each --- `gh issue list --label
+    area:keywords --label gap` --- so landing one means closing that issue and
+    grepping its bare number, nothing more.
 
 ## Code conventions
 
