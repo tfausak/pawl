@@ -102,6 +102,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.ToughnessGreaterThanPower
       " {\"type\":\"ToughnessGreaterThanPower\"} "
+  Spec.it s "ManaValueLessThanSource" $
+    Common.assertCodec
+      s
+      codec
+      Filter.ManaValueLessThanSource
+      " {\"type\":\"ManaValueLessThanSource\"} "
   Spec.it s "PowerLessThanSource" $
     Common.assertCodec
       s

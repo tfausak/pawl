@@ -816,7 +816,9 @@ slotOne slot resolving gs = do
 --      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates, and
 --      how mana may be spent toward it (CR 118.14's `spending`).
 --   4. MAY IT BE CAST AT ALL -- Cast.castableWhenOffered, asked BEFORE the
---      prompt so no cast is offered that the announcement would reverse.
+--      prompt so no cast is offered that the announcement would reverse, and
+--      beside it whatever quality the offer's own CastOffer.restriction states of
+--      the resulting spell (CR 702.85a).
 --
 -- Questions 3 and 4 are asked of EACH half of EACH named card separately (CR
 -- 709.3a, CR 712.11c); where more than one survives, CR 601.3's choice is put to
@@ -830,8 +832,8 @@ slotOne slot resolving gs = do
 -- The caster is a parameter and not the resolving controller: CR 608.2g says "a
 -- player". Everything above is a CLASSIFICATION carried by the opcode's
 -- CastOffer and its CastObligation; nothing here asks which card is offered.
-offerCast :: [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
-offerCast named caster optionality offer = do
+offerCast :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
+offerCast context named caster optionality offer = do
   gs <- State.get
   let -- Whether this offer states CR 118.9's alternative cost, in either of the
       -- two wordings `applied` below reads. NOT `transformed`, which is CR
@@ -876,7 +878,13 @@ offerCast named caster optionality offer = do
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
             candidates = maybe (Cost.candidateCostsGiven True caster name oid proposed) (pure . Cost.untagged) applied
-         in if Cast.castableWhenOffered (CastOffer.spending offer) caster oid name candidates proposed
+         in -- CR 702.85a's second condition, asked of THIS HALF: the offer may
+            -- state a quality the resulting spell must have, and CR 709.3a makes
+            -- that a per-half question like the two above. Against the face's own
+            -- view and the resolution's context, so a source-comparing atom reads
+            -- the same source the reference did. Nothing narrows nothing.
+            if maybe True (Filter.matches context (Projection.viewOfCard face)) (CastOffer.restriction offer)
+              && Cast.castableWhenOffered (CastOffer.spending offer) caster oid name candidates proposed
               then
                 -- CR 118.8c, read off the same candidates the cast will be
                 -- announced with: CR 118.9d keeps the face's additional costs on
@@ -3568,10 +3576,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- reference: CR 601.3's offer over a set (Shell of the Last Kappa) and over
     -- one target (Tinybones, the Pickpocket) are then the same call.
     let named = objectRefObjects legal resolving controller source gs ref
+        -- The SAME context the reference above was gathered through, so an offer
+        -- whose restriction reads the source (CR 702.85a) answers what the walk
+        -- that named these cards answered.
+        context = effectContext gs controller source legal (slotBindings resolving gs)
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
     -- cast to nobody.
     Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
-      offerCast named pid optionality offer
+      offerCast context named pid optionality offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
   -- as CR 109.5's "you" and the stated duration.
   --

@@ -522,6 +522,29 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   Spec.it s "ManaValueAtMost is False for a player" $ do
     Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.ManaValueAtMost 99))) "player"
 
+  -- CR 702.85a's comparison, PowerLessThanSource's shape one characteristic over:
+  -- the bound is the Context's source mana value rather than a literal the atom
+  -- carries. blackCreature's mana value is 3.
+  Spec.describe s "ManaValueLessThanSource" $ do
+    let sourced n = self {Filter.sourceManaValue = Just n}
+    Spec.it s "holds below the source's mana value and fails above it" $ do
+      Spec.assertBool s (Filter.matches (sourced 4) blackCreature Filter.Type.ManaValueLessThanSource) "3 < 4"
+      Spec.assertBool s (not (Filter.matches (sourced 4) (blackCreature {Filter.manaValue = Just 5}) Filter.Type.ManaValueLessThanSource)) "5 is not < 4"
+
+    -- STRICTLY less, rule 702.85a's own word: a cascade off a mana value of 3
+    -- does not reach another 3.
+    Spec.it s "is False at equal mana value" $
+      Spec.assertBool s (not (Filter.matches (sourced 3) blackCreature Filter.Type.ManaValueLessThanSource)) "3 is not < 3"
+
+    -- The two vacuity postures PowerLessThanSource takes, on the same two sides.
+    Spec.it s "is False when either mana value is absent" $ do
+      let noCost = blackCreature {Filter.manaValue = Nothing}
+      Spec.assertBool s (not (Filter.matches (sourced 4) noCost Filter.Type.ManaValueLessThanSource)) "no candidate mana value"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ManaValueLessThanSource)) "no source mana value"
+
+    Spec.it s "is False for a player" $
+      Spec.assertBool s (not (Filter.matches (sourced 4) aPlayer Filter.Type.ManaValueLessThanSource)) "player"
+
   -- CR 202.3 read for parity: Void Winnower's "spells with even mana values",
   -- whose reminder text settles the boundary -- "(Zero is even.)"
   Spec.it s "ManaValueIsEven splits the mana values by parity" $ do

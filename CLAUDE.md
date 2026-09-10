@@ -270,10 +270,10 @@ to agents as written. What it doesn't say:
     function's callers, and say in the PR body which paths you drove and which
     you did not.
 
-5.  There is no census left to edit. CR 701's keyword actions and CR 702's
-    keyword abilities are one issue each --- `gh issue list --label
-    area:keywords --label gap` --- so landing one means closing that issue and
-    grepping its bare number, nothing more.
+5.  There is no keyword census anywhere. Every CR 701 keyword action and CR 702
+    keyword ability carries its own issue --- `gh issue list --label
+    area:keywords --label gap` is the enumeration --- so landing one means
+    closing that one issue and grepping its bare number, nothing more.
 
 ## Code conventions
 

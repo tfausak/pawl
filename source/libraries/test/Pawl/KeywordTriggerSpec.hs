@@ -1803,8 +1803,108 @@ selfAttacksUnblockedSpec s registry =
               after = S.runCombat (declining S.bob) gs
           Spec.assertEqWith s "bob took the Piker's 2 and drew nothing" (S.lifeOf S.bob after, S.handSize S.bob after) (Just 18, 0)
 
+-- CR 702.85a's cascade, the first keyword ability that functions on the STACK:
+-- "When you cast this spell, exile cards from the top of your library until you
+-- exile a nonland card whose mana value is less than this spell's mana value. You
+-- may cast that card without paying its mana cost if the resulting spell's mana
+-- value is less than this spell's mana value. Then put all cards exiled this way
+-- that weren't cast on the bottom of your library in a random order."
+--
+-- Bloodbraid Elf {2}{R}{G} Creature -- Elf Berserker 3/2 -- "Haste / Cascade"
+-- (Oracle text checked 2026-09-10) -- is the producer, and the cheapest printing
+-- carrying cascade once. Apex Devastator, which the issue named, carries it FOUR
+-- times, which a printed keyword SET cannot count (#3577).
+--
+-- The library is stocked so that each conjunct of rule 702.85a's walk is what
+-- stops or fails to stop it: a Hill Giant of mana value 4 exactly (the Elf's own,
+-- so "less than" and not "no greater than" is what passes it by), a Mountain
+-- (mana value 0, a LAND, so the cheapness alone is not enough), Russet Wolves at
+-- 4 again, and then the Goblin Piker at 2, which ends it. Think Twice sits under
+-- the Piker and is never reached, which is how the walk's stopping is visible at
+-- all.
+cascadeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cascadeSpec s registry = Spec.describe s "Cascade" $ do
+  -- CR 702.85c: each instance triggers separately, so the mint is one ability per
+  -- instance, poisonous' reading. The falsifier is a roster that mints it once.
+  Spec.it s "CR 702.85a cascade is minted for a spell on the stack and nowhere else" $ do
+    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Set.singleton Keyword.Type.Cascade)) [Keyword.cascade]
+    Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Cascade 1)) []
+    Spec.assertEqWith s "rule 702.85a's condition is the cast" (TriggeredAbility.condition Keyword.cascade) TriggerCondition.SelfCast
+
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.85a casting Bloodbraid Elf exiles down to the Goblin Piker, casts it free and bottoms the rest" $ do
+    elf <- S.printingOf s registry "Bloodbraid Elf"
+    giant <- S.printingOf s registry "Hill Giant"
+    mountain <- S.printingOf s registry "Mountain"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    think <- S.printingOf s registry "Think Twice"
+    forest <- S.printingOf s registry "Forest"
+    let base = Setup.emptyGame S.bothPlayers
+        -- S.addLibraryCard puts each card ON TOP, so this stocks the library
+        -- bottom first.
+        (_, g1) = S.addLibraryCard think S.alice base
+        (_, g2) = S.addLibraryCard piker S.alice g1
+        (_, g3) = S.addLibraryCard wolves S.alice g2
+        (_, g4) = S.addLibraryCard mountain S.alice g3
+        (_, g5) = S.addLibraryCard giant S.alice g4
+        -- Rule 702.85a's {2}{R}{G} has to be paid for real: the FREE cast is the
+        -- Piker's, and a board that paid nothing for either would not tell them
+        -- apart.
+        (_, g6) = S.addPermanent mountain S.alice g5
+        (_, g7) = S.addPermanent mountain S.alice g6
+        (_, g8) = S.addPermanent forest S.alice g7
+        (_, g9) = S.addPermanent forest S.alice g8
+        (_, g10) = S.addHandCard elf S.alice g9
+        before =
+          g10
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        after = S.runPure cascading before Engine.priorityLoop
+        namesIn zone pid gs = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        orderedIn zone pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
+        named = CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "the Piker the walk stopped at was cast without paying its mana cost, and the Elf behind it resolved too"
+      (namesIn Zone.Battlefield S.alice after)
+      (Set.fromList [named "Bloodbraid Elf", named "Goblin Piker", named "Mountain", named "Forest"])
+    Spec.assertEqWith
+      s
+      "the three cards the walk passed over sit under the card it never reached, in the order the random-order channel handed back"
+      (orderedIn Zone.Library S.alice after)
+      [named "Think Twice", named "Hill Giant", named "Russet Wolves", named "Mountain"]
+    -- Proxies, AFTER the two behavioural assertions so neither can absorb a
+    -- mutation: nothing is left in exile (rule 702.85a's last sentence empties
+    -- it), and alice paid for the Elf alone.
+    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
+    Spec.assertEqWith s "four lands paid the Elf's {2}{R}{G} and nothing paid the Piker's" (S.tappedCount S.alice after) 4
+
+-- alice casts the one spell her hand holds, takes CR 608.2g's offer, and rotates
+-- the batch the random-order channel asks about -- a rotation of three being
+-- neither the identity nor its own inverse, so an engine that never consulted the
+-- channel bottoms the three in a different order. The library reads the answer
+-- back REVERSED, Pawl.Engine.Game.insertIntoZone performing the moves from the
+-- stated end inward, and a rotation survives that too.
+cascading :: Prompt.Prompt r -> r
+cascading p = case p of
+  Prompt.ChooseAction _ _ actions -> Maybe.fromMaybe A.Pass (List.find isCast actions)
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  Prompt.Shuffle ids -> case ids of
+    h : t -> t <> [h]
+    [] -> []
+  _ -> S.identityAnswer p
+
+isCast :: A.Action -> Bool
+isCast action = case action of
+  A.Cast {} -> True
+  _ -> False
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
+  cascadeSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry

@@ -90,6 +90,12 @@ data Filter keyword
   | -- | CR 202.3: the object's mana value is <= this literal. Answerable off the
     -- battlefield, rule 202.3 reading the printed mana cost.
     ManaValueAtMost Integer
+  | -- | CR 202.3 compared against the SOURCE rather than a literal: the object's
+    -- mana value is strictly less than the mana value of the object the
+    -- evaluation comes from (CR 702.85a's cascade). PowerLessThanSource's
+    -- reading one characteristic over -- read off Pawl.Engine.Filter.Context's
+    -- sourceManaValue, and vacuously False where either mana value is absent.
+    ManaValueLessThanSource
   | -- | CR 202.3 read for its PARITY rather than against a bound -- Void
     -- Winnower's "spells with even mana values", whose reminder text settles the
     -- boundary case: "(Zero is even.)" CR 202.3e is what makes it interesting off

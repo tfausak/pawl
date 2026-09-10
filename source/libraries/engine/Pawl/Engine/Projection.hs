@@ -2517,6 +2517,7 @@ filterReads f = case f of
   Filter.Type.HasCountersOfAnyKind -> Set.empty
   -- CR 202.3 reads the printed mana cost, which no Modification writes.
   Filter.Type.ManaValueAtMost _ -> Set.empty
+  Filter.Type.ManaValueLessThanSource -> Set.empty
   Filter.Type.ManaValueIsEven -> Set.empty
   Filter.Type.ManaValueAtMostAmount -> Set.empty
   Filter.Type.And fs -> foldMap filterReads fs
@@ -2651,6 +2652,9 @@ filterReadsPeers f = case f of
   Filter.Type.HasCounters _ -> False
   Filter.Type.HasCountersOfAnyKind -> False
   Filter.Type.ManaValueAtMost _ -> False
+  -- The SOURCE's mana value arrives on the Context, PowerLessThanSource's answer
+  -- above: no projection of a second object is read.
+  Filter.Type.ManaValueLessThanSource -> False
   Filter.Type.ManaValueIsEven -> False
   Filter.Type.ManaValueAtMostAmount -> False
 

@@ -2739,6 +2739,9 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.77a's cost can carry one, as cycling's can; its N and "target
   -- creature" are written into the ability Pawl.Engine.Keyword mints.
   Keyword.Reinforce (Reinforce.MkReinforce _ cost) -> costFilters cost
+  -- CR 702.85a names no quality: the nonland-card filter its minted ability
+  -- carries is written in Pawl.Engine.Keyword, not into the keyword.
+  Keyword.Cascade -> []
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []
@@ -3692,6 +3695,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.PowerIsAmountInSlot _ -> []
   Filter.Type.PowerAtLeastAmountInSlot _ -> []
   Filter.Type.ManaValueAtMost _ -> []
+  Filter.Type.ManaValueLessThanSource -> []
   Filter.Type.ManaValueIsEven -> []
   Filter.Type.ManaValueAtMostAmount -> []
   Filter.Type.ControlledBy _ -> []
