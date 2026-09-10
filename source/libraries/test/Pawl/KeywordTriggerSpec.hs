@@ -1813,7 +1813,7 @@ selfAttacksUnblockedSpec s registry =
 -- Bloodbraid Elf {2}{R}{G} Creature -- Elf Berserker 3/2 -- "Haste / Cascade"
 -- (Oracle text checked 2026-09-10) -- is the producer, and the cheapest printing
 -- carrying cascade once. Apex Devastator, which the issue named, carries it FOUR
--- times, which a printed keyword SET cannot count (#3577).
+-- times, which a printed keyword SET cannot count (gap #3577).
 --
 -- The library is stocked so that each conjunct of rule 702.85a's walk is what
 -- stops or fails to stop it: a Hill Giant of mana value 4 exactly (the Elf's own,

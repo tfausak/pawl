@@ -882,7 +882,8 @@ offerCast context named caster optionality offer = do
             -- state a quality the resulting spell must have, and CR 709.3a makes
             -- that a per-half question like the two above. Against the face's own
             -- view and the resolution's context, so a source-comparing atom reads
-            -- the same source the reference did. Nothing narrows nothing.
+            -- the same source the reference did. An offer stating none narrows
+            -- nothing.
             if maybe True (Filter.matches context (Projection.viewOfCard face)) (CastOffer.restriction offer)
               && Cast.castableWhenOffered (CastOffer.spending offer) caster oid name candidates proposed
               then

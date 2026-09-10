@@ -288,7 +288,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   --
   -- Pawl.Engine.Resolve.Effect.offerCast directly rather than through a cascade,
   -- because no printing is both cheap enough for Bloodbraid Elf's walk to find and
-  -- expensive enough on its other half for the bound to bite (#3578).
+  -- expensive enough on its other half for the bound to bite (gap #3578).
   Spec.it s "CR 702.85a an offer's restriction is asked of each castable half" $ do
     shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
