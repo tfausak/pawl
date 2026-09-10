@@ -64,6 +64,7 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -120,8 +121,10 @@ import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.Replace as Replace
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
@@ -152,6 +155,7 @@ import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -234,6 +238,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Flanking -> List.genericReplicate count flanking
   Keyword.Exalted -> List.genericReplicate count exalted
+  Keyword.Unearth _ -> []
   Keyword.Melee -> List.genericReplicate count melee
   Keyword.Mentor -> List.genericReplicate count mentor
   Keyword.Afterlife n -> List.genericReplicate count (afterlife n)
@@ -440,6 +445,9 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  -- CR 702.84a functions in a GRAVEYARD, so graveyardAbilitiesFor below is the
+  -- roster that mints it and this hand one grants nothing.
+  Keyword.Unearth _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -691,6 +699,292 @@ ninjutsu cost =
           ActivatedAbility.keyword = Nothing
         }
 
+-- CR 602.1: the ACTIVATED abilities rule 702 gives a card in a GRAVEYARD,
+-- handAbilitiesOf's sibling one zone over. Today CR 702.84a's unearth is the only
+-- one.
+--
+-- PRINTED keywords, as handAbilitiesOf takes them and for the same reason: the
+-- projection does not reach a graveyard card (#1859; see
+-- Pawl.Engine.Projection.projectGiven), and Pawl.Engine.Activate's graveyard arm
+-- is what calls this.
+--
+-- MEMBERSHIP and not a count: rule 702.84a's ability returns the one card, so a
+-- second instance has nothing left to do once the first has resolved.
+graveyardAbilitiesOf :: Set Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
+graveyardAbilitiesOf = concatMap graveyardAbilitiesFor . Set.toAscList
+
+-- Exhaustive for the reason handAbilitiesFor is: the next keyword that functions
+-- from a graveyard -- CR 702.97a's scavenge and CR 702.128a's embalm are the
+-- ones the pool will reach first -- must break this build rather than silently
+-- produce nothing.
+graveyardAbilitiesFor :: Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
+graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
+  Keyword.Cycling _ -> []
+  Keyword.Reinforce _ -> []
+  Keyword.Ninjutsu _ -> []
+  Keyword.Afflict _ -> []
+  Keyword.Crew _ -> []
+  Keyword.Fabricate _ -> []
+  Keyword.Hideaway _ -> []
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.Equip _ -> []
+  Keyword.Fortify _ -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flash -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Hexproof _ -> []
+  Keyword.Indestructible -> []
+  Keyword.Landwalk _ -> []
+  Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
+  Keyword.MoreThanMeetsTheEye _ -> []
+  Keyword.Protection _ -> []
+  Keyword.Reach -> []
+  Keyword.Shroud -> []
+  Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
+  Keyword.Vigilance -> []
+  Keyword.Ward _ -> []
+  Keyword.Banding -> []
+  Keyword.Flanking -> []
+  Keyword.Phasing -> []
+  Keyword.Shadow -> []
+  Keyword.Horsemanship -> []
+  Keyword.Aftermath -> []
+  Keyword.JumpStart -> []
+  Keyword.Fear -> []
+  Keyword.Intimidate -> []
+  Keyword.Morph {} -> []
+  Keyword.Menace -> []
+  Keyword.Renown _ -> []
+  Keyword.Kicker _ -> []
+  Keyword.Multikicker _ -> []
+  Keyword.Flashback _ -> []
+  Keyword.Bestow _ -> []
+  Keyword.Mutate _ -> []
+  Keyword.Entwine _ -> []
+  Keyword.Buyback _ -> []
+  Keyword.Bushido _ -> []
+  Keyword.Soulshift _ -> []
+  Keyword.Bloodthirst _ -> []
+  Keyword.Haunt -> []
+  Keyword.Suspend _ -> []
+  Keyword.SplitSecond -> []
+  Keyword.Poisonous _ -> []
+  Keyword.Cascade -> []
+  Keyword.Annihilator _ -> []
+  Keyword.BattleCry -> []
+  Keyword.Evolve -> []
+  Keyword.Dethrone -> []
+  Keyword.Fuse -> []
+  Keyword.LevelUp _ -> []
+  Keyword.Outlast _ -> []
+  Keyword.Prowess -> []
+  Keyword.Infect -> []
+  Keyword.Wither -> []
+  Keyword.Exalted -> []
+  Keyword.Unearth cost -> [unearth cost]
+  Keyword.Mentor -> []
+  Keyword.Afterlife _ -> []
+  Keyword.Provoke -> []
+  Keyword.Changeling -> []
+  Keyword.Devoid -> []
+  Keyword.Ingest -> []
+  Keyword.Skulk -> []
+  Keyword.Partner -> []
+  Keyword.ChooseABackground -> []
+  Keyword.DoctorsCompanion -> []
+  Keyword.Escalate _ -> []
+  Keyword.Melee -> []
+  Keyword.Rampage _ -> []
+  Keyword.CumulativeUpkeep _ -> []
+  Keyword.Riot -> []
+  Keyword.Unleash -> []
+  Keyword.Modular _ -> []
+  Keyword.Vanishing _ -> []
+  Keyword.Fading _ -> []
+  Keyword.Frenzy _ -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
+  Keyword.Decayed -> []
+  Keyword.Compleated -> []
+  Keyword.ReadAhead -> []
+  Keyword.Training -> []
+  Keyword.Prototype _ -> []
+  Keyword.Toxic _ -> []
+  Keyword.Disguise _ -> []
+  Keyword.Plot _ -> []
+  Keyword.Foretell _ -> []
+  Keyword.Companion _ -> []
+  Keyword.Miracle _ -> []
+  Keyword.StartYourEngines -> []
+  Keyword.Exert -> []
+  Keyword.Persist -> []
+  Keyword.Undying -> []
+  Keyword.Station -> []
+  Keyword.UmbraArmor -> []
+  Keyword.Convoke -> []
+  Keyword.Improvise -> []
+
+-- CR 702.84a's whole ability, minted from the one cost the keyword carries, as
+-- four effects in one clause -- the return, the haste, the delayed exile and the
+-- leaves-the-battlefield redirect.
+--
+-- THE RETURN names Zone.Graveyard as its `origin`, which is what confines the
+-- whole ability to a graveyard: CR 113.6m reads that field (Reassembling
+-- Skeleton's reading, Pawl.Engine.Activate.zoneAbilitiesOf), so the ability a
+-- creature with unearth carries on the battlefield cannot be activated there.
+--
+-- THE SLOT is what the three later effects read. Rule 702.84a's "it" is the
+-- PERMANENT the return created, a new object by CR 400.7, so Binding.triggerSource
+-- -- the card in the graveyard -- is the wrong name for it; MoveToZone.slot binds
+-- the arrival, which is Dire Fleet Daredevil's shape in data/cards/.
+--
+-- THE HASTE is Duration.Indefinite: rule 702.84a states no "until", and the
+-- permanent is exiled before any end of turn could end the effect anyway.
+--
+-- THE EXILE is a CR 603.7 delayed triggered ability, created as this ability
+-- resolves, so the effect is the arming opcode and `unearthExile` is what it arms.
+-- Onset.Immediately with no stated duration is CR 603.7a's floor and CR 603.7b's
+-- default: "the next end step", once.
+--
+-- THE REDIRECT is a CR 614 floating replacement with no `whenDestination`, rule
+-- 702.84a's "instead of putting it anywhere else" -- castFromGraveyardExile's
+-- pattern, scoped to the bound arrival rather than to the source. Uses.Unlimited,
+-- since rule 702.84a does not spend it: a permanent returned by the redirect's own
+-- output is in exile, so nothing re-fires.
+unearth :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+unearth cost =
+  let returned =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot Binding.triggerSource,
+              MoveToZone.zone = Zone.Battlefield,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = False,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Just unearthSlot,
+              MoveToZone.origin = Just Zone.Graveyard,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+      hasted =
+        Effect.ModifyTarget
+          ModifyTarget.MkModifyTarget
+            { ModifyTarget.duration = Duration.Indefinite,
+              ModifyTarget.modification = Modification.GainKeyword Keyword.Haste,
+              ModifyTarget.ref = ObjectRef.InSlot unearthSlot
+            }
+      armed =
+        Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = unearthExileName,
+              ArmDelayedTrigger.onset = Onset.Immediately,
+              ArmDelayedTrigger.duration = Nothing
+            }
+      redirected =
+        Effect.Replace
+          Replace.MkReplace
+            { Replace.duration = Duration.Indefinite,
+              Replace.uses = Uses.Unlimited,
+              Replace.origin = ReplacementOrigin.Other,
+              Replace.condition = Nothing,
+              Replace.effect =
+                ReplacementEffect.ZoneChangeR
+                  ( ZoneChangeR.MkZoneChangeR
+                      ZoneChangePattern.MkZoneChangePattern
+                        { ZoneChangePattern.whenDestination = Nothing,
+                          ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                          ZoneChangePattern.whatObject = Filter.IsBound unearthSlot
+                        }
+                      Zone.Exile
+                      False
+                      False
+                  )
+            }
+      clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [returned, hasted, armed, redirected])
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = cost,
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          -- CR 602.5d, rule 702.84a's "Activate only as a sorcery" -- levelUp's
+          -- restriction.
+          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          -- Nothing on every keyword-minted ability: no clause of a card refers to
+          -- one, CR 702's own text being what mints it.
+          ActivatedAbility.name = Nothing,
+          -- Nothing here and written by `mintedBy` at the roster, the one place that
+          -- knows the keyword by identity rather than by reconstructing it.
+          ActivatedAbility.keyword = Nothing
+        }
+
+-- The slot rule 702.84a's "it" is bound into as the card arrives on the
+-- battlefield, so the haste, the delayed exile and the redirect all name the
+-- PERMANENT rather than the graveyard card the ability was activated from.
+unearthSlot :: SlotName.SlotName
+unearthSlot = SlotName.MkSlotName (Text.pack "unearthed")
+
+-- The name rule 702.84a's delayed ability is filed under, decayedSacrificeName's
+-- position. A card may not declare one under this name (Pawl.CardSpec).
+unearthExileName :: AbilityName
+unearthExileName = AbilityName.MkAbilityName (Text.pack "unearth")
+
+-- CR 702.84a's "Exile it at the beginning of the next end step", as CR 513.2
+-- states the timing. TurnScope.EachTurn, rule 702.84a naming no player's turn --
+-- a creature unearthed on an opponent's turn is exiled at the end of THAT turn.
+--
+-- `origin` is Nothing and not the battlefield: rule 702.84a's companion redirect
+-- may already have exiled the permanent, and then this ability has nothing to
+-- move rather than a zone to disagree about.
+unearthExile :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+unearthExile =
+  let effect =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot unearthSlot,
+              MoveToZone.zone = Zone.Exile,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = False,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Nothing,
+              MoveToZone.origin = Nothing,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.EachTurn),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
 -- sibling one zone over.
 --
@@ -786,6 +1080,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Unearth _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -1284,6 +1579,10 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  -- CR 702.84a is an ACTIVATED ability and not a casting permission: unearth
+  -- RETURNS the card to the battlefield, it never casts it. Cycling's reading
+  -- above, one zone over.
+  Keyword.Unearth _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -2050,6 +2349,10 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  -- CR 702.84a's two replacement-shaped clauses are created by the ability's
+  -- RESOLUTION rather than standing on the card, so they are effects inside
+  -- `unearth` above and not rows here.
+  Keyword.Unearth _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -2265,6 +2568,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Unearth _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -2484,6 +2788,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Unearth _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -2644,6 +2949,7 @@ familyOf keyword = case keyword of
   Keyword.Infect -> Nothing
   Keyword.Wither -> Nothing
   Keyword.Exalted -> Nothing
+  Keyword.Unearth _ -> Just KeywordFamily.Unearth
   Keyword.Mentor -> Nothing
   Keyword.Afterlife _ -> Just KeywordFamily.Afterlife
   Keyword.Provoke -> Nothing
@@ -3279,7 +3585,7 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (Earthbend.returnName, Earthbend.returnAbility)]
+mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.

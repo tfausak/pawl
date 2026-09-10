@@ -1043,10 +1043,11 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
               ( PC.activatedAbilities snapshot
                   <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+                  <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords snapshot))
               )
           ),
-      -- CR 602.1 off the same three lists, without CR 605.1a's exclusion, plus CR
-      -- 305.6's intrinsic ability -- which none of the three lists holds, since
+      -- CR 602.1 off the same four lists, without CR 605.1a's exclusion, plus CR
+      -- 305.6's intrinsic ability -- which none of the four lists holds, since
       -- they carry rule 702's abilities and the face's own. Read off the snapshot's
       -- types for Pawl.Engine.Projection.View.viewOfCharacteristics' reason, and
       -- through the reader every view builder shares so that the three cannot
@@ -1057,6 +1058,7 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
               ( PC.activatedAbilities snapshot
                   <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+                  <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords snapshot))
               )
           )
           || Subtype.intrinsicManaAbilityOf snapshot,
