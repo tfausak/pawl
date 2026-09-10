@@ -14,10 +14,12 @@ import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 -- array this payload used to be (#1464).
 codec :: Codec.Codec SacrificeAnyNumber.SacrificeAnyNumber
 codec = Fields.object $ do
+  each <- Fields.required "each" Common.natural SacrificeAnyNumber.each
   filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) SacrificeAnyNumber.filter
   kind <- Fields.required "kind" (Common.maybe (CounterKind.codec Keyword.codec)) SacrificeAnyNumber.kind
   pure
     SacrificeAnyNumber.MkSacrificeAnyNumber
-      { SacrificeAnyNumber.filter = filter_,
+      { SacrificeAnyNumber.each = each,
+        SacrificeAnyNumber.filter = filter_,
         SacrificeAnyNumber.kind = kind
       }

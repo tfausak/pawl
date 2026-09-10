@@ -127,6 +127,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
+import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scope as Scope
@@ -304,6 +305,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Buyback _ -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Devour _ -> []
   Keyword.Changeling -> []
   -- CR 603.2: rule 702.75a states no "each instance" clause, so the general
   -- reason gives one ability per instance.
@@ -444,6 +446,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Devour _ -> []
   Keyword.Exalted -> []
   -- CR 702.84a functions in a GRAVEYARD, so graveyardAbilitiesFor below is the
   -- roster that mints it and this hand one grants nothing.
@@ -785,6 +788,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Devour _ -> []
   Keyword.Exalted -> []
   Keyword.Unearth cost -> [unearth cost]
   Keyword.Mentor -> []
@@ -1079,6 +1083,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Devour _ -> []
   Keyword.Exalted -> []
   Keyword.Unearth _ -> []
   Keyword.Mentor -> []
@@ -1578,6 +1583,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Devour _ -> []
   Keyword.Exalted -> []
   -- CR 702.84a is an ACTIVATED ability and not a casting permission: unearth
   -- RETURNS the card to the battlefield, it never casts it. Cycling's reading
@@ -2348,6 +2354,19 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  -- CR 702.82a's whole content: the SacrificeAnyNumber row a CARD writes
+  -- (Shimatsu the Bloodcloaked), with rule 702.82a's "creatures" as the filter
+  -- and its N as the per-sacrifice multiplier. Filter.IsSource for riot's reason,
+  -- CR 614.1c's "as this object enters" being the entering object's own ability.
+  --
+  -- ONE ROW PER INSTANCE, riot's reading: rule 702.82 states no multiplicity
+  -- clause, so two devours are two independent sacrifices each buying its own
+  -- counters.
+  --
+  -- Rule 702.82b's "it devoured" needs nothing minted here: the row's own
+  -- application records the count at Binding.sacrificedCount, which a card reads
+  -- back as a quantity (Marrow Chomper).
+  Keyword.Devour n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber {SacrificeAnyNumber.filter = Filter.HasCardType CardType.Creature, SacrificeAnyNumber.kind = Just CounterKind.PlusOnePlusOne, SacrificeAnyNumber.each = n}))))
   Keyword.Exalted -> []
   -- CR 702.84a's two replacement-shaped clauses are created by the ability's
   -- RESOLUTION rather than standing on the card, so they are effects inside
@@ -2567,6 +2586,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Devour _ -> []
   Keyword.Exalted -> []
   Keyword.Unearth _ -> []
   Keyword.Mentor -> []
@@ -2787,6 +2807,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Devour _ -> []
   Keyword.Exalted -> []
   Keyword.Unearth _ -> []
   Keyword.Mentor -> []
@@ -2948,6 +2969,7 @@ familyOf keyword = case keyword of
   Keyword.Intimidate -> Nothing
   Keyword.Infect -> Nothing
   Keyword.Wither -> Nothing
+  Keyword.Devour _ -> Just KeywordFamily.Devour
   Keyword.Exalted -> Nothing
   Keyword.Unearth _ -> Just KeywordFamily.Unearth
   Keyword.Mentor -> Nothing

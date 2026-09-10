@@ -1210,7 +1210,8 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.SacrificeAnyNumber s ->
     EntryRewrite.SacrificeAnyNumber
       s
-        { SacrificeAnyNumber.filter = Filter.rewrite pairs (SacrificeAnyNumber.filter s),
+        { SacrificeAnyNumber.each = SacrificeAnyNumber.each s,
+          SacrificeAnyNumber.filter = Filter.rewrite pairs (SacrificeAnyNumber.filter s),
           SacrificeAnyNumber.kind = fmap (Filter.rewriteCounterKind pairs) (SacrificeAnyNumber.kind s)
         }
   -- CR 614.1c's "exile a [matching] card from your graveyard": Living Lore's says

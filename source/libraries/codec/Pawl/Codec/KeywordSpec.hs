@@ -937,6 +937,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.Fabricate 2)
       " {\"type\":\"Fabricate\",\"value\":2} "
     Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Fabricate 1) /= Codec.encode Keyword.codec (Keyword.Fabricate 2)) "fabricate 1 and fabricate 2 encode differently"
+  -- CR 702.82a's N multiplies the counters each sacrifice buys, so devour 1 and
+  -- devour 3 are distinct keywords, Fabricate's shape.
+  Spec.it s "Devour carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Devour 3)
+      " {\"type\":\"Devour\",\"value\":3} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Devour 1) /= Codec.encode Keyword.codec (Keyword.Devour 3)) "devour 1 and devour 3 encode differently"
   Spec.it s "Riot" $
     Common.assertCodec
       s

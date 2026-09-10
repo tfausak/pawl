@@ -1670,7 +1670,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ("CR 603.2c's per-permanent placement", holds (triggerConditionFilters (TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind (Filter.Type.HasCardType CardType.Creature))))),
             ("CR 603.2c's batch placement", holds (triggerConditionFilters (TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.Type.HasCardType CardType.Creature))))),
             ("CR 614.1's scaling pattern", holds (replacementEffectFilters (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern (Just kind) CounterSubject.ByAnything ControllerRelation.Yours (Filter.Type.HasCardType CardType.Creature) Nothing) (Scaling.AddMore 1))))),
-            ("CR 614.1c's as-enters sacrifice", holds (entryRewriteFilters (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.Type.HasCardType CardType.Creature) (Just kind))))),
+            ("CR 614.1c's as-enters sacrifice", holds (entryRewriteFilters (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.Type.HasCardType CardType.Creature) (Just kind) 1)))),
             ("CR 614.1c's as-enters counters", holds (entryRewriteFilters (EntryRewrite.WithCounters (WithCounters.one kind one)))),
             ("CR 614.1e's turn-up counters", holds (turnUpRewriteFilters (TurnUpRewrite.WithCounters (WithCounters.one kind one)))),
             -- The four roads a card writes the kind inside a NUMBER instead, each
