@@ -2405,6 +2405,7 @@ filterReads f = case f of
   -- handed in on the context, so it is a fixed input to any single projection.
   Filter.Type.CantCrewVehicles -> Set.empty
   Filter.Type.DealtDamageThisTurn -> Set.empty
+  Filter.Type.CrewedSourceThisTurn -> Set.empty
   -- Reads the CONTROLLER, which layer 2 moves: CR 302.6's continuity claim is
   -- about a player, and Pawl.Engine.Engine.checkControlContinuity drops the settle when
   -- that player stops controlling the object.
@@ -2632,6 +2633,7 @@ filterReadsPeers f = case f of
   -- peer's view, so no second projection can change its answer.
   Filter.Type.CantCrewVehicles -> False
   Filter.Type.DealtDamageThisTurn -> False
+  Filter.Type.CrewedSourceThisTurn -> False
   Filter.Type.ControlledSinceTurnBegan -> False
   Filter.Type.IsAttachedToSource -> False
   Filter.Type.IsHostOfSource -> False

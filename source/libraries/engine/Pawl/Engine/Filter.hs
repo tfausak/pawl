@@ -274,6 +274,15 @@ data View = MkView
     -- regeneration and CR 120.3d/120.3e mark none at all for a wither or infect
     -- source, so the marks are a strict subset of what was dealt.
     dealtDamageThisTurn :: Bool,
+    -- CR 702.122c: which objects did this candidate crew earlier this turn? The
+    -- same log the three fields above read, and LAZY for their reason -- nothing
+    -- forces it unless a Filter contains CrewedSourceThisTurn.
+    --
+    -- The VEHICLES rather than a Bool, because rule 702.122c's relation has two
+    -- ends: this half is the candidate's, and the other end -- which Vehicle the
+    -- card means by "it" -- is the source on the Context, which the builders that
+    -- fill this field do not hold.
+    crewedThisTurn :: Set.Set ObjectId.ObjectId,
     -- CR 302.6: has this candidate's CONTROLLER controlled it continuously since
     -- their most recent turn began? Read from Object.sickness, the field CR
     -- 302.6's own gates on attacking and the tap symbol are read from, and
@@ -743,6 +752,9 @@ playerView pid =
       -- Pawl.Engine.Target.admittedGiven's Recipient.ToPlayer arm -- build the
       -- view through it. Pawl.DamageSpec's Needle Drop case is what proves it.
       dealtDamageThisTurn = False,
+      -- CR 702.122b crews with a CREATURE, and a player is not one -- CR 506.3
+      -- rules the combat fields above out for the same kind of reason.
+      crewedThisTurn = Set.empty,
       -- CR 302.6's continuity is about a creature a player CONTROLS, and a player
       -- is not one -- False is the answer here rather than a default.
       controlledSinceTurnBegan = False,
@@ -1645,6 +1657,13 @@ matches context view predicate = case predicate of
   -- CantCrewVehicles sits between them and is neither: a prohibition lifts the
   -- moment its source leaves.
   Filter.DealtDamageThisTurn -> dealtDamageThisTurn view
+  -- CR 702.122c: the same look-back asked of a RELATION rather than of one
+  -- subject -- the candidate's own field says which Vehicles it crewed, and the
+  -- SOURCE on the context says which one the card's "it" names. Vacuously False
+  -- for a context with no source, where "crewed it" names nothing at all.
+  Filter.CrewedSourceThisTurn -> case source context of
+    Just src -> Set.member src (crewedThisTurn view)
+    Nothing -> False
   -- CR 302.6: not a look-back over the log at all, unlike AttackedThisTurn,
   -- MilledThisTurn and DealtDamageThisTurn -- the engine keeps the answer as
   -- Object.sickness, written at the untap step and cleared whenever control
@@ -1896,6 +1915,7 @@ rewrite pairs predicate = case predicate of
   Filter.MilledThisTurn -> predicate
   Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
+  Filter.CrewedSourceThisTurn -> predicate
   -- Untouched for AttackedThisTurn's reason: the atom names no subtype.
   Filter.ControlledSinceTurnBegan -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: the nested filter describes
@@ -2392,6 +2412,7 @@ bakeBound players predicate = case predicate of
   Filter.MilledThisTurn -> predicate
   Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
+  Filter.CrewedSourceThisTurn -> predicate
   -- Untouched: the atom names no slot for CR 603.2's map to substitute into.
   Filter.ControlledSinceTurnBegan -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: a ControlledByBound written
@@ -2530,6 +2551,7 @@ manaValueThresholds predicate = case predicate of
   Filter.MilledThisTurn -> []
   Filter.CantCrewVehicles -> []
   Filter.DealtDamageThisTurn -> []
+  Filter.CrewedSourceThisTurn -> []
   Filter.ControlledSinceTurnBegan -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
   -- literals inside bound the HOST's mana value and never the candidate's. Only
@@ -2675,6 +2697,7 @@ statesAQuality predicate = case predicate of
   Filter.MilledThisTurn -> True
   Filter.CantCrewVehicles -> True
   Filter.DealtDamageThisTurn -> True
+  Filter.CrewedSourceThisTurn -> True
   Filter.ControlledSinceTurnBegan -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to
   -- something" is itself a stated quality under CR 701.23b, so even the trivial
