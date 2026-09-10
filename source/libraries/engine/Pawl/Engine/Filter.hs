@@ -2184,6 +2184,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Hideaway _ -> keyword
   Keyword.Type.Infect -> keyword
   Keyword.Type.Wither -> keyword
+  -- CR 702.82a's payload is a count, not a Filter: the sacrifice's "creatures"
+  -- is in the row Pawl.Engine.Keyword mints.
+  Keyword.Type.Devour _ -> keyword
   Keyword.Type.Exalted -> keyword
   Keyword.Type.Mentor -> keyword
   -- CR 702.135a's N is a number and not a word, so CR 612.2 has nothing to swap

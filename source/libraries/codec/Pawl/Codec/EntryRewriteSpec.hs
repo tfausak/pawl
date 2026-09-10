@@ -250,8 +250,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
-      (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.And []) (Just CounterKind.PlusOnePlusOne)))
-      " {\"type\":\"SacrificeAnyNumber\",\"value\":{\"filter\":{\"type\":\"And\",\"value\":[]},\"kind\":{\"type\":\"PlusOnePlusOne\"}}} "
+      (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.And []) (Just CounterKind.PlusOnePlusOne) 1))
+      " {\"type\":\"SacrificeAnyNumber\",\"value\":{\"each\":1,\"filter\":{\"type\":\"And\",\"value\":[]},\"kind\":{\"type\":\"PlusOnePlusOne\"}}} "
   -- The same rewrite buying no counters: Wood Elemental's count is read back by
   -- a characteristic-defining ability instead (CR 208.2a), so the second element
   -- is null. Its criterion is the narrowing one -- an untapped Forest (CR 110.5).
@@ -259,8 +259,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
-      (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.And [Filter.HasSubtype Subtype.Forest, Filter.Not Filter.IsTapped]) Nothing))
-      " {\"type\":\"SacrificeAnyNumber\",\"value\":{\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Forest\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsTapped\"}}]},\"kind\":null}} "
+      (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.And [Filter.HasSubtype Subtype.Forest, Filter.Not Filter.IsTapped]) Nothing 1))
+      " {\"type\":\"SacrificeAnyNumber\",\"value\":{\"each\":1,\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Forest\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsTapped\"}}]},\"kind\":null}} "
   -- CR 614.1c / 614.14: an as-enters exile out of the controller's own graveyard,
   -- carrying the criterion the exiled card must match -- Living Lore's "an
   -- instant or sorcery card".

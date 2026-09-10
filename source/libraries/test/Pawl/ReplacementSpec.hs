@@ -1230,6 +1230,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   gatherSpecimensSpec s registry
   kismetSpec s registry
   shimatsuSpec s registry
+  thunderThrashElderSpec s registry
   undergrowthScavengerSpec s registry
   entryBudgetSpec s registry
   warLeechSpec s registry
@@ -2269,6 +2270,61 @@ shimatsuSpec s registry =
         Just shimatsuId -> do
           Spec.assertEqWith s "six counters, one per OTHER permanent" (countersOn CounterKind.PlusOnePlusOne shimatsuId after) 6
           Spec.assertEqWith s "nothing else of alice's is left" (Set.toList (GameState.battlefield after)) [shimatsuId]
+
+-- Thunder-Thrash Elder {2}{R} Creature -- Lizard Warrior 1/1, whole text:
+-- "Devour 3". Oracle text verified against Scryfall. CR 702.82a's keyword with
+-- nothing else on the card, so the body the counters build is the whole
+-- observable.
+--
+-- shimatsuBoard is the fixture: four Mountains and two Goblin Pikers, all
+-- alice's. The MOUNTAINS earn their place against rule 702.82a's "creatures" --
+-- Shimatsu's card-written row names no quality at all, so a minted row that
+-- dropped the filter would pass every assertion on a creature-only board. The
+-- answerer is greedy, so a wrong filter sacrifices six permanents rather than
+-- two.
+--
+-- Every number distinct: 1/1 printed, 2 creatures sacrificed, N of 3, 6
+-- counters, a 7/7 body.
+thunderThrashElderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+thunderThrashElderSpec s registry =
+  Spec.describe s "Thunder-Thrash Elder (CR 702.82a)" $ do
+    Spec.it s "CR 702.82a devour 3 gives three +1/+1 counters per creature sacrificed" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      elder <- S.printingOf s registry "Thunder-Thrash Elder"
+      let (gs, held, pikers) = shimatsuBoard mountain 4 pikerPrinting 2 elder
+          after = S.runPure sacrificesAll gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      case newestNamed (CardName.MkCardName $ Text.pack "Thunder-Thrash Elder") after of
+        Nothing -> Spec.assertFailure s "the Elder did not reach the battlefield"
+        Just elderId -> do
+          -- WHAT was sacrificed first, WHAT it bought second: the two assertions
+          -- prove different halves of rule 702.82a, and the first failure aborts
+          -- the case, so a dropped filter must redden the sacrifice rather than
+          -- hide behind a count that also changed.
+          --
+          -- CR 702.82a's "creatures": the greedy answer took every Piker offered
+          -- and no Mountain, so the four lands are still there.
+          Spec.assertEqWith s "CR 702.82a both Pikers were devoured" (filter (\oid -> Set.member oid (GameState.battlefield after)) pikers) []
+          Spec.assertEqWith s "CR 702.82a no Mountain was offered: the Elder and four lands remain" (Set.size (GameState.battlefield after)) 5
+          Spec.assertEqWith s "CR 702.82a six +1/+1 counters, three per creature" (countersOn CounterKind.PlusOnePlusOne elderId after) 6
+          -- Printed 1/1, so the counters are all but one point of the body.
+          Spec.assertEqWith s "power" (Projection.powerOf elderId after) (Just 7)
+          Spec.assertEqWith s "toughness" (Projection.toughnessOf elderId after) (Just 7)
+    -- Rule 702.82a's "you may": declining leaves the multiplier nothing to scale,
+    -- so the Elder is its printed 1/1 rather than a 1/1 with counters.
+    Spec.it s "CR 702.82a declining the sacrifice enters the printed 1/1" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      elder <- S.printingOf s registry "Thunder-Thrash Elder"
+      let (gs, held, _) = shimatsuBoard mountain 4 pikerPrinting 2 elder
+          -- S.identityAnswer answers the empty set: sacrifice nothing.
+          after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      case newestNamed (CardName.MkCardName $ Text.pack "Thunder-Thrash Elder") after of
+        Nothing -> Spec.assertFailure s "the Elder did not reach the battlefield"
+        Just elderId -> do
+          Spec.assertEqWith s "no +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne elderId after) 0
+          Spec.assertEqWith s "power" (Projection.powerOf elderId after) (Just 1)
+          Spec.assertEqWith s "toughness" (Projection.toughnessOf elderId after) (Just 1)
 
 -- alice controls four untapped Forests and holds an Undergrowth Scavenger. Her
 -- graveyard holds `aliceCreatures` Goblin Pikers and `aliceLands` Mountains;
