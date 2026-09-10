@@ -424,6 +424,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (ninjutsu 2)
       " {\"type\":\"Ninjutsu\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (ninjutsu 2) /= Codec.encode Keyword.codec (ninjutsu 3)) "the cost is part of the encoding"
+  -- CR 702.84a's payload is a Cost, LevelUp's shape below: the cost is the whole of
+  -- what the card writes, rule 702.84a supplying the rest of the ability.
+  Spec.it s "Unearth carries its cost" $ do
+    let unearth n = Keyword.Unearth (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (unearth 1)
+      " {\"type\":\"Unearth\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (unearth 1) /= Codec.encode Keyword.codec (unearth 5)) "the cost is part of the encoding"
   -- CR 702.87a's payload is a Cost, and the tag must not collide with the level
   -- COUNTER's -- CounterKind's "Level" and this keyword's "LevelUp" are two
   -- different wire tags for the two halves of rule 711.

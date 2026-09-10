@@ -152,7 +152,11 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   Just Zone.Hand -> case Game.faceOf oid gs of
     Nothing -> []
     Just face -> Keyword.handAbilitiesOf (Face.keywords face) <> zoneAbilitiesOf Zone.Hand oid gs
-  Just Zone.Graveyard -> zoneAbilitiesOf Zone.Graveyard oid gs
+  -- CR 113.6j again, the hand arm's shape one zone over: rule 702's MINTED
+  -- graveyard abilities -- CR 702.84a's unearth is the only one today -- plus the
+  -- card's own AUTHORED ones that name the graveyard, disjoint by the same
+  -- construction.
+  Just Zone.Graveyard -> Keyword.graveyardAbilitiesOf (maybe Set.empty Face.keywords (Game.faceOf oid gs)) <> zoneAbilitiesOf Zone.Graveyard oid gs
   -- CR 114.4 and CR 902.7's third limb, "its activated abilities may be
   -- activated". The narrowing to the objects rule 113.6p names is inside
   -- zoneAbilitiesOf, so a commander or a dungeon card sharing this zone offers
