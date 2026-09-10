@@ -40,9 +40,9 @@
 -- than another case on the Dreadnought.
 --
 -- CR 702.122c has its own fixture too, Subterranean Schooner: the relation is
--- read LATER IN THE TURN, by a trigger of a combat step the crew ability has long
--- left, so crewedThisTurnSpec below runs a whole combat rather than watching one
--- resolution.
+-- read LATER IN THE TURN, by a trigger of the declare attackers step rather than
+-- by the crew ability, so crewedThisTurnSpec below runs that whole step instead of
+-- watching one resolution.
 module Pawl.CrewSpec where
 
 import qualified Data.List as List
