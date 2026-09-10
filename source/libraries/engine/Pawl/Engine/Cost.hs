@@ -711,7 +711,7 @@ tapSubstitutions slots pid oid gs manaCost =
 --
 -- A FENCE and not proven behaviour: no card in `data/cards/` states convoke
 -- beside a hybrid symbol, so reverting this to a bare `total_` leaves the suite
--- green. Merrow Skyswimmer is the printing that would observe it (#3585).
+-- green. Merrow Skyswimmer is the printing that would observe it (gap #3585).
 tapSubstitutedManas :: (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [ManaCost.ManaCost]
 tapSubstitutedManas total_ pid oid gs manaCost = concatMap (fmap fst . tapSubstitutions Map.empty pid oid gs) (total_ manaCost)
 
