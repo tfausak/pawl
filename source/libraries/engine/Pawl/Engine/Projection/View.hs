@@ -92,6 +92,7 @@ lastKnownView peers oid gs lk =
   (viewOfCharacteristics peers oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
     { Filter.owner = Just (LastKnown.owner lk),
       Filter.token = Game.sourceIsToken (LastKnown.source lk),
+      Filter.attacking = LastKnown.attacking lk,
       Filter.blocking = LastKnown.blocking lk
     }
 
@@ -402,8 +403,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.targetViews = maybe Map.empty (targetViewsOfStackObject peers gs) (Game.lookupObject oid gs),
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
-      -- CR 508.1k: a combat status, not a characteristic (CR 109.3).
-      Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs)),
+      -- CR 508.1k: a combat status, not a characteristic (CR 109.3). CR 506.4 takes
+      -- a departed creature out of the record, so lastKnownView above writes CR
+      -- 608.2h's answer over this one.
+      Filter.attacking = Game.isAttacking oid gs,
       -- CR 508.1b: the same map's VALUE, kept only when it names a player. A
       -- creature attacking a planeswalker or a battle answers Nothing here and
       -- True above, which is CR 509.1a's and CR 802.4a's own three-way split --

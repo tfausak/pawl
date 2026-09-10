@@ -744,12 +744,17 @@ viewWithLastKnown src gs oid =
 -- makes is False for exactly the creature CR 603.4's intervening "if" on a
 -- dies-trigger asks about (Guildsworn Prowler).
 --
--- Not implemented: the record carries no `attacking`, so that field and the
--- three that hang off the same GameState.combat lookup still read live and
--- answer for a gone creature as though it had never been in combat (#991).
--- The neighbouring `attackedThisTurn` needs no record at all: CR 608.2i makes it
--- a fold over GameState.events, which CR 511.3 does not clear and the death does
--- not touch.
+-- And so is the ATTACKING status, off the record's own field, for the blocking
+-- status' reason on the other side of the declaration: Garna, Bloodfist of Keld's
+-- "draw a card if it was attacking" reads it about the creature CR 400.7 deleted.
+--
+-- The three fields that follow the SAME GameState.combat lookup on to the attacked
+-- permanent -- attackingPlayer, attackingPlaneswalkerController and
+-- attackingBattleProtector -- are left reading live, and Pawl.Types.LastKnown's
+-- `attacking` records the query behind that. So is `blocked`, whose one printing
+-- asks a CR 608.2i question. The neighbouring `attackedThisTurn` needs no record
+-- either: CR 608.2i makes it a fold over GameState.events, which CR 511.3 does not
+-- clear and the death does not touch.
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
@@ -2853,6 +2858,7 @@ quantityReads q = case q of
   Quantity.Type.TimesKickedWith _ -> Set.empty
   Quantity.Type.TagWasSpent {} -> Set.empty
   Quantity.Type.WasToken -> Set.empty
+  Quantity.Type.WasAttacking -> Set.empty
   Quantity.Type.WasBlocking -> Set.empty
   Quantity.Type.DamageDealtToThisTurn -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
