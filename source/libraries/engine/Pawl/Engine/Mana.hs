@@ -1427,7 +1427,11 @@ announce subject capacity spending pid oid total outside claimed (ManaCost.MkMan
       -- not by conservatism, because the gate is now the same predicate over the
       -- same completions -- Pawl.Engine.Cost.canPaySomeCompletion is this
       -- `stillPayable` with nothing yet announced, which is what closed the
-      -- monocolored hybrid's disagreement about CR 118.7a's reductions. {X} used to
+      -- monocolored hybrid's disagreement about CR 118.7a's reductions. CR
+      -- 702.51b's tap substitutes ride inside `total` for exactly that reason
+      -- (Pawl.Engine.Cost.tapSubstitutedManas): they make the gate more
+      -- permissive, so an announcement measured without them could find no
+      -- payable half where the gate found one. {X} used to
       -- be a wedge in that -- a gate at X=0 while this runs on the value the player
       -- named -- and BOTH callers now close it the same way, by
       -- re-asking their own payability predicate at the announced value before

@@ -2264,6 +2264,12 @@ rewriteKeyword pairs keyword = case keyword of
   -- on the card, so CR 612.2 has no printed word here to swap.
   Keyword.Type.Station -> keyword
   Keyword.Type.UmbraArmor -> keyword
+  -- CR 702.51a and CR 702.126a name "creature", "artifact" and a mana symbol's
+  -- own color, all the rules' own vocabulary, and the criterion they produce is
+  -- written in Pawl.Engine.Keyword rather than on the card -- so CR 612.2 has no
+  -- printed word here to swap.
+  Keyword.Type.Convoke -> keyword
+  Keyword.Type.Improvise -> keyword
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is

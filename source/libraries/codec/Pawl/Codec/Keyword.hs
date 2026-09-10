@@ -148,5 +148,7 @@ codec =
       Arm.payload "Bestow" (Cost.codec codec) Keyword.Bestow (\x -> case x of Keyword.Bestow y -> Just y; _ -> Nothing),
       Arm.nullary "Station" Keyword.Station,
       Arm.payload "Mutate" (Cost.codec codec) Keyword.Mutate (\x -> case x of Keyword.Mutate y -> Just y; _ -> Nothing),
-      Arm.nullary "UmbraArmor" Keyword.UmbraArmor
+      Arm.nullary "UmbraArmor" Keyword.UmbraArmor,
+      Arm.nullary "Convoke" Keyword.Convoke,
+      Arm.nullary "Improvise" Keyword.Improvise
     ]

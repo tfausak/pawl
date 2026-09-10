@@ -32,8 +32,8 @@
 -- Clever Concealment joins them as the only printing here whose target slot takes
 -- CR 601.2c's variable number: "any number of target nonland permanents you
 -- control phase out" is what names a permanent and its own Equipment in one
--- announcement, which is CR 702.26h's tie-break. Its convoke is not implemented
--- (#3470), so pawl's copy pays {2}{W}{W} in full -- stricter than printed.
+-- announcement, which is CR 702.26h's tie-break. Its convoke is transcribed and
+-- no case here takes it: every board below pays {2}{W}{W} out of lands.
 --
 -- Nyxborn Rollicker joins them for CR 702.103g, whose "phases in unattached"
 -- needs a BESTOWED Aura: it is the one bestow printing in data/cards/, and its

@@ -251,6 +251,13 @@ to agents as written. What it doesn't say:
     suite, which absorbs it in argument order. Grep every construction site of
     the type by hand.
 
+    A RECORD UPDATE is the other one, and `-Werror`'s missing-fields check does
+    not name it: an update keeps the old value of the field you added, so a
+    descent that rebuilds a record silently drops it. The recurring site is
+    `Pawl.Engine.Projection.Rewrite`'s `rewriteEffect`, CR 612.1's text-change
+    walk. Grep `{ SomeRecord.field = ` over the tree beside the construction
+    sites, and say in the PR which you checked.
+
     A NEW READ OF A PERMANENT'S CARD goes through the projection
     (`Pawl.Engine.Projection.View`) or the copiable record it stamps
     (`Binding.copyOf`), never `Game.cardOf` or `Game.faceOf`, which answer the
