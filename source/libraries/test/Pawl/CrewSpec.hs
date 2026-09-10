@@ -39,10 +39,10 @@
 -- another permanent's static ability, so cantCrewSpec below adds an Aura rather
 -- than another case on the Dreadnought.
 --
--- Not covered here, because no card in the pool reaches it: rule 702.122c's
--- relation read LATER IN THE TURN, which Subterranean Schooner's "target creature
--- that crewed it this turn" wants and which outlives the resolution these
--- fixtures watch.
+-- CR 702.122c has its own fixture too, Subterranean Schooner: the relation is
+-- read LATER IN THE TURN, by a trigger of a combat step the crew ability has long
+-- left, so crewedThisTurnSpec below runs a whole combat rather than watching one
+-- resolution.
 module Pawl.CrewSpec where
 
 import qualified Data.List as List
@@ -63,12 +63,15 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -135,6 +138,7 @@ spec s registry = Spec.describe s "Crew" $ do
   crewedVehicleSpec s registry
   becomesCrewedSpec s registry
   crewsVehicleSpec s registry
+  crewedThisTurnSpec s registry
   cantCrewSpec s registry
 
 -- CR 208.3 and CR 301.7a: the printed numbers are on the card and are not the
@@ -472,6 +476,107 @@ crewingWith :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 crewingWith tappers p = case p of
   Prompt.ChooseTapsForTotalPower {} -> Set.fromList tappers
   _ -> S.identityAnswer p
+
+-- CR 702.122c: "a Vehicle is 'crewed by' a creature if that creature was tapped
+-- to pay the cost to activate that Vehicle's crew ability" -- the relation READ
+-- BACK later in the turn, by which time the crew ability that made it has
+-- resolved and left.
+--
+-- Subterranean Schooner {1}{U} Artifact -- Vehicle 3/4: "Whenever this Vehicle
+-- attacks, target creature that crewed it this turn explores. / Crew 1"
+-- (data/cards/subterranean-schooner.json; Oracle text checked against
+-- api.scryfall.com, 2026-09-10).
+--
+-- TWO Schooners on every board, each crewed by a different creature, and only one
+-- of them declared as an attacker. That is what parts rule 702.122c's "crewed IT"
+-- from "crewed a Vehicle", which one Vehicle cannot: both crewers are tapped,
+-- both crewed something, and only one crewed the attacker. The third board taps a
+-- creature where it stands instead, which parts "crewed it" from "is tapped".
+--
+-- The crewers are Hill Giant 3/3 and Goblin Piker 2/1, so CR 701.44a's +1/+1
+-- counter lands on distinct numbers -- 4/4 and 3/2, neither of which is any
+-- creature's printed size -- and WHICH creature explored is readable off the
+-- board.
+--
+-- The library holds one Bird Maiden, a NONLAND, because rule 701.44a's land
+-- branch puts a card in hand and leaves the explorer unchanged.
+--
+-- The target is FILTERED out of what the engine offered rather than built, so a
+-- board that never offered it takes the other creature and the assertions say so.
+crewedThisTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+crewedThisTurnSpec s registry =
+  let fixture = do
+        schooner <- S.printingOf s registry "Subterranean Schooner"
+        hillGiant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        case S.combatBoardOf [schooner, schooner, hillGiant, piker] [] of
+          (gs, [attackerId, otherId, giantId, pikerId], []) ->
+            pure (Just (attackerId, otherId, giantId, pikerId, snd (S.addLibraryCard maiden S.alice gs)))
+          _ -> pure Nothing
+      -- Run the declare attackers step itself: CR 508.1a's declaration is what
+      -- makes the Schooner attack, CR 603.3 puts its trigger on the stack, and the
+      -- passes inside the step resolve it.
+      throughDeclaration = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+   in Spec.describe s "CrewedThisTurn" $ do
+        -- The proving case: the Giant crewed the Schooner that attacks, the Piker
+        -- crewed the other one, and the explore lands on the Giant.
+        Spec.it s "CR 702.122c the attacking Schooner explores the creature that crewed it" $ do
+          crewBoard <- fixture
+          case crewBoard of
+            Just (attackerId, otherId, giantId, pikerId, gs) -> do
+              let crewed = crewWith (crewingWith [pikerId]) otherId (crewWith (crewingWith [giantId]) attackerId gs)
+                  after = throughDeclaration (attackingWith attackerId giantId) crewed
+              Spec.assertBool s (elem (GameEvent.Explored giantId) (S.eventsOf after)) "CR 701.44a the creature that crewed the attacker explored"
+              Spec.assertEqWith s "so it took the +1/+1 counter" (S.powerToughnessOf giantId after) (Just (4, 4))
+              Spec.assertEqWith s "and the creature that crewed the other Schooner is its printed 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+              Spec.assertEqWith s "with the stack empty, so the trigger resolved" (GameState.stack after) []
+            Nothing -> Spec.assertFailure s "fixture should have two Schooners and two crewers"
+        -- One board away from the case above: the two crewers swap Schooners, so
+        -- the Giant crewed a Vehicle and did not crew THIS one. Rule 702.122c's
+        -- relation names a Vehicle, and the Piker explores instead.
+        Spec.it s "CR 702.122c a creature that crewed the other Vehicle is no target" $ do
+          crewBoard <- fixture
+          case crewBoard of
+            Just (attackerId, otherId, giantId, pikerId, gs) -> do
+              let crewed = crewWith (crewingWith [giantId]) otherId (crewWith (crewingWith [pikerId]) attackerId gs)
+                  after = throughDeclaration (attackingWith attackerId giantId) crewed
+              Spec.assertBool s (notElem (GameEvent.Explored giantId) (S.eventsOf after)) "the creature that crewed the other Schooner did not explore"
+              Spec.assertEqWith s "and is still its printed 3/3" (S.powerToughnessOf giantId after) (Just (3, 3))
+              Spec.assertBool s (elem (GameEvent.Explored pikerId) (S.eventsOf after)) "where the creature that crewed the attacker did"
+              Spec.assertEqWith s "and grew to 3/2" (S.powerToughnessOf pikerId after) (Just (3, 2))
+            Nothing -> Spec.assertFailure s "fixture should have two Schooners and two crewers"
+        -- One board away again, this time in what the Giant was tapped FOR: rule
+        -- 702.122c asks what paid a crew cost, so a creature tapped for anything
+        -- else crewed nothing however tapped it is.
+        Spec.it s "CR 702.122c a creature tapped for another reason crewed nothing" $ do
+          crewBoard <- fixture
+          case crewBoard of
+            Just (attackerId, _, giantId, pikerId, gs) -> do
+              let crewed = crewWith (crewingWith [pikerId]) attackerId (tap giantId gs)
+                  after = throughDeclaration (attackingWith attackerId giantId) crewed
+              Spec.assertBool s (notElem (GameEvent.Explored giantId) (S.eventsOf after)) "the creature tapped where it stood did not explore"
+              Spec.assertEqWith s "and is still its printed 3/3" (S.powerToughnessOf giantId after) (Just (3, 3))
+              Spec.assertEqWith s "where the creature that crewed the attacker grew to 3/2" (S.powerToughnessOf pikerId after) (Just (3, 2))
+            Nothing -> Spec.assertFailure s "fixture should have two Schooners and two crewers"
+
+-- Declares `attacker` and nothing else, aims rule 702.122c's target at `wanted`
+-- where the engine offered it, and bins CR 701.44a's revealed card so the explore
+-- itself is a zone change as well as a counter.
+attackingWith :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackingWith attacker wanted p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+  Prompt.ChooseTargets _ _ _ sets -> fmap (aimAt wanted . snd) sets
+  Prompt.ChooseExplore {} -> OptionalDecision.Exercises
+  _ -> S.aggressiveAnswer p
+
+-- `wanted` if the engine offered it, and otherwise the first candidate it did
+-- offer: a board where rule 702.122c admitted the wrong creature then explores
+-- that one, which the assertions read, rather than announcing an empty set.
+aimAt :: ObjectId.ObjectId -> Set.Set Recipient.Recipient -> Set.Set Recipient.Recipient
+aimAt wanted candidates =
+  let asked = Set.filter ((== Just wanted) . Recipient.objectOf) candidates
+   in if Set.null asked then Set.fromList (take 1 (Set.toAscList candidates)) else asked
 
 -- CR 702.122d: "can't crew Vehicles" -- an effect that forbids TAPPING a
 -- creature to pay a crew cost, carried by Pawl.Types.CrewRestriction and

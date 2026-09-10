@@ -425,7 +425,9 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- pay a crew ability's cost, and Pawl.Engine.Resolve.resolveAbilityWith puts this
 -- set on GameEvent.BecameCrewed so that Gearshift Ace's "whenever this creature
 -- crews a Vehicle" can find itself in it. The component is not crew's alone, so
--- the slot is named for the component; on a non-crew cost nothing reads it.
+-- the slot is named for the component; on a non-crew cost nothing reads it. CR
+-- 702.122c's look-back reads that same event rather than this slot
+-- (Pawl.Engine.Projection.View's crewedByIt), the relation outliving the payment.
 --
 -- SET-VALUED and read as a set: CR 702.122a's "any number" is a set by
 -- construction, so a reader taking Binding.onlyOne of it would go quiet on every
