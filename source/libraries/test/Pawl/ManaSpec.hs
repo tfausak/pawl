@@ -1344,11 +1344,12 @@ laviniaBoard lavinia wretch piker active =
 -- mana ability, so ActivationRestriction.OnlyIf was asked at CR 605.3a's two
 -- windows by no card at all.
 --
--- TWO BOARDS one SUBTYPE apart -- an Island against a Swamp, both untapped,
--- both alice's, neither able to pay {W} itself -- so the refusal is the rider's
--- and not the supply's. Luminesce's printed cost is exactly {W}, which only the
--- ridden route pays: the Maze's own {C} route and the other land are live on
--- both boards and pay nothing here.
+-- TWO BOARDS one SUBTYPE apart -- an Island against a Swamp, alice's and TAPPED
+-- on both, so the Maze is the only untapped source either board has and the
+-- refusal is the rider's rather than the supply's. A tapped land still answers
+-- CR 602.5's condition, which asks what she CONTROLS. Luminesce's printed cost
+-- is exactly {W}, so the Maze's own {C} route -- live on both boards -- pays
+-- nothing here.
 --
 -- NEITHER condition is one CR 601.2a's move can falsify: a card leaving a hand
 -- for the stack changes no permanent alice controls, so the gate's optimistic
