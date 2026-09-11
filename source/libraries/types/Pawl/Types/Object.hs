@@ -595,8 +595,9 @@ data Object = MkObject
     -- became may reference "what costs were paid" -- so
     -- Pawl.Engine.Event.changeZoneAttaching carries it across that one move,
     -- `kicked`'s route. NOT a copiable value (CR 707.2): a Clone of an evoked
-    -- permanent was not cast for that cost. A copy of the SPELL is (CR 707.10),
-    -- and Pawl.Engine.Resolve.Effect's copy is the spell's own record updated.
+    -- permanent was not cast for that cost. A copy of the SPELL copies the
+    -- alternative cost (CR 707.10) but isn't cast, so it keeps evoke's record and
+    -- drops escape's (CR 702.138b) -- Pawl.Engine.Keyword.copiedCastUsing.
     castUsing :: Maybe Keyword.Keyword,
     -- | CR 701.35a: this permanent is DETAINED -- it "can't attack or block and
     -- its activated abilities can't be activated" -- until the next turn of each

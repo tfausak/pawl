@@ -3200,6 +3200,22 @@ escapeSpec s registry = Spec.describe s "Escape" $ do
         Spec.assertEqWith s "CR 707.2 the token copy is the printed 4/1" (fmap (`S.powerToughnessOf` copied) (filter (/= original) (chimerasOn copied))) [Just (4, 1)]
         Spec.assertEqWith s "and the escaped original is still a 5/2" (S.powerToughnessOf original copied) (Just (5, 2))
       other -> Spec.assertFailure s ("expected one Chimera, got " <> show (length other))
+  -- CR 702.138b with CR 707.10: Double Major copies the escaping Chimera on the
+  -- stack. The copy copies the alternative cost but was never CAST, so the token
+  -- it becomes did not escape; the original did.
+  Spec.it s "CR 702.138b a Double Major copy of the escaping Chimera did not escape" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    chimera <- S.printingOf s registry "Loathsome Chimera"
+    doubleMajor <- S.printingOf s registry "Double Major"
+    let (inGraveyard, gs) = escapeBoard forest chimera piker 4
+        onStack = S.runPure S.identityAnswer gs (S.cast S.alice inGraveyard)
+        -- Double Major's {G}{U}, added once the escape has been paid for.
+        (majorId, withMajor) = S.addHandCard doubleMajor S.alice (S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 onStack))
+        after = S.runPure S.identityAnswer withMajor (S.cast S.alice majorId >> Monad.replicateM_ (3 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+    Spec.assertEqWith s "CR 702.138b the token copy is the printed 4/1 beside the escaped 5/2" (List.sort (fmap (`S.powerToughnessOf` after) (chimerasOn after))) [Just (4, 1), Just (5, 2)]
+    Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
 
 -- The battlefield's Loathsome Chimeras, by name: CR 400.7 gives the permanent a
 -- new id.
@@ -3258,6 +3274,31 @@ evokeSpec s registry = Spec.describe s "Evoke" $ do
     Spec.assertEqWith s "two triggers waited on the stack for Flicker of Fate" (length (GameState.stack entered)) 2
     Spec.assertEqWith s "CR 603.4 the returned Mulldrifter is still on the battlefield" (length (namedOnBattlefield "Mulldrifter" after)) 1
     Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+  -- CR 702.170d with CR 118.9a: a plotted card is cast without paying its mana
+  -- cost, and that is its only cost -- no second alternative. Aven Interrupter
+  -- plots bob's Mulldrifter off the stack; the control is the same Mulldrifter
+  -- in his hand, offered its evoke cost.
+  Spec.it s "CR 702.170d a Mulldrifter Aven Interrupter plotted is offered no evoke cost" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    aven <- S.printingOf s registry "Aven Interrupter"
+    mulldrifter <- S.printingOf s registry "Mulldrifter"
+    let (gs0, avenId) = S.handOne aven (S.landsFor island S.bob 5 (S.landsInPlay plains 3))
+        (victim, board) = S.addHandCard mulldrifter S.bob gs0
+        aimed :: Prompt.Prompt r -> r
+        aimed p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just victim) . Recipient.objectOf) sets
+          _ -> S.identityAnswer p
+        waiting = S.runPure aimed board (S.cast S.bob victim)
+        after = S.runPure aimed waiting (S.cast S.alice avenId >> Engine.priorityLoop)
+        offered oid gs = fmap Cost.Type.mana (Cost.costsFor S.bob (S.printingName mulldrifter) oid gs)
+        evoke = Just (ManaCost.MkManaCost evokeCost)
+    case filter (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just (S.printingName mulldrifter)) (Game.zoneMembers Zone.Exile S.bob after) of
+      [exiled] -> do
+        Spec.assertBool s (notElem evoke (offered exiled after)) "CR 702.170d the plotted Mulldrifter is not offered evoke"
+        Spec.assertBool s (elem evoke (offered victim board)) "the control: in bob's hand it is"
+        Spec.assertEqWith s "CR 702.170c and it was plotted" (fmap (Maybe.isJust . Object.plotted) (Game.lookupObject exiled after)) (Just True)
+      other -> Spec.assertFailure s ("expected one exiled Mulldrifter, got " <> show (length other))
 
 -- Mulldrifter's printed {4}{U} and its evoke {2}{U}.
 mulldrifterCost, evokeCost :: [ManaSymbol.ManaSymbol]

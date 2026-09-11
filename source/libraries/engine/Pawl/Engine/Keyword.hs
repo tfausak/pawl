@@ -1862,6 +1862,16 @@ escapeCosts keywords =
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
+-- CR 707.10: what a COPY of a spell keeps of Object.castUsing. The copy copies
+-- the alternative cost decision, so CR 702.74a's "if its evoke cost was paid"
+-- holds of it; CR 702.138b's "escaped" asks whether the spell was CAST from a
+-- graveyard with escape, and a copy of a spell isn't cast. Pawl.CastSpec's "CR
+-- 702.138b a Double Major copy of the escaping Chimera did not escape" proves it.
+copiedCastUsing :: Maybe Keyword -> Maybe Keyword
+copiedCastUsing castUsing = case castUsing of
+  Just (Keyword.Escape _) -> Nothing
+  _ -> castUsing
+
 -- CR 702.74a: every evoke cost this card may be cast for, in ascending Set order.
 -- Read by Pawl.Engine.Cost.candidateCostsFor from EVERY zone, bestowCosts'
 -- reading, the static ability functioning "in any zone from which the card with
