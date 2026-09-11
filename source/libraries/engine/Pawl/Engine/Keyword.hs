@@ -348,9 +348,12 @@ abilitiesFor keyword count = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
-  -- CR 702.157b and CR 702.175b: each instance triggers on its OWN payments,
-  -- which Object.paidCosts keys by the keyword -- so identical instances share one
-  -- key, and a count past one mints one ability rather than one per instance.
+  -- CR 702.157a's and CR 702.175a's enters triggers, one per distinct keyword:
+  -- Object.paidCosts keys a payment by the keyword, so a count past one mints
+  -- one ability reading that one key.
+  --
+  -- Not implemented: CR 702.157b's and CR 702.175b's identical instances, each
+  -- paid separately and triggering on its own payments (#3635).
   Keyword.Squad cost -> List.genericReplicate (min 1 count) (squad cost)
   Keyword.Offspring cost -> List.genericReplicate (min 1 count) (offspring cost)
   Keyword.Foretell _ -> []

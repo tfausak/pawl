@@ -472,9 +472,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect --
         -- rule 702.33d designating the spell for ANY of its kicker costs, so this asks
         -- every KICKER key of the map and no other: a squad or offspring payment is
-        -- not a kick. Kept because CR 702.33d says so, not because anything observes
-        -- it: no card in data/cards/ prints squad or offspring beside a "kicked"
-        -- payoff, so dropping the filter leaves the suite green. The object it
+        -- not a kick. A REGRESSION FENCE: dropping the filter leaves the suite green
+        -- (2026-09-11), since every "kicked" reader in data/cards/ asks about its
+        -- own card and none prints squad or offspring. Hallar, the Firefletcher's
+        -- "if that spell was kicked" would observe it. The object it
         -- reads is the RESOLVING SPELL, which is still on the stack while its own
         -- clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
         Quantity.WasKicked -> fmap (\view -> if any (> 0) (Map.filterWithKey (\keyword _ -> Keyword.familyOf keyword == Just KeywordFamily.Kicker) (Filter.paidCosts view)) then 1 else 0) mView
@@ -1004,9 +1005,10 @@ objectSlots quantity = case quantity of
   Quantity.DesignationValue _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
-  -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
-  -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
-  -- own record by equality, never an instruction this traversal descends into.
+  -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
+  -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
+  -- the spell's own record by equality, never an instruction this traversal
+  -- descends into.
   Quantity.TimesPaid _ -> Set.empty
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
@@ -1229,9 +1231,10 @@ readsX quantity = case quantity of
   Quantity.DesignationValue _ -> False
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
-  -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
-  -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
-  -- own record by equality, never an instruction this traversal descends into.
+  -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
+  -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
+  -- the spell's own record by equality, never an instruction this traversal
+  -- descends into.
   Quantity.TimesPaid _ -> False
   Quantity.CastUsing _ -> False
   Quantity.TagWasSpent {} -> False

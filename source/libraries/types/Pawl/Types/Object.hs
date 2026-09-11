@@ -426,14 +426,16 @@ data Object = MkObject
     -- Pawl.Engine.Cast onto the stack incarnation, and empty where none was.
     --
     -- KEYED BY THE KEYWORD, and a COUNT per key: CR 702.33b's "kicker [cost 1]
-    -- and/or [cost 2]" has payoffs naming one of them (CR 702.33f), CR 702.157b's
-    -- instances of squad each count their own payments, and the count is CR
-    -- 702.33c's multikicker and squad's "for each time". Quantity.TimesPaid reads
-    -- a key; Quantity.WasKicked asks rule 702.33d's yes-or-no across the kicker
-    -- keys only, since a squad or offspring payment is not a kick. Stored rather
-    -- than projected, since it records a choice rather than a characteristic,
-    -- and so NOT a copiable value (CR 707.2): a Clone of a squadded permanent
-    -- paid nothing.
+    -- and/or [cost 2]" has payoffs naming one of them (CR 702.33f), and the count
+    -- is CR 702.33c's multikicker and squad's "for each time". Quantity.TimesPaid
+    -- reads a key; Quantity.WasKicked asks rule 702.33d's yes-or-no across the
+    -- kicker keys only, since a squad or offspring payment is not a kick. Stored
+    -- rather than projected, since it records a choice rather than a
+    -- characteristic, and so NOT a copiable value (CR 707.2): Pawl.CastSpec's
+    -- "CR 707.2 a Clone of a paid Mage makes no token" is the proof.
+    --
+    -- Not implemented: two IDENTICAL instances of one keyword, which CR 702.157b
+    -- and CR 702.175b pay separately and this map keys as one (#3635).
     --
     -- Per-incarnation, save for CR 400.7d's exception -- "an ability of a
     -- permanent can reference information about the spell that became that

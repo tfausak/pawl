@@ -2005,6 +2005,9 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
           -- CR 702.33a/b/c's, CR 702.157a's and CR 702.175a's costs, read ONCE off
           -- the half being cast: the announcement below and the limit it is
           -- judged against are the same list.
+          --
+          -- Not implemented: such a keyword granted to the spell as it is cast,
+          -- which the printed face does not carry (#3635).
           optionalOffers = Keyword.optionalCosts (Face.keywords face)
       -- CR 702.33a: kicker, asked HERE -- after the modes and before the cost, the
       -- variable and the targets -- because that is where CR 601.2b puts the
