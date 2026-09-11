@@ -372,6 +372,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
+  TriggerCondition.CreatureAttacks _ -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.SelfIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
@@ -581,6 +582,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
+  TriggerCondition.CreatureAttacks _ -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.SelfIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
@@ -2022,6 +2024,7 @@ zonesTriggeredFrom cond =
         TriggerCondition.SelfAttacksPermanent _ -> battlefield
         TriggerCondition.CreatureAttacksAlone _ -> battlefield
         TriggerCondition.CreatureAttacksYou -> battlefield
+        TriggerCondition.CreatureAttacks _ -> battlefield
         TriggerCondition.AttachedPlayerIsAttacked -> battlefield
         -- CR 508.1b / 310.5: the announcement names a planeswalker the defending player
         -- CONTROLS or a battle they protect, both battlefield permanents, so CR 113.6k
@@ -2315,6 +2318,7 @@ stateTriggers gs
               TriggerCondition.SelfAttacksPermanent _ -> False
               TriggerCondition.CreatureAttacksAlone _ -> False
               TriggerCondition.CreatureAttacksYou -> False
+              TriggerCondition.CreatureAttacks _ -> False
               TriggerCondition.AttachedPlayerIsAttacked -> False
               TriggerCondition.SelfIsAttacked -> False
               TriggerCondition.PlayerAttacks _ -> False

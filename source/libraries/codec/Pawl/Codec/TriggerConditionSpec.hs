@@ -253,6 +253,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.CreatureAttacksYou
       " {\"type\":\"CreatureAttacksYou\"} "
+  -- CR 508.3a read by a bystander, with a Filter over the attacker.
+  Spec.it s "CreatureAttacks" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.CreatureAttacks (Filter.ControlledBy PlayerRelation.You))
+      " {\"type\":\"CreatureAttacks\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
   -- CR 508.3d. All THREE relations, unlike PlayerCycles' two: rule 508.3d's
   -- "[a player]" is printed as "you" (Boggart Prankster), as "a player" (Avatar
   -- Roku, Firebender) and as "an opponent" (Ever-Watching Threshold).
