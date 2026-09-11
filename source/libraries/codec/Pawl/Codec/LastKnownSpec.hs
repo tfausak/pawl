@@ -7,6 +7,7 @@ import qualified Pawl.Codec.LastKnown as LastKnown
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -39,7 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.attached = Set.singleton (ObjectId.MkObjectId 9),
           LastKnown.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")),
-          LastKnown.attacking = False,
+          LastKnown.attacking = Nothing,
           LastKnown.blocking = True,
           LastKnown.protector = Just (PlayerId.MkPlayerId 7)
         }
@@ -50,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"copiable\":"
           <> minimalJson
           <> ",\"attached\":[9]"
-          <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":false,\"blocking\":true,\"protector\":7} "
+          <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":null,\"blocking\":true,\"protector\":7} "
       )
   -- CR 109.3: neither an attachment nor a chosen name is a characteristic, and
   -- most objects have neither, so the absent case is written out rather than left
@@ -68,7 +69,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.attached = Set.empty,
           LastKnown.chosenNames = Set.empty,
-          LastKnown.attacking = True,
+          LastKnown.attacking = Just (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
           LastKnown.blocking = False,
           LastKnown.protector = Nothing
         }
@@ -79,7 +80,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"copiable\":"
           <> minimalJson
           <> ",\"attached\":[]"
-          <> ",\"chosenNames\":[],\"attacking\":true,\"blocking\":false,\"protector\":null} "
+          <> ",\"chosenNames\":[],\"attacking\":{\"type\":\"OfPlaneswalker\",\"value\":8},\"blocking\":false,\"protector\":null} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s LastKnown.codec

@@ -93,7 +93,9 @@
                             "value": 2
                           },
                           "riders": {
-                            "attacking": true,
+                            "attacking": {
+                              "type": "Chosen"
+                            },
                             "tapped": {
                               "type": "Tapped"
                             }

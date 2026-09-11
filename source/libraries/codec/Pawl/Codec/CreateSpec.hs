@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Create as Create
+import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -28,7 +29,7 @@ plain :: EntryRiders.EntryRiders Quantity.Quantity
 plain =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = TapState.Untapped,
-      EntryRiders.attacking = False,
+      EntryRiders.attacking = Nothing,
       EntryRiders.blocking = Nothing,
       EntryRiders.transformed = False,
       EntryRiders.counters = Map.empty,
@@ -78,12 +79,12 @@ spec s = Spec.describe s "Pawl.Codec.Create" $ do
       ( Create.MkCreate
           { Create.quantity = Quantity.Literal 2,
             Create.card = Text.pack "Spirit Token",
-            Create.riders = plain {EntryRiders.attacking = True},
+            Create.riders = plain {EntryRiders.attacking = Just EntryAttack.Chosen},
             Create.slot = Nothing,
             Create.creator = you
           }
       )
-      " {\"quantity\":{\"type\":\"Literal\",\"value\":2},\"card\":\"Spirit Token\",\"riders\":{\"attacking\":true}} "
+      " {\"quantity\":{\"type\":\"Literal\",\"value\":2},\"card\":\"Spirit Token\",\"riders\":{\"attacking\":{\"type\":\"Chosen\"}}} "
   -- CR 111.2's creator alone, the key a card writes when the sentence names
   -- somebody other than "you".
   Spec.it s "MkCreate, a creator other than you" $

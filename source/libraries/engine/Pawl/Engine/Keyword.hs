@@ -885,7 +885,7 @@ unearth cost =
               MoveToZone.riders =
                 EntryRiders.MkEntryRiders
                   { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = False,
+                    EntryRiders.attacking = Nothing,
                     EntryRiders.blocking = Nothing,
                     EntryRiders.transformed = False,
                     EntryRiders.counters = Map.empty,
@@ -981,7 +981,7 @@ unearthExile =
               MoveToZone.riders =
                 EntryRiders.MkEntryRiders
                   { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = False,
+                    EntryRiders.attacking = Nothing,
                     EntryRiders.blocking = Nothing,
                     EntryRiders.transformed = False,
                     EntryRiders.counters = Map.empty,
@@ -1050,7 +1050,7 @@ graveyardTokenCopy exceptions cost =
               CreateCopy.riders =
                 EntryRiders.MkEntryRiders
                   { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = False,
+                    EntryRiders.attacking = Nothing,
                     EntryRiders.blocking = Nothing,
                     EntryRiders.transformed = False,
                     EntryRiders.counters = Map.empty,
@@ -3211,7 +3211,7 @@ ingest =
               Zone.Exile
               EntryRiders.MkEntryRiders
                 { EntryRiders.tapped = TapState.Untapped,
-                  EntryRiders.attacking = False,
+                  EntryRiders.attacking = Nothing,
                   EntryRiders.blocking = Nothing,
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.empty,
@@ -3905,7 +3905,7 @@ returns kind =
               Zone.Battlefield
               EntryRiders.MkEntryRiders
                 { EntryRiders.tapped = TapState.Untapped,
-                  EntryRiders.attacking = False,
+                  EntryRiders.attacking = Nothing,
                   EntryRiders.blocking = Nothing,
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.singleton kind (Quantity.Literal 1),
@@ -3954,7 +3954,7 @@ afterlife n =
               Create.riders =
                 EntryRiders.MkEntryRiders
                   { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = False,
+                    EntryRiders.attacking = Nothing,
                     EntryRiders.blocking = Nothing,
                     EntryRiders.transformed = False,
                     EntryRiders.counters = Map.empty,
@@ -4079,7 +4079,7 @@ fabricate n =
               Create.riders =
                 EntryRiders.MkEntryRiders
                   { EntryRiders.tapped = TapState.Untapped,
-                    EntryRiders.attacking = False,
+                    EntryRiders.attacking = Nothing,
                     EntryRiders.blocking = Nothing,
                     EntryRiders.transformed = False,
                     EntryRiders.counters = Map.empty,
@@ -4191,7 +4191,7 @@ hideaway n =
   let plain =
         EntryRiders.MkEntryRiders
           { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = False,
+            EntryRiders.attacking = Nothing,
             EntryRiders.blocking = Nothing,
             EntryRiders.transformed = False,
             EntryRiders.counters = Map.empty,
@@ -4279,7 +4279,7 @@ soulshift n =
               Zone.Hand
               EntryRiders.MkEntryRiders
                 { EntryRiders.tapped = TapState.Untapped,
-                  EntryRiders.attacking = False,
+                  EntryRiders.attacking = Nothing,
                   EntryRiders.blocking = Nothing,
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.empty,
@@ -4474,7 +4474,7 @@ cascade =
   let plain =
         EntryRiders.MkEntryRiders
           { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = False,
+            EntryRiders.attacking = Nothing,
             EntryRiders.blocking = Nothing,
             EntryRiders.transformed = False,
             EntryRiders.counters = Map.empty,

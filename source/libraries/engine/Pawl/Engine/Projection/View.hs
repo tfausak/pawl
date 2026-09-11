@@ -92,7 +92,7 @@ lastKnownView peers oid gs lk =
   (viewOfCharacteristics peers oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
     { Filter.owner = Just (LastKnown.owner lk),
       Filter.token = Game.sourceIsToken (LastKnown.source lk),
-      Filter.attacking = LastKnown.attacking lk,
+      Filter.attacking = Maybe.isJust (LastKnown.attacking lk),
       Filter.blocking = LastKnown.blocking lk
     }
 

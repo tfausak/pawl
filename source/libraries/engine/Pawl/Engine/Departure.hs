@@ -259,7 +259,7 @@ objectsLeaveWith pid gs =
                 (Game.attachments oid gs)
                 (Object.chosenNames obj)
                 -- CR 508.1k, the sibling read of the same record.
-                (Game.isAttacking oid gs)
+                (Game.attackTargetOf oid gs)
                 (Game.isBlocking oid gs)
                 -- CR 310.9a, read straight off the object like the owner above:
                 -- Nothing for everything that is not a battle.

@@ -430,7 +430,7 @@ skipSpec s registry = Spec.describe s "Skip" $ do
     -- that one for anything between the attack and the return going wrong.
     piker <- S.printingOf s registry "Goblin Piker"
     let (base, ours, _) = S.combatBoardOf [piker] []
-        joined = S.runPure S.identityAnswer base (Foldable.traverse_ Combat.putOntoBattlefieldAttacking ours)
+        joined = S.runPure S.identityAnswer base (Foldable.traverse_ (Combat.putOntoBattlefieldAttacking Nothing) ours)
         after = Combat.skipEmptyCombat joined
         remaining = foldr (:) [] (GameState.remaining after)
     Spec.assertEqWith s "no declaration was made" (S.attackerDeclarationsOf after) []

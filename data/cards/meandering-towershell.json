@@ -31,7 +31,9 @@
                             "value": "exiled"
                           },
                           "riders": {
-                            "attacking": true,
+                            "attacking": {
+                              "type": "Chosen"
+                            },
                             "tapped": {
                               "type": "Tapped"
                             }

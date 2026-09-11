@@ -687,7 +687,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (gs, battle, mine, _, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker"] [] []
     case mine of
       [arrival] -> do
-        let after = S.runPure (attackTheBattle battle) gs (Combat.putOntoBattlefieldAttacking arrival)
+        let after = S.runPure (attackTheBattle battle) gs (Combat.putOntoBattlefieldAttacking Nothing arrival)
             combat = GameState.combat after
         Spec.assertEqWith s "it is attacking the Siege" (Map.lookup arrival (Combat.Type.attackers combat)) (Just (AttackTarget.OfBattle battle))
         -- The two records hold DIFFERENT seats, which is the whole reason there

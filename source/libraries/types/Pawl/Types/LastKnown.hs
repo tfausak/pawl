@@ -3,6 +3,7 @@ module Pawl.Types.LastKnown where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
@@ -122,9 +123,10 @@ data LastKnown = MkLastKnown
     -- changes nothing the projection folds. So it sits beside them for
     -- `controller`'s reason.
     chosenNames :: !(Set.Set CardName.CardName),
-    -- | CR 508.1k: was it attacking as it left -- the same membership
-    -- Pawl.Engine.Filter.View's `attacking` reports, through the one classifier
-    -- Game.isAttacking, read off GameState.combat before the object ceased.
+    -- | CR 508.1k: what it was attacking as it left -- its Combat.attackers
+    -- entry, whose presence is the membership Pawl.Engine.Filter.View's
+    -- `attacking` reports through the one lookup Game.attackTargetOf, read off
+    -- GameState.combat before the object ceased.
     --
     -- Not a characteristic either (CR 109.3's list has no combat status), and not
     -- recoverable from anything above, for `blocking`'s reason turned to the other
@@ -134,18 +136,14 @@ data LastKnown = MkLastKnown
     -- English "if" gating one clause (CR 608.2c) rather than CR 603.4's
     -- intervening one.
     --
-    -- A Bool rather than what it was attacking, for `blocking`'s reason: that is
-    -- the whole of what Filter.attacking reports, and the three neighbouring
-    -- fields that follow the same GameState.combat lookup to the ATTACKED
-    -- permanent (Filter.attackingPlayer, attackingPlaneswalkerController,
-    -- attackingBattleProtector) go on reading live. Scryfall o:"it was attacking
-    -- you" and o:"it was attacking a", 2026-09-10, no hit -- no printing asks any
-    -- of the three about a permanent that is gone, and Fyndhorn Druid's "if it was
-    -- blocked this turn" is a CR 608.2i fold over GameState.events rather than a
-    -- question for this record. A printing whose leaves-the-battlefield trigger
-    -- asked WHICH player, planeswalker or battle the departed creature had been
-    -- attacking would refute that and want this field widened.
-    attacking :: !Bool,
+    -- The TARGET and not a Bool because CR 702.49c asks it of a creature ninjutsu
+    -- has returned to hand: the ninja attacks "the same player, planeswalker, or
+    -- battle as the creature that was returned". The entry CR 506.4c keeps for a
+    -- creature attacking nothing is recorded as it stands, which is what a later
+    -- CR 508.4 arrival would be sent at. The three Filter.View fields that follow
+    -- the lookup to the ATTACKED permanent (Filter.attackingPlayer,
+    -- attackingPlaneswalkerController, attackingBattleProtector) still read live.
+    attacking :: !(Maybe AttackTarget.AttackTarget),
     -- | CR 509.1g: was it blocking as it left -- the same membership
     -- Pawl.Engine.Filter.View's `blocking` reports, read off GameState.combat
     -- before the object ceased.

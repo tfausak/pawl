@@ -16,6 +16,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Asked as Asked
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -326,11 +327,16 @@ removeFromCombat oid gs =
 -- the declaration keys by ATTACKER -- the line isBlocking below is careful not to
 -- be.
 --
--- The ONE lookup, for isBlocking's reason: Pawl.Engine.Projection's live
--- Filter.attacking and the CR 608.2h record Pawl.Types.LastKnown.attacking keeps
--- must not answer it differently.
+-- The ONE lookup, attackTargetOf below, for isBlocking's reason:
+-- Pawl.Engine.Projection's live Filter.attacking and the CR 608.2h record
+-- Pawl.Types.LastKnown.attacking keeps must not answer it differently.
 isAttacking :: ObjectId -> GameState -> Bool
-isAttacking oid gs = Map.member oid (Combat.attackers (GameState.combat gs))
+isAttacking oid gs = Maybe.isJust (attackTargetOf oid gs)
+
+-- CR 508.1b: what this creature is attacking, as Combat.attackers records it --
+-- which CR 506.4c leaves standing for a creature attacking nothing.
+attackTargetOf :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
+attackTargetOf oid gs = Map.lookup oid (Combat.attackers (GameState.combat gs))
 
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup.

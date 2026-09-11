@@ -2,6 +2,7 @@
 
 module Pawl.Codec.LastKnown where
 
+import qualified Pawl.Codec.AttackTarget as AttackTarget
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
@@ -26,7 +27,7 @@ codec = Fields.object $ do
   copiable <- Fields.required "copiable" ProjectedCharacteristics.codec LastKnown.copiable
   attached <- Fields.required "attached" (Common.set ObjectId.codec) LastKnown.attached
   chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) LastKnown.chosenNames
-  attacking <- Fields.required "attacking" Common.boolean LastKnown.attacking
+  attacking <- Fields.required "attacking" (Common.maybe AttackTarget.codec) LastKnown.attacking
   blocking <- Fields.required "blocking" Common.boolean LastKnown.blocking
   protector <- Fields.required "protector" (Common.maybe PlayerId.codec) LastKnown.protector
   pure

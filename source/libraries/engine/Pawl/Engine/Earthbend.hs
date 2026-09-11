@@ -141,7 +141,7 @@ returnAbility =
               MoveToZone.riders =
                 EntryRiders.MkEntryRiders
                   { EntryRiders.tapped = TapState.Tapped,
-                    EntryRiders.attacking = False,
+                    EntryRiders.attacking = Nothing,
                     EntryRiders.blocking = Nothing,
                     EntryRiders.transformed = False,
                     EntryRiders.counters = Map.empty,

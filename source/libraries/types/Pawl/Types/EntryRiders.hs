@@ -2,6 +2,7 @@ module Pawl.Types.EntryRiders where
 
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SlotName as SlotName
@@ -35,16 +36,10 @@ import qualified Pawl.Types.TapState as TapState
 -- WHICH FACE the card enters showing, which CR 712.14 otherwise answers with the
 -- front one.
 --
--- `attacking` is a Bool rather than an AttackTarget because the effect does not
--- say WHAT the creature attacks; whom it attacks is chosen as it enters, by
--- Pawl.Engine.Combat.putOntoBattlefieldAttacking.
---
--- Not implemented: CR 508.4's parenthetical case, an effect that DOES specify
--- what the entering creature attacks. CR 702.49c is that case and Ninja of the
--- Deep Hours is it in the pool -- the arriving ninja should attack whatever the
--- returned creature was attacking (#3019). A Bool cannot say it, and the field
--- `blocking` one line down, which names a slot for CR 509.4's counterpart, is
--- the shape this one would take.
+-- `attacking` is an EntryAttack rather than an AttackTarget because the effect
+-- names no seat or permanent a card could write: CR 508.4 has the controller
+-- choose as it enters, and CR 702.49c's specified case reads what another object
+-- was attacking. Pawl.Engine.Combat.putOntoBattlefieldAttacking applies either.
 --
 -- `blocking` is CR 509.4's rider, and its ASYMMETRY with `attacking` one field
 -- up is the design call rather than an oversight. CR 509.4's parenthetical --
@@ -202,7 +197,7 @@ import qualified Pawl.Types.TapState as TapState
 -- permanent turnable by. That pairing is the one a Bool could not say at all.
 data EntryRiders count = MkEntryRiders
   { tapped :: TapState.TapState,
-    attacking :: Bool,
+    attacking :: Maybe EntryAttack.EntryAttack,
     blocking :: Maybe SlotName.SlotName,
     transformed :: Bool,
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) count,
