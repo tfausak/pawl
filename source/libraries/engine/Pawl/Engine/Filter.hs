@@ -591,9 +591,9 @@ data View = MkView
     -- `ringBearerFor` above takes.
     classLevel :: Maybe ClassLevel.ClassLevel,
     -- CR 601.2b: how many times was each optional additional cost a keyword of
-    -- this candidate offers declared? Read off Object.paidCosts, and empty where
-    -- there is no object to read it off, both for the reasons `designations`
-    -- above gives. Its readers are Pawl.Engine.Quantity's WasKicked arm, answering
+    -- this candidate offers declared? Read off Object.paidCosts, or off
+    -- LastKnown.paidCosts for an object that has left its zone (CR 608.2h), and
+    -- empty for a printed card, a player or an event snapshot. Its readers are Pawl.Engine.Quantity's WasKicked arm, answering
     -- Burst Lightning's clause conditions and Monstrous War-Leech's CR 604.2
     -- clause on its entry replacement, and its TimesPaid arm, answering Gnarlid
     -- Pack's count, Sunscape Battlemage's "kicked with its {1}{G} kicker" and CR
@@ -606,9 +606,9 @@ data View = MkView
     -- the forgetting (see Pawl.Types.Object).
     paidCosts :: Map.Map Keyword.Type.Keyword Natural.Natural,
     -- CR 601.2b / 400.7d: the keyword whose candidate cost this candidate was
-    -- cast for, read off Object.castUsing for `paidCosts` above's reasons, and
-    -- Nothing where there is no object. Pawl.Engine.Quantity's CastUsing arm is
-    -- the reader.
+    -- cast for, read off Object.castUsing, and Nothing where there is no live
+    -- object, since Pawl.Types.LastKnown keeps no such record.
+    -- Pawl.Engine.Quantity's CastUsing arm is the reader.
     castUsing :: Maybe Keyword.Type.Keyword,
     -- CR 400.7d / CR 107.4h: the production tags of the mana that was spent to
     -- cast the spell this candidate is, or was, or to activate the CR 602.2a

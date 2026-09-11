@@ -710,12 +710,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the read, which is what a CR 608.2h asker gets for a permanent that is
       -- gone.
       Filter.classLevel = Game.lookupObject oid gs >>= Object.classLevel,
-      -- CR 702.33d: read live off the object, so the CR 608.2h path answers "not
-      -- kicked" for a spell that has left the stack.
+      -- CR 601.2b: read live off the object. For one that has left its zone,
+      -- lastKnownView overrides this with LastKnown.paidCosts, so the CR 608.2h
+      -- path answers "kicked" for a kicked spell that has left the stack.
       Filter.paidCosts = foldMap Object.paidCosts (Game.lookupObject oid gs),
-      -- CR 400.7d, `paidCosts`' read.
+      -- CR 400.7d: read live off the object, with no last-known override.
       Filter.castUsing = Object.castUsing =<< Game.lookupObject oid gs,
-      -- CR 400.7d / CR 107.4h: read live off the object like `paidCosts`, and
+      -- CR 400.7d / CR 107.4h: read live off the object like `castUsing`, and
       -- flattened to the tags here because that is the whole of what the
       -- vocabulary asks (see the field's own comment in Pawl.Engine.Filter). The
       -- object may be a CR 602.2a ability on the stack as well as a spell or the
