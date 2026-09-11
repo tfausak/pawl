@@ -22,7 +22,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- Clone of a Primal Plasma runs the COPIED choice rather than skipping it.
 --
 -- Parametric in the EFFECT, for the reason Pawl.Types.DamageR gives: RunEffects
--- below carries a card's effects, and neither module may name the other.
+-- below carries a card's effects, and neither module may name the other. And in
+-- the ABILITY for Pawl.Types.CopyException's GainAbility, which AsCopy carries.
 --
 -- SacrificeAnyNumber and ExileFromGraveyard are the constructors whose choice
 -- SPENDS something, and CR 614.12b's combined budget across permanents entering
@@ -33,11 +34,11 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- names the board that proves it. CR 614.13a is a separate exclusion and does
 -- NOT fall out with it -- see Pawl.Engine.Replacement.graveyardCandidates for the
 -- half that is unimplemented.
-data EntryRewrite effect
+data EntryRewrite ability effect
   = -- | CR 707.5 / 614.1c / Clone, Vesuva: "you may have this permanent enter as a
     -- copy of ...", the payload carrying which permanents the printed noun phrase
     -- admits and CR 707.9's exceptions.
-    AsCopy AsCopy.AsCopy
+    AsCopy (AsCopy.AsCopy ability)
   | -- | CR 208.2b / 614.1c / Primal Plasma: the controller chooses one of these
     -- entry options as it enters.
     ChoiceOf [EntryOption.EntryOption]

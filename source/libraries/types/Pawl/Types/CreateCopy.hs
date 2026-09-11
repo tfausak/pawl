@@ -10,7 +10,7 @@ import qualified Pawl.Types.Quantity as Quantity
 -- The quantity is how many copies. Rite of Replication is the only producer
 -- above one, and its five enter SIMULTANEOUSLY, which is what CR 614.12's entry
 -- loop and CR 616.1g's containment are asked about.
-data CreateCopy = MkCreateCopy
+data CreateCopy ability = MkCreateCopy
   { quantity :: Quantity.Quantity,
     ref :: ObjectRef.ObjectRef,
     -- | CR 110.5b's default is no riders at all, which is every copy token in
@@ -37,7 +37,7 @@ data CreateCopy = MkCreateCopy
     -- it enters with an additional +1/+1 counter on it" prints as an exception
     -- and is a rider, which is CR 707.9e's distinction rather than a spelling
     -- choice.
-    exceptions :: [CopyException.CopyException]
+    exceptions :: [CopyException.CopyException ability]
   }
   deriving (Eq, Ord, Show)
 

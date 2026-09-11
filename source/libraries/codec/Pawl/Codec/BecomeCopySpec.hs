@@ -19,7 +19,7 @@ spec s = Spec.describe s "Pawl.Codec.BecomeCopy" $ do
   Spec.it s "MkBecomeCopy, both keys" $
     Common.assertCodec
       s
-      BecomeCopy.codec
+      (BecomeCopy.codec Common.text)
       ( BecomeCopy.MkBecomeCopy
           { BecomeCopy.original = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became")),
             BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource,
@@ -33,7 +33,7 @@ spec s = Spec.describe s "Pawl.Codec.BecomeCopy" $ do
   Spec.it s "MkBecomeCopy, with an exception" $
     Common.assertCodec
       s
-      BecomeCopy.codec
+      (BecomeCopy.codec Common.text)
       ( BecomeCopy.MkBecomeCopy
           { BecomeCopy.original = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became")),
             BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource,
@@ -41,4 +41,4 @@ spec s = Spec.describe s "Pawl.Codec.BecomeCopy" $ do
           }
       )
       " {\"exceptions\":[{\"type\":\"GainThisAbility\"}],\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s BecomeCopy.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (BecomeCopy.codec Common.text)

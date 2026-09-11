@@ -26,14 +26,15 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 -- EntryR arm CR 614.1c's as-enters effects. The card codec is one for
 -- Pawl.Codec.Create's: the TokenR arm's appended token is card data.
 codec ::
-  (Typeable.Typeable card, Eq card, Typeable.Typeable effect, Eq effect) =>
+  (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability, Typeable.Typeable effect, Eq effect) =>
   Codec.Codec card ->
+  Codec.Codec ability ->
   Codec.Codec effect ->
-  Codec.Codec (ReplacementEffect.ReplacementEffect card effect)
-codec cardCodec effectCodec =
+  Codec.Codec (ReplacementEffect.ReplacementEffect card ability effect)
+codec cardCodec abilityCodec effectCodec =
   Arm.tagged
     [ Arm.payload "ZoneChangeR" ZoneChangeR.codec ReplacementEffect.ZoneChangeR (\x -> case x of ReplacementEffect.ZoneChangeR y -> Just y; _ -> Nothing),
-      Arm.payload "EntryR" (EntryR.codec effectCodec) ReplacementEffect.EntryR (\x -> case x of ReplacementEffect.EntryR y -> Just y; _ -> Nothing),
+      Arm.payload "EntryR" (EntryR.codec abilityCodec effectCodec) ReplacementEffect.EntryR (\x -> case x of ReplacementEffect.EntryR y -> Just y; _ -> Nothing),
       Arm.payload "DamageR" (DamageR.codec effectCodec) ReplacementEffect.DamageR (\x -> case x of ReplacementEffect.DamageR y -> Just y; _ -> Nothing),
       Arm.payload "DestructionR" DestructionRewrite.codec ReplacementEffect.DestructionR (\x -> case x of ReplacementEffect.DestructionR y -> Just y; _ -> Nothing),
       Arm.payload "CounterR" CounterR.codec ReplacementEffect.CounterR (\x -> case x of ReplacementEffect.CounterR y -> Just y; _ -> Nothing),

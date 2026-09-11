@@ -53,7 +53,7 @@ codec = Fields.object $ do
   playerAbilities <- Fields.defaulted "playerAbilities" [] (Common.list PlayerStaticAbility.codec) PC.playerAbilities
   specialActions <- Fields.defaulted "specialActions" [] (Common.list SpecialAction.codec) PC.specialActions
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.activatedAbilities
-  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))) PC.replacementEffects
+  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec Card.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))) PC.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.triggeredAbilities
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) PC.enchant
   ruleAbilities <- Fields.defaulted "ruleAbilities" mempty RuleAbilities.codec PC.ruleAbilities

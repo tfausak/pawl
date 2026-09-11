@@ -16,7 +16,7 @@ spec s = Spec.describe s "Pawl.Codec.AsCopy" $ do
   Spec.it s "MkAsCopy, no exceptions: the key is omitted" $
     Common.assertCodec
       s
-      AsCopy.codec
+      (AsCopy.codec Common.text)
       (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False)
       " {\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 707.9d: Quicksilver Gargantuan's "except it's 7/7", beside the same
@@ -24,14 +24,14 @@ spec s = Spec.describe s "Pawl.Codec.AsCopy" $ do
   Spec.it s "MkAsCopy, an exception: both keys" $
     Common.assertCodec
       s
-      AsCopy.codec
+      (AsCopy.codec Common.text)
       (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 7 7)] False)
       " {\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"exceptions\":[{\"type\":\"SetPowerToughness\",\"value\":{\"power\":7,\"toughness\":7}}]} "
   -- CR 614.1d inside CR 614.1c: Vesuva's "enter tapped as a copy".
   Spec.it s "MkAsCopy, entering tapped (Vesuva)" $
     Common.assertCodec
       s
-      AsCopy.codec
+      (AsCopy.codec Common.text)
       (AsCopy.MkAsCopy (Filter.HasCardType CardType.Land) [] True)
       " {\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"tapped\":true} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s AsCopy.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (AsCopy.codec Common.text)

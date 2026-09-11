@@ -431,7 +431,7 @@ printedBoxOffends card =
 -- wire, so the codec cannot refuse the pair; card data is held to it here.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
-idleTokenRowOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+idleTokenRowOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 idleTokenRowOffends replacement = case replacement of
   ReplacementEffect.TokenR (TokenR.MkTokenR _ scaling plus) -> Maybe.isNothing scaling && Maybe.isNothing plus
   ReplacementEffect.DamageR {} -> False
@@ -448,7 +448,7 @@ idleTokenRowOffends replacement = case replacement of
   ReplacementEffect.PhaseR _ -> False
 
 -- The non-vacuity half of idleTokenRowOffends' lint, isPhaseR's shape.
-isTokenR :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+isTokenR :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 isTokenR replacement = case replacement of
   ReplacementEffect.TokenR _ -> True
   _ -> False
@@ -485,7 +485,7 @@ isTokenR replacement = case replacement of
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- pattern-carrying replacement must break this build rather than silently pass.
-phasePatternOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+phasePatternOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 phasePatternOffends replacement = case replacement of
   ReplacementEffect.PhaseR phasePattern -> Maybe.isJust (PhasePattern.whosePhase phasePattern)
   ReplacementEffect.CounterR {} -> False
@@ -514,7 +514,7 @@ phasePatternOffends replacement = case replacement of
 -- printing either half would be claiming an ability no rule gives it.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
-engineOnlyOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+engineOnlyOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 engineOnlyOffends replacement = case replacement of
   -- `whatRecipient` and `whoRecipient` beside it are the PRINTED halves and are
   -- not swept: a card may describe the recipient it shields (Stormwild Capridor)
@@ -602,7 +602,7 @@ engineMintedDestruction rewrite = case rewrite of
 -- The non-vacuity half of the same lint: is this the replacement that carries a
 -- PhasePattern at all? A wildcard is right here, where it is not above -- this
 -- asks "did the sweep have anything to look at", not "is it well-formed".
-isPhaseR :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+isPhaseR :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
   _ -> False
@@ -615,7 +615,7 @@ isPhaseR replacement = case replacement of
 --
 -- Exhaustive rather than a wildcard, phasePatternOffends' discipline: a second
 -- engine-baked field on this class must break this build rather than pass.
-turnUpRequiringOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+turnUpRequiringOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.TurnUpR turnUpR -> Maybe.isJust (TurnUpR.requiring turnUpR)
   ReplacementEffect.CounterR {} -> False
@@ -633,7 +633,7 @@ turnUpRequiringOffends replacement = case replacement of
 
 -- isPhaseR's twin: did the sweep above have anything to look at? A wildcard for
 -- the same reason.
-isTurnUpR :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+isTurnUpR :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 isTurnUpR replacement = case replacement of
   ReplacementEffect.TurnUpR _ -> True
   _ -> False
@@ -646,7 +646,7 @@ isTurnUpR replacement = case replacement of
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: an arm
 -- that gains a riders field of its own must be classified here.
-riderWithoutPreventionOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+riderWithoutPreventionOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite riders) -> not (null riders) && not (preventsDamage rewrite)
   ReplacementEffect.CounterR {} -> False
@@ -681,14 +681,14 @@ preventsDamage rewrite = case rewrite of
   DamageRewrite.RunEffects _ -> False
 
 -- The non-vacuity half of riderWithoutPreventionOffends' lint, isPhaseR's shape.
-hasRider :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+hasRider :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 hasRider = not . null . replacementEffectRiders
 
 -- CR 701.24a shuffles a LIBRARY, so a redirect saying to shuffle has to be
 -- sending the card into one. The type cannot say that -- the destination and the
 -- rider are two independent fields -- so card data is held to it here, as CR
 -- 615.5's rider is one lint up.
-shufflingOutsideLibraryOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+shufflingOutsideLibraryOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 shufflingOutsideLibraryOffends replacement = case replacement of
   ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ destination _ shuffling) -> shuffling && destination /= Zone.Library
   ReplacementEffect.DamageR {} -> False
@@ -705,13 +705,13 @@ shufflingOutsideLibraryOffends replacement = case replacement of
   ReplacementEffect.PhaseR _ -> False
 
 -- The non-vacuity half of shufflingOutsideLibraryOffends' lint, isPhaseR's shape.
-hasZoneChangeRider :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+hasZoneChangeRider :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 hasZoneChangeRider replacement = case replacement of
   ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ _ revealing shuffling) -> revealing || shuffling
   _ -> False
 
 -- The non-vacuity half of engineOnlyOffends' lint, isPhaseR's shape.
-isDamageR :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+isDamageR :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 isDamageR replacement = case replacement of
   ReplacementEffect.DamageR {} -> True
   _ -> False

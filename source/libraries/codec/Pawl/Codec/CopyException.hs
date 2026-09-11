@@ -1,5 +1,6 @@
 module Pawl.Codec.CopyException where
 
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
@@ -12,8 +13,10 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CopyException as CopyException
 
-codec :: Codec.Codec CopyException.CopyException
-codec =
+-- | The ability codec is a PARAMETER rather than an import, for the reason
+-- Pawl.Types.CopyException is parametric: the ability codec reaches this one.
+codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (CopyException.CopyException ability)
+codec abilityCodec =
   Arm.tagged
     [ Arm.payload "SetPowerToughness" SetPowerToughness.codec CopyException.SetPowerToughness $ \x -> case x of
         CopyException.SetPowerToughness y -> Just y
@@ -40,5 +43,8 @@ codec =
       Arm.payload "SetColors" (Common.set Color.codec) CopyException.SetColors $ \x -> case x of
         CopyException.SetColors y -> Just y
         _ -> Nothing,
-      Arm.nullary "NoManaCost" CopyException.NoManaCost
+      Arm.nullary "NoManaCost" CopyException.NoManaCost,
+      Arm.payload "GainAbility" abilityCodec CopyException.GainAbility $ \x -> case x of
+        CopyException.GainAbility y -> Just y
+        _ -> Nothing
     ]

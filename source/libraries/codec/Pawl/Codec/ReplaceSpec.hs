@@ -21,7 +21,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Replace" $ do
   -- The effect codec the card boundary would pass in (CR 615.5's riders ride
   -- the DamageR arm underneath).
-  let codec = Replace.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
+  let codec = Replace.codec Card.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
   -- CR 614.3: the unconditional case, which is most of them. The positional
   -- payload this replaces wrote the absent condition as an explicit null.
   Spec.it s "MkReplace, condition elided" $

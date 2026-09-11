@@ -1159,7 +1159,7 @@ conditionSlots condition = case condition of
 -- and are not missing: what one of those reads is a whole effect's worth of
 -- reads rather than a Filter or a Quantity, so replacementRowEffects below
 -- declares them and replacementRowSlots joins slotsOf over the answer.
-replacementRowReads :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
+replacementRowReads :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 replacementRowReads re = case re of
   -- The rewrite is a Zone and two Bools (Pawl.Types.ZoneChangeR): nothing that can
   -- name a slot, so the pattern is the whole of it.
@@ -1208,7 +1208,7 @@ addFilter filter_ (filters, quantities) = (filter_ : filters, quantities)
 -- is only sound if this list is complete -- a rewrite read left out is a slot the
 -- installed row does not carry, and the Filter or Quantity that wanted it then
 -- answers vacuously at the event.
-entryRewriteReads :: EntryRewrite.EntryRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
+entryRewriteReads :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 entryRewriteReads rewrite = case rewrite of
   EntryRewrite.AsCopy asCopy -> ([AsCopy.eligible asCopy], [])
   EntryRewrite.ChoiceOf _ -> ([], [])
@@ -1268,7 +1268,7 @@ drawRewriteReads rewrite = case rewrite of
 -- CR 614.1c's WithCounters and CR 702.37b's are the two rewrites that can carry
 -- one. The two capture sites take Map.keysSet, so the arity reaches only slotsOf's
 -- Replace arm.
-replacementRowSlots :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
+replacementRowSlots :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
 replacementRowSlots re =
   let (filters, quantities) = replacementRowReads re
    in joinSlots (fmap filterSlotsOf filters <> fmap quantitySlots quantities <> fmap slotsOf (replacementRowEffects re))
@@ -1293,7 +1293,7 @@ replacementRowSlots re =
 -- answer leaves the suite green. A regression fence rather than a proven
 -- behaviour; what would prove it is a card whose nested effect reads a slot its
 -- row's pattern does not name (#1962).
-replacementRowEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+replacementRowEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementRowEffects re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) -> entryRewriteEffects rewrite
   -- CR 615.5's rider and CR 614.1a's instead-effects both, and in that order:
@@ -1313,7 +1313,7 @@ replacementRowEffects re = case re of
 
 -- The program an ENTRY rewrite runs. entryRewriteReads' discipline: no wildcard,
 -- so a second arm that nests one is asked here rather than losing its reads.
-entryRewriteEffects :: EntryRewrite.EntryRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+entryRewriteEffects :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.RunEffects effects -> Foldable.toList effects
   EntryRewrite.AsCopy _ -> []
