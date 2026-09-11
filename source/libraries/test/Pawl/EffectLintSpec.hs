@@ -1017,13 +1017,18 @@ data Asks
     AsksNothing
   | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
     -- monad. It asks the graveyard, hand, from-among, one-permanent and
-    -- any-number arms; the random arm answers @pure []@ there (#1733).
+    -- any-number arms; the random arm answers @pure []@ there (#3629).
     AsksMoveGather
   | -- | Pawl.Engine.Resolve's Effect.Reveal arm. It asks the from-among arm
     -- through chooseCardFromAmong and the random arm through
     -- Prompt.RandomObject, and falls through to the pure sweep for the two
     -- zone-keyed chosen arms.
     AsksRevealArm
+  | -- | Pawl.Engine.Resolve's Effect.Discard arm, over Discard.These: CR 701.9b's
+    -- two exceptions, the from-among arm (Duress) through chooseCardFromAmong and
+    -- the random arm (Hymn to Tourach) through randomCardsInHand. Every other
+    -- arm falls through to the pure sweep.
+    AsksDiscardArm
   | -- | Pawl.Engine.Resolve's turnPermanentsOver gather, shared by Effect.Transform
     -- and Effect.Convert. It asks the any-number arm and nothing else: the four
     -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and CR
@@ -1078,7 +1083,7 @@ chooserRef ref = case ref of
 -- The asking matrix itself: whether the site an Asks names asks THIS arm. A
 -- per-(site, arm) pair and not a per-site or per-arm predicate, because both
 -- coarser readings admit a ref that names nothing -- MoveToZone's gather does not
--- ask the random arm (#1733), and Reveal's arm does not ask either zone-keyed
+-- ask the random arm (#3629), and Reveal's arm does not ask either zone-keyed
 -- chosen one.
 asksFor :: Asks -> ObjectRef.ObjectRef -> Bool
 asksFor asks ref = case asks of
@@ -1092,6 +1097,10 @@ asksFor asks ref = case asks of
     ObjectRef.AnyNumberMatching {} -> True
     _ -> False
   AsksRevealArm -> case ref of
+    ObjectRef.ChosenCardFromAmong {} -> True
+    ObjectRef.RandomCardInHand {} -> True
+    _ -> False
+  AsksDiscardArm -> case ref of
     ObjectRef.ChosenCardFromAmong {} -> True
     ObjectRef.RandomCardInHand {} -> True
     _ -> False
@@ -1160,7 +1169,7 @@ effectObjectRefs effect =
         Effect.ControlPlayerThisResolution {} -> []
         Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
         Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> read_ [ref]
-        -- THE gather that asks, and the one that elides the random arm (#1733).
+        -- THE gather that asks, and the one that elides the random arm (#3629).
         Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [(AsksMoveGather, ref)]
         Effect.Draw {} -> []
         Effect.Mill {} -> []
@@ -1173,7 +1182,7 @@ effectObjectRefs effect =
         Effect.Explore ref -> read_ [ref]
         Effect.Discard subject -> case subject of
           Discard.Counted {} -> []
-          Discard.These ref -> read_ [ref]
+          Discard.These ref -> [(AsksDiscardArm, ref)]
         Effect.LoseLife {} -> []
         Effect.GainLife {} -> []
         Effect.ExchangeLifeTotals {} -> []
@@ -2146,7 +2155,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "only a library has ends" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 608.2d: a choice an effect offers is announced while the effect is
   -- applied, so an opcode that gathers its objects through the pure
-  -- Pawl.Engine.Resolve.Slots.objectRefObjects cannot make one. Three arms of Resolve
+  -- Pawl.Engine.Resolve.Slots.objectRefObjects cannot make one. Some arms of Resolve
   -- reach the Game monad and ask instead, over DIFFERENT subsets -- see Asks --
   -- and a chooser-shaped ref written anywhere else names no object, so that share
   -- of the instruction is skipped (CR 101.3, CR 609.3) with nothing on the wire
@@ -2162,7 +2171,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s asks "the pool has a card asking a player to pick a card"
     Spec.assertEqWith s "a chosen card under an opcode that cannot ask (CR 608.2d)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sweep above still passes VACUOUSLY on the half that matters: every
-  -- committed card writes its chooser under one of the five asking pairs, so the
+  -- committed card writes its chooser under an asking pair, so the
   -- sweep proves nothing about the lint. Both directions are proven here instead,
   -- against hand-built effects (never a card file -- a misauthored card must not
   -- be loadable).
@@ -2170,9 +2179,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- Every asking arm gets an accept case AND a reject case, and the four
   -- degenerate classifications this rules out are why. "Every pair asks" is ruled
   -- out by Transform's four rejects and by MoveToZone's random arm; "MoveToZone
-  -- asks everything" by that same random arm (#1733); "the three chosen arms
+  -- asks everything" by that same random arm (#3629); "the three chosen arms
   -- always ask, the random one never does" by Reveal accepting the random arm and
-  -- rejecting both zone-keyed chosen ones; "the battlefield subset asks
+  -- rejecting both zone-keyed chosen ones, and Discard answering the same row;
+  -- "the battlefield subset asks
   -- everywhere" by the last assertion, which rejects it at two sites and
   -- accepts it at two.
   Spec.it s "the lint itself catches a chosen card under an opcode that cannot ask" $ do
@@ -2192,13 +2202,20 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         inert = fmap (not . null . inertChoosers)
     Spec.assertEqWith
       s
-      "MoveToZone's gather asks the three chosen arms and not the random one (#1733)"
+      "MoveToZone's gather asks the three chosen arms and not the random one (#3629)"
       (inert (fmap moves [inGraveyard, inHand, fromAmong, atRandom]))
       [False, False, False, True]
     Spec.assertEqWith
       s
       "CR 701.20a's reveal asks from-among and at-random, and neither zone-keyed chosen arm"
       (inert (fmap reveals [inGraveyard, inHand, fromAmong, atRandom]))
+      [True, True, False, False]
+    -- CR 701.9b's two exceptions, asked by the discard arm over Discard.These:
+    -- Duress's from-among and Hymn to Tourach's at-random.
+    Spec.assertEqWith
+      s
+      "CR 701.9b's discard asks from-among and at-random, and neither zone-keyed chosen arm"
+      (inert (fmap (Effect.Discard . Discard.These) [inGraveyard, inHand, fromAmong, atRandom]))
       [True, True, False, False]
     -- Tovolar, Dire Overlord's opcode. CR 701.27a turns over PERMANENTS, so its
     -- gather asks for the battlefield subset and for NONE of the four

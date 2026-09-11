@@ -2195,9 +2195,73 @@ soulsMajestySpec s registry = Spec.describe s "SoulsMajesty" $ do
         after = snd (Engine.runGamePure (targetingCreature spider) cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew two" (S.handSize S.alice after) 2
 
+-- CR 701.9b's two exceptions to the discarding player's own choice, both over
+-- Discard.These. bob holds four distinct cards, so every assertion reads
+-- identity, and the expectations are read off his hand's own order rather than
+-- assumed. Each answerer pins its pick to the LAST card offered -- the one
+-- answer a fallback to the head of the offer, or CR 701.9b's default choice
+-- answered with the first cards, would not produce.
+--
+-- Hymn to Tourach {B}{B} Sorcery -- "Target player discards two cards at
+-- random." Duress {B} Sorcery -- "Target opponent reveals their hand. You choose
+-- a noncreature, nonland card from it. That player discards that card." (both
+-- checked against api.scryfall.com, 2026-09-11).
+discardExceptionsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+discardExceptionsSpec s registry = Spec.describe s "CR 701.9b discard exceptions" $ do
+  Spec.it s "CR 701.9b Hymn to Tourach discards the two cards randomness named" $ do
+    hymn <- S.printingOf s registry "Hymn to Tourach"
+    swamp <- S.printingOf s registry "Swamp"
+    cards <- traverse (S.printingOf s registry) ["Goblin Piker", "Forest", "Lightning Bolt", "Murder"]
+    let (withSpell, spell) = S.handOne hymn (S.landsInPlay swamp 2)
+        ready = List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) withSpell cards
+        hand = namesIn Zone.Hand S.bob ready
+        -- Randomness answers the last card of each offer; bob, were he asked
+        -- CR 701.9b's default question, would answer the first two.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RandomObject offered -> NonEmpty.last offered
+          Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
+          _ -> atBobAnswer p
+        after = S.runPure answer (S.runPure answer ready (S.cast S.alice spell)) Stack.resolveTop
+    Spec.assertEqWith
+      s
+      "the last card of each random offer is discarded, not the first two"
+      (List.sort (namesIn Zone.Graveyard S.bob after))
+      (List.sort (drop 2 hand))
+    Spec.assertEqWith
+      s
+      "and the two randomness passed over stay in bob's hand"
+      (List.sort (namesIn Zone.Hand S.bob after))
+      (List.sort (take 2 hand))
+  Spec.it s "CR 701.9b Duress discards the card its caster chose from the revealed hand" $ do
+    duress <- S.printingOf s registry "Duress"
+    swamp <- S.printingOf s registry "Swamp"
+    cards <- traverse (S.printingOf s registry) ["Goblin Piker", "Lightning Bolt", "Forest", "Murder"]
+    let (withSpell, spell) = S.handOne duress (S.landsInPlay swamp 1)
+        ready = List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) withSpell cards
+        hand = Game.zoneMembers Zone.Hand S.bob ready
+        nameOf oid = fmap S.nameOf (Game.cardOf oid ready)
+        spells = [oid | oid <- hand, nameOf oid `elem` fmap (Just . CardName.MkCardName . Text.pack) ["Lightning Bolt", "Murder"]]
+        -- Records who was asked over which cards, and answers the last one.
+        answer :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ObjectId.ObjectId])] r
+        answer p = case p of
+          Prompt.ChooseCardFromAmong _ asked _ offered -> do
+            State.modify' (<> [(asked, NonEmpty.toList offered)])
+            pure (NonEmpty.last offered)
+          _ -> pure (atBobAnswer p)
+        (after, asks) = State.runState (fmap snd (Engine.runGame answer ready (S.cast S.alice spell *> Stack.resolveTop))) []
+    Spec.assertEqWith s "the card alice chose is the one bob discarded" (namesIn Zone.Graveyard S.bob after) (fmap nameOf (take 1 (reverse spells)))
+    Spec.assertEqWith s "CR 608.2d alice was asked, over the noncreature, nonland cards alone" asks [(S.alice, spells)]
+    Spec.assertEqWith
+      s
+      "CR 701.20a bob revealed his whole hand"
+      (List.sort (S.revealsOf after))
+      (List.sort (fmap (\p -> (S.bob, Set.singleton (S.printingName p))) cards))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
+  discardExceptionsSpec s registry
   libraryPositionSpec s registry
   aetherspoutsSpec s registry
   drawCardSpec s registry

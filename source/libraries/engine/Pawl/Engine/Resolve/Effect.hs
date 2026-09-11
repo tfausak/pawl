@@ -729,15 +729,15 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- which for Deflecting Palm's ControllerOfBound is CR 108.4's controller of the
   -- object a slot holds, read through CR 608.2h's last known information.
   ObjectRef.Players playerRef -> fmap Recipient.ToPlayer (playerRefPlayers legal controller gs playerRef)
-  -- No recipients: the answer needs the chooser asked, and only the MoveToZone
-  -- gather can ask.
+  -- No recipients: the answer needs the chooser asked, and only a gather in the
+  -- Game monad can ask.
   ObjectRef.ChosenCardInGraveyard {} -> []
   ObjectRef.ChosenCardInHand {} -> []
   ObjectRef.ChosenCardFromAmong {} -> []
   -- A read rather than a question, so the sweep above answers it -- and objects
   -- only, a group never holding a player.
   ObjectRef.EachCardFromAmong {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
-  -- No recipients: only the Reveal arm can ask the interpreter.
+  -- No recipients: only randomCardsInHand can ask the interpreter.
   ObjectRef.RandomCardInHand _ -> []
   -- No recipients: the answer needs the chooser asked, and only
   -- turnPermanentsOver's gather and the Effect.MoveToZone gather can ask.
@@ -1597,6 +1597,51 @@ chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmon
   case playerRefPlayers legal controller gs chooser of
     [asked] -> pick asked wanted candidates
     _ -> pure []
+
+-- CR 701.20a / 701.9b: the cards randomness names out of each hand the ref
+-- reaches, paired with the seat whose hand it is. The ONE asking read of
+-- ObjectRef.RandomCardInHand, shared by Effect.Reveal (Fall) and Effect.Discard
+-- (Hymn to Tourach), so the two cannot ask differently.
+--
+-- The question goes to the INTERPRETER: the engine does not roll and no player
+-- picks. Filtered rather than trusted, so an answer naming a card never offered
+-- falls back to the head of the offer. Game.ask and not Game.choose, since
+-- randomness is not CR 104.4b's optional action.
+--
+-- Elided at one candidate and skipped at none (CR 101.3, CR 609.3). Candidates
+-- are the hand as CR 608.2c reaches it in the zone's own order (CR 402.3)
+-- narrowed by the ref's own Filter, and the seats come from handChoosers so the
+-- asks run in CR 608.2e's APNAP order.
+--
+-- The count names DISTINCT cards -- "two cards at random" is two cards and not
+-- two picks that may coincide -- so each card named is dropped from the
+-- candidates before the next ask. CR 609.3 caps the run at the hand's matching
+-- size.
+randomCardsInHand ::
+  ObjectId ->
+  ObjectId ->
+  PlayerId ->
+  Map.Map SlotName (Set Recipient) ->
+  RandomCardInHand.RandomCardInHand ->
+  Game [(PlayerId, ObjectId)]
+randomCardsInHand resolving source controller legal (RandomCardInHand.MkRandomCardInHand player filter_ count) = do
+  gs <- State.get
+  let viewOf = effectViewOf source legal gs
+      context = effectContext gs controller source legal (slotBindings resolving gs)
+      wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
+      pick remaining candidates =
+        if remaining <= (0 :: Natural)
+          then pure []
+          else case candidates of
+            [] -> pure []
+            [only] -> pure [only]
+            first : second : more -> do
+              answer <- Game.ask (Prompt.RandomObject (first NonEmpty.:| (second : more)))
+              let named = if List.elem answer candidates then answer else first
+              rest <- pick (remaining - 1) (filter (/= named) candidates)
+              pure (named : rest)
+  fmap concat . Monad.mapM (\pid -> fmap (fmap ((,) pid)) (pick wanted (handCardsOf context gs pid filter_))) $
+    handChoosers legal controller gs player
 
 -- One effect, applied, wrapped in the window CR 607.2a's link is filed from:
 -- what was in exile before, and what is in it after.
@@ -3418,11 +3463,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- the two positions cannot ask differently.
               ObjectRef.ChosenCardInHand chosenInHand -> chooseCardsInHand resolving source controller legal chosenInHand
               -- The printed "from among them", a CR 608.2d choice, asked by
-              -- chooseCardFromAmong -- which is where the rule lives, this opcode
-              -- and CR 701.20a's reveal being the two that ask it. The candidates
-              -- come off the pre-move state (CR 608.2c) through the same
-              -- slotBoundObjects the InSlot gather reads, so the choice and "the
-              -- rest" cannot see different groups.
+              -- chooseCardFromAmong -- which is where the rule lives, this opcode,
+              -- CR 701.20a's reveal and CR 701.9a's discard being the three that
+              -- ask it. The candidates come off the pre-move state (CR 608.2c)
+              -- through the same slotBoundObjects the InSlot gather reads, so the
+              -- choice and "the rest" cannot see different groups.
               --
               -- What the group has left over is not named here at all. "The rest"
               -- is the same slot read by ObjectRef.InSlot in a LATER clause, which
@@ -3442,10 +3487,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 members <- fromAmongMembers legal resolving chosen slot
                 gs <- State.get
                 pure (matchingFromAmong legal resolving controller source gs filter_ members)
-              -- Not implemented: a card moved at random out of a hand, CR 701.9b's
-              -- random discard. Nothing moves it here, so a card writing the ref
-              -- under this opcode names no object; that rule's other exception --
-              -- a discard another player chooses -- needs a design call (#1733).
+              -- Not implemented: a card moved at random out of a hand. Nothing
+              -- asks randomCardsInHand here, so a card writing the ref under this
+              -- opcode names no object (#3629).
               ObjectRef.RandomCardInHand _ -> pure []
               -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
               -- you control", announced while the effect is applied and so asked
@@ -3913,43 +3957,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Event.reveal RevealCause.Ordinary pid oid
           Monad.forM_ mSlot $ \slot -> State.modify' (bindSlot resolving slot oid)
     case ref of
-      -- The one ref whose objects are a QUESTION rather than a read, so it is
-      -- answered here -- and the question goes to the INTERPRETER: the engine does
-      -- not roll and no player picks. Filtered rather than trusted, so an answer
-      -- naming a card never offered falls back to the head of the offer. Game.ask
-      -- and not Game.choose, since randomness is not CR 104.4b's optional action.
-      --
-      -- Elided at one candidate and skipped at none (CR 101.3, CR 609.3).
-      -- Candidates are the hand as CR 608.2c reaches it in the zone's own order (CR
-      -- 402.3) narrowed by the ref's own Filter, and the seats come from
-      -- handChoosers so the asks run in CR 608.2e's APNAP order.
-      --
-      -- The count names DISTINCT cards -- Fall's "two cards at random" is two cards
-      -- and not two picks that may coincide -- so each card named is dropped from
-      -- the candidates before the next ask. CR 609.3 caps the run at the hand's
-      -- matching size.
-      ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player filter_ count) -> do
-        let viewOf = effectViewOf source legal gs
-            context = effectContext gs controller source legal (slotBindings resolving gs)
-            wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
-            pick remaining candidates =
-              if remaining <= (0 :: Natural)
-                then pure []
-                else case candidates of
-                  [] -> pure []
-                  [only] -> pure [only]
-                  first : second : more -> do
-                    answer <- Game.ask (Prompt.RandomObject (first NonEmpty.:| (second : more)))
-                    let named = if List.elem answer candidates then answer else first
-                    rest <- pick (remaining - 1) (filter (/= named) candidates)
-                    pure (named : rest)
+      -- A QUESTION rather than a read, so it is answered here, by
+      -- randomCardsInHand -- the one asking read of the ref, shared with the
+      -- Discard arm.
+      ObjectRef.RandomCardInHand random -> do
         -- Every card named across every seat, so the binding below sees one group
         -- rather than one write per seat -- Fall reads it back with an
         -- EachCardFromAmong, which a per-seat single binding would answer with the
         -- last card alone.
-        picked <-
-          fmap concat . Monad.mapM (\pid -> fmap (fmap ((,) pid)) (pick wanted (handCardsOf context gs pid filter_))) $
-            handChoosers legal controller gs player
+        picked <- randomCardsInHand resolving source controller legal random
         Monad.mapM_ (uncurry (Event.reveal RevealCause.Ordinary)) picked
         Monad.forM_ mSlot $ \slot -> case fmap snd picked of
           [] -> pure ()
@@ -3971,7 +3987,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Monad.mapM_ (showOne controller) picked
       _ -> do
         let named = objectRefObjects legal resolving controller source gs ref
-        Monad.mapM_ (Event.reveal RevealCause.Ordinary controller) named
+            -- A card in a hand is shown by the seat whose hand it is -- Duress's
+            -- "target opponent reveals their hand" -- the random arm's reason.
+            shower oid = case Game.lookupObject oid gs of
+              Just obj | Object.zone obj == Zone.Hand -> Object.owner obj
+              _ -> controller
+        Monad.mapM_ (\oid -> Event.reveal RevealCause.Ordinary (shower oid) oid) named
         -- LookAt's one-versus-many line: a lone card takes the SINGLE binding,
         -- which every reader sees, and several take the group binding, which the
         -- ObjectRef readers and Filter.IsBound see and slotOne does not.
@@ -4059,23 +4080,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- permanent that has left (CR 701.44c).
     ordered <- forEachOrder resolving id (objectRefRecipients legal resolving controller source gs ref)
     Monad.mapM_ exploreOne (Maybe.mapMaybe Recipient.objectOf ordered)
-  -- The card names the set, so CR 701.9b's default choice does not arise and
-  -- nobody is prompted. Swept ONCE as this instruction is reached (CR 608.2c) and
-  -- then fixed (CR 608.2f), and buried through the same funnel the counted branch
-  -- below uses, so CR 701.9a's move is RECORDED as a discard -- writing it as a
-  -- zone change instead would land every card in the right graveyard and leave
+  -- The card names the set, so CR 701.9b's default choice -- the discarding
+  -- player's -- does not arise and the discarding player is not prompted. Named
+  -- ONCE as this instruction is reached (CR 608.2c) and then fixed (CR 608.2f),
+  -- and buried through the same funnel the counted branch below uses, so CR
+  -- 701.9a's move is RECORDED as a discard -- writing it as a zone change instead
+  -- would land every card in the right graveyard and leave
   -- TriggerCondition.SelfDiscarded silent.
+  --
+  -- CR 701.9b's two exceptions are the two refs that ASK rather than read: a
+  -- random discard (Hymn to Tourach) through randomCardsInHand, and a card
+  -- another player chooses (Duress) through chooseCardFromAmong over the hand an
+  -- earlier Reveal bound. Every other ref is the pure sweep.
   --
   -- The discarding player is PER CARD: rule 701.9a moves a card from its OWNER's
   -- hand, and a ref over CR 400.1's per-player zone can name several owners'
   -- cards at once. A card whose owner cannot be read is skipped rather than
   -- filed under the controller.
   Effect.Discard (Discard.These ref) -> do
+    named <- case ref of
+      ObjectRef.RandomCardInHand random -> fmap (fmap snd) (randomCardsInHand resolving source controller legal random)
+      ObjectRef.ChosenCardFromAmong from -> chooseCardFromAmong resolving source controller legal chosen from
+      _ -> State.gets (\gs -> objectRefObjects legal resolving controller source gs ref)
     gs <- State.get
     let owned oid = fmap ((,) oid . Object.owner) (Game.lookupObject oid gs)
     Monad.mapM_
       (\(oid, owner) -> Event.discard DiscardCause.Ordinary owner oid)
-      (Maybe.mapMaybe owned (objectRefObjects legal resolving controller source gs ref))
+      (Maybe.mapMaybe owned named)
   Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity mDiscarded)) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

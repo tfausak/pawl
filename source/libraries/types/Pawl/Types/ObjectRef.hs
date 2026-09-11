@@ -127,12 +127,13 @@ data ObjectRef
     -- matches -- the printed "all land cards revealed this way", the arm above's
     -- plural and a read rather than a question.
     EachCardFromAmong EachCardFromAmong.EachCardFromAmong
-  | -- | CR 701.20a / 701.9b / Merfolk Spy, Fall: the cards randomness names out of
-    -- the hands the PlayerRef names, asked of the interpreter through
-    -- Prompt.RandomObject and filtered back against the candidates.
+  | -- | CR 701.20a / 701.9b / Merfolk Spy, Fall, Hymn to Tourach: the cards
+    -- randomness names out of the hands the PlayerRef names, asked of the
+    -- interpreter through Prompt.RandomObject and filtered back against the
+    -- candidates.
     --
     -- Not implemented: the MoveToZone gather, which elides this arm so that only
-    -- Reveal carries it out (#1733).
+    -- Reveal and Discard carry it out (#3629).
     RandomCardInHand RandomCardInHand.RandomCardInHand
   | -- | CR 608.2d / Tovolar, Dire Overlord: any number of the permanents on the
     -- battlefield matching the Filter, offered rather than swept, the empty answer
