@@ -891,6 +891,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.CreatureAttacksAlone _ -> []
   -- Nullary, so no Count either.
   TriggerCondition.CreatureAttacksYou -> []
+  TriggerCondition.CreatureAttacks _ -> []
   -- Nullary too, and rule 508.3b's "one or more" is the EVENT's grouping rather
   -- than a number this condition counts.
   TriggerCondition.AttachedPlayerIsAttacked -> []
@@ -3407,6 +3408,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 508.3a's second sentence names no quality of the attacker -- CR 508.1a has
   -- already made it a creature -- so this one carries no Filter to traverse.
   TriggerCondition.CreatureAttacksYou -> []
+  -- Its bystander sibling names a quality of the attacker -- Fervent Charge's "a
+  -- creature you control" -- so it is swept like CreatureAttacksAlone's.
+  TriggerCondition.CreatureAttacks f -> unframed [f]
   -- CR 508.3b names no quality of anything: its subject is the ability's own
   -- attachment, so there is no Filter here either.
   TriggerCondition.AttachedPlayerIsAttacked -> []
@@ -3578,6 +3582,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksPermanent _ -> []
   TriggerCondition.CreatureAttacksAlone _ -> []
   TriggerCondition.CreatureAttacksYou -> []
+  TriggerCondition.CreatureAttacks _ -> []
   TriggerCondition.AttachedPlayerIsAttacked -> []
   TriggerCondition.SelfIsAttacked -> []
   TriggerCondition.PlayerAttacks _ -> []

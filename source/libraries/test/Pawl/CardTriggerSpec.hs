@@ -3309,8 +3309,126 @@ decliningAttacks p = case p of
   Prompt.DeclareAttackers {} -> []
   _ -> S.fightAnswer p
 
+-- CR 508.3a read by a bystander, once per declared attacker: "whenever a
+-- creature you control attacks".
+--
+-- Fervent Charge {1}{R}{W}{B} Enchantment is the card, whole: "Whenever a
+-- creature you control attacks, it gets +2/+2 until end of turn." (name, cost,
+-- type line and Oracle text checked against api.scryfall.com, 2026-09-11).
+--
+-- TWO attackers with different printed pairs -- Goblin Piker 2/1 and Hill Giant
+-- 3/3 -- so a condition firing once per DECLARATION (CR 508.3d) leaves one of
+-- them unpumped, and the numbers stay apart under either bonus.
+--
+-- The negative is the same board with BOB active and attacking his own Piker:
+-- CR 109.5's "you" is the enchantment's controller, so the Charge is silent.
+-- Bob's Piker is the same printing as one of alice's, which is what makes the
+-- reading a controller test rather than a card test.
+ferventChargeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ferventChargeSpec s registry =
+  let board = do
+        charge <- S.printingOf s registry "Fervent Charge"
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Hill Giant"
+        pure (S.combatBoardOf [charge, piker, giant] [piker])
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer
+      -- combatBoardOf hardcodes alice as the active player; CR 508.1 lets only
+      -- the active player declare, so bob has to be it for his own creature to
+      -- attack under alice's enchantment.
+      bobsTurn gs =
+        gs
+          { GameState.activePlayer = S.bob,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice]}
+          }
+      declared gs = Map.keysSet (Combat.Type.attackers (GameState.combat gs))
+   in Spec.describe s "Fervent Charge" $ do
+        Spec.it s "CR 508.3a whole card: each creature you control that attacks gets +2/+2" $ do
+          (gs, mine, _) <- board
+          case mine of
+            [_, pikerId, giantId] -> do
+              let after = atBlockers gs
+              Spec.assertEqWith s "the 2/1 Piker attacked and is a 4/3" (S.powerToughnessOf pikerId after) (Just (4, 3))
+              Spec.assertEqWith s "and the 3/3 Giant declared beside it is a 5/5, so the trigger fired twice" (S.powerToughnessOf giantId after) (Just (5, 5))
+              Spec.assertEqWith s "CR 508.1b both really were declared as attackers" (declared after) (Set.fromList [pikerId, giantId])
+            _ -> Spec.assertFailure s "fixture should give alice a Charge, a Piker and a Giant"
+        Spec.it s "CR 109.5 a creature its controller does not control gets nothing" $ do
+          (gs, _, theirs) <- board
+          case theirs of
+            [theirPiker] -> do
+              let after = atBlockers (bobsTurn gs)
+              Spec.assertEqWith s "bob's Piker attacked and is still the printed 2/1" (S.powerToughnessOf theirPiker after) (Just (2, 1))
+              Spec.assertEqWith s "CR 508.1b and it really was declared as an attacker" (declared after) (Set.singleton theirPiker)
+            _ -> Spec.assertFailure s "fixture should give bob one Piker"
+
+-- The same condition with the Filter naming the ability's own attachment: CR
+-- 301.5f's "equipped creature", written as Filter.HasAttached Filter.IsSource --
+-- the spelling Basilisk Collar's static ability already uses. Filter.IsHostOfSource
+-- would answer False here: Pawl.Engine.Event.Match builds the trigger's context
+-- through Filter.contextFor, which leaves Filter.Context.sourceAttachedTo unfilled.
+--
+-- Conjurer's Mantle {1}{W} Artifact -- Equipment is the card, whole: "Equipped
+-- creature gets +1/+1 and has vigilance. / Whenever equipped creature attacks,
+-- look at the top six cards of your library. You may reveal a card that shares a
+-- creature type with that creature from among them and put it into your hand. Put
+-- the rest on the bottom of your library in a random order. / Equip {1}" (name,
+-- cost, type line and Oracle text checked against api.scryfall.com, 2026-09-11).
+--
+-- TWO attackers of DIFFERENT creature types, only one of them equipped, and the
+-- library holds a card of each type among the six: a trigger that fired for the
+-- unequipped Hill Giant as well, or one that bound the wrong attacker, brings a
+-- Giant card to hand instead of or beside the Goblin one.
+conjurersMantleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+conjurersMantleSpec s registry =
+  let -- alice's library, BOTTOM FIRST -- S.addLibraryCard puts each new card on
+      -- top -- so the top six are the Goblin Piker down to the Hill Giant, and
+      -- the Swamp beneath them is never looked at.
+      stockNames = ["Swamp", "Hill Giant", "Island", "Forest", "Mountain", "Plains", "Goblin Piker"]
+      board attached = do
+        mantle <- S.printingOf s registry "Conjurer's Mantle"
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Hill Giant"
+        stock <- traverse (S.printingOf s registry) stockNames
+        let (base, mine, _) = S.combatBoardOf [mantle, piker, giant] [piker]
+            stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) base stock
+        pure
+          ( mine,
+            case (attached, mine) of
+              (True, [mantleId, pikerId, _]) -> S.attach mantleId pikerId stocked
+              _ -> stocked
+          )
+      -- Attacks with everything, takes the printed "may", and takes the first
+      -- card offered -- which is discriminating because the OFFER is filtered:
+      -- only a card sharing a creature type with the bound attacker is in it.
+      answering :: Prompt.Prompt r -> r
+      answering p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseCardFromAmong _ _ _ offered -> NonEmpty.head offered
+        Prompt.Shuffle offered -> offered
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) answering
+   in Spec.describe s "Conjurer's Mantle" $ do
+        Spec.it s "CR 301.5f whole card: the equipped creature's attack takes a card sharing ITS creature type" $ do
+          (mine, gs) <- board True
+          case mine of
+            [_, pikerId, giantId] -> do
+              let after = atBlockers gs
+              Spec.assertEqWith s "the Goblin card came to hand, and the Giant card the other attacker would have found did not" (handNames S.alice after) ["Goblin Piker"]
+              Spec.assertEqWith s "CR 508.1b both creatures really were declared as attackers" (Map.keysSet (Combat.Type.attackers (GameState.combat after))) (Set.fromList [pikerId, giantId])
+            _ -> Spec.assertFailure s "fixture should give alice a Mantle, a Piker and a Giant"
+        -- The paired board, differing in the attachment and nothing else: an
+        -- Equipment attached to nothing stays on the battlefield (CR 704.5m
+        -- reaches only Auras), so this is the condition's answer and not a
+        -- state-based action's.
+        Spec.it s "CR 301.5a an Equipment attached to nothing watches no attack" $ do
+          (_, gs) <- board False
+          let after = atBlockers gs
+          Spec.assertEqWith s "alice's hand is empty" (handNames S.alice after) []
+          Spec.assertEqWith s "and the Mantle is still on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 3
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
+  ferventChargeSpec s registry
+  conjurersMantleSpec s registry
   anafenzaAttackSpec s registry
   curseOfVitalitySpec s registry
   wardedSentinelSpec s registry

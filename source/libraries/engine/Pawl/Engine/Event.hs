@@ -6914,6 +6914,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfAttacksPermanent _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
+  TriggerCondition.CreatureAttacks _ -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.SelfIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
@@ -7180,6 +7181,8 @@ controllerTurnScoped cond = case cond of
   -- controller's turn either -- StepBegins' OpponentsTurn arm above answers the
   -- same way for the same reason.
   TriggerCondition.CreatureAttacksYou -> False
+  -- The SelfAttacks arm's reason: a stolen creature attacks on its thief's turn.
+  TriggerCondition.CreatureAttacks _ -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.SelfIsAttacked -> False
   -- The only arm around here that can answer True, and only on one relation: CR

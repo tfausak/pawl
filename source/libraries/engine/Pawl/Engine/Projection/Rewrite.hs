@@ -1396,6 +1396,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfAttacksPermanent f -> TriggerCondition.SelfAttacksPermanent (Filter.rewrite pairs f)
   TriggerCondition.CreatureAttacksAlone f -> TriggerCondition.CreatureAttacksAlone (Filter.rewrite pairs f)
   TriggerCondition.CreatureAttacksYou -> condition
+  TriggerCondition.CreatureAttacks f -> TriggerCondition.CreatureAttacks (Filter.rewrite pairs f)
   TriggerCondition.AttachedPlayerIsAttacked -> condition
   TriggerCondition.SelfIsAttacked -> condition
   TriggerCondition.PlayerAttacks _ -> condition

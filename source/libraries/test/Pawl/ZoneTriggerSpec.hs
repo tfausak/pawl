@@ -2068,6 +2068,8 @@ representativeEvents cond =
         -- an arm that bound that player instead would disagree with
         -- eventBindingSlots here.
         TriggerCondition.CreatureAttacksYou -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        -- The same declaration event, binding the attacker as the arm above does.
+        TriggerCondition.CreatureAttacks _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 2))
         -- The GROUPED declaration event instead, which is CR 508.3b's arity: one
         -- per target the declaration named. carol again, and it is the PLAYER this
         -- one binds -- the arm above binds the attacker off its own event, and the
@@ -2516,6 +2518,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacksPermanent (Filter.Type.And []),
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
     TriggerCondition.CreatureAttacksYou,
+    TriggerCondition.CreatureAttacks (Filter.Type.And []),
     TriggerCondition.AttachedPlayerIsAttacked,
     TriggerCondition.SelfIsAttacked,
     TriggerCondition.PlayerAttacks PlayerRelation.You,
