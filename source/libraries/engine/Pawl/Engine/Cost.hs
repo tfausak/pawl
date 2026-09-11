@@ -301,14 +301,15 @@ candidateCostsGiven permitted pid name oid gs =
                 fmap
                   (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
                   (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
-              -- CR 702.74a: evoke, offered from EVERY zone for bestow's reason --
-              -- "a static ability that functions in any zone from which the card
-              -- with evoke can be cast" -- wrapped in `withAdditional` for
-              -- flashback's, and read off the PROJECTION for bestow's.
+              -- CR 702.74a, 702.109a and 702.152a: evoke, dash and blitz, offered
+              -- from EVERY zone for bestow's reason -- "a static ability that
+              -- functions in any zone from which the card with evoke can be
+              -- cast" -- wrapped in `withAdditional` for flashback's, read off the
+              -- PROJECTION for bestow's, and tagged with the keyword itself.
               evoked =
                 fmap
-                  (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Evoke cost)) (withAdditional cost))
-                  (Keyword.evokeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  (\(keyword, cost) -> CandidateCost.MkCandidateCost (Just keyword) (withAdditional cost))
+                  (Keyword.plainAlternativeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
               -- which the spell may be cast".
