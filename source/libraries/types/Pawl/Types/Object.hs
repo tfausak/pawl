@@ -584,8 +584,9 @@ data Object = MkObject
     -- | CR 601.2b: the keyword ability that offered the cost this SPELL was cast
     -- for -- Pawl.Types.CandidateCost's tag, stamped by Pawl.Engine.Cast onto the
     -- stack incarnation. Nothing for a printed or effect-granted cost. Read by
-    -- Quantity.CastUsing: CR 702.74a's "if its evoke cost was paid" and CR
-    -- 702.138b's "escaped".
+    -- Quantity.CastUsing: CR 702.74a's "if its evoke cost was paid", CR
+    -- 702.109a's and CR 702.152a's "as long as this permanent's [dash or blitz]
+    -- cost was paid", and CR 702.138b's "escaped".
     --
     -- One field for every such keyword rather than a Bool per keyword, beside
     -- `bestowed` and `prototyped` above, which stay: each has its own clearing
@@ -596,8 +597,9 @@ data Object = MkObject
     -- Pawl.Engine.Event.changeZoneAttaching carries it across that one move,
     -- `kicked`'s route. NOT a copiable value (CR 707.2): a Clone of an evoked
     -- permanent was not cast for that cost. A copy of the SPELL copies the
-    -- alternative cost (CR 707.10) but isn't cast, so it keeps evoke's record and
-    -- drops escape's (CR 702.138b) -- Pawl.Engine.Keyword.copiedCastUsing.
+    -- alternative cost (CR 707.10) but isn't cast, so it keeps evoke's, dash's
+    -- and blitz's record and drops escape's (CR 702.138b) --
+    -- Pawl.Engine.Keyword.copiedCastUsing.
     castUsing :: Maybe Keyword.Keyword,
     -- | CR 701.35a: this permanent is DETAINED -- it "can't attack or block and
     -- its activated abilities can't be activated" -- until the next turn of each

@@ -138,6 +138,8 @@ data KeywordFamily
     LevelUp
   | -- | CR 702.107a: outlast [cost].
     Outlast
+  | -- | CR 702.109a: dash [cost]; the family Quantity.CastUsing names.
+    Dash
   | -- | CR 702.112a: renown N.
     Renown
   | -- | CR 702.120a: escalate [cost].
@@ -172,6 +174,8 @@ data KeywordFamily
     -- and CR 701.58d names it again; no card in the pool asks yet, and it is owed
     -- at the keyword rather than at the first asker.
     Disguise
+  | -- | CR 702.152a: blitz [cost]; the family Quantity.CastUsing names.
+    Blitz
   | -- | CR 702.170a: plot [cost].
     Plot
   | -- | CR 702.143a: foretell [cost].

@@ -335,6 +335,11 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.74a's triggered half; its static half is a candidate cost
   -- (Pawl.Engine.Cost.candidateCostsFor).
   Keyword.Evoke _ -> List.genericReplicate count evoke
+  -- CR 702.109a and CR 702.152a print no triggered ability: the delayed one
+  -- is created by the spell as it resolves (Pawl.Engine.Stack), and blitz's
+  -- draw is granted by mintedStaticAbilitiesOf.
+  Keyword.Dash _ -> []
+  Keyword.Blitz _ -> []
   Keyword.Unleash -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -490,6 +495,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Riot -> []
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
+  Keyword.Dash _ -> []
+  Keyword.Blitz _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -829,6 +836,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Riot -> []
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
+  Keyword.Dash _ -> []
+  Keyword.Blitz _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1209,6 +1218,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Riot -> []
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
+  Keyword.Dash _ -> []
+  Keyword.Blitz _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1724,9 +1735,11 @@ permissionsFor cardTypes keyword = case keyword of
   -- Pawl.Engine.Cost.candidateCostsFor's, and rule 702.138a grants no exile
   -- replacement, so castFromGraveyardReplacementsOf stays flashback's.
   Keyword.Escape _ -> [CastingPermission.CastFromGraveyard]
-  -- CR 702.74a states an alternative cost and no permission: the card is cast
-  -- from wherever something else lets it be.
+  -- CR 702.74a, 702.109a and 702.152a state an alternative cost and no
+  -- permission: the card is cast from wherever something else lets it be.
   Keyword.Evoke _ -> []
+  Keyword.Dash _ -> []
+  Keyword.Blitz _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1864,22 +1877,29 @@ escapeCosts keywords =
 
 -- CR 707.10: what a COPY of a spell keeps of Object.castUsing. The copy copies
 -- the alternative cost decision, so CR 702.74a's "if its evoke cost was paid"
--- holds of it; CR 702.138b's "escaped" asks whether the spell was CAST from a
--- graveyard with escape, and a copy of a spell isn't cast. Pawl.CastSpec's "CR
--- 702.138b a Double Major copy of the escaping Chimera did not escape" proves it.
+-- and CR 702.109a's and CR 702.152a's "[dash or blitz] cost was paid" hold of
+-- it; CR 702.138b's "escaped" asks whether the spell was CAST from a graveyard
+-- with escape, and a copy of a spell isn't cast. Pawl.CastSpec's "CR 702.138b a
+-- Double Major copy of the escaping Chimera did not escape" and "CR 707.10 a
+-- Double Major copy of a dashed Scout attacks and is returned" prove both halves.
 copiedCastUsing :: Maybe Keyword -> Maybe Keyword
 copiedCastUsing castUsing = case castUsing of
   Just (Keyword.Escape _) -> Nothing
   _ -> castUsing
 
--- CR 702.74a: every evoke cost this card may be cast for, in ascending Set order.
--- Read by Pawl.Engine.Cost.candidateCostsFor from EVERY zone, bestowCosts'
--- reading, the static ability functioning "in any zone from which the card with
--- evoke can be cast". A list and a wildcard for flashbackCosts' reasons.
-evokeCosts :: Set Keyword -> [Cost Keyword]
-evokeCosts keywords =
+-- CR 702.74a, 702.109a and 702.152a: every evoke, dash and blitz cost this card
+-- may be cast for, each beside the keyword that offers it -- the tag CR 601.2b
+-- records as Object.castUsing -- in ascending Set order. Read by
+-- Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is offered,
+-- bestowCosts' reading: evoke's static ability functions "in any zone from which
+-- the card with evoke can be cast", and dash and blitz name no zone. A list and a
+-- wildcard for flashbackCosts' reasons.
+plainAlternativeCosts :: Set Keyword -> [(Keyword, Cost Keyword)]
+plainAlternativeCosts keywords =
   let costOf keyword = case keyword of
-        Keyword.Evoke cost -> Just cost
+        Keyword.Evoke cost -> Just (keyword, cost)
+        Keyword.Dash cost -> Just (keyword, cost)
+        Keyword.Blitz cost -> Just (keyword, cost)
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -2275,9 +2295,9 @@ castFromGraveyardExile =
         False
     )
 
--- The static continuous abilities rule 702 states as a keyword's whole meaning,
--- for the object those keywords are on. Today CR 702.161a's living metal is the
--- only one.
+-- The static continuous abilities rule 702 states as a keyword's meaning, for the
+-- object those keywords are on: CR 702.161a's living metal, and the battlefield
+-- halves of CR 702.109a's dash and CR 702.152a's blitz.
 --
 -- MEMBERSHIP and not a count, unlike mintedReplacementsOf below: rule 702.161a
 -- adds card types the object already has once the first instance has applied, so
@@ -2289,7 +2309,43 @@ castFromGraveyardExile =
 -- meaning is a static ability is rare enough that a hundred-arm case would say
 -- nothing a reader could not get from the rule number.
 mintedStaticAbilitiesOf :: Set Keyword -> [StaticAbility.StaticAbility Card]
-mintedStaticAbilitiesOf keywords = if Set.member Keyword.LivingMetal keywords then [livingMetal] else []
+mintedStaticAbilitiesOf =
+  let staticsOf keyword = case keyword of
+        Keyword.LivingMetal -> [livingMetal]
+        Keyword.Dash _ -> [whilePaid KeywordFamily.Dash (NonEmpty.singleton (Modification.GainKeyword Keyword.Haste))]
+        Keyword.Blitz _ -> [whilePaid KeywordFamily.Blitz (Modification.GainKeyword Keyword.Haste NonEmpty.:| [Modification.GainAbility (GrantedAbility.Triggered blitzDraw)])]
+        _ -> []
+   in foldMap staticsOf . Set.toAscList
+
+-- CR 702.109a's and CR 702.152a's "as long as this permanent's [dash or blitz]
+-- cost was paid", a condition re-asked on every projection.
+-- Quantity.CastUsing reads Object.castUsing, which CR 400.7 clears on any other
+-- zone change and CR 707.2 does not copy, so a flickered permanent and a Clone of
+-- this one both fail it. Pawl.CastSpec's "Dash" group proves both.
+whilePaid :: KeywordFamily.KeywordFamily -> NonEmpty.NonEmpty (Modification.Modification (GrantedAbility.GrantedAbility Card)) -> StaticAbility.StaticAbility Card
+whilePaid family modifications =
+  StaticAbility.MkStaticAbility
+    { StaticAbility.affected = Affected.Matching Filter.IsSource,
+      StaticAbility.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.CastUsing family) Comparison.AtLeast (Quantity.Literal 1))),
+      StaticAbility.functionsFrom = Set.empty,
+      StaticAbility.lingers = Nothing,
+      StaticAbility.modifications = modifications
+    }
+
+-- CR 702.152a's granted "When this permanent is put into a graveyard from the
+-- battlefield, draw a card" -- CR 700.4's "dies", a CR 603.10a look-back.
+blitzDraw :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+blitzDraw =
+  let effect = Effect.Draw Draw.MkDraw {Draw.player = PlayerRef.Relative PlayerRelation.You, Draw.quantity = Quantity.Literal 1, Draw.slot = Nothing}
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfDies,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- CR 702.161a: "During your turn, this permanent is an artifact creature in
 -- addition to its other types."
@@ -2357,6 +2413,8 @@ mintedReplacementsFor keyword count = case keyword of
   -- an escaped instant or sorcery goes to its owner's graveyard under CR 608.2n.
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
+  Keyword.Dash _ -> []
+  Keyword.Blitz _ -> []
   -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.
   -- Filter.IsSource and one row per instance for riot's reasons.
   Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Unleash))
@@ -2666,6 +2724,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Riot -> []
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
+  Keyword.Dash _ -> []
+  Keyword.Blitz _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -2871,6 +2931,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Riot -> []
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
+  Keyword.Dash _ -> []
+  Keyword.Blitz _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -3188,6 +3250,8 @@ familyOf keyword = case keyword of
   Keyword.Riot -> Nothing
   Keyword.Escape _ -> Just KeywordFamily.Escape
   Keyword.Evoke _ -> Just KeywordFamily.Evoke
+  Keyword.Dash _ -> Just KeywordFamily.Dash
+  Keyword.Blitz _ -> Just KeywordFamily.Blitz
   Keyword.Unleash -> Nothing
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing
@@ -3793,12 +3857,85 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility)]
+mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.
 mintedDelayedAbility :: AbilityName -> Maybe (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
 mintedDelayedAbility name = Map.lookup name mintedDelayedAbilities
+
+-- CR 702.109a's and CR 702.152a's second static ability: the delayed triggered
+-- ability a spell cast for this keyword's cost creates as it becomes a permanent
+-- (CR 603.7a), named for mintedDelayedAbility. Pawl.Engine.Stack arms it on
+-- resolution with `becameSlot` bound to that permanent. Nothing for every other
+-- keyword, and for a spell cast for no keyword's cost.
+resolutionDelayedAbility :: Maybe Keyword -> Maybe AbilityName
+resolutionDelayedAbility castUsing = case castUsing of
+  Just (Keyword.Dash _) -> Just dashReturnName
+  Just (Keyword.Blitz _) -> Just blitzSacrificeName
+  _ -> Nothing
+
+-- The slot rule 702.109a's and rule 702.152a's "the permanent this spell becomes"
+-- is bound into, unearthSlot's position: CR 603.7c's "it", which a flickered
+-- permanent is not (CR 400.7).
+becameSlot :: SlotName.SlotName
+becameSlot = SlotName.MkSlotName (Text.pack "became permanent")
+
+-- The names rule 702.109a's and rule 702.152a's delayed abilities are filed
+-- under. A card may not declare one under either name (Pawl.AbilitySlotLintSpec).
+dashReturnName, blitzSacrificeName :: AbilityName
+dashReturnName = AbilityName.MkAbilityName (Text.pack "dash")
+blitzSacrificeName = AbilityName.MkAbilityName (Text.pack "blitz")
+
+-- CR 702.109a's "return the permanent this spell becomes to its owner's hand at
+-- the beginning of the next end step", unearthExile's shape with the hand for
+-- exile: CR 513.2's timing, TurnScope.EachTurn, and no `origin`.
+dashReturn :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+dashReturn =
+  let effect =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot becameSlot,
+              MoveToZone.zone = Zone.Hand,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Nothing,
+              MoveToZone.origin = Nothing,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+   in atNextEndStep effect
+
+-- CR 702.152a's "sacrifice the permanent this spell becomes at the beginning of
+-- the next end step", decayedSacrifice's effect on dashReturn's timing.
+-- Sacrificer.EffectController: CR 603.7d makes the delayed ability's controller
+-- the spell's, and CR 701.21a lets that player sacrifice only a permanent they
+-- control.
+blitzSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+blitzSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot becameSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController})
+
+-- CR 513.2's "at the beginning of the next end step", once (CR 603.7b), on any
+-- player's turn.
+atNextEndStep :: Effect.Effect Card (GrantedAbility.GrantedAbility Card) -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+atNextEndStep effect =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.EachTurn),
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
 
 -- The name rule 702.147a's delayed ability is filed under. A card may not declare
 -- one under this name (Pawl.CardSpec), which is what makes the fallback order in

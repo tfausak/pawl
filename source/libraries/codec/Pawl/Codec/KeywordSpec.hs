@@ -348,6 +348,11 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (Keyword.Evoke (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))
       " {\"type\":\"Evoke\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+  -- CR 702.109a and CR 702.152a carry a whole Cost each, under tags of their own.
+  Spec.it s "Dash and Blitz carry their costs" $ do
+    let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
+    Common.assertCodec s Keyword.codec (Keyword.Dash cost) " {\"type\":\"Dash\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Common.assertCodec s Keyword.codec (Keyword.Blitz cost) " {\"type\":\"Blitz\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
   -- CR 702.168a's payload is a Cost too, and it must not share Morph's tag: the
   -- two name the turn-face-up cost of DIFFERENT procedures (CR 702.37e and CR
   -- 702.168d), and the objects they list differ by CR 702.168b's ward {2}.
