@@ -1350,7 +1350,7 @@ eventTriggers events gs =
       -- cascade is on the stack" -- so rule 113.6's default has already been
       -- overridden by the rule that mints it.
       -- Pawl.Engine.Keyword.stackTriggeredAbilitiesOf is what decides which
-      -- keywords reach this, and cascade is the only one.
+      -- keywords reach this: cascade and storm.
       --
       -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#1859).
       spellCast event = case event of

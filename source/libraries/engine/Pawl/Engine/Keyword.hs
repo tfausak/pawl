@@ -44,6 +44,8 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.CopyStackObject as CopyStackObject
+import qualified Pawl.Types.CopyTargets as CopyTargets
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -230,6 +232,8 @@ abilitiesFor keyword count = case keyword of
   -- stackTriggeredAbilitiesOf mints it and this roster stays empty -- suspend's
   -- shape one zone over.
   Keyword.Cascade -> []
+  -- CR 702.40a's, likewise.
+  Keyword.Storm -> []
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
@@ -443,6 +447,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
+  Keyword.Storm -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -789,6 +794,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
+  Keyword.Storm -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1161,6 +1167,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
+  Keyword.Storm -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1665,6 +1672,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
+  Keyword.Storm -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2469,6 +2477,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
+  Keyword.Storm -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2705,6 +2714,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
+  Keyword.Storm -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2930,6 +2940,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
+  Keyword.Storm -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3078,6 +3089,7 @@ familyOf keyword = case keyword of
   -- stated quality.
   Keyword.Protection _ -> Just KeywordFamily.Protection
   Keyword.Cascade -> Nothing
+  Keyword.Storm -> Nothing
   Keyword.Deathtouch -> Nothing
   Keyword.Defender -> Nothing
   Keyword.DoubleStrike -> Nothing
@@ -4425,18 +4437,64 @@ exileTriggeredAbilitiesOf keywords = case suspend keywords of
   Just _ -> [suspendUpkeep, suspendLastCounter]
 
 -- CR 702.85a's ability, "a triggered ability that functions only while the spell
--- with cascade is on the stack" -- the roster the cast scan in
--- Pawl.Engine.Event.Trigger mints, `exileTriggeredAbilitiesOf`'s sibling one zone
--- over and ungated by CR 113.6 for that function's reason: rule 702.85a states
--- the zone itself, so asking `functionsIn` would only re-derive it from a
--- condition (a cast) that says nothing about the stack.
+-- with cascade is on the stack", and CR 702.40a's storm, which "functions on the
+-- stack" -- the roster the cast scan in Pawl.Engine.Event.Trigger mints,
+-- `exileTriggeredAbilitiesOf`'s sibling one zone over and ungated by CR 113.6
+-- for that function's reason: both rules state the zone themselves, so asking
+-- `functionsIn` would only re-derive it from a condition (a cast) that says
+-- nothing about the stack.
 --
 -- A SET, `exileTriggeredAbilitiesOf`'s reading. Not implemented: CR 702.85c's
--- separate trigger per instance, which a printed keyword set cannot count
--- (#3577).
+-- and CR 702.40b's separate trigger per instance, which a printed keyword set
+-- cannot count (#3577).
 stackTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 stackTriggeredAbilitiesOf keywords =
-  if Set.member Keyword.Cascade keywords then [cascade] else []
+  [cascade | Set.member Keyword.Cascade keywords] <> [storm | Set.member Keyword.Storm keywords]
+
+-- CR 702.40a: "When you cast this spell, copy it for each other spell that was
+-- cast before it this turn. If the spell has any targets, you may choose new
+-- targets for any of the copies."
+--
+-- "It" is the spell itself, which is this ability's source (CR 113.7), named as
+-- the stack object Filter.IsSource matches. CopyTargets.ChosenByController is
+-- CR 707.10c's offer, asked per copy and never raised for a spell with no
+-- targets.
+--
+-- Not implemented: copying a spell that has left the stack before the trigger
+-- resolves (CR 608.2h); the trigger then copies nothing (#3618).
+storm :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+storm =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfCast,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          ( Seq.singleton
+              ( Mode.MkMode
+                  ( Seq.singleton
+                      ( Clause.MkClause
+                          Nothing
+                          Nothing
+                          Nothing
+                          Optionality.Mandatory
+                          Nothing
+                          ( Seq.singleton
+                              ( Effect.CopyStackObject
+                                  CopyStackObject.MkCopyStackObject
+                                    { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
+                                      CopyStackObject.targets = CopyTargets.ChosenByController,
+                                      CopyStackObject.quantity = Quantity.SpellsCastBefore
+                                    }
+                              )
+                          )
+                      )
+                  )
+                  Map.empty
+              )
+          )
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
 
 -- CR 702.85a: "When you cast this spell, exile cards from the top of your library
 -- until you exile a nonland card whose mana value is less than this spell's mana
