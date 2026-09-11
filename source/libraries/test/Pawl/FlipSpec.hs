@@ -41,6 +41,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -52,6 +53,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -61,6 +63,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
@@ -164,6 +167,34 @@ akkiDuel = S.duel S.beginningOfCombat [S.settled "akki" "Akki Lavarunner"] []
 attackScript :: Seq.Seq S.Timed
 attackScript = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "akki"])]
 
+-- The battlefield objects whose printed card is Clone. Copy effects change
+-- projected characteristics, not the card represented by the object (CR 707.2).
+clonesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
+clonesOnBattlefield gs =
+  let isClone oid = maybe False ((== CardName.MkCardName (Text.pack "Clone")) . Face.name) (Game.faceOf oid gs)
+   in filter isClone (Set.toList (GameState.battlefield gs))
+
+-- Pin CR 614.12a's as-enters choice to one exact source and order any trigger or
+-- damage batches encountered while resolving and fighting.
+copyNamed :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+copyNamed wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  Prompt.ChooseLegend _ _ candidates -> Foldable.maximum candidates
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
+  _ -> S.identityAnswer p
+
+resolveAndSettle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+resolveAndSettle answer gs = snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
+
+-- S.spellOnStack creates a settled fixture. Mark the resolved permanent sick so
+-- these attacks depend on Akki's copied haste rather than fixture history.
+sicken :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+sicken oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+
+leaveBattlefield :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+leaveBattlefield oid gs = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Flip" $ do
   -- CR 710.2, first sentence: "in every zone other than the battlefield, and
@@ -188,6 +219,67 @@ spec s registry = Spec.describe s "Flip" $ do
     let (oid, gs) = S.addObjectIn Zone.Library akki S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertBool s (not (isLegendary oid gs)) "a legendary search must not find the flip card"
     Spec.assertEqWith s "and it is named for its normal half" (Projection.namesOf oid gs) (Set.singleton akkiName)
+  Spec.it s "CR 707.2 / 710 a Clone of unflipped Akki later flips into Tok-Tok" $ do
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    clone <- S.printingOf s registry "Clone"
+    let (board, mine, _) = S.combatBoardOf [akki] []
+    case mine of
+      [akkiId] -> do
+        let (_, staged) = S.spellOnStack clone S.alice board
+            copied = resolveAndSettle (copyNamed akkiId) staged
+        case clonesOnBattlefield copied of
+          [cloneId] -> do
+            Spec.assertEqWith s "before combat every reader sees the normal Akki half" (halfReadings cloneId copied) normalHalf
+            Spec.assertEqWith s "the new Clone did not copy flipped status" (fmap Object.flipped (Game.lookupObject cloneId copied)) (Just False)
+            let ready = sicken cloneId (leaveBattlefield akkiId copied)
+                after = S.runCombat (S.attackTo S.bob) ready
+            Spec.assertEqWith s "the Clone became Tok-Tok after its copied trigger resolved" (halfReadings cloneId after) alternativeHalf
+            Spec.assertEqWith s "the copied permanent's status is flipped" (fmap Object.flipped (Game.lookupObject cloneId after)) (Just True)
+            Spec.assertEqWith s "CR 710.1c still keeps mana value 4 and red" (costReadings cloneId after) (Just 4, Set.singleton Color.Red)
+          other -> Spec.assertFailure s ("expected one printed Clone, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Akki source, got " <> show (length other))
+  Spec.it s "CR 707.2 a Clone of flipped Tok-Tok starts as Akki and may flip later" $ do
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    clone <- S.printingOf s registry "Clone"
+    let (board, mine, _) = S.combatBoardOf [akki] []
+    case mine of
+      [akkiId] -> do
+        let flippedSource = Game.flipPermanent akkiId board
+            (_, staged) = S.spellOnStack clone S.alice flippedSource
+            copied = resolveAndSettle (copyNamed akkiId) staged
+        case clonesOnBattlefield copied of
+          [cloneId] -> do
+            Spec.assertEqWith s "before combat the Clone starts as the normal Akki half" (halfReadings cloneId copied) normalHalf
+            Spec.assertEqWith s "the new Clone is itself unflipped" (fmap Object.flipped (Game.lookupObject cloneId copied)) (Just False)
+            let ready = sicken cloneId (leaveBattlefield akkiId copied)
+                after = S.runCombat (S.attackTo S.bob) ready
+            Spec.assertEqWith s "the Clone of flipped Tok-Tok later became Tok-Tok" (halfReadings cloneId after) alternativeHalf
+            Spec.assertEqWith s "the copied permanent's status is now flipped" (fmap Object.flipped (Game.lookupObject cloneId after)) (Just True)
+            Spec.assertEqWith s "CR 710.1c still keeps mana value 4 and red" (costReadings cloneId after) (Just 4, Set.singleton Color.Red)
+          other -> Spec.assertFailure s ("expected one printed Clone, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Akki source, got " <> show (length other))
+  Spec.it s "CR 707.3 a copy of a Clone of Akki retains Tok-Tok" $ do
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    clone <- S.printingOf s registry "Clone"
+    let (board, mine, _) = S.combatBoardOf [akki] []
+    case mine of
+      [akkiId] -> do
+        let (_, stagedFirst) = S.spellOnStack clone S.alice board
+            withFirst = resolveAndSettle (copyNamed akkiId) stagedFirst
+        case clonesOnBattlefield withFirst of
+          [firstId] -> do
+            let (_, stagedSecond) = S.spellOnStack clone S.alice withFirst
+                withSecond = resolveAndSettle (copyNamed firstId) stagedSecond
+                second = List.find (/= firstId) (clonesOnBattlefield withSecond)
+            case second of
+              Nothing -> Spec.assertFailure s "the second printed Clone never entered"
+              Just secondId -> do
+                let withoutAkki = leaveBattlefield akkiId withSecond
+                    ready = sicken secondId (leaveBattlefield firstId withoutAkki)
+                    after = S.runCombat (S.attackTo S.bob) ready
+                Spec.assertEqWith s "the second Clone became Tok-Tok after its copied trigger resolved" (halfReadings secondId after) alternativeHalf
+          other -> Spec.assertFailure s ("expected one first Clone, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Akki source, got " <> show (length other))
   -- THE proving case. CR 710.2: "once a permanent is flipped, its normal name,
   -- text box, type line, power, and toughness don't apply and the alternative
   -- versions of those characteristics apply instead."
