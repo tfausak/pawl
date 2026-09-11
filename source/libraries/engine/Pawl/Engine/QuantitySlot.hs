@@ -142,6 +142,7 @@ overSlots f quantity =
         -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
         -- own record by equality, never an instruction this traversal descends into.
         Quantity.TimesKickedWith _ -> pure quantity
+        Quantity.CastUsing _ -> pure quantity
         Quantity.TagWasSpent {} -> pure quantity
         Quantity.WasToken -> pure quantity
         Quantity.WasAttacking -> pure quantity
@@ -290,6 +291,7 @@ nestedRefs quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> Set.empty
+  Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasAttacking -> Set.empty
@@ -373,6 +375,7 @@ nestedCounts quantity = case quantity of
   -- and no traversal of this type can carry a Cost; Pawl.CardSpec's
   -- timesKickedWithOffends checks that field off the encoding instead.
   Quantity.TimesKickedWith {} -> []
+  Quantity.CastUsing {} -> []
   Quantity.TagWasSpent {} -> []
   Quantity.WasToken -> []
   Quantity.WasAttacking -> []
@@ -550,6 +553,7 @@ mapPlayerRefs f intoCount quantity =
         -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
         -- own record by equality, never an instruction this traversal descends into.
         Quantity.TimesKickedWith _ -> quantity
+        Quantity.CastUsing _ -> quantity
         Quantity.TagWasSpent {} -> quantity
         Quantity.WasToken -> quantity
         Quantity.WasAttacking -> quantity

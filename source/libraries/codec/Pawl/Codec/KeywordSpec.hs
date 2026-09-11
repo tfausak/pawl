@@ -341,6 +341,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (escape 6)
       " {\"type\":\"Escape\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":6}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (escape 6) /= Codec.encode Keyword.codec (flashbackOf 6)) "the same cost under two keywords encodes differently"
+  -- CR 702.74a's payload is a whole Cost, Mulldrifter's {2}{U}.
+  Spec.it s "Evoke carries its cost" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Evoke (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))
+      " {\"type\":\"Evoke\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
   -- CR 702.168a's payload is a Cost too, and it must not share Morph's tag: the
   -- two name the turn-face-up cost of DIFFERENT procedures (CR 702.37e and CR
   -- 702.168d), and the objects they list differ by CR 702.168b's ward {2}.

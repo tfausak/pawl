@@ -51,6 +51,7 @@ substituteStar star quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> quantity
+  Quantity.CastUsing _ -> quantity
   Quantity.TagWasSpent {} -> quantity
   Quantity.WasToken -> quantity
   Quantity.WasAttacking -> quantity

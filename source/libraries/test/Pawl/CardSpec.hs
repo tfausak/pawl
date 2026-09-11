@@ -2595,6 +2595,8 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.138a: the escape cost, flashback's shape -- its "exile N other cards
   -- from your graveyard" component carries the Filter that names them.
   Keyword.Escape cost -> costFilters cost
+  -- CR 702.74a: the evoke cost, flashback's shape.
+  Keyword.Evoke cost -> costFilters cost
   -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
   -- flashback's may.
   Keyword.Bestow cost -> costFilters cost
@@ -3131,6 +3133,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   Quantity.Type.TimesKickedWith {} -> []
+  Quantity.Type.CastUsing {} -> []
   Quantity.Type.TagWasSpent {} -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasAttacking -> []

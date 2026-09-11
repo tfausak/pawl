@@ -263,6 +263,9 @@ data Keyword
   | -- | 702.73a: "This object is every creature type." A characteristic-defining
     -- ability (CR 604.3) landing in layer 4.
     Changeling
+  | -- | 702.74a: evoke [cost] -- cast this card for [cost] rather than its mana
+    -- cost, and sacrifice it as it enters if that cost was paid.
+    Evoke (Cost.Cost Keyword)
   | -- | 702.75a: hideaway N -- a triggered ability. On entry, look at the top N
     -- cards of your library, exile one of them face down and put the rest on the
     -- bottom in a random order; the exiled card gains a look for whoever controls
@@ -439,10 +442,6 @@ data Keyword
   | -- | 702.138a: "escape--[cost]" -- you may cast this card from your graveyard
     -- by paying [cost] rather than paying its mana cost, which CR 601.2b and CR
     -- 601.2f-h price as an alternative cost.
-    --
-    -- Not implemented: CR 702.138b's "escaped" designation, and with it CR
-    -- 702.138c's "escapes with [counters]" and CR 702.138d's "escapes with
-    -- [ability]" (#3603).
     Escape (Cost.Cost Keyword)
   | -- | 702.139a: "Companion--[Condition]" -- reveal this card from outside the
     -- game before the game begins if your starting deck fulfills the condition

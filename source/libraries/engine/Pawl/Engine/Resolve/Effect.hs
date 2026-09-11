@@ -4730,6 +4730,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- CR 701.37c's X rides the designation, so it is zeroed
                       -- with it -- `designations` above, same sentence.
                       Object.designationValues = Map.empty,
+                      -- CR 707.10 copies the alternative cost, but a copy isn't
+                      -- CAST, so it keeps evoke's record and not escape's.
+                      Object.castUsing = Keyword.copiedCastUsing (Object.castUsing obj),
                       -- CR 109.5's "you" is RE-STAMPED, and it is the one binding
                       -- that must be: Pawl.Engine.Cast and Pawl.Engine.Activate
                       -- write the caster or activator into it as the original goes

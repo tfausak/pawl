@@ -12,6 +12,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaCount as ManaCount
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
@@ -477,6 +478,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- one read: how many times THIS cost was declared, zero for a cost the spell's
         -- controller declined and for one the card does not print.
         Quantity.TimesKickedWith cost -> fmap (toInteger . Map.findWithDefault 0 cost . Filter.kicked) mView
+        -- CR 601.2b / 400.7d: was the candidate this object was cast for
+        -- offered by that family's keyword? Off the view, WasKicked's read.
+        Quantity.CastUsing family -> fmap (\view -> if fmap Keyword.familyOf (Filter.castUsing view) == Just (Just family) then 1 else 0) mView
         -- CR 107.4h's third sentence as a 0/1, WasKicked's arm in every respect --
         -- including the object it reads, which for Berg Strider is the PERMANENT the
         -- spell became (CR 400.7d) and for Forsworn Paladin is the CR 602.2a ability
@@ -999,6 +1003,7 @@ objectSlots quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> Set.empty
+  Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasAttacking -> Set.empty
@@ -1223,6 +1228,7 @@ readsX quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> False
+  Quantity.CastUsing _ -> False
   Quantity.TagWasSpent {} -> False
   Quantity.WasToken -> False
   Quantity.WasAttacking -> False
