@@ -100,6 +100,7 @@ codec =
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator (\x -> case x of Keyword.Annihilator y -> Just y; _ -> Nothing),
       Arm.nullary "Cascade" Keyword.Cascade,
       Arm.nullary "Storm" Keyword.Storm,
+      Arm.payload "Affinity" (Filter.codec codec) Keyword.Affinity (\x -> case x of Keyword.Affinity y -> Just y; _ -> Nothing),
       Arm.payload "Evoke" (Cost.codec codec) Keyword.Evoke (\x -> case x of Keyword.Evoke y -> Just y; _ -> Nothing),
       Arm.payload "Dash" (Cost.codec codec) Keyword.Dash (\x -> case x of Keyword.Dash y -> Just y; _ -> Nothing),
       Arm.payload "Blitz" (Cost.codec codec) Keyword.Blitz (\x -> case x of Keyword.Blitz y -> Just y; _ -> Nothing),
@@ -165,5 +166,6 @@ codec =
       Arm.payload "Mutate" (Cost.codec codec) Keyword.Mutate (\x -> case x of Keyword.Mutate y -> Just y; _ -> Nothing),
       Arm.nullary "UmbraArmor" Keyword.UmbraArmor,
       Arm.nullary "Convoke" Keyword.Convoke,
+      Arm.nullary "Undaunted" Keyword.Undaunted,
       Arm.nullary "Improvise" Keyword.Improvise
     ]

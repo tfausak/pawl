@@ -2881,6 +2881,14 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  -- CR 702.41a's [text], which is a Filter rather than a Cost. KeywordFramed like
+  -- the rest: Pawl.Engine.Keyword.selfCostReductionsFor drops it into a Count over
+  -- the battlefield, which Pawl.Engine.Cost.selfReductions evaluates through a
+  -- bare Context, so no slot is in scope.
+  Keyword.Affinity quality -> [quality]
+  -- CR 702.125a names no quality: the opponents it counts are written into the
+  -- reduction Pawl.Engine.Keyword.selfCostReductionsFor mints.
+  Keyword.Undaunted -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]

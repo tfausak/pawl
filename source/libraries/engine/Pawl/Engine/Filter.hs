@@ -2311,6 +2311,12 @@ rewriteKeyword pairs keyword = case keyword of
   -- printed word here to swap.
   Keyword.Type.Convoke -> keyword
   Keyword.Type.Improvise -> keyword
+  -- CR 702.41a's [text] is a printed quality, so `rewrite` reaches it as
+  -- landwalk's criterion is reached -- a Magical Hack naming Island turns
+  -- affinity for Islands into affinity for whatever it named.
+  Keyword.Type.Affinity quality -> Keyword.Type.Affinity (rewrite pairs quality)
+  -- CR 702.125a counts OPPONENTS, so there is no printed word here to swap.
+  Keyword.Type.Undaunted -> keyword
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is
