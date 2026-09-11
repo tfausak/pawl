@@ -338,6 +338,13 @@ isAttacking oid gs = Maybe.isJust (attackTargetOf oid gs)
 attackTargetOf :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
 attackTargetOf oid gs = Map.lookup oid (Combat.attackers (GameState.combat gs))
 
+-- attackTargetOf through CR 608.2h: for an object that has left, what it was
+-- attacking as it left (Pawl.Types.LastKnown.attacking).
+attackTargetWithLastKnown :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
+attackTargetWithLastKnown oid gs = case lookupObject oid gs of
+  Just _ -> attackTargetOf oid gs
+  Nothing -> LastKnown.attacking =<< Map.lookup oid (GameState.lastKnown gs)
+
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup.
 --

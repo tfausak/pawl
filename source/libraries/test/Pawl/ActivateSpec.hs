@@ -612,6 +612,33 @@ ninjutsuBeforeAttack s registry = do
         [] -> S.noSource
   pure (ninjaId, attackerId, g3 {GameState.priority = Just S.alice})
 
+-- CR 702.49c's board: ninjutsuBeforeAttack's seats, mana and hand, plus bob's
+-- Jace Beleren with three loyalty, so the Piker has two things to attack and the
+-- one the Ninja lands on is a fact rather than the only option.
+ninjutsuJaceBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ninjutsuJaceBoard s registry = do
+  ninja <- S.printingOf s registry "Ninja of the Deep Hours"
+  piker <- S.printingOf s registry "Goblin Piker"
+  island <- S.printingOf s registry "Island"
+  jace <- S.printingOf s registry "Jace Beleren"
+  let (g0, _, theirs) = S.combatBoardOf [piker] [jace]
+      jaceId = case theirs of
+        oid : _ -> oid
+        -- Unreachable, for ninjutsuBeforeAttack's reason.
+        [] -> S.noSource
+      g1 = S.addCounter CounterKind.Loyalty 3 jaceId g0
+      (_, g2) = S.addPermanent island S.alice g1
+      (_, g3) = S.addPermanent island S.alice g2
+      (ninjaId, g4) = S.addHandCard ninja S.alice g3
+  pure (ninjaId, jaceId, g4 {GameState.priority = Just S.alice})
+
+-- Aims every CR 508.1b and CR 508.4 announcement at `target` whenever it is
+-- offered; aggressiveAnswer otherwise.
+sendAt :: AttackTarget.AttackTarget -> Prompt.Prompt r -> r
+sendAt target p = case p of
+  Prompt.ChooseAttackTarget _ _ _ options -> if List.elem target (NonEmpty.toList options) then target else NonEmpty.head options
+  _ -> S.aggressiveAnswer p
+
 -- The battlefield ids the second state has and the first does not. The ninjutsu
 -- effect moves a card out of a hand, so CR 400.7 gives the arriving permanent a
 -- NEW id and the hand id cannot be asserted on; the Piker went home as the cost
@@ -655,6 +682,43 @@ ninjutsuSpec s registry = Spec.describe s "Ninjutsu" $ do
           (False, 2)
         Spec.assertEqWith s "and only the Piker is left in hand once the Ninja has arrived" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 1
         Spec.assertBool s (Maybe.isNothing (Game.lookupObject ninjaId resolved)) "CR 400.7 the hand id is gone; the permanent is a new object"
+      _ -> Spec.assertFailure s "expected exactly one ninjutsu ability"
+
+  -- CR 702.49c: the Ninja attacks what the returned creature was attacking. Two
+  -- boards differing only in the Piker's declared target, each resolved by an
+  -- answerer that would send the Ninja at the OTHER one if asked, so each lands
+  -- only because the effect specified the target and nobody was asked.
+  Spec.it s "CR 702.49c the Ninja attacks whatever the Piker it returned was attacking" $ do
+    (ninjaId, jaceId, g0) <- ninjutsuJaceBoard s registry
+    let atJace = AttackTarget.OfPlaneswalker jaceId
+        atBob = AttackTarget.OfPlayer S.bob
+        declared aimed = (S.runPure (sendAt aimed) g0 (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.alice}
+        ninjaTarget aimed asked =
+          let gs = declared aimed
+           in case Activate.abilitiesFor ninjaId gs of
+                [ability] ->
+                  let activated = S.runPure (sendAt asked) gs (Activate.activateAbility S.alice ninjaId ability)
+                      resolved = S.runPure (sendAt asked) activated Stack.resolveTop
+                   in fmap (\oid -> Map.lookup oid (Combat.Type.attackers (GameState.combat resolved))) (arrivedOnBattlefield activated resolved)
+                _ -> []
+    Spec.assertEqWith s "CR 702.49c sent at Jace, the Ninja attacks Jace, where the answerer would pick bob" (ninjaTarget atJace atBob) [Just atJace]
+    Spec.assertEqWith s "CR 702.49c sent at bob, the Ninja attacks bob, where the answerer would pick Jace" (ninjaTarget atBob atJace) [Just atBob]
+    Spec.assertEqWith s "the Piker really was declared at each" (fmap (Map.elems . Combat.Type.attackers . GameState.combat . declared) [atJace, atBob]) [[atJace], [atBob]]
+
+  -- CR 508.4a: the specified target has left the battlefield by the time the
+  -- ability resolves, so the Ninja enters and is never an attacking creature --
+  -- rather than being offered bob, which the answerer would take.
+  Spec.it s "CR 508.4a the Ninja is not attacking when the Piker's Jace has left" $ do
+    (ninjaId, jaceId, g0) <- ninjutsuJaceBoard s registry
+    let gs = (S.runPure (sendAt (AttackTarget.OfPlaneswalker jaceId)) g0 (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.alice}
+    case Activate.abilitiesFor ninjaId gs of
+      [ability] -> do
+        let activated = S.runPure (sendAt (AttackTarget.OfPlayer S.bob)) gs (Activate.activateAbility S.alice ninjaId ability)
+            jaceGone = S.runPure S.identityAnswer activated (Event.changeZone jaceId Zone.Graveyard)
+            resolved = S.runPure (sendAt (AttackTarget.OfPlayer S.bob)) jaceGone Stack.resolveTop
+            arrived = arrivedOnBattlefield jaceGone resolved
+        Spec.assertEqWith s "CR 508.4a the Ninja entered but is not an attacking creature" (fmap (\oid -> Map.lookup oid (Combat.Type.attackers (GameState.combat resolved))) arrived) [Nothing]
+        Spec.assertBool s (not (S.onBattlefield jaceId jaceGone)) "Jace left before the ability resolved"
       _ -> Spec.assertFailure s "expected exactly one ninjutsu ability"
 
   -- The cost's own gate, against the board one turn-based action earlier. Same

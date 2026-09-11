@@ -69,6 +69,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -655,13 +656,9 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 -- the card with ninjutsu is in a player's hand"; handAbilitiesFor is the roster
 -- that offers it, so the restriction holds by construction there as well.
 --
--- Not implemented: CR 702.49c's rider -- "the creature put onto the battlefield
--- with the ninjutsu ability enters attacking the same player, planeswalker, or
--- battle as the creature that was returned to its owner's hand". The `attacking`
--- rider is a Bool, so Pawl.Engine.Combat.putOntoBattlefieldAttacking asks the
--- entering creature's controller which defender instead, and the payment records
--- nothing about which creature it returned (#3019). Identical wherever there is
--- one thing to attack, and a real divergence where there is more than one.
+-- CR 702.49c is the `attacking` rider: the ninja attacks whatever the creature
+-- the cost returned was attacking, which the payment binds under
+-- Binding.returnedPermanent and CR 608.2h's last known information answers.
 ninjutsu :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 ninjutsu cost =
   let returned =
@@ -683,7 +680,7 @@ ninjutsu cost =
               MoveToZone.riders =
                 EntryRiders.MkEntryRiders
                   { EntryRiders.tapped = TapState.Tapped,
-                    EntryRiders.attacking = True,
+                    EntryRiders.attacking = Just (EntryAttack.SameAs Binding.returnedPermanent),
                     EntryRiders.blocking = Nothing,
                     EntryRiders.transformed = False,
                     EntryRiders.counters = Map.empty,

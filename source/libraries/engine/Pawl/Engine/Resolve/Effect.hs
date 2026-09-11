@@ -85,6 +85,7 @@ import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
@@ -145,6 +146,7 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -801,6 +803,20 @@ slotOne :: SlotName -> ObjectId -> GameState -> Maybe ObjectId
 slotOne slot resolving gs = do
   obj <- Game.lookupObject resolving gs
   Recipient.objectOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+
+-- CR 508.4: what an entry rider says the arriving creature attacks. Nothing: it
+-- does not enter attacking. Just Nothing: its controller chooses, which
+-- Combat.putOntoBattlefieldAttacking asks. Just (Just target): the effect
+-- specified it (CR 702.49c), read through CR 608.2h for a slot whose object has
+-- left (ninjutsu's returned creature, CR 400.7). A slot naming no creature that
+-- was attacking specifies nothing to attack, so nothing enters attacking.
+entryAttack :: ObjectId -> EntryRiders.EntryRiders count -> GameState -> Maybe (Maybe AttackTarget.AttackTarget)
+entryAttack resolving entry gs = case EntryRiders.attacking entry of
+  Nothing -> Nothing
+  Just EntryAttack.Chosen -> Just Nothing
+  Just (EntryAttack.SameAs slot) -> do
+    named <- slotOne slot resolving gs
+    fmap Just (Game.attackTargetWithLastKnown named gs)
 
 -- CR 608.2g: make the offer Effect.OfferCast carries, and cast if it is taken.
 --
@@ -3168,7 +3184,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- member of a batch entering the battlefield. A card whose ZoneChangeR
         -- watched the battlefield and could match a member of such a batch would
         -- separate them.
-        moveOne mBlocked frozen before (sofar, acc) (target, position) = do
+        moveOne mAttack mBlocked frozen before (sofar, acc) (target, position) = do
           mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position frozen (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
           -- 603.7c). Nothing entered, so there is nothing to bind.
@@ -3176,8 +3192,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- CR 508.4, via Pawl.Engine.Combat -- which is also what keeps this
             -- from looking like a declaration, so CR 508.3a's attack triggers see
             -- nothing. CR 506.3b refuses a controller who is not the active
-            -- player, which the funnel above has already settled.
-            Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
+            -- player, which the funnel above has already settled. What it
+            -- attacks was read ONCE ahead of this fold (see mAttack below).
+            Monad.forM_ mAttack (\specified -> Combat.putOntoBattlefieldAttacking specified newId)
             -- CR 509.4, the blocking twin one rule over, through the same
             -- Pawl.Engine.Combat function the Create arm hands its tokens to, so
             -- CR 506.3e and CR 509.4a's two no-op conditions are decided in one
@@ -3499,6 +3516,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 pure $ case named of
                   [attacker] -> Just attacker
                   _ -> Nothing
+            -- CR 508.4's rider, read ONCE off the same pre-move board for
+            -- mBlocked's reason.
+            let mAttack = entryAttack resolving entry before
             -- ONE event, which is what Event.simultaneously stamps on everything the
             -- fold records: CR 608.2f processes an action taken on multiple objects
             -- simultaneously, and one opcode is one such action however many objects
@@ -3540,8 +3560,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 then fmap concat . Monad.forM arrivals $ \arrival -> do
                   now <- State.get
                   let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
-                  fmap (reverse . snd) (Event.simultaneously (moveOne mBlocked riders now (Set.empty, []) arrival))
-                else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals))
+                  fmap (reverse . snd) (Event.simultaneously (moveOne mAttack mBlocked riders now (Set.empty, []) arrival))
+                else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
             Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
@@ -4395,6 +4415,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         pure $ case named of
           [attacker] -> Just attacker
           _ -> Nothing
+    -- CR 508.4's rider, read ONCE ahead of the minting loop for mBlocked's
+    -- reason.
+    let mAttack = entryAttack resolving entry gs
     -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
     -- seat's tokens cannot change how many the next seat gets.
     minted <- fmap concat . Monad.forM creators $ \creating ->
@@ -4412,7 +4435,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- defending player chosen in Pawl.Engine.Combat, and CR 508.3a's
               -- attack triggers see nothing. After the entry loops rather than
               -- inside them: CR 614.16's replacement settles the COUNT first.
-              Monad.when (EntryRiders.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking made)
+              Monad.forM_ mAttack (\specified -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking specified) made)
               -- CR 509.4, the blocking twin one rule over, and in the same place
               -- for the same reason: CR 614.16's replacement settles the COUNT
               -- first, and CR 506.3e / CR 509.4a's no-op conditions live in
