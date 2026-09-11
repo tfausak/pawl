@@ -1973,8 +1973,8 @@ selfCostReductionsFor keyword = case keyword of
   -- CR 702.41a's "for each [text] YOU CONTROL": the card carries the [text] and
   -- the rule carries the control clause and the battlefield, so the Filter the
   -- count runs is the conjunction. EachPlayer's battlefield and not yours,
-  -- because CR 108.3 indexes that zone by OWNER -- Filter.ControlledBy is the
-  -- control question.
+  -- because CR 403.1 makes the battlefield one shared zone -- Filter.ControlledBy
+  -- is the control question, and the scope's reference is not.
   Keyword.Affinity quality ->
     [ oneLessPerEach
         ( Count.MkCount

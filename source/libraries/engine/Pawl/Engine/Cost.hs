@@ -515,7 +515,7 @@ spellAdjustments pid oid gs =
         then withSelf
         else withSelf {CostAdjustments.increases = commanderTax : CostAdjustments.increases withSelf}
 
--- CR 601.2f / 113.6d: the reductions a spell's OWN printed text applies to its
+-- CR 601.2f / 113.6d: the reductions a spell's OWN text applies to its
 -- own cost -- the sentence Thrasta, Tempest's Roar prints out, and the one CR
 -- 702.41a's affinity and CR 702.125a's undaunted state as a keyword
 -- (Keyword.selfCostReductionsOf) -- each Quantity evaluated and its amount
