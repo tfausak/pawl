@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
@@ -63,6 +64,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
@@ -240,6 +242,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -345,6 +348,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -432,6 +436,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -497,6 +502,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -574,6 +580,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -646,6 +653,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -726,6 +734,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -812,6 +821,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -895,6 +905,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -965,6 +976,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1043,6 +1055,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1118,6 +1131,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1193,6 +1207,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1267,6 +1282,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1342,6 +1358,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1429,6 +1446,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1514,6 +1532,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1590,6 +1609,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1665,6 +1685,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1705,6 +1726,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1804,6 +1826,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -1933,6 +1956,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2009,6 +2033,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2106,6 +2131,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2187,6 +2213,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2263,6 +2290,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2353,6 +2381,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2419,6 +2448,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2504,6 +2534,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2576,6 +2607,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2659,6 +2691,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2737,6 +2770,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -2873,6 +2907,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.BecameTapped _ -> False
           GameEvent.BecameUntapped _ -> False
           GameEvent.TappedForMana _ -> False
+          GameEvent.ManaAdded _ -> False
           GameEvent.CoinFlipped {} -> False
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
@@ -3007,6 +3042,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.BecameTapped _ -> False
           GameEvent.BecameUntapped _ -> False
           GameEvent.TappedForMana _ -> False
+          GameEvent.ManaAdded _ -> False
           GameEvent.CoinFlipped {} -> False
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
@@ -3077,6 +3113,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -3147,6 +3184,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -3220,6 +3258,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -3322,6 +3361,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.BecameTapped _ -> False
           GameEvent.BecameUntapped _ -> False
           GameEvent.TappedForMana _ -> False
+          GameEvent.ManaAdded _ -> False
           GameEvent.CoinFlipped {} -> False
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
@@ -3394,6 +3434,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -3480,6 +3521,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -3561,6 +3603,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -3664,6 +3707,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -3698,6 +3742,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     -- into the arm above: a mana activation writes both, and matching this
     -- one here would fire Betrayal twice off one tap.
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -3802,6 +3847,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -3836,6 +3882,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.AttachedPermanentTappedForMana -> case event of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.TappedForMana tapped ->
       let hostOfBearer = Object.attachedTo =<< Game.lookupObject bearer gs
        in (Recipient.objectOf =<< hostOfBearer) == Just (TappedForMana.permanent tapped)
@@ -3918,6 +3965,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana relation f specified) -> case event of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.TappedForMana tapped -> case Projection.View.controllerOf (TappedForMana.permanent tapped) gs of
       -- Nothing is a permanent that is gone, about which no relation can
       -- honestly answer -- the PermanentSacrificed arm's closing note.
@@ -3928,6 +3976,79 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
               Nothing -> False
               Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
         | otherwise -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 605.1b's "mana being added to a player's mana pool", read by a
+  -- bystander: Caged Sun's "whenever a land's ability causes you to add one or
+  -- more mana of the chosen color". The PermanentTappedForMana arm's posture --
+  -- the adding player against `you` under the relation, the ability's source
+  -- against the Filter, the added mana against the specification -- except
+  -- that the player is the event's own recipient rather than a controller read
+  -- off the board: CR 106.4 names whose pool the mana went to.
+  TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana relation f specified) -> case event of
+    GameEvent.ManaAdded added
+      | PlayerRelation.holds (Game.teams gs) relation you (ManaAdded.player added) && producedSpecified gs bearer specified (ManaAdded.mana added) ->
+          case Projection.viewWithLastKnown (ManaAdded.source added) gs (ManaAdded.source added) of
+            Nothing -> False
+            Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+      | otherwise -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -4024,6 +4145,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -4101,6 +4223,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.BecameTapped _ -> False
           GameEvent.BecameUntapped _ -> False
           GameEvent.TappedForMana _ -> False
+          GameEvent.ManaAdded _ -> False
           GameEvent.CoinFlipped {} -> False
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
@@ -4188,6 +4311,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.BecameTapped _ -> False
           GameEvent.BecameUntapped _ -> False
           GameEvent.TappedForMana _ -> False
+          GameEvent.ManaAdded _ -> False
           GameEvent.CoinFlipped {} -> False
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
@@ -4303,6 +4427,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -4350,6 +4475,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.BecameTapped _ -> False
           GameEvent.BecameUntapped _ -> False
           GameEvent.TappedForMana _ -> False
+          GameEvent.ManaAdded _ -> False
           GameEvent.CoinFlipped {} -> False
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
@@ -4464,6 +4590,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -4537,6 +4664,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -4632,6 +4760,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -4721,6 +4850,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -4804,6 +4934,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -4887,6 +5018,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -4941,6 +5073,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5021,6 +5154,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5131,6 +5265,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5247,6 +5382,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5338,6 +5474,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5375,6 +5512,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5455,6 +5593,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5548,6 +5687,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5633,6 +5773,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5706,6 +5847,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5781,6 +5923,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5870,6 +6013,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -5961,6 +6105,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6026,6 +6171,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6095,6 +6241,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6159,6 +6306,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6234,6 +6382,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6297,6 +6446,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6367,6 +6517,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6435,6 +6586,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6501,6 +6653,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6581,6 +6734,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6668,6 +6822,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6776,6 +6931,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6843,6 +6999,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -6911,6 +7068,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7015,6 +7173,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7083,6 +7242,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted tempted -> PlayerRelation.holds (Game.teams gs) relation you tempted
     GameEvent.Blighted _ -> False
@@ -7150,6 +7310,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7213,6 +7374,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7285,6 +7447,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7353,6 +7516,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     -- A flip with NO outcome (CR 705.2's first sentence) is not a won one, so
     -- Nothing answers False exactly as Just False does.
     GameEvent.CoinFlipped flipped -> CoinFlipped.won flipped == Just True && PlayerRelation.holds (Game.teams gs) relation you (CoinFlipped.flipper flipped)
@@ -7420,6 +7584,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7494,6 +7659,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7559,6 +7725,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7640,6 +7807,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7720,6 +7888,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7795,6 +7964,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
@@ -7864,6 +8034,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted blighter -> PlayerRelation.holds (Game.teams gs) relation you blighter

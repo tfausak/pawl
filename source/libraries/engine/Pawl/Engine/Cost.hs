@@ -91,6 +91,7 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
+import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -3590,13 +3591,12 @@ tapForManaWith perform inFlight oid = do
               -- ORDER across recipients is unobservable: a pool is a multiset
               -- (Pawl.Types.Mana) and CR 101.4's ordering rule is about
               -- CHOICES, of which the addition itself makes none.
-              State.modify'
-                ( \gs2 ->
-                    List.foldl'
-                      (\acc (ref, mana) -> List.foldl' (\inner recipient -> Mana.addMana recipient (Mana.unitsOf mana) inner) acc (Mana.recipientsOf controller gs2 ref))
-                      gs2
-                      (Map.toList (ManaOption.yield chosen))
-                )
+              gs2 <- State.get
+              let shares = concatMap (\(ref, mana) -> fmap (\recipient -> (recipient, Mana.unitsOf mana)) (Mana.recipientsOf controller gs2 ref)) (Map.toList (ManaOption.yield chosen))
+                  -- CR 605.1b's "mana being added to a player's mana pool", one
+                  -- event per player whose pool this activation filled.
+                  added = Map.fromListWith Set.union [(recipient, Set.fromList (fmap ManaUnit.manaType units)) | (recipient, units) <- shares, not (null units)]
+              State.put (List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) gs2 shares)
               -- CR 405.6c: "if a mana ability both produces mana and has another
               -- effect, the mana is produced and the other effect happens
               -- immediately" -- so the rest of the chosen mode runs HERE, inside
@@ -3639,52 +3639,59 @@ tapForManaWith perform inFlight oid = do
               -- Mana.yieldUnits and not the payer's share: CR 106.12a asks
               -- whether the activation PRODUCED mana, which it did whoever's
               -- pool it went to.
-              Monad.when (List.elem CostComponent.TapThis (Cost.components (ManaOption.cost chosen)) && not (null (Mana.yieldUnits chosen))) $
-                applyManaTriggers perform oid (Set.fromList (fmap ManaUnit.manaType (Mana.yieldUnits chosen)))
+              let tappedForMana =
+                    [ GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = oid, TappedForMana.mana = Set.fromList (fmap ManaUnit.manaType (Mana.yieldUnits chosen))})
+                    | List.elem CostComponent.TapThis (Cost.components (ManaOption.cost chosen)) && not (null (Mana.yieldUnits chosen))
+                    ]
+                  -- CR 605.1b's other event, whether or not {T} was paid, and
+                  -- recorded at the same moment for the same CR 605.4a reason.
+                  manaAdded = fmap (\(recipient, types) -> GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = recipient, ManaAdded.source = oid, ManaAdded.mana = types})) (Map.toList added)
+              applyManaTriggers perform (tappedForMana <> manaAdded)
               pure True
 
--- CR 605.4a: record CR 106.12a's event and apply, where they stand, the
--- triggered mana abilities it fired -- "a triggered mana ability doesn't go on
--- the stack ... it resolves immediately after the mana ability that triggered
--- it, without waiting for priority".
+-- CR 605.4a: record the events one activated mana ability wrote -- CR 106.12a's
+-- tap for mana and CR 605.1b's mana being added -- and apply, where they stand,
+-- the triggered mana abilities they fired: "a triggered mana ability doesn't go
+-- on the stack ... it resolves immediately after the mana ability that
+-- triggered it, without waiting for priority".
 --
--- `produced` is the set of mana TYPES the activation yielded, which CR 106.12a's
--- "or is tapped for mana of a specified type" narrowing reads -- Gauntlet of
--- Power's "for mana of the chosen color". Recorded on the event because nothing
--- else can answer for it afterwards: the mana is a Pawl.Types.ManaUnit in a pool
--- carrying no reference to its source.
+-- Each event carries the mana TYPES it is about, which the "of a specified
+-- type" narrowings read -- Gauntlet of Power's "for mana of the chosen color",
+-- Caged Sun's "one or more mana of the chosen color". Recorded on the event
+-- because nothing else can answer for it afterwards: the mana is a
+-- Pawl.Types.ManaUnit in a pool carrying no reference to its source.
 --
--- The event is recorded whatever it fires, since an ordinary triggered ability
+-- The events are recorded whatever they fire, since an ordinary triggered ability
 -- watching the same moment is CR 603.3's business and reaches the stack through
 -- Pawl.Engine.Engine.placePendingTriggers like any other. What this consumes is
 -- only the CR 605.1b subset, and that same predicate is what
 -- placePendingTriggers uses to refuse them a stack object -- one classifier, two
 -- readers, so an ability cannot both resolve here and be placed there.
 --
--- Gathered against the ONE event just recorded rather than everything unscanned:
+-- Gathered against the events just recorded rather than everything unscanned:
 -- a payment taps several permanents in turn (payManaWindow), and the earlier
 -- taps' triggers have already been applied here. The watermark is deliberately
 -- NOT moved -- it belongs to the CR 117.5 scan, and moving it would swallow the
--- ordinary triggers this same event owes that scan.
+-- ordinary triggers these same events owe that scan.
 --
 -- CR 603.4's intervening "if" is applied, Event.reactionTriggers doing it.
 --
--- Not implemented: an ordering choice where ONE tap fires several triggered mana
--- abilities -- two Wild Growths enchanting one Forest. `fired` is gathered from
--- the single event above and applied in gather order, engine-chosen. CR 605.4a
--- keeps them off the stack, so CR 603.3b's process does not literally run, but it
--- is the rule that gives their controller the order, and no prompt is raised.
--- Sound only while every such ability's effect is order-independent, which every
--- AddMana into a pool is (#1572).
+-- Not implemented: an ordering choice where ONE activation fires several
+-- triggered mana abilities -- two Wild Growths enchanting one Forest, or a Caged
+-- Sun beside a Gauntlet of Power. `fired` is applied in gather order,
+-- engine-chosen. CR 605.4a keeps them off the stack, so CR 603.3b's process does
+-- not literally run, but it is the rule that gives their controller the order,
+-- and no prompt is raised. Sound only while every such ability's effect is
+-- order-independent, which every AddMana into a pool is (#1572).
 --
 -- Not implemented: the printed "triggers only once" riders
 -- (Pawl.Types.TriggerLimit), which Engine.withinTriggerLimit spends for a trigger
 -- that reaches the stack. No triggered mana ability prints one (#1572).
-applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Set.Set ManaType.ManaType -> Game ()
-applyManaTriggers perform oid produced = do
-  State.modify' (Event.recordEvent (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = oid, TappedForMana.mana = produced})))
+applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> [GameEvent.GameEvent] -> Game ()
+applyManaTriggers perform events = do
+  Monad.mapM_ (State.modify' . Event.recordEvent) events
   gs <- State.get
-  let recorded = Foldable.toList (Seq.drop (Seq.length (GameState.events gs) - 1) (GameState.events gs))
+  let recorded = Foldable.toList (Seq.drop (Seq.length (GameState.events gs) - length events) (GameState.events gs))
       fired = filter (ManaAbility.isTriggeredManaAbility . PendingTrigger.ability) (Event.reactionTriggers recorded gs)
   Monad.mapM_ (ManaAbilityPerformer.triggered perform) fired
 

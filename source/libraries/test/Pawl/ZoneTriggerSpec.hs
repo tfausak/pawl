@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
@@ -85,6 +86,7 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
@@ -2357,6 +2359,9 @@ representativeEvents cond =
         -- above's reason: the arm stamps the tapped permanent under every
         -- relation it admits, so the floor is the same whether the pair matches.
         TriggerCondition.PermanentTappedForMana {} -> one (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = departed, TappedForMana.mana = Set.singleton (ManaType.Colored Color.Green)}))
+        -- CR 605.1b's mana-added event, on `departed` for the arm above's
+        -- reason; the arm binds nothing either way.
+        TriggerCondition.AbilityAddsMana {} -> one (GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = S.alice, ManaAdded.source = departed, ManaAdded.mana = Set.singleton (ManaType.Colored Color.Green)}))
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
@@ -2628,6 +2633,12 @@ everyTriggerCondition =
     -- the specification and stamped nothing under this one would go unseen.
     -- Gauntlet of Power prints it.
     TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.ChosenColor),
+    -- CR 605.1b's mana-added condition under each relation and both
+    -- specifications, for the rows above' reason. Caged Sun prints the You,
+    -- ChosenColor form.
+    TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.You (Filter.Type.And []) ManaSpecification.ChosenColor),
+    TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.Opponent (Filter.Type.And []) ManaSpecification.AnyMana),
+    TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.AnyMana),
     TriggerCondition.SelfTrains,
     TriggerCondition.SelfBecomesCrewed,
     TriggerCondition.SelfCrewsVehicle,

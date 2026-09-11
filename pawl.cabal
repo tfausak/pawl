@@ -81,6 +81,8 @@ library codec
   hs-source-dirs: source/libraries/codec
   -- cabal-gild: discover source/libraries/codec
   exposed-modules:
+    Pawl.Codec.AbilityAddsMana
+    Pawl.Codec.AbilityAddsManaSpec
     Pawl.Codec.AbilityKind
     Pawl.Codec.AbilityKindSpec
     Pawl.Codec.AbilityName
@@ -555,6 +557,8 @@ library codec
     Pawl.Codec.LoyaltyKindSpec
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.Mana
+    Pawl.Codec.ManaAdded
+    Pawl.Codec.ManaAddedSpec
     Pawl.Codec.ManaAddition
     Pawl.Codec.ManaAdditionSpec
     Pawl.Codec.ManaCost
@@ -1476,6 +1480,7 @@ library types
   hs-source-dirs: source/libraries/types
   -- cabal-gild: discover source/libraries/types
   exposed-modules:
+    Pawl.Types.AbilityAddsMana
     Pawl.Types.AbilityKind
     Pawl.Types.AbilityName
     Pawl.Types.AbilityTriggered
@@ -1745,6 +1750,7 @@ library types
     Pawl.Types.LoyaltyKind
     Pawl.Types.Mana
     Pawl.Types.ManaAbilityPerformer
+    Pawl.Types.ManaAdded
     Pawl.Types.ManaAddition
     Pawl.Types.ManaCost
     Pawl.Types.ManaCount
