@@ -265,6 +265,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.SameControllerAsBound (SlotName.MkSlotName (Text.pack "from")))
       " {\"type\":\"SameControllerAsBound\",\"value\":\"from\"} "
+  Spec.it s "SharesCreatureTypeWithBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.SharesCreatureTypeWithBound (SlotName.MkSlotName (Text.pack "thatDepartedPermanent")))
+      " {\"type\":\"SharesCreatureTypeWithBound\",\"value\":\"thatDepartedPermanent\"} "
   Spec.it s "HasChosenName" $
     Common.assertCodec
       s

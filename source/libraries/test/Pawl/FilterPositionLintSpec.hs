@@ -11,7 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (AttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (AttachDestination, ClauseGateFramed, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Cost as Cost.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
@@ -245,6 +245,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBound _ -> 0
   Filter.Type.SameNameAsBound _ -> 0
   Filter.Type.SameControllerAsBound _ -> 0
+  Filter.Type.SharesCreatureTypeWithBound _ -> 0
   Filter.Type.HasChosenName -> 0
   Filter.Type.HasChosenColor -> 0
   Filter.Type.OfChosenPlayer -> 0
@@ -333,6 +334,9 @@ hostFramed framing = case framing of
   -- `sourceAttachedTo`: no card in a hand names what its Aura's host is
   -- (Pawl.Engine.Resolve.Slots.objectRefObjects).
   HandSweepFramed -> False
+  -- Pawl.Engine.Resolve.gateHolds takes effectContext as it stands, with no
+  -- host overlay.
+  ClauseGateFramed -> False
 
 -- How many CR 701.3a atoms this card carries in an attach opcode's destination
 -- filter -- Effect.AttachTarget's or Effect.AttachTargetToEach's -- and how many
@@ -655,6 +659,29 @@ sameNameAsBoundOffends :: Face.Face Card.Type.Card -> Bool
 sameNameAsBoundOffends card =
   let (slotted, elsewhere) = sameNameAsBoundCounts card
    in elsewhere /= 0 || slotted + elsewhere /= jsonAtoms sameNameAsBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The CR 205.3m tag, spelled once.
+sharesCreatureTypeTag :: Text.Text
+sharesCreatureTypeTag = Text.pack "SharesCreatureTypeWithBound"
+
+-- How many CR 205.3m atoms this card carries in a resolution's own positions --
+-- an effect's ObjectRef (Heirloom Blade), a clause's "if" (Mudbutton Clanger), a
+-- search, a mill tally or a hand sweep, each read through
+-- Pawl.Engine.Resolve.Slots.effectContext, the one filler of
+-- Filter.Context.slotCreatureTypes -- and how many anywhere else, where the atom
+-- is a silent False. The second number is the offence.
+sharesCreatureTypeCounts :: Face.Face Card.Type.Card -> (Int, Int)
+sharesCreatureTypeCounts card =
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms sharesCreatureTypeTag f) (filter (\(framing, _) -> elem framing [SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed] == wanted) (cardFilters card)))
+   in (total True, total False)
+
+-- The atom outside those positions, or the traversal and the codec disagreeing
+-- about how many the card holds -- sameNameAsBoundOffends' two offences, and its
+-- second disjunct is the same regression fence.
+sharesCreatureTypeOffends :: Face.Face Card.Type.Card -> Bool
+sharesCreatureTypeOffends card =
+  let (framed, elsewhere) = sharesCreatureTypeCounts card
+   in elsewhere /= 0 || framed + elsewhere /= jsonAtoms sharesCreatureTypeTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- The CR 110.2 tag, spelled once.
 sameControllerAsBoundTag :: Text.Text
@@ -1114,6 +1141,25 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (length positions > 100) "the pool gives the traversal Filter positions to walk"
     Spec.assertBool s (length (filter ((== InTargetSlot) . fst) positions) > 10) "and target slot filters for the accepted side to be about"
     Spec.assertBool s (length (filter ((== SearchFramed) . fst) positions) > 10) "and search filters, the accepted side's other half"
+  -- CR 205.3m's bound comparison in SameNameAsBound's frame, one field over:
+  -- answerable only where effectContext fills Filter.Context.slotCreatureTypes.
+  -- See sharesCreatureTypeOffends for the two offences.
+  Spec.it s "CR 205.3m no card asks SharesCreatureTypeWithBound outside a resolution's own positions" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace sharesCreatureTypeOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only where the resolution fills the creature types" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: one card per admitted position the pool uses is ACCEPTED.
+    blade <- S.printingOf s registry "Heirloom Blade"
+    Spec.assertEqWith s "Heirloom Blade's two atoms are in its ObjectRefs" (sharesCreatureTypeCounts (S.combinedFace blade)) (2, 0)
+    clanger <- S.printingOf s registry "Mudbutton Clanger"
+    let face = S.combinedFace clanger
+        atom = Filter.Type.SharesCreatureTypeWithBound (SlotName.MkSlotName (Text.pack "self"))
+        restricted = face {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching atom) Nothing]}
+    Spec.assertEqWith s "Mudbutton Clanger's one atom is in its clause's gate" (sharesCreatureTypeCounts face) (1, 0)
+    -- The lint's own proof, the pair differing in one position: the same atom in
+    -- a static restriction's affected set, read through a bare contextFor.
+    Spec.assertBool s (sharesCreatureTypeOffends restricted) "the atom in an affected set offends"
+    Spec.assertEqWith s "counted outside the admitted positions" (sharesCreatureTypeCounts restricted) (1, 1)
   -- CR 110.2's Filter.SameControllerAsBound is CR 709.4a's atom one characteristic
   -- over, in the same position and with the STAKES reversed: it is vacuously TRUE
   -- where Filter.Context.slotControllers has no key for its slot, so an atom
@@ -1807,7 +1853,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (SlotlessCostFramed, [bound]),
         (MintedTargetSlot, [bound]),
         (MillTallyFramed, [bound]),
-        (HandSweepFramed, [bound])
+        (HandSweepFramed, [bound]),
+        (ClauseGateFramed, [bound])
       ]
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
