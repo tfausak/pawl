@@ -1080,7 +1080,8 @@ isDoubleFacedPermanent oid gs = case lookupObject oid gs of
 -- gate because that rule turns a permanent over from a STATIC ability rather than
 -- from an ability on the stack.
 --
--- ONE FIELD, in place, because CR 712.18 says the permanent is not a new object:
+-- ONE FIELD, in place (two for a merged permanent, `turnedTo` below), because
+-- CR 712.18 says the permanent is not a new object:
 -- "when a double-faced permanent transforms or converts, it doesn't become a new
 -- object. Any effects that applied to that permanent will continue to apply to
 -- it." So no id is minted and damage, counters and attachments ride through
@@ -1112,7 +1113,22 @@ turnFaceOver :: Timestamp.Timestamp -> ObjectId -> GameState -> GameState
 turnFaceOver now oid gs = case (turnsTo oid gs, lookupObject oid gs) of
   (Just name, Just object) ->
     let (ts, stamped) = freshTimestamp gs
-     in stamped {GameState.objects = Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
+     in stamped {GameState.objects = Map.insert oid (turnedTo name object) {Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
+  _ -> gs
+
+-- CR 701.27a's write on the object itself: show `name`, and for a merged
+-- permanent make its merge's turned reading the current one (CR 730.2i,
+-- Binding.turnMergeCopy), since its characteristics come off that stamp rather
+-- than off Object.face.
+turnedTo :: CardName.CardName -> Object -> Object
+turnedTo name object = object {Object.face = Just name, Object.bindings = Binding.turnMergeCopy (Object.bindings object)}
+
+-- `turnedTo` as a counterfactual board, with no battlefield gate and no stamp:
+-- this object with its double-faced card turned over, or the board unchanged.
+-- Pawl.Engine.Event.merge's CR 730.2i reading asks it of both sides.
+withFaceTurned :: ObjectId -> GameState -> GameState
+withFaceTurned oid gs = case lookupObject oid gs of
+  Just object | Just name <- turnedFace object gs -> gs {GameState.objects = Map.insert oid (turnedTo name object) (GameState.objects gs)}
   _ -> gs
 
 -- CR 710.2 over ONE object: set its flipped status, or leave the map exactly as
@@ -1178,8 +1194,8 @@ flipsOver oid gs =
 --   * the id names nothing at all, or nothing with a card behind it (CR 113.7a).
 --   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
 --     CR 701.27d's instant or sorcery face.
---   * CR 712.4c / 712.9: more than one card represents the permanent, a melded
---     one being neither transformable nor convertible.
+--   * CR 712.4c / 712.9: the permanent is melded, and so neither transformable
+--     nor convertible.
 --
 -- Read ahead of the act by every road that restamps a batch, which must know
 -- which of the ids it swept will actually take a CR 613.7m stamp before it asks
@@ -1188,32 +1204,55 @@ flipsOver oid gs =
 turnsTo :: ObjectId -> GameState -> Maybe CardName.CardName
 turnsTo oid gs
   | not (Set.member oid (GameState.battlefield gs)) = Nothing
-  | otherwise = case (lookupObject oid gs, cardOf oid gs) of
-      -- CR 712.4c: "Unlike other double-faced cards, meld cards cannot be
-      -- transformed or converted. Any instructions to do so are ignored", and CR
-      -- 712.9 says it from the permanent's side. Asked of the OBJECT here, where
-      -- Pawl.Engine.Card.turnedOver asks it of a meld CARD: a melded permanent's
-      -- own card is the interned combined face (CR 712.8g), whose layout says
-      -- nothing about the pair it came from, so the cards representing it are the
-      -- only thing left that does.
-      --
-      -- Here rather than in Pawl.Engine.Resolve's gathering because this is what
-      -- the one writer every road reaches asks: Pawl.Engine.Daytime's CR
-      -- 702.145c/f sweep comes straight here, and a melded permanent whose
-      -- combined face printed nightbound would otherwise turn over that way. CR
-      -- 701.28a's convert is a third road and needs nothing of its own -- it
-      -- shares Pawl.Engine.Resolve's turnPermanentsOver with Transform, so CR
-      -- 701.28f's "can't transform" also can't convert is this same guard.
-      --
-      -- OVER-DETERMINED on every board Magic can reach: no printed meld pair
-      -- combines into a double-faced card, so Card.turnedOver would decline the
-      -- one-faced combined face anyway. What separates the two readings is
-      -- Pawl.MeldSpec's "CR 712.4c a melded permanent refuses the turn its own
-      -- card would allow", which melds into a double-faced card -- card data the
-      -- opcode carries -- so that this guard is the only thing refusing.
-      (Just object, _) | not (Seq.null (componentsOf (Object.source object))) -> Nothing
-      (Just object, Just card) -> Card.turnedOver (Object.face object) card
-      _ -> Nothing
+  | otherwise = lookupObject oid gs >>= \object -> turnedFace object gs
+
+-- `turnsTo` without its battlefield gate: the face this object's double-faced
+-- card would turn to. `faceCardOf` below is the card, so a merged permanent
+-- turns its double-faced component whichever component is topmost (CR 730.2i).
+turnedFace :: Object -> GameState -> Maybe CardName.CardName
+turnedFace object gs
+  -- CR 712.4c: "Unlike other double-faced cards, meld cards cannot be
+  -- transformed or converted. Any instructions to do so are ignored", and CR
+  -- 712.9 says it from the permanent's side. Asked of the OBJECT here, where
+  -- Pawl.Engine.Card.turnedOver asks it of a meld CARD: a melded permanent's
+  -- own card is the interned combined face (CR 712.8g), whose layout says
+  -- nothing about the pair it came from, so the cards representing it are the
+  -- only thing left that does.
+  --
+  -- Here rather than in Pawl.Engine.Resolve's gathering because this is what
+  -- the one writer every road reaches asks: Pawl.Engine.Daytime's CR
+  -- 702.145c/f sweep comes straight here, and a melded permanent whose
+  -- combined face printed nightbound would otherwise turn over that way. CR
+  -- 701.28a's convert is a third road and needs nothing of its own -- it
+  -- shares Pawl.Engine.Resolve's turnPermanentsOver with Transform, so CR
+  -- 701.28f's "can't transform" also can't convert is this same guard.
+  --
+  -- OVER-DETERMINED on every board Magic can reach: no printed meld pair
+  -- combines into a double-faced card, so Card.turnedOver would decline the
+  -- one-faced combined face anyway. What separates the two readings is
+  -- Pawl.MeldSpec's "CR 712.4c a melded permanent refuses the turn its own
+  -- card would allow", which melds into a double-faced card -- card data the
+  -- opcode carries -- so that this guard is the only thing refusing.
+  | not (Seq.null (meldComponentsOf (Object.source object))) = Nothing
+  | otherwise = faceCardOf object gs >>= Card.turnedOver (Object.face object)
+
+-- The card Object.face names a face of: the object's own card (cardOf), and for
+-- a merged permanent its double-faced component, which need not be the topmost
+-- one (CR 730.2i). Printed cards, `turnsTo`'s footing. A melded component is
+-- its two meld cards here (`componentsOf`), which Card.turnedOver refuses (CR
+-- 712.4c); a melded permanent is not merged, and keeps its combined face -- a
+-- regression fence, since no printed combined face is double-faced.
+--
+-- Not implemented: a face per component. Object.face is one field, so a merged
+-- permanent with two double-faced components shows one face for both (#3614).
+faceCardOf :: Object -> GameState -> Maybe Card
+faceCardOf object gs =
+  let source = Object.source object
+      merged = if Seq.null (mergeComponentsOf source) then Seq.empty else componentsOf source
+      components = Maybe.mapMaybe (cardOfSource gs . Just . sourceOfComponent) (Foldable.toList merged)
+   in case List.find Card.isDoubleFaced components of
+        Just card -> Just card
+        Nothing -> cardOfSource gs (Just source)
 
 -- CR 701.27a over a swept set, from the other side: which of these ids ACTUALLY
 -- turned over. `turnFaceOver` above declines five ways -- an id naming nothing on
@@ -1250,12 +1289,17 @@ facesTurned before after =
 -- Pawl.Engine.Projection.View.viewOfCharacteristics reads it beside a battlefield
 -- conjunct of its own, so CR 701.27g answers False for such an object either
 -- way.
+--
+-- The card is `faceCardOf`'s, so a merged permanent answers for its double-faced
+-- component and not its topmost one (CR 730.2i). Proved by Pawl.MutateSpec's
+-- "CR 730.2i/702.145c a Cubwarden over a nightbound Werewolf turns with the day
+-- and back with the night".
 isFrontFaceUp :: ObjectId -> GameState -> Bool
-isFrontFaceUp oid gs = case lookupObject oid gs >>= Object.face of
+isFrontFaceUp oid gs = case lookupObject oid gs of
   Nothing -> True
-  Just name -> case cardOf oid gs of
-    Nothing -> True
-    Just card -> Face.name (NonEmpty.head (Card.Type.faces card)) == name
+  Just object -> case (Object.face object, faceCardOf object gs) of
+    (Just name, Just card) -> Face.name (NonEmpty.head (Card.Type.faces card)) == name
+    _ -> True
 
 -- CR 112.1: a spell is a card on the stack. Asks the object's zone AND its KIND
 -- (its Source) -- a classification, never the card's identity.

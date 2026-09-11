@@ -830,6 +830,15 @@ copiableCharacteristicsFlipped oid gs =
     oid
     gs {GameState.objects = Map.adjust (\o -> o {Object.flipped = True}) oid (GameState.objects gs)}
 
+-- CR 730.2i: `copiableCharacteristicsFaceUp` above asked of a side whose
+-- double-faced card is turned over (Game.withFaceTurned). Equal to the face-up
+-- read for a side with no card that can transform, so Pawl.Engine.Event.merge
+-- asks it of BOTH sides, as it does the flipped read. On a side that is already
+-- a MERGED permanent the counterfactual swaps in the turned reading that merge
+-- stamped.
+copiableCharacteristicsTurned :: ObjectId -> GameState -> ProjectedCharacteristics
+copiableCharacteristicsTurned oid gs = copiableCharacteristicsFaceUp oid (Game.withFaceTurned oid gs)
+
 -- CR 707.3: the copy snapshot an object's copiable RULES TEXT is read from --
 -- Nothing for an object that is copying nothing, and Nothing again for one whose
 -- snapshot copied HALVES, whose rules text every reader must re-derive against
@@ -897,7 +906,8 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 -- characteristics, which is why this is a choice between two stamped readings
 -- rather than a CR 613 layer -- Pawl.Types.Object.flipped says the same of the
 -- unmerged road, where Game.resolveFaceFor makes the substitution at the face
--- seam a merged permanent's stamp goes around.
+-- seam a merged permanent's stamp goes around. CR 730.2i needs no fork here:
+-- Game.turnFaceOver swaps the turned reading into Binding.copyOf itself.
 stampedSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 stampedSnapshotOf oid gs = do
   object <- Game.lookupObject oid gs
