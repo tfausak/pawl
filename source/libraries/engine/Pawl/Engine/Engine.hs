@@ -965,7 +965,11 @@ placeBorne srcId pending = do
           attempt rejected = do
             -- Zero, there being no announcement to read: CR 601.2b's is made
             -- while casting a spell or activating an ability, and a triggered
-            -- ability is neither, so no slot of one can count by an X.
+            -- ability is neither.
+            --
+            -- Not implemented: a slot counting by an X the trigger inherits (CR
+            -- 107.3m, CR 701.37c) or by a computed quantity; Pawl.CardSpec
+            -- refuses a triggered ability whose slot counts by X (#3633).
             chosen <- Target.chooseTargets decider controller abilId 0 slots sets
             if Target.jointlyCoherent (Just controller) bound srcId slots chosen gs
               then pure (Just chosen)

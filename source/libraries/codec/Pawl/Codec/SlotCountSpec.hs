@@ -22,5 +22,12 @@ spec s = Spec.describe s "Pawl.Codec.SlotCount" $ do
       SlotCount.codec
       SlotCount.AnnouncedX
       " {\"type\":\"AnnouncedX\"} "
+  -- Pest Infestation's "up to X target artifacts and/or enchantments".
+  Spec.it s "up to the announced X" $
+    Common.assertCodec
+      s
+      SlotCount.codec
+      SlotCount.UpToAnnouncedX
+      " {\"type\":\"UpToAnnouncedX\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s SlotCount.codec

@@ -2264,8 +2264,8 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- the same set.
                   --
                   -- The COUNT reads the same announcement through its own
-                  -- argument two lines down (SlotCount.AnnouncedX, Rot-Curse
-                  -- Rakshasa); the bound reads it through the seed.
+                  -- argument two lines down (SlotCount.at); the bound reads it
+                  -- through the seed.
                   --
                   -- The SAME seed reaches the joint check below, which re-derives
                   -- every jointly judged slot: a slot that both reads a sibling

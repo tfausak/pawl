@@ -31,9 +31,9 @@ import qualified Pawl.Types.TargetCount as TargetCount
 --
 -- HOW MANY the slot takes is the `count` field (CR 601.2c), which covers CR
 -- 115.6's "up to one", every larger count, "any number of target ..." -- that
--- one by naming no maximum -- and CR 601.2b's announced X. On the slot and not
--- on the mode, because a card makes the call per slot -- Explosive Entry's
--- artifact and creature slots are separately optional.
+-- one by naming no maximum -- and CR 601.2b's announced X, exactly or up to
+-- it. On the slot and not on the mode, because a card makes the call per slot
+-- -- Explosive Entry's artifact and creature slots are separately optional.
 --
 -- `filter` shadows the Prelude's, for the reason Pawl.Types.Count's does.
 data TargetSlot = MkTargetSlot
