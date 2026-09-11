@@ -1710,7 +1710,7 @@ modalReadsAnnouncedX =
 -- them come out of card JSON, which is the whole of what the lint below is
 -- about; a replacement the ENGINE bakes reaches GameState without passing
 -- through a Card and is not swept here.
-cardReplacementEffects :: Face.Face Card.Type.Card -> [ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+cardReplacementEffects :: Face.Face Card.Type.Card -> [ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 cardReplacementEffects card =
   fmap PrintedReplacement.effect (Face.replacementEffects card)
     <> concatMap effectReplacements (cardResolutionEffects card)
@@ -1723,7 +1723,7 @@ cardReplacementEffects card =
 -- enters, [do something]". Swept as one list wherever a card's effects are, since
 -- what the lints downstream ask is whether a card authored the effect rather than
 -- which field it sat in.
-replacementPrintedEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+replacementPrintedEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementPrintedEffects replacement = replacementEffectRiders replacement <> replacementRewriteEffects replacement
 
 -- The effects a REWRITE runs, on the two axes that carry a program: CR 614.1c's
@@ -1731,7 +1731,7 @@ replacementPrintedEffects replacement = replacementEffectRiders replacement <> r
 -- Cultist's destruction). Kept apart from the riders below rather than folded
 -- in, because CR 615.5's rider is a lint's subject in its own right
 -- (riderWithoutPreventionOffends) and these are not one.
-replacementRewriteEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+replacementRewriteEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects effects)) -> Foldable.toList effects
   ReplacementEffect.EntryR {} -> []
@@ -1757,7 +1757,7 @@ replacementRewriteEffects replacement = case replacement of
 -- the rider a SPELL authors on Effect.PreventAllDamage or
 -- Effect.PreventNextDamage through effectNestedEffects, which is what lets the CR
 -- 111.4 naming case below see Inkshield's nested token face.
-replacementEffectRiders :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+replacementEffectRiders :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ _ riders) -> Foldable.toList riders
   ReplacementEffect.CounterR {} -> []
@@ -1779,7 +1779,7 @@ replacementEffectRiders replacement = case replacement of
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- card-bearing arm must be classified here.
-replacementMintedCards :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Card.Type.Card]
+replacementMintedCards :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Card.Type.Card]
 replacementMintedCards replacement = case replacement of
   ReplacementEffect.TokenR (TokenR.MkTokenR _ _ plus) -> Maybe.maybeToList plus
   ReplacementEffect.DamageR {} -> []
@@ -1804,7 +1804,7 @@ replacementMintedCards replacement = case replacement of
 -- Exhaustive and hand-maintained, with effectCounts' caveat: a NEW effect
 -- carrying a ReplacementEffect or embedding a Card must be added here too, and
 -- the build breaks until it is.
-effectReplacements :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+effectReplacements :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 effectReplacements effect = case effect of
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementPrintedEffects replacement) <> concatMap (overFaces cardReplacementEffects) (replacementMintedCards replacement)
   Effect.Create (Create.MkCreate _ token _ _ _) -> overFaces cardReplacementEffects token
@@ -2182,7 +2182,7 @@ mintedFacesTagged card =
 
 -- The faces a replacement mints, tagged as effectMintedFaces tags a Create's:
 -- CR 111.1's token, so MintedToken.
-replacementMintedFaces :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(MintedKind, Face.Face Card.Type.Card)]
+replacementMintedFaces :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(MintedKind, Face.Face Card.Type.Card)]
 replacementMintedFaces replacement = fmap ((,) MintedToken) (concatMap (NonEmpty.toList . Card.Type.faces) (replacementMintedCards replacement))
 
 -- CR 111.1, CR 114.1 and CR 701.42a: the kinds of object a card's own effects
@@ -3937,7 +3937,7 @@ playerEffectFilters playerEffect = case playerEffect of
 -- and only through the keyword it names; CR 707.9b's other arms name a pair of
 -- literals, a name, colours, the absence of a mana cost, and sets over the parts
 -- of CR 205.1's type line, none of which narrows anything.
-copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+copyExceptionFilters :: CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 copyExceptionFilters exception = case exception of
   CopyException.SetPowerToughness _ -> []
   CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
@@ -3952,6 +3952,10 @@ copyExceptionFilters exception = case exception of
   -- ability it points at is the resolving one, which this walk reaches where the
   -- card prints it.
   CopyException.GainThisAbility -> []
+  -- Nothing HERE, for modificationFilters' GainAbility reason: a quoted ability
+  -- is swept by grantedActivatedAbilities and grantedTriggeredAbilities, which
+  -- keep its Framing (copyQuotedAbilities).
+  CopyException.GainAbility _ -> []
 
 -- CR 208.2b's entry option. The P/T pair narrows nothing; the keywords reach a
 -- Filter apiece, copyExceptionFilters' road one rule over.
@@ -3971,7 +3975,7 @@ entryOptionFilters option = concatMap keywordFilters (Set.toList (EntryOption.ke
 -- carries a fifth, through the keyword it grants (a landwalk's). CR 614.1c's
 -- as-enters exile carries a sixth, over a CARD IN A GRAVEYARD (Living Lore's "an
 -- instant or sorcery card"). None of the six is framed.
-entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+entryRewriteFilters :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> unframed [f]
   EntryRewrite.ChooseCardName f -> unframed [f]
@@ -4060,7 +4064,7 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
 -- turnUpRewriteFilters above say which cards a name choice inside it may name,
 -- which permanents an as-enters sacrifice may take, and where CR 303.4k's
 -- attachment may land.
-replacementEffectFilters :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+replacementEffectFilters :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 replacementEffectFilters replacementEffect = case replacementEffect of
   -- BOTH of the pattern's Filter-bearing fields: the permanents it watches, and
   -- CR 122.1b's kind, which may be a whole Keyword carrying a Filter; see #2728.
@@ -4129,7 +4133,7 @@ damageRewriteFilters rewrite = case rewrite of
 -- through Pawl.Engine.Replacement.candidateContext, which supplies the source's
 -- host, and the CR 604.2 clause beside them through
 -- Pawl.Engine.Projection.replacementsOf, whose bare Filter.contextFor does not.
-printedReplacementFilters :: PrintedReplacement.PrintedReplacement Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+printedReplacementFilters :: PrintedReplacement.PrintedReplacement Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 printedReplacementFilters printedReplacement =
   frame Unframed (foldMap conditionFilters (PrintedReplacement.condition printedReplacement))
     <> frame ReplacementRowFramed (replacementEffectFilters (PrintedReplacement.effect printedReplacement))
@@ -4941,6 +4945,10 @@ grantedTriggeredAbilities card =
 -- target nonland permanent to its owner's hand" is the second kind, and reading
 -- only the first would let it escape every lint below.
 --
+-- A THIRD source rides beside them as a GainAbility: CR 707.9a's quoted ability
+-- in a copy exception (copyQuotedAbilities), text printed on this card that ends
+-- up on the copy.
+--
 -- Iterated, because a granted ability's own effects may store a grant in turn:
 -- each round feeds the abilities just found back through the ModifyTarget walk,
 -- and it bottoms out because every round descends strictly further into one
@@ -4956,10 +4964,13 @@ grantedModifications card =
       storedIn :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Projection.Modification]
       storedIn =
         concatMap
-          ( Maybe.mapMaybe
+          ( concatMap
               ( \effect -> case effect of
-                  Effect.ModifyTarget modify -> Just (ModifyTarget.modification modify)
-                  _ -> Nothing
+                  Effect.ModifyTarget modify -> [ModifyTarget.modification modify]
+                  Effect.CreateCopy create -> copyQuotedAbilities (CreateCopy.exceptions create)
+                  Effect.BecomeCopy become -> copyQuotedAbilities (BecomeCopy.exceptions become)
+                  Effect.Replace replace -> copyQuotedAbilities (replacementCopyExceptions (Replace.effect replace))
+                  _ -> []
               )
               . effectWithNested
           )
@@ -4970,7 +4981,22 @@ grantedModifications card =
         if null modifications
           then []
           else modifications <> deeper (storedIn (effectsOf modifications))
-   in deeper (printed <> storedIn (printedCarrierEffects card))
+   in deeper (printed <> concatMap (copyQuotedAbilities . replacementCopyExceptions . PrintedReplacement.effect) (Face.replacementEffects card) <> storedIn (printedCarrierEffects card))
+
+-- CR 707.9a: the abilities a copy exception QUOTES, as the grant they amount to.
+copyQuotedAbilities :: [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Projection.Modification]
+copyQuotedAbilities =
+  Maybe.mapMaybe
+    ( \exception -> case exception of
+        CopyException.GainAbility granted -> Just (Modification.GainAbility granted)
+        _ -> Nothing
+    )
+
+-- The copy exceptions a replacement carries: CR 707.5's AsCopy is the one arm.
+replacementCopyExceptions :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)]
+replacementCopyExceptions replacement = case replacement of
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy asCopy)) -> AsCopy.exceptions asCopy
+  _ -> []
 
 -- The enchant slots this face GRANTS rather than prints: CR 613.1f layer 6's
 -- Modification.GainEnchant, which Cloudform and Gliding Licid write and CR

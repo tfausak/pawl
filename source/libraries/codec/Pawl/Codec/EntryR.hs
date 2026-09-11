@@ -16,12 +16,13 @@ import qualified Pawl.Types.EntryR as EntryR
 -- The effect codec is a PARAMETER rather than an import, for the reason
 -- Pawl.Codec.DamageR gives.
 codec ::
-  (Typeable.Typeable effect, Eq effect) =>
+  (Typeable.Typeable ability, Eq ability, Typeable.Typeable effect, Eq effect) =>
+  Codec.Codec ability ->
   Codec.Codec effect ->
-  Codec.Codec (EntryR.EntryR effect)
-codec effectCodec = Fields.object $ do
+  Codec.Codec (EntryR.EntryR ability effect)
+codec abilityCodec effectCodec = Fields.object $ do
   matching <- Fields.required "matching" (Filter.codec Keyword.codec) EntryR.matching
-  rewrite <- Fields.required "rewrite" (EntryRewrite.codec effectCodec) EntryR.rewrite
+  rewrite <- Fields.required "rewrite" (EntryRewrite.codec abilityCodec effectCodec) EntryR.rewrite
   pure
     EntryR.MkEntryR
       { EntryR.matching = matching,

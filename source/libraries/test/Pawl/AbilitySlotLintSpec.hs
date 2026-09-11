@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, declaresVariable, effectCounts, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, triggerConditionSlots)
+import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, triggerConditionSlots)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -926,9 +926,12 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- Brothers of Fire is what this caught: its "and 1 damage to you" reads CR
   -- 109.5's slot from an ACTIVATED ability, which nothing bound until
   -- Activate.activateAbility started stamping it (#569).
+  --
+  -- A GRANTED ability is read too (CardSpec.grantedActivatedAbilities): the
+  -- permanent it lands on activates it through the same Activate road.
   Spec.it s "every slot an activated ability reads is bound for its activation, and every slot it declares is read" $ do
     ps <- S.allPrintings s
-    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
+    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p) <> grantedActivatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
         readsAnySlot ab = not (all (Map.null . Resolve.slotsOf) (Modal.allEffects (ActivatedAbility.modal ab)))
     -- Guards the sweep against passing vacuously, in both directions: an empty

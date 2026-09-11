@@ -38,7 +38,11 @@ import qualified Pawl.Types.Supertype as Supertype
 -- (Vesuvan Doppelganger's "except it doesn't copy that creature's color") and CR
 -- 707.9e's exception that is an additional effect rather than a characteristic
 -- (Altered Ego's additional counters) (#1292).
-data CopyException
+--
+-- Parametric in the ABILITY for GainAbility's payload: a quoted ability is a
+-- Pawl.Types.GrantedAbility, which reaches Pawl.Types.Effect and so this module,
+-- the cycle Pawl.Types.GrantedAbility's own variable exists to open.
+data CopyException ability
   = -- | CR 707.9b: the copy's power and toughness are these numbers instead of
     -- the copied object's ("except it's 7/7").
     --
@@ -77,14 +81,6 @@ data CopyException
     -- own instance is what "this ability" names the next time it resolves, which
     -- is what lets a Shapeshifter copy a second creature and a third. A payload
     -- would have to be the ability that contains it, which no finite value is.
-    --
-    -- Not implemented: the exception that QUOTES an ability instead of pointing
-    -- at this one (Copycrook's "except it has 'Whenever this creature attacks, it
-    -- connives'", Estrid's Invocation). That payload is a whole
-    -- Pawl.Types.GrantedAbility, which this module may not name -- CR 707.9's
-    -- exceptions ride Pawl.Types.Effect's BecomeCopy, and GrantedAbility reaches
-    -- Effect -- so it wants this type parametric in the ability the way
-    -- Pawl.Types.EntryRewrite is parametric in the effect (#1292).
     --
     -- EITHER KIND of ability, since CR 707.9a names none: the words are read off
     -- the resolving object's Pawl.Types.Source, so a triggered carrier joins the
@@ -181,4 +177,7 @@ data CopyException
     SetColors (Set.Set Color.Color)
   | -- | CR 707.9b over CR 202.1: the copy has no mana cost (CR 202.3a's value 0).
     NoManaCost
+  | -- | CR 707.9a: the copy gains this quoted ability ("except it has '{2}{U}{U}:
+    -- Return this creature to its owner's hand'", Mercurial Pretender).
+    GainAbility ability
   deriving (Eq, Ord, Show)

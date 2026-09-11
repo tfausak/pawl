@@ -436,7 +436,7 @@ collect sources floating =
 -- "prevent that damage and remove that many +1/+1 counters from it", where
 -- Pawl.Types.RemoveCounters names a slot and Pawl.Types.PutCounters (Stormwild
 -- Capridor) names an ObjectRef and needs no binding.
-printedRider :: ObjectId -> Maybe PlayerId -> ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Maybe PreventionRider.PreventionRider
+printedRider :: ObjectId -> Maybe PlayerId -> ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Maybe PreventionRider.PreventionRider
 printedRider src you re = case re of
   ReplacementEffect.DamageR damageR
     | not (Seq.null (DamageR.riders damageR)),
@@ -467,7 +467,7 @@ printedRider src you re = case re of
 -- replacement's position mid-loop. What the ordinal DOES prove is the duplicate
 -- itself -- dropping it to a constant reddens Pawl.ReplacementSpec's two
 -- "CR 702.136b riot twice" cases.
-numberInstances :: [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card)))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))))]
+numberInstances :: [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card)))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))))]
 numberInstances =
   let step seen row =
         let n = Map.findWithDefault 0 row seen
@@ -911,7 +911,7 @@ resizes rewrite n = case rewrite of
 -- board rather than the live one (see `applicable`). Immaterial today -- every
 -- WouldEnter reaches here from Event.runEntry, which passes no `asOf` -- but a
 -- batched entry would read the designation and the card off a frozen board.
-admitsEntry :: GameState -> ObjectId -> EntryRewrite.EntryRewrite effect -> Bool
+admitsEntry :: GameState -> ObjectId -> EntryRewrite.EntryRewrite ability effect -> Bool
 admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.AsCopy _ -> True
   EntryRewrite.ChoiceOf _ -> True
@@ -1522,7 +1522,7 @@ bucketOf candidate = case ReplacementCandidate.origin candidate of
   ReplacementOrigin.Other -> bucketOfEffect (ReplacementCandidate.effect candidate)
 
 -- CR 616.1b-e: which bucket an effect that is NOT CR 614.15's falls in.
-bucketOfEffect :: ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> ReplacementBucket
+bucketOfEffect :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> ReplacementBucket
 bucketOfEffect re = case re of
   ReplacementEffect.ZoneChangeR {} -> ReplacementBucket.Other
   -- CR 616.1c: entering as a copy is its own, HIGHER bucket. The split only
@@ -1651,7 +1651,7 @@ bucketOfEffect re = case re of
 -- bucketOfEffect and Event.apply. A wildcard defaulting to False would hand an
 -- author who teaches Event.apply a new controller-reading rewrite an unasked choice
 -- instead of a build failure.
-readsApplier :: ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Bool
+readsApplier :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Bool
 readsApplier re = case re of
   -- The destination zone is the effect's own field, and the pattern is matched
   -- before Event.apply runs (Rest in Peace, Leyline of the Void). CR 701.20's
@@ -2070,7 +2070,7 @@ applyEntryOption oid option gs =
 -- exception a copiable value whichever half the copy's status picks (CR 707.3)
 -- -- CR 110.5c's flipped Dimir Doppelganger keeps "this ability". A regression
 -- fence: no test copies a flip card under an exception.
-applyCopyExceptions :: Maybe Source.Source -> [CopyException.CopyException] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
+applyCopyExceptions :: Maybe Source.Source -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card)] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
 applyCopyExceptions this exceptions snapshot =
   let excepted pc = List.foldl' (applyCopyException this) pc exceptions
    in (excepted snapshot) {PC.flipped = fmap excepted (PC.flipped snapshot)}
@@ -2078,7 +2078,7 @@ applyCopyExceptions this exceptions snapshot =
 -- One arm per CopyException constructor, no wildcard, for Event.apply's reason: a
 -- new exception shape must break the build here rather than silently copy without
 -- it.
-applyCopyException :: Maybe Source.Source -> PC.ProjectedCharacteristics -> CopyException.CopyException -> PC.ProjectedCharacteristics
+applyCopyException :: Maybe Source.Source -> PC.ProjectedCharacteristics -> CopyException.CopyException (GrantedAbility.GrantedAbility Card) -> PC.ProjectedCharacteristics
 applyCopyException this snapshot exception = case exception of
   -- CR 707.9b sets the pair; CR 707.9d is the second write -- an exception that
   -- "provides a specific set of values for a certain characteristic" does not
@@ -2133,6 +2133,17 @@ applyCopyException this snapshot exception = case exception of
     Just (Source.OfAbility activated) ->
       snapshot {PC.activatedAbilities = PC.activatedAbilities snapshot <> [ActivatedAbilitySource.ability activated]}
     _ -> snapshot
+  -- CR 707.9a over a QUOTED ability (Mercurial Pretender): appended for the arm
+  -- above's reason, into the list CR 113.3's classification of the quotation
+  -- names. In the snapshot, so a Clone of the copy has it too (CR 707.2) and its
+  -- source is whichever permanent carries it (CR 113.7) -- Pawl.CopySpec's
+  -- "Mercurial Pretender's copy has the quoted ability, and so does a Clone of
+  -- it" proves both.
+  CopyException.GainAbility granted -> case granted of
+    GrantedAbility.Activated activated ->
+      snapshot {PC.activatedAbilities = PC.activatedAbilities snapshot <> [activated]}
+    GrantedAbility.Triggered triggered ->
+      snapshot {PC.triggeredAbilities = PC.triggeredAbilities snapshot <> [triggered]}
   -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
   -- copied type line rather than the replacement CR 205.1a's own sentence would
   -- make. Phyrexian Metamorph copying a Goblin Piker is an artifact creature.

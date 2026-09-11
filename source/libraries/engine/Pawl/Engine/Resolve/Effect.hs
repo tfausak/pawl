@@ -1242,7 +1242,7 @@ referredToSources gs =
 -- No wildcard: an arm of Pawl.Types.ReplacementEffect that later bakes an id must
 -- answer here, or its object silently leaves the pool. Every arm answering []
 -- names things by Filter and by slot alone, which replacementRowSlots reports.
-referentsOfReplacement :: ReplacementEffect.ReplacementEffect card effect -> [ObjectId]
+referentsOfReplacement :: ReplacementEffect.ReplacementEffect card ability effect -> [ObjectId]
 referentsOfReplacement re = case re of
   ReplacementEffect.ZoneChangeR _ -> []
   ReplacementEffect.EntryR _ -> []

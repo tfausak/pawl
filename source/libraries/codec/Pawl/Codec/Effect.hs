@@ -101,7 +101,7 @@ codec cardCodec abilityCodec =
   let createCodec = Create.codec cardCodec
       conjureCodec = Conjure.codec cardCodec
       meldCodec = Meld.codec cardCodec
-      replaceCodec = Replace.codec cardCodec (codec cardCodec abilityCodec)
+      replaceCodec = Replace.codec cardCodec abilityCodec (codec cardCodec abilityCodec)
       preventCodec = PreventNextDamage.codec (codec cardCodec abilityCodec)
       preventAllCodec = PreventAllDamage.codec (codec cardCodec abilityCodec)
       forEachCodec = ForEach.codec (codec cardCodec abilityCodec)
@@ -155,9 +155,9 @@ codec cardCodec abilityCodec =
           Arm.payload "DecreaseSpeed" SpeedDecrease.codec Effect.DecreaseSpeed (\x -> case x of Effect.DecreaseSpeed y -> Just y; _ -> Nothing),
           Arm.payload "Create" createCodec Effect.Create (\x -> case x of Effect.Create y -> Just y; _ -> Nothing),
           Arm.payload "Conjure" conjureCodec Effect.Conjure (\x -> case x of Effect.Conjure y -> Just y; _ -> Nothing),
-          Arm.payload "CreateCopy" CreateCopy.codec Effect.CreateCopy (\x -> case x of Effect.CreateCopy y -> Just y; _ -> Nothing),
+          Arm.payload "CreateCopy" (CreateCopy.codec abilityCodec) Effect.CreateCopy (\x -> case x of Effect.CreateCopy y -> Just y; _ -> Nothing),
           Arm.payload "CopyStackObject" CopyStackObject.codec Effect.CopyStackObject (\x -> case x of Effect.CopyStackObject y -> Just y; _ -> Nothing),
-          Arm.payload "BecomeCopy" BecomeCopy.codec Effect.BecomeCopy (\x -> case x of Effect.BecomeCopy y -> Just y; _ -> Nothing),
+          Arm.payload "BecomeCopy" (BecomeCopy.codec abilityCodec) Effect.BecomeCopy (\x -> case x of Effect.BecomeCopy y -> Just y; _ -> Nothing),
           Arm.payload "Replace" replaceCodec Effect.Replace (\x -> case x of Effect.Replace y -> Just y; _ -> Nothing),
           Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase (\x -> case x of Effect.SkipNextPhase y -> Just y; _ -> Nothing),
           Arm.payload "PreventNextDamage" preventCodec Effect.PreventNextDamage (\x -> case x of Effect.PreventNextDamage y -> Just y; _ -> Nothing),

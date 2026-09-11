@@ -21,12 +21,13 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 -- Pawl.Codec.DamageR gives: @RunEffects@ carries a card's effects and neither
 -- module may name the other.
 codec ::
-  (Typeable.Typeable effect, Eq effect) =>
+  (Typeable.Typeable ability, Eq ability, Typeable.Typeable effect, Eq effect) =>
+  Codec.Codec ability ->
   Codec.Codec effect ->
-  Codec.Codec (EntryRewrite.EntryRewrite effect)
-codec effectCodec =
+  Codec.Codec (EntryRewrite.EntryRewrite ability effect)
+codec abilityCodec effectCodec =
   Arm.tagged
-    [ Arm.payload "AsCopy" AsCopy.codec EntryRewrite.AsCopy (\x -> case x of EntryRewrite.AsCopy y -> Just y; _ -> Nothing),
+    [ Arm.payload "AsCopy" (AsCopy.codec abilityCodec) EntryRewrite.AsCopy (\x -> case x of EntryRewrite.AsCopy y -> Just y; _ -> Nothing),
       Arm.payload "ChoiceOf" (Common.list EntryOption.codec) EntryRewrite.ChoiceOf (\x -> case x of EntryRewrite.ChoiceOf y -> Just y; _ -> Nothing),
       Arm.payload "ChoiceByCoinFlip" EntryFlip.codec EntryRewrite.ChoiceByCoinFlip (\x -> case x of EntryRewrite.ChoiceByCoinFlip y -> Just y; _ -> Nothing),
       Arm.payload "WithCounters" WithCounters.codec EntryRewrite.WithCounters (\x -> case x of EntryRewrite.WithCounters y -> Just y; _ -> Nothing),

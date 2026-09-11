@@ -1,0 +1,136 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Mercurial Pretender",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "AsCopy",
+                "value": {
+                  "eligible": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    ]
+                  },
+                  "exceptions": [
+                    {
+                      "type": "GainAbility",
+                      "value": {
+                        "type": "Activated",
+                        "value": {
+                          "cost": {
+                            "mana": [
+                              {
+                                "type": "Generic",
+                                "value": 2
+                              },
+                              {
+                                "type": "OfType",
+                                "value": {
+                                  "type": "Colored",
+                                  "value": {
+                                    "type": "Blue"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "OfType",
+                                "value": {
+                                  "type": "Colored",
+                                  "value": {
+                                    "type": "Blue"
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "modal": {
+                            "modes": [
+                              {
+                                "clauses": [
+                                  {
+                                    "effects": [
+                                      {
+                                        "type": "MoveToZone",
+                                        "value": {
+                                          "ref": {
+                                            "type": "InSlot",
+                                            "value": "self"
+                                          },
+                                          "zone": {
+                                            "type": "Hand"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 0
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Shapeshifter"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

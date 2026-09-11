@@ -25,9 +25,9 @@ import qualified Pawl.Types.Keyword as Keyword
 -- 707.9 makes them modifications OF the copying process: they happen only when a
 -- copy is actually made, so declining the "may" leaves the object its printed
 -- self and no exception applies.
-data AsCopy = MkAsCopy
+data AsCopy ability = MkAsCopy
   { eligible :: Filter.Filter Keyword.Keyword,
-    exceptions :: [CopyException.CopyException],
+    exceptions :: [CopyException.CopyException ability],
     -- | CR 614.1d inside CR 614.1c's sentence: Vesuva's "you may have this land
     -- enter TAPPED as a copy of any land on the battlefield". One replacement
     -- doing two things, so the status rides the rewrite rather than sitting in a

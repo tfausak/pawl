@@ -10,9 +10,10 @@ import qualified Pawl.Types.Uses as Uses
 -- times it applies, what it attaches to, what gates its creation, and what it
 -- actually rewrites.
 --
--- Parametric in the EFFECT for Pawl.Types.DamageR's reason, and instantiated at
--- `Effect card` where Pawl.Types.Effect declares the arm that holds it.
-data Replace card effect = MkReplace
+-- Parametric in the EFFECT for Pawl.Types.DamageR's reason, and in the ABILITY
+-- for Pawl.Types.ReplacementEffect's, instantiated at `Effect card ability` and
+-- `ability` where Pawl.Types.Effect declares the arm that holds it.
+data Replace card ability effect = MkReplace
   { duration :: Duration.Duration,
     uses :: Uses.Uses,
     origin :: ReplacementOrigin.ReplacementOrigin,
@@ -32,6 +33,6 @@ data Replace card effect = MkReplace
     -- against the same board -- see that field for which one, and why CR 614.12a
     -- leaves the two segments no room to differ on it.
     condition :: Maybe Condition.Condition,
-    effect :: ReplacementEffect.ReplacementEffect card effect
+    effect :: ReplacementEffect.ReplacementEffect card ability effect
   }
   deriving (Eq, Ord, Show)

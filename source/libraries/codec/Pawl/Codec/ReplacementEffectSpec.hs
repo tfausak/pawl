@@ -59,7 +59,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s =
   let -- CR 615.5: the DamageR arm carries riders, so the codec takes the effect
       -- codec the card boundary would pass it.
-      codec = ReplacementEffect.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
+      codec = ReplacementEffect.codec Card.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
    in Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
         Spec.it s "ZoneChangeR (Rest in Peace, Anyones)" $
           Common.assertCodec
