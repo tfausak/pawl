@@ -20,18 +20,23 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.ClassLevel as ClassLevel
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.Devotion as Devotion
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Halved as Halved
+import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -428,6 +433,30 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- Spawning's Corrupted clause is that card, and CastSpec's three-seat
         -- GrantedFlashback case is what proves the reading (a two-seat board cannot:
         -- there "an opponent" and "your opponent" name one player).
+        -- CR 700.5: that player's devotion. Nothing for a reference naming anything
+        -- but exactly one player, LifeTotal's arity and for its reason -- "your
+        -- devotion" is what every printing asks, and a table's worth of devotions
+        -- is an aggregation choice rather than a sum.
+        --
+        -- CONTROL off the injected view rather than off Game.zoneMembers, which
+        -- slices the shared battlefield by OWNER: rule 110.2 is what the rule asks
+        -- and the two come apart (Count.controlledMatching carries the same note).
+        -- The COST comes off the same view, so CR 707.2's copiable mana cost is
+        -- honoured -- a Clone of a red creature contributes its copied {R} and not
+        -- the {U} its own card prints (Pawl.DevotionSpec). A permanent the
+        -- projection cannot describe contributes nothing, as do CR 202.1b's
+        -- costless ones -- a land, a token.
+        --
+        -- CR 700.5a's layer bound is not applied here and does not need to be. The
+        -- rule stops at copy, control and text-changing effects -- layers 1, 2 and
+        -- 3 -- and no layer above those writes a mana cost or a controller, so this
+        -- arm reads the same numbers off whatever bounded or finished view its
+        -- caller injected. Projection.conditionHolds already hands a static
+        -- ability's gate a view bounded at that ability's own layer, which is what
+        -- keeps a devotion-gated continuous effect from reading its own output.
+        Quantity.Devotion (Devotion.MkDevotion ref colors) -> case playersOf ref of
+          Just [pid] -> Just (devotionOf viewOf colors pid gs)
+          _ -> Nothing
         Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> case playersOf ref of
           Just [pid] -> fmap (toInteger . Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
           _ -> Nothing
@@ -999,6 +1028,7 @@ objectSlots quantity = case quantity of
   Quantity.IsStartingPlayer _ -> Set.empty
   Quantity.IsActivePlayer _ -> Set.empty
   Quantity.PlayerCounters {} -> Set.empty
+  Quantity.Devotion {} -> Set.empty
   Quantity.ObjectCounters _ -> Set.empty
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
@@ -1210,8 +1240,8 @@ readsX quantity = case quantity of
   -- strictly smaller subterm.
   Quantity.Count c -> QuantitySlot.anyCount readsX c
   -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
-  -- The seven references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
-  -- IsStartingPlayer's, IsActivePlayer's, PlayerCounters') are PlayerRefs, whose InSlot names a
+  -- The eight references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
+  -- IsStartingPlayer's, IsActivePlayer's, PlayerCounters', Devotion's) are PlayerRefs, whose InSlot names a
   -- TARGET slot rather than an amount one, and X is only ever an amount.
   Quantity.Literal _ -> False
   Quantity.ManaValue -> False
@@ -1225,6 +1255,7 @@ readsX quantity = case quantity of
   Quantity.IsStartingPlayer _ -> False
   Quantity.IsActivePlayer _ -> False
   Quantity.PlayerCounters {} -> False
+  Quantity.Devotion {} -> False
   Quantity.ObjectCounters _ -> False
   Quantity.ObjectCountersOfAnyKind -> False
   Quantity.HasDesignation _ -> False
@@ -1307,3 +1338,58 @@ symbolValue symbol = case symbol of
   -- for it while the object is ON THE STACK, so an {X} spell on the stack
   -- projects its mana value with X at 0 here (#3582).
   ManaSymbol.Variable -> 0
+
+-- CR 202.2b: only a coloured mana symbol carries a colour; colourless is not a
+-- colour (CR 105.2c). A list, since a hybrid is all of its colours (CR 107.4e).
+--
+-- symbolValue's sibling, and here beside it rather than in
+-- Pawl.Engine.Projection.View where it used to sit, because CR 700.5's devotion
+-- reads it from this module and the projection imports this one.
+symbolColors :: ManaSymbol.ManaSymbol -> [Color.Color]
+symbolColors symbol = case symbol of
+  ManaSymbol.OfType (ManaType.Colored c) -> [c]
+  ManaSymbol.OfType ManaType.Colorless -> []
+  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Maybe.mapMaybe colorOfManaType [a, b]
+  -- CR 107.4b/107.4e: a monocolored hybrid's other half is generic, so the named
+  -- half is the whole contribution.
+  ManaSymbol.MonocoloredHybrid t -> Maybe.maybeToList (colorOfManaType t)
+  -- CR 107.4f / 202.2d: Phyrexian symbols are coloured mana symbols. Total `[c]`
+  -- since Phyrexian carries a Color -- there is no colourless Phyrexian symbol.
+  ManaSymbol.Phyrexian c -> [c]
+  -- CR 107.4f: "a hybrid Phyrexian mana symbol is BOTH of its component
+  -- colors", which CR 202.2d makes the object. Tamiyo, Compleated Sage is green
+  -- and blue whichever of her {G/U/P}'s three ways paid for her.
+  ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) -> [l, r]
+  -- CR 107.4h: snow is neither a colour nor a type of mana.
+  ManaSymbol.Snow -> []
+  ManaSymbol.Generic _ -> []
+  -- CR 107.3 / 202.2b: {X} is a placeholder, not a coloured mana symbol, so it
+  -- contributes nothing to CR 700.5's devotion whatever was announced for it.
+  ManaSymbol.Variable -> []
+
+-- CR 700.5: one player's devotion to a colour or combination of colours.
+--
+-- ONE QUESTION PER SYMBOL, and that is the whole content of CR 700.5's second
+-- sentence: a symbol counts once if it is ANY of the named colours, so a {B/G}
+-- counts once toward devotion to black and green rather than twice. Summing two
+-- single-colour readings would be the other answer, and it is the wrong one.
+--
+-- CR 202.1b names the permanents that have no mana cost at all -- a land, and a
+-- token whose creating effect gave it none -- so each contributes nothing; the
+-- same Nothing covers a permanent the injected view cannot describe.
+devotionOf :: Count.ViewOf -> Set Color.Color -> PlayerId.PlayerId -> GameState -> Integer
+devotionOf viewOf colors pid gs =
+  let symbolsOf oid = case viewOf oid of
+        Nothing -> []
+        Just view ->
+          if Filter.controller view == Just pid
+            then foldMap ManaCost.unwrap (Filter.manaCost view)
+            else []
+      counts symbol = any (`Set.member` colors) (symbolColors symbol)
+   in toInteger (length (concatMap (filter counts . symbolsOf) (Set.toList (GameState.battlefield gs))))
+
+-- CR 105.2c: colourless is not a colour, so a colourless hybrid half adds none.
+colorOfManaType :: ManaType.ManaType -> Maybe Color.Color
+colorOfManaType manaType = case manaType of
+  ManaType.Colored c -> Just c
+  ManaType.Colorless -> Nothing

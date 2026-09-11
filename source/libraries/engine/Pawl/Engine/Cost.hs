@@ -650,7 +650,7 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 --
 -- The SCALE is cashed here, the only place CR 601.2f's addition meets the cost
 -- it is added to. Drought counts CR 107.4a's coloured mana symbol through
--- Projection.symbolColors, so CR 107.4e's and CR 107.4f's count too, on THIS
+-- Quantity.symbolColors, so CR 107.4e's and CR 107.4f's count too, on THIS
 -- cost before any reduction -- CR 601.2f's order, argued rather than tested.
 --
 -- Applied AFTER `substituteX`, so an ADDED component may not carry CR 601.2b's
@@ -662,7 +662,7 @@ plusComponents adjustments cost =
   let symbols = foldMap ManaCost.unwrap (Cost.mana cost)
       repeats scale = case scale of
         CostScale.Once -> 1
-        CostScale.PerColoredSymbol color -> length (filter (elem color . Projection.symbolColors) symbols)
+        CostScale.PerColoredSymbol color -> length (filter (elem color . Quantity.symbolColors) symbols)
       expand (scale, component) = replicate (repeats scale) component
       added = concatMap expand (CostAdjustments.components adjustments)
    in cost {Cost.components = combineLoyalty (Cost.components cost <> added)}

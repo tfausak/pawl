@@ -41,6 +41,7 @@ substituteStar star quantity = case quantity of
   Quantity.IsStartingPlayer _ -> quantity
   Quantity.IsActivePlayer _ -> quantity
   Quantity.PlayerCounters {} -> quantity
+  Quantity.Devotion {} -> quantity
   Quantity.ObjectCounters _ -> quantity
   Quantity.ObjectCountersOfAnyKind -> quantity
   Quantity.HasDesignation _ -> quantity

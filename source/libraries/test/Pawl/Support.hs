@@ -3428,6 +3428,9 @@ stubView table oid =
                 Filter.power = Nothing,
                 Filter.toughness = Nothing,
                 Filter.manaValue = Nothing,
+                -- CR 202.1: the table registers no mana cost, so CR 700.5's
+                -- devotion reads no symbol off this stub.
+                Filter.manaCost = Nothing,
                 Filter.controller = ctrl,
                 -- CR 108.3: the table registers no owner, and no Count in the
                 -- pool filters by one, so this stub answers Nothing and OwnedBy
