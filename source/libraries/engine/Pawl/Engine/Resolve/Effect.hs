@@ -4529,7 +4529,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- 707.9b) -- Multiversal Recruitment's "except it isn't
                 -- legendary". "This ability" is the resolving object's, read the
                 -- way the BecomeCopy arm below reads it.
-                Monad.void (Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
+                Monad.void (Event.createTokens controller card (Just (Replacement.applyCopySnapshotExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
       _ -> pure ()
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef exceptions) ->
     State.modify' $ \gs ->
@@ -4558,8 +4558,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- have left (CR 113.7a). Not implemented: a stated duration (#1753).
       case objectRefObjects legal resolving controller source gs originalRef of
         [original] ->
-          let snapshot = Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown original gs)
-              write o = o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}
+          let snapshot = Replacement.applyCopySnapshotExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown original gs)
+              write o = o {Object.bindings = Binding.setCopySnapshot snapshot (Object.bindings o)}
               subjects = objectRefObjects legal resolving controller source gs subjectRef
            in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
         _ -> gs
@@ -4628,7 +4628,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- (2026-09-03), an ability having no characteristic any board can
                 -- read it back off.
                 stampCopiable = case kind of
-                  StackObjectKind.Spell -> Binding.setCopy (Event.copiedSnapshot original gs)
+                  StackObjectKind.Spell -> Binding.setCopySnapshot (Event.copiedSnapshot original gs)
                   StackObjectKind.ActivatedAbility -> id
                   StackObjectKind.TriggeredAbility -> id
                 copy =

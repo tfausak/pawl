@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -86,10 +87,11 @@ data LastKnown = MkLastKnown
     -- Beside the projection rather than derived from it, for `counters`' reason
     -- turned around: the fold is lossy in the other direction too, and a +1/+1
     -- counter or a live pump is exactly what CR 707.2 does not copy. Nor is it
-    -- recoverable from `source`, which knows the card but not which face was up
-    -- and not whether the object was ITSELF a copy (CR 707.2's "as modified by
-    -- other copy effects").
-    copiable :: !ProjectedCharacteristics.ProjectedCharacteristics,
+    -- recoverable from `source`, which knows the card but not whether the object
+    -- was itself a copy. The normal and optional alternative snapshots are two
+    -- readings of one layer-1 result, selected by the recipient's uncopied flipped
+    -- status, so they are filed as one indivisible value.
+    copiable :: !CopySnapshot.CopySnapshot,
     -- | CR 303.4b / CR 301.5a: the permanents that were attached TO it as it
     -- left -- Object.attachedTo with the arrow turned round, swept off the
     -- battlefield by Pawl.Engine.Game.attachments as the object ceased. What

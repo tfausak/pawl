@@ -1100,27 +1100,28 @@ applyCrossings finalSub parent =
           Just
             ( oid,
               LastKnown.MkLastKnown
-                (Projection.project oid g)
-                -- CR 613.1b: the projected controller as it left, who need not be
-                -- its owner. The fallback is unreachable for the reason
-                -- Departure.objectsLeaveWith gives.
-                (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid g))
-                -- CR 108.3, which no projection moves: read straight off the
-                -- object, unlike the controller above.
-                (Object.owner obj)
-                (Object.source obj)
-                (Object.counters obj)
-                (Event.copiedSnapshot oid g)
-                -- CR 303.4b / 301.5a with the arrow turned round, taken
-                -- while the answer still exists (CR 603.10a).
-                (Game.attachments oid g)
-                (Object.chosenNames obj)
-                -- CR 508.1k, the sibling read of the same record.
-                (Game.isAttacking oid g)
-                (Game.isBlocking oid g)
-                -- CR 310.9a, read straight off the object like the owner above:
-                -- Nothing for everything that is not a battle.
-                (Object.protector obj)
+                { LastKnown.characteristics = Projection.project oid g,
+                  -- CR 613.1b: the projected controller as it left, who need not be
+                  -- its owner. The fallback is unreachable for the reason
+                  -- Departure.objectsLeaveWith gives.
+                  LastKnown.controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid g),
+                  -- CR 108.3, which no projection moves: read straight off the
+                  -- object, unlike the controller above.
+                  LastKnown.owner = Object.owner obj,
+                  LastKnown.source = Object.source obj,
+                  LastKnown.counters = Object.counters obj,
+                  LastKnown.copiable = Event.copiedSnapshot oid g,
+                  -- CR 303.4b / 301.5a with the arrow turned round, taken
+                  -- while the answer still exists (CR 603.10a).
+                  LastKnown.attached = Game.attachments oid g,
+                  LastKnown.chosenNames = Object.chosenNames obj,
+                  -- CR 508.1k, the sibling read of the same record.
+                  LastKnown.attacking = Game.isAttacking oid g,
+                  LastKnown.blocking = Game.isBlocking oid g,
+                  -- CR 310.9a, read straight off the object like the owner above:
+                  -- Nothing for everything that is not a battle.
+                  LastKnown.protector = Object.protector obj
+                }
             )
       -- One crossing: file, delete, then record. The event LAST, so that
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after

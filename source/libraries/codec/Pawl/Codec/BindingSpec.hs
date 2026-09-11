@@ -10,6 +10,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -36,14 +37,21 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
           { Binding.targets = Just (Set.singleton (Recipient.ToPlayer (PlayerId.MkPlayerId 0))),
             Binding.amount = Just 3,
             Binding.modes = Just (Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2, ModeIndex.MkModeIndex 2]),
-            Binding.copy = Just ProjectedCharacteristicsSpec.testCharacteristics,
+            Binding.copy =
+              Just
+                CopySnapshot.MkCopySnapshot
+                  { CopySnapshot.normal = ProjectedCharacteristicsSpec.testCharacteristics,
+                    CopySnapshot.flipped = Just ProjectedCharacteristicsSpec.testCharacteristics
+                  },
             Binding.objects = Just (Seq.fromList [ObjectId.MkObjectId 7, ObjectId.MkObjectId 4])
           }
       )
       ( "{\"targets\":[{\"type\":\"ToPlayer\",\"value\":0}],"
-          <> "\"amount\":3,\"modes\":[0,2,2],\"copy\":"
+          <> "\"amount\":3,\"modes\":[0,2,2],\"copy\":{\"normal\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> ",\"objects\":[7,4]}"
+          <> ",\"flipped\":"
+          <> ProjectedCharacteristicsSpec.testCharacteristicsJson
+          <> "},\"objects\":[7,4]}"
       )
   -- A name-keyed map is a JSON OBJECT keyed by the slot name, written in
   -- ascending key order. The two entries are inserted in DESCENDING slot-name

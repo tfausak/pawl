@@ -8,6 +8,7 @@ import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteris
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -36,7 +37,11 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.owner = PlayerId.MkPlayerId 6,
           LastKnown.source = Source.OfCard (PrintingId.MkPrintingId 2),
           LastKnown.counters = Map.singleton CounterKind.PlusOnePlusOne 3,
-          LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
+          LastKnown.copiable =
+            CopySnapshot.MkCopySnapshot
+              { CopySnapshot.normal = ProjectedCharacteristicsSpec.minimalCharacteristics,
+                CopySnapshot.flipped = Just ProjectedCharacteristicsSpec.testCharacteristics
+              },
           LastKnown.attached = Set.singleton (ObjectId.MkObjectId 9),
           LastKnown.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")),
           LastKnown.attacking = False,
@@ -47,9 +52,11 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> ",\"controller\":1,\"owner\":6,\"source\":{\"type\":\"OfCard\",\"value\":2}"
           <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}]"
-          <> ",\"copiable\":"
+          <> ",\"copiable\":{\"normal\":"
           <> minimalJson
-          <> ",\"attached\":[9]"
+          <> ",\"flipped\":"
+          <> ProjectedCharacteristicsSpec.testCharacteristicsJson
+          <> "},\"attached\":[9]"
           <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":false,\"blocking\":true,\"protector\":7} "
       )
   -- CR 109.3: neither an attachment nor a chosen name is a characteristic, and
@@ -65,7 +72,11 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.owner = PlayerId.MkPlayerId 4,
           LastKnown.source = Source.OfToken (PrintingId.MkPrintingId 5),
           LastKnown.counters = Map.empty,
-          LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
+          LastKnown.copiable =
+            CopySnapshot.MkCopySnapshot
+              { CopySnapshot.normal = ProjectedCharacteristicsSpec.minimalCharacteristics,
+                CopySnapshot.flipped = Nothing
+              },
           LastKnown.attached = Set.empty,
           LastKnown.chosenNames = Set.empty,
           LastKnown.attacking = True,
@@ -76,9 +87,9 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> minimalJson
           <> ",\"controller\":4,\"owner\":4,\"source\":{\"type\":\"OfToken\",\"value\":5}"
           <> ",\"counters\":[]"
-          <> ",\"copiable\":"
+          <> ",\"copiable\":{\"normal\":"
           <> minimalJson
-          <> ",\"attached\":[]"
+          <> "},\"attached\":[]"
           <> ",\"chosenNames\":[],\"attacking\":true,\"blocking\":false,\"protector\":null} "
       )
   Spec.it s "has a schema" $

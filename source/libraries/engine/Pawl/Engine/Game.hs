@@ -469,7 +469,7 @@ cardOfSource gs mSource = case mSource of
     Source.OfEmblem pid -> cardOfPrinting pid gs
     -- CR 707.10 / 707.2: the copied spell's printing, so every characteristic
     -- read resolves as the original's does. What the copy is a copy OF is the
-    -- snapshot at Binding.copyOf, layer 1 (CR 613.1a); this is only where the
+    -- snapshot at Binding.copySnapshotOf, layer 1 (CR 613.1a); this is only where the
     -- text a reader past the projection sees comes from -- CreateCopy's token
     -- takes the same posture, and its comment says why the pair must move
     -- together.
@@ -1117,40 +1117,29 @@ flipPermanent oid gs
   | flipsOver oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.flipped = True}) oid (GameState.objects gs)}
   | otherwise = gs
 
--- | CR 710.2 asked rather than performed: may this permanent flip? `flipPermanent`
--- above is the only performer and asks this, so the three ways nothing happens are
--- stated once, and none of them is an error:
---
---   * the id names nothing on the BATTLEFIELD. CR 710.1b uses the alternative
---     characteristics "only if the permanent is on the battlefield", and CR
---     110.5d gives only permanents status at all.
---   * the id names nothing, or nothing with a card behind it (CR 113.7a).
---   * no card representing it is a flip card, so there are no alternative
---     characteristics to apply -- Card.flippedFace's refusal, read off the
---     card's LAYOUT.
---
--- A layout classification and never which card it is, `turnsTo` above's posture:
--- the closed half asks whether the object has a second set of characteristics CR
--- 710.1b reaches, and the card data carries the ability that asks for the flip.
---
--- EVERY card representing the object (`cardsOfWithLastKnown`), not just CR
--- 730.2a's topmost component: CR 730.2h admits a flip card anywhere among a
--- merged permanent's components, so a flip card merged UNDER another component
--- still gives the permanent alternative characteristics to reach. What those
--- characteristics come to is the flipped reading Pawl.Engine.Event.merge stamps
--- beside the ordinary one, which folds every component's flipped read -- so this
--- gate is the whole of the difference between the two orders. Proved by
--- Pawl.MutateSpec's "CR 730.2h a merged permanent flips for a flip component
--- that is not its topmost one".
---
--- Read off PRINTED cards and not off a copy snapshot, so a permanent that copied
--- an unflipped flip card carries the flip trigger and can never flip. Whether
--- the rules allow such a copy to flip at all is a question the CR does not
--- settle (#3366).
+-- | CR 710.1-2's classification, independent of zone: does this object carry
+-- alternative flip characteristics? A copy stamp can provide them even when the
+-- represented card is not itself a flip card; otherwise every represented card
+-- is checked so CR 730.2h still sees a flip component below the topmost one.
+-- This cases only on the layout-derived presence of alternatives, never card or
+-- effect identity.
+hasFlipCharacteristics :: ObjectId -> GameState -> Bool
+hasFlipCharacteristics oid gs =
+  let printed = any (Maybe.isJust . Card.flippedFace) (cardsOfWithLastKnown oid gs)
+   in case lookupObject oid gs of
+        Nothing -> printed
+        Just object ->
+          let bindings = Object.bindings object
+           in case Binding.copySnapshotOf bindings of
+                Just _ -> Maybe.isJust (Binding.flippedCopyOf bindings)
+                Nothing -> printed
+
+-- | CR 710.2 asked rather than performed: only a permanent on the battlefield
+-- may flip, and it must carry alternative characteristics. `flipPermanent` is the
+-- sole writer. Pawl.MutateSpec proves the merged-component path; Pawl.FlipSpec's
+-- Clone cases prove the copied-alternative path.
 flipsOver :: ObjectId -> GameState -> Bool
-flipsOver oid gs =
-  Set.member oid (GameState.battlefield gs)
-    && any (Maybe.isJust . Card.flippedFace) (cardsOfWithLastKnown oid gs)
+flipsOver oid gs = Set.member oid (GameState.battlefield gs) && hasFlipCharacteristics oid gs
 
 -- | CR 701.27a asked rather than performed: the face this permanent WOULD turn
 -- to, or Nothing where the turn is declined. `turnFaceOver` above is the only

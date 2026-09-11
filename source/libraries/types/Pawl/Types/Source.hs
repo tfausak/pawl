@@ -60,8 +60,8 @@ data Source
     -- represents it is turned face down" said once.
     --
     -- CR 730.2h's flip components are Object.flipped and not a field here
-    -- either: what the flip reaches is decided at the merge, which stamps a
-    -- second reading of it beside the first (Pawl.Engine.Binding.setMergeCopy).
+    -- either: what the flip reaches is decided at the merge, which stamps both
+    -- readings together (Pawl.Engine.Binding.setMergeCopy).
     --
     -- Not implemented: CR 730.2g's instant or sorcery component, which keeps a
     -- face-down merged permanent from turning face up (#3392); CR 730.2i/730.2j's

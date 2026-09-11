@@ -44,6 +44,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -870,7 +871,11 @@ lastKnownRiderSpec s registry =
                     LastKnown.counters = Map.empty,
                     -- Nothing here copies anything; the field is filled to
                     -- build the record.
-                    LastKnown.copiable = Projection.copiableCharacteristics srcId equipped,
+                    LastKnown.copiable =
+                      CopySnapshot.MkCopySnapshot
+                        { CopySnapshot.normal = Projection.copiableCharacteristics srcId equipped,
+                          CopySnapshot.flipped = Nothing
+                        },
                     -- The Collar is attached to the Sorcerer, but this record
                     -- is filed under a still-live id by hand rather than by the
                     -- funnel, and nothing here reads the look-back.

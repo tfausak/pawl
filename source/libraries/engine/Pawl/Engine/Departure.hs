@@ -240,30 +240,31 @@ objectsLeaveWith pid gs =
           Just
             ( oid,
               LastKnown.MkLastKnown
-                (Projection.project oid gs)
-                -- CR 613.1b, and the reason this record is what a departure's
-                -- trigger is read from: a permanent this player OWNED could
-                -- have been controlled by somebody still in the game right up
-                -- to the moment it left, and CR 603.3a hands that player its
-                -- ability. The Object.owner fallback is unreachable for the
-                -- reason Event.changeZoneAttaching gives at its own call.
-                (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs))
-                -- CR 108.3, which no projection moves: read straight off the
-                -- object, unlike the controller above.
-                (Object.owner obj)
-                (Object.source obj)
-                (Object.counters obj)
-                (Event.copiedSnapshot oid gs)
-                -- CR 303.4b / 301.5a with the arrow turned round, taken
-                -- while the answer still exists (CR 603.10a).
-                (Game.attachments oid gs)
-                (Object.chosenNames obj)
-                -- CR 508.1k, the sibling read of the same record.
-                (Game.isAttacking oid gs)
-                (Game.isBlocking oid gs)
-                -- CR 310.9a, read straight off the object like the owner above:
-                -- Nothing for everything that is not a battle.
-                (Object.protector obj)
+                { LastKnown.characteristics = Projection.project oid gs,
+                  -- CR 613.1b, and the reason this record is what a departure's
+                  -- trigger is read from: a permanent this player OWNED could
+                  -- have been controlled by somebody still in the game right up
+                  -- to the moment it left, and CR 603.3a hands that player its
+                  -- ability. The Object.owner fallback is unreachable for the
+                  -- reason Event.changeZoneAttaching gives at its own call.
+                  LastKnown.controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs),
+                  -- CR 108.3, which no projection moves: read straight off the
+                  -- object, unlike the controller above.
+                  LastKnown.owner = Object.owner obj,
+                  LastKnown.source = Object.source obj,
+                  LastKnown.counters = Object.counters obj,
+                  LastKnown.copiable = Event.copiedSnapshot oid gs,
+                  -- CR 303.4b / 301.5a with the arrow turned round, taken
+                  -- while the answer still exists (CR 603.10a).
+                  LastKnown.attached = Game.attachments oid gs,
+                  LastKnown.chosenNames = Object.chosenNames obj,
+                  -- CR 508.1k, the sibling read of the same record.
+                  LastKnown.attacking = Game.isAttacking oid gs,
+                  LastKnown.blocking = Game.isBlocking oid gs,
+                  -- CR 310.9a, read straight off the object like the owner above:
+                  -- Nothing for everything that is not a battle.
+                  LastKnown.protector = Object.protector obj
+                }
             )
       -- CR 603.6c's second trigger event: "when a phased-in permanent leaves the
       -- game because its owner leaves the game". Only those, which is CR 702.26k

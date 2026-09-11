@@ -3,9 +3,9 @@ module Pawl.Types.Binding where
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
 
 -- | CR 601.2: the cast-time choices bound to one named slot of a spell or ability
@@ -42,10 +42,11 @@ data Binding = MkBinding
     -- the modes pre-sorted with a repeated mode's occurrences adjacent.
     -- Stored only under the reserved Binding.chosenModes slot. Nothing elsewhere.
     modes :: Maybe (Seq.Seq ModeIndex.ModeIndex),
-    -- | CR 707.2 / 707.5: the copiable-value snapshot a permanent copies AS IT
-    -- ENTERS. Stored only under Pawl.Engine.Binding.copySource; the layer fold
-    -- reads it as the layer-1 seed. Nothing for a non-copy object.
-    copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics,
+    -- | CR 707.2-3 / 707.5: the normal and optional flipped readings of the
+    -- copiable-value snapshot a permanent copies. Stored only under
+    -- Pawl.Engine.Binding.copySource; the layer fold selects the recipient's
+    -- reading as its layer-1 seed. Nothing for a non-copy object.
+    copy :: Maybe CopySnapshot.CopySnapshot,
     -- | EVERY object one instruction produced or acted on, for a card that refers
     -- back to all of them at once -- CR 111.1's minted tokens under Thatcher
     -- Revolt's "those tokens", the incarnations CR 400.7 mints in a public zone

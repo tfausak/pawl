@@ -78,6 +78,7 @@ import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1748,8 +1749,8 @@ apply batch candidate event =
                   -- Nothing for "this ability": the copy effect here is a
                   -- replacement effect, and no printed one points at itself --
                   -- applyCopyExceptions records the query.
-                  let stamped = Replacement.applyCopyExceptions Nothing (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
-                      stamp o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
+                  let stamped = Replacement.applyCopySnapshotExceptions Nothing (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
+                      stamp o = o {Object.bindings = Binding.setCopySnapshot stamped (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 -- CR 614.1d, inside the same sentence: Vesuva enters TAPPED as a
                 -- copy. On this branch alone -- a declined copy is a Vesuva that
@@ -3342,17 +3343,19 @@ apply batch candidate event =
 -- Pawl.Engine.Resolve's CR 707.10 copy stamps the spell's off this same
 -- function.
 --
--- Not implemented: CR 707.2's "status ... [is] not copied", for the one status
--- that changes what a permanent's characteristics ARE. Projection.copiableCharacteristics
--- reads Game.faceOf, which CR 710.2 substitutes a flipped permanent's alternative
--- half at, so a copy of a flipped flip card acquires that half's name, type line
--- and power/toughness where the rule leaves it the normal one (#3364).
--- Face-down status is the exception rule 707.2 names, and reads correctly through
--- the same seam.
-copiedSnapshot :: ObjectId -> GameState -> PC.ProjectedCharacteristics
+-- CR 707.2-3: both readings of one copy operation. Flipped status is excluded
+-- from the normal reading, while face-down status remains because rule 707.2
+-- explicitly copies the values it produces. A face-up object with flip
+-- alternatives contributes the counterfactual flipped reading.
+--
+-- The current CR does not explicitly say that latent flip alternatives accompany
+-- the normal values. The official Champions of Kamigawa FAQ does: “If you copy a
+-- flipped permanent, you get the normal, unflipped version. That copy may flip
+-- later if certain conditions are met.” Pawl.FlipSpec proves both directions with
+-- Clone copying unflipped Akki and flipped Tok-Tok.
+copiedSnapshot :: ObjectId -> GameState -> CopySnapshot.CopySnapshot
 copiedSnapshot src gs =
-  let snapshot = Projection.copiableCharacteristics src gs
-      backFace = case (Game.lookupObject src gs, Game.cardOf src gs) of
+  let backFace = case (Game.lookupObject src gs, Game.cardOf src gs) of
         (Just obj, Just card) -> Card.showsBackFace card (Object.face obj)
         _ -> False
       -- CR 202.3c's second sentence, the melded twin of CR 202.3b's: "if a
@@ -3369,7 +3372,16 @@ copiedSnapshot src gs =
       -- topmost component's mana value like its every other characteristic, so
       -- a copy of one has that number rather than 0.
       melded = maybe False (not . Seq.null . Game.meldComponentsOf . Object.source) (Game.lookupObject src gs)
-   in if backFace || melded then snapshot {PC.manaValue = Just 0} else snapshot
+      adjust snapshot = if backFace || melded then snapshot {PC.manaValue = Just 0} else snapshot
+      sourceIsFaceUp = maybe False ((== Facing.FaceUp) . Object.facing) (Game.lookupObject src gs)
+      alternative =
+        if sourceIsFaceUp && Game.hasFlipCharacteristics src gs
+          then Just (adjust (Projection.copiableCharacteristicsFlipped src gs))
+          else Nothing
+   in CopySnapshot.MkCopySnapshot
+        { CopySnapshot.normal = adjust (Projection.copiableCharacteristicsUnflipped src gs),
+          CopySnapshot.flipped = alternative
+        }
 
 -- CR 608.2h: `copiedSnapshot` for an object that may already be gone -- the
 -- record filed as it ceased, which is the same value this function would have
@@ -3380,7 +3392,7 @@ copiedSnapshot src gs =
 -- Game.cardOfWithLastKnown's reason: the live reader is asked by the CR 614.1c
 -- entry rewrite, whose subject is on the battlefield by construction, and
 -- answering there for an object that is not would resurrect it.
-copiedSnapshotWithLastKnown :: ObjectId -> GameState -> PC.ProjectedCharacteristics
+copiedSnapshotWithLastKnown :: ObjectId -> GameState -> CopySnapshot.CopySnapshot
 copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
   Just lk -> LastKnown.copiable lk
   Nothing -> copiedSnapshot oid gs
@@ -4582,7 +4594,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 (Source.OfSpellCopy printingId, Zone.Battlefield) ->
                   (Object.newIncarnation obj)
                     { Object.source = Source.OfToken printingId,
-                      Object.bindings = foldMap (\pc -> Binding.setCopy pc Map.empty) (Binding.copyOf (Object.bindings obj))
+                      Object.bindings = foldMap (\copySnapshot -> Binding.setCopySnapshot copySnapshot Map.empty) (Binding.copySnapshotOf (Object.bindings obj))
                     }
                 _ -> Object.newIncarnation obj
               mkObj entrySeed ts =
@@ -4850,7 +4862,23 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- id moves before its host, and the live board has already
                         -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
                         -- in the same batch, ahead of its host" is the proof.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
+                        GameState.lastKnown =
+                          Map.insert
+                            oid
+                            LastKnown.MkLastKnown
+                              { LastKnown.characteristics = snapshot,
+                                LastKnown.controller = lastController,
+                                LastKnown.owner = Object.owner obj,
+                                LastKnown.source = Object.source obj,
+                                LastKnown.counters = Object.counters obj,
+                                LastKnown.copiable = copiedSnapshot oid gs,
+                                LastKnown.attached = Game.attachments oid lki,
+                                LastKnown.chosenNames = Object.chosenNames obj,
+                                LastKnown.attacking = Game.isAttacking oid gs,
+                                LastKnown.blocking = Game.isBlocking oid gs,
+                                LastKnown.protector = Object.protector obj
+                              }
+                            (GameState.lastKnown g1)
                       }
               -- CR 712.21: "If a melded permanent leaves the battlefield, one
               -- permanent leaves the battlefield and two cards are put into the
@@ -5961,7 +5989,7 @@ sacrifice pid oid = do
 -- (CR 111.2 for `underOwner`, CR 508.4 for `attacking`, CR 712.14a's card-only
 -- scope for `transformed`), and handing this funnel the record would read as
 -- though it applied them.
-createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Game [ObjectId]
+createTokens :: PlayerId -> Card -> Maybe CopySnapshot.CopySnapshot -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Game [ObjectId]
 createTokens controller card copy n tapped entering = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
@@ -6011,7 +6039,7 @@ createTokens controller card copy n tapped entering = do
                       -- 614.12 asks for the characteristics the permanent would
                       -- have on the battlefield, and for this token those are the
                       -- copy's from the instant it exists.
-                      Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (TokenLot.copy lot),
+                      Object.bindings = maybe Map.empty (\snapshot -> Binding.setCopySnapshot snapshot Map.empty) (TokenLot.copy lot),
                       Object.counters = Map.empty,
                       Object.counterTimestamps = Map.empty,
                       Object.attachedTo = Nothing,
@@ -6363,8 +6391,8 @@ meldable victims gs = do
 -- spell's printing at the head, which CR 730.2a then reads every characteristic
 -- off, and Under puts it at the tail.
 --
--- The CHARACTERISTICS the merge leaves are stamped here, into the same
--- Binding.copyOf a copy effect writes: CR 613.2a puts copy effects and merges in
+-- The CHARACTERISTICS the merge leaves are stamped here with
+-- Binding.setCopySnapshot, the same carrier a copy effect writes: CR 613.2a puts copy effects and merges in
 -- one sublayer, CR 613.7 orders them by timestamp and CR 730.2a fixes this one's
 -- at the merge, so the two sides are folded against what layer 1a had left each
 -- of them at this moment (Projection.copiableCharacteristics of the spell and of
@@ -6399,9 +6427,10 @@ meldable victims gs = do
 -- contributes is its card's characteristics and CR 708.2's substitution then
 -- applies to the resulting PERMANENT rather than to any component of it.
 --
--- CR 730.2h's flip components are stamped as a SECOND reading of the same merge,
--- both sides read again through Projection.copiableCharacteristicsFlipped, and
--- Projection.stampedSnapshotOf spends it once the merged permanent is flipped.
+-- CR 730.2h's flip components become the optional alternative in the merge's
+-- one CopySnapshot. Both sides are read again through
+-- Projection.copiableCharacteristicsFlipped, and
+-- Projection.stampedSnapshotOf selects it once the merged permanent is flipped.
 -- Two readings rather than one because CR 110.5a keeps status out of the
 -- characteristics: flipping is no CR 613 layer to fold in later, and CR 730.2a
 -- fixes this stamp's timestamp at the merge, so what the flip may reach is
@@ -6444,6 +6473,7 @@ merge sid target side = do
               MutateSide.Under -> Projection.withMergedAbilities ofSpell ofHost
             resulting = fold spellPc hostPc
             resultingFlipped = fold spellFlippedPc hostFlippedPc
+            hasFlipAlternative = Game.hasFlipCharacteristics sid gs || Game.hasFlipCharacteristics target gs
         State.modify' (`forgetObject` sid)
         State.modify'
           ( \g ->
@@ -6454,7 +6484,7 @@ merge sid target side = do
                           o
                             { Object.source = Source.OfMerge merged,
                               Object.facing = facing,
-                              Object.bindings = Binding.setMergeCopy resulting resultingFlipped (Object.bindings o)
+                              Object.bindings = Binding.setMergeCopy hasFlipAlternative resulting resultingFlipped (Object.bindings o)
                             }
                       )
                       target
@@ -6560,7 +6590,23 @@ forgetObject gs oid = case Game.lookupObject oid gs of
         cleared = Game.removeFromZones (Object.owner obj) oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown =
+              Map.insert
+                oid
+                LastKnown.MkLastKnown
+                  { LastKnown.characteristics = snapshot,
+                    LastKnown.controller = lastController,
+                    LastKnown.owner = Object.owner obj,
+                    LastKnown.source = Object.source obj,
+                    LastKnown.counters = Object.counters obj,
+                    LastKnown.copiable = copiedSnapshot oid gs,
+                    LastKnown.attached = Game.attachments oid gs,
+                    LastKnown.chosenNames = Object.chosenNames obj,
+                    LastKnown.attacking = Game.isAttacking oid gs,
+                    LastKnown.blocking = Game.isBlocking oid gs,
+                    LastKnown.protector = Object.protector obj
+                  }
+                (GameState.lastKnown cleared)
           }
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i

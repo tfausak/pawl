@@ -9,6 +9,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -93,8 +94,36 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
   Spec.it s "modesOf is empty for an absent slot" $ do
     Spec.assertEq s (Binding.modesOf Map.empty) Seq.empty
 
-  Spec.it s "setCopy then copyOf round-trips the snapshot" $ do
-    Spec.assertEq s (Binding.copyOf (Binding.setCopy sampleSnapshot Map.empty)) $ Just sampleSnapshot
+  Spec.it s "setCopy stores a normal-only snapshot" $ do
+    let stored = Binding.setCopy sampleSnapshot Map.empty
+    Spec.assertEq
+      s
+      (Binding.copySnapshotOf stored, Binding.copyOf stored)
+      ( Just CopySnapshot.MkCopySnapshot {CopySnapshot.normal = sampleSnapshot, CopySnapshot.flipped = Nothing},
+        Just sampleSnapshot
+      )
+
+  Spec.it s "setCopySnapshot exposes both readings" $ do
+    let alternative = sampleSnapshot {PC.power = Just 3}
+        stored =
+          Binding.setCopySnapshot
+            CopySnapshot.MkCopySnapshot {CopySnapshot.normal = sampleSnapshot, CopySnapshot.flipped = Just alternative}
+            Map.empty
+    Spec.assertEq s (Binding.copyOf stored, Binding.flippedCopyOf stored) (Just sampleSnapshot, Just alternative)
+
+  Spec.it s "setCopy replaces an old alternative" $ do
+    let alternative = sampleSnapshot {PC.power = Just 3}
+        paired =
+          Binding.setCopySnapshot
+            CopySnapshot.MkCopySnapshot {CopySnapshot.normal = sampleSnapshot, CopySnapshot.flipped = Just alternative}
+            Map.empty
+        replaced = Binding.setCopy alternative paired
+    Spec.assertEq s (Binding.copyOf replaced, Binding.flippedCopyOf replaced) (Just alternative, Nothing)
+
+  Spec.it s "setMergeCopy records alternative presence even when both readings are equal" $ do
+    let withAlternative = Binding.setMergeCopy True sampleSnapshot sampleSnapshot Map.empty
+        withoutAlternative = Binding.setMergeCopy False sampleSnapshot sampleSnapshot Map.empty
+    Spec.assertEq s (Binding.flippedCopyOf withAlternative, Binding.flippedCopyOf withoutAlternative) (Just sampleSnapshot, Nothing)
 
   Spec.it s "no copy binding means copyOf is Nothing" $ do
     Spec.assertEq s (Binding.copyOf Map.empty) Nothing

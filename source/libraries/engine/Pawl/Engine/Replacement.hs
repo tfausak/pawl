@@ -59,6 +59,7 @@ import qualified Pawl.Types.Card as Card.Type
 import Pawl.Types.ControllerRelation (ControllerRelation)
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
@@ -1462,7 +1463,7 @@ candidateContext gs candidate =
 -- "under your control" on the Filter axis too.
 matchesTokenLot :: Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerId -> TokenLot.TokenLot -> Bool
 matchesTokenLot context filter_ pid lot =
-  let view = case TokenLot.copy lot of
+  let view = case fmap CopySnapshot.normal (TokenLot.copy lot) of
         -- No OWNER, matching the viewOfCard branch below, which has no object to
         -- read CR 108.3 off either: a lot that named one would answer two ways
         -- for the same token depending on whether it was a copy.
@@ -2041,8 +2042,23 @@ applyEntryOption oid option gs =
             -- snapshot already carries rather than absorbing a repeat.
             PC.keywords = Map.unionWith (+) (PC.keywords base) (Map.fromSet (const 1) (EntryOption.keywords option))
           }
-      write o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
+      write o =
+        let bindings = Object.bindings o
+            next = case Binding.copySnapshotOf bindings of
+              Nothing -> Binding.setCopy stamped bindings
+              Just snapshot -> Binding.setCopySnapshot snapshot {CopySnapshot.normal = stamped} bindings
+         in o {Object.bindings = next}
    in gs {GameState.objects = Map.adjust write oid (GameState.objects gs)}
+
+-- CR 707.9: apply one exception list independently to both copy readings, so an
+-- excepted name, type, or ability remains part of the copiable values after the
+-- recipient flips.
+applyCopySnapshotExceptions :: Maybe Source.Source -> [CopyException.CopyException] -> CopySnapshot.CopySnapshot -> CopySnapshot.CopySnapshot
+applyCopySnapshotExceptions this exceptions snapshot =
+  snapshot
+    { CopySnapshot.normal = applyCopyExceptions this exceptions (CopySnapshot.normal snapshot),
+      CopySnapshot.flipped = fmap (applyCopyExceptions this exceptions) (CopySnapshot.flipped snapshot)
+    }
 
 -- CR 707.9: fold a copy effect's "except ..." clauses into the snapshot the copy
 -- is about to be stamped with. Left fold, so a later clause overrides an earlier

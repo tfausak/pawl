@@ -26,8 +26,12 @@
 -- Not implemented: Akki's printed trigger is "whenever this creature deals
 -- damage to an opponent", and the card carries the COMBAT-damage condition, so
 -- noncombat damage it deals to an opponent does not flip it (#3363). Nor CR
--- 710.5's alternative name, which is #679's, nor whether a permanent that COPIED
--- a flip card may flip at all (#3366).
+-- 710.5's alternative name, which is #679's.
+--
+-- The Clone cases prove both copy directions: CR 707.2 does not copy flipped
+-- status, while the copied flip card's latent alternative remains available for
+-- the recipient's own later flip. Sakashima proves CR 707.9 exceptions apply to
+-- both readings.
 --
 -- CR 730.2h's merged permanent containing a flip card is Pawl.MutateSpec's, this
 -- card being the pool's only flip printing and Cubwarden what merges with it.
@@ -41,11 +45,13 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -53,6 +59,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
@@ -167,12 +174,15 @@ akkiDuel = S.duel S.beginningOfCombat [S.settled "akki" "Akki Lavarunner"] []
 attackScript :: Seq.Seq S.Timed
 attackScript = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "akki"])]
 
--- The battlefield objects whose printed card is Clone. Copy effects change
+-- The battlefield objects whose printed card has this name. Copy effects change
 -- projected characteristics, not the card represented by the object (CR 707.2).
+printedOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
+printedOnBattlefield name gs =
+  let isIt oid = maybe False ((== CardName.MkCardName (Text.pack name)) . Face.name) (Game.faceOf oid gs)
+   in filter isIt (Set.toList (GameState.battlefield gs))
+
 clonesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
-clonesOnBattlefield gs =
-  let isClone oid = maybe False ((== CardName.MkCardName (Text.pack "Clone")) . Face.name) (Game.faceOf oid gs)
-   in filter isClone (Set.toList (GameState.battlefield gs))
+clonesOnBattlefield = printedOnBattlefield "Clone"
 
 -- Pin CR 614.12a's as-enters choice to one exact source and order any trigger or
 -- damage batches encountered while resolving and fighting.
@@ -219,6 +229,24 @@ spec s registry = Spec.describe s "Flip" $ do
     let (oid, gs) = S.addObjectIn Zone.Library akki S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertBool s (not (isLegendary oid gs)) "a legendary search must not find the flip card"
     Spec.assertEqWith s "and it is named for its normal half" (Projection.namesOf oid gs) (Set.singleton akkiName)
+  -- A regression fence for the authoritative absence in CopySnapshot. No card in
+  -- the pool can observe a flip after a later non-flip copy has replaced Akki's
+  -- trigger, so the positive copied-flip behavior is proved by the gameplay cases
+  -- below while this case protects the layer-1 classification itself.
+  Spec.it s "CR 707.2 a normal-only copy stamp replaces the represented flip card's alternatives" $ do
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (akkiId, g2) = S.addPermanent akki S.alice g1
+        pikerSnapshot = Projection.copiableCharacteristics pikerId g2
+        stamp o = o {Object.bindings = Binding.setCopy pikerSnapshot (Object.bindings o)}
+        copied = g2 {GameState.objects = Map.adjust stamp akkiId (GameState.objects g2)}
+        copiedAgain = Event.copiedSnapshot akkiId copied
+    Spec.assertEqWith
+      s
+      "the normal-only stamp is authoritative over Akki's printed flip layout"
+      (Game.hasFlipCharacteristics akkiId copied, CopySnapshot.flipped copiedAgain)
+      (False, Nothing)
   Spec.it s "CR 707.2 / 710 a Clone of unflipped Akki later flips into Tok-Tok" $ do
     akki <- S.printingOf s registry "Akki Lavarunner"
     clone <- S.printingOf s registry "Clone"
@@ -279,6 +307,24 @@ spec s registry = Spec.describe s "Flip" $ do
                     after = S.runCombat (S.attackTo S.bob) ready
                 Spec.assertEqWith s "the second Clone became Tok-Tok after its copied trigger resolved" (halfReadings secondId after) alternativeHalf
           other -> Spec.assertFailure s ("expected one first Clone, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Akki source, got " <> show (length other))
+  Spec.it s "CR 707.9 Sakashima's copy exceptions survive flipping" $ do
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    sakashima <- S.printingOf s registry "Sakashima the Impostor"
+    let sakashimaName = CardName.MkCardName (Text.pack "Sakashima the Impostor")
+        sakashimaAlternative :: (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Set.Set Supertype.Supertype, Bool)
+        sakashimaAlternative = (Set.singleton sakashimaName, Just (2, 2), Set.fromList [Subtype.Goblin, Subtype.Shaman], Set.singleton Supertype.Legendary, True)
+        (board, mine, _) = S.combatBoardOf [akki] []
+    case mine of
+      [akkiId] -> do
+        let (_, staged) = S.spellOnStack sakashima S.alice board
+            copied = resolveAndSettle (copyNamed akkiId) staged
+        case printedOnBattlefield "Sakashima the Impostor" copied of
+          [sakId] -> do
+            let ready = sicken sakId (leaveBattlefield akkiId copied)
+                after = S.runCombat (S.attackTo S.bob) ready
+            Spec.assertEqWith s "the flipped copy is Tok-Tok except it remains legendary Sakashima" (halfReadings sakId after) sakashimaAlternative
+          other -> Spec.assertFailure s ("expected one printed Sakashima, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Akki source, got " <> show (length other))
   -- THE proving case. CR 710.2: "once a permanent is flipped, its normal name,
   -- text box, type line, power, and toughness don't apply and the alternative

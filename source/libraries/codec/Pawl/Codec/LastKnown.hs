@@ -3,6 +3,7 @@
 module Pawl.Codec.LastKnown where
 
 import qualified Pawl.Codec.CardName as CardName
+import qualified Pawl.Codec.CopySnapshot as CopySnapshot
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
@@ -23,7 +24,7 @@ codec = Fields.object $ do
   owner <- Fields.required "owner" PlayerId.codec LastKnown.owner
   source <- Fields.required "source" Source.codec LastKnown.source
   counters <- Fields.required "counters" (Common.multiset (CounterKind.codec Keyword.codec)) LastKnown.counters
-  copiable <- Fields.required "copiable" ProjectedCharacteristics.codec LastKnown.copiable
+  copiable <- Fields.required "copiable" CopySnapshot.codec LastKnown.copiable
   attached <- Fields.required "attached" (Common.set ObjectId.codec) LastKnown.attached
   chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) LastKnown.chosenNames
   attacking <- Fields.required "attacking" Common.boolean LastKnown.attacking

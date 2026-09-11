@@ -291,6 +291,8 @@ library codec
     Pawl.Codec.ControlPlayerSpec
     Pawl.Codec.CopyException
     Pawl.Codec.CopyExceptionSpec
+    Pawl.Codec.CopySnapshot
+    Pawl.Codec.CopySnapshotSpec
     Pawl.Codec.CopyStackObject
     Pawl.Codec.CopyStackObjectSpec
     Pawl.Codec.CopyTargets
@@ -1593,6 +1595,7 @@ library types
     Pawl.Types.ControllerRelation
     Pawl.Types.ControlPlayer
     Pawl.Types.CopyException
+    Pawl.Types.CopySnapshot
     Pawl.Types.CopyStackObject
     Pawl.Types.CopyTargets
     Pawl.Types.Cost

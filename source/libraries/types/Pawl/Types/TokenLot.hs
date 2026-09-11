@@ -2,7 +2,7 @@ module Pawl.Types.TokenLot where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
+import qualified Pawl.Types.CopySnapshot as CopySnapshot
 
 -- | CR 111.1: some number of tokens of one shape, as one creation event would
 -- make them. A Pawl.Types.ProposedEvent.WouldCreateTokens carries a sequence
@@ -11,9 +11,9 @@ import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 data TokenLot = MkTokenLot
   { card :: Card.Card,
     -- | CR 707.1's copy token: the copied permanent's copiable values, which
-    -- are what the token has from the instant it exists. Nothing for a token
-    -- whose text is given.
-    copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics,
+    -- are what the token has from the instant it exists. The normal and optional
+    -- flipped readings travel together. Nothing for a token whose text is given.
+    copy :: Maybe CopySnapshot.CopySnapshot,
     count :: Natural.Natural
   }
   deriving (Eq, Ord, Show)
