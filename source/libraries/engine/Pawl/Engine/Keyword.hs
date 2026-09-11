@@ -2318,7 +2318,7 @@ mintedStaticAbilitiesOf =
    in foldMap staticsOf . Set.toAscList
 
 -- CR 702.109a's and CR 702.152a's "as long as this permanent's [dash or blitz]
--- cost was paid", a CR 604.2 condition re-asked on every projection.
+-- cost was paid", a condition re-asked on every projection.
 -- Quantity.CastUsing reads Object.castUsing, which CR 400.7 clears on any other
 -- zone change and CR 707.2 does not copy, so a flickered permanent and a Clone of
 -- this one both fail it. Pawl.CastSpec's "Dash" group proves both.

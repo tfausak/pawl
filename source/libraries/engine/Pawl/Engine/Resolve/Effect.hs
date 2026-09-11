@@ -278,9 +278,10 @@ import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
--- CR 603.7a: create a delayed triggered ability, appended so it never fires on an
--- event that already happened. The one writer: Effect.ArmDelayedTrigger's arm
--- below, and Pawl.Engine.Stack's for CR 702.109a's and CR 702.152a's spell.
+-- CR 603.7a: create a delayed triggered ability, appended so it never fires on
+-- an event that already happened. Every entry is built here: by
+-- Effect.ArmDelayedTrigger's arm below, and by Pawl.Engine.Stack for CR
+-- 702.109a's and CR 702.152a's spell.
 armDelayed :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ObjectId -> PlayerId -> Map.Map SlotName Binding.Type.Binding -> Onset.Onset -> Maybe Expiry.Type.Expiry -> GameState -> GameState
 armDelayed ability source controller captured onset expiry gs =
   let -- CR 603.7a's creation moment, from the same counter every other moment
