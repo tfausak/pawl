@@ -3201,6 +3201,57 @@ gauntletBoard s registry = do
   Spec.assertEqWith s "the fixture: the Gauntlet resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Gauntlet of Power") S.alice withBob) 1
   pure (aliceForest, aliceMountain, aliceArbor, bobForest, withBob)
 
+-- CR 605.1b's "mana being added to a player's mana pool", the trigger source the
+-- three groups above leave untouched: Caged Sun ({6} Artifact, "As this
+-- artifact enters, choose a color." / "Creatures you control of the chosen
+-- color get +1/+1." / "Whenever a land's ability causes you to add one or more
+-- mana of the chosen color, add an additional one mana of that color.").
+--
+-- The land is a TAPPED Blood Pet ("Sacrifice this creature: Add {B}.") made a
+-- Forest land by Ashaya, Soul of the Wild: its ability adds mana with no {T} in
+-- the cost, so CR 106.12a's "tapped for mana" is false of it and only the
+-- mana-added event can fire Caged Sun. The same board without Ashaya is the
+-- Filter's control -- a creature's ability, not a land's -- and bob's Swamp is
+-- the relation's: mana HE adds is not mana alice adds.
+cagedSunSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+cagedSunSpec s registry = Spec.describe s "Caged Sun" $ do
+  Spec.it s "CR 605.1b a land's ability adding the chosen colour with no tap adds Caged Sun's additional mana" $ do
+    (pet, bobSwamp, board, withAshaya) <- cagedSunBoard s registry
+    let sacrificed = S.runPure S.identityAnswer withAshaya (Cost.tapForMana S.manaPerformer pet)
+        -- The same board differing in exactly one thing: no Ashaya, so the Pet
+        -- is no land.
+        creature = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer pet)
+        -- And in exactly one other: whose pool the mana went to.
+        theirs = S.runPure S.identityAnswer withAshaya (Cost.tapForMana S.manaPerformer bobSwamp)
+    Spec.assertEqWith s "CR 605.1b the Ashaya'd Pet is a land, so alice's pool holds its {B} and Caged Sun's additional one" (poolTypes S.alice sacrificed) [ManaType.Colored Color.Black, ManaType.Colored Color.Black]
+    Spec.assertEqWith s "the Filter: without Ashaya the Pet is no land, so its {B} stands alone" (poolTypes S.alice creature) [ManaType.Colored Color.Black]
+    Spec.assertEqWith s "the PlayerRelation: bob's Swamp added the {B} to HIS pool, so Caged Sun gives alice nothing" (poolTypes S.alice theirs) []
+    Spec.assertEqWith s "and the Pet really was sacrificed for it" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Blood Pet") S.alice sacrificed) 0
+
+-- alice CASTS a Caged Sun off six Plains and names black, the Gauntlet of Power
+-- group's reason; then a TAPPED Blood Pet of hers and a Swamp of bob's are
+-- added. Returns the Pet, bob's Swamp, the board, and the board with alice's
+-- Ashaya, Soul of the Wild added last.
+cagedSunBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+cagedSunBoard s registry = do
+  plains <- S.printingOf s registry "Plains"
+  swamp <- S.printingOf s registry "Swamp"
+  bloodPet <- S.printingOf s registry "Blood Pet"
+  ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+  cagedSun <- S.printingOf s registry "Caged Sun"
+  let (withCard, cardId) = S.handOne cagedSun (S.landsInPlay plains 6)
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseColor {} -> Color.Black
+        _ -> S.identityAnswer p
+      resolved = S.runPure answer (S.runPure answer withCard (S.cast S.alice cardId)) Stack.resolveTop
+      (pet, withPet) = S.addPermanent bloodPet S.alice resolved
+      (bobSwamp, board) = S.addPermanent swamp S.bob (S.tapObject pet withPet)
+      withAshaya = snd (S.addPermanent ashaya S.alice board)
+  Spec.assertEqWith s "the fixture: Caged Sun resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Caged Sun") S.alice board) 1
+  Spec.assertEqWith s "the fixture: the Pet is tapped, so no {T} can be what fires Caged Sun" (fmap Object.tapped (Game.lookupObject pet board)) (Just TapState.Tapped)
+  pure (pet, bobSwamp, board, withAshaya)
+
 -- Resolve the whole stack down, so a board that placed a triggered mana ability
 -- CR 605.4a forbids the stack reads differently from one that placed nothing: a
 -- reading taken with the trigger still waiting could not tell them apart at
@@ -3381,6 +3432,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   wildGrowthSpec s registry
   autumnWillowSpec s registry
   gauntletOfPowerSpec s registry
+  cagedSunSpec s registry
   drainPowerSpec s registry
   yurlokSpec s registry
   almsEngineSpec s registry

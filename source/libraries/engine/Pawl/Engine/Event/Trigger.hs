@@ -178,6 +178,7 @@ movedOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -286,6 +287,8 @@ looksBack condition = case condition of
   TriggerCondition.AttachedPermanentTappedForMana -> False
   -- The same event and the same reason, whoever watches it.
   TriggerCondition.PermanentTappedForMana {} -> False
+  -- CR 605.1b's mana-added event: the same answer, for the same reason.
+  TriggerCondition.AbilityAddsMana {} -> False
   -- CR 603.10a's first family again, read off the event rather than off the
   -- bearer: this triggers when a permanent leaves the battlefield. Inert today --
   -- the bearer is a card in exile, which no look-back source can offer -- but a
@@ -520,6 +523,9 @@ batchScoped condition = case condition of
   TriggerCondition.AttachedPermanentTappedForMana -> False
   -- One occurrence for the arm above's reason, bystander or not.
   TriggerCondition.PermanentTappedForMana {} -> False
+  -- Caged Sun's "one or more" counts MANA within one addition, not events:
+  -- Pawl.Types.ManaAdded is already one per player per activation.
+  TriggerCondition.AbilityAddsMana {} -> False
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.PermanentSacrificed {} -> False
   TriggerCondition.AnyOf conditions -> any batchScoped conditions
@@ -913,6 +919,7 @@ eventTriggers events gs =
         GameEvent.BecameTapped _ -> Map.empty
         GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
+        GameEvent.ManaAdded _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
@@ -1172,6 +1179,7 @@ eventTriggers events gs =
         GameEvent.BecameTapped _ -> Map.empty
         GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
+        GameEvent.ManaAdded _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
@@ -1405,6 +1413,7 @@ eventTriggers events gs =
         GameEvent.BecameTapped _ -> Map.empty
         GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
+        GameEvent.ManaAdded _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
@@ -1547,6 +1556,7 @@ eventTriggers events gs =
         GameEvent.BecameTapped _ -> Map.empty
         GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
+        GameEvent.ManaAdded _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
@@ -1970,6 +1980,8 @@ zonesTriggeredFrom cond =
         -- from the board it stands on, and CR 113.6k's exception -- for a condition
         -- that cannot trigger from the battlefield at all -- does not apply.
         TriggerCondition.PermanentTappedForMana {} -> battlefield
+        -- CR 605.1b's mana-added event: the same answer, for the same reason.
+        TriggerCondition.AbilityAddsMana {} -> battlefield
         -- The same default from the training creature's own side: rule 702.149a's ability
         -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
         -- exception -- for a condition that cannot trigger from there at all -- does not
@@ -2416,6 +2428,8 @@ stateTriggers gs
               TriggerCondition.AttachedPermanentTappedForMana -> False
               -- The same resolution read by a bystander, so the same answer.
               TriggerCondition.PermanentTappedForMana {} -> False
+              -- CR 605.1b's mana-added event: the same answer, for the same reason.
+              TriggerCondition.AbilityAddsMana {} -> False
               -- CR 702.149c the same: it fires on a resolution, and the counter
               -- that resolution put is a counter like any other, so the board
               -- afterwards says nothing about which creature trained.

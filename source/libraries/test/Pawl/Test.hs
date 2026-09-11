@@ -20,6 +20,7 @@ import qualified Pawl.CastProhibitionSpec
 import qualified Pawl.CastRestrictionSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.ClassSpec
+import qualified Pawl.Codec.AbilityAddsManaSpec
 import qualified Pawl.Codec.AbilityKindSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.AbilityTriggeredSpec
@@ -252,6 +253,7 @@ import qualified Pawl.Codec.LoggedEventSpec
 import qualified Pawl.Codec.LookAtSpec
 import qualified Pawl.Codec.LoyaltyKindSpec
 import qualified Pawl.Codec.LoyaltySpec
+import qualified Pawl.Codec.ManaAddedSpec
 import qualified Pawl.Codec.ManaAdditionSpec
 import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaCountSpec
@@ -647,6 +649,7 @@ spec s registry = do
   Pawl.CastSpec.spec s registry
   Pawl.CastRestrictionSpec.spec s registry
   Pawl.CoinSpec.spec s registry
+  Pawl.Codec.AbilityAddsManaSpec.spec s
   Pawl.Codec.AbilityKindSpec.spec s
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
@@ -876,6 +879,7 @@ spec s registry = do
   Pawl.Codec.LoggedEventSpec.spec s
   Pawl.Codec.LookAtSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
+  Pawl.Codec.ManaAddedSpec.spec s
   Pawl.Codec.ManaAdditionSpec.spec s
   Pawl.Codec.LoyaltyKindSpec.spec s
   Pawl.Codec.ManaCostSpec.spec s

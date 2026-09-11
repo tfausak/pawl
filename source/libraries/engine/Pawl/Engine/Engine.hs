@@ -568,8 +568,8 @@ placePendingTriggers = do
   -- immediately after the mana ability that triggered it". Dropped from the
   -- batch HERE rather than never gathered, because the same gather is what an
   -- ordinary trigger watching the same event rides;
-  -- Pawl.Engine.Cost.applyManaTriggers has already applied these off the one
-  -- event that fired them, reading the same classifier.
+  -- Pawl.Engine.Cost.applyManaTriggers has already applied these off the
+  -- events that fired them, reading the same classifier.
   --
   -- Only `pending` is filtered. CR 605.1b's conditions are all EVENT conditions
   -- (ManaAbility.triggersFromMana), so no state trigger, no delayed entry and
@@ -760,6 +760,7 @@ abilityTriggeredOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing

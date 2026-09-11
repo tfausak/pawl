@@ -50,6 +50,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
@@ -846,6 +847,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 106.12a's bystander reading carries a PlayerRelation and a Filter,
   -- neither of which holds a Count.
   TriggerCondition.PermanentTappedForMana {} -> []
+  TriggerCondition.AbilityAddsMana {} -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   -- Nor does CR 702.122e's, which is nullary.
@@ -3327,6 +3329,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Harmony's "a land creature" -- and is swept like the PermanentSacrificed arm
   -- below.
   TriggerCondition.PermanentTappedForMana payload -> unframed [PermanentTappedForMana.filter payload]
+  -- Caged Sun's "a land's" is a Filter over the ability's source, swept alike.
+  TriggerCondition.AbilityAddsMana payload -> unframed [AbilityAddsMana.source payload]
   -- CR 701.21a's Filter narrows the sacrificed permanent -- Vengeful Tracker's
   -- "an artifact" -- and is swept like PermanentDies' below.
   TriggerCondition.PermanentSacrificed payload -> unframed [PermanentSacrificed.filter payload]
@@ -3585,6 +3589,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfBecomesUntapped -> []
   TriggerCondition.AttachedPermanentTappedForMana -> []
   TriggerCondition.PermanentTappedForMana {} -> []
+  TriggerCondition.AbilityAddsMana {} -> []
   -- CR 702.55a names the haunted creature through the haunting object's own
   -- attachment rather than through a slot.
   TriggerCondition.HauntedCreatureDies -> []

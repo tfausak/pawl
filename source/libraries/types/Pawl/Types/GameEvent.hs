@@ -22,6 +22,7 @@ import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
@@ -479,6 +480,13 @@ data GameEvent
     -- "of a specified type" narrowing reads -- Gauntlet of Power's "whenever a
     -- basic land is tapped for mana of the chosen color".
     TappedForMana TappedForMana.TappedForMana
+  | -- | CR 605.1b: an activated mana ability's source made a player add mana,
+    -- recorded per player by Pawl.Engine.Cost.tapForManaWith beside the arm
+    -- above, whether or not {T} was in the cost.
+    --
+    -- Not implemented: mana added by an ability resolving in the ordinary way,
+    -- which Pawl.Engine.Resolve.Effect's AddMana arm does not record (#3612).
+    ManaAdded ManaAdded.ManaAdded
   | -- | CR 705.1: a player flipped a coin, and CR 705.2 decided whether they won
     -- it -- or left it winnerless. Recorded by both roads that flip:
     -- Pawl.Engine.Resolve's Effect.FlipCoin arm, after the outcome is settled and
