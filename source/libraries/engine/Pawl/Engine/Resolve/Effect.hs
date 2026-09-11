@@ -3058,8 +3058,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- shares, so one rule has one writer.
     --
     -- CR 708.2b is the guard below: an effect that LISTS its own values would
-    -- otherwise overwrite the list already there. No event is recorded, so
-    -- nothing triggers on the turning-over (#984).
+    -- otherwise overwrite the list already there, and a permanent it spares
+    -- records no GameEvent.TurnedFaceDown either. Pawl.FaceDownSpec's "CR 708.2b
+    -- Synthetic Veiled Witness draws nothing off a permanent already face down"
+    -- proves it.
     --
     -- The victims are enumerated ONCE (CR 608.2f), as RemoveFromCombat's fold
     -- below does; an illegal slot (CR 608.2b), a player recipient and an empty
@@ -3068,16 +3070,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- turnings are processed simultaneously -- and what IS asked below is a
     -- different question: which of the simultaneous CR 613.7f stamps is earlier.
     --
-    -- A permanent already face down is turned no further, read off the gather's
-    -- board rather than the fold's; the two agree, turning one permanent face
-    -- down leaving another's facing alone.
+    -- A permanent already face down is turned no further, and neither is one
+    -- CR 712.16 / 730.2j forbids (Game.isDoubleFacedPermanent), both read off
+    -- the gather's board rather than the fold's; the two agree, turning one
+    -- permanent face down leaving another's facing and cards alone.
     --
     -- LEFT fold, where RemoveFromCombat's is a right one, and the stamp above is
     -- why: the fold hands out timestamps, so it must run `ordered` forwards for
     -- the earlier stamp to go to the permanent CR 613.7m put first.
     gs0 <- State.get
     let alreadyDown target = maybe False (Facing.isFaceDown . Object.facing) (Map.lookup target (GameState.objects gs0))
-        faceUp = filter (not . alreadyDown) (objectRefObjects legal resolving controller source gs0 ref)
+        turnable target = not (alreadyDown target || Game.isDoubleFacedPermanent target gs0)
+        faceUp = filter turnable (objectRefObjects legal resolving controller source gs0 ref)
     ordered <- Restamp.order faceUp
     State.modify'
       ( \gs ->
@@ -3086,6 +3090,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             gs
             ordered
       )
+    -- CR 701.27b: one event per permanent that actually turned, after the writes,
+    -- so a trigger's Filter reads the face-down permanent (CR 603.10).
+    Monad.mapM_ (State.modify' . Event.recordEvent . GameEvent.TurnedFaceDown) ordered
   -- CR 708 through FaceDown.turnFaceUpByEffect, the funnel CR 116.2b's special
   -- action shares: this arm decides only WHICH permanent, never what turning it
   -- over does. CR 701.40g lives inside that funnel and so applies here without

@@ -1430,6 +1430,9 @@ eventBindingSlots cond = case cond of
   -- unlike CR 400.7e's hidden-destination case (eventBindingSlotsSometimes)
   -- there is no shape of this event that withholds it.
   TriggerCondition.PermanentTurnedFaceUp _ -> Set.singleton Binding.became
+  -- A deliberate empty: Synthetic Veiled Witness draws and names no "it". A
+  -- card that did would take CR 400.7e's slot, as PermanentTurnedFaceUp does.
+  TriggerCondition.PermanentTurnedFaceDown _ -> Set.empty
   -- A deliberate empty: Valeron Wardens draws a card and names no "it", so there
   -- is no subject to claim a slot for. The arm above is the worked example of what
   -- a card reading the designated permanent would take -- CR 400.7e's slot, since

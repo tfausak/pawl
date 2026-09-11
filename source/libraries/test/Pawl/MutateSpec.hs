@@ -285,6 +285,30 @@ spec s registry = Spec.describe s "Mutate" $ do
         -- permanent of two cards.
         Spec.assertEqWith s "setup: CR 730.2e it was face down while its topmost component was" (Projection.namesOf host after) Set.empty
         Spec.assertEqWith s "setup: the two cards represent one permanent, the face-down one on top" (componentNames host after) [CardName.MkCardName (Text.pack "Misthoof Kirin"), CardName.MkCardName (Text.pack "Cubwarden")]
+  -- CR 730.2j: a face-up merged permanent with a double-faced component can't
+  -- be turned face down. Cubwarden goes OVER, so the permanent shows one-faced
+  -- Cubwarden and only the component under it, Blightreaper Thallid, is
+  -- double-faced. The control is the same merge over one-faced Falcon
+  -- Abomination. The Islands arrive after the merge, so the mutate cost cannot
+  -- spend them.
+  Spec.it s "CR 730.2j Cyber Conversion does nothing to a merged permanent with a double-faced component" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    thallid <- S.printingOf s registry "Blightreaper Thallid"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    let converted under =
+          let (host, board, spellId) = mutateBoard plains under cubwarden
+              merged = merging MutateSide.Over host board spellId
+              (armed, spell) = S.handOne cyber (S.landsFor island S.alice 2 merged)
+           in (host, merged, S.runPure (mutatingAt MutateSide.Over host) armed (Cast.castSpell S.manaPerformer S.alice spell (S.printingName cyber) Facing.FaceUp >> Stack.resolveTop))
+        (dfcHost, dfcMerged, dfcAfter) = converted thallid
+        (plainHost, _, plainAfter) = converted falcon
+    Spec.assertEqWith s "CR 730.2j the merged permanent is still face up" (fmap Object.facing (Game.lookupObject dfcHost dfcAfter)) (Just Facing.FaceUp)
+    Spec.assertEqWith s "CR 730.2j and still Cubwarden" (Projection.namesOf dfcHost dfcAfter) (Set.singleton (CardName.MkCardName (Text.pack "Cubwarden")))
+    Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject plainHost plainAfter)) "the same merge over a one-faced card turns face down"
+    Spec.assertEqWith s "setup: Cubwarden over the Thallid" (componentNames dfcHost dfcMerged) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Blightreaper Thallid")]
   -- CR 730.2a's timestamp sentence, which is the one board it is observable on:
   -- the merge and the copy effect already on the target share layer 1a (CR
   -- 613.2a) and CR 613.7 orders them by timestamp, so the merge -- timestamped

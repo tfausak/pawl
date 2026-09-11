@@ -528,6 +528,7 @@ damageOf event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
@@ -589,6 +590,7 @@ revealOf event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
@@ -6408,7 +6410,8 @@ meldable victims gs = do
 -- decided here or nowhere.
 --
 -- Not implemented: CR 730.2g's instant or sorcery component, which cannot be
--- turned face up (#3392); CR 730.2i/730.2j's double-faced components (#3428).
+-- turned face up (#3392); CR 730.2i's double-faced component, which transforms
+-- in place (#3428).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
@@ -6952,6 +6955,7 @@ reactsToAbilityTriggering cond = case cond of
   -- The bystander form of the same event, and False for the same reason.
   TriggerCondition.PermanentTransforms _ -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
+  TriggerCondition.PermanentTurnedFaceDown _ -> False
   TriggerCondition.PermanentBecomesDesignated {} -> False
   TriggerCondition.SelfEvolves -> False
   TriggerCondition.SelfMutates -> False
@@ -7073,6 +7077,7 @@ controllerTurnScoped cond = case cond of
   -- player take the action on any turn, and the watcher is not even the player
   -- taking it.
   TriggerCondition.PermanentTurnedFaceUp _ -> False
+  TriggerCondition.PermanentTurnedFaceDown _ -> False
   -- CR 702.112a's ability fires on combat damage to a player, which any player's
   -- turn can carry, and the watcher's turn is not asked about at all.
   TriggerCondition.PermanentBecomesDesignated {} -> False

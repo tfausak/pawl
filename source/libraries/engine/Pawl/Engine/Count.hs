@@ -736,6 +736,7 @@ snapshotView gs shape event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing

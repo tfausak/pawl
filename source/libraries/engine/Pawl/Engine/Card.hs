@@ -1370,6 +1370,21 @@ hasSharedTypeLine card = case Card.layout card of
   -- not two halves of one printed line.
   Layout.Meld -> False
 
+-- CR 712.1: is this a double-faced card -- nonmodal, modal or meld. A layout
+-- read; CR 712.16 and CR 730.2j are its readers.
+isDoubleFaced :: Card.Card -> Bool
+isDoubleFaced card = case Card.layout card of
+  Layout.Normal -> False
+  Layout.Split -> False
+  Layout.Room -> False
+  Layout.Flip -> False
+  Layout.Adventure -> False
+  Layout.Omen -> False
+  Layout.Preparation -> False
+  Layout.Transforming -> True
+  Layout.ModalDoubleFaced -> True
+  Layout.Meld -> True
+
 -- CR 709.5: what a Room permanent's characteristics ARE, given which of its
 -- halves are unlocked (CR 709.5c). The shared type line "represents two static
 -- abilities that function on the battlefield" -- "As long as this permanent

@@ -267,9 +267,10 @@ data GameEvent
     HalfUnlocked HalfUnlocked.HalfUnlocked
   | -- | CR 708.7: a face-down permanent was turned face up, which CR 708.8 makes
     -- a change to copiable values rather than a zone change, so no Moved event
-    -- describes it. One direction only: no printed card triggers on a permanent
-    -- being turned face down.
+    -- describes it.
     TurnedFaceUp ObjectId.ObjectId
+  | -- | CR 708.2 / 701.27b: a face-up permanent was turned face down.
+    TurnedFaceDown ObjectId.ObjectId
   | -- | CR 701.27a: a double-faced permanent TRANSFORMED. CR 701.27b makes that a
     -- different game action from TurnedFaceUp above and CR 712.18 keeps it the
     -- same object, so nothing else in this list carries it. Recorded through

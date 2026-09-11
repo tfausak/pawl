@@ -263,6 +263,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
@@ -307,6 +308,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -392,6 +394,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -455,6 +458,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -530,6 +534,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -600,6 +605,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -678,6 +684,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -762,6 +769,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -843,6 +851,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -911,6 +920,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -987,6 +997,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1060,6 +1071,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1133,6 +1145,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1205,6 +1218,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1278,6 +1292,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1363,6 +1378,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1446,6 +1462,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1520,6 +1537,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1593,6 +1611,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1690,6 +1709,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1787,6 +1807,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1856,6 +1877,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -1930,6 +1952,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2025,6 +2048,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2103,6 +2127,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2177,6 +2202,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2265,6 +2291,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2329,6 +2356,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2412,6 +2440,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2482,6 +2511,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2563,6 +2593,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2639,6 +2670,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -2773,6 +2805,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
+          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
           GameEvent.Evolved _ -> False
@@ -2905,6 +2938,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
+          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
           GameEvent.Evolved _ -> False
@@ -2973,6 +3007,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3041,6 +3076,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3112,6 +3148,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3212,6 +3249,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
+          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
           GameEvent.Evolved _ -> False
@@ -3282,6 +3320,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3366,6 +3405,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3445,6 +3485,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3546,6 +3587,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3633,6 +3675,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3684,6 +3727,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     -- different event; nothing folds the two together.
     GameEvent.BecameTapped _ -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3770,6 +3814,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3857,6 +3902,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -3954,6 +4000,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4029,6 +4076,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
+          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
           GameEvent.Evolved _ -> False
@@ -4114,6 +4162,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
+          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
           GameEvent.Evolved _ -> False
@@ -4169,6 +4218,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4272,6 +4322,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
+          GameEvent.TurnedFaceDown _ -> False
           GameEvent.Transformed {} -> False
           GameEvent.BecameDesignated {} -> False
           GameEvent.Evolved _ -> False
@@ -4326,6 +4377,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4397,6 +4449,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4490,6 +4543,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4577,6 +4631,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4659,6 +4714,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4740,6 +4796,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4850,6 +4907,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4928,6 +4986,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5036,6 +5095,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5095,6 +5155,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           && maybe True (castOrdinal (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) f fromZone spell gs ==) ordinal
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5180,6 +5241,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5274,6 +5336,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5352,6 +5415,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5443,6 +5507,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5470,6 +5535,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfHalfUnlocked half -> case event of
     GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid _ name _) -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5540,6 +5606,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 708.8's last sentence fall out rather than needing a clause.
   TriggerCondition.SelfTurnedFaceUp -> case event of
     GameEvent.TurnedFaceUp oid -> oid == bearer
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5614,6 +5681,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfTransformedInto name -> case event of
     GameEvent.Transformed (Transformed.MkTransformed oid pc) -> oid == bearer && Set.member name (PC.names pc)
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mutated _ -> False
@@ -5701,6 +5769,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Nothing -> False
       Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) (Count.overlaySnapshot pc view) f
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mutated _ -> False
@@ -5789,6 +5858,71 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp oid -> case Projection.viewWithLastKnown oid gs oid of
       Nothing -> False
       Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+  -- CR 701.27b: PermanentTurnedFaceUp's arm in the other direction, read live
+  -- for the same reason. The permanent is face down by now, so the Filter sees
+  -- CR 708.2's listed characteristics, never the card's.
+  TriggerCondition.PermanentTurnedFaceDown f -> case event of
+    GameEvent.TurnedFaceDown oid -> case Projection.viewWithLastKnown oid gs oid of
+      Nothing -> False
+      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5862,6 +5996,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameCrewed _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5924,6 +6059,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameCrewed _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5997,6 +6133,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameCrewed _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6058,6 +6195,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Mentored {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6126,6 +6264,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Mentored {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6192,6 +6331,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Mentored {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6256,6 +6396,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6329,6 +6470,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked _ actor _ fully) ->
       fully && PlayerRelation.holds (Game.teams gs) relation you actor
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -6415,6 +6557,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -6521,6 +6664,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
              )
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -6625,6 +6769,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -6692,6 +6837,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -6750,6 +6896,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -6816,6 +6963,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -6881,6 +7029,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -6942,6 +7091,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7012,6 +7162,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7078,6 +7229,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7143,6 +7295,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7213,6 +7366,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7278,6 +7432,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7352,6 +7507,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7428,6 +7584,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7501,6 +7658,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -7575,6 +7733,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
