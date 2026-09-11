@@ -117,6 +117,11 @@
 -- Ethereal Ambush is CR 701.40e's card, the one manifest here that moves more
 -- than one card, and Synthetic Encircling Net is what makes "one at a time"
 -- readable off a board; manifestOrderSpec says why each.
+--
+-- Synthetic Veiled Witness is the watcher of CR 701.27b's turned-face-down
+-- event: Scryfall `o:"turned face down" include:extras`, 2026-09-10, answers
+-- Vesuvan Shapeshifter alone, whose clause is a duration, see #3606. Thraben
+-- Gargoyle is CR 712.16's double-faced permanent. turnedFaceDownSpec has both.
 module Pawl.FaceDownSpec where
 
 import qualified Data.Foldable as Foldable
@@ -197,6 +202,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnFaceDownSpec s registry
   restampSpec s registry
   listedSpec s registry
+  turnedFaceDownSpec s registry
   manifestSpec s registry
   manifestOrderSpec s registry
   manifestDreadSpec s registry
@@ -922,6 +928,195 @@ cyberBoard island mountain cyber backslide ainok piker =
 aimAtByFiltering :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtByFiltering oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter (\r -> Recipient.objectOf r == Just oid) offered) sets
+  _ -> S.identityAnswer p
+
+-- CR 701.27b: Synthetic Veiled Witness, "Whenever a permanent you control is
+-- turned face down, draw a card", watching every road over. alice's library
+-- count is the observable: nothing else on these boards draws.
+turnedFaceDownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnedFaceDownSpec s registry = Spec.describe s "Turned face down" $ do
+  -- THE PROVING TEST. The negative leg is the same Conversion from the same
+  -- board at a Piker bob controls, which the Filter's "you control" refuses
+  -- (CR 109.5).
+  Spec.it s "CR 701.27b Synthetic Veiled Witness draws when Backslide turns the Tracker face down" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    backslide <- S.printingOf s registry "Backslide"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    witness <- S.printingOf s registry "Synthetic Veiled Witness"
+    let (board, spell, slide, victim, _, _) = witnessBoard island mountain cyber backslide ainok piker witness
+        (theirs, gs) = S.addPermanent piker S.bob board
+        after = castAtAndSettle backslide slide victim gs
+        other = castAtAndSettle cyber spell theirs gs
+    Spec.assertEqWith s "CR 701.27b the Witness drew one card" (libraryCount gs - libraryCount after) 1
+    Spec.assertEqWith s "CR 109.5 bob's Piker turned face down draws nothing" (libraryCount gs - libraryCount other) 0
+    Spec.assertBool s (isFaceDown victim after) "CR 708.2 the Tracker is face down"
+    Spec.assertBool s (isFaceDown theirs other) "setup: bob's Piker is face down"
+
+  -- CR 708.2b: a permanent already face down is not turned, so nothing is
+  -- recorded. The pair runs from the same post-Backslide board with the same
+  -- spell; only the target's facing differs.
+  Spec.it s "CR 708.2b Synthetic Veiled Witness draws nothing off a permanent already face down" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    backslide <- S.printingOf s registry "Backslide"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    witness <- S.printingOf s registry "Synthetic Veiled Witness"
+    let (gs, spell, slide, victim, bystander, _) = witnessBoard island mountain cyber backslide ainok piker witness
+        down = castAtAndSettle backslide slide victim gs
+        again = castAtAndSettle cyber spell victim down
+        control = castAtAndSettle cyber spell bystander down
+    Spec.assertEqWith s "CR 708.2b the Conversion at the face-down Tracker draws nothing" (libraryCount down - libraryCount again) 0
+    Spec.assertEqWith s "the Conversion at the face-up Piker draws one" (libraryCount down - libraryCount control) 1
+    Spec.assertBool s (isFaceDown victim down) "setup: the Tracker was face down"
+
+  -- CR 603.10: triggers are checked against the board after the event, when the
+  -- Witness turned face down has no abilities (CR 708.2a). The control is the
+  -- same cast from the same board at the Piker.
+  Spec.it s "CR 603.10 the Witness turned face down itself draws nothing" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    backslide <- S.printingOf s registry "Backslide"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    witness <- S.printingOf s registry "Synthetic Veiled Witness"
+    let (gs, spell, _, _, bystander, watcher) = witnessBoard island mountain cyber backslide ainok piker witness
+        self = castAtAndSettle cyber spell watcher gs
+        control = castAtAndSettle cyber spell bystander gs
+    Spec.assertEqWith s "CR 603.10 no card drawn" (libraryCount gs - libraryCount self) 0
+    Spec.assertEqWith s "the Conversion at the Piker draws one" (libraryCount gs - libraryCount control) 1
+    Spec.assertBool s (isFaceDown watcher self) "setup: the Witness is face down"
+
+  -- Entering face down (CR 708.3) and turning face up (CR 708.7) are not being
+  -- turned face down. One board, three moments: the morph cast, the turn face
+  -- up, then Backslide as the control. The two Islands arrive only for the
+  -- Backslide, so the morph costs cannot spend them.
+  Spec.it s "CR 708.3 / 708.7 entering face down and turning face up draw nothing" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    backslide <- S.printingOf s registry "Backslide"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    witness <- S.printingOf s registry "Synthetic Veiled Witness"
+    let (base, card) = morphBoard mountain ainok 8
+        (_, seated) = S.addPermanent witness S.alice base
+        gs = stockLibrary piker seated
+        (cast, entered) = castAndResolve ainok (Facing.faceDown FaceDownReason.Morphed) gs card
+        settled = S.runPure S.identityAnswer cast Engine.priorityLoop
+    case entered of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just morphling -> do
+        let up = S.runPure S.identityAnswer settled (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph morphling >> Engine.priorityLoop)
+            (armed, slide) = S.handOne backslide (S.landsFor island S.alice 2 up)
+            down = castAtAndSettle backslide slide morphling armed
+        Spec.assertEqWith s "CR 708.3 entering face down draws nothing" (libraryCount gs - libraryCount settled) 0
+        Spec.assertEqWith s "CR 708.7 turning face up draws nothing" (libraryCount settled - libraryCount up) 0
+        Spec.assertEqWith s "the Backslide draws one" (libraryCount armed - libraryCount down) 1
+        Spec.assertBool s (isFaceDown morphling settled) "setup: it entered face down"
+        Spec.assertEqWith s "setup: it was turned face up" (fmap Object.facing (Game.lookupObject morphling up)) (Just Facing.FaceUp)
+
+  -- CR 701.27b's own sentence: a transform is a different game action. The
+  -- Gargoyle's {6} turns it over; the control is Cyber Conversion at the Piker
+  -- from the transformed board.
+  Spec.it s "CR 701.27b a permanent transforming draws nothing" $ do
+    island <- S.printingOf s registry "Island"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    piker <- S.printingOf s registry "Goblin Piker"
+    witness <- S.printingOf s registry "Synthetic Veiled Witness"
+    let (gs, spell, dfc, bystander) = gargoyleBoard island cyber gargoyle piker witness
+    case Activate.abilitiesFor dfc gs of
+      [ability] -> do
+        let turned = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice dfc ability >> Engine.priorityLoop)
+            control = castAtAndSettle cyber spell bystander turned
+        Spec.assertEqWith s "CR 701.27b no card drawn" (libraryCount gs - libraryCount turned) 0
+        Spec.assertEqWith s "the Conversion at the Piker draws one" (libraryCount turned - libraryCount control) 1
+        Spec.assertEqWith s "setup: CR 701.27a the Gargoyle transformed" (Projection.namesOf dfc turned) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))
+      abilities -> Spec.assertFailure s ("expected one activated ability, got " <> show (length abilities))
+
+  -- CR 712.16: a double-faced permanent can't be turned face down. The pair is
+  -- one cast from one board at two targets, the Gargoyle and the one-faced Piker.
+  Spec.it s "CR 712.16 Cyber Conversion does nothing to a double-faced permanent" $ do
+    island <- S.printingOf s registry "Island"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    piker <- S.printingOf s registry "Goblin Piker"
+    witness <- S.printingOf s registry "Synthetic Veiled Witness"
+    let (gs, spell, dfc, bystander) = gargoyleBoard island cyber gargoyle piker witness
+        after = castAtAndSettle cyber spell dfc gs
+        control = castAtAndSettle cyber spell bystander gs
+    Spec.assertEqWith s "CR 712.16 the Gargoyle is still face up" (fmap Object.facing (Game.lookupObject dfc after)) (Just Facing.FaceUp)
+    Spec.assertEqWith s "CR 712.16 and still a Gargoyle, not a Cyberman" (Projection.subtypesOf dfc after) (Set.singleton Subtype.Gargoyle)
+    Spec.assertEqWith s "nothing turned, so nothing drawn" (libraryCount gs - libraryCount after) 0
+    Spec.assertBool s (isFaceDown bystander control) "the Conversion turns the Piker face down"
+
+  -- CR 712.9's Example read against CR 712.16: a Clone copying the Gargoyle is a
+  -- one-faced card, so it CAN be turned face down. The tripwire for a guard that
+  -- read the projection instead of the card.
+  Spec.it s "CR 712.9 a Clone copying the Gargoyle is one-faced, so it turns face down" $ do
+    island <- S.printingOf s registry "Island"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    piker <- S.printingOf s registry "Goblin Piker"
+    witness <- S.printingOf s registry "Synthetic Veiled Witness"
+    clone <- S.printingOf s registry "Clone"
+    let (gs, spell, dfc, _) = gargoyleBoard island cyber gargoyle piker witness
+        (_, staged) = S.spellOnStack clone S.alice gs
+        cloned = S.runPure (copying dfc) staged (Stack.resolveTop >> Engine.settleForPriority)
+    case enteredOne staged cloned of
+      Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"
+      Just copy -> do
+        let after = castAtAndSettle cyber spell copy cloned
+        Spec.assertBool s (isFaceDown copy after) "CR 712.9 the Clone is face down"
+        Spec.assertEqWith s "CR 701.27b and the Witness drew one" (libraryCount cloned - libraryCount after) 1
+        Spec.assertEqWith s "setup: the Clone copied the Gargoyle" (Projection.namesOf copy cloned) (Set.singleton (CardName.MkCardName (Text.pack "Thraben Gargoyle")))
+
+-- cyberBoard with Synthetic Veiled Witness beside the Tracker and the Piker, and
+-- alice's library stocked. Returns the board, the Conversion, the Backslide, the
+-- Tracker, the Piker and the Witness.
+witnessBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+witnessBoard island mountain cyber backslide ainok piker witness =
+  let (gs0, spell, slide, victim, bystander) = cyberBoard island mountain cyber backslide ainok piker
+      (watcher, gs1) = S.addPermanent witness S.alice gs0
+   in (stockLibrary piker gs1, spell, slide, victim, bystander, watcher)
+
+-- alice's main phase with priority, eight Islands -- six for Thraben Gargoyle's
+-- {6}, two for Cyber Conversion's {U}{U} -- the Conversion in hand, and the
+-- Gargoyle, a Piker and the Witness on the battlefield. Returns the board, the
+-- Conversion, the Gargoyle and the Piker.
+gargoyleBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+gargoyleBoard island cyber gargoyle piker witness =
+  let (gs0, spell) = S.handOne cyber (S.landsInPlay island 8)
+      (dfc, gs1) = S.addPermanent gargoyle S.alice gs0
+      (bystander, gs2) = S.addPermanent piker S.alice gs1
+      (_, gs3) = S.addPermanent witness S.alice gs2
+   in (stockLibrary piker gs3 {GameState.priority = Just S.alice}, spell, dfc, bystander)
+
+-- Three cards in alice's library, so a draw is a count that moves.
+stockLibrary :: Printing.Printing -> GameState.GameState -> GameState.GameState
+stockLibrary card gs = foldr (\_ g -> snd (S.addLibraryCard card S.alice g)) gs [1 .. 3 :: Int]
+
+libraryCount :: GameState.GameState -> Int
+libraryCount = length . Game.zoneMembers Zone.Library S.alice
+
+isFaceDown :: ObjectId.ObjectId -> GameState.GameState -> Bool
+isFaceDown oid = maybe False (Facing.isFaceDown . Object.facing) . Game.lookupObject oid
+
+-- Cast `spell` at `target`, resolve it, and run the priority loop so whatever
+-- triggered is put on the stack and resolves (CR 603.3).
+castAtAndSettle :: Printing.Printing -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castAtAndSettle printing spell target gs =
+  S.runPure (aimAtByFiltering target) gs (Cast.castSpell S.manaPerformer S.alice spell (S.printingName printing) Facing.FaceUp >> Stack.resolveTop >> Engine.priorityLoop)
+
+-- Clone's as-enters copy choice, pinned to `original`.
+copying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+copying original p = case p of
+  Prompt.ChooseCopyTarget {} -> Just original
   _ -> S.identityAnswer p
 
 -- CR 702.37d: "You can't normally cast a card face down. A morph ability allows

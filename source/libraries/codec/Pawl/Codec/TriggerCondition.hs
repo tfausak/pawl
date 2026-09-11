@@ -122,6 +122,7 @@ codec =
           Arm.payload "SelfTransformedInto" CardName.codec TriggerCondition.SelfTransformedInto (\x -> case x of TriggerCondition.SelfTransformedInto y -> Just y; _ -> Nothing),
           Arm.payload "PermanentTransforms" filterCodec TriggerCondition.PermanentTransforms (\x -> case x of TriggerCondition.PermanentTransforms y -> Just y; _ -> Nothing),
           Arm.payload "PermanentTurnedFaceUp" filterCodec TriggerCondition.PermanentTurnedFaceUp (\x -> case x of TriggerCondition.PermanentTurnedFaceUp y -> Just y; _ -> Nothing),
+          Arm.payload "PermanentTurnedFaceDown" filterCodec TriggerCondition.PermanentTurnedFaceDown (\x -> case x of TriggerCondition.PermanentTurnedFaceDown y -> Just y; _ -> Nothing),
           Arm.payload "PermanentBecomesDesignated" PermanentBecomesDesignated.codec TriggerCondition.PermanentBecomesDesignated (\x -> case x of TriggerCondition.PermanentBecomesDesignated y -> Just y; _ -> Nothing),
           Arm.nullary "SelfEvolves" TriggerCondition.SelfEvolves,
           Arm.nullary "SelfMutates" TriggerCondition.SelfMutates,

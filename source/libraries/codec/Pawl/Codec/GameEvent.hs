@@ -79,6 +79,7 @@ codec =
       Arm.payload "CountersRemoved" CounterChange.codec GameEvent.CountersRemoved (\x -> case x of GameEvent.CountersRemoved y -> Just y; _ -> Nothing),
       Arm.payload "HalfUnlocked" HalfUnlocked.codec GameEvent.HalfUnlocked (\x -> case x of GameEvent.HalfUnlocked y -> Just y; _ -> Nothing),
       Arm.payload "TurnedFaceUp" ObjectId.codec GameEvent.TurnedFaceUp (\x -> case x of GameEvent.TurnedFaceUp y -> Just y; _ -> Nothing),
+      Arm.payload "TurnedFaceDown" ObjectId.codec GameEvent.TurnedFaceDown (\x -> case x of GameEvent.TurnedFaceDown y -> Just y; _ -> Nothing),
       Arm.payload "Transformed" Transformed.codec GameEvent.Transformed (\x -> case x of GameEvent.Transformed y -> Just y; _ -> Nothing),
       Arm.payload "BecameDesignated" BecameDesignated.codec GameEvent.BecameDesignated (\x -> case x of GameEvent.BecameDesignated y -> Just y; _ -> Nothing),
       Arm.payload "Evolved" ObjectId.codec GameEvent.Evolved (\x -> case x of GameEvent.Evolved y -> Just y; _ -> Nothing),

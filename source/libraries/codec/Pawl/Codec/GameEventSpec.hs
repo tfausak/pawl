@@ -300,6 +300,13 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.TurnedFaceUp (ObjectId.MkObjectId 5))
       " {\"type\":\"TurnedFaceUp\",\"value\":5} "
+  -- CR 701.27b's other direction, the same one-id payload.
+  Spec.it s "TurnedFaceDown" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.TurnedFaceDown (ObjectId.MkObjectId 5))
+      " {\"type\":\"TurnedFaceDown\",\"value\":5} "
   -- CR 701.27a, the different game action CR 701.27b holds it apart from. Two
   -- fields rather than one: CR 701.27e reads what the permanent turned INTO.
   Spec.it s "Transformed" $

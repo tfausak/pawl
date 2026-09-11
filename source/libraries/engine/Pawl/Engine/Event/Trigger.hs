@@ -142,6 +142,7 @@ movedOf event = case event of
   GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
@@ -313,6 +314,7 @@ looksBack condition = case condition of
   -- sentence asks for. Both written forms.
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
+  TriggerCondition.PermanentTurnedFaceDown _ -> False
   -- CR 712.18 is the same claim about transforming, and states it outright: the
   -- permanent "doesn't become a new object", so there is no departure for CR
   -- 603.10a to look back at.
@@ -527,6 +529,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
+  TriggerCondition.PermanentTurnedFaceDown _ -> False
   TriggerCondition.SelfTransformedInto _ -> False
   TriggerCondition.PermanentTransforms _ -> False
   TriggerCondition.PermanentBecomesDesignated {} -> False
@@ -932,6 +935,7 @@ eventTriggers events gs =
         GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
+        GameEvent.TurnedFaceDown _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
@@ -1130,6 +1134,7 @@ eventTriggers events gs =
         GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
+        GameEvent.TurnedFaceDown _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
@@ -1361,6 +1366,7 @@ eventTriggers events gs =
         GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
+        GameEvent.TurnedFaceDown _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
@@ -1501,6 +1507,7 @@ eventTriggers events gs =
         GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
+        GameEvent.TurnedFaceDown _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
@@ -1924,6 +1931,7 @@ zonesTriggeredFrom cond =
         -- 113.6k's exception, which is for a condition that cannot trigger from the
         -- battlefield at all, does not apply.
         TriggerCondition.PermanentTurnedFaceUp _ -> battlefield
+        TriggerCondition.PermanentTurnedFaceDown _ -> battlefield
         -- The same default: CR 702.112b's "only permanents can be or become renowned"
         -- keeps the subject on the battlefield, and Valeron Wardens watches from it.
         TriggerCondition.PermanentBecomesDesignated {} -> battlefield
@@ -2373,6 +2381,7 @@ stateTriggers gs
               -- says nothing about which of them was ever TURNED over, so there
               -- is no state here to read at all.
               TriggerCondition.PermanentTurnedFaceUp _ -> False
+              TriggerCondition.PermanentTurnedFaceDown _ -> False
               -- CR 702.112b's designation is exactly that shape once more: the
               -- permanent keeps it, so a state read would fire every settle.
               TriggerCondition.PermanentBecomesDesignated {} -> False
