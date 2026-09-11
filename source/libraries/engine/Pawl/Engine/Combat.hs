@@ -1947,11 +1947,7 @@ putOntoBattlefieldAttacking specified oid = do
                         -- 508.4 road: THIS creature joins combat now, so the seat
                         -- it compares against is who controls the battle now --
                         -- whatever seat an earlier attacker recorded for it.
-                        --
-                        -- Not implemented: a board that drives rule 506.4's removal
-                        -- down this road, the ordering it needs being beyond a pure
-                        -- answerer; only a record assertion covers this write
-                        -- (#2986).
+                        -- Pawl.BattleSpec's Ninja against Word of Seizing proves it.
                         Combat.attackedControlledBy =
                           Maybe.maybe
                             (Combat.attackedControlledBy c)
