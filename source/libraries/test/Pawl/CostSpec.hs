@@ -2090,6 +2090,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   crossCheckSpec s registry
   longtuskCubSpec s registry
   thrastaSpec s registry
+  frogmiteSpec s registry
+  exhalationSpec s registry
   omniscienceSpec s registry
   springleafDrumSpec s registry
   morcantSpec s registry
@@ -2416,6 +2418,159 @@ thrastaSpec s registry =
       Spec.assertBool s (not (S.castable S.alice fiveThrasta five)) "one green source left is not two"
       Spec.assertEqWith s "and Thrasta is not offered" (filter (S.isCastOf fiveThrasta) (Action.legalActions S.alice five)) []
       Spec.assertBool s (S.castable S.alice sixThrasta six) "the sixth Forest is the whole difference"
+
+-- alice holds Frogmite and controls `forests` untapped Forests and `golems`
+-- Icehide Golems, with priority in her own precombat main phase.
+--
+-- The Golem is the thing COUNTED and the Forest is what PAYS, kept apart on
+-- purpose: an artifact land would be both at once, and then no tapped count could
+-- tell a reduction from a mana source.
+frogmiteBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, GameState.GameState)
+frogmiteBoard forest icehideGolem frogmitePrinting forests golems =
+  let base = S.landsInPlay forest forests
+      (frogmite, gs1) = S.addHandCard frogmitePrinting S.alice base
+      addGolem gs _ = snd (S.addPermanent icehideGolem S.alice gs)
+      gs2 = List.foldl' addGolem gs1 [1 .. golems]
+   in ( frogmite,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- CR 702.41a's affinity, which is rule 601.2f's cost reduction stated as a
+-- KEYWORD rather than printed out as a sentence: Frogmite is a {4} artifact
+-- creature with "affinity for artifacts", so its total steps 4, 3, 2, 1, 0, 0 ...
+-- as the artifacts climb.
+--
+-- Every leg reads the total off S.tappedCount, thrastaSpec's reason: the Forests
+-- the payment taps are what tells "reduced once per artifact" from "reduced once",
+-- from "not reduced at all", and from a count that swept the Golems' controller
+-- or the whole battlefield in.
+frogmiteSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+frogmiteSpec s registry =
+  Spec.describe s "Frogmite" $ do
+    Spec.it s "Frogmite is a {4} with affinity for artifacts" $ do
+      frogmitePrinting <- S.printingOf s registry "Frogmite"
+      let face = S.combinedFace frogmitePrinting
+      Spec.assertEqWith
+        s
+        "the printed mana cost"
+        (Face.manaCost face)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]))
+      Spec.assertEqWith
+        s
+        "and one affinity, for artifacts"
+        (Set.toList (Face.keywords face))
+        [Keyword.Affinity (Filter.Type.HasCardType CardType.Artifact)]
+    -- Three Forests. Two Golems take {2} off a {4}, leaving {2} and one Forest
+    -- spare -- which is what an over-tapping payment could not produce. The tapped
+    -- count separates every reading: 2 here, 3 for a flat one-off reduction, no
+    -- cast at all for no reduction, and 1 for a count that also swept the Frogmite
+    -- or a Forest in.
+    Spec.it s "CR 702.41a two artifacts take {2} off, and the total is what pays" $ do
+      forest <- S.printingOf s registry "Forest"
+      icehideGolem <- S.printingOf s registry "Icehide Golem"
+      frogmitePrinting <- S.printingOf s registry "Frogmite"
+      let (frogmite, gs) = frogmiteBoard forest icehideGolem frogmitePrinting 3 2
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice frogmite)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertBool s (S.castable S.alice frogmite gs) "the reduced {2} is within three Forests"
+      Spec.assertEqWith s "and exactly two Forests paid it, leaving one" (S.tappedCount S.alice resolved) 2
+      Spec.assertEqWith
+        s
+        "Frogmite resolved onto the battlefield"
+        (namesIn Zone.Battlefield resolved)
+        (fmap (CardName.MkCardName . Text.pack) (replicate 3 "Forest" <> ["Frogmite"] <> replicate 2 "Icehide Golem"))
+    -- The negative, and the SAME board with ONE thing changed: no Golems. The
+    -- same three Forests, the same seats, phase and priority -- so the refusal is
+    -- the {2} the two artifacts would have taken off and nothing else.
+    Spec.it s "CR 702.41a no artifacts means no reduction, and the printed {4} does not pay" $ do
+      forest <- S.printingOf s registry "Forest"
+      icehideGolem <- S.printingOf s registry "Icehide Golem"
+      frogmitePrinting <- S.printingOf s registry "Frogmite"
+      let (frogmite, gs) = frogmiteBoard forest icehideGolem frogmitePrinting 3 0
+      Spec.assertBool s (not (S.castable S.alice frogmite gs)) "the printed {4} is out of reach of three Forests"
+      Spec.assertEqWith s "and Frogmite is not offered" (filter (S.isCastOf frogmite) (Action.legalActions S.alice gs)) []
+    -- CR 601.2f's floor, reached from the other side of thrastaSpec's: five Golems
+    -- are a {5} reduction against a {4} generic component and Frogmite has no
+    -- coloured symbol to strand, so the whole cost is {0} and NO land is needed.
+    -- CR 118.5 still makes that a cast rather than an automatic arrival.
+    Spec.it s "CR 601.2f a reduction past the whole cost floors at {0}" $ do
+      forest <- S.printingOf s registry "Forest"
+      icehideGolem <- S.printingOf s registry "Icehide Golem"
+      frogmitePrinting <- S.printingOf s registry "Frogmite"
+      let (frogmite, gs) = frogmiteBoard forest icehideGolem frogmitePrinting 0 5
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice frogmite)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertBool s (S.castable S.alice frogmite gs) "a landless alice can still cast it"
+      Spec.assertEqWith s "nothing was tapped to pay {0}" (S.tappedCount S.alice resolved) 0
+      Spec.assertEqWith
+        s
+        "and Frogmite resolved onto the battlefield"
+        (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Frogmite")) S.alice resolved)
+        1
+
+-- alice holds Sublime Exhalation and controls five untapped Plains, with priority
+-- in her own precombat main phase. `seats` is the whole roster, which is the one
+-- thing the two boards below differ in.
+exhalationBoard :: NonEmpty.NonEmpty PlayerId.PlayerId -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+exhalationBoard seats plains exhalationPrinting =
+  let base = S.landsFor plains S.alice 5 (Setup.emptyGame seats)
+      (exhalation, gs1) = S.addHandCard exhalationPrinting S.alice base
+   in ( exhalation,
+        gs1
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- CR 702.125a's undaunted, affinity's sibling with the count over PLAYERS instead
+-- of over permanents: Sublime Exhalation is {6}{W} and costs {1} less for each
+-- opponent, so alice's total is six mana against one opponent and five against
+-- two.
+--
+-- The pair below is one board with ONE thing changed -- a third seat -- against
+-- the same five Plains, so what the second board casts is the {1} carol is worth
+-- and nothing else. Three seats also keep "an opponent" from collapsing onto "the
+-- other player".
+exhalationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exhalationSpec s registry =
+  Spec.describe s "Sublime Exhalation" $ do
+    Spec.it s "Sublime Exhalation is a {6}{W} with undaunted" $ do
+      exhalationPrinting <- S.printingOf s registry "Sublime Exhalation"
+      let face = S.combinedFace exhalationPrinting
+      Spec.assertEqWith
+        s
+        "the printed mana cost"
+        (Face.manaCost face)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 6, ManaSymbol.OfType (ManaType.Colored Color.White)]))
+      Spec.assertEqWith
+        s
+        "and undaunted, which carries no payload"
+        (Set.toList (Face.keywords face))
+        [Keyword.Undaunted]
+    Spec.it s "CR 702.125a two opponents take {2} off, and the total is what pays" $ do
+      plains <- S.printingOf s registry "Plains"
+      exhalationPrinting <- S.printingOf s registry "Sublime Exhalation"
+      let (exhalation, gs) = exhalationBoard S.threePlayers plains exhalationPrinting
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice exhalation)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertBool s (S.castable S.alice exhalation gs) "the reduced {4}{W} is within five Plains"
+      Spec.assertEqWith s "and all five Plains paid it" (S.tappedCount S.alice resolved) 5
+      Spec.assertEqWith
+        s
+        "Sublime Exhalation resolved into the graveyard"
+        (namesIn Zone.Graveyard resolved)
+        [CardName.MkCardName (Text.pack "Sublime Exhalation")]
+    Spec.it s "CR 702.125a one opponent takes only {1} off, and that does not pay" $ do
+      plains <- S.printingOf s registry "Plains"
+      exhalationPrinting <- S.printingOf s registry "Sublime Exhalation"
+      let (exhalation, gs) = exhalationBoard S.bothPlayers plains exhalationPrinting
+      Spec.assertBool s (not (S.castable S.alice exhalation gs)) "the reduced {5}{W} is out of reach of five Plains"
+      Spec.assertEqWith s "and it is not offered" (filter (S.isCastOf exhalation) (Action.legalActions S.alice gs)) []
 
 -- alice controls a Safehold Sentry and three Plains, all settled. `tapped` says
 -- whether the Sentry itself starts tapped -- which for a {Q} cost is the payable

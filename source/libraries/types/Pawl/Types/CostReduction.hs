@@ -3,9 +3,14 @@ module Pawl.Types.CostReduction where
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Quantity as Quantity
 
--- | CR 601.2f: a reduction a spell's OWN printed text applies to its own cost --
+-- | CR 601.2f: a reduction a spell's OWN text applies to its own cost --
 -- Thrasta, Tempest's Roar's "This spell costs {3} less to cast for each other
 -- spell cast this turn".
+--
+-- A face may print that sentence out (Face.costReductions) or state it as a
+-- rule-702 keyword, which Pawl.Engine.Keyword.selfCostReductionsOf mints into
+-- this type: CR 702.41a's affinity and CR 702.125a's undaunted are the two, and
+-- neither reaches this type through a card's own text beyond affinity's quality.
 --
 -- The SELF-scoped sibling of Pawl.Types.ReduceSpellCost, which is a battlefield
 -- permanent's static ability discounting whatever spells its Filter names

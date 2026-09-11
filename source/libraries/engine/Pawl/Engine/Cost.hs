@@ -515,8 +515,10 @@ spellAdjustments pid oid gs =
         then withSelf
         else withSelf {CostAdjustments.increases = commanderTax : CostAdjustments.increases withSelf}
 
--- CR 601.2f / 113.6d: the reductions a spell's OWN printed text applies to its
--- own cost (Thrasta, Tempest's Roar), each Quantity evaluated and its amount
+-- CR 601.2f / 113.6d: the reductions a spell's OWN text applies to its
+-- own cost -- the sentence Thrasta, Tempest's Roar prints out, and the one CR
+-- 702.41a's affinity and CR 702.125a's undaunted state as a keyword
+-- (Keyword.selfCostReductionsOf) -- each Quantity evaluated and its amount
 -- REPEATED that many times rather than multiplied, so a typed amount falls out
 -- with no arithmetic. A NEGATIVE or UNDETERMINABLE Quantity contributes nothing,
 -- the direction that leaves the spell dearer.
@@ -538,7 +540,7 @@ selfReductions pid oid gs =
          in fmap (ManaCost.MkManaCost . times) copies
    in case Game.faceOf oid gs of
         Nothing -> []
-        Just face -> Maybe.mapMaybe scaled (Face.costReductions face)
+        Just face -> Maybe.mapMaybe scaled (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywords face))
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes
 -- through rule 601.2b-i like a spell's. No commander tax: CR 903.8 taxes
