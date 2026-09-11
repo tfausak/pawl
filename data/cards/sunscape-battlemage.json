@@ -79,23 +79,26 @@
                 "type": "AtLeast"
               },
               "measured": {
-                "type": "TimesKickedWith",
+                "type": "TimesPaid",
                 "value": {
-                  "mana": [
-                    {
-                      "type": "Generic",
-                      "value": 1
-                    },
-                    {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
+                  "type": "Kicker",
+                  "value": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 1
+                      },
+                      {
+                        "type": "OfType",
                         "value": {
-                          "type": "Green"
+                          "type": "Colored",
+                          "value": {
+                            "type": "Green"
+                          }
                         }
                       }
-                    }
-                  ]
+                    ]
+                  }
                 }
               },
               "threshold": {
@@ -153,23 +156,26 @@
                 "type": "AtLeast"
               },
               "measured": {
-                "type": "TimesKickedWith",
+                "type": "TimesPaid",
                 "value": {
-                  "mana": [
-                    {
-                      "type": "Generic",
-                      "value": 2
-                    },
-                    {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
+                  "type": "Kicker",
+                  "value": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 2
+                      },
+                      {
+                        "type": "OfType",
                         "value": {
-                          "type": "Blue"
+                          "type": "Colored",
+                          "value": {
+                            "type": "Blue"
+                          }
                         }
                       }
-                    }
-                  ]
+                    ]
+                  }
                 }
               },
               "threshold": {

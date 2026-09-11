@@ -168,6 +168,10 @@ data LastKnown = MkLastKnown
     -- was attacking before it was removed from combat" -- a question with no live
     -- object left to read. Pawl.Engine.Battle.lastKnownProtectorOf is the reader,
     -- through Pawl.Engine.Defender.playerOf's battle arm.
-    protector :: !(Maybe PlayerId.PlayerId)
+    protector :: !(Maybe PlayerId.PlayerId),
+    -- | CR 400.7d: the optional additional costs paid for the spell that became
+    -- it -- Object.paidCosts as it left. Not a characteristic, and gone with the
+    -- object, but CR 702.175a's trigger still asks after it on resolution.
+    paidCosts :: !(Map.Map Keyword.Keyword Natural.Natural)
   }
   deriving (Eq, Ord, Show)

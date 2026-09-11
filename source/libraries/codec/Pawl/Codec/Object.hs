@@ -11,7 +11,6 @@ import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Color as Color
-import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.ExileLooker as ExileLooker
@@ -33,7 +32,6 @@ import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
-import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind.Type
 import qualified Pawl.Types.Designation as Designation.Type
 import qualified Pawl.Types.Facing as Facing.Type
@@ -43,25 +41,14 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.TapState as TapState.Type
 import qualified Pawl.Types.Timestamp as Timestamp.Type
 
--- | CR 702.33d: one of a spell's kicker costs and how many times its controller
--- declared it (CR 702.33c). A pair per cost through 'Common.keyedList' for
--- 'counterTimestamp' below's reason -- the value is a count the wire states
--- rather than a repeat it could spell -- and possibly EMPTY, since that is every
--- object no kicker was announced for.
 -- | CR 701.37c's X for one designation. A pair per mark through
--- 'Common.keyedList', 'kickerPayment' below's shape and for its reason: the key
--- is structured, so it cannot be an object key.
+-- 'Common.keyedList', because the key is structured, so it cannot be an object
+-- key.
 designationValue :: Codec.Codec (Designation.Type.Designation, Natural.Natural)
 designationValue = Fields.object $ do
   designation <- Fields.required "designation" Designation.codec fst
   value <- Fields.required "value" Common.natural snd
   pure (designation, value)
-
-kickerPayment :: Codec.Codec (Cost.Type.Cost Keyword.Type.Keyword, Natural.Natural)
-kickerPayment = Fields.object $ do
-  cost <- Fields.required "cost" (Cost.codec Keyword.codec) fst
-  times <- Fields.required "times" Common.natural snd
-  pure (cost, times)
 
 -- | One counter kind and CR 613.7c's timestamp for it. A pair per kind through
 -- 'Common.keyedList' rather than 'Common.multiset', which pairs a key with a
@@ -124,7 +111,7 @@ codec = Fields.object $ do
   unlockedHalves <- Fields.defaulted "unlockedHalves" Set.empty (Common.set CardName.codec) Object.unlockedHalves
   designations <- Fields.defaulted "designations" Set.empty (Common.set Designation.codec) Object.designations
   designationValues <- Fields.defaulted "designationValues" Map.empty (Common.keyedList designationValue) Object.designationValues
-  kicked <- Fields.defaulted "kicked" Map.empty (Common.keyedList kickerPayment) Object.kicked
+  paidCosts <- Fields.defaulted "paidCosts" Map.empty (Common.multiset Keyword.codec) Object.paidCosts
   bestowed <- Fields.defaulted "bestowed" False Common.boolean Object.bestowed
   mutating <- Fields.defaulted "mutating" False Common.boolean Object.mutating
   prototyped <- Fields.defaulted "prototyped" False Common.boolean Object.prototyped
@@ -175,7 +162,7 @@ codec = Fields.object $ do
         Object.unlockedHalves = unlockedHalves,
         Object.designations = designations,
         Object.designationValues = designationValues,
-        Object.kicked = kicked,
+        Object.paidCosts = paidCosts,
         Object.bestowed = bestowed,
         Object.mutating = mutating,
         Object.prototyped = prototyped,

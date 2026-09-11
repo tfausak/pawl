@@ -3,7 +3,6 @@ module Pawl.Codec.Quantity where
 import qualified Pawl.Codec.AgainstSlot as AgainstSlot
 import qualified Pawl.Codec.CastFrom as CastFrom
 import qualified Pawl.Codec.CompletedDungeon as CompletedDungeon
-import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
@@ -75,10 +74,10 @@ codec =
       -- HasDesignation above carries: which mark's value is asked is a value.
       Arm.payload "DesignationValue" Designation.codec Quantity.DesignationValue (\x -> case x of Quantity.DesignationValue y -> Just y; _ -> Nothing),
       Arm.nullary "WasKicked" Quantity.WasKicked,
-      -- CR 702.33f's "kicked with its [A] kicker", with the COST on the wire and
-      -- the object still implicit: which kicker cost is asked about is the whole
-      -- of what the card names (Pawl.Types.Quantity).
-      Arm.payload "TimesKickedWith" (Cost.codec Keyword.codec) Quantity.TimesKickedWith (\x -> case x of Quantity.TimesKickedWith y -> Just y; _ -> Nothing),
+      -- CR 702.33f's "kicked with its [A] kicker", with the KEYWORD on the wire
+      -- and the object still implicit: which ability's cost is asked about is
+      -- the whole of what the card names (Pawl.Types.Quantity).
+      Arm.payload "TimesPaid" Keyword.codec Quantity.TimesPaid (\x -> case x of Quantity.TimesPaid y -> Just y; _ -> Nothing),
       -- CR 601.2b's candidate, with the keyword FAMILY on the wire: "if its evoke
       -- cost was paid" names the ability and never its cost.
       Arm.payload "CastUsing" KeywordFamily.codec Quantity.CastUsing (\x -> case x of Quantity.CastUsing y -> Just y; _ -> Nothing),

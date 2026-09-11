@@ -90,7 +90,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.unlockedHalves = Set.empty,
           Object.designations = Set.empty,
           Object.designationValues = Map.empty,
-          Object.kicked = Map.empty,
+          Object.paidCosts = Map.empty,
           Object.bestowed = False,
           Object.mutating = False,
           Object.prototyped = False,
@@ -186,9 +186,9 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Fire")),
           Object.designations = Set.singleton Designation.Renowned,
           Object.designationValues = Map.singleton Designation.Monstrous 26,
-          Object.kicked =
+          Object.paidCosts =
             Map.singleton
-              Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 24]), Cost.components = []}
+              (Keyword.Squad Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 24]), Cost.components = []})
               25,
           Object.bestowed = True,
           Object.mutating = True,
@@ -236,7 +236,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"
           <> ",\"designationValues\":[{\"designation\":{\"type\":\"Monstrous\"},\"value\":26}]"
-          <> ",\"kicked\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]},\"times\":25}]"
+          <> ",\"paidCosts\":[{\"key\":{\"type\":\"Squad\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]}},\"value\":25}]"
           <> ",\"bestowed\":true"
           <> ",\"mutating\":true"
           <> ",\"prototyped\":true"

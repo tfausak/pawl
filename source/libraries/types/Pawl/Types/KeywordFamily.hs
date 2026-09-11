@@ -198,4 +198,10 @@ data KeywordFamily
     -- pool asks yet, and it is owed at the keyword rather than at the first
     -- asker.
     Mutate
+  | -- | CR 702.157a: squad [cost]. No card in the pool asks yet, and it is owed
+    -- at the keyword rather than at the first asker.
+    Squad
+  | -- | CR 702.175a: offspring [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Offspring
   deriving (Bounded, Enum, Eq, Ord, Show)

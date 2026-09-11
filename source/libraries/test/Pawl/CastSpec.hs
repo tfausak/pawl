@@ -15,6 +15,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Numeric.Natural as Natural
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
@@ -713,7 +714,7 @@ handInPlay printing board =
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
-            Object.kicked = Map.empty,
+            Object.paidCosts = Map.empty,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1429,8 +1430,8 @@ kicksBlue = kicksMatching blueKicker
 
 kicksMatching :: Cost.Type.Cost Keyword.Keyword -> Prompt.Prompt r -> r
 kicksMatching wanted p = case p of
-  Prompt.ChooseKicker _ _ _ cost _ ->
-    KickerDecision.MkKickerDecision (if cost == wanted then 1 else 0)
+  Prompt.ChooseKicker _ _ _ keyword _ ->
+    KickerDecision.MkKickerDecision (if keyword == Keyword.Kicker wanted then 1 else 0)
   -- One legal target per slot, FILTERED out of the offered set rather than built
   -- by hand, so CR 608.2b sees the recipient the prompt offered.
   Prompt.ChooseTargets _ _ _ sets -> Map.map (Set.take 1 . snd) sets
@@ -1612,8 +1613,8 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     Spec.assertEqWith
       s
       "one cost, {4}, and rule 702.33a's limit of one payment"
-      (fmap (Keyword.Engine.kickerCosts . Face.keywords) (Game.faceOf spellId gs))
-      (Just [(Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]), Cost.Type.components = []}, Just 1)])
+      (fmap (fmap Keyword.Engine.optionalCost . Keyword.Engine.optionalCosts . Face.keywords) (Game.faceOf spellId gs))
+      (Just [Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]), Cost.Type.components = []}, Just 1)])
   -- A card with no kicker is never asked, which is the other half of "where the
   -- rules leave nothing to ask, don't prompt".
   Spec.it s "CR 702.33a a spell without kicker (Lightning Bolt) is never offered one" $ do
@@ -1622,7 +1623,7 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     hillGiant <- S.printingOf s registry "Hill Giant"
     let (gs, spellId, giantId) = kickerBoard mountain lightningBolt hillGiant 5
         (asked, _) = castAndResolve (bursts (KickerDecision.MkKickerDecision 1) giantId) gs spellId
-    Spec.assertEqWith s "no kicker cost to offer" (fmap (Keyword.Engine.kickerCosts . Face.keywords) (Game.faceOf spellId gs)) (Just [])
+    Spec.assertEqWith s "no kicker cost to offer" (fmap (Keyword.Engine.optionalCosts . Face.keywords) (Game.faceOf spellId gs)) (Just [])
     Spec.assertEqWith s "so no kicker question was put, on a board that could pay one" (kickerAnnouncements asked) []
   -- CR 702.33a's "an additional cost", singular: kicker is payable once, so an
   -- answer of two is text Burst Lightning does not have. Nine Mountains, which is
@@ -3378,6 +3379,121 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
     Spec.assertEqWith s "CR 702.152a and drew a card as it died" (drew blitzed) 1
     Spec.assertEqWith s "cast for {1}{R} and bolted, it died and made its Treasure without drawing" (drew bolted, dead bolted) (0, (0, 1))
 
+-- CR 702.157a on Galadhrim Brigade {2}{G} 2/2 Creature -- Elf Soldier, "Squad
+-- {1}{G} / Other Elves you control get +1/+1." (Oracle text checked on Scryfall,
+-- 2026-09-11).
+--
+-- Seven Forests: the {2}{G} and the squad cost twice. The Brigades' lord ability
+-- makes each one's power say how many OTHER Brigades entered.
+squadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+squadSpec s registry = Spec.describe s "Squad" $ do
+  Spec.it s "CR 702.157a squad paid twice makes two token copies; unpaid, none" $ do
+    forest <- S.printingOf s registry "Forest"
+    brigade <- S.printingOf s registry "Galadhrim Brigade"
+    let (brigadeId, board) = boardWith S.addHandCard forest brigade 7
+        brigadesAfter times = List.sort (fmap (\oid -> S.powerToughnessOf oid (castResolved (paidTimes times) brigadeId board)) (namedOnBattlefield "Galadhrim Brigade" (castResolved (paidTimes times) brigadeId board)))
+    Spec.assertEqWith s "CR 702.157a three Brigades, each pumped by the other two" (brigadesAfter 2) [Just (4, 4), Just (4, 4), Just (4, 4)]
+    Spec.assertEqWith s "CR 603.4 unpaid, the one printed 2/2" (brigadesAfter 0) [Just (2, 2)]
+    Spec.assertEqWith s "and two of the three are tokens" (length (S.tokensOf (castResolved (paidTimes 2) brigadeId board))) 2
+  -- CR 707.10: Double Major's copy of a Brigade squadded once copies the
+  -- payment, so the token it becomes makes a token copy of its own. Four
+  -- Brigades, each pumped by the other three; without the copied payment, three
+  -- 4/4s.
+  Spec.it s "CR 707.10 a Double Major copy of a squadded Brigade makes its own token" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    brigade <- S.printingOf s registry "Galadhrim Brigade"
+    doubleMajor <- S.printingOf s registry "Double Major"
+    let (brigadeId, board) = boardWith S.addHandCard forest brigade 5
+        onStack = S.runPure (paidTimes 1) board (S.cast S.alice brigadeId)
+        (majorId, withMajor) = S.addHandCard doubleMajor S.alice (S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 onStack))
+        after = S.runPure S.identityAnswer withMajor (S.cast S.alice majorId >> Monad.replicateM_ (6 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+    Spec.assertEqWith s "CR 707.10 four Brigades, each pumped by the other three" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Galadhrim Brigade" after)) (replicate 4 (Just (5, 5)))
+    Spec.assertEqWith s "and three of the four are tokens, with the stack empty" (length (S.tokensOf after), length (GameState.stack after)) (3, 0)
+
+-- CR 702.175a on Coruscation Mage {1}{R} 2/2 Creature -- Otter Wizard, "Offspring
+-- {2} / Whenever you cast a noncreature spell, this creature deals 1 damage to
+-- each opponent." (Oracle text checked on Scryfall, 2026-09-11).
+--
+-- Four Mountains pay the {1}{R} and the offspring {2}; each case adds what else
+-- it casts.
+offspringSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+offspringSpec s registry = Spec.describe s "Offspring" $ do
+  Spec.it s "CR 702.175a offspring paid makes a 1/1 token copy; unpaid, none" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mage <- S.printingOf s registry "Coruscation Mage"
+    let (mageId, board) = boardWith S.addHandCard mountain mage 4
+        magesAfter times = let gs = castResolved (paidTimes times) mageId board in List.sort (fmap (`S.powerToughnessOf` gs) (namedOnBattlefield "Coruscation Mage" gs))
+    Spec.assertEqWith s "CR 707.9b the token copy is a 1/1 beside the printed 2/2" (magesAfter 1) [Just (1, 1), Just (2, 2)]
+    Spec.assertEqWith s "CR 603.4 unpaid, the one printed 2/2" (magesAfter 0) [Just (2, 2)]
+  -- CR 608.2h: Lightning Bolt kills the Mage with its offspring trigger on the
+  -- stack. The trigger's "if" and its copy both read the Mage's last known
+  -- information, which remembers the payment (CR 400.7d).
+  Spec.it s "CR 608.2h a Mage killed in response still leaves its token" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mage <- S.printingOf s registry "Coruscation Mage"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (mageId, gs1) = boardWith S.addHandCard mountain mage 5
+        (boltId, board) = S.addHandCard bolt S.alice gs1
+        entered = S.runPure (paidTimes 1) (S.runPure (paidTimes 1) board (S.cast S.alice mageId)) (Stack.resolveTop >> Engine.settleForPriority)
+    case namedOnBattlefield "Coruscation Mage" entered of
+      [original] -> do
+        let after = castResolved (aimedAt original) boltId entered
+        Spec.assertEqWith s "CR 608.2h the Mage died and its 1/1 token copy entered" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Coruscation Mage" after), not (null (S.tokensOf after))) ([Just (1, 1)], True)
+        Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+      other -> Spec.assertFailure s ("expected one Coruscation Mage, got " <> show (length other))
+  -- CR 707.2: the payment is not a copiable value, so a Clone of the paid Mage
+  -- has an offspring trigger whose "if" fails (CR 603.4) and makes no token.
+  Spec.it s "CR 707.2 a Clone of a paid Mage makes no token" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    mage <- S.printingOf s registry "Coruscation Mage"
+    clone <- S.printingOf s registry "Clone"
+    let (mageId, board) = boardWith S.addHandCard mountain mage 4
+        paid = castResolved (paidTimes 1) mageId board
+    case filter (\oid -> S.powerToughnessOf oid paid == Just (2, 2)) (namedOnBattlefield "Coruscation Mage" paid) of
+      [original] -> do
+        let (cloneId, withClone) = S.addHandCard clone S.alice (S.landsFor island S.alice 4 paid)
+            after = castResolved (aimedAt original) cloneId withClone
+        Spec.assertEqWith s "CR 707.2 the Clone is a second 2/2 and nothing else entered" (List.sort (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Coruscation Mage" after))) [Just (1, 1), Just (2, 2), Just (2, 2)]
+        Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+      other -> Spec.assertFailure s ("expected one printed Coruscation Mage, got " <> show (length other))
+  -- CR 400.7: Flicker of Fate makes the paid Mage a new object nobody paid an
+  -- offspring cost for, so its trigger's "if" fails as it re-enters (CR 603.4).
+  Spec.it s "CR 400.7 a flickered paid Mage makes no second token" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    mage <- S.printingOf s registry "Coruscation Mage"
+    flicker <- S.printingOf s registry "Flicker of Fate"
+    let (mageId, board) = boardWith S.addHandCard mountain mage 4
+        paid = castResolved (paidTimes 1) mageId board
+    case filter (\oid -> S.powerToughnessOf oid paid == Just (2, 2)) (namedOnBattlefield "Coruscation Mage" paid) of
+      [original] -> do
+        let (flickerId, withFlicker) = S.addHandCard flicker S.alice (S.landsFor plains S.alice 2 paid)
+            after = castResolved (aimedAt original) flickerId withFlicker
+        Spec.assertEqWith s "CR 400.7 the flickered 2/2 and the one 1/1 token, nothing more" (List.sort (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Coruscation Mage" after))) [Just (1, 1), Just (2, 2)]
+        Spec.assertEqWith s "and the 2/2 is a new object, with the stack empty" (notElem original (namedOnBattlefield "Coruscation Mage" after), length (GameState.stack after)) (True, 0)
+      other -> Spec.assertFailure s ("expected one printed Coruscation Mage, got " <> show (length other))
+  -- CR 702.175a's "an additional [cost]", singular: an answer of two is text the
+  -- Mage does not have. Six Mountains pay {1}{R} plus {2} twice, so only the
+  -- LIMIT can reject the cast; the same board answering one is the control.
+  Spec.it s "CR 702.175a paying offspring TWICE rejects the cast; once, one token" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mage <- S.printingOf s registry "Coruscation Mage"
+    let (mageId, board) = boardWith S.addHandCard mountain mage 6
+        twice = castResolved (paidTimes 2) mageId board
+        once = castResolved (paidTimes 1) mageId board
+    Spec.assertEqWith s "CR 702.175a answered twice, no Mage entered and the card is back in hand" (length (namedOnBattlefield "Coruscation Mage" twice), inHandNamed "Coruscation Mage" twice) (0, 1)
+    Spec.assertEqWith s "CR 601.2e and no Mountain is tapped" (S.tappedCount S.alice twice) 0
+    Spec.assertEqWith s "the control: answered once, the 2/2 and one 1/1" (List.sort (fmap (`S.powerToughnessOf` once) (namedOnBattlefield "Coruscation Mage" once))) [Just (1, 1), Just (2, 2)]
+
+-- CR 601.2b's optional additional cost paid `times` times, every other prompt
+-- S.identityAnswer's.
+paidTimes :: Natural.Natural -> Prompt.Prompt r -> r
+paidTimes times p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
+  _ -> S.identityAnswer p
+
 -- Mardu Scout's printed {R}{R} and its dash {1}{R}; Riveteers Requisitioner's
 -- printed {1}{R} and its blitz {2}{R}.
 scoutCost, dashCost, requisitionerCost, blitzCost :: [ManaSymbol.ManaSymbol]
@@ -3740,6 +3856,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   evokeSpec s registry
   dashSpec s registry
   blitzSpec s registry
+  squadSpec s registry
+  offspringSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry

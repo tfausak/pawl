@@ -103,6 +103,8 @@ codec =
       Arm.payload "Evoke" (Cost.codec codec) Keyword.Evoke (\x -> case x of Keyword.Evoke y -> Just y; _ -> Nothing),
       Arm.payload "Dash" (Cost.codec codec) Keyword.Dash (\x -> case x of Keyword.Dash y -> Just y; _ -> Nothing),
       Arm.payload "Blitz" (Cost.codec codec) Keyword.Blitz (\x -> case x of Keyword.Blitz y -> Just y; _ -> Nothing),
+      Arm.payload "Squad" (Cost.codec codec) Keyword.Squad (\x -> case x of Keyword.Squad y -> Just y; _ -> Nothing),
+      Arm.payload "Offspring" (Cost.codec codec) Keyword.Offspring (\x -> case x of Keyword.Offspring y -> Just y; _ -> Nothing),
       Arm.payload "Hideaway" Common.natural Keyword.Hideaway (\x -> case x of Keyword.Hideaway y -> Just y; _ -> Nothing),
       Arm.payload "Reinforce" (Reinforce.codec codec) Keyword.Reinforce (\x -> case x of Keyword.Reinforce y -> Just y; _ -> Nothing),
       Arm.nullary "Persist" Keyword.Persist,

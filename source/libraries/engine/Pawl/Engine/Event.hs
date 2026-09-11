@@ -749,7 +749,7 @@ mintCard pid under printingId dest position gs =
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
-            Object.kicked = Map.empty,
+            Object.paidCosts = Map.empty,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -942,7 +942,7 @@ createEmblem pid card = do
                 Object.unlockedHalves = Set.empty,
                 Object.designations = Set.empty,
                 Object.designationValues = Map.empty,
-                Object.kicked = Map.empty,
+                Object.paidCosts = Map.empty,
                 Object.bestowed = False,
                 Object.mutating = False,
                 Object.prototyped = False,
@@ -4699,15 +4699,15 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- to a graveyard becomes a card, and rule 400.7d speaks only
                     -- about a permanent. Nothing else reads the record off an
                     -- object outside the stack.
-                    Object.kicked = if dest == Zone.Battlefield then Object.kicked obj else Map.empty,
+                    Object.paidCosts = if dest == Zone.Battlefield then Object.paidCosts obj else Map.empty,
                     -- CR 702.103b: "these effects last until the SPELL OR THE
                     -- PERMANENT IT BECOMES ceases to be bestowed", so the
                     -- designation crosses this one move with the object the rule
-                    -- is still about. `kicked`'s route above, but for a stronger
+                    -- is still about. `paidCosts`' route above, but for a stronger
                     -- reason than rule 400.7d's look-back: this is not a memory
                     -- of the cast, it is the effect still running.
                     --
-                    -- BATTLEFIELD ONLY, `kicked`'s gate and for a reason the rule
+                    -- BATTLEFIELD ONLY, `paidCosts`' gate and for a reason the rule
                     -- states rather than implies: what a bestowed spell becomes
                     -- anywhere else is a card, and a card is no bestowed Aura.
                     Object.bestowed = Object.bestowed obj && dest == Zone.Battlefield,
@@ -4732,7 +4732,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- that references it: how many of the spell's Phyrexian mana
                     -- symbols were announced to be paid with life (CR 601.2b).
                     --
-                    -- BATTLEFIELD ONLY, `kicked`'s gate and for its reason: rule
+                    -- BATTLEFIELD ONLY, `paidCosts`' gate and for its reason: rule
                     -- 702.150a is about a permanent entering, and a countered
                     -- spell on its way to a graveyard becomes a card no compleated
                     -- ability can be on.
@@ -4743,13 +4743,13 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- Strider's "if {S} was spent to cast this spell" is asked of
                     -- the permanent that spell became.
                     --
-                    -- BATTLEFIELD ONLY, `kicked`'s gate and for its reason: rule
+                    -- BATTLEFIELD ONLY, `paidCosts`' gate and for its reason: rule
                     -- 400.7d speaks about a permanent, and a countered spell
                     -- becomes a card no such ability can be on.
                     Object.manaSpent = if dest == Zone.Battlefield then Object.manaSpent obj else Mana.MkMana [],
                     -- CR 400.7d a fifth time: which keyword's cost was paid, what
                     -- CR 702.74a's "if its evoke cost was paid" and CR 702.138b's
-                    -- "escaped" ask of the permanent. BATTLEFIELD ONLY, `kicked`'s
+                    -- "escaped" ask of the permanent. BATTLEFIELD ONLY, `paidCosts`'
                     -- gate and for its reason.
                     Object.castUsing = if dest == Zone.Battlefield then Object.castUsing obj else Nothing
                   }
@@ -4876,7 +4876,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- id moves before its host, and the live board has already
                         -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
                         -- in the same batch, ahead of its host" is the proof.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj)) (GameState.lastKnown g1)
                       }
               -- CR 712.21: "If a melded permanent leaves the battlefield, one
               -- permanent leaves the battlefield and two cards are put into the
@@ -6060,7 +6060,7 @@ createTokens controller card copy n tapped entering = do
                       Object.unlockedHalves = Set.empty,
                       Object.designations = Set.empty,
                       Object.designationValues = Map.empty,
-                      Object.kicked = Map.empty,
+                      Object.paidCosts = Map.empty,
                       Object.bestowed = False,
                       Object.mutating = False,
                       Object.prototyped = False,
@@ -6254,7 +6254,7 @@ meld controller victims resultCard = do
                 Object.unlockedHalves = Set.empty,
                 Object.designations = Set.empty,
                 Object.designationValues = Map.empty,
-                Object.kicked = Map.empty,
+                Object.paidCosts = Map.empty,
                 Object.bestowed = False,
                 Object.mutating = False,
                 Object.prototyped = False,
@@ -6595,7 +6595,7 @@ forgetObject gs oid = case Game.lookupObject oid gs of
         cleared = Game.removeFromZones (Object.owner obj) oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj)) (GameState.lastKnown cleared)
           }
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i

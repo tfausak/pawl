@@ -1568,11 +1568,11 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.DesignationValue _ -> quantity
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
-  -- A LEAF like WasKicked above, and the Cost it names is deliberately NOT
+  -- A LEAF like WasKicked above, and the Keyword it names is deliberately NOT
   -- rewritten: Pawl.Engine.Cast keys the record it stamps off the PRINTED face
-  -- (Game.faceOf), so rewriting the identifier here would ask about a cost no
-  -- announcement was ever recorded under.
-  Quantity.Type.TimesKickedWith _ -> quantity
+  -- (Game.faceOf), so rewriting the identifier here would ask about a keyword
+  -- no announcement was ever recorded under.
+  Quantity.Type.TimesPaid _ -> quantity
   Quantity.Type.CastUsing _ -> quantity
   Quantity.Type.TagWasSpent {} -> quantity
   Quantity.Type.WasToken -> quantity

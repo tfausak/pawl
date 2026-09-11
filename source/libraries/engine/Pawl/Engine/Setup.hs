@@ -297,7 +297,7 @@ createCard pid printingId = do
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
-            Object.kicked = Map.empty,
+            Object.paidCosts = Map.empty,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1124,6 +1124,8 @@ applyCrossings finalSub parent =
                 -- CR 310.9a, read straight off the object like the owner above:
                 -- Nothing for everything that is not a battle.
                 (Object.protector obj)
+                -- CR 400.7d's cost record, read straight off the object too.
+                (Object.paidCosts obj)
             )
       -- One crossing: file, delete, then record. The event LAST, so that
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after

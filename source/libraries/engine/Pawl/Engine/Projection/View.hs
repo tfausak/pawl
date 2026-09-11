@@ -93,7 +93,8 @@ lastKnownView peers oid gs lk =
     { Filter.owner = Just (LastKnown.owner lk),
       Filter.token = Game.sourceIsToken (LastKnown.source lk),
       Filter.attacking = LastKnown.attacking lk,
-      Filter.blocking = LastKnown.blocking lk
+      Filter.blocking = LastKnown.blocking lk,
+      Filter.paidCosts = LastKnown.paidCosts lk
     }
 
 -- The characteristics view of a printed card, from the FACE alone. The axes that
@@ -250,7 +251,7 @@ viewOfCard face =
           -- CR 716.2b gives a level to a PERMANENT, and this builder describes a
           -- printed face.
           Filter.classLevel = Nothing,
-          Filter.kicked = Map.empty,
+          Filter.paidCosts = Map.empty,
           Filter.castUsing = Nothing,
           -- CR 601.2h pays the cost of a SPELL, and this builder describes a
           -- printed face.
@@ -709,12 +710,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the read, which is what a CR 608.2h asker gets for a permanent that is
       -- gone.
       Filter.classLevel = Game.lookupObject oid gs >>= Object.classLevel,
-      -- CR 702.33d: read live off the object, so the CR 608.2h path answers "not
-      -- kicked" for a spell that has left the stack.
-      Filter.kicked = foldMap Object.kicked (Game.lookupObject oid gs),
-      -- CR 400.7d, `kicked`'s read.
+      -- CR 601.2b: read live off the object. For one that has left its zone,
+      -- lastKnownView overrides this with LastKnown.paidCosts, so the CR 608.2h
+      -- path answers "kicked" for a kicked spell that has left the stack.
+      Filter.paidCosts = foldMap Object.paidCosts (Game.lookupObject oid gs),
+      -- CR 400.7d: read live off the object, with no last-known override.
       Filter.castUsing = Object.castUsing =<< Game.lookupObject oid gs,
-      -- CR 400.7d / CR 107.4h: read live off the object like `kicked`, and
+      -- CR 400.7d / CR 107.4h: read live off the object like `castUsing`, and
       -- flattened to the tags here because that is the whole of what the
       -- vocabulary asks (see the field's own comment in Pawl.Engine.Filter). The
       -- object may be a CR 602.2a ability on the stack as well as a spell or the
