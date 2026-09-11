@@ -775,10 +775,6 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   -- Replacement.applyCopyExceptions stamps into the snapshot this arm goes
   -- around (#3249). No card in data/cards/ pairs an exception with a
   -- Room-eligible copy.
-  -- Not implemented: CR 707.2's "status ... [is] not copied" for CR 110.5's
-  -- flipped status, which baseCharacteristics reads through Game.faceOf and so
-  -- folds a flipped permanent's alternative half into the value a copy freezes
-  -- (#3364). Pawl.Engine.Event.copiedSnapshot is the reader that spends it.
   Nothing -> baseCharacteristics oid gs
 
 -- CR 613.2a / 613.2b: an object's LAYER 1a value -- `copiableCharacteristics`
@@ -826,9 +822,7 @@ copiableCharacteristicsFaceUp oid gs =
 -- merged permanent carries the older merge's flip component forward.
 copiableCharacteristicsFlipped :: ObjectId -> GameState -> ProjectedCharacteristics
 copiableCharacteristicsFlipped oid gs =
-  copiableCharacteristicsFaceUp
-    oid
-    gs {GameState.objects = Map.adjust (\o -> o {Object.flipped = True}) oid (GameState.objects gs)}
+  copiableCharacteristicsFaceUp oid (Game.withFlipped True oid gs)
 
 -- CR 730.2i: `copiableCharacteristicsFaceUp` above asked of a side whose
 -- double-faced card is turned over (Game.withFaceTurned). Equal to the face-up
@@ -908,6 +902,11 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 -- unmerged road, where Game.resolveFaceFor makes the substitution at the face
 -- seam a merged permanent's stamp goes around. CR 730.2i needs no fork here:
 -- Game.turnFaceOver swaps the turned reading into Binding.copyOf itself.
+--
+-- CR 707.3 is the same fork for a COPY of a flip card: a flipped permanent reads
+-- the alternative reading its copy stamp carries (PC.flipped), and one whose
+-- stamp carries none -- CR 110.5c's flipped permanent that became a copy of
+-- Runeclaw Bear -- keeps its status to no effect.
 stampedSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 stampedSnapshotOf oid gs = do
   object <- Game.lookupObject oid gs
@@ -915,7 +914,7 @@ stampedSnapshotOf oid gs = do
   if Object.flipped object
     then case Binding.flippedCopyOf bindings of
       Just flipped -> Just flipped
-      Nothing -> Binding.copyOf bindings
+      Nothing -> fmap (\stamp -> Maybe.fromMaybe stamp (PC.flipped stamp)) (Binding.copyOf bindings)
     else Binding.copyOf bindings
 
 -- CR 707.2a: the static abilities this object's copiable rules text gives it --
@@ -1081,7 +1080,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         -- CR 709.5: no card behind the object, so no halves either.
         PC.halves = Nothing,
         -- CR 722.2b, for the same reason one line up.
-        PC.prepare = Nothing
+        PC.prepare = Nothing,
+        -- CR 710.1b, for the same reason again.
+        PC.flipped = Nothing
       }
   Just face ->
     -- CR 718.3b's swap sits OUTSIDE the record rather than in four of its fields,
@@ -1196,7 +1197,11 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- carry either -- CR 722.4 leaves the normal half alone in every
               -- zone, so the inset frame is nowhere in it. Game.prepareSpellOf
               -- decides, and it reads the copy snapshot first for halves' reason.
-              PC.prepare = Game.prepareSpellOf oid gs
+              PC.prepare = Game.prepareSpellOf oid gs,
+              -- CR 707.3: a copy stamp's alternative reading, which
+              -- Pawl.Engine.Event.copiedSnapshot stamps. A printed flip card's
+              -- alternative half is its card's, read at Game.resolveFaceFor.
+              PC.flipped = Nothing
             }
 
 -- CR 718.3b: "both a prototyped spell and the permanent it becomes have only its

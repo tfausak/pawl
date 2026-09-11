@@ -34,6 +34,8 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 
 -- | The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
+--
+-- RECURSIVE through `flipped`, Pawl.Codec.Card's knot and for its reason.
 codec :: Codec.Codec PC.ProjectedCharacteristics
 codec = Fields.object $ do
   names <- Fields.required "names" (Common.set CardName.codec) PC.names
@@ -64,6 +66,7 @@ codec = Fields.object $ do
   grantsStationToughness <- Fields.defaulted "grantsStationToughness" False Common.boolean PC.grantsStationToughness
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   prepare <- Fields.defaulted "prepare" Nothing (Common.maybe (Face.codec Card.codec)) PC.prepare
+  flipped <- Fields.defaulted "flipped" Nothing (Common.maybe codec) PC.flipped
   pure
     PC.MkProjectedCharacteristics
       { PC.names = names,
@@ -93,5 +96,6 @@ codec = Fields.object $ do
         PC.assignsCombatDamageWithToughness = assignsCombatDamageWithToughness,
         PC.grantsStationToughness = grantsStationToughness,
         PC.halves = halves,
-        PC.prepare = prepare
+        PC.prepare = prepare,
+        PC.flipped = flipped
       }
