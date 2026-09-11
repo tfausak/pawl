@@ -164,8 +164,9 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- battlefield as readily as in a graveyard, so unearth leans on CR 113.6m, the
   -- reading zoneFunctionedFrom below implements off the return's
   -- MoveToZone.origin (Pawl.Engine.Keyword.unearth). Rules 702.128a's and
-  -- 702.129a's costs exile the card from a graveyard, which CR 113.6j confines
-  -- there on its own (Pawl.Engine.Keyword.graveyardTokenCopy).
+  -- 702.129a's COSTS exile the card from a graveyard, CR 113.6m's other reading,
+  -- which the cost's own payability gate enforces
+  -- (Pawl.Engine.Keyword.graveyardTokenCopy).
   Just Zone.Graveyard -> Keyword.graveyardAbilitiesOf (maybe Set.empty Face.keywords (Game.faceOf oid gs)) <> zoneAbilitiesOf Zone.Graveyard oid gs
   -- CR 114.4 and CR 902.7's third limb, "its activated abilities may be
   -- activated". The narrowing to the objects rule 113.6p names is inside

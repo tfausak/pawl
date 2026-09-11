@@ -3229,9 +3229,9 @@ graveyardTokenCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         embalmed = activateFromGraveyard gyId board
         zombieSnakeWarrior = Set.fromList [Subtype.Snake, Subtype.Warrior, Subtype.Zombie]
     Spec.assertBool s (any (isActivationOf gyId) (Action.legalActions S.alice board)) "embalm is offered from the graveyard"
-    -- CR 113.6j: the Skirmisher on the battlefield HAS the ability too, and the
+    -- CR 113.6m: the Skirmisher on the battlefield HAS the ability too, and the
     -- same Islands would pay its mana, but its cost exiles a graveyard card.
-    Spec.assertBool s (not (any (\a -> any (`isActivationOf` a) twinIds) (Action.legalActions S.alice board))) "CR 113.6j but not from the battlefield"
+    Spec.assertBool s (not (any (\a -> any (`isActivationOf` a) twinIds) (Action.legalActions S.alice board))) "CR 113.6m but not from the battlefield"
     -- CR 602.5d: the same board a step later, so only the timing differs.
     Spec.assertBool
       s

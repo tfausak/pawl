@@ -1030,7 +1030,8 @@ eternalize =
 --
 -- THE EXILE is a cost component appended to the keyword's own cost, so it is
 -- paid on activation (CR 602.2b / 601.2h), and it is what confines the ability
--- to a graveyard: CR 113.6j, enforced by Pawl.Engine.Cost.canPayComponent.
+-- to a graveyard: CR 113.6m, a cost that moves the object out of a zone,
+-- enforced by Pawl.Engine.Cost.canPayComponent.
 --
 -- THE COPY names Binding.triggerSource, the graveyard card. That card is gone by
 -- resolution (CR 400.7), so CreateCopy reads its copiable values (CR 707.2)

@@ -1407,7 +1407,7 @@ functionsFromZone zone sa =
 -- CR 702.29b and CR 702.77b are why handAbilitiesOf is in this list, and CR
 -- 702.84a why graveyardAbilitiesOf is beside it: a cycling, reinforce, unearth,
 -- embalm or eternalize ability exists in every zone, so the object HAS it here;
--- it just cannot be activated here (CR 113.6j, 113.6m).
+-- it just cannot be activated here (CR 113.6m).
 --
 -- CR 613.1: the gate's board comes in as a parameter. Taking fullView here would
 -- not terminate for a caller inside the fold -- it re-enters `gather`, with no
