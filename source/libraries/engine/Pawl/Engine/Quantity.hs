@@ -472,9 +472,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect --
         -- rule 702.33d designating the spell for ANY of its kicker costs, so this asks
         -- every KICKER key of the map and no other: a squad or offspring payment is
-        -- not a kick. The object it reads is the RESOLVING SPELL, which is still on
-        -- the stack while its own clause conditions are gated
-        -- (Pawl.Engine.Resolve.gateHolds).
+        -- not a kick. Kept because CR 702.33d says so, not because anything observes
+        -- it: no card in data/cards/ prints squad or offspring beside a "kicked"
+        -- payoff, so dropping the filter leaves the suite green. The object it
+        -- reads is the RESOLVING SPELL, which is still on the stack while its own
+        -- clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
         Quantity.WasKicked -> fmap (\view -> if any (> 0) (Map.filterWithKey (\keyword _ -> Keyword.familyOf keyword == Just KeywordFamily.Kicker) (Filter.paidCosts view)) then 1 else 0) mView
         -- CR 702.33f's "kicked with its [A] kicker", CR 702.33c's count and CR
         -- 702.157a's "for each time", which are one read: how many times THIS

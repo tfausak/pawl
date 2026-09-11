@@ -15,6 +15,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Numeric.Natural as Natural
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
@@ -3378,6 +3379,78 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
     Spec.assertEqWith s "CR 702.152a and drew a card as it died" (drew blitzed) 1
     Spec.assertEqWith s "cast for {1}{R} and bolted, it died and made its Treasure without drawing" (drew bolted, dead bolted) (0, (0, 1))
 
+-- CR 702.157a on Galadhrim Brigade {2}{G} 2/2 Creature -- Elf Soldier, "Squad
+-- {1}{G} / Other Elves you control get +1/+1." (Oracle text checked on Scryfall,
+-- 2026-09-11).
+--
+-- Seven Forests: the {2}{G} and the squad cost twice. The Brigades' lord ability
+-- makes each one's power say how many OTHER Brigades entered.
+squadSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+squadSpec s registry = Spec.describe s "Squad" $ do
+  Spec.it s "CR 702.157a squad paid twice makes two token copies; unpaid, none" $ do
+    forest <- S.printingOf s registry "Forest"
+    brigade <- S.printingOf s registry "Galadhrim Brigade"
+    let (brigadeId, board) = boardWith S.addHandCard forest brigade 7
+        brigadesAfter times = List.sort (fmap (\oid -> S.powerToughnessOf oid (castResolved (paidTimes times) brigadeId board)) (namedOnBattlefield "Galadhrim Brigade" (castResolved (paidTimes times) brigadeId board)))
+    Spec.assertEqWith s "CR 702.157a three Brigades, each pumped by the other two" (brigadesAfter 2) [Just (4, 4), Just (4, 4), Just (4, 4)]
+    Spec.assertEqWith s "CR 603.4 unpaid, the one printed 2/2" (brigadesAfter 0) [Just (2, 2)]
+    Spec.assertEqWith s "and two of the three are tokens" (length (S.tokensOf (castResolved (paidTimes 2) brigadeId board))) 2
+
+-- CR 702.175a on Coruscation Mage {1}{R} 2/2 Creature -- Otter Wizard, "Offspring
+-- {2} / Whenever you cast a noncreature spell, this creature deals 1 damage to
+-- each opponent." (Oracle text checked on Scryfall, 2026-09-11).
+--
+-- Four Mountains pay the {1}{R} and the offspring {2}; each case adds what else
+-- it casts.
+offspringSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+offspringSpec s registry = Spec.describe s "Offspring" $ do
+  Spec.it s "CR 702.175a offspring paid makes a 1/1 token copy; unpaid, none" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mage <- S.printingOf s registry "Coruscation Mage"
+    let (mageId, board) = boardWith S.addHandCard mountain mage 4
+        magesAfter times = let gs = castResolved (paidTimes times) mageId board in List.sort (fmap (`S.powerToughnessOf` gs) (namedOnBattlefield "Coruscation Mage" gs))
+    Spec.assertEqWith s "CR 707.9b the token copy is a 1/1 beside the printed 2/2" (magesAfter 1) [Just (1, 1), Just (2, 2)]
+    Spec.assertEqWith s "CR 603.4 unpaid, the one printed 2/2" (magesAfter 0) [Just (2, 2)]
+  -- CR 608.2h: Lightning Bolt kills the Mage with its offspring trigger on the
+  -- stack. The trigger's "if" and its copy both read the Mage's last known
+  -- information, which remembers the payment (CR 400.7d).
+  Spec.it s "CR 608.2h a Mage killed in response still leaves its token" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mage <- S.printingOf s registry "Coruscation Mage"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (mageId, gs1) = boardWith S.addHandCard mountain mage 5
+        (boltId, board) = S.addHandCard bolt S.alice gs1
+        entered = S.runPure (paidTimes 1) (S.runPure (paidTimes 1) board (S.cast S.alice mageId)) (Stack.resolveTop >> Engine.settleForPriority)
+    case namedOnBattlefield "Coruscation Mage" entered of
+      [original] -> do
+        let after = castResolved (aimedAt original) boltId entered
+        Spec.assertEqWith s "CR 608.2h the Mage died and its 1/1 token copy entered" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Coruscation Mage" after), not (null (S.tokensOf after))) ([Just (1, 1)], True)
+        Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+      other -> Spec.assertFailure s ("expected one Coruscation Mage, got " <> show (length other))
+  -- CR 707.2: the payment is not a copiable value, so a Clone of the paid Mage
+  -- has an offspring trigger whose "if" fails (CR 603.4) and makes no token.
+  Spec.it s "CR 707.2 a Clone of a paid Mage makes no token" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    mage <- S.printingOf s registry "Coruscation Mage"
+    clone <- S.printingOf s registry "Clone"
+    let (mageId, board) = boardWith S.addHandCard mountain mage 4
+        paid = castResolved (paidTimes 1) mageId board
+    case filter (\oid -> S.powerToughnessOf oid paid == Just (2, 2)) (namedOnBattlefield "Coruscation Mage" paid) of
+      [original] -> do
+        let (cloneId, withClone) = S.addHandCard clone S.alice (S.landsFor island S.alice 4 paid)
+            after = castResolved (aimedAt original) cloneId withClone
+        Spec.assertEqWith s "CR 707.2 the Clone is a second 2/2 and nothing else entered" (List.sort (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Coruscation Mage" after))) [Just (1, 1), Just (2, 2), Just (2, 2)]
+        Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+      other -> Spec.assertFailure s ("expected one printed Coruscation Mage, got " <> show (length other))
+
+-- CR 601.2b's optional additional cost paid `times` times, every other prompt
+-- S.identityAnswer's.
+paidTimes :: Natural.Natural -> Prompt.Prompt r -> r
+paidTimes times p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
+  _ -> S.identityAnswer p
+
 -- Mardu Scout's printed {R}{R} and its dash {1}{R}; Riveteers Requisitioner's
 -- printed {1}{R} and its blitz {2}{R}.
 scoutCost, dashCost, requisitionerCost, blitzCost :: [ManaSymbol.ManaSymbol]
@@ -3740,6 +3813,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   evokeSpec s registry
   dashSpec s registry
   blitzSpec s registry
+  squadSpec s registry
+  offspringSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry

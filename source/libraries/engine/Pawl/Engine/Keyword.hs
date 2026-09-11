@@ -350,9 +350,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Plot _ -> []
   -- CR 702.157b and CR 702.175b: each instance triggers on its OWN payments,
   -- which Object.paidCosts keys by the keyword -- so identical instances share one
-  -- key, and one ability answers for it rather than one per instance.
-  Keyword.Squad cost -> [squad cost]
-  Keyword.Offspring cost -> [offspring cost]
+  -- key, and a count past one mints one ability rather than one per instance.
+  Keyword.Squad cost -> List.genericReplicate (min 1 count) (squad cost)
+  Keyword.Offspring cost -> List.genericReplicate (min 1 count) (offspring cost)
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   -- CR 702.94a's linked triggered half, one per instance for CR 603.2's general
@@ -2092,9 +2092,9 @@ disguiseCost keywords =
 -- multikicker (CR 702.33c) and squad (CR 702.157a), which their rules make
 -- payable "any number of times" -- and Nothing for every other keyword.
 --
--- One function for all four because their rules say one thing: each pays its
--- cost "following the rules for paying additional costs in rules 601.2b and
--- 601.2f-h", so one announcement asks about them and Object.paidCosts records
+-- One function for all four because their rules say one thing: each is an
+-- optional ADDITIONAL cost (CR 118.8b) announced at CR 601.2b and paid at CR
+-- 601.2f-h, so one announcement asks about them and Object.paidCosts records
 -- them. What each PAYS OFF differs, and is read back off that record by keyword.
 --
 -- A wildcard rather than an exhaustive case, entwineCosts' reason: this asks
@@ -4188,7 +4188,9 @@ offspring cost = paidTokenCopies (Keyword.Offspring cost) (Quantity.Literal 1) [
 -- permanent, one that re-enters, and the token copies themselves paid nothing
 -- and do not trigger. CR 608.2h's last known information answers both reads for
 -- a permanent that left before the ability resolved (Pawl.Types.LastKnown's
--- `paidCosts`), and CreateCopy copies what it last was, as graveyardTokenCopy's.
+-- `paidCosts`), and CreateCopy copies what it last was, as graveyardTokenCopy's --
+-- Pawl.CastSpec's "CR 608.2h a Mage killed in response still leaves its token"
+-- proves that half.
 paidTokenCopies :: Keyword -> Quantity.Quantity -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card)] -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 paidTokenCopies keyword quantity exceptions =
   let copied =
