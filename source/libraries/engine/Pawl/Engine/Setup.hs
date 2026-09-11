@@ -377,8 +377,9 @@ createDeck pid deck = do
   commanderIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Deck.commander deck))
   -- CR 903.6 / CR 702.124b: "both commanders begin the game in the command
   -- zone". Which cards those are is Commander.designations' judgement, not this
-  -- deck's claim -- rule 702.124h admits a second commander only when both have
-  -- partner, and an inadmissible pair designates neither.
+  -- deck's claim -- rule 702.124 admits a second commander only for a pair one
+  -- of its partner abilities allows, and an inadmissible pair designates
+  -- neither.
   designatedIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Commander.designations deck))
   Monad.forM_ designatedIds $ \printingId -> do
     Monad.void (createInCommandZone pid printingId)

@@ -21,9 +21,8 @@
 --
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
---   * CR 702.124's partner limbs other than CR 702.124h's plain one, CR
---     702.124k's Background and CR 702.124m's Doctor's companion, and CR
---     903.3a's "this card can be your commander" (#939).
+--   * CR 702.124j's partner with [name], and CR 903.3a's "this card can be
+--     your commander" (#939).
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
 module Pawl.Engine.Commander where
 
@@ -53,6 +52,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
@@ -67,7 +67,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- | CR 903.3 \/ CR 702.124: the cards this deck may designate as its
 -- commanders. One designation is rule 903.3's; two are rule 702.124h's, and
 -- only when EACH of them has partner -- "you can have two commanders if both
--- have partner" -- or rule 702.124k's, and only when one has "choose a
+-- have partner" -- or rule 702.124i's, and only when both have the SAME
+-- partner—[text] ability, or rule 702.124k's, and only when one has "choose a
 -- Background" and the other is a legendary Background enchantment card, or rule
 -- 702.124m's, and only when one has "Doctor's companion" and the other is a
 -- legendary Time Lord Doctor creature card with no other creature types.
@@ -80,9 +81,10 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 --
 -- More than two is empty for CR 702.124g: "no partner ability or combination of
 -- partner abilities can ever let a player have more than two commanders". CR
--- 702.124f is why the three limbs are separate disjuncts rather than one
--- predicate: "different partner abilities are distinct from one another and
--- cannot be combined", so a card with partner beside a Background is no pair.
+-- 702.124f is why the limbs are separate disjuncts rather than one predicate:
+-- "different partner abilities are distinct from one another and cannot be
+-- combined", so a card with partner beside a Background is no pair, and neither
+-- is partner beside partner—Friends forever.
 --
 -- Rule 702.124k's exclusion runs BOTH ways and both halves are here. A card with
 -- "choose a Background" paired with anything that is not a legendary Background
@@ -104,9 +106,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- designates on its own like any other. So the ONE-card case is gated for a
 -- Background and not for a Doctor.
 --
--- Not implemented: CR 702.124i's partner—[text] and CR 702.124j's partner with
--- [name], each of which admits a different pair; and CR 903.3a's "this card can
--- be your commander" (#939).
+-- Not implemented: CR 702.124j's partner with [name], which admits a different
+-- pair; and CR 903.3a's "this card can be your commander" (#939).
 designations :: Deck.Deck -> Set.Set Printing.Printing
 designations deck =
   let named = Deck.commander deck
@@ -115,6 +116,7 @@ designations deck =
         [one] | isBackground one -> Set.empty
         [_] -> named
         [_, _] | all hasPartner named -> named
+        [a, b] | sharesPartnerText a b -> named
         [a, b] | choosesBackground a && isBackground b -> named
         [a, b] | choosesBackground b && isBackground a -> named
         [a, b] | isDoctorsCompanion a && isTheDoctor b -> named
@@ -124,6 +126,18 @@ designations deck =
 -- | CR 702.124h's requirement of one card of a pair.
 hasPartner :: Printing.Printing -> Bool
 hasPartner = printedKeyword Keyword.Partner
+
+-- | CR 702.124i's requirement of the pair: the same partner—[text] ability on
+-- both. An intersection rather than one ability each, for CR 702.124g: a card
+-- with two partner abilities may use either.
+sharesPartnerText :: Printing.Printing -> Printing.Printing -> Bool
+sharesPartnerText a b = not (Set.null (Set.intersection (partnerTexts a) (partnerTexts b)))
+
+-- | The partner—[text] abilities printed on this card's front face, for the
+-- reason `designations` gives.
+partnerTexts :: Printing.Printing -> Set.Set PartnerText.PartnerText
+partnerTexts printing =
+  Set.fromList [text | Keyword.PartnerText text <- Set.toList (Face.keywords (Card.frontFace (Printing.card printing)))]
 
 -- | CR 702.124k's requirement of the card that names the other.
 choosesBackground :: Printing.Printing -> Bool

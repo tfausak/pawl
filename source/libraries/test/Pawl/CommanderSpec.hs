@@ -3,7 +3,8 @@
 
 -- Covers Pawl.Engine.Commander (CR 903.3's designation, CR 903.6's starting zone,
 -- CR 903.8's permission and tax, CR 903.9a's state-based action, CR 903.9b's
--- command-zone replacement), CR 702.124h's two-commander designation, the
+-- command-zone replacement), CR 702.124h's and CR 702.124i's two-commander
+-- designations, the
 -- Player.commander and Player.commanderCasts fields, Deck's commander, CR
 -- 702.124k's Background designation and the Filter.IsCommander atom that reads
 -- it, the Zone.Command arm of Pawl.Engine.Cast.castableZones, and the CR 903.8
@@ -41,6 +42,12 @@
 -- Akiri gets +1\/+0 for each artifact you control. / Partner"). Rograkh's {0}
 -- is what makes CR 702.124d readable: his cast spends no mana, so whatever the
 -- board then pays for Akiri is her own cost and CR 903.8's tax alone.
+--
+-- The Partner text group takes that same fixture and the "partner—Friends
+-- forever" pair Bjorna, Nightfall Alchemist ({U}{R} Legendary Creature -- Human
+-- 1\/3) and Hargilde, Kindly Runechanter ({2}{W}{U} Legendary Creature -- Human
+-- 2\/3), beside April O'Neil, Live on the Scene ({1}{U} Legendary Creature --
+-- Human Detective 2\/1), whose "partner—Character select" is the other text.
 --
 -- The Choose a Background group takes that same fixture and a third pool: Wilson,
 -- Refined Grizzly ({1}{G} Legendary Creature -- Bear Warrior 2\/2, "This spell
@@ -154,6 +161,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   castSpec s registry
   taxSpec s registry
   partnerSpec s registry
+  partnerTextSpec s registry
   backgroundSpec s registry
   doctorsCompanionSpec s registry
   bounceSpec s registry
@@ -517,6 +525,34 @@ partnerSpec s registry = Spec.describe s "Partner" $ do
     Spec.assertEqWith s "CR 903.10a: twenty-two from Rograkh alone loses bob the game" (statusOf S.bob lethal) (Just (Status.Departed Departure.Type.Lost))
     Spec.assertEqWith s "at 7 life, so CR 704.5a is not what killed him either" (S.lifeOf S.bob lethal) (Just 7)
     Spec.assertEqWith s "and it was his tally that reached it, not Akiri's" (List.sort (tallyFrom S.alice S.bob lethal)) [11, 22]
+
+partnerTextSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+partnerTextSpec s registry = Spec.describe s "Partner text" $ do
+  -- CR 702.124i: "each of them has the same 'partner—[text]' ability", and CR
+  -- 702.124b starts both in the command zone.
+  Spec.it s "CR 702.124i two cards with the same partner—[text] are both designated" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    bjorna <- S.printingOf s registry "Bjorna, Nightfall Alchemist"
+    hargilde <- S.printingOf s registry "Hargilde, Kindly Runechanter"
+    let gs = partnerBoard mountain plains 6 [bjorna, hargilde]
+    Spec.assertEqWith s "both are in the command zone" (List.sort (commandZoneNames gs)) (List.sort [S.nameOf (Printing.card bjorna), S.nameOf (Printing.card hargilde)])
+    Spec.assertEqWith s "she is designated both" (fmap (List.sort . commanderPrintingsOf gs) (Map.lookup S.alice (GameState.players gs))) (Just (List.sort [bjorna, hargilde]))
+  -- Each leg is the control board with ONE printing swapped. April O'Neil has
+  -- partner—Character select, a different text; Akiri has plain partner, which
+  -- CR 702.124f keeps from combining with this one.
+  Spec.it s "CR 702.124i the pair admits only the same text" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    bjorna <- S.printingOf s registry "Bjorna, Nightfall Alchemist"
+    hargilde <- S.printingOf s registry "Hargilde, Kindly Runechanter"
+    april <- S.printingOf s registry "April O'Neil, Live on the Scene"
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    let board = partnerBoard mountain plains 6
+    Spec.assertEqWith s "control leg: Bjorna beside Hargilde designates both" (List.length (commandZoneNames (board [bjorna, hargilde]))) 2
+    Spec.assertEqWith s "CR 702.124i: Bjorna beside a different partner—[text] designates neither" (commandZoneNames (board [bjorna, april])) []
+    Spec.assertEqWith s "CR 702.124f: plain partner is not this one, so Bjorna beside Akiri designates neither" (commandZoneNames (board [bjorna, akiri])) []
+    Spec.assertEqWith s "control leg: Bjorna named alone still is (CR 903.3)" (commandZoneNames (board [bjorna])) [S.nameOf (Printing.card bjorna)]
 
 backgroundSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 backgroundSpec s registry = Spec.describe s "Choose a Background" $ do
