@@ -114,6 +114,9 @@ data TriggerCondition
     -- attacks you or a planeswalker you control" (Marchesa's Decree), once per
     -- declared attacker.
     CreatureAttacksYou
+  | -- | CR 508.3a read by a bystander: "whenever a creature you control attacks"
+    -- (Fervent Charge), once per declared attacker the Filter admits.
+    CreatureAttacks (Filter.Filter Keyword.Keyword)
   | -- | CR 508.3b: "whenever enchanted player is attacked" (Curse of Vitality),
     -- once per distinct target, the subject read off Object.attachedTo.
     --

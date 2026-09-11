@@ -398,6 +398,10 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- "you", so a slot would be a second name for a seat the ability has.
   (TriggerCondition.CreatureAttacksYou, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _)) ->
     Binding.setAttackingCreature attacker Map.empty
+  -- The same slot once more: Fervent Charge's "it" and Conjurer's Mantle's "that
+  -- creature" are the attacker, never the bearer.
+  (TriggerCondition.CreatureAttacks _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _)) ->
+    Binding.setAttackingCreature attacker Map.empty
   -- CR 508.3b's subject, under the same reserved slot every other "that player"
   -- takes: whom the Curse enchants, which matchesTrigger has already required the
   -- event to name. Bound rather than left to the ability's own attachment because
@@ -1137,6 +1141,8 @@ eventBindingSlots cond = case cond of
   -- Unconditional, as this classification has to be: every AttackerDeclared event
   -- carries an ObjectId.
   TriggerCondition.CreatureAttacksYou -> Set.singleton Binding.attackingCreature
+  -- The attacker again, unconditionally for the arm above's reason.
+  TriggerCondition.CreatureAttacks _ -> Set.singleton Binding.attackingCreature
   -- The PLAYER instead, where the arm above binds the attacker: rule 508.3b names
   -- a set of creatures rather than one, and Curse of Vitality's payload says
   -- "that player" and nothing about them.
