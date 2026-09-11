@@ -3248,8 +3248,8 @@ evokeSpec s registry = Spec.describe s "Evoke" $ do
   -- CR 603.4 and CR 400.7: Flicker of Fate, cast with the sacrifice trigger on
   -- the stack, returns a NEW Mulldrifter nobody paid an evoke cost for, so its
   -- own instance's "if" fails and it does not trigger. The evoked one's trigger
-  -- then has no object left to sacrifice -- a CR 400.7 fact this board cannot
-  -- tell from CR 608.2a's re-check, which leaving out stays green here.
+  -- then has no object left to sacrifice (CR 400.7): disabling CR 608.2a's
+  -- re-check leaves this case green, so it proves the trigger-time check alone.
   Spec.it s "CR 603.4 a flickered evoked Mulldrifter is not sacrificed" $ do
     (board, mulldrifter, flicker) <- evokeBoard s registry
     let entered = S.runPure (payingFor evokeCost) (S.runPure (payingFor evokeCost) board (S.cast S.alice mulldrifter)) (Stack.resolveTop >> Engine.settleForPriority)
