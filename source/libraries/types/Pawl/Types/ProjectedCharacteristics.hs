@@ -335,7 +335,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     prepare :: Maybe (Face.Face Card.Card),
     -- | CR 707.3 / 710.1b: a copy snapshot's reading once the copy is flipped,
     -- and Nothing for copiable values with no flip card's alternative half.
-    -- Only Pawl.Engine.Event.copiedSnapshot writes it; a printed flip card's
+    -- Stamped by Pawl.Engine.Event.copiedSnapshot; a printed flip card's
     -- alternative half is its card's (Pawl.Engine.Card.flippedFace).
     flipped :: Maybe ProjectedCharacteristics
   }

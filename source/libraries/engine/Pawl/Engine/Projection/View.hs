@@ -905,8 +905,8 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 --
 -- CR 707.3 is the same fork for a COPY of a flip card: a flipped permanent reads
 -- the alternative reading its copy stamp carries (PC.flipped), and one whose
--- stamp carries none -- a flipped Akki that became a copy of a Grizzly Bears --
--- keeps its status to no effect (CR 110.5c).
+-- stamp carries none -- CR 110.5c's flipped permanent that became a copy of
+-- Runeclaw Bear -- keeps its status to no effect.
 stampedSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 stampedSnapshotOf oid gs = do
   object <- Game.lookupObject oid gs
@@ -1198,8 +1198,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- zone, so the inset frame is nowhere in it. Game.prepareSpellOf
               -- decides, and it reads the copy snapshot first for halves' reason.
               PC.prepare = Game.prepareSpellOf oid gs,
-              -- CR 707.3: a copy stamp's alternative reading, which only
-              -- Pawl.Engine.Event.copiedSnapshot writes. A printed flip card's
+              -- CR 707.3: a copy stamp's alternative reading, which
+              -- Pawl.Engine.Event.copiedSnapshot stamps. A printed flip card's
               -- alternative half is its card's, read at Game.resolveFaceFor.
               PC.flipped = Nothing
             }
