@@ -2065,8 +2065,15 @@ applyEntryOption oid option gs =
 -- where the copy effect is a replacement effect and no printed card writes those
 -- two words (Scryfall @o:"enter as a copy" o:"except it has this ability"@,
 -- 2026-09-06, no hit; Copycrook would refute it by quoting an ability instead).
+--
+-- Into BOTH readings of a copy of a flip card, since CR 707.9b makes the
+-- exception a copiable value whichever half the copy's status picks (CR 707.3)
+-- -- CR 110.5c's flipped Dimir Doppelganger keeps "this ability". A regression
+-- fence: no test copies a flip card under an exception.
 applyCopyExceptions :: Maybe Source.Source -> [CopyException.CopyException] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
-applyCopyExceptions this exceptions snapshot = List.foldl' (applyCopyException this) snapshot exceptions
+applyCopyExceptions this exceptions snapshot =
+  let excepted pc = List.foldl' (applyCopyException this) pc exceptions
+   in (excepted snapshot) {PC.flipped = fmap excepted (PC.flipped snapshot)}
 
 -- One arm per CopyException constructor, no wildcard, for Event.apply's reason: a
 -- new exception shape must break the build here rather than silently copy without

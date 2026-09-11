@@ -649,7 +649,9 @@ resolveFaceFor mObj card = case mObj of
   -- No battlefield gate of its own, where the Room arm below needs one: CR 110.5d
   -- gives only permanents status, and Object.flipped is written only by
   -- `flipPermanent` below (which gates on the battlefield) and cleared by CR
-  -- 400.7's new incarnation, so no object outside the battlefield carries it.
+  -- 400.7's new incarnation, so no object outside the battlefield carries it --
+  -- except on `withFlipped`'s counterfactual board, where Pawl.Engine.Event's
+  -- copiedSnapshot asks what a copy of a flip card in a graveyard would flip to.
   Just obj
     | Object.flipped obj,
       Just flipped <- Card.flippedFace card ->
@@ -1013,10 +1015,9 @@ facesOfWithLastKnown oid gs =
 
 -- CR 702.140e: every card representing `oid`, topmost first -- what
 -- `cardOfWithLastKnown` answers with, widened past CR 730.2a's topmost
--- component for facesOfWithLastKnown's reason. Its readers are
+-- component for facesOfWithLastKnown's reason. Its reader is
 -- Pawl.Engine.Resolve.Effect.declaredDelayedAbility's fallback, which asks the
--- card rather than the face that is up, and `flipsOver` below, for CR 730.2h's
--- flip component anywhere among the components.
+-- card rather than the face that is up.
 cardsOfWithLastKnown :: ObjectId -> GameState -> [Card]
 cardsOfWithLastKnown oid gs =
   Maybe.maybeToList (cardOfWithLastKnown oid gs)
@@ -1146,43 +1147,60 @@ withFaceTurned oid gs = case lookupObject oid gs of
 -- an already-flipped permanent writes the value it already had.
 flipPermanent :: ObjectId -> GameState -> GameState
 flipPermanent oid gs
-  | flipsOver oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.flipped = True}) oid (GameState.objects gs)}
+  | flipsOver oid gs = withFlipped True oid gs
   | otherwise = gs
 
 -- | CR 710.2 asked rather than performed: may this permanent flip? `flipPermanent`
--- above is the only performer and asks this, so the three ways nothing happens are
+-- above is the only performer and asks this, so the ways nothing happens are
 -- stated once, and none of them is an error:
 --
 --   * the id names nothing on the BATTLEFIELD. CR 710.1b uses the alternative
 --     characteristics "only if the permanent is on the battlefield", and CR
 --     110.5d gives only permanents status at all.
---   * the id names nothing, or nothing with a card behind it (CR 113.7a).
---   * no card representing it is a flip card, so there are no alternative
---     characteristics to apply -- Card.flippedFace's refusal, read off the
---     card's LAYOUT.
+--   * its copiable values include no flip card's alternative half
+--     (`hasFlipHalf` below) -- Card.flippedFace's refusal, read off a LAYOUT.
 --
 -- A layout classification and never which card it is, `turnsTo` above's posture:
 -- the closed half asks whether the object has a second set of characteristics CR
 -- 710.1b reaches, and the card data carries the ability that asks for the flip.
 --
--- EVERY card representing the object (`cardsOfWithLastKnown`), not just CR
--- 730.2a's topmost component: CR 730.2h admits a flip card anywhere among a
--- merged permanent's components, so a flip card merged UNDER another component
--- still gives the permanent alternative characteristics to reach. What those
--- characteristics come to is the flipped reading Pawl.Engine.Event.merge stamps
--- beside the ordinary one, which folds every component's flipped read -- so this
--- gate is the whole of the difference between the two orders. Proved by
--- Pawl.MutateSpec's "CR 730.2h a merged permanent flips for a flip component
--- that is not its topmost one".
---
--- Read off PRINTED cards and not off a copy snapshot, so a permanent that copied
--- an unflipped flip card carries the flip trigger and can never flip. Whether
--- the rules allow such a copy to flip at all is a question the CR does not
--- settle (#3366).
+-- Off the COPIABLE values and not the printed card, which is CR 707.3: a copy's
+-- values are the copied information "as modified by the copy's status", and CR
+-- 110.5c's Example flips a Dimir Doppelganger that became a copy of Jushi
+-- Apprentice. Pawl.FlipSpec's "CR 707.3 a Clone of Akki Lavarunner flips into
+-- Tok-Tok, and a Clone of that is Akki" proves it. A merged permanent answers off
+-- the flipped reading its merge stamped, which folds every component's (CR
+-- 730.2h), so a flip card merged UNDER another component counts too -- proved by
+-- Pawl.MutateSpec's "CR 730.2h a merged permanent flips for a flip component that
+-- is not its topmost one".
 flipsOver :: ObjectId -> GameState -> Bool
-flipsOver oid gs =
-  Set.member oid (GameState.battlefield gs)
-    && any (Maybe.isJust . Card.flippedFace) (cardsOfWithLastKnown oid gs)
+flipsOver oid gs = Set.member oid (GameState.battlefield gs) && hasFlipHalf oid gs
+
+-- | CR 710.1b / 707.3: do this object's COPIABLE values include a flip card's
+-- alternative half? Its copy snapshot's answer when it has one -- the merge's
+-- flipped reading (CR 730.2h) or the copy's (PC.flipped) -- and its printed
+-- card's otherwise, `halvesCardOf`'s posture. A copy of anything else has none
+-- whatever card is printed underneath it.
+--
+-- FACE UP only, halvesOf's fork: CR 708.2 leaves a face-down object only the
+-- characteristics its allower listed. Every zone, since Pawl.Engine.Event's
+-- copiedSnapshot asks it of a card a copy effect reads in a graveyard.
+hasFlipHalf :: ObjectId -> GameState -> Bool
+hasFlipHalf oid gs = case lookupObject oid gs of
+  Just obj
+    | Facing.FaceUp <- Object.facing obj ->
+        let bindings = Object.bindings obj
+         in case Binding.copyOf bindings of
+              Just snapshot -> Maybe.isJust (Binding.flippedCopyOf bindings) || Maybe.isJust (PC.flipped snapshot)
+              Nothing -> maybe False (Maybe.isJust . Card.flippedFace) (cardOf oid gs)
+  _ -> False
+
+-- CR 110.5: this board with `oid`'s flipped status set to `status`, and no other
+-- change. `flipPermanent`'s write, and the counterfactual board
+-- Pawl.Engine.Event.copiedSnapshot and
+-- Pawl.Engine.Projection.View.copiableCharacteristicsFlipped read off.
+withFlipped :: Bool -> ObjectId -> GameState -> GameState
+withFlipped status oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.flipped = status}) oid (GameState.objects gs)}
 
 -- | CR 701.27a asked rather than performed: the face this permanent WOULD turn
 -- to, or Nothing where the turn is declined. `turnFaceOver` above is the only

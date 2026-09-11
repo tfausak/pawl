@@ -76,10 +76,10 @@ data Object = MkObject
     -- reason: CR 110.5a makes status not a characteristic, so this is no CR 613
     -- layer.
     --
-    -- A MERGED permanent's characteristics come off a stamped copiable record
-    -- that goes around that seam, so CR 730.2h is read one place further out:
-    -- the merge stamps both readings and Pawl.Engine.Projection.stampedSnapshotOf
-    -- picks between them off this field.
+    -- A MERGED or COPYING permanent's characteristics come off a stamped
+    -- copiable record that goes around that seam, so CR 730.2h and CR 707.3 are
+    -- read one place further out: the stamp carries both readings and
+    -- Pawl.Engine.Projection.stampedSnapshotOf picks between them off this field.
     --
     -- A Bool and not a face name, though Object.face below already points a
     -- permanent at one half. CR 710.1c is why: "a flip card's color and mana cost
