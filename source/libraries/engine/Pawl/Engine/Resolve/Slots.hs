@@ -556,7 +556,7 @@ effectObjectRefs effect = case effect of
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> [original, subject]
   -- BOTH refs: CR 707.10d's candidates are named by a ref of their own, and a
   -- slot it reads is as much a read of this effect's as the copied object's.
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> ref : copyTargetsRefs targets
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _) -> ref : copyTargetsRefs targets
   Effect.Replace {} -> []
   Effect.SkipNextPhase {} -> []
   -- Absent where the shield's recipients are described rather than named.
@@ -924,7 +924,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   Effect.BecomeCopy {} -> Map.empty
-  Effect.CopyStackObject {} -> Map.empty
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> quantitySlots quantity
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
   -- The ROW's own Filters and Quantities are READS too (replacementRowReads):
   -- Filter.IsBound in one names an object an earlier effect of this same
@@ -1471,7 +1471,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
-  Effect.CopyStackObject {} -> True
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   -- The ReplacementEffect's own reads are replacementRowReads', and slotsOf
   -- reports them through replacementRowSlots: its Filters name no target slot, and
   -- the Quantities a counter rewrite counts with are asked here. The effects a
@@ -1676,9 +1676,9 @@ readsX =
         -- creating effect's number (tokenBoxQuantities).
         Effect.Create (Create.MkCreate quantity card riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders <> tokenBoxQuantities card)
         Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
+        Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> Quantity.readsX quantity
         Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> any Quantity.readsX (quantity : riderQuantities riders)
         Effect.BecomeCopy {} -> False
-        Effect.CopyStackObject {} -> False
         -- CR 601.2b's X reaches the effects a rewrite or a CR 615.5 rider nests,
         -- the two prevention opcodes' posture with their own riders.
         Effect.Replace (Replace.MkReplace _ _ _ _ re) -> readsX (replacementRowEffects re)

@@ -1882,6 +1882,61 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
     Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
     Spec.assertEqWith s "four lands paid the Elf's {2}{R}{G} and nothing paid the Piker's" (S.tappedCount S.alice after) 4
 
+-- CR 702.40a's storm: "When you cast this spell, copy it for each other spell
+-- that was cast before it this turn."
+--
+-- Grapeshot {1}{R} Sorcery -- "Grapeshot deals 1 damage to any target. / Storm"
+-- (Oracle text checked 2026-09-11) -- is the producer.
+--
+-- The count is of spells cast BEFORE Grapeshot, by ANY player (Grapeshot's
+-- rulings): alice and bob each cast one, then alice casts one more in response to
+-- the storm trigger. Two copies is right. A count of alice's spells alone, or a
+-- single copy whatever the count, makes one; a this-turn tally read at
+-- resolution makes three. Each leaves bob at a different life total.
+stormSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stormSpec s registry = Spec.describe s "Storm" $ do
+  Spec.it s "CR 702.40a storm is minted for a spell on the stack and nowhere else" $ do
+    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Set.singleton Keyword.Type.Storm)) [Keyword.storm]
+    Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Storm 1)) []
+
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.40a Grapeshot copies itself once per spell cast before it, and not for one cast in response" $ do
+    grapeshot <- S.printingOf s registry "Grapeshot"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let lands = S.landsFor mountain S.bob 1 (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
+        (firstBolt, g1) = S.addHandCard bolt S.alice lands
+        (bobBolt, g2) = S.addHandCard bolt S.bob g1
+        (responseBolt, g3) = S.addHandCard bolt S.alice g2
+        (grapeshotId, g4) = S.addHandCard grapeshot S.alice g3
+        board =
+          g4
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain
+            }
+        -- Every target prompt answered with that player: each cast's, and CR
+        -- 707.10c's offer to re-target a copy.
+        step pid gs action = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer pid)) gs (action >> Engine.settleForPriority))
+        castAndResolve caster pid gs oid = step pid (step pid gs {GameState.priority = Just caster} (S.cast caster oid)) Stack.resolveTop
+        -- The two spells cast before Grapeshot: alice's Bolt at bob, bob's at alice.
+        before = castAndResolve S.bob S.alice (castAndResolve S.alice S.bob board firstBolt) bobBolt
+        -- Grapeshot at bob, its storm trigger on the stack above it, and alice's
+        -- second Bolt at bob in response to the trigger.
+        responded = step S.bob (step S.bob before {GameState.priority = Just S.alice} (S.cast S.alice grapeshotId)) (S.cast S.alice responseBolt)
+        -- The Bolt, the trigger, the copies, then Grapeshot: resolved down to an
+        -- empty stack, however many copies there were.
+        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step S.bob gs Stack.resolveTop)
+        after = resolveAll responded
+    Spec.assertEqWith s "bob took two Bolts' 6, Grapeshot's 1 and TWO copies' 2" (S.lifeOf S.bob after) (Just 11)
+    Spec.assertEqWith s "alice took bob's Bolt" (S.lifeOf S.alice after) (Just 17)
+
+-- Answer a ChooseTargets by FILTERING the offered set down to one recipient
+-- (Pawl.CopySpec's pinTarget).
+pinTarget :: Recipient.Recipient -> Prompt.Prompt r -> r
+pinTarget recipient p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
+  _ -> S.identityAnswer p
+
 -- alice casts the one spell her hand holds, takes CR 608.2g's offer, and rotates
 -- the batch the random-order channel asks about -- a rotation of three being
 -- neither the identity nor its own inverse, so an engine that never consulted the
@@ -1905,6 +1960,7 @@ isCast action = case action of
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cascadeSpec s registry
+  stormSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry

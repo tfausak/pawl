@@ -549,11 +549,11 @@ objectRefPositions =
         ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
         ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders []), [plantedRef "cc"]),
         ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject") []), [plantedRef "bc-original", plantedRef "bc-subject"]),
-        ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied), [plantedRef "cs"]),
+        ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied CopyStackObject.defaultQuantity), [plantedRef "cs"]),
         -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
         -- reach: a copy effect whose candidate description reads a slot no clause
         -- binds is a dangling read like any other.
-        ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each"))), [plantedRef "cs-ref", plantedRef "cs-each"]),
+        ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each")) CopyStackObject.defaultQuantity), [plantedRef "cs-ref", plantedRef "cs-each"]),
         ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
         ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
         ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
@@ -1092,9 +1092,8 @@ ownCounts effect = case effect of
   -- Neither a Quantity nor a Duration, so no Count can hide here; the refs'
   -- Filters are effectFilters' business below.
   Effect.BecomeCopy {} -> []
-  -- CR 707.10 copies one spell per named object and prints no count, so the
-  -- BecomeCopy arm above answers for this too.
-  Effect.CopyStackObject {} -> []
+  -- CR 702.40a's "for each" count is card data like CreateCopy's.
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> quantityCounts quantity
   -- The Condition is Galvanic Blast's and Synthetic Voltaic Surge's "if you
   -- control three or more artifacts", and its Counts are as much card data as a
   -- Duration's.
@@ -2750,6 +2749,8 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.85a names no quality: the nonland-card filter its minted ability
   -- carries is written in Pawl.Engine.Keyword, not into the keyword.
   Keyword.Cascade -> []
+  -- CR 702.40a names no quality: its count is written into the minted ability.
+  Keyword.Storm -> []
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []
@@ -3152,6 +3153,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> []
   Quantity.Type.SpellsCastLastTurn _ -> []
+  Quantity.Type.SpellsCastBefore -> []
   Quantity.Type.DungeonsCompleted _ -> []
   Quantity.Type.CompletedDungeon {} -> []
   Quantity.Type.EnteredThisTurn -> []
@@ -4730,7 +4732,7 @@ effectFilters effect = case effect of
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject exceptions) -> frame SourceHostFramed (objectRefFilters original <> objectRefFilters subject) <> concatMap copyExceptionFilters exceptions
   -- BOTH refs, CreateCopy's arm above: an EachMatching Filter is card text, and
   -- CR 707.10d's candidates are named by one.
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> frame SourceHostFramed (objectRefFilters ref <> copyTargetsFilters targets)
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref <> copyTargetsFilters targets)
   -- The ROW's own Filters are framed for printedReplacementFilters' reason: a
   -- stored row is read through the same
   -- Pawl.Engine.Replacement.candidateContext a printed one is, where the

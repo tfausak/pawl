@@ -520,8 +520,8 @@ rewriteEffect pairs effect = case effect of
   -- copiable values, so what the copy becomes is not rewritten, but CR 707.10d's
   -- description of the candidates ("each other creature you control") is card
   -- text like any other ref's. CR 707.10c's offer is no land type at all.
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) ->
-    Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (rewriteObjectRef pairs ref) (rewriteCopyTargets pairs targets))
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity) ->
+    Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (rewriteObjectRef pairs ref) (rewriteCopyTargets pairs targets) (rewriteQuantity pairs quantity))
   -- CR 612.1 through the SHIELD a resolution installs: the row's duration, its
   -- CR 614.1 gate, and the replacement effect itself, which is where the word
   -- usually sits. rewritePrintedReplacement makes the same descent over a
@@ -1587,6 +1587,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> quantity
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> quantity
   Quantity.Type.SpellsCastLastTurn _ -> quantity
+  Quantity.Type.SpellsCastBefore -> quantity
   Quantity.Type.DungeonsCompleted _ -> quantity
   Quantity.Type.CompletedDungeon {} -> quantity
   Quantity.Type.EnteredThisTurn -> quantity

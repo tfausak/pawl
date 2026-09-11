@@ -161,11 +161,10 @@ data Quantity
     DamageDealtToThisTurn
   | -- | CR 601.2i / 608.2i: how many spells that player cast last turn, read off
     -- GameState.castsLastTurn (not CR 502.2's active-player scalar).
-    --
-    -- "This turn" is a different measurement over the live log, wanted by
-    -- Brightspear Zealot and Ertai's Scorn. Not implemented: no arm measures it
-    -- (#2185).
     SpellsCastLastTurn PlayerRef.PlayerRef
+  | -- | CR 702.40a: how many spells, by any player, were cast this turn before the
+    -- object this quantity is evaluated against -- storm's count.
+    SpellsCastBefore
   | -- | CR 309.7: how many dungeons that player has completed
     -- (Player.completedDungeons).
     DungeonsCompleted PlayerRef.PlayerRef

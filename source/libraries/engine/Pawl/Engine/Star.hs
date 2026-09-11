@@ -63,6 +63,7 @@ substituteStar star quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> quantity
   Quantity.DamageDealtToPlayersThisTurn _ -> quantity
   Quantity.SpellsCastLastTurn _ -> quantity
+  Quantity.SpellsCastBefore -> quantity
   Quantity.DungeonsCompleted _ -> quantity
   Quantity.CompletedDungeon {} -> quantity
   Quantity.EnteredThisTurn -> quantity

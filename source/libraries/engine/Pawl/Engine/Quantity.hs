@@ -646,6 +646,20 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.SpellsCastLastTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (GameState.castsLastTurn gs)))
           _ -> Nothing
+        -- CR 702.40a: how many spells were cast this turn before the object this
+        -- evaluation is aimed at. Keyed on that object's OWN cast in the log, so a
+        -- spell cast after it -- in response to the storm trigger -- is not
+        -- counted, where a this-turn tally would count it. Every caster counts, and
+        -- a countered spell was still cast.
+        --
+        -- Nothing for an evaluation aimed at no object, or at one whose cast is not
+        -- in this turn's log: CR 707.10's copy was never cast.
+        Quantity.SpellsCastBefore -> do
+          oid <- mOid
+          let casts = Maybe.mapMaybe (Game.castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))
+          case break ((== oid) . SpellWasCast.spell) casts of
+            (_, []) -> Nothing
+            (before, _) -> Just (toInteger (length before))
         -- CR 309.7: how many dungeons that player has completed. LifeTotal's arm in
         -- ARITY -- one player's tally, so a reference naming several answers "whose?"
         -- rather than a sum -- and in SOURCE: read straight off the player, because
@@ -997,6 +1011,7 @@ objectSlots quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.SpellsCastLastTurn _ -> Set.empty
+  Quantity.SpellsCastBefore -> Set.empty
   Quantity.DungeonsCompleted _ -> Set.empty
   Quantity.CompletedDungeon {} -> Set.empty
   Quantity.EnteredThisTurn -> Set.empty
@@ -1220,6 +1235,7 @@ readsX quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> False
   Quantity.DamageDealtToPlayersThisTurn _ -> False
   Quantity.SpellsCastLastTurn _ -> False
+  Quantity.SpellsCastBefore -> False
   Quantity.DungeonsCompleted _ -> False
   Quantity.CompletedDungeon {} -> False
   Quantity.EnteredThisTurn -> False
