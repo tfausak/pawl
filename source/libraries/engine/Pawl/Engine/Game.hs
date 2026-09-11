@@ -1057,6 +1057,22 @@ turnFacing facing oid gs =
       adjust o = o {Object.facing = facing, Object.timestamp = if restamps then ts else Object.timestamp o}
    in next {GameState.objects = Map.adjust adjust oid (GameState.objects next)}
 
+-- CR 712.16 / 730.2j: the permanent is represented by a double-faced card or
+-- token, or is melded or merged with a double-faced component, so it can't be
+-- turned face down. Read off the cards (cardOf, componentsOf), never the
+-- projection -- turnsTo's footing, and CR 712.9's Example is why: a Clone
+-- copying a double-faced permanent is one-faced.
+isDoubleFacedPermanent :: ObjectId -> GameState -> Bool
+isDoubleFacedPermanent oid gs = case lookupObject oid gs of
+  Nothing -> False
+  Just object ->
+    let components = componentsOf (Object.source object)
+        cards =
+          if Seq.null components
+            then Foldable.toList (cardOf oid gs)
+            else Maybe.mapMaybe (cardOfSource gs . Just . sourceOfComponent) (Foldable.toList components)
+     in any Card.isDoubleFaced cards
+
 -- CR 701.27a over ONE object: "turn it over so that its other face is up", or
 -- leave the map exactly as it was. The primitive BOTH transform paths share --
 -- Pawl.Engine.Resolve's CR 701.27a opcode, which adds CR 701.27f's already-turned
@@ -1582,6 +1598,7 @@ castOf event = case event of
   GameEvent.SpellCast cast -> Just cast
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
@@ -1659,6 +1676,7 @@ discardOf event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
@@ -1741,6 +1759,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
@@ -1838,6 +1857,7 @@ damageDealt event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
@@ -1987,6 +2007,7 @@ lifeGainOf event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing

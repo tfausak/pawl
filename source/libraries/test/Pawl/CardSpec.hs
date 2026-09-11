@@ -831,6 +831,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.PermanentTurnedFaceUp _ -> []
+  TriggerCondition.PermanentTurnedFaceDown _ -> []
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
   TriggerCondition.PermanentBecomesDesignated {} -> []
   TriggerCondition.SelfEvolves -> []
@@ -3297,6 +3298,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Its watcher-scoped sibling carries one, and Aven Farseer's is the trivial
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
   TriggerCondition.PermanentTurnedFaceUp f -> unframed [f]
+  TriggerCondition.PermanentTurnedFaceDown f -> unframed [f]
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated _ f) -> unframed [f]
   TriggerCondition.SelfEvolves -> []
@@ -3611,6 +3613,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfTransformedInto _ -> []
   TriggerCondition.PermanentTransforms _ -> []
   TriggerCondition.PermanentTurnedFaceUp _ -> []
+  TriggerCondition.PermanentTurnedFaceDown _ -> []
   TriggerCondition.PermanentBecomesDesignated _ -> []
   TriggerCondition.SelfEvolves -> []
   TriggerCondition.SelfMutates -> []

@@ -824,6 +824,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentTurnedFaceUp (Filter.ControlledBy PlayerRelation.You))
       " {\"type\":\"PermanentTurnedFaceUp\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
+  -- CR 701.27b: Synthetic Veiled Witness's "whenever a permanent you control is
+  -- turned face down".
+  Spec.it s "PermanentTurnedFaceDown round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentTurnedFaceDown (Filter.ControlledBy PlayerRelation.You))
+      " {\"type\":\"PermanentTurnedFaceDown\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
   -- CR 702.112b's designation, carrying Valeron Wardens' own narrowing: the pair of
   -- designation and Filter is the whole payload, so both have to survive both
   -- directions -- a dropped designation would make this condition match Arbor

@@ -370,6 +370,9 @@ data TriggerCondition
   | -- | CR 708.7's other written form read by a bystander (Aven Farseer),
     -- filtered and read live after CR 708.8 restores the copiable values.
     PermanentTurnedFaceUp (Filter.Filter Keyword.Keyword)
+  | -- | CR 701.27b: a permanent the Filter admits was turned face down (Synthetic
+    -- Veiled Witness), read live after the turning.
+    PermanentTurnedFaceDown (Filter.Filter Keyword.Keyword)
   | -- | A permanent the Filter admits gained this designation -- CR 702.112b's
     -- renown (Valeron Wardens) and CR 701.37b's monstrous (Arbor Colossus).
     PermanentBecomesDesignated PermanentBecomesDesignated.PermanentBecomesDesignated

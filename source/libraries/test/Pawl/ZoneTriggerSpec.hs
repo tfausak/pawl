@@ -2311,6 +2311,9 @@ representativeEvents cond =
         -- is instantiated with below is the trivial one, which admits whatever the
         -- id resolves to.
         TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp departed)
+        -- CR 701.27b's event for the other direction, on `departed` for the arm
+        -- above's reason.
+        TriggerCondition.PermanentTurnedFaceDown _ -> one (GameEvent.TurnedFaceDown departed)
         -- CR 702.112b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
         TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d _) -> one (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated d departed))
@@ -2604,6 +2607,7 @@ everyTriggerCondition =
     TriggerCondition.SelfTransformedInto (CardName.MkCardName (Text.pack "Blightsower Thallid")),
     TriggerCondition.PermanentTransforms (Filter.Type.And []),
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
+    TriggerCondition.PermanentTurnedFaceDown (Filter.Type.And []),
     TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Renowned (Filter.Type.And [])),
     TriggerCondition.SelfEvolves,
     TriggerCondition.SelfMutates,
