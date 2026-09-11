@@ -9,6 +9,7 @@ import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -19,20 +20,27 @@ spec s = Spec.describe s "Pawl.Codec.CopyStackObject" $ do
     Common.assertCodec
       s
       CopyStackObject.codec
-      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) CopyTargets.Copied)
+      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) CopyTargets.Copied CopyStackObject.defaultQuantity)
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}} "
   -- CR 707.10c, Twincast's second sentence.
   Spec.it s "MkCopyStackObject, new targets offered: it is written" $
     Common.assertCodec
       s
       CopyStackObject.codec
-      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) CopyTargets.ChosenByController)
+      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) CopyTargets.ChosenByController CopyStackObject.defaultQuantity)
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"targets\":{\"type\":\"ChosenByController\"}} "
   -- CR 707.10d, Zada, Hedron Grinder's second sentence.
   Spec.it s "MkCopyStackObject, one copy per candidate: the candidates' ref rides in the payload" $
     Common.assertCodec
       s
       CopyStackObject.codec
-      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) (CopyTargets.ForEach (ObjectRef.EachMatching (Filter.ControlledBy PlayerRelation.You))))
+      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) (CopyTargets.ForEach (ObjectRef.EachMatching (Filter.ControlledBy PlayerRelation.You))) CopyStackObject.defaultQuantity)
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"targets\":{\"type\":\"ForEach\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}} "
+  -- CR 702.40a, storm's "copy it for each": a count other than one is written.
+  Spec.it s "MkCopyStackObject, a count: it is written" $
+    Common.assertCodec
+      s
+      CopyStackObject.codec
+      (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) CopyTargets.ChosenByController Quantity.SpellsCastBefore)
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"targets\":{\"type\":\"ChosenByController\"},\"quantity\":{\"type\":\"SpellsCastBefore\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CopyStackObject.codec

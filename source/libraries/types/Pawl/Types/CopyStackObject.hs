@@ -2,6 +2,7 @@ module Pawl.Types.CopyStackObject where
 
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Quantity as Quantity
 
 -- | The payload of Pawl.Types.Effect's CopyStackObject arm: CR 707.10's "put a copy of
 -- it onto the stack". Twincast's "copy target instant or sorcery spell" is
@@ -15,9 +16,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- choice the card makes.
 --
 -- An ObjectRef rather than a bare SlotName, for the reason
--- Pawl.Types.CreateCopy's comment gives: every printed producer names a target
--- slot, but the field is the general one so a swept "copy each ..." needs no new
--- shape.
+-- Pawl.Types.CreateCopy's comment gives: a swept "copy each ..." needs no new
+-- shape, and CR 702.40a's storm copies its own spell, which no slot names.
 --
 -- `targets` is CR 707.10's own clause and not an inference from the copy: a
 -- copy carries the original's targets (CR 707.10) unless the effect says
@@ -25,6 +25,13 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- separately from the copy instruction.
 data CopyStackObject = MkCopyStackObject
   { ref :: ObjectRef.ObjectRef,
-    targets :: CopyTargets.CopyTargets
+    targets :: CopyTargets.CopyTargets,
+    -- | How many copies of each named object: CR 702.40a's "copy it for each
+    -- other spell that was cast before it this turn"; a printed "copy" is one.
+    quantity :: Quantity.Quantity
   }
   deriving (Eq, Ord, Show)
+
+-- | What a card making one copy writes, and the value the codec elides.
+defaultQuantity :: Quantity.Quantity
+defaultQuantity = Quantity.Literal 1

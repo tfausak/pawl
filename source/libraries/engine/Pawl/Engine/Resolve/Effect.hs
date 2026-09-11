@@ -4572,12 +4572,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               subjects = objectRefObjects legal resolving controller source gs subjectRef
            in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
         _ -> gs
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> do
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity) -> do
     gs <- State.get
-    -- CR 707.10: one copy per named object, each put onto the stack. The named
-    -- objects are enumerated ONCE off this `gs` (CR 608.2f); each copy is then
-    -- minted against the live state, since a fresh id and a fresh timestamp are
-    -- both counters the previous mint moved.
+    -- CR 707.10: `quantity` copies of each named object, each put onto the stack.
+    -- The named objects and the count are both determined ONCE off this `gs` (CR
+    -- 608.2f); each copy is then minted against the live state, since a fresh id
+    -- and a fresh timestamp are both counters the previous mint moved.
+    -- Pawl.KeywordTriggerSpec's Storm group proves the count.
+    let copies = maybe 0 Integer.toIntSaturating (Quantity.evaluateFor (effectViewOf source legal gs) (effectContext gs controller source legal (slotBindings resolving gs)) gs resolving source quantity)
     Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \original ->
       -- CR 707.10's three nouns: a spell (Game.isSpell) and an activated or
       -- triggered ability (Game.isAbility), each classifying off the object's
@@ -4586,7 +4588,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- CR 707.13's different act (#888), and a permanent on the battlefield is
       -- the CreateCopy and BecomeCopy opcodes' subject rather than this one's.
       Monad.forM_ (if Game.isSpell original gs || Game.isAbility original gs then Game.lookupObject original gs else Nothing) $ \obj ->
-        Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(copySource, kind) -> do
+        Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(copySource, kind) -> Monad.replicateM_ copies $ do
           -- CR 707.10's answers, as the target maps to write: one EMPTY map
           -- where the copy keeps the decisions rule 707.10 copied (rule 707.10c
           -- included, its offer below being a separate act), CR 707.10d's one

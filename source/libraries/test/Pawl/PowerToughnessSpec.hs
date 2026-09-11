@@ -624,6 +624,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     Spec.assertEqWith s "no Leech on the battlefield" (leechesOnBattlefield settled) []
   omnathSpec s registry
   serraAvatarSpec s registry
+  brightspearZealotSpec s registry
   kirdApeSpec s registry
   knightOfGraceSpec s registry
   knightOfMaliceSpec s registry
@@ -1125,6 +1126,36 @@ newestNamed wanted gs =
 -- differently than a continuous effect from a static ability") is the rule that
 -- keeps the two apart, and the last test here is the observable difference -- the
 -- bonus comes BACK.
+-- Brightspear Zealot ({2}{W} Creature -- Human Soldier, printed 2/4): "Vigilance
+-- / This creature gets +2/+0 as long as you've cast two or more spells this
+-- turn." Oracle text checked 2026-09-11.
+--
+-- Kird Ape's clause over CR 601.2i's cast log rather than the battlefield: a
+-- Count over Scope.InHistory SpellCast, read live by CR 604.2. bob's cast is on
+-- the log beside alice's first, so an engine counting every caster's spells
+-- reads 4/4 before alice's second.
+brightspearZealotSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+brightspearZealotSpec s registry =
+  Spec.describe s "Brightspear Zealot" . Spec.it s "CR 604.2 +2/+0 once YOU have cast two spells this turn, and an opponent's cast is not one" $ do
+    zealot <- S.printingOf s registry "Brightspear Zealot"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let lands = S.landsFor mountain S.bob 1 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (zealotId, g1) = S.addPermanent zealot S.alice lands
+        (first, g2) = S.addHandCard bolt S.alice g1
+        (second, g3) = S.addHandCard bolt S.alice g2
+        (bobs, g4) = S.addHandCard bolt S.bob g3
+        -- Every Bolt at bob, so no damage lands on the Zealot.
+        atPlayer :: Prompt.Prompt r -> r
+        atPlayer p = case p of
+          Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== Recipient.ToPlayer S.bob) offered) asked
+          _ -> S.identityAnswer p
+        castBy pid oid gs = S.runPure atPlayer gs {GameState.priority = Just pid} (S.cast pid oid >> Stack.resolveTop)
+        oneEach = castBy S.bob bobs (castBy S.alice first g4)
+        twoOfAlices = castBy S.alice second oneEach
+    Spec.assertEqWith s "alice's one cast and bob's one: still 2/4" (S.powerToughnessOf zealotId oneEach) (Just (2, 4))
+    Spec.assertEqWith s "alice's second cast: 4/4" (S.powerToughnessOf zealotId twoOfAlices) (Just (4, 4))
+
 kirdApeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 kirdApeSpec s registry = Spec.describe s "Kird Ape" $ do
   -- Both halves of the clause on one board, with a permanent ENTERING between the

@@ -433,6 +433,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.SpellsCastLastTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"SpellsCastLastTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 702.40a with nothing on the wire: the spell is the one the quantity is
+  -- evaluated against, and "this turn" is the event log's own extent.
+  Spec.it s "SpellsCastBefore is nullary" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.SpellsCastBefore
+      " {\"type\":\"SpellsCastBefore\"} "
   -- CR 309.7, on CardsDiscardedThisTurn's terms again: a PlayerRef and nothing
   -- else. Gloom Stalker writes the Relative You arm, which is the only spelling
   -- any printing uses -- "as long as YOU'VE completed a dungeon"; the InSlot arm

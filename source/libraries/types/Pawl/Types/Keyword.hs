@@ -171,6 +171,10 @@ data Keyword
   | -- | 702.39a: whenever this creature attacks, you may have target creature
     -- defending player controls block it if able; if you do, untap that creature.
     Provoke
+  | -- | 702.40a: storm -- a triggered ability that functions on the stack. When
+    -- you cast the spell, copy it for each other spell cast before it this turn;
+    -- you may choose new targets for the copies.
+    Storm
   | -- | 702.42a: you may choose all modes of this modal spell (CR 700.2) instead
     -- of the number specified, paying an additional cost if you do.
     Entwine (Cost.Cost Keyword)

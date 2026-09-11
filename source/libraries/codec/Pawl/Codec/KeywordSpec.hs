@@ -1059,6 +1059,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Cascade
       " {\"type\":\"Cascade\"} "
+  -- CR 702.40a. Nullary: the count is the log's, read at resolution.
+  Spec.it s "Storm" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Storm
+      " {\"type\":\"Storm\"} "
   Spec.it s "Persist" $
     Common.assertCodec
       s

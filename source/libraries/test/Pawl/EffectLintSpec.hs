@@ -263,7 +263,7 @@ ownQuantities effect = case effect of
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> [quantity]
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> quantity : Resolve.riderQuantities riders
   Effect.BecomeCopy {} -> []
-  Effect.CopyStackObject {} -> []
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> [quantity]
   Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity _) -> quantity : durationQuantities duration
@@ -384,6 +384,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False
   Quantity.Type.DamageDealtToPlayersThisTurn {} -> False
   Quantity.Type.SpellsCastLastTurn {} -> False
+  Quantity.Type.SpellsCastBefore -> False
   Quantity.Type.DungeonsCompleted {} -> False
   Quantity.Type.CompletedDungeon {} -> False
   Quantity.Type.EnteredThisTurn -> False
@@ -1186,7 +1187,7 @@ effectObjectRefs effect =
         Effect.Conjure {} -> []
         Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _) -> read_ [ref]
         Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
-        Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> read_ (ref : copyTargetsRefs targets)
+        Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _) -> read_ (ref : copyTargetsRefs targets)
         Effect.Replace {} -> []
         Effect.SkipNextPhase {} -> []
         Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)

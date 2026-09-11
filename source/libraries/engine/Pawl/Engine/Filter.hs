@@ -2178,6 +2178,8 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.85a is payload-free, so CR 612.2 has nothing to swap; the walk's
   -- nonland filter is in the ability Pawl.Engine.Keyword.cascade mints.
   Keyword.Type.Cascade -> keyword
+  -- CR 702.40a is payload-free too.
+  Keyword.Type.Storm -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
   -- CR 702.75a's N is a number and not a word, so CR 612.2 has nothing to swap;
