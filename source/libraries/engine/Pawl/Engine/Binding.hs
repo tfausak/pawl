@@ -422,12 +422,13 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- otherwise answer Binding.onlyOne Nothing for either question.
 --
 -- CR 702.122b is what reads it: a creature "crews a Vehicle" when it is tapped to
--- pay a crew ability's cost, and Pawl.Engine.Resolve.resolveAbilityWith puts this
--- set on GameEvent.BecameCrewed so that Gearshift Ace's "whenever this creature
--- crews a Vehicle" can find itself in it. The component is not crew's alone, so
--- the slot is named for the component; on a non-crew cost nothing reads it. CR
--- 702.122c's look-back reads that same event rather than this slot
--- (Pawl.Engine.Projection.View's crewedByIt), the relation outliving the payment.
+-- pay a crew ability's cost, and Pawl.Engine.Activate puts this set on
+-- GameEvent.Crewed as the payment completes so that Gearshift Ace's "whenever
+-- this creature crews a Vehicle" can find itself in it. The component is not
+-- crew's alone, so the slot is named for the component; on a non-crew cost
+-- nothing reads it. CR 702.122c's look-back reads that same event rather than
+-- this slot (Pawl.Engine.Projection.View's crewedByIt), the relation outliving
+-- the payment.
 --
 -- SET-VALUED and read as a set: CR 702.122a's "any number" is a set by
 -- construction, so a reader taking Binding.onlyOne of it would go quiet on every
@@ -470,7 +471,7 @@ revealedCard = SlotName.MkSlotName (Text.pack "thatRevealedCard")
 -- crewer-side wording keeps apart.
 --
 -- Every read is CURRENT information (CR 608.2h's first clause), tappedPermanent's
--- reason: the Vehicle is on the battlefield when the crew ability resolves, and a
+-- reason: the Vehicle is on the battlefield when it is crewed, and a
 -- Vehicle that has left by the time the trigger resolves is one this effect
 -- modifies nothing of. Pawl.Engine.Resolve.Slots.effectViewOf needs no arm.
 --

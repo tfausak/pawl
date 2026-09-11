@@ -17,7 +17,6 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
-import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
@@ -32,6 +31,7 @@ import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
+import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
@@ -359,6 +359,19 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Trained (ObjectId.MkObjectId 8))
       " {\"type\":\"Trained\",\"value\":8} "
+  -- CR 702.122b: the Vehicle and the creatures tapped to pay its crew cost, two
+  -- crewers so a codec that dropped all but one goes red.
+  Spec.it s "Crewed" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      ( GameEvent.Crewed
+          Crewing.MkCrewing
+            { Crewing.vehicle = ObjectId.MkObjectId 11,
+              Crewing.crewedBy = Set.fromList [ObjectId.MkObjectId 12, ObjectId.MkObjectId 13]
+            }
+      )
+      " {\"type\":\"Crewed\",\"value\":{\"crewedBy\":[12,13],\"vehicle\":11}} "
   -- CR 702.122e: the Vehicle whose crew ability resolved, and CR 702.122b's
   -- creatures that crewed it. The Vehicle is not among them -- rule 702.122a's
   -- "other" creatures -- so the fixture keeps the two sides apart.
@@ -367,9 +380,9 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.codec
       ( GameEvent.BecameCrewed
-          BecameCrewed.MkBecameCrewed
-            { BecameCrewed.vehicle = ObjectId.MkObjectId 9,
-              BecameCrewed.crewedBy = Set.fromList [ObjectId.MkObjectId 10]
+          Crewing.MkCrewing
+            { Crewing.vehicle = ObjectId.MkObjectId 9,
+              Crewing.crewedBy = Set.fromList [ObjectId.MkObjectId 10]
             }
       )
       " {\"type\":\"BecameCrewed\",\"value\":{\"crewedBy\":[10],\"vehicle\":9}} "

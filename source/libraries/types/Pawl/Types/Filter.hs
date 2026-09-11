@@ -304,14 +304,7 @@ data Filter keyword
     CantCrewVehicles
   | -- | CR 702.122c: the candidate is a creature that crewed the SOURCE earlier
     -- this turn -- Subterranean Schooner's "target creature that crewed it this
-    -- turn". AttackedThisTurn's look-back read, over (GameEvent.BecameCrewed) and
-    -- narrowed to the crewings of the object the surrounding evaluation is FOR,
-    -- which is what makes it "crewed it" rather than "crewed a Vehicle".
-    --
-    -- Not implemented: rule 702.122b's own timing, which makes a creature crew as
-    -- it is TAPPED. The event this reads is recorded where the crew ability
-    -- resolves, so a crew ability that is countered leaves a creature this atom
-    -- says crewed nothing (#915).
+    -- turn", read back off GameEvent.Crewed.
     CrewedSourceThisTurn
   | -- | CR 120.1 / 608.2i: the candidate -- an object or a player, since CR 120.1
     -- has damage dealt to both -- was DEALT DAMAGE earlier this turn.

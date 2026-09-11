@@ -38,7 +38,6 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
-import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
@@ -65,6 +64,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
@@ -2363,10 +2363,10 @@ representativeEvents cond =
         TriggerCondition.SelfTrains -> one (GameEvent.Trained departed)
         -- CR 702.122e's own event, and the only one this condition admits, on
         -- `departed` for SelfTrains' reason above.
-        TriggerCondition.SelfBecomesCrewed -> one (GameEvent.BecameCrewed (BecameCrewed.MkBecameCrewed departed (Set.singleton departed)))
-        -- The same event under CR 702.122b's crewer reading, with `departed` on
-        -- BOTH sides so the pair matches whichever side the arm reads.
-        TriggerCondition.SelfCrewsVehicle -> one (GameEvent.BecameCrewed (BecameCrewed.MkBecameCrewed departed (Set.singleton departed)))
+        TriggerCondition.SelfBecomesCrewed -> one (GameEvent.BecameCrewed (Crewing.MkCrewing departed (Set.singleton departed)))
+        -- CR 702.122b's own event, with `departed` on BOTH sides so the pair
+        -- matches whichever side the arm reads.
+        TriggerCondition.SelfCrewsVehicle -> one (GameEvent.Crewed (Crewing.MkCrewing departed (Set.singleton departed)))
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- pair need not actually match -- `departed` is no artifact on the empty
         -- board -- which is fine for what this pins: the arm binds the event's
