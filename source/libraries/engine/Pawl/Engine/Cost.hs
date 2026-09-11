@@ -2274,10 +2274,14 @@ canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ subs
         -- it, and unstacking THIS capacity alone leaves the suite green. What
         -- would observe it is a permanent with TWO mana routes, only one carrying
         -- the rider -- a source on the free route, which this must still refuse
-        -- the ridden one of. In `data/cards/` the two sets do not meet: Grinning
-        -- Ignus, Lavinia and Synthetic Ember Spring carry the pool's three riders
-        -- on a mana ability and each has one route, while Gemstone Caverns,
-        -- Muraganda Raceway and Phyrexian Tower have two routes and no rider.
+        -- the ridden one of -- and the rider has to be one
+        -- ActivationRestriction.needsEmptyStack answers True for. In `data/cards/`
+        -- those two sets do not meet: Grinning Ignus, Lavinia and Synthetic Ember
+        -- Spring carry the pool's three refusable riders on a mana ability and each
+        -- has one route, while Gemstone Caverns, Muraganda Raceway and Phyrexian
+        -- Tower have two routes and no rider. Nimbus Maze is both and still not
+        -- it: two of its three routes carry CR 602.5's board condition, which
+        -- needsEmptyStack admits.
         hoisted = stackedManaActivations (PlayerEffect.applying pid gs)
         payable (completed, life) =
           any

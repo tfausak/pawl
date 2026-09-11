@@ -247,6 +247,12 @@ to agents as written. What it doesn't say:
     Grep the sibling constructor, read every hit, and record in the PR which
     ones you read and why each is right as it stands.
 
+    A CONSTRUCTOR GREP has to allow for the module ALIAS. The same constructor is
+    spelled `Keyword.Flying` in most of the tree and `Keyword.Type.Flying` where a
+    module imports the type module under a second name, so a grep for the usual
+    spelling misses those arms. `Pawl.Engine.Filter`'s `rewriteKeyword` is where
+    that bites.
+
     A NEW FIELD's invisible site is positional record construction in the test
     suite, which absorbs it in argument order. Grep every construction site of
     the type by hand.
