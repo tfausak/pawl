@@ -1130,11 +1130,12 @@ rewriteDrawRewrite pairs rewrite = case rewrite of
 -- rewriteReplacementEffect's reason.
 --
 -- NO BOARD OBSERVES IT, the ChoiceByCoinFlip arm's position below: what changes
--- is a keyword that CARRIES a word, or CR 707.9b's subtype clause, and no card in
--- data/cards puts a text-changing effect on either -- no producer of the CR
--- 707.9a arms names a word (Dack's Duplicate grants haste and dethrone,
--- Omni-Changeling changeling, Mercurial Pretender a bounce), and Wall of Stolen Identity's "a Wall" would need
--- an Artificial Evolution aimed at it. The arms are the rule rather than a proven
+-- is a keyword that CARRIES a word, a quoted ability, or CR 707.9b's subtype
+-- clause, and no card in data/cards puts a text-changing effect on any of them --
+-- no producer of the CR 707.9a arms names a word (Dack's Duplicate grants haste
+-- and dethrone, Omni-Changeling changeling, Mercurial Pretender a bounce), and
+-- Wall of Stolen Identity's "a Wall" would need an Artificial Evolution aimed at
+-- it. The arms are the rule rather than a proven
 -- behaviour -- an "except it has islandwalk", or that Artificial Evolution, would
 -- be what proves them. CR 707.9b's remaining arms name no word CR 612.2's
 -- subtype swap reaches: the pair is two literals, the type clause names CR

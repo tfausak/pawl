@@ -9,7 +9,8 @@
 -- 707.9a's Dack's Duplicate and Omni-Changeling, the second of which is where CR
 -- 604.3a makes the gained ability characteristic-defining, and CR 707.9b's
 -- Sakashima the Impostor, whose name and additive supertype clauses are read
--- together by CR 704.5j), its CR 707.5 eligible set
+-- together by CR 704.5j, and CR 707.9a's quoted ability, Mercurial Pretender,
+-- which a Clone of the copy keeps), its CR 707.5 eligible set
 -- (Replacement.legalCopyTargets, Copy Enchantment's "any enchantment" against Clone's
 -- "any creature", and Clever Impersonator's negated "any nonland permanent"), the
 -- P2 copy gate (Clone), and
