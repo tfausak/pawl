@@ -9,7 +9,6 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExileLooker as ExileLooker
@@ -410,7 +409,7 @@ data Object = MkObject
     -- read. Absent for a mark set with no number, which is every one of them but
     -- a "Monstrosity X".
     --
-    -- KEYED BY THE DESIGNATION, `kicked` below's shape, rather than a
+    -- KEYED BY THE DESIGNATION, `paidCosts` below's shape, rather than a
     -- Maybe Natural named for monstrosity: Effect.Designate is parameterised by
     -- WHICH mark (Pawl.Types.Designation's own argument), so the writer records
     -- the number the same way whatever the mark is, and Quantity.DesignationValue
@@ -421,24 +420,29 @@ data Object = MkObject
     -- Per-incarnation, `designations` above's route and each rule's own "until it
     -- leaves the battlefield".
     designationValues :: Map.Map Designation.Designation Natural.Natural,
-    -- | CR 702.33d: how many times did this SPELL's controller declare each of
-    -- its kicker costs? Stamped by Pawl.Engine.Cast at CR 601.2b onto the stack
-    -- incarnation, and empty for a spell that was not kicked.
+    -- | CR 601.2b: how many times did this SPELL's controller declare each
+    -- optional additional cost a keyword ability offers -- kicker and multikicker
+    -- (CR 702.33a/c), squad (CR 702.157a), offspring (CR 702.175a)? Stamped by
+    -- Pawl.Engine.Cast onto the stack incarnation, and empty where none was.
     --
-    -- KEYED BY THE COST, and a COUNT per key: CR 702.33b's "kicker [cost 1]
+    -- KEYED BY THE KEYWORD, and a COUNT per key: CR 702.33b's "kicker [cost 1]
     -- and/or [cost 2]" has payoffs naming one of them (CR 702.33f), and the count
-    -- is CR 702.33c's multikicker. Quantity.TimesKickedWith reads a key;
-    -- Quantity.WasKicked asks rule 702.33d's yes-or-no across the map. Stored
+    -- is CR 702.33c's multikicker and squad's "for each time". Quantity.TimesPaid
+    -- reads a key; Quantity.WasKicked asks rule 702.33d's yes-or-no across the
+    -- kicker keys only, since a squad or offspring payment is not a kick. Stored
     -- rather than projected, since it records a choice rather than a
-    -- characteristic, and not a Pawl.Types.Designation, whose marks only
-    -- permanents can have.
+    -- characteristic, and so NOT a copiable value (CR 707.2): Pawl.CastSpec's
+    -- "CR 707.2 a Clone of a paid Mage makes no token" is the proof.
+    --
+    -- Not implemented: two IDENTICAL instances of one keyword, which CR 702.157b
+    -- and CR 702.175b pay separately and this map keys as one (#3635).
     --
     -- Per-incarnation, save for CR 400.7d's exception -- "an ability of a
     -- permanent can reference information about the spell that became that
     -- permanent as it resolved, including what costs were paid" -- which CR
     -- 702.33e's payoff needs, so Pawl.Engine.Event.changeZoneAttaching carries it
-    -- across that one move.
-    kicked :: Map.Map (Cost.Cost Keyword.Keyword) Natural.Natural,
+    -- across that one move, and Pawl.Types.LastKnown keeps it for CR 608.2h.
+    paidCosts :: Map.Map Keyword.Keyword Natural.Natural,
     -- | CR 702.103b: is this object BESTOWED? Stamped by Pawl.Engine.Cast at CR
     -- 601.2b, and read by Pawl.Engine.Projection.bestowGathered, which mints the
     -- three modifications that rule names on every projection.
@@ -446,7 +450,7 @@ data Object = MkObject
     -- A Bool and not the effect's timestamp: CR 702.103a makes bestow a static
     -- ability, so CR 613.7a gives its effect the object's own timestamp, which
     -- bestowGathered reads instead. Carried across the stack-to-battlefield move
-    -- by Pawl.Engine.Event.changeZoneAttaching, `kicked`'s route, for a stronger
+    -- by Pawl.Engine.Event.changeZoneAttaching, `paidCosts`'s route, for a stronger
     -- reason than rule 400.7d's: rule 702.103b's effects last until the permanent
     -- the spell becomes ceases to be bestowed.
     --
@@ -513,12 +517,12 @@ data Object = MkObject
     -- it (Pawl.Engine.Replacement.installBuybackReturn), so CR 616.1 orders it
     -- against every other row watching the same move.
     --
-    -- A Bool where `kicked` above is a map keyed by cost: rule 702.27a states ONE
+    -- A Bool where `paidCosts` above is a map of counts: rule 702.27a states ONE
     -- cost and one payment of it, and nothing reads back WHICH cost was paid --
     -- the whole of the payoff is the destination. Stored rather than projected,
     -- since it records a choice rather than a characteristic.
     --
-    -- Per-incarnation with no exception at all, where `kicked` has CR 400.7d's:
+    -- Per-incarnation with no exception at all, where `paidCosts` has CR 400.7d's:
     -- rule 702.27a's ability is spent on the one move it replaces, and only an
     -- instant or a sorcery can carry buyback, so there is no permanent to
     -- reference it afterwards. Nothing carries it across a zone change.
@@ -528,10 +532,10 @@ data Object = MkObject
     -- would pay 2 life for. CR 702.150a's compleated is the one reader, through
     -- Pawl.Engine.Projection.intrinsicReplacementsOf.
     --
-    -- ONE count for the whole cost, where `kicked` above keys by which cost was
+    -- ONE count for the whole cost, where `paidCosts` above keys by which cost was
     -- announced: rule 702.150a subtracts two for EACH of those symbols of the one
     -- cost being paid. Zero for every object that was not cast for life this way,
-    -- and carried across the one move CR 400.7d admits, `kicked`'s route.
+    -- and carried across the one move CR 400.7d admits, `paidCosts`'s route.
     phyrexianLifePaid :: Natural.Natural,
     -- | CR 107.4h with CR 601.2h and CR 602.2b: the mana that was SPENT to pay
     -- the cost of casting the SPELL that became this object, or of activating the
@@ -549,7 +553,7 @@ data Object = MkObject
     -- cast records nothing. An ACTIVATION's units land on the ability object and
     -- never on its source -- Pawl.ManaSpec's "CR 400.7d an activation's record
     -- goes on the ability object, not on its source" is the proof. Carried
-    -- across the one move CR 400.7d admits, `kicked`'s route, which is what Berg
+    -- across the one move CR 400.7d admits, `paidCosts`'s route, which is what Berg
     -- Strider's clause needs.
     manaSpent :: Mana.Mana,
     -- | CR 107.3m: the value of X chosen for the SPELL that became this
@@ -595,7 +599,7 @@ data Object = MkObject
     -- Per-incarnation, save for CR 400.7d's exception -- the permanent a spell
     -- became may reference "what costs were paid" -- so
     -- Pawl.Engine.Event.changeZoneAttaching carries it across that one move,
-    -- `kicked`'s route. NOT a copiable value (CR 707.2): a Clone of an evoked
+    -- `paidCosts`'s route. NOT a copiable value (CR 707.2): a Clone of an evoked
     -- permanent was not cast for that cost. A copy of the SPELL copies the
     -- alternative cost (CR 707.10) but isn't cast, so it keeps evoke's, dash's
     -- and blitz's record and drops escape's (CR 702.138b) --
@@ -745,10 +749,10 @@ newIncarnation object =
       unlockedHalves = Set.empty,
       designations = Set.empty,
       designationValues = Map.empty,
-      kicked = Map.empty,
+      paidCosts = Map.empty,
       -- CR 702.103b's record is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move that
-      -- keeps it, `kicked` above's route.
+      -- keeps it, `paidCosts` above's route.
       bestowed = False,
       -- CR 702.140a's record is written back by nothing: rule 702.140a's ability
       -- functions only while the spell is on the stack, and CR 702.140c leaves

@@ -13,7 +13,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Pawl.CardSpec (Framing (AttachDestination, ClauseGateFramed, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
-import qualified Pawl.Codec.Cost as Cost.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Codec.Filter as Filter.Codec
@@ -784,51 +783,51 @@ isBoundOffends card =
   let (wished, elsewhere) = isBoundCounts card
    in wished /= 0 || wished + elsewhere /= jsonAtoms isBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
--- The CR 702.33d per-cost tally's codec tag, spelled once.
-timesKickedWithTag :: Text.Text
-timesKickedWithTag = Text.pack "TimesKickedWith"
+-- The CR 601.2b per-keyword tally's codec tag, spelled once.
+timesPaidTag :: Text.Text
+timesPaidTag = Text.pack "TimesPaid"
 
--- Every cost a Quantity.TimesKickedWith names in an ENCODED face, as the codec
+-- Every keyword a Quantity.TimesPaid names in an ENCODED face, as the codec
 -- wrote it. Read off the encoding for canHostSubjectOffends' reason turned to a
 -- payload: this module's three Quantity traversals answer in Counts and Filters,
--- neither of which can carry a Cost, so the arm is invisible to all three.
+-- neither of which can carry a Keyword, so the arm is invisible to all three.
 --
 -- The tagged arm and not the bare tag, jsonAtoms' distinction: only an object
 -- whose "type" is the tag contributes, and what it contributes is the "value"
 -- beside it -- Pawl.JsonCodec.Common's shape for an Arm.payload.
-timesKickedWithCosts :: Value.Value -> [Value.Value]
-timesKickedWithCosts value = case value of
-  Value.Array a -> concatMap timesKickedWithCosts (Array.unwrap a)
+timesPaidKeywords :: Value.Value -> [Value.Value]
+timesPaidKeywords value = case value of
+  Value.Array a -> concatMap timesPaidKeywords (Array.unwrap a)
   Value.Object o ->
     let pairs = Object.unwrap o
         keyed k = fmap Pair.value (filter (\pair -> String.unwrap (Pair.name pair) == Text.pack k) pairs)
-        tagged = Maybe.mapMaybe (\v -> case v of Value.String t | String.unwrap t == timesKickedWithTag -> Just (); _ -> Nothing) (keyed "type")
+        tagged = Maybe.mapMaybe (\v -> case v of Value.String t | String.unwrap t == timesPaidTag -> Just (); _ -> Nothing) (keyed "type")
         here = if null tagged then [] else keyed "value"
-     in here <> concatMap (timesKickedWithCosts . Pair.value) pairs
+     in here <> concatMap (timesPaidKeywords . Pair.value) pairs
   Value.String _ -> []
   Value.Null _ -> []
   Value.Boolean _ -> []
   Value.Number _ -> []
 
--- CR 702.33d's per-cost tally, which the rule makes payable more than once for a
--- multikicker. Pawl.Engine.Quantity joins TimesKickedWith's Cost to
+-- CR 601.2b's per-keyword tally, which CR 702.33c makes payable more than once
+-- for a multikicker. Pawl.Engine.Quantity joins TimesPaid's Keyword to
 -- Pawl.Engine.Cast's tally by structural equality, and that tally is keyed by
--- Pawl.Engine.Keyword.kickerCosts of the face's own keywords -- so a cost this
--- face never prints, or the same symbols in another order, reads 0 for the life
--- of the game with nothing red. This is where that is made loud.
+-- Pawl.Engine.Keyword.optionalCosts of the face's own keywords -- so a keyword
+-- this face never prints, or the same symbols in another order, reads 0 for the
+-- life of the game with nothing red. This is where that is made loud.
 --
--- Compared as ENCODINGS rather than as Costs so the two sides come off the one
--- codec Pawl.CodecIntegrationSpec round-trips; the Cost's own Eq is what the
+-- Compared as ENCODINGS rather than as Keywords so the two sides come off the one
+-- codec Pawl.CodecIntegrationSpec round-trips; the Keyword's own Eq is what the
 -- engine joins on, and the codec is injective, so the two agree.
 --
 -- Stated about the PRINTED keywords, which is what a card file can be wrong
 -- about. Nothing in data/cards/ grants one for a CR 613 projection to add
 -- instead: each of the six Kicker or Multikicker occurrences sits at a face's own
 -- `keywords`, 2026-09-02.
-timesKickedWithOffends :: Face.Face Card.Type.Card -> Bool
-timesKickedWithOffends card =
-  let printed = fmap (Codec.encode (Cost.Codec.codec Keyword.Codec.codec) . fst) (Keyword.Engine.kickerCosts (Face.keywords card))
-   in any (`notElem` printed) (timesKickedWithCosts (Codec.encode (Face.Codec.codec Card.codec) card))
+timesPaidOffends :: Face.Face Card.Type.Card -> Bool
+timesPaidOffends card =
+  let printed = fmap (Codec.encode Keyword.Codec.codec) (Keyword.Engine.optionalCosts (Face.keywords card))
+   in any (`notElem` printed) (timesPaidKeywords (Codec.encode (Face.Codec.codec Card.codec) card))
 
 -- Two things a TriggerCondition.AnyOf may not contain, checked at every depth so
 -- that a nested one cannot smuggle either in.
@@ -1371,19 +1370,19 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "a planted atom is an offence" (hostOfSourceCounts planted) (0, 1)
     Spec.assertBool s (hostOfSourceOffends planted) "and the lint says so"
-  -- CR 702.33d: a kicker tally names one of the face's OWN kicker costs, joined
-  -- to Pawl.Engine.Cast's per-cost map by structural equality. See
-  -- timesKickedWithOffends for why this is read off the encoding.
+  -- CR 702.33d: a kicker tally names one of the face's OWN kicker keywords,
+  -- joined to Pawl.Engine.Cast's per-keyword map by structural equality. See
+  -- timesPaidOffends for why this is read off the encoding.
   Spec.it s "CR 702.33d every kicker tally names a cost its face prints" $ do
     ps <- S.allPrintings s
-    let offenders = filter (anyFace timesKickedWithOffends . Printing.card) ps
+    let offenders = filter (anyFace timesPaidOffends . Printing.card) ps
     Spec.assertEqWith s "no card counts a kicker cost its face never prints" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous: the pool authors the arm, and the cards that do are ACCEPTED
     -- here rather than swept past. Gnarlid Pack counts its multikicker once and
     -- Sunscape Battlemage its two CR 702.33b kickers once each.
     gnarlid <- S.printingOf s registry "Gnarlid Pack"
     sunscape <- S.printingOf s registry "Sunscape Battlemage"
-    let tallies = length . timesKickedWithCosts . Codec.encode (Face.Codec.codec Card.codec) . S.combinedFace
+    let tallies = length . timesPaidKeywords . Codec.encode (Face.Codec.codec Card.codec) . S.combinedFace
     Spec.assertEqWith s "the pool writes three tallies for this lint to be about" (fmap tallies [gnarlid, sunscape]) [1, 2]
     -- The REJECTING direction, as faces differing from the printed one in the
     -- kicker cost ALONE: Gnarlid Pack's {1}{G} respelled {G}{1} is a different Map
@@ -1393,9 +1392,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         respell keyword = case keyword of
           Keyword.Multikicker cost -> Keyword.Multikicker (reverseMana cost)
           _ -> keyword
-    Spec.assertBool s (not (timesKickedWithOffends face)) "the control: Gnarlid Pack as printed is accepted"
-    Spec.assertBool s (timesKickedWithOffends (face {Face.keywords = Set.map respell (Face.keywords face)})) "a reordered multikicker cost is rejected"
-    Spec.assertBool s (timesKickedWithOffends (face {Face.keywords = Set.empty})) "and so is a face that counts a kicker it prints none of"
+    Spec.assertBool s (not (timesPaidOffends face)) "the control: Gnarlid Pack as printed is accepted"
+    Spec.assertBool s (timesPaidOffends (face {Face.keywords = Set.map respell (Face.keywords face)})) "a reordered multikicker cost is rejected"
+    Spec.assertBool s (timesPaidOffends (face {Face.keywords = Set.empty})) "and so is a face that counts a kicker it prints none of"
   -- CR 702.122d's Filter.CantCrewVehicles is the one atom here that no card may
   -- write ANYWHERE, rather than one admitted at some positions: it is answerable
   -- only where Pawl.Engine.Cost.tapCandidates gathers the prohibition, and it is

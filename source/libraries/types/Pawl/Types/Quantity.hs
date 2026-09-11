@@ -3,7 +3,6 @@ module Pawl.Types.Quantity where
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
-import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
@@ -102,9 +101,10 @@ data Quantity
     -- kicked with any of its kicker costs, else 0; a permanent answers for the
     -- spell that became it (CR 400.7d).
     WasKicked
-  | -- | CR 702.33c / 702.33f: how many times that kicker cost was declared for
-    -- the spell this quantity is evaluated against.
-    TimesKickedWith (Cost.Cost Keyword.Keyword)
+  | -- | CR 601.2b / 400.7d: how many times the additional cost that keyword
+    -- ability offers was declared for the spell this quantity is evaluated
+    -- against, or the spell that became it -- CR 702.33c/f, 702.157a, 702.175a.
+    TimesPaid Keyword.Keyword
   | -- | CR 601.2b / 400.7d: 1 if the spell this quantity is evaluated against, or
     -- the spell that became it, was cast for the cost that keyword ability
     -- offers -- CR 702.74a's "if its evoke cost was paid", CR 702.138b's

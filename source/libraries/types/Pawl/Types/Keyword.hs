@@ -497,6 +497,9 @@ data Keyword
     -- entered unless it has exactly that chapter's number of lore counters; rule
     -- 714.3b REPLACES rule 714.3a's ability rather than adding to it.
     ReadAhead
+  | -- | 702.157a: "As an additional cost to cast this spell, you may pay [cost]
+    -- any number of times", and an enters trigger making a token copy per payment.
+    Squad (Cost.Cost Keyword)
   | -- | 702.160a: a second mana cost, power and toughness the caster may choose
     -- instead of the printed ones as the card is cast (CR 718.3).
     Prototype Prototype.Prototype
@@ -518,6 +521,9 @@ data Keyword
     -- Lost on the Range), which Pawl.Engine.Plot.canPlot's Zone.Hand test refuses
     -- (#2091).
     Plot (Cost.Cost Keyword)
+  | -- | 702.175a: "You may pay an additional [cost] as you cast this spell", and
+    -- an enters trigger making a 1\/1 token copy if it was paid.
+    Offspring (Cost.Cost Keyword)
   | -- | 702.179a: a static ability whose whole content is CR 704.5aa's
     -- state-based action, read off the projection by Pawl.Engine.Sba rather than
     -- minted.

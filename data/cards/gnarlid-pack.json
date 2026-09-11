@@ -56,23 +56,26 @@
                 "value": [
                   {
                     "count": {
-                      "type": "TimesKickedWith",
+                      "type": "TimesPaid",
                       "value": {
-                        "mana": [
-                          {
-                            "type": "Generic",
-                            "value": 1
-                          },
-                          {
-                            "type": "OfType",
-                            "value": {
-                              "type": "Colored",
+                        "type": "Multikicker",
+                        "value": {
+                          "mana": [
+                            {
+                              "type": "Generic",
+                              "value": 1
+                            },
+                            {
+                              "type": "OfType",
                               "value": {
-                                "type": "Green"
+                                "type": "Colored",
+                                "value": {
+                                  "type": "Green"
+                                }
                               }
                             }
-                          }
-                        ]
+                          ]
+                        }
                       }
                     },
                     "kind": {

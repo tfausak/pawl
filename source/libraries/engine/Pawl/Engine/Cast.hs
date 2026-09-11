@@ -517,28 +517,28 @@ entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
     Monad.guard (any (\candidate -> payableCost spending pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
 
--- CR 601.2f: one candidate cost with every kicker payment announced so far added
--- to it -- CR 118.8a's "any number of additional costs may be applied", so a cost
--- declared N times is added N times (CR 702.33c).
-withKickerPayments :: Map.Map (Cost Keyword) Natural -> Cost Keyword -> Cost Keyword
-withKickerPayments paid candidate =
+-- CR 601.2f: one candidate cost with every optional additional payment announced
+-- so far added to it -- CR 118.8a's "any number of additional costs may be
+-- applied", so a cost declared N times is added N times (CR 702.33c, CR 702.157a).
+withOptionalPayments :: Map.Map Keyword Natural -> Cost Keyword -> Cost Keyword
+withOptionalPayments paid candidate =
   Map.foldrWithKey
-    (\cost times acc -> List.foldl' Cost.plus acc (List.genericReplicate times cost))
+    (\keyword times acc -> maybe acc (\(cost, _) -> List.foldl' Cost.plus acc (List.genericReplicate times cost)) (Keyword.optionalCost keyword))
     candidate
     paid
 
--- CR 702.33a / 702.33b / 702.33c: the announcement of this spell's kicker costs,
--- one question per cost and each answered as a count -- the record CR 702.33d's
+-- CR 601.2b: the announcement of this spell's optional additional costs -- CR
+-- 702.33a/b/c's kicker costs, CR 702.157a's squad and CR 702.175a's offspring --
+-- one question per keyword and each answered as a count: the record CR 702.33d's
 -- designation is made of, and empty for a player who declared none.
 --
 -- Two conditions per cost, and each is entwineOffer's above:
 --
---   1. The card HAS that kicker: `offers` is Keyword.kickerCosts over the printed
---      keywords of the half being cast, handed in rather than re-read here so the
---      announcement and castProposed's limit check cannot disagree about which
---      half's kickers those are. Rule 702.33a is a static ability of the spell
---      itself (CR 702.33a: "functions while the spell with kicker is on the
---      stack").
+--   1. The card HAS that keyword: `offers` is Keyword.optionalCosts over the
+--      printed keywords of the half being cast, handed in rather than re-read here
+--      so the announcement and castProposed's limit check cannot disagree about
+--      which half's costs those are. Each rule's first ability is a static ability
+--      of the spell itself (CR 702.33a, CR 702.157a).
 --   2. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
 --      additional costs", at CR 601.2b's X=0 floor and with the same payableCost
 --      predicate castability was gated on. An option the player cannot take is not
@@ -560,30 +560,30 @@ withKickerPayments paid candidate =
 -- together are payable. How high a multikicker count may go is not gated here at
 -- all -- the answer is honoured and then measured, which is Prompt.ChooseX's
 -- posture, and castProposed rejects a cast whose announced total nothing can pay.
-announceKickers :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> [(Cost Keyword, Maybe Natural)] -> GameState -> Game (Map.Map (Cost Keyword) Natural)
-announceKickers spending pid sid candidates offers gs =
-  let ask paid (cost, limit) =
-        if any (\candidate -> payableCost spending pid sid gs (Cost.plus (withKickerPayments paid candidate) cost)) candidates
-          then do
-            decision <- Game.choose (Prompt.ChooseKicker (Decide.deciderFor pid gs) pid sid cost limit)
-            let times = KickerDecision.unwrap decision
-            pure (if times == 0 then paid else Map.insert cost times paid)
-          else pure paid
+announceOptionalCosts :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> [Keyword] -> GameState -> Game (Map.Map Keyword Natural)
+announceOptionalCosts spending pid sid candidates offers gs =
+  let ask paid keyword = case Keyword.optionalCost keyword of
+        Just (cost, limit)
+          | any (\candidate -> payableCost spending pid sid gs (Cost.plus (withOptionalPayments paid candidate) cost)) candidates -> do
+              decision <- Game.choose (Prompt.ChooseKicker (Decide.deciderFor pid gs) pid sid keyword limit)
+              let times = KickerDecision.unwrap decision
+              pure (if times == 0 then paid else Map.insert keyword times paid)
+        _ -> pure paid
    in Monad.foldM ask Map.empty offers
 
--- CR 702.33d's designation, written onto the spell's own stack incarnation: "that
--- spell has been kicked". Read back by Quantity.WasKicked and
--- Quantity.TimesKickedWith through the CR 613 projection, which is how the card's
--- own CR 702.33e ability sees it.
+-- CR 601.2b's record, written onto the spell's own stack incarnation -- CR
+-- 702.33d's "that spell has been kicked" among it. Read back by Quantity.WasKicked
+-- and Quantity.TimesPaid through the CR 613 projection, which is how the card's
+-- own CR 702.33e ability and CR 702.157a's trigger see it.
 --
 -- A write of a field no layer computes, and one direction only: rule 702.33d gives
 -- no way to unkick a spell, and CR 400.7 ends the designation with the incarnation
 -- (Object.newIncarnation), so nothing has to clear it.
-stampKicked :: Map.Map (Cost Keyword) Natural -> ObjectId -> GameState -> GameState
-stampKicked paid sid gs =
+stampPaidCosts :: Map.Map Keyword Natural -> ObjectId -> GameState -> GameState
+stampPaidCosts paid sid gs =
   gs
     { GameState.objects =
-        Map.adjust (\o -> o {Object.kicked = paid}) sid (GameState.objects gs)
+        Map.adjust (\o -> o {Object.paidCosts = paid}) sid (GameState.objects gs)
     }
 
 -- CR 702.27a's designation, written onto the spell's own stack incarnation: "if
@@ -591,7 +591,7 @@ stampKicked paid sid gs =
 -- is the one place rule 702.27a's rewrite is minted as a replacement row over CR
 -- 608.2n's move (Pawl.Engine.Replacement.installBuybackReturn).
 --
--- stampKicked's shape above in every respect: an idempotent write of a field no
+-- stampPaidCosts' shape above in every respect: an idempotent write of a field no
 -- layer computes, one direction only, rule 702.27a giving no way to unpay the
 -- cost and CR 400.7 ending the record with the incarnation.
 stampBoughtBack :: ObjectId -> GameState -> GameState
@@ -614,7 +614,7 @@ stampBoughtBack sid gs =
 -- move -- is asked after CR 601.2b, and a proposal that rewinds takes the stamp
 -- back with the spell (`reject` restores the pre-move state).
 --
--- An idempotent write of a field no layer computes, stampKicked's shape, and one
+-- An idempotent write of a field no layer computes, stampPaidCosts' shape, and one
 -- direction only: rule 702.103a's choice is available while casting and never
 -- after, so nothing here can set it back.
 stampBestowed :: ObjectId -> GameState -> GameState
@@ -642,7 +642,7 @@ stampPrototyped sid gs =
 
 -- CR 601.2b: record on the spell the keyword that offered the candidate the
 -- announcement settled on (`castFor`), read back by Quantity.CastUsing.
--- stampKicked's shape: an idempotent write of a field no layer computes, which a
+-- stampPaidCosts' shape: an idempotent write of a field no layer computes, which a
 -- rejected proposal takes back with the spell.
 stampCastUsing :: Maybe Keyword -> ObjectId -> GameState -> GameState
 stampCastUsing castFor sid gs =
@@ -2002,18 +2002,22 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
           withEscalate candidate = maybe candidate (Cost.plus candidate) escalated
           withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
           announcedCandidates = fmap (withEscalate . withEntwine) candidates
-          -- CR 702.33a/b/c's costs, each with the number of times its own rule lets
-          -- it be paid, read ONCE off the half being cast: the announcement below
-          -- and the limit it is judged against are the same list.
-          kickerOffers = Keyword.kickerCosts (Face.keywords face)
+          -- CR 702.33a/b/c's, CR 702.157a's and CR 702.175a's costs, read ONCE off
+          -- the half being cast: the announcement below and the limit it is
+          -- judged against are the same list.
+          --
+          -- Not implemented: such a keyword granted to the spell as it is cast,
+          -- which the printed face does not carry (#3635).
+          optionalOffers = Keyword.optionalCosts (Face.keywords face)
       -- CR 702.33a: kicker, asked HERE -- after the modes and before the cost, the
       -- variable and the targets -- because that is where CR 601.2b puts the
       -- announcement of an additional cost, and rule 702.33a bundles nothing else
-      -- into the question the way rule 702.42a bundles a mode choice.
+      -- into the question the way rule 702.42a bundles a mode choice. Squad and
+      -- offspring ride the same question (CR 702.157a, CR 702.175a).
       --
-      -- The choice is never made for them: announceKickers asks about every kicker
-      -- cost the card prints and skips one only where there is no payable route,
-      -- and where there IS one, every answer goes to the player.
+      -- The choice is never made for them: announceOptionalCosts asks about every
+      -- such cost the card prints and skips one only where there is no payable
+      -- route, and where there IS one, every answer goes to the player.
       --
       -- Offered against the ENTWINED and ESCALATED candidates, so a player already
       -- owing one additional cost is asked about this one only if they are payable
@@ -2022,7 +2026,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       --
       -- Carried as the counts per cost rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
-      kicked <- announceKickers spending pid sid announcedCandidates kickerOffers gs
+      paid <- announceOptionalCosts spending pid sid announcedCandidates optionalOffers gs
       -- Not implemented: CR 702.33g's targets, which a spell whose kicked-only
       -- clause names a slot of its own should be asked for only on a kicked cast
       -- (#2833). No card in data/cards/ prints that shape -- Burst Lightning's two
@@ -2034,7 +2038,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- is what designates it, so the stamp lands here and not at CR 601.2h's
       -- payment. A cast that fails after this point rewinds to `before`, which
       -- takes the stamp with it along with the spell.
-      Monad.unless (Map.null kicked) (State.modify' (stampKicked kicked sid))
+      Monad.unless (Map.null paid) (State.modify' (stampPaidCosts paid sid))
       -- CR 702.27a: buyback, asked after the kicker and before the cost, the
       -- variable and the targets -- CR 601.2b's place for an additional cost's
       -- announcement, kicker's reason exactly, rule 702.27a bundling nothing else
@@ -2053,7 +2057,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- Carried as the additional Cost itself rather than as a flag, entwine's
       -- reason: the candidate costs below and the CR 702.27a stamp read one value.
       let buybackAffordable extra =
-            any (\candidate -> payableCost spending pid sid gs (Cost.plus (withKickerPayments kicked candidate) extra)) announcedCandidates
+            any (\candidate -> payableCost spending pid sid gs (Cost.plus (withOptionalPayments paid candidate) extra)) announcedCandidates
       boughtBack <- case Keyword.buybackCost (Face.keywords face) of
         Nothing -> pure Nothing
         Just extra
@@ -2068,15 +2072,16 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- cast that fails after this point rewinds to `before`, which takes the stamp
       -- with it along with the spell.
       Monad.when (Maybe.isJust boughtBack) (State.modify' (stampBoughtBack sid))
-      -- CR 702.33a's additional cost is payable ONCE, where rule 702.33c's
-      -- multikicker states no limit. An answer past a stated limit is text the card
-      -- does not have, so it rejects the cast below rather than being clamped --
-      -- Prompt.ChooseX's reject-not-repair posture, and for its reason.
+      -- CR 702.33a's and CR 702.175a's additional costs are payable ONCE, where
+      -- rule 702.33c's multikicker and rule 702.157a's squad state no limit. An
+      -- answer past a stated limit is text the card does not have, so it rejects
+      -- the cast below rather than being clamped -- Prompt.ChooseX's
+      -- reject-not-repair posture, and for its reason.
       let overKickerLimit =
             any
-              (\(cost, limit) -> maybe False (Map.findWithDefault 0 cost kicked >) limit)
-              kickerOffers
-          withKicker = withKickerPayments kicked
+              (\keyword -> maybe False (\limit -> Map.findWithDefault 0 keyword paid > limit) (snd =<< Keyword.optionalCost keyword))
+              optionalOffers
+          withKicker = withOptionalPayments paid
           -- CR 702.27a's cost is additional too, so it rides the same fold.
           withBuyback candidate = maybe candidate (Cost.plus candidate) boughtBack
           -- The additional costs are folded into each candidate's COST and
@@ -2238,7 +2243,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.tapSubstitutedManas (Cost.totalManas gathered) pid sid bestowedGs) (Cost.plusComponents gathered announcedAtX)
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
-                  -- Pawl.Engine.Event.changeZoneAttaching, `Object.kicked`'s
+                  -- Pawl.Engine.Event.changeZoneAttaching, `Object.paidCosts`'s
                   -- route exactly. Rule 702.150a's compleated is the one reader.
                   State.modify' (\st -> st {GameState.objects = Map.adjust (\o -> o {Object.phyrexianLifePaid = phyrexianLifePaid}) sid (GameState.objects st)})
                   -- CR 601.2c, and the spell is on the stack for it: `bestowedGs`

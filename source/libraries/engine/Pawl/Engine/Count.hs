@@ -1025,7 +1025,7 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- carry and never could, so a past event records none -- `designations`
       -- above, same sentence.
       Filter.classLevel = Nothing,
-      Filter.kicked = Map.empty,
+      Filter.paidCosts = Map.empty,
       Filter.castUsing = Nothing,
       -- CR 400.7d's mana record is a field of an OBJECT, which a
       -- ProjectedCharacteristics does not carry -- `designations` above, same

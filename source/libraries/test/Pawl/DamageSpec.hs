@@ -882,7 +882,8 @@ lastKnownRiderSpec s registry =
                     LastKnown.attackTarget = Nothing,
                     LastKnown.blocking = False,
                     -- CR 310.9a: the Sorcerer is no battle, so nobody protects it.
-                    LastKnown.protector = Nothing
+                    LastKnown.protector = Nothing,
+                    LastKnown.paidCosts = Map.empty
                   }
               humbled = S.withHumility humility equipped
               planted =

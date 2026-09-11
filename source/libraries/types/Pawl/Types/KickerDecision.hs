@@ -15,6 +15,11 @@ import qualified Numeric.Natural as Natural
 -- ChooseKicker), and an answer past the limit rejects the cast rather than being
 -- clamped, which is Prompt.ChooseX's posture (Pawl.Engine.Cast).
 --
+-- The same answer serves CR 702.157a's squad, payable "any number of times", and
+-- CR 702.175a's offspring, payable once: both are optional additional costs
+-- announced at CR 601.2b, as kicker is. Only a kicker answer makes a spell
+-- kicked.
+--
 -- Its own type rather than a reuse of Pawl.Types.EntwineDecision, whose rule
 -- bundles a MODE choice into the same sentence, or of OptionalDecision, which is
 -- scoped to CR 603.5's printed "may" answered AS THE SPELL RESOLVES. This one is

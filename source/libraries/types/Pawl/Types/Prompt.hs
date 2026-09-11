@@ -297,10 +297,11 @@ data Prompt r where
   -- merges with. Never elided: CR 730.2a makes the two answers differ in the
   -- merged permanent's every characteristic.
   ChooseMutateSide :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt MutateSide.MutateSide
-  -- | CR 702.33a: how many times one kicker cost is paid, after ChooseModes and
-  -- before ChooseCost (CR 601.2b); the Maybe Natural is the limit, Nothing for
-  -- CR 702.33c's multikicker, and an answer past it is rejected.
-  ChooseKicker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Maybe Natural.Natural -> Prompt KickerDecision.KickerDecision
+  -- | CR 601.2b: how many times the optional additional cost of that keyword --
+  -- kicker, multikicker, squad or offspring (CR 702.33a/c, 702.157a, 702.175a) --
+  -- is paid, after ChooseModes and before ChooseCost; the Maybe Natural is the
+  -- limit, Nothing for "any number of times", and an answer past it is rejected.
+  ChooseKicker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Keyword.Keyword -> Maybe Natural.Natural -> Prompt KickerDecision.KickerDecision
   -- | CR 702.27a: whether the spell's buyback cost is paid, after ChooseKicker
   -- and before ChooseCost (CR 601.2b); the Cost is what buying back adds (CR
   -- 601.2f).
