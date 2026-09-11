@@ -1330,10 +1330,9 @@ zoneScopeSlot scope = case scope of
 --
 -- `x` is the value announced at CR 601.2b, which a slot counting "each of X
 -- target creatures" or "up to X target ..." reads instead of a printed range
--- (SlotCount.at). It comes in
--- as a number rather than being read off the board here because CR 601.2b's
--- announcement is not recorded anywhere yet -- the object is put on the stack
--- carrying it only after CR 601.2c is done.
+-- (SlotCount.at). It comes in as a number rather than being read off the board
+-- here because CR 601.2b's announcement is not recorded anywhere yet -- the
+-- object is put on the stack carrying it only after CR 601.2c is done.
 --
 -- `capacity` is how many of the slot's legal recipients ONE announcement could
 -- name, which is the slot's own candidate count for every slot but a
