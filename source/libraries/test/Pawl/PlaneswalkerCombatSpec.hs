@@ -250,9 +250,8 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
 -- 'attacking' but, for the purposes of trigger events and effects, they never
 -- 'attacked'."
 --
--- Hanweir Garrison is the pool's only source of one: "Whenever this creature
--- attacks, create two 1/1 red Human creature tokens that are tapped and
--- attacking."
+-- Hanweir Garrison is the producer here: "Whenever this creature attacks,
+-- create two 1/1 red Human creature tokens that are tapped and attacking."
 putOntoBattlefieldAttackingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefieldAttacking" $ do
   Spec.it s "CR 508.4 whole card: Hanweir Garrison's two Humans enter tapped and attacking" $ do

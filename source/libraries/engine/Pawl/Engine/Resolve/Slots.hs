@@ -555,7 +555,7 @@ effectObjectRefs effect = case effect of
   Effect.DecreaseSpeed {} -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
-  Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _) -> [ref]
+  Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> [ref]
   -- Both sides: CR 707.2's copiable values come off one and go onto the other.
   -- The exceptions beside them read no slot: CR 707.9a's "this ability" is the
   -- resolving object's own, and neither of CR 707.9b's arms names an object.
@@ -928,7 +928,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The COUNT only: the conjured card is literal card data, its destination is
   -- a constructor, and the conjurer is the resolving controller.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   Effect.BecomeCopy {} -> Map.empty
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> quantitySlots quantity
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
@@ -1475,7 +1475,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- hands it to Event.conjure exactly as written. The COUNT is the effect
   -- speaking, read in the resolution's own slots.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   -- The ReplacementEffect's own reads are replacementRowReads', and slotsOf
@@ -1683,7 +1683,7 @@ readsX =
         Effect.Create (Create.MkCreate quantity card riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders <> tokenBoxQuantities card)
         Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> Quantity.readsX quantity
-        Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> any Quantity.readsX (quantity : riderQuantities riders)
+        Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
         Effect.BecomeCopy {} -> False
         -- CR 601.2b's X reaches the effects a rewrite or a CR 615.5 rider nests,
         -- the two prevention opcodes' posture with their own riders.
@@ -1781,7 +1781,8 @@ boundSlots effect = case effect of
   -- Two's "if that card is on the battlefield, return it to its owner's hand")
   -- cannot be transcribed and this binds nothing (#2638).
   Effect.Conjure {} -> Set.empty
-  Effect.CreateCopy {} -> Set.empty
+  -- Create's reason: the copy tokens minted, for CR 603.7c.
+  Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ _ mSlot _) -> foldMap Set.singleton mSlot
   -- Binds nothing: no new object comes into existence.
   Effect.BecomeCopy {} -> Set.empty
   Effect.CopyStackObject {} -> Set.empty

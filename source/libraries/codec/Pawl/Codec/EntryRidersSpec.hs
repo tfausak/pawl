@@ -29,6 +29,13 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       EntryRiders.codec
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
       " {\"tapped\":{\"type\":\"Tapped\"},\"attacking\":{\"type\":\"Chosen\"}} "
+  -- CR 702.49c's specified attack: whatever the slot's object was attacking.
+  Spec.it s "MkEntryRiders, attacking what a slot's object attacked" $
+    Common.assertCodec
+      s
+      EntryRiders.codec
+      EntryRiders.defaultValue {EntryRiders.attacking = Just (EntryAttack.SameAs (SlotName.MkSlotName (Text.pack "returned")))}
+      " {\"attacking\":{\"type\":\"SameAs\",\"value\":\"returned\"}} "
   -- CR 509.4's rider, which is a SLOT and not a flag: the effect specifies which
   -- attacking creature the entering creature blocks (Flash Foliage's target),
   -- and it implies nothing about tapped-ness -- CR 509.4b exempts the creature
@@ -119,13 +126,13 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Spec.it s "is untapped, not attacking and not transformed" $
       Spec.assertEq s (EntryRiders.defaultValue :: EntryRiders.EntryRiders Quantity.Quantity) EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
     Spec.it s "a missing tapped key decodes as Untapped" $
-      Common.assertFromJson s (Codec.decode EntryRiders.codec) "{\"attacking\":false}" EntryRiders.defaultValue
-    Spec.it s "a missing attacking key decodes as False" $
+      Common.assertFromJson s (Codec.decode EntryRiders.codec) "{\"attacking\":null}" EntryRiders.defaultValue
+    Spec.it s "a missing attacking key decodes as Nothing" $
       Common.assertFromJson s (Codec.decode EntryRiders.codec) "{\"tapped\":{\"type\":\"Untapped\"}}" EntryRiders.defaultValue
     -- CR 712.14: the front face is the default, so a card file that says nothing
     -- about transforming is saying the card enters showing its front face.
     Spec.it s "a missing transformed key decodes as False" $
-      Common.assertFromJson s (Codec.decode EntryRiders.codec) "{\"tapped\":{\"type\":\"Untapped\"},\"attacking\":false}" EntryRiders.defaultValue
+      Common.assertFromJson s (Codec.decode EntryRiders.codec) "{\"tapped\":{\"type\":\"Untapped\"},\"attacking\":null}" EntryRiders.defaultValue
     -- An explicit null is tolerated only for a Maybe field, composed with
     -- Common.maybe. `tapped` isn't one, so a null is a decode error
     -- rather than a second spelling of the default.

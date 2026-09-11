@@ -4,6 +4,7 @@ import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | The payload of Pawl.Types.Effect's CreateCopy arm (#1305).
 --
@@ -21,9 +22,12 @@ data CreateCopy ability = MkCreateCopy
     -- map of this opcode's own: CR 122.6 does not care which door an object
     -- arrives by, and Littjara Mirrorlake's "except it enters with an additional
     -- +1/+1 counter on it" is the same sentence Eyes of Gitaxias writes over a
-    -- Create. Only `counters` is read here -- Pawl.CardSpec lints that no
-    -- CreateCopy in the pool sets any of the others (gap #2302).
+    -- Create. `counters`, `tapped` and `attacking` are read here; Pawl.EffectLintSpec
+    -- lints that no CreateCopy in the pool sets any of the others.
     riders :: EntryRiders.EntryRiders Quantity.Quantity,
+    -- | CR 603.7c: the slot the minted token is bound under, Create.slot's
+    -- shape -- Flamerush Rider's "Exile the token at end of combat".
+    slot :: Maybe SlotName.SlotName,
     -- | CR 707.9's "except ..." clause, empty for a copy effect that states none.
     -- The SAME list EntryRewrite.AsCopy and Pawl.Types.BecomeCopy carry, applied
     -- by the same fold (Pawl.Engine.Replacement.applyCopyExceptions) into the

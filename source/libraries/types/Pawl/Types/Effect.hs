@@ -284,9 +284,7 @@ data Effect card ability
     -- The payload carries CR 707.9's exceptions, BecomeCopy's arm below: the
     -- excepted value joins the token's copiable values (Multiversal Recruitment).
     --
-    -- Not implemented: the rest of the EntryRiders record beyond CR 122.6's
-    -- counters, and a bound slot for CR 603.7c's "it" -- Kiki-Jiki's hasty token
-    -- and the delayed sacrifice that names it (#2302).
+    -- Not implemented: CR 509.4's blocking rider on the copy token (#3621).
     CreateCopy (CreateCopy.CreateCopy ability)
   | -- | CR 707.4 / 613.1a: make a permanent already on the battlefield a copy of
     -- another object (Unstable Shapeshifter), by writing CR 707.2's copiable

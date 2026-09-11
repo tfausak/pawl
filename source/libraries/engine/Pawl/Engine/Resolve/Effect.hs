@@ -311,6 +311,34 @@ declaredDelayedAbility source name gs =
           )
    in onFace <|> onCard
 
+-- CR 603.7c: bind the tokens a Create or a CreateCopy minted under the slot the
+-- effect names, so a later effect of this resolution or a delayed ability it
+-- arms can name them.
+bindMinted :: PlayerId -> ObjectId -> ObjectId -> Maybe SlotName -> Quantity.Type.Quantity -> [ObjectId] -> Game ()
+bindMinted controller source resolving mSlot quantity minted = case (mSlot, namesEveryToken quantity, minted) of
+  (Nothing, _, _) -> pure ()
+  -- Nothing was minted, so no slot names anything: an unevaluable or
+  -- non-positive count, a creator reference naming nobody (CR 101.3), a
+  -- creator who has left the game (CR 800.4b), or CR 111.5's prohibited
+  -- token, which createTokens refuses to mint at all.
+  (Just _, _, []) -> pure ()
+  -- The card says "those tokens", so the slot holds EVERY token this
+  -- effect minted (CR 111.1) and there is nothing to ask.
+  (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
+  -- One token is the whole candidate list, so there is nothing to ask.
+  (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
+  -- CR 614.16 got there first: a replacement multiplied the count, so
+  -- several tokens stand where CR 603.7c's "it" names one. CR 707.10e
+  -- is the codified analogue, so this asks. FILTERED, NOT TRUSTED: an
+  -- answer naming something not minted falls back to the first.
+  (Just slot, False, first : second : rest) -> do
+    gs1 <- State.get
+    let candidates = first NonEmpty.:| (second : rest)
+        decider = Decide.deciderFor controller gs1
+    answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
+    let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
+    State.modify' (bindSlot resolving slot named)
+
 -- Does a Create's slot name EVERY token it minted rather than one particular one
 -- (CR 603.7c's "it")? CR 111 gives the opcode no way to carry the word, and the
 -- count at RESOLUTION cannot tell them apart -- CR 614.16 lets a replacement
@@ -4443,31 +4471,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\made2 -> Combat.putOntoBattlefieldBlocking made2 attacker) made)
               pure made
         _ -> pure []
-    case (mSlot, namesEveryToken quantity, minted) of
-      (Nothing, _, _) -> pure ()
-      -- Nothing was minted, so no slot names anything: an unevaluable or
-      -- non-positive count, a creator reference naming nobody (CR 101.3), a
-      -- creator who has left the game (CR 800.4b), or CR 111.5's prohibited
-      -- token, which createTokens refuses to mint at all.
-      (Just _, _, []) -> pure ()
-      -- The card says "those tokens", so the slot holds EVERY token this
-      -- Create minted (CR 111.1) and there is nothing to ask.
-      (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
-      -- CR 603.7c: bind the minted token so a delayed ability this same
-      -- resolution arms can name it. One token is the whole candidate
-      -- list, so there is nothing to ask.
-      (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
-      -- CR 614.16 got there first: a replacement multiplied the count, so
-      -- several tokens stand where CR 603.7c's "it" names one. CR 707.10e
-      -- is the codified analogue, so this asks. FILTERED, NOT TRUSTED: an
-      -- answer naming something not minted falls back to the first.
-      (Just slot, False, first : second : rest) -> do
-        gs1 <- State.get
-        let candidates = first NonEmpty.:| (second : rest)
-            decider = Decide.deciderFor controller gs1
-        answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
-        let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
-        State.modify' (bindSlot resolving slot named)
+    bindMinted controller source resolving mSlot quantity minted
   -- Alchemy's conjure keyword action. Digital-only, so there is no rule to cite;
   -- what the CR settles is that the result is a CARD and not CR 111.1's token,
   -- which is what Pawl.Engine.Event's conjure and conjureOntoBattlefield mint.
@@ -4517,7 +4521,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- under, which conjureOntoBattlefield stamps.
             ConjureDestination.Battlefield -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n))
       _ -> pure ()
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry exceptions) -> do
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry mSlot exceptions) -> do
     gs <- State.get
     -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the
     -- same CR 111.2 funnel, carrying the copied permanent's COPIABLE values
@@ -4534,12 +4538,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 608.2h: the counters the copies enter with, settled ONCE off the
         -- pre-effect board, outside the loop over named permanents below.
         frozen = freezeRiders viewOf context gs resolving source entry
+        -- CR 508.4's rider, read ONCE off the pre-effect board for Create's
+        -- reason.
+        mAttack = entryAttack resolving entry gs
     -- The count is Create's, read the same way and off the same `gs` (CR 707.1).
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+    minted <- case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
-            Monad.forM_ sources $ \src ->
-              Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
+            fmap concat . Monad.forM sources $ \src ->
+              fmap concat . Monad.forM (Maybe.maybeToList (Game.cardOfWithLastKnown src gs)) $ \card -> do
                 -- CR 707.2 copies no counters, so what the token arrives with
                 -- is what the EFFECT said and nothing the original carried --
                 -- Littjara Mirrorlake's "except it enters with an additional
@@ -4547,9 +4554,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- argument, CR 122.6's door, so CR 614.16's replacements see
                 -- them; Create's arm one case up hands over the same value.
                 --
-                -- Untapped rather than the rider's tap state: only `counters` is
-                -- read here, and Pawl.CardSpec lints that no CreateCopy in the
-                -- pool sets any other rider (gap #2302).
+                -- CR 110.5b's tap state rides through the same funnel, Create's
+                -- road; Pawl.EffectLintSpec lints that no CreateCopy in the pool
+                -- sets a rider this arm does not read.
                 --
                 -- ONE call per named permanent, with the whole count: CR 614.12's
                 -- entry loop is handed the batch, so the copies enter
@@ -4561,8 +4568,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- 707.9b) -- Multiversal Recruitment's "except it isn't
                 -- legendary". "This ability" is the resolving object's, read the
                 -- way the BecomeCopy arm below reads it.
-                Monad.void (Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
-      _ -> pure ()
+                made <- Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen)
+                -- CR 508.4, after the entry loop for Create's reason.
+                Monad.forM_ mAttack (\specified -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking specified) made)
+                pure made
+      _ -> pure []
+    bindMinted controller source resolving mSlot quantity minted
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef exceptions) ->
     State.modify' $ \gs ->
       -- CR 707.1: each named subject becomes a copy of the named original, in

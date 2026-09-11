@@ -7,6 +7,7 @@ import qualified Pawl.Codec.CopyException as CopyException
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -30,11 +31,13 @@ codec abilityCodec = Fields.object $ do
   quantity <- Fields.defaulted "quantity" CreateCopy.defaultQuantity Quantity.codec CreateCopy.quantity
   ref <- Fields.required "ref" ObjectRef.codec CreateCopy.ref
   riders <- Fields.defaulted "riders" EntryRiders.defaultValue EntryRiders.codec CreateCopy.riders
+  slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) CreateCopy.slot
   exceptions <- Fields.defaulted "exceptions" [] (Common.list (CopyException.codec abilityCodec)) CreateCopy.exceptions
   pure
     CreateCopy.MkCreateCopy
       { CreateCopy.quantity = quantity,
         CreateCopy.ref = ref,
         CreateCopy.riders = riders,
+        CreateCopy.slot = slot,
         CreateCopy.exceptions = exceptions
       }

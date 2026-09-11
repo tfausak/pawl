@@ -14,10 +14,10 @@ import qualified Pawl.Types.TapState as TapState
 -- Befriending the Moths' "return it to the battlefield transformed", and
 -- Ignorant Bliss' "exile all cards from your hand face down".
 --
--- Carried by the OPCODE (Create, MoveToZone) and not by the entering object,
--- because neither is one of its characteristics (CR 109.3, CR 111.3). Two tokens
--- with the same text can enter differently, and one printed card can be returned
--- tapped by one effect and untapped by another.
+-- Carried by the OPCODE (Create, CreateCopy, MoveToZone) and not by the
+-- entering object, because neither is one of its characteristics (CR 109.3, CR
+-- 111.3). Two tokens with the same text can enter differently, and one printed
+-- card can be returned tapped by one effect and untapped by another.
 --
 -- Each rider is meaningful only in the zone its own rule scopes it to, and every
 -- other destination carries the default: `tapped`, `attacking`, `counters`,
@@ -41,8 +41,8 @@ import qualified Pawl.Types.TapState as TapState
 -- choose as it enters, and CR 702.49c's specified case reads what another object
 -- was attacking. Pawl.Engine.Combat.putOntoBattlefieldAttacking applies either.
 --
--- `blocking` is CR 509.4's rider, and its ASYMMETRY with `attacking` one field
--- up is the design call rather than an oversight. CR 509.4's parenthetical --
+-- `blocking` is CR 509.4's rider, and that it has no counterpart to
+-- `attacking`'s Chosen is the design call rather than an oversight. CR 509.4's parenthetical --
 -- "unless the effect that put it onto the battlefield specifies what it's
 -- blocking" -- is the case every printing of this shape is in: Flash Foliage
 -- names a target and Aetherplasm names a trigger's binding, both in the pool;

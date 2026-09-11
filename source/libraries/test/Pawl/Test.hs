@@ -1111,6 +1111,7 @@ spec s registry = do
   Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.zadaSpec s registry
   Pawl.CopySpec.graveyardTokenCopySpec s registry
+  Pawl.CopySpec.flamerushRiderSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry

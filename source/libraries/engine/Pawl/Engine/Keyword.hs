@@ -1061,6 +1061,8 @@ graveyardTokenCopy exceptions cost =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.faceDown = Nothing
                   },
+              -- Nothing looks back at the token, so it binds no slot.
+              CreateCopy.slot = Nothing,
               CreateCopy.exceptions = exceptions
             }
    in ActivatedAbility.MkActivatedAbility
