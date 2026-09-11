@@ -2634,8 +2634,8 @@ everyTriggerCondition =
     -- Gauntlet of Power prints it.
     TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.ChosenColor),
     -- CR 605.1b's mana-added condition under each relation and both
-    -- specifications, for the rows above' reason. Caged Sun prints the You,
-    -- ChosenColor form.
+    -- specifications, for the PermanentTappedForMana rows' reason. Caged Sun
+    -- prints the You, ChosenColor form.
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.You (Filter.Type.And []) ManaSpecification.ChosenColor),
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.Opponent (Filter.Type.And []) ManaSpecification.AnyMana),
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.AnyMana),
