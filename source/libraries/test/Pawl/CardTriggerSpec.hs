@@ -2647,6 +2647,46 @@ wildgrowthWalkerSpec s registry =
           Spec.assertEqWith s "alice gained 3" (S.lifeOf S.alice after) (Just 23)
           Spec.assertEqWith s "and nothing was binned" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
 
+-- CR 701.50a over a whole card. Raffine's Informant {1}{W} Creature -- Human
+-- Wizard 2/1, "When this creature enters, it connives." (Oracle text checked
+-- against api.scryfall.com, 2026-09-11.)
+--
+-- One board, two answers: alice holds a Hill Giant and a Mountain, draws the
+-- Forest on top of her library, and discards whichever card the answer pins by
+-- id. Nothing else differs, so the counter is the nonland question alone. Three
+-- cards in hand when the discard is asked, so the prompt is a real choice.
+raffinesInformantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+raffinesInformantSpec s registry =
+  let board = do
+        informant <- S.printingOf s registry "Raffine's Informant"
+        giant <- S.printingOf s registry "Hill Giant"
+        mountain <- S.printingOf s registry "Mountain"
+        forest <- S.printingOf s registry "Forest"
+        let (_, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
+            (giantId, g2) = S.addHandCard giant S.alice g1
+            (mountainId, g3) = S.addHandCard mountain S.alice g2
+            (informantId, g4) = S.entersWithTrigger informant S.alice g3
+        pure (informantId, giantId, mountainId, g4)
+      discarding :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      discarding pick p = case p of
+        Prompt.ChooseDiscard {} -> [pick]
+        _ -> S.identityAnswer p
+      settle pick gs = S.runPure (discarding pick) gs Engine.priorityLoop
+      graveyardNames gs = List.sort (fmap (\oid -> Text.unpack (CardName.unwrap (S.soleFaceName oid gs))) (Game.zoneMembers Zone.Graveyard S.alice gs))
+   in Spec.describe s "RaffinesInformantConnive" $ do
+        Spec.it s "CR 701.50a discarding a nonland card puts a +1/+1 counter on the conniver" $ do
+          (informantId, giantId, _, gs) <- board
+          let after = settle giantId gs
+          Spec.assertEqWith s "the Informant took its +1/+1 counter" (S.powerToughnessOf informantId after) (Just (3, 2))
+          Spec.assertEqWith s "the Hill Giant was the card discarded" (graveyardNames after) ["Hill Giant"]
+          Spec.assertEqWith s "and alice drew the Forest first" (handNames S.alice after) ["Forest", "Mountain"]
+        Spec.it s "CR 701.50a discarding a land card puts no counter on the conniver" $ do
+          (informantId, _, mountainId, gs) <- board
+          let after = settle mountainId gs
+          Spec.assertEqWith s "the Informant is still 2/1" (S.powerToughnessOf informantId after) (Just (2, 1))
+          Spec.assertEqWith s "the Mountain was the card discarded" (graveyardNames after) ["Mountain"]
+          Spec.assertEqWith s "and alice drew the Forest first" (handNames S.alice after) ["Forest", "Hill Giant"]
+
 -- CR 701.3a's attachment event, read from the HOST's side by
 -- TriggerCondition.SelfBecomesAttachedBy.
 --
@@ -3333,6 +3373,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   tavernScoundrelSpec s registry
   aloeAlchemistSpec s registry
   wildgrowthWalkerSpec s registry
+  raffinesInformantSpec s registry
   rayOfCommandSpec s registry
   brambleElementalSpec s registry
   enormousEnergyBladeSpec s registry

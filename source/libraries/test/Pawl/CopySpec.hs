@@ -1186,6 +1186,49 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
               _ -> Spec.assertFailure s "expected one Clone on each board"
           others -> Spec.assertFailure s ("expected exactly one Mercurial Pretender, got " <> show (length others))
 
+  -- CR 707.9a's quoted arm over a TRIGGERED ability. Copycrook {2}{U}{U}
+  -- Creature -- Shapeshifter Rogue 0/0: "You may have this creature enter as a
+  -- copy of any creature on the battlefield, except it has \"Whenever this
+  -- creature attacks, it connives.\"" (Oracle text checked against
+  -- api.scryfall.com, 2026-09-11.)
+  --
+  -- Copycrook copies a Goblin Piker and attacks; the quoted trigger connives it,
+  -- and alice discards the Hill Giant, a nonland card, so the copy grows. The
+  -- control is the same board with a Clone copying the Piker instead: it attacks
+  -- the same way and nothing connives.
+  Spec.it s "Copycrook's copy connives when it attacks, and a Clone of the same creature does not (CR 707.9a, CR 701.50a)" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    copycrook <- S.printingOf s registry "Copycrook"
+    giant <- S.printingOf s registry "Hill Giant"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    let (pikerId, board0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (_, board1) = S.addLibraryCard forest S.alice board0
+        (giantId, board2) = S.addHandCard giant S.alice board1
+        (_, board3) = S.addHandCard mountain S.alice board2
+        entering printing = resolveAndSettle (copyNamed pikerId) (snd (S.spellOnStack printing S.alice board3))
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseDiscard {} -> [giantId]
+          _ -> S.aggressiveAnswer p
+        -- CR 302.6: the copy entered this turn, so it is settled by hand, as
+        -- the Piker beside it already is.
+        attacked oid gs = S.runCombat answer (intoCombat (gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects gs)}))
+        excepted = entering copycrook
+        control = entering clone
+    case (printedOnBattlefield "Copycrook" excepted, clonesOnBattlefield control) of
+      ([crookId], [cloneId]) -> do
+        -- THE GAMEPLAY ASSERTION, ahead of every diagnostic.
+        Spec.assertEqWith s "Copycrook's copy of the Piker connived and took a +1/+1 counter" (S.powerToughnessOf crookId (attacked crookId excepted)) (Just (3, 2))
+        Spec.assertEqWith s "where a Clone of the Piker attacking the same way is still 2/1" (S.powerToughnessOf cloneId (attacked cloneId control)) (Just (2, 1))
+        -- Diagnostics: the control's Clone did attack, beside the Piker; the
+        -- copy entered as the Piker; and what it discarded was the Giant.
+        Spec.assertEqWith s "the control's Clone attacked beside the Piker, so bob took 4" (S.lifeOf S.bob (attacked cloneId control)) (Just 16)
+        Spec.assertEqWith s "Copycrook entered as the Piker's 2/1" (S.powerToughnessOf crookId excepted) (Just (2, 1))
+        Spec.assertEqWith s "and the Hill Giant is what alice discarded" (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid (attacked crookId excepted))) (Game.zoneMembers Zone.Graveyard S.alice (attacked crookId excepted))) [CardName.MkCardName (Text.pack "Hill Giant")]
+      _ -> Spec.assertFailure s "expected one Copycrook and one Clone"
+
   -- THE PROVING TEST for the copiable stamp. The target is itself a copy, so
   -- its printed card (Clone, a 0/0 with an as-enters copy ability) and its
   -- copiable values (the Piker's) disagree -- and CR 707.2's "as modified by

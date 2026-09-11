@@ -269,6 +269,7 @@ manaProduced effect = case effect of
   Effect.Surveil {} -> Nothing
   Effect.Fateseal {} -> Nothing
   Effect.Explore {} -> Nothing
+  Effect.Connive {} -> Nothing
   Effect.Discard {} -> Nothing
   Effect.LoseLife {} -> Nothing
   Effect.GainLife {} -> Nothing
@@ -384,6 +385,8 @@ movesLibraryCard effect = case effect of
   -- CR 701.44a's explore reveals the top card and may put it into a hand or a
   -- graveyard.
   Effect.Explore {} -> True
+  -- CR 701.50a's connive draws a card, CR 121.1's move out of a library.
+  Effect.Connive {} -> True
   -- CR 701.23a searches a zone -- Pawl.Types.Search names which zones and whose,
   -- and its SearchDestination is where the found card goes. Every zone it can
   -- name is one this asks about, so the answer does not depend on Search.zones. A search finding nothing moves nothing, which CR 605.1a's "don't
