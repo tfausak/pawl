@@ -28,6 +28,10 @@
 -- combat damage to an opponent flips it into the legendary 2/2 Goblin Shaman
 -- Tok-Tok, Volcano Born. CR 710's own coverage of it is Pawl.FlipSpec's.
 --
+-- Blightreaper Thallid // Blightsower Thallid and Howlpack Piper // Wildsong
+-- Howler are the DOUBLE-FACED hosts CR 730.2i needs: the Thallid turns over by
+-- its own activated ability, the Werewolf by CR 702.145c/f's day and night.
+--
 -- Falcon Abomination is the creature it merges with: {2}{U} 2\/2 Creature --
 -- Bird Zombie, flying, "When this creature enters, create a 2\/2 black Zombie
 -- creature token with decayed". Non-Human (CR 702.140a), a DIFFERENT name, box
@@ -47,6 +51,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -62,6 +67,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
@@ -70,6 +76,7 @@ import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -309,6 +316,67 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "CR 730.2j and still Cubwarden" (Projection.namesOf dfcHost dfcAfter) (Set.singleton (CardName.MkCardName (Text.pack "Cubwarden")))
     Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject plainHost plainAfter)) "the same merge over a one-faced card turns face down"
     Spec.assertEqWith s "setup: Cubwarden over the Thallid" (componentNames dfcHost dfcMerged) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Blightreaper Thallid")]
+  -- CR 730.2i: Cubwarden merged UNDER Blightreaper Thallid, and the Thallid's own
+  -- "{3}{G/P}: Transform this creature" turns its card over. The merged
+  -- permanent's characteristics come off the merge's stamp, so a transform that
+  -- wrote only Object.face would leave it Blightreaper Thallid.
+  Spec.it s "CR 730.2i a merged permanent transforms by turning its double-faced component over" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    thallid <- S.printingOf s registry "Blightreaper Thallid"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    case transformedMerge plains forest thallid cubwarden of
+      Nothing -> Spec.assertFailure s "expected the merged permanent to offer exactly one activated ability"
+      Just (host, merged, after) -> do
+        Spec.assertEqWith
+          s
+          "CR 730.2i it is now Blightsower Thallid, a 3/3 keeping Cubwarden's lifelink, and CR 701.27e's trigger made a Saproling"
+          (Projection.namesOf host after, S.powerToughnessOf host after, Projection.hasKeyword Keyword.Lifelink host after, S.countOnBattlefieldByName saprolingToken S.alice after)
+          (Set.singleton blightsower, Just (3, 3), True, 1)
+        Spec.assertEqWith s "setup: before the activation it was Blightreaper Thallid, a 2/2" (Projection.namesOf host merged, S.powerToughnessOf host merged) (Set.singleton (CardName.MkCardName (Text.pack "Blightreaper Thallid")), Just (2, 2))
+        Spec.assertEqWith s "setup: the Thallid on top, Cubwarden under it" (componentNames host merged) [CardName.MkCardName (Text.pack "Blightreaper Thallid"), CardName.MkCardName (Text.pack "Cubwarden")]
+  -- The tripwire for the stamp: a Clone copies the merged permanent's copiable
+  -- values (CR 707.2, CR 730.2a), so it enters as whatever the turned-over
+  -- reading says, never as the printed card behind either component.
+  Spec.it s "CR 730.2i/707.2 a Clone of a transformed merged permanent copies the turned-over reading" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    thallid <- S.printingOf s registry "Blightreaper Thallid"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    clone <- S.printingOf s registry "Clone"
+    case transformedMerge plains forest thallid cubwarden of
+      Nothing -> Spec.assertFailure s "expected the merged permanent to offer exactly one activated ability"
+      Just (host, _, after) -> do
+        let (_, staged) = S.spellOnStack clone S.alice after
+            copied = S.runPure (copying host) staged (Stack.resolveTop >> Engine.settleForPriority)
+        case cloneOn copied of
+          Nothing -> Spec.assertFailure s "the Clone should have entered as a copy of the merged permanent"
+          Just copy ->
+            Spec.assertEqWith
+              s
+              "CR 707.2 the Clone is Blightsower Thallid, a 3/3 with the lifelink CR 702.140e merged in"
+              (Projection.namesOf copy copied, S.powerToughnessOf copy copied, Projection.hasKeyword Keyword.Lifelink copy copied)
+              (Set.singleton blightsower, Just (3, 3), True)
+  -- CR 730.2i over the OTHER order and the other road: Cubwarden merged OVER
+  -- Wildsong Howler, so every characteristic but the abilities stays
+  -- Cubwarden's, and CR 702.145c/f's day and night do the turning. The keyword
+  -- pair is the discriminator; the second night is the one a front-face read off
+  -- the topmost card gets wrong, since Howlpack Piper is no face of Cubwarden.
+  Spec.it s "CR 730.2i/702.145c a Cubwarden over a nightbound Werewolf turns with the day and back with the night" $ do
+    plains <- S.printingOf s registry "Plains"
+    piper <- S.printingOf s registry "Howlpack Piper"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let (host, board, spellId) = mutateBoard plains piper cubwarden
+        -- PLACED back face up at night, as a nightbound permanent is.
+        atNight = board {GameState.daytime = Just Daytime.Night, GameState.objects = Map.adjust (\o -> o {Object.face = Just howler}) host (GameState.objects board)}
+        merged = merging MutateSide.Over host atNight spellId
+        day = untapStepAfter 2 merged
+        night = untapStepAfter 0 day
+        bounds gs = (Projection.hasKeyword Keyword.Daybound host gs, Projection.hasKeyword Keyword.Nightbound host gs)
+    Spec.assertEqWith s "CR 730.2i daybound by day, nightbound again by night" (bounds day, bounds night) ((True, False), (False, True))
+    Spec.assertEqWith s "CR 730.2a and Cubwarden, a 3/5, throughout" (Projection.namesOf host night, S.powerToughnessOf host night) (Set.singleton (CardName.MkCardName (Text.pack "Cubwarden")), Just (3, 5))
+    Spec.assertEqWith s "setup: nightbound after the merge" (bounds merged) (False, True)
+    Spec.assertEqWith s "setup: it became day, then night" (GameState.daytime day, GameState.daytime night) (Just Daytime.Day, Just Daytime.Night)
   -- CR 730.2a's timestamp sentence, which is the one board it is observable on:
   -- the merge and the copy effect already on the target share layer 1a (CR
   -- 613.2a) and CR 613.7 orders them by timestamp, so the merge -- timestamped
@@ -936,6 +1004,33 @@ intoCombat gs =
       GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
       GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.DeclareAttackers)
     }
+
+-- Cubwarden merged under Blightreaper Thallid, then four Forests for its
+-- {3}{G/P} (S.identityAnswer declines the Phyrexian life payment) in alice's
+-- main phase for its sorcery-speed rider: the ability activated and the stack
+-- drained. The merged permanent, the board before the activation, and after.
+transformedMerge :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+transformedMerge plains forest thallid cubwarden =
+  let (host, board, spellId) = mutateBoard plains thallid cubwarden
+      merged = merging MutateSide.Under host board spellId
+      armed = (S.landsFor forest S.alice 4 merged) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+   in case Activate.abilitiesFor host armed of
+        [ability] ->
+          let activated = S.runPure S.identityAnswer armed (Activate.activateAbility S.alice host ability)
+           in Just (host, merged, S.runPure S.identityAnswer activated (Monad.replicateM_ 4 (Stack.resolveTop >> Engine.settleForPriority)))
+        _ -> Nothing
+
+-- CR 502.2's day/night check, run as the untap step's turn-based actions with
+-- `n` spells on the previous turn's books -- Pawl.TransformSpec's own helper.
+untapStepAfter :: Natural.Natural -> GameState.GameState -> GameState.GameState
+untapStepAfter n gs =
+  S.runPure S.identityAnswer (gs {GameState.spellsCastLastTurn = n}) (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+
+-- Blightreaper Thallid's back face, its token, and Howlpack Piper's back face.
+blightsower, saprolingToken, howler :: CardName.CardName
+blightsower = CardName.MkCardName (Text.pack "Blightsower Thallid")
+saprolingToken = CardName.MkCardName (Text.pack "Phyrexian Saproling Token")
+howler = CardName.MkCardName (Text.pack "Wildsong Howler")
 
 -- mutateBoard with two more of alice's creatures on it, for the cases that ask
 -- how many creatures may be declared rather than what one of them may do.

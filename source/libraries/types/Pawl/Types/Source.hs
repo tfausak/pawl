@@ -63,9 +63,11 @@ data Source
     -- either: what the flip reaches is decided at the merge, which stamps a
     -- second reading of it beside the first (Pawl.Engine.Binding.setMergeCopy).
     --
+    -- CR 730.2i's double-faced component is Object.face, and the merge stamps a
+    -- third reading for it (Pawl.Engine.Binding.turnMergeCopy).
+    --
     -- Not implemented: CR 730.2g's instant or sorcery component, which keeps a
-    -- face-down merged permanent from turning face up (#3392); CR 730.2i's
-    -- double-faced component, which transforms in place (#3428).
+    -- face-down merged permanent from turning face up (#3392).
     OfMerge (NonEmpty.NonEmpty MergeComponent.MergeComponent)
   | -- | CR 111.3/111.6: a token -- a permanent not represented by a card. Its
     -- characteristics ARE a Card (CR 111.3: effect-defined values are functionally
