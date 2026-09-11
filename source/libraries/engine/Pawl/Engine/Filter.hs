@@ -1072,6 +1072,15 @@ data Context = MkContext
     -- controller at all (CR 108.4's card in a library). The atom widens on the
     -- first and refuses on the second.
     slotControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
+    -- CR 205.3m: the CREATURE TYPES of the objects the resolution's slots hold,
+    -- for SharesCreatureTypeWithBound -- Heirloom Blade's "shares a creature type
+    -- with it", and through Binding.triggerSource a kinship card's "with this
+    -- creature". `slotNames` above in every respect but its one filler,
+    -- Pawl.Engine.Resolve.Slots.effectContext: empty elsewhere, where the atom
+    -- is False, and Pawl.FilterPositionLintSpec's "CR 205.3m no card asks
+    -- SharesCreatureTypeWithBound outside a resolution's own positions" keeps a
+    -- card out of those.
+    slotCreatureTypes :: Map.Map SlotName.SlotName (Set.Set Subtype.Subtype),
     -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
     -- `slotObjects` above's player half, filled from the same map by the same
     -- caller (Pawl.Engine.Resolve.Slots.effectContext), and by
@@ -1287,7 +1296,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1325,7 +1334,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1557,6 +1566,10 @@ matches context view predicate = case predicate of
   Filter.SameControllerAsBound slot -> case Map.lookup slot (slotControllers context) of
     Nothing -> True
     Just pids -> maybe False (`Set.member` pids) (controller view)
+  -- CR 205.3m at both ends, SameNameAsBound's intersection: the context holds
+  -- only the bound objects' creature types, so a shared land type (Dryad Arbor's
+  -- Forest) is not a match, and an unfilled slot answers False.
+  Filter.SharesCreatureTypeWithBound slot -> not (Set.disjoint (subtypes view) (Map.findWithDefault Set.empty slot (slotCreatureTypes context)))
   -- CR 201.4 at both ends, the arm above's INTERSECTION for CR 201.4g's reason as
   -- much as CR 709.4a's: choosing one of a set of interchangeable names chooses
   -- each of them, so a candidate showing either matches. A source that has chosen
@@ -1922,6 +1935,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameControllerAsBound _ -> predicate
+  Filter.SharesCreatureTypeWithBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.HasChosenColor -> predicate
   Filter.OfChosenPlayer -> predicate
@@ -2443,6 +2457,7 @@ bakeBound players predicate = case predicate of
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameControllerAsBound _ -> predicate
+  Filter.SharesCreatureTypeWithBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.HasChosenColor -> predicate
   Filter.OfChosenPlayer -> predicate
@@ -2593,6 +2608,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsBound _ -> []
   Filter.SameNameAsBound _ -> []
   Filter.SameControllerAsBound _ -> []
+  Filter.SharesCreatureTypeWithBound _ -> []
   Filter.HasChosenName -> []
   Filter.HasChosenColor -> []
   Filter.OfChosenPlayer -> []
@@ -2734,6 +2750,7 @@ statesAQuality predicate = case predicate of
   Filter.IsBound _ -> True
   Filter.SameNameAsBound _ -> True
   Filter.SameControllerAsBound _ -> True
+  Filter.SharesCreatureTypeWithBound _ -> True
   -- CR 701.23b's "stated quality" for HasName's reason, one indirection along: the
   -- description is a card name whichever way the name was arrived at, so a search
   -- whose filter is this one may decline to find what it can see.
@@ -2844,6 +2861,11 @@ overBoundSlots f predicate = case predicate of
   -- 601.2c's joint check is the whole of what enforces this atom (the offer
   -- widens for it).
   Filter.SameControllerAsBound slot -> fmap Filter.SameControllerAsBound (f slot)
+  -- Named for SameNameAsBound's reason, one Context field over. A regression
+  -- fence until a card names a mode-declared slot with it, as Killer's "shares
+  -- a creature type with it" would: the reserved slots it names today are
+  -- neither renamed nor dataflow-linted.
+  Filter.SharesCreatureTypeWithBound slot -> fmap Filter.SharesCreatureTypeWithBound (f slot)
   -- Named for IsBound's reason and answerable one field along again
   -- (boundAmounts). The dataflow lint is what this report is for -- a card whose
   -- filter reads an amount no clause of the mode ever bound is then a failing

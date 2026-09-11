@@ -1732,6 +1732,47 @@ lookAtSpec s registry = Spec.describe s "LookAt" $ do
     Spec.assertEqWith s "the library is still empty" (zoneNames Zone.Library after) []
     Spec.assertEqWith s "stack empty: the trigger resolved" (length (GameState.stack after)) 0
 
+-- alice's Clone copying bob's Mudbutton Clanger, over a library holding one
+-- card. The Clone is a Goblin Warrior by CR 707.2 and a Shapeshifter as printed,
+-- and bob's own Clanger does not trigger in alice's upkeep.
+kinshipBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+kinshipBoard s registry top = do
+  clanger <- S.printingOf s registry "Mudbutton Clanger"
+  clone <- S.printingOf s registry "Clone"
+  card <- S.printingOf s registry top
+  let (original, g1) = S.addPermanent clanger S.bob (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.spellOnStack clone S.alice g1
+      g3 = S.runPure (kinshipAnswer original) g2 (Stack.resolveTop >> Engine.settleForPriority)
+      (_, g4) = S.addLibraryCard card S.alice g3
+  case Game.zoneMembers Zone.Battlefield S.alice g4 of
+    [copy] -> pure (original, copy, g4)
+    _ -> Spec.assertFailure s "the Clone did not resolve onto the battlefield"
+
+-- Copies `wanted` at Clone's as-enters choice and takes every CR 603.5 "may".
+kinshipAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+kinshipAnswer wanted p = case p of
+  Prompt.ChooseCopyTarget _ _ _ legal -> if elem wanted legal then Just wanted else Nothing
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- Kinship, through Mudbutton Clanger: CR 205.3m's comparison against the
+-- SOURCE, which Filter.SharesCreatureTypeWithBound reaches as
+-- Binding.triggerSource. The pair differs only in alice's top card, and each leg
+-- answers the other way if the source's types were read off the printed Clone.
+kinshipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kinshipSpec s registry = Spec.describe s "Kinship" $ do
+  Spec.it s "CR 205.3m a top card sharing the Clone's copied Warrior type pumps it" $ do
+    (original, copy, board) <- kinshipBoard s registry "Mardu Skullhunter"
+    let after = runWildsUpkeep (kinshipAnswer original) board
+    Spec.assertEqWith s "CR 205.3m the Clone got +1/+1" (Projection.powerOf copy after) (Just 2)
+    Spec.assertEqWith s "the Human Warrior was revealed" (revealedNames after) ["Mardu Skullhunter"]
+    Spec.assertEqWith s "the Clone entered as a 1/1 copy" (Projection.powerOf copy board) (Just 1)
+  Spec.it s "CR 707.2 a top card sharing only the Clone's printed Shapeshifter type does not" $ do
+    (original, copy, board) <- kinshipBoard s registry "Primal Plasma"
+    let after = runWildsUpkeep (kinshipAnswer original) board
+    Spec.assertEqWith s "CR 707.2 the Clone is still 1/1" (Projection.powerOf copy after) (Just 1)
+    Spec.assertEqWith s "and nothing was revealed" (revealedNames after) []
+
 -- The elision half: CR 608.2a's gate is asked BEFORE CR 603.5's "may", so a top
 -- card that is not a land is never a question. Counts the optional prompts one
 -- upkeep raises.
@@ -2613,6 +2654,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   explorePromptSpec s registry
   exploreOrderSpec s registry
   lookAtSpec s registry
+  kinshipSpec s registry
   lookAtPromptSpec s registry
   playerSacrificesSpec s registry
   createEmblemSpec s registry

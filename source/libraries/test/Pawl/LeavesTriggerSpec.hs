@@ -3350,6 +3350,40 @@ widowedBladeSpec s registry =
           Spec.assertEqWith s "as an Aura the exception applies and it names no zone" (zonesWith (Set.insert Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) [Nothing]
           Spec.assertBool s (not (Set.member Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) "and the printed card really is no Aura"
 
+-- Heirloom Blade: CR 205.3m's comparison against a BOUND slot,
+-- Binding.departedPermanent, read as the equipped creature last existed (CR
+-- 603.10a). The host is alice's Clone copying bob's Goblin Piker, so it died a
+-- Goblin Warrior (CR 707.2) and is a Shapeshifter as printed; Primal Plasma, an
+-- Elemental Shapeshifter, is on top, where a reader of the printed card stops.
+heirloomBladeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+heirloomBladeSpec s registry =
+  Spec.describe s "HeirloomBlade" . Spec.it s "CR 205.3m the reveal stops at the first creature card sharing the dead Clone's copied type" $ do
+    blade <- S.printingOf s registry "Heirloom Blade"
+    clone <- S.printingOf s registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    deck <- mapM (S.printingOf s registry) ["Hill Giant", "Mardu Skullhunter", "Primal Plasma"]
+    let (original, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (equipment, g2) = S.addPermanent blade S.alice g1
+        (_, g3) = S.spellOnStack clone S.alice g2
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseCopyTarget _ _ _ legal -> if elem original legal then Just original else Nothing
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          _ -> S.identityAnswer p
+        g4 = S.runPure answer g3 (Stack.resolveTop >> Engine.settleForPriority)
+        -- addLibraryCard puts its card ON TOP, so the deepest is stocked first.
+        g5 = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) g4 deck
+        named zone gs = fmap (\oid -> maybe "?" (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs)
+    case filter (/= equipment) (Game.zoneMembers Zone.Battlefield S.alice g5) of
+      [host] -> do
+        let placed = S.runPure answer (S.attach equipment host g5) (Event.destroy Regenerability.Regenerable [host] >> Engine.settleForPriority)
+            after = S.runPure answer placed Stack.resolveTop
+        Spec.assertEqWith s "CR 205.3m the Human Warrior went to alice's hand" (named Zone.Hand after) ["Mardu Skullhunter"]
+        Spec.assertEqWith s "and the Shapeshifter above it to the bottom" (named Zone.Library after) ["Hill Giant", "Primal Plasma"]
+        Spec.assertEqWith s "the host was a 2/1 copy of the Piker" (Projection.powerOf host g5) (Just 2)
+        Spec.assertEqWith s "and the trigger was on the stack" (length (GameState.stack placed)) 1
+      _ -> Spec.assertFailure s "the Clone did not resolve onto the battlefield"
+
 -- CR 603.10a's look-back at an attachment, on the EQUIPMENT side. Skullclamp
 -- {1} Artifact -- Equipment, "Equipped creature gets +1/-1. / Whenever equipped
 -- creature dies, draw two cards. / Equip {1}", is the printing. (Name, cost,
@@ -3701,6 +3735,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   screamsFromWithinSpec s registry
   widowedBladeSpec s registry
   skullclampSpec s registry
+  heirloomBladeSpec s registry
   prizedAmalgamSpec s registry
   ivoryGargoyleSpec s registry
   banewaspAfflictionSpec s registry
