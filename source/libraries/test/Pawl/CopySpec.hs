@@ -3371,8 +3371,6 @@ graveyardTokenCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
 -- creature attacks, create a token that's a copy of another target attacking
 -- creature and that's tapped and attacking. Exile the token at end of combat."
 --
--- Its dash is omitted, leaving pawl's card stricter than printed (#3498).
---
 -- alice attacks bob with the 3/3 Rider and a 2/1 Goblin Piker; the trigger's one
 -- legal target is the Piker, so the token is a second 2/1 Piker.
 flamerushRiderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()

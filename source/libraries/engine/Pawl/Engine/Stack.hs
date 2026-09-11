@@ -2,9 +2,12 @@ module Pawl.Engine.Stack where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -13,6 +16,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -29,6 +33,7 @@ import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.PlayerControl as PlayerControl
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
@@ -382,7 +387,7 @@ resolveCardBacked runSubgame oid rest printingId = do
           -- CR 608.3's ordinary permanent entry for a non-Aura, named so that
           -- the refusing mutate branch below can reach the same move rather than
           -- restating it.
-          entersOrdinarily = Monad.void (Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False CarryOver.Carried)
+          entersOrdinarily = armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False CarryOver.Carried
        in if not (Card.isPermanent face)
             then Resolve.resolveSpellWith runSubgame oid
             else
@@ -474,5 +479,26 @@ resolveCardBacked runSubgame oid rest printingId = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          Monad.void (Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs1) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried)
+                          armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs1) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried
     _ -> State.put gs {GameState.stack = rest}
+
+-- CR 702.109a's and CR 702.152a's second static ability: a spell cast for its
+-- dash or blitz cost creates, as it resolves (CR 603.7a), a delayed triggered
+-- ability naming "the permanent this spell becomes" -- the arrival, bound under
+-- Keyword.becameSlot, so a later zone change leaves it naming nothing (CR 603.7c).
+-- Not a trigger of the permanent's: nothing goes on the stack as it enters.
+--
+-- CR 603.7d: the spell is the source and its controller as it resolved the
+-- controller. A copy of the spell carries the record too (CR 707.10,
+-- Keyword.copiedCastUsing), and so arms its own; Pawl.CastSpec's "Dash" group
+-- proves both. An arrival a replacement put anywhere but the battlefield is no
+-- permanent and arms nothing, and the Aura branch arms like the other: both are
+-- rule 702.109a written out and unobserved, no dash or blitz card in data/cards/
+-- being an Aura or entering elsewhere.
+armBecame :: ObjectId -> Object.Object -> GameState.GameState -> Seq.Seq ObjectId -> Game ()
+armBecame oid obj gs1 arrivals = do
+  gs <- State.get
+  let permanents = filter (\arrival -> fmap Object.zone (Game.lookupObject arrival gs) == Just Zone.Battlefield) (Foldable.toList arrivals)
+      ability = Keyword.resolutionDelayedAbility (Object.castUsing obj) >>= Keyword.mintedDelayedAbility
+      arm delayed permanent = Resolve.armDelayed delayed oid (Resolve.spellController obj oid gs1) (Map.singleton Keyword.becameSlot (Binding.toObject permanent)) Onset.Immediately Nothing
+  Foldable.for_ ability (\delayed -> State.modify' (\g -> List.foldl' (flip (arm delayed)) g permanents))

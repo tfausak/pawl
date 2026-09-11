@@ -3300,6 +3300,131 @@ evokeSpec s registry = Spec.describe s "Evoke" $ do
         Spec.assertEqWith s "CR 702.170c and it was plotted" (fmap (Maybe.isJust . Object.plotted) (Game.lookupObject exiled after)) (Just True)
       other -> Spec.assertFailure s ("expected one exiled Mulldrifter, got " <> show (length other))
 
+-- CR 702.109a on Mardu Scout {R}{R} 3/1 Creature -- Goblin Scout, "Dash {1}{R}"
+-- (Oracle text checked on Scryfall, 2026-09-11).
+--
+-- Every case casts the Scout off two Mountains in alice's precombat main phase
+-- and plays the turn out through the end step attacking with everything, so bob's
+-- life says who had haste and the hand says who was returned.
+dashSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dashSpec s registry = Spec.describe s "Dash" $ do
+  -- The dash cost paid against the printed {R}{R} on the same board.
+  Spec.it s "CR 702.109a dashed, Mardu Scout attacks as it is cast and returns at the next end step; cast for {R}{R} it does neither" $ do
+    (board, scout) <- scoutBoard s registry 2
+    let dashed = throughEndStep (castResolved (payingAttacking dashCost) scout board)
+        hardCast = throughEndStep (castResolved (payingAttacking scoutCost) scout board)
+    Spec.assertEqWith s "CR 702.109a the dashed Scout attacked bob for 3" (S.lifeOf S.bob dashed) (Just 17)
+    Spec.assertEqWith s "CR 702.109a and is back in alice's hand at the end step" (inHandNamed "Mardu Scout" dashed, length (namedOnBattlefield "Mardu Scout" dashed)) (1, 0)
+    Spec.assertEqWith s "cast for {R}{R}, it could not attack and stays" (S.lifeOf S.bob hardCast, length (namedOnBattlefield "Mardu Scout" hardCast)) (Just 20, 1)
+  -- CR 707.2 and CR 400.7: a Clone of the dashed Scout copies nothing of the
+  -- payment, and Flicker of Fate then makes the Scout a new object nobody paid a
+  -- dash cost for. Neither has haste, so nobody attacks, and the delayed ability
+  -- finds neither at the end step (CR 603.7c).
+  Spec.it s "CR 707.2 / 400.7 a Clone of a dashed Scout and the Scout flickered neither have haste nor return" $ do
+    (board, scout) <- scoutBoard s registry 2
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    clone <- S.printingOf s registry "Clone"
+    flicker <- S.printingOf s registry "Flicker of Fate"
+    let dashed = castResolved (payingAttacking dashCost) scout board
+    case namedOnBattlefield "Mardu Scout" dashed of
+      [original] -> do
+        let (cloneId, withClone) = S.addHandCard clone S.alice (S.landsFor island S.alice 4 dashed)
+            cloned = castResolved (aimedAt original) cloneId withClone
+            (flickerId, withFlicker) = S.addHandCard flicker S.alice (S.landsFor plains S.alice 2 cloned)
+            after = throughEndStep (castResolved (aimedAt original) flickerId withFlicker)
+        Spec.assertEqWith s "CR 707.2 / 400.7 neither the Clone nor the flickered Scout could attack" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "CR 603.7c and both are still on the battlefield after the end step" (length (namedOnBattlefield "Mardu Scout" after), inHandNamed "Mardu Scout" after) (2, 0)
+      other -> Spec.assertFailure s ("expected one Mardu Scout, got " <> show (length other))
+  -- CR 707.10: Double Major's copy of the dashed Scout copies the alternative
+  -- cost, so the token it becomes has haste and is returned too, ceasing to exist
+  -- in the hand (CR 704.5d).
+  Spec.it s "CR 707.10 a Double Major copy of a dashed Scout attacks and is returned" $ do
+    (board, scout) <- scoutBoard s registry 2
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    doubleMajor <- S.printingOf s registry "Double Major"
+    let onStack = S.runPure (payingAttacking dashCost) board (S.cast S.alice scout)
+        (majorId, withMajor) = S.addHandCard doubleMajor S.alice (S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 onStack))
+        resolved = S.runPure S.identityAnswer withMajor (S.cast S.alice majorId >> Monad.replicateM_ (3 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+        after = throughEndStep resolved
+    Spec.assertEqWith s "CR 707.10 the Scout and its token copy attacked bob for 6" (S.lifeOf S.bob after) (Just 14)
+    Spec.assertEqWith s "CR 702.109a and at the end step the card is in hand and the token gone" (inHandNamed "Mardu Scout" after, S.tokensOf after) (1, [])
+
+-- CR 702.152a on Riveteers Requisitioner {1}{R} 3/1 Creature -- Lizard Rogue,
+-- "When this creature dies, create a Treasure token. / Blitz {2}{R}" (Oracle text
+-- checked on Scryfall, 2026-09-11).
+--
+-- One board: three Mountains, the Requisitioner and a Lightning Bolt in hand, and
+-- three library cards. Both cases end with the Requisitioner dead and its own
+-- Treasure made; only the blitzed one was granted the draw.
+blitzSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+blitzSpec s registry = Spec.describe s "Blitz" $ do
+  Spec.it s "CR 702.152a blitzed, the Requisitioner attacks, is sacrificed at the next end step and draws a card; hard-cast and bolted it draws nothing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    requisitioner <- S.printingOf s registry "Riveteers Requisitioner"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (requisitionerId, gs1) = S.addHandCard requisitioner S.alice (S.landsInPlay mountain 3)
+        (boltId, gs2) = S.addHandCard bolt S.alice gs1
+        board = scheduled (List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) gs2 [1 :: Int .. 3])
+        blitzed = throughEndStep (castResolved (payingAttacking blitzCost) requisitionerId board)
+        hardCast = castResolved (payingAttacking requisitionerCost) requisitionerId board
+        bolted = case namedOnBattlefield "Riveteers Requisitioner" hardCast of
+          [victim] -> castResolved (aimedAt victim) boltId hardCast
+          _ -> hardCast
+        drew gs = 3 - length (Game.zoneMembers Zone.Library S.alice gs)
+        dead gs = (length (namedOnBattlefield "Riveteers Requisitioner" gs), length (namedOnBattlefield "Treasure Token" gs))
+    Spec.assertEqWith s "CR 702.152a the blitzed Requisitioner attacked bob for 3 and was sacrificed at the end step, leaving its Treasure" (S.lifeOf S.bob blitzed, dead blitzed) (Just 17, (0, 1))
+    Spec.assertEqWith s "CR 702.152a and drew a card as it died" (drew blitzed) 1
+    Spec.assertEqWith s "cast for {1}{R} and bolted, it died and made its Treasure without drawing" (drew bolted, dead bolted) (0, (0, 1))
+
+-- Mardu Scout's printed {R}{R} and its dash {1}{R}; Riveteers Requisitioner's
+-- printed {1}{R} and its blitz {2}{R}.
+scoutCost, dashCost, requisitionerCost, blitzCost :: [ManaSymbol.ManaSymbol]
+scoutCost = [theRed, theRed]
+dashCost = [ManaSymbol.Generic 1, theRed]
+requisitionerCost = [ManaSymbol.Generic 1, theRed]
+blitzCost = [ManaSymbol.Generic 2, theRed]
+
+-- alice with `n` Mountains and Mardu Scout in hand, on turn with the rest of the
+-- turn scheduled.
+scoutBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (GameState.GameState, ObjectId.ObjectId)
+scoutBoard s registry n = do
+  mountain <- S.printingOf s registry "Mountain"
+  scout <- S.printingOf s registry "Mardu Scout"
+  let (scoutId, gs) = S.addHandCard scout S.alice (S.landsInPlay mountain n)
+  pure (scheduled gs, scoutId)
+
+-- aliceOnTurn with every step after the precombat main phase still to come.
+scheduled :: GameState.GameState -> GameState.GameState
+scheduled gs = (aliceOnTurn gs) {GameState.remaining = S.phasesAfter Phase.PrecombatMain}
+
+-- CR 601.2b's announcement answered with `wanted`'s mana (payingFor), and every
+-- combat declaration with S.aggressiveAnswer's: attack with everything.
+payingAttacking :: [ManaSymbol.ManaSymbol] -> Prompt.Prompt r -> r
+payingAttacking wanted p = case p of
+  Prompt.DeclareAttackers {} -> S.aggressiveAnswer p
+  _ -> payingFor wanted p
+
+-- Every target slot and the as-enters copy choice aimed at `victim`, filtered from
+-- what was offered, so a mutation cannot be repaired by another legal answer.
+aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAt victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (Set.filter ((== Just victim) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== victim) legal
+  _ -> S.identityAnswer p
+
+-- Cast `oid` for alice answering with `answer`, and resolve the stack down.
+castResolved :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castResolved answer oid gs =
+  S.runPure answer (S.runPure answer gs (S.cast S.alice oid)) (Monad.replicateM_ (3 :: Int) (Stack.resolveTop >> Engine.settleForPriority))
+
+-- Play the turn out from the precombat main phase through the end step, where CR
+-- 513.2's delayed abilities trigger and resolve: eight steps, attacking with
+-- everything.
+throughEndStep :: GameState.GameState -> GameState.GameState
+throughEndStep gs = List.foldl' (\g _ -> S.runPure (payingAttacking []) g Engine.runStep) gs [1 .. (8 :: Int)]
+
 -- Mulldrifter's printed {4}{U} and its evoke {2}{U}.
 mulldrifterCost, evokeCost :: [ManaSymbol.ManaSymbol]
 mulldrifterCost = [ManaSymbol.Generic 4, theBlue]
@@ -3613,6 +3738,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   flashbackCardTypeSpec s registry
   escapeSpec s registry
   evokeSpec s registry
+  dashSpec s registry
+  blitzSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry

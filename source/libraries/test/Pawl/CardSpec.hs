@@ -2605,6 +2605,9 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Escape cost -> costFilters cost
   -- CR 702.74a: the evoke cost, flashback's shape.
   Keyword.Evoke cost -> costFilters cost
+  -- CR 702.109a and CR 702.152a: the dash and blitz costs, flashback's shape.
+  Keyword.Dash cost -> costFilters cost
+  Keyword.Blitz cost -> costFilters cost
   -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
   -- flashback's may.
   Keyword.Bestow cost -> costFilters cost

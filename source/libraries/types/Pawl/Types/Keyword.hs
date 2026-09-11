@@ -354,6 +354,9 @@ data Keyword
   | -- | 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
     -- until end of turn; each instance triggers separately (CR 702.108b).
     Prowess
+  | -- | 702.109a: dash [cost] -- an alternative cost; the permanent has haste
+    -- and returns to its owner's hand at the next end step.
+    Dash (Cost.Cost Keyword)
   | -- | 702.111b: a creature with menace can't be blocked except by two or more
     -- creatures.
     Menace
@@ -487,6 +490,9 @@ data Keyword
     -- EntryRewrite row, so it can be ordered against CR 614.16's multipliers
     -- under CR 616.1e.
     Compleated
+  | -- | 702.152a: blitz [cost] -- an alternative cost; the permanent has haste
+    -- and a dies-draw, and is sacrificed at the next end step.
+    Blitz (Cost.Cost Keyword)
   | -- | 702.155a: chapter abilities of this Saga can't trigger the turn it
     -- entered unless it has exactly that chapter's number of lore counters; rule
     -- 714.3b REPLACES rule 714.3a's ability rather than adding to it.
