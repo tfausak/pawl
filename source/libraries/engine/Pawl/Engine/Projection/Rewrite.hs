@@ -1161,6 +1161,10 @@ rewriteCopyException pairs exception = case exception of
   -- that changes a color word or a subtype can't change a card name". CR 612.7's
   -- Spy Kit is the effect that does change one, and it is unimplemented (#887).
   CopyException.SetName _ -> exception
+  -- CR 612.2 names colour words, but pawl's only text changer swaps subtypes, so
+  -- no pair reaches a colour exception; a missing mana cost carries no word.
+  CopyException.SetColors _ -> exception
+  CopyException.NoManaCost -> exception
   -- CR 707.9a's "this ability" carries no word of its own. The ability it points
   -- at is the resolving one, which the projection already rewrote where it was
   -- read (rewriteTriggeredAbility).

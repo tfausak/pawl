@@ -3,6 +3,7 @@ module Pawl.Types.CopyException where
 import qualified Data.Set as Set
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.Subtype as Subtype
@@ -176,4 +177,8 @@ data CopyException
     -- the characteristic-defining ability that DEFINES the excepted
     -- characteristic, and no pawl characteristic-defining ability defines a name.
     SetName CardName.CardName
+  | -- | CR 707.9b over CR 105.2: the copy is exactly these colours ("it's white").
+    SetColors (Set.Set Color.Color)
+  | -- | CR 707.9b over CR 202.1: the copy has no mana cost (CR 202.3a's value 0).
+    NoManaCost
   deriving (Eq, Ord, Show)

@@ -2,6 +2,7 @@ module Pawl.Codec.CopyException where
 
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Codec.Subtype as Subtype
@@ -35,5 +36,9 @@ codec =
         _ -> Nothing,
       Arm.payload "SetName" CardName.codec CopyException.SetName $ \x -> case x of
         CopyException.SetName y -> Just y
-        _ -> Nothing
+        _ -> Nothing,
+      Arm.payload "SetColors" (Common.set Color.codec) CopyException.SetColors $ \x -> case x of
+        CopyException.SetColors y -> Just y
+        _ -> Nothing,
+      Arm.nullary "NoManaCost" CopyException.NoManaCost
     ]

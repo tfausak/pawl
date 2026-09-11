@@ -2192,6 +2192,25 @@ applyCopyException this snapshot exception = case exception of
   -- strip: no pawl characteristic-defining ability defines a name.
   CopyException.SetName name ->
     snapshot {PC.names = Set.singleton name}
+  -- CR 707.9b over CR 105.2: "except it's white" REPLACES the copied colours,
+  -- colour indicator included, which is CR 707.9d's second sentence. Its first
+  -- strips the colour-defining ability, and devoid (CR 702.114a) is the one
+  -- Projection.applyColorDefining would read off the snapshot at layer 5. That
+  -- strip is a regression fence: no embalm or eternalize card has devoid, and
+  -- Hour of Eternity's "4/4 black Zombie" copy of a devoid creature card is the
+  -- board that would prove it.
+  CopyException.SetColors colors ->
+    snapshot
+      { PC.colors = colors,
+        PC.keywords = Map.filterWithKey (\keyword _ -> not (Projection.definesColorless (Set.singleton keyword))) (PC.keywords snapshot)
+      }
+  -- CR 707.9b over CR 202.1: no mana cost, so CR 202.3a's mana value 0. The
+  -- colours stay as copied, since the snapshot carries them apart from the cost;
+  -- a printed clause changes them through SetColors above. No
+  -- characteristic-defining ability defines a mana cost, so CR 707.9d has
+  -- nothing to strip.
+  CopyException.NoManaCost ->
+    snapshot {PC.manaCost = Nothing, PC.manaValue = Just 0}
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- permanents matching the rewrite's printed noun phrase, other than itself, minus

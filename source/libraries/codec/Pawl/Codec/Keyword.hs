@@ -107,6 +107,8 @@ codec =
       Arm.payload "Devour" Common.natural Keyword.Devour (\x -> case x of Keyword.Devour y -> Just y; _ -> Nothing),
       Arm.nullary "Exalted" Keyword.Exalted,
       Arm.payload "Unearth" (Cost.codec codec) Keyword.Unearth (\x -> case x of Keyword.Unearth y -> Just y; _ -> Nothing),
+      Arm.payload "Embalm" (Cost.codec codec) Keyword.Embalm (\x -> case x of Keyword.Embalm y -> Just y; _ -> Nothing),
+      Arm.payload "Eternalize" (Cost.codec codec) Keyword.Eternalize (\x -> case x of Keyword.Eternalize y -> Just y; _ -> Nothing),
       Arm.nullary "Mentor" Keyword.Mentor,
       Arm.payload "Afterlife" Common.natural Keyword.Afterlife (\x -> case x of Keyword.Afterlife y -> Just y; _ -> Nothing),
       Arm.nullary "Provoke" Keyword.Provoke,
