@@ -34,7 +34,6 @@ import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
-import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
@@ -42,6 +41,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -324,13 +324,12 @@ milledIt oid event = case event of
   _ -> False
 
 -- CR 702.122c: if this event records a crewing THIS object paid for, which
--- Vehicle it crewed. Only Pawl.Engine.Resolve appends one, off the crew ability
--- resolving, so rule 702.122b's earlier moment -- the tap that pays the cost --
--- is not what is read here (#915).
+-- Vehicle it crewed. GameEvent.Crewed, written as the cost is paid, so a crew
+-- ability that never resolves still leaves the relation behind.
 crewedByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
 crewedByIt oid event = case event of
-  GameEvent.BecameCrewed crewed
-    | Set.member oid (BecameCrewed.crewedBy crewed) -> Just (BecameCrewed.vehicle crewed)
+  GameEvent.Crewed crewed
+    | Set.member oid (Crewing.crewedBy crewed) -> Just (Crewing.vehicle crewed)
   _ -> Nothing
 
 -- CR 302.6: has `controller` had this object under their control continuously

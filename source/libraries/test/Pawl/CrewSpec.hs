@@ -423,13 +423,13 @@ crewingAt tappers target p = case p of
 -- Ace's "whenever this creature crews a Vehicle, that Vehicle gains first strike
 -- until end of turn".
 --
--- TWO Dreadnoughts on every board here, and a creature TAPPED FOR ANOTHER REASON
--- on both: the readings this has to be told apart from are "any tapped creature
--- crewed" and "any Vehicle gains it", and one Vehicle with one tapped creature
--- distinguishes neither.
+-- TWO Dreadnoughts on the first two boards, and a creature TAPPED FOR ANOTHER
+-- REASON on both: the readings this has to be told apart from are "any tapped
+-- creature crewed" and "any Vehicle gains it", and one Vehicle with one tapped
+-- creature distinguishes neither. The third board asks only WHEN the Ace crews.
 --
 -- The arithmetic is non-degenerate for the module header's reason: crew 6 is paid
--- by the Ace (2) and Blind-Spot Giant (4) in the positive case and by Hill Giant
+-- by the Ace (2) and Blind-Spot Giant (4) in the positive cases and by Hill Giant
 -- (3) and Blind-Spot Giant (4) in the negative, so no single creature and no
 -- other pair reaches the threshold.
 crewsVehicleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -465,6 +465,57 @@ crewsVehicleSpec s registry = Spec.describe s "CrewsVehicle" $ do
         Spec.assertBool s (not (hasFirstStrike crewedId after)) "and gained no first strike"
         Spec.assertEqWith s "with nothing triggered onto the stack" (length (GameState.stack onStack)) 0
       _ -> Spec.assertFailure s "fixture should have two Vehicles and two other crewers"
+  -- Rule 702.122b's TIMING: the Ace crews as it is tapped, so bob's Stifle on
+  -- the crew ability undoes nothing the tap already did. The Ace's trigger,
+  -- above the crew ability, still gives the Vehicle first strike; the crew
+  -- ability itself never animates it.
+  Spec.it s "CR 702.122b a countered crew ability still crewed the Vehicle" $ do
+    ace <- S.printingOf s registry "Gearshift Ace"
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    island <- S.printingOf s registry "Island"
+    stifle <- S.printingOf s registry "Stifle"
+    let (aceId, vehicleIds, crewIds, gs) = crewReaderBoard ace [dreadnought] [blindSpot]
+    case (vehicleIds, crewIds) of
+      ([crewedId], [blindId]) -> do
+        let (stifleId, armed) = withStifle island stifle gs
+            (crewId, activated) = activateCrew (crewingWith [aceId, blindId]) crewedId armed
+            onStack = S.runPure S.identityAnswer activated Engine.settleForPriority
+            countered = stifleResolved stifleId crewId onStack
+            after = S.runPure S.identityAnswer countered Stack.resolveTop
+        Spec.assertBool s (hasFirstStrike crewedId after) "the Vehicle the Ace crewed has first strike"
+        Spec.assertBool s (not (isCreature crewedId after)) "though the countered crew ability never animated it"
+        Spec.assertEqWith s "with the stack empty" (GameState.stack after) []
+      _ -> Spec.assertFailure s "fixture should have one Vehicle and one other crewer"
+
+-- bob gets an Island and a Stifle in hand, so he can counter a crew ability.
+withStifle :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+withStifle island stifle gs =
+  let (_, withIsland) = S.addPermanent island S.bob gs
+   in S.addHandCard stifle S.bob withIsland
+
+-- Activate the Vehicle's crew ability WITHOUT resolving it, returning the
+-- ability's id with the state. The id is the placeholder 0 when the Vehicle
+-- offers no ability, which no Stifle target can then match.
+activateCrew :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+activateCrew answer vehicleId gs = case crewAbility vehicleId gs of
+  Nothing -> (ObjectId.MkObjectId 0, gs)
+  Just ability ->
+    let activated = S.runPure answer gs (Activate.activateAbility S.alice vehicleId ability)
+     in case GameState.stack activated of
+          top : _ -> (top, activated)
+          [] -> (ObjectId.MkObjectId 0, activated)
+
+-- bob casts `stifleId` at the ability `abilId` -- filtered out of what the
+-- engine offered -- and it resolves, countering that ability (CR 701.6a).
+stifleResolved :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+stifleResolved stifleId abilId gs =
+  let aimed :: Prompt.Prompt r -> r
+      aimed p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just abilId) . Recipient.objectOf) . snd) sets
+        _ -> S.identityAnswer p
+      cast = S.runPure aimed gs (S.cast S.bob stifleId)
+   in S.runPure S.identityAnswer cast Stack.resolveTop
 
 -- Does this permanent have first strike right now, after the layer fold?
 hasFirstStrike :: ObjectId.ObjectId -> GameState.GameState -> Bool
@@ -487,11 +538,13 @@ crewingWith tappers p = case p of
 -- (data/cards/subterranean-schooner.json; Oracle text checked against
 -- api.scryfall.com, 2026-09-10).
 --
--- TWO Schooners on every board, each crewed by a different creature, and only one
--- of them declared as an attacker. That is what parts rule 702.122c's "crewed IT"
--- from "crewed a Vehicle", which one Vehicle cannot: both crewers are tapped,
--- both crewed something, and only one crewed the attacker. The third board taps a
--- creature where it stands instead, which parts "crewed it" from "is tapped".
+-- TWO Schooners on the first two boards, each crewed by a different creature, and
+-- only one of them declared as an attacker. That is what parts rule 702.122c's
+-- "crewed IT" from "crewed a Vehicle", which one Vehicle cannot: both crewers are
+-- tapped, both crewed something, and only one crewed the attacker. The third
+-- board taps a creature where it stands instead, which parts "crewed it" from "is
+-- tapped". The fourth crews the attacker twice with the first crew ability
+-- countered, which parts "crewed it" from "its crew ability resolved".
 --
 -- The crewers are Hill Giant 3/3 and Goblin Piker 2/1, so CR 701.44a's +1/+1
 -- counter lands on distinct numbers -- 4/4 and 3/2, neither of which is any
@@ -558,6 +611,24 @@ crewedThisTurnSpec s registry =
               Spec.assertBool s (notElem (GameEvent.Explored giantId) (S.eventsOf after)) "the creature tapped where it stood did not explore"
               Spec.assertEqWith s "and is still its printed 3/3" (S.powerToughnessOf giantId after) (Just (3, 3))
               Spec.assertEqWith s "where the creature that crewed the attacker grew to 3/2" (S.powerToughnessOf pikerId after) (Just (3, 2))
+            Nothing -> Spec.assertFailure s "fixture should have two Schooners and two crewers"
+        -- Rule 702.122b's timing read back: the Giant's crew ability is
+        -- Stifled, and the Piker crews the Schooner for real. The Giant was
+        -- still tapped to pay a crew cost of THIS Vehicle, so it crewed it.
+        Spec.it s "CR 702.122c a creature whose crew ability was countered still crewed it" $ do
+          crewBoard <- fixture
+          island <- S.printingOf s registry "Island"
+          stifle <- S.printingOf s registry "Stifle"
+          case crewBoard of
+            Just (attackerId, _, giantId, pikerId, gs) -> do
+              let (stifleId, armed) = withStifle island stifle gs
+                  (crewId, activated) = activateCrew (crewingWith [giantId]) attackerId armed
+                  countered = stifleResolved stifleId crewId activated
+                  crewed = crewWith (crewingWith [pikerId]) attackerId countered
+                  after = throughDeclaration (attackingWith attackerId giantId) crewed
+              Spec.assertBool s (elem (GameEvent.Explored giantId) (S.eventsOf after)) "CR 701.44a the creature whose crew ability was countered explored"
+              Spec.assertEqWith s "so it took the +1/+1 counter" (S.powerToughnessOf giantId after) (Just (4, 4))
+              Spec.assertEqWith s "and the creature that crewed it after is its printed 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
             Nothing -> Spec.assertFailure s "fixture should have two Schooners and two crewers"
 
 -- Declares `attacker` and nothing else, aims rule 702.122c's target at `wanted`

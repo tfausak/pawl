@@ -1606,6 +1606,7 @@ castOf event = case event of
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.Moved {} -> Nothing
@@ -1684,6 +1685,7 @@ discardOf event = case event of
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.Moved {} -> Nothing
@@ -1767,6 +1769,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.DamageDealt _ -> Nothing
@@ -1865,6 +1868,7 @@ damageDealt event = case event of
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.Moved {} -> Nothing
@@ -2015,6 +2019,7 @@ lifeGainOf event = case event of
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.DamageDealt _ -> Nothing

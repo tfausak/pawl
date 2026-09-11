@@ -36,12 +36,12 @@ import qualified Pawl.Extra.Integer as Integer
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
-import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.Crewing as Crewing
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -1031,29 +1031,23 @@ resolveAbilityWith runSubgame abilId srcId ability = do
       -- The source is the Vehicle -- CR 113.7's "the object whose ability was
       -- activated" -- which is what rule 702.122e's "[this Vehicle]" names.
       --
-      -- CR 702.122b/c's other side rides along: the creatures rule 702.122a's
-      -- cost tapped, which Cost.payComponent bound under
-      -- Binding.tappedForTotalPower and Activate folded onto this ability object.
-      -- Read off THIS ability and not off the Vehicle, so two crew activations in
-      -- a turn name two sets (CrewSpec's "a second crew ability").
+      -- The creatures rule 702.122a's cost tapped ride along, read off THIS
+      -- ability (Binding.tappedForTotalPower, folded on by Activate) so two crew
+      -- activations in a turn name two sets. Off the `obj` this resolution
+      -- opened with: resolveModesWith ends with CR 608.2n's cease, so a fresh
+      -- lookup here answers Nothing. CR 702.122b's crewing itself is
+      -- GameEvent.Crewed, which Activate writes at the payment.
       --
-      -- Off the `obj` this resolution opened with, which is where the modes were
-      -- read too, and NOT off the state as it stands here: resolveModesWith ends
-      -- with CR 608.2n's cease, so by this line the ability object is gone and a
-      -- fresh lookup answers Nothing. Pinned by CrewSpec's "the Ace gives first
-      -- strike to the Vehicle it crewed", which goes red on the later read.
-      --
-      -- Not implemented: CR 702.122b's own timing, which makes a creature crew as
-      -- it is TAPPED rather than as the ability resolves -- a crew activation that
-      -- never resolves still crewed, and here fires nothing (#915).
+      -- Not implemented: rule 702.122e's rider, the intervening "if" that would
+      -- read these creatures (#915).
       case ActivatedAbility.keyword ability of
         Just (Keyword.Crew _) ->
           State.modify'
             ( Event.recordEvent
                 ( GameEvent.BecameCrewed
-                    BecameCrewed.MkBecameCrewed
-                      { BecameCrewed.vehicle = srcId,
-                        BecameCrewed.crewedBy = crewersOf obj
+                    Crewing.MkCrewing
+                      { Crewing.vehicle = srcId,
+                        Crewing.crewedBy = crewersOf obj
                       }
                 )
             )

@@ -20,11 +20,11 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
-import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.CounterChange as CounterChange
+import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Discarded as Discarded
@@ -661,9 +661,9 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- of them, and no printed payload points at the others.
   --
   -- Unconditional given a match, which is what eventBindingSlots' per-condition
-  -- promise needs: every GameEvent.BecameCrewed carries a vehicle.
-  (TriggerCondition.SelfCrewsVehicle, GameEvent.BecameCrewed ev) ->
-    Binding.setCrewedVehicle (BecameCrewed.vehicle ev) Map.empty
+  -- promise needs: every GameEvent.Crewed carries a vehicle.
+  (TriggerCondition.SelfCrewsVehicle, GameEvent.Crewed ev) ->
+    Binding.setCrewedVehicle (Crewing.vehicle ev) Map.empty
   -- CR 400.7f, the sibling of CR 400.7e's `became` arms above: an ability that
   -- triggers when an enchanted permanent leaves the battlefield "can find the new
   -- object that each Aura enchanting that permanent became in its owner's
@@ -1513,7 +1513,7 @@ eventBindingSlots cond = case cond of
   TriggerCondition.SelfBecomesCrewed -> Set.empty
   -- CR 702.122b's crewer side, which DOES name somebody the bearer does not: the
   -- Vehicle it crewed, Gearshift Ace's "that Vehicle". Guaranteed given a match,
-  -- every GameEvent.BecameCrewed carrying a vehicle.
+  -- every GameEvent.Crewed carrying a vehicle.
   TriggerCondition.SelfCrewsVehicle -> Set.singleton Binding.crewedVehicle
   -- CR 701.21a's event names a player and a permanent, and this claims the
   -- PLAYER: Vengeful Tracker's "deals 2 damage to them" reads the seat that

@@ -37,6 +37,7 @@ import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
+import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
@@ -1075,6 +1076,23 @@ activateAbility pid srcId ability = do
                   -- loyalty record above and for its reason: every rejecting path
                   -- restores `before`, so no refused activation leaves one behind.
                   State.modify' (ActivationRestriction.recordActivation srcId ability)
+                  -- CR 702.122b: the creatures this crew cost tapped crewed the
+                  -- Vehicle as they were tapped, so the relation is recorded at
+                  -- the payment and a crew ability that never resolves still
+                  -- leaves it (CrewSpec's "a countered crew ability"). A case on
+                  -- the rule-702 keyword stamp, never on an effect.
+                  Monad.when
+                    (family == Just KeywordFamily.Crew)
+                    ( State.modify'
+                        ( Event.recordEvent
+                            ( GameEvent.Crewed
+                                Crewing.MkCrewing
+                                  { Crewing.vehicle = srcId,
+                                    Crewing.crewedBy = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedForTotalPower bound)))
+                                  }
+                            )
+                        )
+                    )
                   -- CR 601.2c through CR 602.2b: each chosen object became a
                   -- target of this ability, which is what CR 702.21a's ward
                   -- watches -- and an activated ability is the half

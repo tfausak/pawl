@@ -3926,18 +3926,17 @@ payComponent moment slots pid oid component = case component of
   -- route, so each one is a becomes-tapped event (CR 701.26a).
   --
   -- Binds Binding.tappedForTotalPower, which is CR 702.122b's "crews a Vehicle"
-  -- relation: Pawl.Engine.Resolve.resolveAbilityWith reads the slot off the
-  -- ability object and puts the set on GameEvent.BecameCrewed, so Gearshift Ace's
-  -- crewer-side trigger can find itself among them. Its own slot and NOT the
-  -- sibling arm's Binding.tappedPermanent: see that slot's comment for why one
-  -- name for both questions would go quiet on a cost carrying both components.
+  -- relation: Pawl.Engine.Activate reads the slot off this payment and records
+  -- GameEvent.Crewed, so Gearshift Ace's crewer-side trigger can find itself
+  -- among them. Its own slot and NOT the sibling arm's Binding.tappedPermanent:
+  -- see that slot's comment for why one name for both questions would go quiet
+  -- on a cost carrying both components.
   --
-  -- Not implemented: CR 702.122e's intervening-"if" rider, which would read this
-  -- set as the trigger's condition rather than as its subject (#915). This
-  -- component is not crew's alone (data/cards/synthetic-crewed-battery.json),
-  -- which is why the binding is unconditional here and the crew reading is made
-  -- where the keyword is known -- CR 702.122d's prohibition is made there too,
-  -- as the criterion atom `tapCandidates` above supplies the set for.
+  -- This component is not crew's alone
+  -- (data/cards/synthetic-crewed-battery.json), which is why the binding is
+  -- unconditional here and the crew reading is made where the keyword is known
+  -- -- CR 702.122d's prohibition is made there too, as the criterion atom
+  -- `tapCandidates` above supplies the set for.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates slots pid oid criterion gs

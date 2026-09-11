@@ -744,6 +744,7 @@ snapshotView gs shape event = case event of
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing

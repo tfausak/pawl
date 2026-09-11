@@ -150,6 +150,7 @@ movedOf event = case event of
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
@@ -943,6 +944,7 @@ eventTriggers events gs =
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
+        GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -1142,6 +1144,7 @@ eventTriggers events gs =
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
+        GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -1374,6 +1377,7 @@ eventTriggers events gs =
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
+        GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -1515,6 +1519,7 @@ eventTriggers events gs =
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
+        GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty

@@ -172,8 +172,6 @@ library codec
     Pawl.Codec.BecameAttackedSpec
     Pawl.Codec.BecameBlocking
     Pawl.Codec.BecameBlockingSpec
-    Pawl.Codec.BecameCrewed
-    Pawl.Codec.BecameCrewedSpec
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
     Pawl.Codec.BecameTarget
@@ -335,6 +333,8 @@ library codec
     Pawl.Codec.CreateSpec
     Pawl.Codec.CreatureBecomesBlockedByAtLeast
     Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
+    Pawl.Codec.Crewing
+    Pawl.Codec.CrewingSpec
     Pawl.Codec.CrewRestriction
     Pawl.Codec.CrewRestrictionSpec
     Pawl.Codec.Cycling
@@ -1527,7 +1527,6 @@ library types
     Pawl.Types.BecameAttached
     Pawl.Types.BecameAttacked
     Pawl.Types.BecameBlocking
-    Pawl.Types.BecameCrewed
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget
     Pawl.Types.BecameUnattached
@@ -1620,6 +1619,7 @@ library types
     Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.CreatureBecomesBlockedByAtLeast
+    Pawl.Types.Crewing
     Pawl.Types.CrewRestriction
     Pawl.Types.Cycling
     Pawl.Types.DamageDirection
