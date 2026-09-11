@@ -1105,27 +1105,6 @@ newestNamed wanted gs =
   let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack wanted))
    in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
 
--- Kird Ape ({R} Creature -- Ape, printed 1/1), whole text: "This creature gets
--- +1/+2 as long as you control a Forest." Oracle text verified against Scryfall.
---
--- CR 613.4c layer 7c, like Omnath's and unlike Serra Avatar's: the printed
--- box is 1/1, so the pump is a modification rather than a characteristic-defining
--- ability. What is new is the "as long as" clause -- the first
--- StaticAbility.condition in the pool.
---
--- CR 604.1 makes a static ability "simply true" and CR 604.2 keeps its effect
--- active while the permanent is on the battlefield and has the ability; the clause
--- narrows that to while a Forest is also there. CR 613.5 is why every test below
--- can assert two different answers on ONE board with nothing but a permanent
--- moving in between: the layer system is "continually and automatically
--- performed", so the modification stops and starts with no trigger, no resolution
--- and no stored effect anywhere.
---
--- Deliberately NOT CR 611.2b's "for as long as" duration, which ends a stored
--- effect once and for good; CR 611.2c's parenthetical ("Note that this works
--- differently than a continuous effect from a static ability") is the rule that
--- keeps the two apart, and the last test here is the observable difference -- the
--- bonus comes BACK.
 -- Brightspear Zealot ({2}{W} Creature -- Human Soldier, printed 2/4): "Vigilance
 -- / This creature gets +2/+0 as long as you've cast two or more spells this
 -- turn." Oracle text checked 2026-09-11.
@@ -1156,6 +1135,27 @@ brightspearZealotSpec s registry =
     Spec.assertEqWith s "alice's one cast and bob's one: still 2/4" (S.powerToughnessOf zealotId oneEach) (Just (2, 4))
     Spec.assertEqWith s "alice's second cast: 4/4" (S.powerToughnessOf zealotId twoOfAlices) (Just (4, 4))
 
+-- Kird Ape ({R} Creature -- Ape, printed 1/1), whole text: "This creature gets
+-- +1/+2 as long as you control a Forest." Oracle text verified against Scryfall.
+--
+-- CR 613.4c layer 7c, like Omnath's and unlike Serra Avatar's: the printed
+-- box is 1/1, so the pump is a modification rather than a characteristic-defining
+-- ability. What is new is the "as long as" clause -- the first
+-- StaticAbility.condition in the pool.
+--
+-- CR 604.1 makes a static ability "simply true" and CR 604.2 keeps its effect
+-- active while the permanent is on the battlefield and has the ability; the clause
+-- narrows that to while a Forest is also there. CR 613.5 is why every test below
+-- can assert two different answers on ONE board with nothing but a permanent
+-- moving in between: the layer system is "continually and automatically
+-- performed", so the modification stops and starts with no trigger, no resolution
+-- and no stored effect anywhere.
+--
+-- Deliberately NOT CR 611.2b's "for as long as" duration, which ends a stored
+-- effect once and for good; CR 611.2c's parenthetical ("Note that this works
+-- differently than a continuous effect from a static ability") is the rule that
+-- keeps the two apart, and the last test here is the observable difference -- the
+-- bonus comes BACK.
 kirdApeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 kirdApeSpec s registry = Spec.describe s "Kird Ape" $ do
   -- Both halves of the clause on one board, with a permanent ENTERING between the

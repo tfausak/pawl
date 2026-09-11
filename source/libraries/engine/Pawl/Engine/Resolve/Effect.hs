@@ -4575,9 +4575,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity) -> do
     gs <- State.get
     -- CR 707.10: `quantity` copies of each named object, each put onto the stack.
-    -- The named objects and the count are both determined ONCE off this `gs` (CR
-    -- 608.2f); each copy is then minted against the live state, since a fresh id
-    -- and a fresh timestamp are both counters the previous mint moved.
+    -- The named objects are enumerated ONCE off this `gs` (CR 608.2f), and the
+    -- count is determined once off it too (CR 608.2h); each copy is then minted
+    -- against the live state, since a fresh id and a fresh timestamp are both
+    -- counters the previous mint moved.
     -- Pawl.KeywordTriggerSpec's Storm group proves the count.
     let copies = maybe 0 Integer.toIntSaturating (Quantity.evaluateFor (effectViewOf source legal gs) (effectContext gs controller source legal (slotBindings resolving gs)) gs resolving source quantity)
     Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \original ->
