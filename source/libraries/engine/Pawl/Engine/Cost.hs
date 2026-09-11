@@ -341,13 +341,15 @@ candidateCostsGiven permitted pid name oid gs =
            in (<> (bestowed <> prototyped <> mutated)) . orConverted $ case Object.zone obj of
                 -- Four shapes, differing in what they do to the printed cost.
                 -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
-                -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it
-                -- is `printed`; jump-start (CR 702.133a) ADDS a discard to `printed`,
-                -- one however many such abilities the card has; and CR 601.3 /
-                -- Yawgmoth's Will is an EFFECT stating no cost, offering the hand's
-                -- list BESIDE the three rather than instead of them. Rule 702.34a's
-                -- "if the resulting spell is an instant or sorcery spell" gates the
-                -- PERMISSION (Keyword.permissionsFor) and is not re-asked here.
+                -- `withAdditional`, and escape (CR 702.138a) is that same shape in
+                -- rule 702.138a's own words; aftermath (CR 702.127a) replaces nothing,
+                -- so it is `printed`; jump-start (CR 702.133a) ADDS a discard to
+                -- `printed`, one however many such abilities the card has; and CR
+                -- 601.3 / Yawgmoth's Will is an EFFECT stating no cost, offering the
+                -- hand's list BESIDE the three rather than instead of them. Rule
+                -- 702.34a's "if the resulting spell is an instant or sorcery spell"
+                -- gates the PERMISSION (Keyword.permissionsFor) and is not re-asked
+                -- here; rule 702.138a states no such clause to gate.
                 Zone.Graveyard ->
                   let -- CR 613.1: the keywords the card HAS in the graveyard, not
                       -- the ones it prints, an ability granted there (CR 113.6f)
@@ -358,7 +360,16 @@ candidateCostsGiven permitted pid name oid gs =
                       -- and its cost are one sentence, so the cost is what
                       -- distinguishes one instance from another.
                       flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
+                      -- CR 702.138a's cost, read as flashback's is and wrapped by
+                      -- `withAdditional` for the same reason -- rule 702.138a replaces
+                      -- the mana cost and CR 601.2f-h still adds the card's additional
+                      -- costs on top. Its "exile N other cards from your graveyard"
+                      -- rides in the Cost's own components, which is why no arm here
+                      -- spells it; the "other" needs no exclusion, exileCandidates'
+                      -- CR 601.2a note below.
+                      escape cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Escape cost)) (withAdditional cost)
                    in fmap flashback (Keyword.flashbackCosts keywords)
+                        <> fmap escape (Keyword.escapeCosts keywords)
                         <> (if Keyword.hasAftermath keywords then [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed] else [])
                         <> ( if Keyword.hasJumpStart keywords
                                then
@@ -1515,8 +1526,14 @@ revealFromHandCandidates = discardCandidates
 -- this pool has a face: CR 111.7 with CR 704.5d makes a token in a graveyard
 -- cease to exist, and an ability exists only on the stack (CR 113.7a).
 --
--- No `oid` exclusion, unlike discardCandidates above, and none is owed: CR
--- 601.2a has put the spell being cast on the STACK.
+-- No `oid` exclusion, unlike discardCandidates above. At PAYMENT time none is
+-- owed, CR 601.2a having put the spell being cast on the STACK, and none can be
+-- added unconditionally either: CR 602.2a leaves an ability activated FROM a
+-- graveyard with its source still there, a legal candidate for its own cost.
+--
+-- Not implemented: the exclusion the two callers that ask BEFORE that move need --
+-- canPayComponent, CR 118.3's gate on the offer, and claimOf -- which count
+-- Loathsome Chimera among the cards its own escape cost could exile (#3604).
 exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates slots pid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots

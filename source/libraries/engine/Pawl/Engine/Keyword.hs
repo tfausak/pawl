@@ -320,6 +320,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
   Keyword.Riot -> []
+  Keyword.Escape _ -> []
   Keyword.Unleash -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -468,6 +469,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
+  Keyword.Escape _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -806,6 +808,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
+  Keyword.Escape _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1105,6 +1108,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
+  Keyword.Escape _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1608,6 +1612,13 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
+  -- CR 702.138a: "You may cast this card from your graveyard by paying [cost]
+  -- rather than paying its mana cost." UNGATED, unlike flashback's arm above:
+  -- rule 702.138a names no card type, so Loathsome Chimera's creature cast is
+  -- permitted (Pawl.CastSpec's "Escape" group). The cost half is
+  -- Pawl.Engine.Cost.candidateCostsFor's, and rule 702.138a grants no exile
+  -- replacement, so castFromGraveyardReplacementsOf stays flashback's.
+  Keyword.Escape _ -> [CastingPermission.CastFromGraveyard]
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1723,6 +1734,23 @@ flashbackCosts :: Set Keyword -> [Cost Keyword]
 flashbackCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Flashback cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.138a: every cost this card may be cast from the graveyard for by escaping,
+-- in ascending Set order, and empty when it has no escape. Read by
+-- Pawl.Engine.Cost.candidateCostsFor at its graveyard arm, the zone half of the
+-- same sentence.
+--
+-- A LIST for flashbackCosts' reason: rule 702.138a states no limit on how many
+-- escape abilities an object has, and CR 601.2b makes two of them a CHOICE rather
+-- than a sum.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+escapeCosts :: Set Keyword -> [Cost Keyword]
+escapeCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Escape cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -2194,6 +2222,11 @@ mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toA
 mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Riot))
+  -- CR 702.138a mints nothing: the exile-as-it-leaves-the-stack replacement is
+  -- rule 702.34a's SECOND ability, and rule 702.138a prints no such sentence, so an
+  -- escaped permanent spell becomes a permanent under CR 608.3a like any other, and
+  -- an escaped instant or sorcery goes to its owner's graveyard under CR 608.2n.
+  Keyword.Escape _ -> []
   -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.
   -- Filter.IsSource and one row per instance for riot's reasons.
   Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Unleash))
@@ -2497,6 +2530,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
           }
     ]
   Keyword.Riot -> []
+  Keyword.Escape _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -2696,6 +2730,7 @@ mintedAttachRestrictionsFor :: Keyword -> [AttachRestriction.AttachRestriction]
 mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Unleash -> []
   Keyword.Riot -> []
+  Keyword.Escape _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -3002,6 +3037,7 @@ familyOf keyword = case keyword of
   Keyword.Aftermath -> Nothing
   Keyword.JumpStart -> Nothing
   Keyword.Riot -> Nothing
+  Keyword.Escape _ -> Just KeywordFamily.Escape
   Keyword.Unleash -> Nothing
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing

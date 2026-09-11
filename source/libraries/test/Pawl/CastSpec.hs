@@ -3110,6 +3110,77 @@ flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
     Spec.assertBool s (S.castable S.alice inGraveyard gs) "castable from the graveyard"
     Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "and offered"
 
+-- CR 702.138a's one static ability, on Loathsome Chimera {2}{G} 4/1 Creature --
+-- Chimera, whose whole text box is "Escape--{4}{G}, Exile three other cards from
+-- your graveyard."
+--
+-- Flashback's near twin and the one card type flashback cannot be: rule 702.34a
+-- gates its permission on the resulting spell being an instant or sorcery
+-- (flashbackCardTypeSpec above) and rule 702.138a states no such clause, so a
+-- CREATURE escaping is what tells the two permissions apart.
+--
+-- Not implemented: the printed "This creature escapes with a +1/+1 counter on
+-- it.", CR 702.138c over CR 702.138b's "escaped" designation, which leaves pawl's
+-- Chimera a 4/1 where paper makes it a 5/2 -- stricter than printed, never weaker
+-- (#3603).
+--
+-- EVERY BOARD BELOW CARRIES FIVE FORESTS, positives and negatives alike, so the
+-- only thing a negative can be turning on is the graveyard.
+escapeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+escapeSpec s registry = Spec.describe s "Escape" $ do
+  -- The whole card end to end: graveyard -> stack -> BATTLEFIELD. Three readings
+  -- discriminate. A creature on the battlefield is rule 702.138a's ungated
+  -- permission, since flashback's clause would have refused the cast outright. An
+  -- exile of exactly three is the alternative cost's own component being paid. And
+  -- the Chimera in PLAY rather than in exile is rule 702.138a printing no second
+  -- ability: flashback's exile-as-it-leaves-the-stack is rule 702.34a's, and an
+  -- escaped permanent keeps none of it.
+  --
+  -- FOUR fodder cards, not three: the payment prompt short-circuits when the
+  -- candidates equal the count, so a three-card graveyard would prove the exile
+  -- happened without proving anybody was asked which cards.
+  Spec.it s "CR 702.138a a creature card escapes from the graveyard for {4}{G} plus three exiles" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    chimera <- S.printingOf s registry "Loathsome Chimera"
+    let (inGraveyard, gs) = escapeBoard forest chimera piker 4
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice inGraveyard)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertBool s (not (Card.isInstant (S.combinedFace chimera)) && not (Card.isSorcery (S.combinedFace chimera))) "neither an instant nor a sorcery"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "the cast is offered from her graveyard"
+    Spec.assertEqWith s "the creature is on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 6
+    Spec.assertEqWith s "CR 406.2 three other cards were exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 3
+    Spec.assertEqWith s "the fourth is still in the graveyard, and the Chimera is not" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+    Spec.assertEqWith s "CR 601.2h {4}{G} was paid too" (S.tappedCount S.alice resolved) 5
+  -- The negative and its control, ONE fodder card apart. Both boards hold the same
+  -- five Forests and the same Chimera in the same graveyard; only the cards it can
+  -- exile differ, so nothing but rule 702.138a's cost can be stopping the cast.
+  --
+  -- Asserted at the PAYMENT rather than at the offer: the two-card board is offered
+  -- the cast, because CR 118.3's check counts the Chimera itself among the cards it
+  -- could exile while CR 601.2a's payment no longer can (gap #3604). The cast then
+  -- rewinds under CR 601.2, which is what the Chimera staying in the graveyard says.
+  Spec.it s "CR 702.138a a graveyard two cards deep cannot pay the escape cost" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    chimera <- S.printingOf s registry "Loathsome Chimera"
+    let (tooShallow, shallow) = escapeBoard forest chimera piker 2
+        (deepEnough, deep) = escapeBoard forest chimera piker 3
+        attempt oid gs = S.runPure S.identityAnswer gs (S.cast S.alice oid)
+    Spec.assertEqWith s "with two other cards, nothing reached the stack" (length (GameState.stack (attempt tooShallow shallow))) 0
+    Spec.assertEqWith s "and the Chimera is still in the graveyard with them" (length (Game.zoneMembers Zone.Graveyard S.alice (attempt tooShallow shallow))) 3
+    Spec.assertEqWith s "with three, the Chimera is on the stack" (length (GameState.stack (attempt deepEnough deep))) 1
+    Spec.assertEqWith s "and the three are exiled" (length (Game.zoneMembers Zone.Exile S.alice (attempt deepEnough deep))) 3
+
+-- alice on turn with five untapped Forests, `printing` in her graveyard under `n`
+-- other copies of `fodder`. Five Forests because rule 702.138a's cost is {4}{G},
+-- which is two more mana than the printed {2}{G} the same card would cost from a
+-- hand.
+escapeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+escapeBoard land printing fodder n =
+  let (oid, gs) = inGraveyardWith land printing 5
+   in (oid, List.foldl' (\acc _ -> snd (S.addGraveyardCard fodder S.alice acc)) gs [1 .. n])
+
 -- CR 702.133a's two static abilities, on Direct Current {1}{R}{R} Sorcery,
 -- "Direct Current deals 2 damage to any target." plus jump-start.
 --
@@ -3388,6 +3459,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   auraTargetSpec s registry
   fireboltSpec s registry
   flashbackCardTypeSpec s registry
+  escapeSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry

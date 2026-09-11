@@ -144,6 +144,10 @@ data KeywordFamily
     Afflict
   | -- | CR 702.135a: afterlife N.
     Afterlife
+  | -- | CR 702.138a: escape--[cost]. The family a card writing "a creature card
+    -- with escape" would name, as against escape--{4}{G}; no card in the pool
+    -- asks yet, and it is owed at the keyword rather than at the first asker.
+    Escape
   | -- | CR 702.94a: miracle [cost].
     Miracle
   | -- | CR 702.162a: more than meets the eye [cost]. The family a card writing

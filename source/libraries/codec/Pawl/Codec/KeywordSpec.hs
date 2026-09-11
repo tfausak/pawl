@@ -326,6 +326,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (flashback 1)
       " {\"type\":\"Flashback\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (flashback 1) /= Codec.encode Keyword.codec (flashback 4)) "the cost is part of the encoding"
+  -- CR 702.138a's payload is a whole Cost too, and it must not share Flashback's
+  -- tag: the two buy the same cast from the same zone, but rule 702.34a gates its
+  -- permission on the resulting spell being an instant or sorcery and rule
+  -- 702.138a gates nothing, so Loathsome Chimera's creature cast turns on which
+  -- tag was read.
+  Spec.it s "Escape carries its cost, and is not Flashback" $ do
+    let escape n = Keyword.Escape (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (escape 6)
+      " {\"type\":\"Escape\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":6}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (escape 6) /= Codec.encode Keyword.codec (flashbackOf 6)) "the same cost under two keywords encodes differently"
   -- CR 702.168a's payload is a Cost too, and it must not share Morph's tag: the
   -- two name the turn-face-up cost of DIFFERENT procedures (CR 702.37e and CR
   -- 702.168d), and the objects they list differ by CR 702.168b's ward {2}.
