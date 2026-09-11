@@ -100,6 +100,7 @@ codec =
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator (\x -> case x of Keyword.Annihilator y -> Just y; _ -> Nothing),
       Arm.nullary "Cascade" Keyword.Cascade,
       Arm.nullary "Storm" Keyword.Storm,
+      Arm.payload "Evoke" (Cost.codec codec) Keyword.Evoke (\x -> case x of Keyword.Evoke y -> Just y; _ -> Nothing),
       Arm.payload "Hideaway" Common.natural Keyword.Hideaway (\x -> case x of Keyword.Hideaway y -> Just y; _ -> Nothing),
       Arm.payload "Reinforce" (Reinforce.codec codec) Keyword.Reinforce (\x -> case x of Keyword.Reinforce y -> Just y; _ -> Nothing),
       Arm.nullary "Persist" Keyword.Persist,

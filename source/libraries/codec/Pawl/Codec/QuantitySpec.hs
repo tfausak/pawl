@@ -17,6 +17,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -250,6 +251,19 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.TimesKickedWith (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))
       " {\"type\":\"TimesKickedWith\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+  -- CR 702.74a / 702.138b, with the keyword FAMILY on the wire. Both families,
+  -- so a payload codec that ignored its argument cannot round-trip them.
+  Spec.it s "CastUsing" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.CastUsing KeywordFamily.Evoke)
+      " {\"type\":\"CastUsing\",\"value\":{\"type\":\"Evoke\"}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.CastUsing KeywordFamily.Escape)
+      " {\"type\":\"CastUsing\",\"value\":{\"type\":\"Escape\"}} "
   -- CR 107.4h's third sentence, with the tag on the wire and the object still
   -- implicit for WasKicked's reason. BOTH tags, since the wire shape is the whole
   -- of what this arm adds and a payload codec that ignored its argument would

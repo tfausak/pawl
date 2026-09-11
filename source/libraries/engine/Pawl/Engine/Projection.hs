@@ -2863,6 +2863,7 @@ quantityReads q = case q of
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.TimesKickedWith _ -> Set.empty
+  Quantity.Type.CastUsing _ -> Set.empty
   Quantity.Type.TagWasSpent {} -> Set.empty
   Quantity.Type.WasToken -> Set.empty
   Quantity.Type.WasAttacking -> Set.empty

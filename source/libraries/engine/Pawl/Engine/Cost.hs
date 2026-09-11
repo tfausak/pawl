@@ -188,9 +188,9 @@ costsFor pid name oid gs = fmap CandidateCost.cost (candidateCostsFor pid name o
 -- costsFor's list with WHICH ability offered each candidate recorded -- the fact
 -- CR 702.34a's "if the flashback cost was paid", CR 702.133a's jump-start clause
 -- and CR 702.103b's rewrite of a spell cast bestowed are conditioned on. The
--- GRAVEYARD arm tags the first two, and `bestowed` below tags from every zone,
--- which is the zone half of rule 702.103a; CR 702.127a's aftermath asks about the
--- ZONE instead and needs no tag of its own.
+-- GRAVEYARD arm tags the first two, and `bestowed` below tags from every zone
+-- the printed cost is offered in, which is the zone half of rule 702.103a; CR
+-- 702.127a's aftermath asks about the ZONE instead and needs no tag of its own.
 candidateCostsFor :: PlayerId -> CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
 candidateCostsFor = candidateCostsGiven False
 
@@ -247,11 +247,11 @@ candidateCostsGiven permitted pid name oid gs =
                     oid
                     cond
               alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
-              -- CR 702.103a: bestow, offered from EVERY zone rather than from one
-              -- arm of the case below -- "a static ability that functions in any
-              -- zone from which you could play the card it's on". So it is appended
-              -- to whatever that zone's own list is instead of replacing it, and
-              -- LAST, so `firstOffered` still reads the printed cost.
+              -- CR 702.103a: bestow, offered from EVERY zone the printed cost is
+              -- -- "a static ability that functions in any zone from which you
+              -- could play the card it's on" -- so it joins `ordinary` below
+              -- rather than one arm of the case, and after the printed cost, so
+              -- `firstOffered` still reads that.
               --
               -- CR 118.9d wraps it in `withAdditional`, flashback's reason: an
               -- alternative replaces only the mana cost.
@@ -301,6 +301,14 @@ candidateCostsGiven permitted pid name oid gs =
                 fmap
                   (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
                   (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+              -- CR 702.74a: evoke, offered from EVERY zone for bestow's reason --
+              -- "a static ability that functions in any zone from which the card
+              -- with evoke can be cast" -- wrapped in `withAdditional` for
+              -- flashback's, and read off the PROJECTION for bestow's.
+              evoked =
+                fmap
+                  (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Evoke cost)) (withAdditional cost))
+                  (Keyword.evokeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
               -- which the spell may be cast".
@@ -339,7 +347,17 @@ candidateCostsGiven permitted pid name oid gs =
               -- not permit; a printing whose back face had a mana cost would be the
               -- card that told the two apart.
               orConverted zoneCandidates = if null converted then zoneCandidates else converted
-           in (<> (bestowed <> prototyped <> mutated)) . orConverted $ case Object.zone obj of
+              -- CR 118.9a / 601.2b: the keyword alternatives ride BESIDE the printed
+              -- cost, wherever the permission that lets the card be cast admits
+              -- paying its printed cost or an alternative -- the hand, the `_` arm,
+              -- and a graveyard some permission opens. Not where the permission
+              -- itself fixes the cost: a plotted card (CR 702.170d), a foretold one
+              -- (CR 702.143a), a free CR 118.9 grant, flashback's or escape's own
+              -- cost, or rule 702.162a's converted cast. Pawl.CastSpec's "CR
+              -- 702.170d a Mulldrifter Aven Interrupter plotted is offered no evoke
+              -- cost" proves it.
+              ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked
+           in orConverted $ case Object.zone obj of
                 -- Four shapes, differing in what they do to the printed cost.
                 -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
                 -- `withAdditional`, and escape (CR 702.138a) is that same shape in
@@ -385,7 +403,7 @@ candidateCostsGiven permitted pid name oid gs =
                         -- UNTAGGED: an effect's permission states no cost, so
                         -- neither rule 702.34a's clause nor rule 702.133a's is
                         -- satisfied by paying it.
-                        <> (if permitted || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then fmap untagged (printed : alternatives) else [])
+                        <> (if permitted || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then ordinary else [])
                 -- CR 702.170d: a PLOTTED card is cast "without paying its mana
                 -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
                 -- rule 702.170d being the only thing permitting this cast. CR
@@ -432,9 +450,9 @@ candidateCostsGiven permitted pid name oid gs =
                 -- than being enforced: withoutPayingManaCost carries an empty
                 -- ManaCost, which has no variable to prompt for.
                 Zone.Hand ->
-                  fmap untagged (printed : alternatives)
+                  ordinary
                     <> (if PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs then [untagged (withoutPayingManaCost face)] else [])
-                _ -> fmap untagged (printed : alternatives)
+                _ -> ordinary
    in case Game.lookupObject oid gs of
         Nothing -> []
         Just obj | Facing.isFaceDown (Object.facing obj) -> [untagged faceDownCost]

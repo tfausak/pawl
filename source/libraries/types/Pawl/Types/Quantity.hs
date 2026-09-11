@@ -10,6 +10,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -104,6 +105,11 @@ data Quantity
   | -- | CR 702.33c / 702.33f: how many times that kicker cost was declared for
     -- the spell this quantity is evaluated against.
     TimesKickedWith (Cost.Cost Keyword.Keyword)
+  | -- | CR 601.2b / 400.7d: 1 if the spell this quantity is evaluated against, or
+    -- the spell that became it, was cast for the cost that keyword ability
+    -- offers -- CR 702.74a's "if its evoke cost was paid", CR 702.138b's
+    -- "escaped" -- else 0.
+    CastUsing KeywordFamily.KeywordFamily
   | -- | CR 107.4h: 1 if mana carrying that production tag was spent to pay for
     -- the object this quantity is evaluated against, else 0.
     --

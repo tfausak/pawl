@@ -332,6 +332,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Escalate _ -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
+  -- CR 702.74a's triggered half; its static half is a candidate cost
+  -- (Pawl.Engine.Cost.candidateCostsFor).
+  Keyword.Evoke _ -> List.genericReplicate count evoke
   Keyword.Unleash -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -486,6 +489,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
+  Keyword.Evoke _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -824,6 +828,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
+  Keyword.Evoke _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1203,6 +1208,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
+  Keyword.Evoke _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1718,6 +1724,9 @@ permissionsFor cardTypes keyword = case keyword of
   -- Pawl.Engine.Cost.candidateCostsFor's, and rule 702.138a grants no exile
   -- replacement, so castFromGraveyardReplacementsOf stays flashback's.
   Keyword.Escape _ -> [CastingPermission.CastFromGraveyard]
+  -- CR 702.74a states an alternative cost and no permission: the card is cast
+  -- from wherever something else lets it be.
+  Keyword.Evoke _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1850,6 +1859,27 @@ escapeCosts :: Set Keyword -> [Cost Keyword]
 escapeCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Escape cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 707.10: what a COPY of a spell keeps of Object.castUsing. The copy copies
+-- the alternative cost decision, so CR 702.74a's "if its evoke cost was paid"
+-- holds of it; CR 702.138b's "escaped" asks whether the spell was CAST from a
+-- graveyard with escape, and a copy of a spell isn't cast. Pawl.CastSpec's "CR
+-- 702.138b a Double Major copy of the escaping Chimera did not escape" proves it.
+copiedCastUsing :: Maybe Keyword -> Maybe Keyword
+copiedCastUsing castUsing = case castUsing of
+  Just (Keyword.Escape _) -> Nothing
+  _ -> castUsing
+
+-- CR 702.74a: every evoke cost this card may be cast for, in ascending Set order.
+-- Read by Pawl.Engine.Cost.candidateCostsFor from EVERY zone, bestowCosts'
+-- reading, the static ability functioning "in any zone from which the card with
+-- evoke can be cast". A list and a wildcard for flashbackCosts' reasons.
+evokeCosts :: Set Keyword -> [Cost Keyword]
+evokeCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Evoke cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -2326,6 +2356,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- escaped permanent spell becomes a permanent under CR 608.3a like any other, and
   -- an escaped instant or sorcery goes to its owner's graveyard under CR 608.2n.
   Keyword.Escape _ -> []
+  Keyword.Evoke _ -> []
   -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.
   -- Filter.IsSource and one row per instance for riot's reasons.
   Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Unleash))
@@ -2634,6 +2665,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
     ]
   Keyword.Riot -> []
   Keyword.Escape _ -> []
+  Keyword.Evoke _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -2838,6 +2870,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Unleash -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
+  Keyword.Evoke _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -3154,6 +3187,7 @@ familyOf keyword = case keyword of
   Keyword.JumpStart -> Nothing
   Keyword.Riot -> Nothing
   Keyword.Escape _ -> Just KeywordFamily.Escape
+  Keyword.Evoke _ -> Just KeywordFamily.Evoke
   Keyword.Unleash -> Nothing
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing
@@ -3937,6 +3971,29 @@ returns kind =
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0))),
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.74a's triggered ability: "When this permanent enters, if its evoke cost
+-- was paid, its controller sacrifices it."
+--
+-- The intervening "if" is CR 603.4's, so a permanent that re-enters -- flickered,
+-- or a copy -- is a new object whose cost nobody paid (CR 400.7), and its own
+-- instance does not trigger; Pawl.CastSpec's "CR 603.4 a flickered evoked
+-- Mulldrifter is not sacrificed" proves it. Quantity.CastUsing reads
+-- Object.castUsing, which is not a copiable value. Sacrificer.PermanentController
+-- for the rule's "its controller".
+evoke :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+evoke =
+  let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.PermanentController}
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening =
+            Just (Condition.Compares (Compares.MkCompares (Quantity.CastUsing KeywordFamily.Evoke) Comparison.AtLeast (Quantity.Literal 1))),
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
