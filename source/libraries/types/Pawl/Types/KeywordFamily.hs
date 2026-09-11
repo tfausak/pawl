@@ -204,4 +204,10 @@ data KeywordFamily
   | -- | CR 702.175a: offspring [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Offspring
+  | -- | CR 702.56a: replicate [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Replicate
+  | -- | CR 702.153a: casualty N. No card in the pool asks yet, and it is owed at
+    -- the keyword rather than at the first asker.
+    Casualty
   deriving (Bounded, Enum, Eq, Ord, Show)

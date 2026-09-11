@@ -528,7 +528,8 @@ withOptionalPayments paid candidate =
     paid
 
 -- CR 601.2b: the announcement of this spell's optional additional costs -- CR
--- 702.33a/b/c's kicker costs, CR 702.157a's squad and CR 702.175a's offspring --
+-- 702.33a/b/c's kicker costs, CR 702.157a's squad, CR 702.175a's offspring, CR
+-- 702.56a's replicate and CR 702.153a's casualty --
 -- one question per keyword and each answered as a count: the record CR 702.33d's
 -- designation is made of, and empty for a player who declared none.
 --

@@ -232,6 +232,10 @@ data Keyword
     -- sorcery -- the mint is handed a keyword and a count, never a card type, so
     -- the two sentences cannot be told apart there (#1404).
     Haunt
+  | -- | 702.56a: replicate [cost] -- an optional additional cost payable any
+    -- number of times, and a cast trigger copying the spell once per payment,
+    -- minted by Pawl.Engine.Keyword.stackTriggeredAbilitiesOf.
+    Replicate (Cost.Cost Keyword)
   | -- | 702.61a: "As long as this spell is on the stack, players can't cast
     -- spells or activate abilities that aren't mana abilities." A
     -- rules-modifying continuous effect (CR 611.1) other players' gates ask
@@ -493,6 +497,10 @@ data Keyword
   | -- | 702.152a: blitz [cost] -- an alternative cost; the permanent has haste
     -- and a dies-draw, and is sacrificed at the next end step.
     Blitz (Cost.Cost Keyword)
+  | -- | 702.153a: casualty N -- an optional additional cost of sacrificing a
+    -- creature with power N or greater, and a cast trigger copying the spell
+    -- once if it was paid, both minted by Pawl.Engine.Keyword.
+    Casualty Natural.Natural
   | -- | 702.155a: chapter abilities of this Saga can't trigger the turn it
     -- entered unless it has exactly that chapter's number of lore counters; rule
     -- 714.3b REPLACES rule 714.3a's ability rather than adding to it.

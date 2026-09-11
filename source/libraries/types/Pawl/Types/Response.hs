@@ -556,8 +556,9 @@ data Response
   | -- | CR 702.42a / 601.2b: whether a caster used a modal spell's entwine
     -- ability.
     AnnouncedEntwine EntwineDecision.EntwineDecision
-  | -- | CR 601.2b: how many times a caster declared a kicker, squad or offspring
-    -- cost (CR 702.33a, 702.157a, 702.175a); a kicker one is CR 702.33d's "kicked".
+  | -- | CR 601.2b: how many times a caster declared a kicker, squad, offspring,
+    -- replicate or casualty cost (CR 702.33a, 702.157a, 702.175a, 702.56a,
+    -- 702.153a); a kicker one is CR 702.33d's "kicked".
     AnnouncedKicker KickerDecision.KickerDecision
   | -- | CR 702.27a / 601.2b: whether a caster declared the intention to pay a
     -- spell's buyback cost, which is what rule 702.27a's second static ability
