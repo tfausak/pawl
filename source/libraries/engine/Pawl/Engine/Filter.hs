@@ -2092,11 +2092,12 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Horsemanship -> keyword
   Keyword.Type.Skulk -> keyword
   Keyword.Type.Melee -> keyword
-  -- CR 702.124h names no colour, type or quality CR 612.2 could swap; CR
-  -- 702.124k names only the Background enchantment type, and CR 702.124m only
-  -- the Time Lord and Doctor creature types. None of the three is a word this
-  -- function carries, since none of these keywords holds a Filter.
+  -- CR 702.124h and CR 702.124i name no colour, type or quality CR 612.2 could
+  -- swap; CR 702.124k names only the Background enchantment type, and CR
+  -- 702.124m only the Time Lord and Doctor creature types. None of these is a
+  -- word this function carries, since none of these keywords holds a Filter.
   Keyword.Type.Partner -> keyword
+  Keyword.Type.PartnerText _ -> keyword
   Keyword.Type.ChooseABackground -> keyword
   Keyword.Type.DoctorsCompanion -> keyword
   -- CR 702.23a's N is a number and not a word, so CR 612.2 has nothing to swap.

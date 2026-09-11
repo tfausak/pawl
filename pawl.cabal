@@ -652,6 +652,8 @@ library codec
     Pawl.Codec.OutsideObjectSpec
     Pawl.Codec.PaidExpiry
     Pawl.Codec.PaidExpirySpec
+    Pawl.Codec.PartnerText
+    Pawl.Codec.PartnerTextSpec
     Pawl.Codec.PayBranch
     Pawl.Codec.PayBranchSpec
     Pawl.Codec.PayGate
@@ -1798,6 +1800,7 @@ library types
     Pawl.Types.OutsideCard
     Pawl.Types.OutsideObject
     Pawl.Types.PaidExpiry
+    Pawl.Types.PartnerText
     Pawl.Types.PayBranch
     Pawl.Types.PayGate
     Pawl.Types.Payment

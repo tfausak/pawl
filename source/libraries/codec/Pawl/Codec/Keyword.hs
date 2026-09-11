@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Cycling as Cycling
 import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Morph as Morph
+import qualified Pawl.Codec.PartnerText as PartnerText
 import qualified Pawl.Codec.Protection as Protection
 import qualified Pawl.Codec.Prototype as Prototype
 import qualified Pawl.Codec.Reinforce as Reinforce
@@ -128,6 +129,7 @@ codec =
       Arm.payload "Crew" Common.natural Keyword.Crew (\x -> case x of Keyword.Crew y -> Just y; _ -> Nothing),
       Arm.payload "Fabricate" Common.natural Keyword.Fabricate (\x -> case x of Keyword.Fabricate y -> Just y; _ -> Nothing),
       Arm.nullary "Partner" Keyword.Partner,
+      Arm.payload "PartnerText" PartnerText.codec Keyword.PartnerText (\x -> case x of Keyword.PartnerText y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseABackground" Keyword.ChooseABackground,
       Arm.nullary "DoctorsCompanion" Keyword.DoctorsCompanion,
       Arm.nullary "Riot" Keyword.Riot,

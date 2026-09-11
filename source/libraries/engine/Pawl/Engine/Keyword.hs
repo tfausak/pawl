@@ -316,6 +316,7 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
@@ -462,6 +463,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
@@ -801,6 +803,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ingest -> []
   Keyword.Skulk -> []
   Keyword.Partner -> []
+  Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
@@ -1101,6 +1104,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
@@ -1605,6 +1609,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
@@ -2417,6 +2422,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
@@ -2632,6 +2638,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
@@ -2854,6 +2861,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
   Keyword.Escalate _ -> []
@@ -3032,6 +3040,8 @@ familyOf keyword = case keyword of
   Keyword.ChooseABackground -> Nothing
   -- CR 702.124m carries none either.
   Keyword.DoctorsCompanion -> Nothing
+  -- CR 702.124i's text is the payload the family drops.
+  Keyword.PartnerText _ -> Just KeywordFamily.PartnerText
   Keyword.Escalate _ -> Just KeywordFamily.Escalate
   Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing
