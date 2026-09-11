@@ -28,7 +28,8 @@
 -- noncombat damage it deals to an opponent does not flip it (#3363). Nor CR
 -- 710.5's alternative name, which is #679's.
 --
--- CR 707.2 / 707.3's copies of it are the Clone cases at the end.
+-- CR 707.2 / 707.3's copies of it are the Clone cases at the end, and CR
+-- 707.9b's exceptions on a copy that flips are the Sakashima case after them.
 --
 -- CR 730.2h's merged permanent containing a flip card is Pawl.MutateSpec's, this
 -- card being the pool's only flip printing and Cubwarden what merges with it.
@@ -276,7 +277,7 @@ spec s registry = Spec.describe s "Flip" $ do
     (akkiId, base, clone) <- cloneBoard s registry
     let flipped = S.runCombat (S.attackTo S.bob) base
     Spec.assertEqWith s "control: the copied permanent is Tok-Tok" (halfReadings akkiId flipped) alternativeHalf
-    case enterCloneOf akkiId clone flipped of
+    case enterCopyOf akkiId clone flipped of
       Nothing -> Spec.assertFailure s "the Clone did not enter"
       Just (cloneId, copied) ->
         Spec.assertEqWith s "CR 707.2: the Clone is Akki Lavarunner, the status left behind" (halfReadings cloneId copied) normalHalf
@@ -290,17 +291,40 @@ spec s registry = Spec.describe s "Flip" $ do
   -- unflipped reading, where the first case is the printed card's.
   Spec.it s "CR 707.3 a Clone of Akki Lavarunner flips into Tok-Tok, and a Clone of that is Akki" $ do
     (akkiId, base, clone) <- cloneBoard s registry
-    case enterCloneOf akkiId clone base of
+    case enterCopyOf akkiId clone base of
       Nothing -> Spec.assertFailure s "the Clone did not enter"
       Just (cloneId, copied) -> do
         let fought = S.runCombat (attackWithOnly cloneId) copied
         Spec.assertEqWith s "CR 710.2: the Clone's own trigger flipped it into Tok-Tok" (halfReadings cloneId fought) alternativeHalf
         Spec.assertEqWith s "CR 710.1c: still mana value 4 and red" (costReadings cloneId fought) (Just 4, Set.singleton Color.Red)
         Spec.assertEqWith s "the Clone alone connected, and the Akki beside it is unflipped" (S.lifeOf S.bob fought, halfReadings akkiId fought) (Just 19, normalHalf)
-        case enterCloneOf cloneId clone fought of
+        case enterCopyOf cloneId clone fought of
           Nothing -> Spec.assertFailure s "the second Clone did not enter"
           Just (secondId, recopied) ->
             Spec.assertEqWith s "CR 707.2: a Clone of the flipped Clone is Akki Lavarunner" (halfReadings secondId recopied) normalHalf
+  -- CR 707.9b / 110.5c: Sakashima's exceptions are copiable values of the copy
+  -- whichever half its status picks, so once its copied trigger flips it, it is
+  -- Tok-Tok's 2/2 Goblin Shaman still named Sakashima. Tok-Tok is legendary
+  -- anyway, so the NAME is what an exception dropped from the flipped reading
+  -- would change.
+  Spec.it s "CR 707.9b a Sakashima that copied Akki flips into Tok-Tok named Sakashima" $ do
+    (akkiId, base, _) <- cloneBoard s registry
+    sakashima <- S.printingOf s registry "Sakashima the Impostor"
+    let sakashimaName = CardName.MkCardName (Text.pack "Sakashima the Impostor")
+    case enterCopyOf akkiId sakashima base of
+      Nothing -> Spec.assertFailure s "Sakashima did not enter"
+      Just (sakashimaId, copied) -> do
+        let fought = S.runCombat (attackWithOnly sakashimaId) copied
+        Spec.assertEqWith
+          s
+          "CR 707.9b: the flipped copy is Tok-Tok except its name and legendary"
+          (halfReadings sakashimaId fought)
+          (Set.singleton sakashimaName, Just (2, 2), Set.fromList [Subtype.Goblin, Subtype.Shaman], Set.singleton Supertype.Legendary, True)
+        Spec.assertEqWith
+          s
+          "control: unflipped, it was Akki except its name and legendary"
+          (halfReadings sakashimaId copied)
+          (Set.singleton sakashimaName, Just (1, 1), Set.fromList [Subtype.Goblin, Subtype.Warrior], Set.singleton Supertype.Legendary, False)
 
 -- S.attackTo bob, declaring `attacker` and nothing else.
 attackWithOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -318,11 +342,11 @@ cloneBoard s registry = do
     (base, [akkiId], _) -> pure (akkiId, base, clone)
     _ -> Spec.assertFailure s "the fixture should have exactly one Akki"
 
--- Resolve a Clone for alice, its CR 707.2 choice PINNED to `original`, and answer
--- with the one new permanent.
-enterCloneOf :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> Maybe (ObjectId.ObjectId, GameState.GameState)
-enterCloneOf original clone gs =
-  let (_, staged) = S.spellOnStack clone S.alice gs
+-- Resolve a Clone (or another copier) for alice, its CR 707.2 choice PINNED to
+-- `original`, and answer with the one new permanent.
+enterCopyOf :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> Maybe (ObjectId.ObjectId, GameState.GameState)
+enterCopyOf original copier gs =
+  let (_, staged) = S.spellOnStack copier S.alice gs
       pinned :: Prompt.Prompt r -> r
       pinned p = case p of
         Prompt.ChooseCopyTarget _ _ _ legal -> if elem original legal then Just original else Nothing
