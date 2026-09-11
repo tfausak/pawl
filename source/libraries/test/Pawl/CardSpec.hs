@@ -1692,15 +1692,23 @@ handActionSlotsOffend card =
    in any offends (handActions card)
 
 -- CR 601.2c with CR 601.2b: does this modal read the announced X through a
--- TARGET SLOT's count -- "each of X target creatures" (Rot-Curse Rakshasa) -- or
+-- TARGET SLOT's count -- "each of X target creatures" (Rot-Curse Rakshasa),
+-- "up to X target artifacts and/or enchantments" (Pest Infestation) -- or
 -- through a slot's CR 202.3 computed BOUND, "mana value X or less" (Stir the
 -- Grave)? Two readers Resolve.readsX cannot see, that one walking effects and
 -- both of these sitting on the slot, so the two reads-equal-declares lints below
 -- ask all three.
 modalReadsAnnouncedX :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modalReadsAnnouncedX =
-  any (\slot -> TargetSlot.count slot == SlotCount.AnnouncedX || any (Set.member Binding.variableX . QuantitySlot.slots) (TargetSlot.amount slot))
+  any (\slot -> countReadsX (TargetSlot.count slot) || any (Set.member Binding.variableX . QuantitySlot.slots) (TargetSlot.amount slot))
     . Modal.allTargetSlots
+
+-- CR 601.2c with CR 601.2b: does this slot's COUNT read the announced X?
+countReadsX :: SlotCount.SlotCount -> Bool
+countReadsX count = case count of
+  SlotCount.Printed _ -> False
+  SlotCount.AnnouncedX -> True
+  SlotCount.UpToAnnouncedX -> True
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
 -- (Face.replacementEffects, Eon Hub's) and the ones an effect of its own
@@ -5725,6 +5733,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (null abilities)) "the pool has activated abilities"
     Spec.assertBool s (any (declaresVariable . ActivatedAbility.cost . snd) abilities) "and one of them declares an X"
     Spec.assertEqWith s "X read iff X declared" (fmap fst (filter offends abilities)) []
+  -- Pawl.Engine.Engine.placeBorne counts a trigger's slots with X as zero, so a
+  -- slot counted by X there would silently take no targets (#3633).
+  Spec.it s "CR 603.3d no triggered ability's target count reads an announced X" $ do
+    ps <- S.allPrintings s
+    let triggerModals f =
+          fmap TriggeredAbility.modal (Face.triggeredAbilities f <> Map.elems (Face.delayedAbilities f) <> grantedTriggeredAbilities f)
+            <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms f))
+        offends = any (any (countReadsX . TargetSlot.count) . Modal.allTargetSlots) . triggerModals
+    Spec.assertEqWith s "no offenders" (fmap (S.nameOf . Printing.card) (filter (anyFace offends . Printing.card) ps)) []
   -- CR 702: Pawl.Types.ActivatedAbility.keyword is the stamp
   -- Pawl.Engine.Keyword.mintedBy puts on an ability rule 702 states, and the wire
   -- carries the key only so an ability already on the stack round-trips through

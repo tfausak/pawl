@@ -1234,9 +1234,9 @@ amassing oid p = case p of
 -- CR 701.41 support, which is card DATA and no opcode: "support N" is written out
 -- as the counters it means, over a CR 601.2c slot of 0 to N.
 --
--- N is a LITERAL range here. A count of 0 to the announced X -- The Crowd Goes
--- Wild's "Support X" -- is not expressible (#2580); the point range X to X is,
--- and Rot-Curse Rakshasa writes one (Pawl.CombatSpec).
+-- N is a LITERAL range here. The Crowd Goes Wild's "Support X" is the same
+-- slot counted 0 to the announced X, SlotCount.UpToAnnouncedX, which Pest
+-- Infestation proves below.
 --
 -- Lead by Example {1}{G} Instant (data/cards/lead-by-example.json): "Support 2.",
 -- and nothing else -- CR 701.41a's INSTANT reading, which has no "other" in it.
@@ -1355,6 +1355,68 @@ leadBoard s registry extra = do
       g4 = List.foldl' (\g (p, pid) -> snd (S.addPermanent p pid g)) g3 extras
       (gs, spellId) = S.handOne lead g4
   pure (pikerId, wallId, ratsId, gs, spellId)
+
+-- CR 601.2c with CR 601.2b: a slot counted 0 to the announced X.
+--
+-- Pest Infestation {X}{X}{G} Sorcery (data/cards/pest-infestation.json): "Destroy
+-- up to X target artifacts and/or enchantments. Create twice X 1/1 black and
+-- green Pest creature tokens with 'When this token dies, you gain 1 life.'" The
+-- Pests are what make the zero-target case observable: a spell that fizzled
+-- under CR 608.2b would make none.
+--
+-- bob holds three candidates, one more than the largest X cast below, so each
+-- case names a different number of them and the ones nobody named are asserted
+-- standing.
+upToXSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+upToXSpec s registry = Spec.describe s "UpToX" $ do
+  -- AnnouncedX's point range would force a second target here.
+  Spec.it s "CR 601.2c X=2 announcing one target destroys only that one" $ do
+    (ringId, others, gs, spellId) <- infestationBoard s registry
+    let after = resolveOne (infesting 2 1 [ringId]) gs spellId
+    Spec.assertEqWith s "the two it could also have named still stand" (fmap (`S.onBattlefield` after) others) [True, True]
+    Spec.assertBool s (not (S.onBattlefield ringId after)) "the Sol Ring it named is gone"
+    Spec.assertEqWith s "twice X Pests" (S.countOnBattlefieldByName pestName S.alice after) 4
+  -- CR 115.6: no targets chosen, so CR 608.2b has nothing to find illegal.
+  Spec.it s "CR 115.6 X=2 announcing no targets destroys nothing and still makes the Pests" $ do
+    (ringId, others, gs, spellId) <- infestationBoard s registry
+    let after = resolveOne (infesting 2 0 []) gs spellId
+    Spec.assertEqWith s "all three stand" (fmap (`S.onBattlefield` after) (ringId : others)) [True, True, True]
+    Spec.assertEqWith s "and the spell resolved: twice X Pests" (S.countOnBattlefieldByName pestName S.alice after) 4
+  -- The ceiling: an announcement past X is clamped back to X.
+  Spec.it s "CR 601.2c X=1 announcing three targets destroys only one" $ do
+    (ringId, others, gs, spellId) <- infestationBoard s registry
+    let after = resolveOne (infesting 1 3 (ringId : others)) gs spellId
+    Spec.assertEqWith s "two of the three stand" (length (filter (`S.onBattlefield` after) (ringId : others))) 2
+    Spec.assertEqWith s "twice X Pests" (S.countOnBattlefieldByName pestName S.alice after) 2
+
+-- alice holds Pest Infestation with five Forests, enough for {X}{X}{G} at X=2;
+-- bob controls a Sol Ring, an Ornithopter and a Glorious Anthem, the filter's
+-- two card types.
+infestationBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState, ObjectId.ObjectId)
+infestationBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  ring <- S.printingOf s registry "Sol Ring"
+  thopter <- S.printingOf s registry "Ornithopter"
+  anthem <- S.printingOf s registry "Glorious Anthem"
+  infestation <- S.printingOf s registry "Pest Infestation"
+  let (ringId, g1) = S.addPermanent ring S.bob (S.landsInPlay forest 5)
+      (thopterId, g2) = S.addPermanent thopter S.bob g1
+      (anthemId, g3) = S.addPermanent anthem S.bob g2
+      (gs, spellId) = S.handOne infestation g3
+  pure (ringId, [thopterId, anthemId], gs, spellId)
+
+-- Announces X, then `n` targets aimed at `wanted` first.
+infesting :: Natural -> Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+infesting x n wanted p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> takingTargets n wanted p
+
+pestName :: CardName.CardName
+pestName = CardName.MkCardName (Text.pack "Pest Token")
 
 -- CR 701.39 bolster, which is an opcode: Effect.Bolster over a Quantity, whose
 -- candidate pool and counter kind are rule 701.39a's rather than the card's.
@@ -1985,6 +2047,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   upToOneTargetSpec s registry
   multiTargetSpec s registry
   supportSpec s registry
+  upToXSpec s registry
   bolsterSpec s registry
   amassSpec s registry
   blightSpec s registry

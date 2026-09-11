@@ -4,8 +4,8 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.TargetCount as TargetCount
 
 -- | CR 601.2c: how many targets one instance of the word "target" takes, as the
--- CARD states it -- either a range printed in the text, or the value of X the
--- caster announced one step earlier (CR 601.2b).
+-- CARD states it -- either a range printed in the text, or a range counted by
+-- the value of X the caster announced one step earlier (CR 601.2b).
 --
 -- A type of its own rather than a third arm inside Pawl.Types.TargetCount,
 -- because the two speak at different moments. This is card data, written before
@@ -19,11 +19,14 @@ data SlotCount
   | -- | CR 601.2c with CR 601.2b: exactly the announced X ("each of X target
     -- creatures", Rot-Curse Rakshasa).
     AnnouncedX
+  | -- | CR 601.2c with CR 601.2b: zero through the announced X ("up to X target
+    -- artifacts and/or enchantments", Pest Infestation).
+    UpToAnnouncedX
   deriving (Eq, Ord, Show)
 
--- | CR 601.2b then CR 601.2c: the range once the value of X is known. Announcing
--- X fixes the number of targets, so the range collapses to a point and there is
--- nothing left for CR 601.2c to ask.
+-- | CR 601.2b then CR 601.2c: the range once the value of X is known.
+-- AnnouncedX's collapses to a point, leaving nothing for CR 601.2c to ask;
+-- UpToAnnouncedX's runs from zero to X.
 --
 -- Zero is the value to pass where no X has been announced: an ability
 -- with no {X} in its cost announces none (CR 601.2b), and a castability gate
@@ -33,11 +36,14 @@ at :: Natural.Natural -> SlotCount -> TargetCount.TargetCount
 at x c = case c of
   Printed count -> count
   AnnouncedX -> TargetCount.MkTargetCount {TargetCount.least = x, TargetCount.most = Just x}
+  UpToAnnouncedX -> TargetCount.upTo x
 
--- | May this slot be answered with more than one target? True for the announced
--- X, which no card bounds at one -- so a slot taking X targets must be read
--- where a set of recipients fits, exactly as a printed plural count must.
+-- | May this slot be answered with more than one target? True for either count
+-- the announced X sets, which no card bounds at one -- so a slot taking X
+-- targets must be read where a set of recipients fits, exactly as a printed
+-- plural count must.
 plural :: SlotCount -> Bool
 plural c = case c of
   Printed count -> TargetCount.plural count
   AnnouncedX -> True
+  UpToAnnouncedX -> True
