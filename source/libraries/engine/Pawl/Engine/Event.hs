@@ -3348,15 +3348,28 @@ apply batch candidate event =
 -- Pawl.Engine.Resolve's CR 707.10 copy stamps the spell's off this same
 -- function.
 --
--- Not implemented: CR 707.2's "status ... [is] not copied", for the one status
--- that changes what a permanent's characteristics ARE. Projection.copiableCharacteristics
--- reads Game.faceOf, which CR 710.2 substitutes a flipped permanent's alternative
--- half at, so a copy of a flipped flip card acquires that half's name, type line
--- and power/toughness where the rule leaves it the normal one (#3364).
--- Face-down status is the exception rule 707.2 names, and reads correctly through
--- the same seam.
+-- CR 707.2's "status ... [is] not copied" is read off two COUNTERFACTUAL
+-- boards: the snapshot is the source's copiable values UNFLIPPED, and a source
+-- whose values include a flip card's alternative half (Game.hasFlipHalf) adds
+-- its flipped reading as PC.flipped, which the copy's own status then picks (CR
+-- 707.3). So a Clone of a flipped Tok-Tok is Akki Lavarunner and can flip later.
+-- Face-down status is the exception rule 707.2 names, and rides both boards
+-- unchanged.
 copiedSnapshot :: ObjectId -> GameState -> PC.ProjectedCharacteristics
 copiedSnapshot src gs =
+  (stampedOn (Game.withFlipped False src gs))
+    { PC.flipped =
+        if Game.hasFlipHalf src gs
+          then Just (stampedOn (Game.withFlipped True src gs))
+          else Nothing
+    }
+  where
+    stampedOn = copiedReading src
+
+-- One of `copiedSnapshot`'s two readings: the copiable values off this board,
+-- with CR 202.3's mana-value overrides.
+copiedReading :: ObjectId -> GameState -> PC.ProjectedCharacteristics
+copiedReading src gs =
   let snapshot = Projection.copiableCharacteristics src gs
       backFace = case (Game.lookupObject src gs, Game.cardOf src gs) of
         (Just obj, Just card) -> Card.showsBackFace card (Object.face obj)

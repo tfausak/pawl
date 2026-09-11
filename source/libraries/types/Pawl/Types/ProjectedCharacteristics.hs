@@ -332,6 +332,11 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- rather than an omission: it is a designation, which CR 722.3a's own wording
     -- and Pawl.Types.Designation's argument keep off the copiable values, so a
     -- permanent that copies a prepared one is not prepared and mints nothing.
-    prepare :: Maybe (Face.Face Card.Card)
+    prepare :: Maybe (Face.Face Card.Card),
+    -- | CR 707.3 / 710.1b: a copy snapshot's reading once the copy is flipped,
+    -- and Nothing for copiable values with no flip card's alternative half.
+    -- Stamped by Pawl.Engine.Event.copiedSnapshot; a printed flip card's
+    -- alternative half is its card's (Pawl.Engine.Card.flippedFace).
+    flipped :: Maybe ProjectedCharacteristics
   }
   deriving (Eq, Ord, Show)

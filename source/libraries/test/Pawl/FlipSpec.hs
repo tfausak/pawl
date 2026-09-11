@@ -26,8 +26,9 @@
 -- Not implemented: Akki's printed trigger is "whenever this creature deals
 -- damage to an opponent", and the card carries the COMBAT-damage condition, so
 -- noncombat damage it deals to an opponent does not flip it (#3363). Nor CR
--- 710.5's alternative name, which is #679's, nor whether a permanent that COPIED
--- a flip card may flip at all (#3366).
+-- 710.5's alternative name, which is #679's.
+--
+-- CR 707.2 / 707.3's copies of it are the Clone cases at the end.
 --
 -- CR 730.2h's merged permanent containing a flip card is Pawl.MutateSpec's, this
 -- card being the pool's only flip printing and Cubwarden what merges with it.
@@ -57,6 +58,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
@@ -266,3 +268,66 @@ spec s registry = Spec.describe s "Flip" $ do
     -- The proxy, after the behaviour: the redirect really moved the event, so
     -- the negative is not a combat that failed to deal damage.
     Spec.assertEqWith s "CR 614.9: alice took the 1 and bob took none" (S.lifeOf S.bob redirected, S.lifeOf S.alice redirected) (Just 20, Just 19)
+  -- CR 707.2 / 110.5: status is not copied, so a Clone entering as a copy of a
+  -- FLIPPED Akki copies the flip card and arrives unflipped (CR 110.5b) -- a 1/1
+  -- Akki Lavarunner, not a legendary Tok-Tok. The control is the same Akki read
+  -- after the same combat, so the copy is of a permanent that really flipped.
+  Spec.it s "CR 707.2 a Clone of a flipped Tok-Tok is an unflipped Akki Lavarunner" $ do
+    (akkiId, base, clone) <- cloneBoard s registry
+    let flipped = S.runCombat (S.attackTo S.bob) base
+    Spec.assertEqWith s "control: the copied permanent is Tok-Tok" (halfReadings akkiId flipped) alternativeHalf
+    case enterCloneOf akkiId clone flipped of
+      Nothing -> Spec.assertFailure s "the Clone did not enter"
+      Just (cloneId, copied) ->
+        Spec.assertEqWith s "CR 707.2: the Clone is Akki Lavarunner, the status left behind" (halfReadings cloneId copied) normalHalf
+  -- CR 707.3 / 110.5c: the copy's copiable values are the flip card's, "as
+  -- modified by the copy's status", so a Clone of an unflipped Akki carries the
+  -- trigger AND the alternative half it reaches -- CR 110.5c's Example flips a
+  -- Dimir Doppelganger that copied Jushi Apprentice. Only the Clone attacks, so
+  -- its own trigger is the only thing that can flip it.
+  --
+  -- Then a second Clone copies the FLIPPED first one: the snapshot road's
+  -- unflipped reading, where the first case is the printed card's.
+  Spec.it s "CR 707.3 a Clone of Akki Lavarunner flips into Tok-Tok, and a Clone of that is Akki" $ do
+    (akkiId, base, clone) <- cloneBoard s registry
+    case enterCloneOf akkiId clone base of
+      Nothing -> Spec.assertFailure s "the Clone did not enter"
+      Just (cloneId, copied) -> do
+        let fought = S.runCombat (attackWithOnly cloneId) copied
+        Spec.assertEqWith s "CR 710.2: the Clone's own trigger flipped it into Tok-Tok" (halfReadings cloneId fought) alternativeHalf
+        Spec.assertEqWith s "CR 710.1c: still mana value 4 and red" (costReadings cloneId fought) (Just 4, Set.singleton Color.Red)
+        Spec.assertEqWith s "the Clone alone connected, and the Akki beside it is unflipped" (S.lifeOf S.bob fought, halfReadings akkiId fought) (Just 19, normalHalf)
+        case enterCloneOf cloneId clone fought of
+          Nothing -> Spec.assertFailure s "the second Clone did not enter"
+          Just (secondId, recopied) ->
+            Spec.assertEqWith s "CR 707.2: a Clone of the flipped Clone is Akki Lavarunner" (halfReadings secondId recopied) normalHalf
+
+-- S.attackTo bob, declaring `attacker` and nothing else.
+attackWithOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackWithOnly attacker p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+  _ -> S.attackTo S.bob p
+
+-- alice's settled Akki at declare attackers against an empty bob, and the Clone
+-- printing the copy cases cast.
+cloneBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState, Printing.Printing)
+cloneBoard s registry = do
+  akki <- S.printingOf s registry "Akki Lavarunner"
+  clone <- S.printingOf s registry "Clone"
+  case S.combatBoardOf [akki] [] of
+    (base, [akkiId], _) -> pure (akkiId, base, clone)
+    _ -> Spec.assertFailure s "the fixture should have exactly one Akki"
+
+-- Resolve a Clone for alice, its CR 707.2 choice PINNED to `original`, and answer
+-- with the one new permanent.
+enterCloneOf :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> Maybe (ObjectId.ObjectId, GameState.GameState)
+enterCloneOf original clone gs =
+  let (_, staged) = S.spellOnStack clone S.alice gs
+      pinned :: Prompt.Prompt r -> r
+      pinned p = case p of
+        Prompt.ChooseCopyTarget _ _ _ legal -> if elem original legal then Just original else Nothing
+        _ -> S.identityAnswer p
+      resolved = S.runPure pinned staged Stack.resolveTop
+   in case Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield gs)) of
+        [cloneId] -> Just (cloneId, resolved)
+        _ -> Nothing
