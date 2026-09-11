@@ -133,6 +133,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
@@ -236,6 +237,10 @@ abilitiesFor keyword count = case keyword of
   Keyword.Cascade -> []
   -- CR 702.40a's, likewise.
   Keyword.Storm -> []
+  -- CR 702.56a's and CR 702.153a's triggers function on the STACK too, so
+  -- stackTriggeredAbilitiesOf mints them and this roster stays empty.
+  Keyword.Replicate _ -> []
+  Keyword.Casualty _ -> []
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
@@ -468,6 +473,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Replicate _ -> []
+  Keyword.Casualty _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -818,6 +825,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Replicate _ -> []
+  Keyword.Casualty _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1200,6 +1209,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Replicate _ -> []
+  Keyword.Casualty _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1712,6 +1723,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Replicate _ -> []
+  Keyword.Casualty _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2162,24 +2175,45 @@ disguiseCost keywords =
 
 -- CR 601.2b: the OPTIONAL additional cost this keyword ability lets its spell's
 -- controller pay as they cast it, paired with how many times its rule lets it be
--- paid -- Just 1 for kicker (CR 702.33a) and offspring (CR 702.175a), Nothing for
--- multikicker (CR 702.33c) and squad (CR 702.157a), which their rules make
--- payable "any number of times" -- and Nothing for every other keyword.
+-- paid -- Just 1 for kicker (CR 702.33a), offspring (CR 702.175a) and casualty
+-- (CR 702.153a), Nothing for multikicker (CR 702.33c), squad (CR 702.157a) and
+-- replicate (CR 702.56a), which their rules make payable "any number of times"
+-- -- and Nothing for every other keyword.
 --
--- One function for all four because their rules say one thing: each is an
+-- One function for all six because their rules say one thing: each is an
 -- optional ADDITIONAL cost (CR 118.8b) announced at CR 601.2b and paid at CR
 -- 601.2f-h, so one announcement asks about them and Object.paidCosts records
 -- them. What each PAYS OFF differs, and is read back off that record by keyword.
 --
 -- A wildcard rather than an exhaustive case, entwineCosts' reason: this asks
--- about four named constructors rather than classifying every keyword.
+-- about six named constructors rather than classifying every keyword.
 optionalCost :: Keyword -> Maybe (Cost Keyword, Maybe Natural)
 optionalCost keyword = case keyword of
   Keyword.Kicker cost -> Just (cost, Just 1)
   Keyword.Multikicker cost -> Just (cost, Nothing)
   Keyword.Squad cost -> Just (cost, Nothing)
   Keyword.Offspring cost -> Just (cost, Just 1)
+  Keyword.Replicate cost -> Just (cost, Nothing)
+  -- The one arm whose cost is MINTED rather than printed: rule 702.153a writes
+  -- the sacrifice out in the rulebook and the card prints only the N.
+  Keyword.Casualty n -> Just (casualtyCost n, Just 1)
   _ -> Nothing
+
+-- CR 702.153a's additional cost: "you may sacrifice a creature with power N or
+-- greater". One permanent, and CR 701.21a leaves WHICH creature to the payer --
+-- Pawl.Engine.Cost pays it exactly as it pays Phyrexian Tower's printed
+-- sacrifice, control of the sacrificed permanent being rule 701.21a's rather
+-- than the Filter's.
+--
+-- An EMPTY mana part rather than Nothing: rule 702.153a levies no mana, and
+-- Pawl.Engine.Cost.plus reads a Nothing as CR 118.6a's unpayable cost, which
+-- would make every casualty offer unpayable rather than free.
+casualtyCost :: Natural -> Cost Keyword
+casualtyCost n =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost []),
+      Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerAtLeast (toInteger n)]))]
+    }
 
 -- Every keyword of this card offering optionalCost's kind of cost, in ascending
 -- Set order. Offered at CR 601.2b and added to whichever candidate cost was
@@ -2664,6 +2698,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Replicate _ -> []
+  Keyword.Casualty _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2908,6 +2944,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Replicate _ -> []
+  Keyword.Casualty _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3141,6 +3179,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Replicate _ -> []
+  Keyword.Casualty _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3288,6 +3328,8 @@ familyOf keyword = case keyword of
   Keyword.Plot _ -> Just KeywordFamily.Plot
   Keyword.Squad _ -> Just KeywordFamily.Squad
   Keyword.Offspring _ -> Just KeywordFamily.Offspring
+  Keyword.Replicate _ -> Just KeywordFamily.Replicate
+  Keyword.Casualty _ -> Just KeywordFamily.Casualty
   Keyword.Foretell _ -> Just KeywordFamily.Foretell
   -- CR 702.94a's parameterized keyword: "a card with miracle" drops the cost.
   Keyword.Miracle _ -> Just KeywordFamily.Miracle
@@ -4808,12 +4850,81 @@ exileTriggeredAbilitiesOf keywords = case suspend keywords of
 -- `functionsIn` would only re-derive it from a condition (a cast) that says
 -- nothing about the stack.
 --
--- A SET, `exileTriggeredAbilitiesOf`'s reading. Not implemented: CR 702.85c's
--- and CR 702.40b's separate trigger per instance, which a printed keyword set
--- cannot count (#3577).
+-- A SET, `exileTriggeredAbilitiesOf`'s reading. The PARAMETERIZED members get
+-- one trigger per distinct payload all the same, which is CR 702.56b's and CR
+-- 702.153b's "each is paid separately and triggers based on the payments made
+-- for it": two replicate costs are two Set members and two instances of
+-- Quantity.TimesPaid, each reading its own payment. Not implemented: CR
+-- 702.85c's, CR 702.40b's and those two rules' separate trigger for a card
+-- printing the SAME keyword twice, which a printed keyword set cannot count
+-- (#3577).
 stackTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 stackTriggeredAbilitiesOf keywords =
-  [cascade | Set.member Keyword.Cascade keywords] <> [storm | Set.member Keyword.Storm keywords]
+  [cascade | Set.member Keyword.Cascade keywords]
+    <> [storm | Set.member Keyword.Storm keywords]
+    <> Maybe.mapMaybe stackCopyTrigger (Set.toAscList keywords)
+
+-- The arm of `stackTriggeredAbilitiesOf` above that reads a keyword's PAYLOAD,
+-- so it cannot be a membership test: rule 702.56a counts the payments made for
+-- this very replicate cost, and rule 702.153a asks whether this very casualty
+-- cost was paid.
+--
+-- A wildcard rather than an exhaustive case, entwineCosts' reason.
+stackCopyTrigger :: Keyword -> Maybe (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
+stackCopyTrigger keyword = case keyword of
+  Keyword.Replicate _ -> Just (paidSpellCopies keyword (Quantity.TimesPaid keyword))
+  Keyword.Casualty _ -> Just (paidSpellCopies keyword (Quantity.Literal 1))
+  _ -> Nothing
+
+-- CR 702.56a's and CR 702.153a's SECOND ability: "When you cast this spell, if a
+-- [replicate/casualty] cost was paid for it, copy it [for each time its replicate
+-- cost was paid]. If the spell has any targets, you may choose new targets for
+-- [any of] the cop[ies]."
+--
+-- `storm` below is the same trigger with no intervening "if" and a different
+-- count; what differs is only which question CR 707.10 is handed, which is why
+-- the two keywords share this builder and rule 702.40a does not.
+--
+-- The intervening "if" is CR 603.4's, evoke's reading: Quantity.TimesPaid reads
+-- Object.paidCosts off the SPELL, which CR 601.2b stamped as it was announced,
+-- so a spell nobody paid the cost for never puts the ability on the stack.
+--
+-- Not implemented: copying a spell that has left the stack before the trigger
+-- resolves (CR 608.2h); the trigger then copies nothing (#3618).
+paidSpellCopies :: Keyword -> Quantity.Quantity -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+paidSpellCopies keyword quantity =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfCast,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          ( Seq.singleton
+              ( Mode.MkMode
+                  ( Seq.singleton
+                      ( Clause.MkClause
+                          Nothing
+                          Nothing
+                          Nothing
+                          Optionality.Mandatory
+                          Nothing
+                          ( Seq.singleton
+                              ( Effect.CopyStackObject
+                                  CopyStackObject.MkCopyStackObject
+                                    { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
+                                      CopyStackObject.targets = CopyTargets.ChosenByController,
+                                      CopyStackObject.quantity = quantity
+                                    }
+                              )
+                          )
+                      )
+                  )
+                  Map.empty
+              )
+          )
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening =
+        Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid keyword) Comparison.AtLeast (Quantity.Literal 1))),
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
 
 -- CR 702.40a: "When you cast this spell, copy it for each other spell that was
 -- cast before it this turn. If the spell has any targets, you may choose new

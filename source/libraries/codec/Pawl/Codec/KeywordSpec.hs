@@ -358,6 +358,11 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []
     Common.assertCodec s Keyword.codec (Keyword.Squad cost) " {\"type\":\"Squad\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Common.assertCodec s Keyword.codec (Keyword.Offspring cost) " {\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+  -- CR 702.56a carries a Cost as squad does; CR 702.153a carries only its N, the
+  -- creature it names being written in the rulebook rather than on the card.
+  Spec.it s "Replicate carries its cost and Casualty its N" $ do
+    Common.assertCodec s Keyword.codec (Keyword.Replicate (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])) " {\"type\":\"Replicate\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
+    Common.assertCodec s Keyword.codec (Keyword.Casualty 2) " {\"type\":\"Casualty\",\"value\":2} "
   -- CR 702.168a's payload is a Cost too, and it must not share Morph's tag: the
   -- two name the turn-face-up cost of DIFFERENT procedures (CR 702.37e and CR
   -- 702.168d), and the objects they list differ by CR 702.168b's ward {2}.

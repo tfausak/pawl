@@ -14,6 +14,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -33,6 +34,7 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -41,6 +43,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
@@ -1930,6 +1933,119 @@ stormSpec s registry = Spec.describe s "Storm" $ do
     Spec.assertEqWith s "bob took two Bolts' 6, Grapeshot's 1 and TWO copies' 2" (S.lifeOf S.bob after) (Just 11)
     Spec.assertEqWith s "alice took bob's Bolt" (S.lifeOf S.alice after) (Just 17)
 
+-- CR 702.56a's replicate: "As an additional cost to cast this spell, you may pay
+-- [cost] any number of times" and "When you cast this spell, if a replicate cost
+-- was paid for it, copy it for each time its replicate cost was paid."
+--
+-- Pyromatics {1}{R} Instant -- "Replicate {1}{R} / Pyromatics deals 1 damage to
+-- any target." (Oracle text checked on Scryfall, 2026-09-11) -- is the producer.
+--
+-- Six Mountains: the printed {1}{R} and the replicate cost twice. Three damage to
+-- bob is the original plus TWO copies; one copy whatever the count leaves him at
+-- 18, and no trigger at all at 19.
+replicateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+replicateSpec s registry = Spec.describe s "Replicate" $ do
+  Spec.it s "CR 702.56a replicate's trigger is minted for a spell on the stack and nowhere else" $ do
+    let keyword = Keyword.Type.Replicate (Cost.MkCost Nothing [])
+    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Set.singleton keyword))) 1
+    Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton keyword 1)) []
+
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.56a Pyromatics replicated twice deals its damage three times; unreplicated, once" $ do
+    pyromatics <- S.printingOf s registry "Pyromatics"
+    mountain <- S.printingOf s registry "Mountain"
+    let (pyroId, g1) = S.addHandCard pyromatics S.alice (S.landsFor mountain S.alice 6 (Setup.emptyGame S.bothPlayers))
+        board =
+          g1
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        -- CR 601.2b's announcement answered `times`; CR 707.10c's per-copy offer
+        -- and the original's own target both pinned to bob.
+        step times gs action = snd (Engine.runGamePure (paidTimesAt times (Recipient.ToPlayer S.bob)) gs (action >> Engine.settleForPriority))
+        resolveAll times gs = if null (GameState.stack gs) then gs else resolveAll times (step times gs Stack.resolveTop)
+        after :: Natural.Natural -> GameState.GameState
+        after times = resolveAll times (step times board (S.cast S.alice pyroId))
+    Spec.assertEqWith s "bob took the original's 1 and TWO copies' 2" (S.lifeOf S.bob (after 2)) (Just 17)
+    Spec.assertEqWith s "CR 603.4 unreplicated, the original's 1 alone" (S.lifeOf S.bob (after 0)) (Just 19)
+
+-- CR 702.153a's casualty: "As an additional cost to cast this spell, you may
+-- sacrifice a creature with power N or greater" and "When you cast this spell, if
+-- a casualty cost was paid for it, copy it."
+--
+-- Light 'Em Up {1}{R} Sorcery -- "Casualty 2 / Light 'Em Up deals 2 damage to
+-- target creature or planeswalker." (Oracle text checked on Scryfall,
+-- 2026-09-11) -- is the producer.
+--
+-- Two boards differing in ONE answer: bob's Hill Giant is a 3/3, so the printed
+-- 2 leaves it standing and the copy's second 2 kills it. Alice's sacrifice is
+-- Jedit Ojanen, a 5/5, so no number in the board coincides with another.
+casualtySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+casualtySpec s registry = Spec.describe s "Casualty" $ do
+  Spec.it s "CR 702.153a casualty's trigger is minted for a spell on the stack and nowhere else" $ do
+    let keyword = Keyword.Type.Casualty 2
+    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Set.singleton keyword))) 1
+    Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton keyword 1)) []
+
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.153a Light 'Em Up with its casualty paid deals its damage twice; unpaid, once" $ do
+    lightEmUp <- S.printingOf s registry "Light 'Em Up"
+    mountain <- S.printingOf s registry "Mountain"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (_, withJedit) = S.addPermanent jedit S.alice (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (giantId, withGiant) = S.addPermanent giant S.bob withJedit
+        (spellId, g1) = S.addHandCard lightEmUp S.alice withGiant
+        board =
+          g1
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        step times gs action = snd (Engine.runGamePure (paidTimesAt times (Recipient.ToObject giantId)) gs (action >> Engine.settleForPriority))
+        resolveAll times gs = if null (GameState.stack gs) then gs else resolveAll times (step times gs Stack.resolveTop)
+        after :: Natural.Natural -> GameState.GameState
+        after times = resolveAll times (step times board (S.cast S.alice spellId))
+        standing gs = (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob gs, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jedit Ojanen")) S.alice gs)
+    Spec.assertEqWith s "CR 704.5g the copy's second 2 killed the 3/3, and Jedit paid for it" (standing (after 1)) (0, 0)
+    Spec.assertEqWith s "CR 603.4 unpaid, 2 damage alone leaves the 3/3 standing beside Jedit" (standing (after 0)) (1, 1)
+
+  -- The floor rule 702.153a states, on the same board with alice's creature
+  -- swapped for one under it: Dryad Arbor is a 1/1, so there is nothing she may
+  -- sacrifice to casualty 2 and CR 601.2f leaves the cost unpayable however she
+  -- answers.
+  Spec.it s "CR 702.153a a creature under casualty's power floor cannot pay it" $ do
+    lightEmUp <- S.printingOf s registry "Light 'Em Up"
+    mountain <- S.printingOf s registry "Mountain"
+    arbor <- S.printingOf s registry "Dryad Arbor"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (_, withArbor) = S.addPermanent arbor S.alice (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (giantId, withGiant) = S.addPermanent giant S.bob withArbor
+        (spellId, g1) = S.addHandCard lightEmUp S.alice withGiant
+        board =
+          g1
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        step gs action = snd (Engine.runGamePure (paidTimesAt 1 (Recipient.ToObject giantId)) gs (action >> Engine.settleForPriority))
+        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step gs Stack.resolveTop)
+        after = resolveAll (step board (S.cast S.alice spellId))
+    Spec.assertEqWith
+      s
+      "the 3/3 took 2 and stands, and the 1/1 was never sacrificed"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob after, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dryad Arbor")) S.alice after)
+      (1, 1)
+
+-- CR 601.2b's optional additional cost answered `times` times, with every target
+-- prompt -- the spell's own and CR 707.10c's per-copy offer -- pinned to one
+-- recipient: Pawl.CastSpec's paidTimes crossed with `pinTarget` below.
+paidTimesAt :: Natural.Natural -> Recipient.Recipient -> Prompt.Prompt r -> r
+paidTimesAt times recipient p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
+  _ -> pinTarget recipient p
+
 -- Answer a ChooseTargets by FILTERING the offered set down to one recipient
 -- (Pawl.CopySpec's pinTarget).
 pinTarget :: Recipient.Recipient -> Prompt.Prompt r -> r
@@ -1961,6 +2077,8 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cascadeSpec s registry
   stormSpec s registry
+  replicateSpec s registry
+  casualtySpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry

@@ -2629,6 +2629,8 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.157a and CR 702.175a: the squad and offspring costs, kicker's shape.
   Keyword.Squad cost -> costFilters cost
   Keyword.Offspring cost -> costFilters cost
+  -- CR 702.56a: the replicate cost, kicker's shape.
+  Keyword.Replicate cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.120a: the escalate cost, whose components may hold a Filter exactly as
   -- entwine's may.
@@ -2774,6 +2776,9 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Cascade -> []
   -- CR 702.40a names no quality: its count is written into the minted ability.
   Keyword.Storm -> []
+  -- CR 702.153a names its creature in the rulebook rather than on the card, so
+  -- the Filter is in the cost Pawl.Engine.Keyword.casualtyCost mints.
+  Keyword.Casualty _ -> []
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []

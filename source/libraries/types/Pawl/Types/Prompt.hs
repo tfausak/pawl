@@ -298,7 +298,8 @@ data Prompt r where
   -- merged permanent's every characteristic.
   ChooseMutateSide :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt MutateSide.MutateSide
   -- | CR 601.2b: how many times the optional additional cost of that keyword --
-  -- kicker, multikicker, squad or offspring (CR 702.33a/c, 702.157a, 702.175a) --
+  -- kicker, multikicker, squad, offspring, replicate or casualty (CR 702.33a/c,
+  -- 702.157a, 702.175a, 702.56a, 702.153a) --
   -- is paid, after ChooseModes and before ChooseCost; the Maybe Natural is the
   -- limit, Nothing for "any number of times", and an answer past it is rejected.
   ChooseKicker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Keyword.Keyword -> Maybe Natural.Natural -> Prompt KickerDecision.KickerDecision
