@@ -256,8 +256,8 @@ viewOfCard face =
           Filter.manaSpentTags = Set.empty,
           -- CR 602.1 / 605.1a off the PRINTED face: the card's printed abilities
           -- plus rule 702's HAND ones (CR 702.29b, CR 702.77b) and GRAVEYARD ones
-          -- (CR 702.84a, 702.128a, 702.129a), not the battlefield ones, which are minted from the
-          -- post-layer keyword map.
+          -- (CR 702.84a, 702.128a, 702.129a), not the battlefield ones, which are
+          -- minted from the post-layer keyword map.
           Filter.nonManaActivatedAbility =
             not
               ( all

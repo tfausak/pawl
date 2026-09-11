@@ -410,9 +410,10 @@ data Keyword
   | -- | 702.127a: three static abilities in one word -- cast this half from your
     -- graveyard, never from anywhere else, and exile it as it leaves the stack.
     Aftermath
-  | -- | 702.128a: [cost], exile this card from your graveyard: create a token copy of it that is white, has no mana cost and is also a Zombie; sorcery speed.
+  | -- | 702.128a: a graveyard ability exiling this card for a white Zombie token
+    -- copy of it with no mana cost.
     Embalm (Cost.Cost Keyword)
-  | -- | 702.129a: embalm's sibling, whose token copy is black and 4/4 instead of white.
+  | -- | 702.129a: embalm's sibling, whose token copy is black and 4/4.
     Eternalize (Cost.Cost Keyword)
   | -- | 702.130a: whenever this creature becomes blocked, defending player loses
     -- N life; each instance triggers separately (CR 702.130b).

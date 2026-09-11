@@ -2204,10 +2204,10 @@ applyCopyException this snapshot exception = case exception of
       { PC.colors = colors,
         PC.keywords = Map.filterWithKey (\keyword _ -> not (Projection.definesColorless (Set.singleton keyword))) (PC.keywords snapshot)
       }
-  -- CR 707.9b over CR 202.1: no mana cost, so CR 202.3a's mana value 0. Colour
-  -- is not re-derived from the missing cost -- CR 707.9b's final values are the
-  -- copiable ones, and the SetColors arm above is how a printed clause states
-  -- one. No characteristic-defining ability defines a mana cost, so CR 707.9d has
+  -- CR 707.9b over CR 202.1: no mana cost, so CR 202.3a's mana value 0. The
+  -- colours stay as copied, since the snapshot carries them apart from the cost;
+  -- a printed clause changes them through SetColors above. No
+  -- characteristic-defining ability defines a mana cost, so CR 707.9d has
   -- nothing to strip.
   CopyException.NoManaCost ->
     snapshot {PC.manaCost = Nothing, PC.manaValue = Just 0}
