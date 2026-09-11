@@ -3744,6 +3744,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.SameNameAsBound _ -> []
   -- Reads the whole set too, one field further over.
   Filter.Type.SameControllerAsBound _ -> []
+  -- Reads the whole set too, off its own field.
+  Filter.Type.SharesCreatureTypeWithBound _ -> []
   Filter.Type.HasChosenName -> []
   -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.
   Filter.Type.HasChosenColor -> []
@@ -4279,6 +4281,10 @@ blockPermissionFilters permission =
 --     Filter.Context.sourceChosenNames, as the search arm does. Not SearchFramed,
 --     whose other promise -- a view filling Filter.View.canAttachToSubject -- it
 --     does not keep.
+--   * ClauseGateFramed -- a mode clause's own "if" (Clause.condition), read by
+--     Pawl.Engine.Resolve.gateHolds through Resolve.Slots.effectContext, so
+--     CR 205.3m's Filter.SharesCreatureTypeWithBound answers there (Mudbutton
+--     Clanger). It overlays no Filter.Context.sourceAttachedTo.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -4428,6 +4434,9 @@ data Framing
     -- unanswerable here where it is answerable at its siblings. Narrowing, and
     -- no card in the pool loses a position by it.
     HandSweepFramed
+  | -- | CR 608.2c's clause "if", evaluated in the resolution's own context. See
+    -- the overview above.
+    ClauseGateFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
   -- here joins that case with no edit, which is the tripwire a hand-kept list
@@ -4494,6 +4503,8 @@ sweptForSingularSlots framing = case framing of
   MillTallyFramed -> True
   -- SWEPT for MillTallyFramed's reason: effectContext fills the slots here too.
   HandSweepFramed -> True
+  -- SWEPT for MillTallyFramed's reason: gateHolds' context carries the slots.
+  ClauseGateFramed -> True
 
 -- filterSlotsReadSingly against a TAGGED position, and the one funnel every
 -- reader of that walk goes through, so two routes to the same keyword filter
@@ -4905,7 +4916,7 @@ modalFilters modal =
   concatMap
     ( \mode ->
         concatMap effectFilters (Mode.allEffects mode)
-          <> frame Unframed (concatMap conditionFilters (modeClauseConditions mode))
+          <> frame ClauseGateFramed (concatMap conditionFilters (modeClauseConditions mode))
           -- CR 118.12's gate, the fourth thing a clause carries that a card
           -- writes filters into; see #2876.
           <> concatMap payGateFilters (Maybe.mapMaybe Clause.payGate (Foldable.toList (Mode.clauses mode)))

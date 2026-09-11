@@ -186,6 +186,8 @@ data Filter keyword
     -- no card asks SameControllerAsBound outside a mode's target slot" is what
     -- keeps the atom out of the positions with no joint check behind them.
     SameControllerAsBound SlotName.SlotName
+  | -- | CR 205.3m: the candidate shares a creature type with the object this slot holds.
+    SharesCreatureTypeWithBound SlotName.SlotName
   | -- | CR 201.4: the candidate has a name the SOURCE has chosen earlier in the
     -- same resolution (CR 608.2c) -- Ancient Vendetta's "cards with that name".
     -- Set intersection, for CR 201.4g's interchangeable names as much as CR

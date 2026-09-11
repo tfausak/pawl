@@ -2338,6 +2338,8 @@ filterReads f = case f of
   -- Reads the CANDIDATE's controller, where its sibling above reads names: the
   -- bound object's controller arrives on the Context, already projected.
   Filter.Type.SameControllerAsBound _ -> Set.singleton Controller
+  -- Reads the CANDIDATE's subtypes; the bound object's arrive on the Context.
+  Filter.Type.SharesCreatureTypeWithBound _ -> Set.singleton Subtypes
   -- Reads NAMES at both ends too, HasName's answer one indirection along: the
   -- chosen half is not a projection at all, and no Modification writes the other.
   Filter.Type.HasChosenName -> Set.empty
@@ -2615,6 +2617,7 @@ filterReadsPeers f = case f of
   -- The bound object's controller arrives on the Context, filled by
   -- Pawl.Engine.Target.slotContext -- no peer projection is read here.
   Filter.Type.SameControllerAsBound _ -> False
+  Filter.Type.SharesCreatureTypeWithBound _ -> False
   Filter.Type.HasChosenName -> False
   -- The source's chosen colour arrives on the Context, read off Object.chosenColor
   -- rather than off a projection; the candidate's own colours come from its

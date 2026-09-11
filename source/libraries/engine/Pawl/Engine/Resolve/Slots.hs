@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
+import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
@@ -2418,6 +2419,11 @@ effectContext gs controller source legal bindings =
           -- creature" is a reference the spell already made rather than a target
           -- CR 608.2b re-checks.
           Filter.slotNames = fmap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs)) objects,
+          -- CR 205.3m's creature types off the same objects and the same
+          -- reader, for slotNames' reason: Heirloom Blade's dead creature is
+          -- read as it last existed (CR 603.10a), and a face-down one has none
+          -- (CR 708.2a).
+          Filter.slotCreatureTypes = fmap (foldMap (foldMap (Set.filter Subtype.isCreatureType . Filter.subtypes) . Projection.viewWithLastKnownAnywhere gs)) objects,
           -- CR 601.2c's PLAYERS out of the same CR 608.2b-filtered map
           -- effectSlotObjects takes the objects from, and the reason the
           -- resolution has to hand them over at all: CR 113.7 makes
