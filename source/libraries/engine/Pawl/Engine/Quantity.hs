@@ -28,6 +28,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -470,14 +471,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.ClassLevel -> fmap (toInteger . ClassLevel.defaulted . Filter.classLevel) mView
         -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect --
         -- rule 702.33d designating the spell for ANY of its kicker costs, so this asks
-        -- the whole map. The object it reads is the RESOLVING SPELL, which is still on
+        -- every KICKER key of the map and no other: a squad or offspring payment is
+        -- not a kick. The object it reads is the RESOLVING SPELL, which is still on
         -- the stack while its own clause conditions are gated
         -- (Pawl.Engine.Resolve.gateHolds).
-        Quantity.WasKicked -> fmap (\view -> if any (> 0) (Filter.kicked view) then 1 else 0) mView
-        -- CR 702.33f's "kicked with its [A] kicker" and CR 702.33c's count, which are
-        -- one read: how many times THIS cost was declared, zero for a cost the spell's
-        -- controller declined and for one the card does not print.
-        Quantity.TimesKickedWith cost -> fmap (toInteger . Map.findWithDefault 0 cost . Filter.kicked) mView
+        Quantity.WasKicked -> fmap (\view -> if any (> 0) (Map.filterWithKey (\keyword _ -> Keyword.familyOf keyword == Just KeywordFamily.Kicker) (Filter.paidCosts view)) then 1 else 0) mView
+        -- CR 702.33f's "kicked with its [A] kicker", CR 702.33c's count and CR
+        -- 702.157a's "for each time", which are one read: how many times THIS
+        -- ability's cost was declared, zero for one the spell's controller declined
+        -- and for one the card does not print.
+        Quantity.TimesPaid keyword -> fmap (toInteger . Map.findWithDefault 0 keyword . Filter.paidCosts) mView
         -- CR 601.2b / 400.7d: was the candidate this object was cast for
         -- offered by that family's keyword? Off the view, WasKicked's read.
         Quantity.CastUsing family -> fmap (\view -> if fmap Keyword.familyOf (Filter.castUsing view) == Just (Just family) then 1 else 0) mView
@@ -1002,7 +1005,7 @@ objectSlots quantity = case quantity of
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
-  Quantity.TimesKickedWith _ -> Set.empty
+  Quantity.TimesPaid _ -> Set.empty
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
   Quantity.WasToken -> Set.empty
@@ -1227,7 +1230,7 @@ readsX quantity = case quantity of
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
-  Quantity.TimesKickedWith _ -> False
+  Quantity.TimesPaid _ -> False
   Quantity.CastUsing _ -> False
   Quantity.TagWasSpent {} -> False
   Quantity.WasToken -> False

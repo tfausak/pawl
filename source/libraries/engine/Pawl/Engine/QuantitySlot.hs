@@ -141,7 +141,7 @@ overSlots f quantity =
         -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
         -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
         -- own record by equality, never an instruction this traversal descends into.
-        Quantity.TimesKickedWith _ -> pure quantity
+        Quantity.TimesPaid _ -> pure quantity
         Quantity.CastUsing _ -> pure quantity
         Quantity.TagWasSpent {} -> pure quantity
         Quantity.WasToken -> pure quantity
@@ -290,7 +290,7 @@ nestedRefs quantity = case quantity of
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
-  Quantity.TimesKickedWith _ -> Set.empty
+  Quantity.TimesPaid _ -> Set.empty
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
   Quantity.WasToken -> Set.empty
@@ -374,7 +374,7 @@ nestedCounts quantity = case quantity of
   -- CR 702.33d's per-cost tally reads a Cost off the spell's own announcement,
   -- and no traversal of this type can carry a Cost; Pawl.CardSpec's
   -- timesKickedWithOffends checks that field off the encoding instead.
-  Quantity.TimesKickedWith {} -> []
+  Quantity.TimesPaid {} -> []
   Quantity.CastUsing {} -> []
   Quantity.TagWasSpent {} -> []
   Quantity.WasToken -> []
@@ -552,7 +552,7 @@ mapPlayerRefs f intoCount quantity =
         -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
         -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
         -- own record by equality, never an instruction this traversal descends into.
-        Quantity.TimesKickedWith _ -> quantity
+        Quantity.TimesPaid _ -> quantity
         Quantity.CastUsing _ -> quantity
         Quantity.TagWasSpent {} -> quantity
         Quantity.WasToken -> quantity

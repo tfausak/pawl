@@ -242,15 +242,15 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.WasKicked
       " {\"type\":\"WasKicked\"} "
-  -- CR 702.33f, with the COST on the wire: which of the spell's kicker costs is
-  -- asked about is the whole of what the card names, the object being whichever
-  -- one the quantity is evaluated against.
-  Spec.it s "TimesKickedWith" $
+  -- CR 702.33f, with the KEYWORD on the wire: which of the spell's additional
+  -- costs is asked about is the whole of what the card names, the object being
+  -- whichever one the quantity is evaluated against.
+  Spec.it s "TimesPaid" $
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.TimesKickedWith (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))
-      " {\"type\":\"TimesKickedWith\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+      (Quantity.TimesPaid (Keyword.Kicker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])))
+      " {\"type\":\"TimesPaid\",\"value\":{\"type\":\"Kicker\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}} "
   -- CR 702.74a / 702.138b, with the keyword FAMILY on the wire. Both families,
   -- so a payload codec that ignored its argument cannot round-trip them.
   Spec.it s "CastUsing" $ do

@@ -713,7 +713,7 @@ handInPlay printing board =
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
-            Object.kicked = Map.empty,
+            Object.paidCosts = Map.empty,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1429,8 +1429,8 @@ kicksBlue = kicksMatching blueKicker
 
 kicksMatching :: Cost.Type.Cost Keyword.Keyword -> Prompt.Prompt r -> r
 kicksMatching wanted p = case p of
-  Prompt.ChooseKicker _ _ _ cost _ ->
-    KickerDecision.MkKickerDecision (if cost == wanted then 1 else 0)
+  Prompt.ChooseKicker _ _ _ keyword _ ->
+    KickerDecision.MkKickerDecision (if keyword == Keyword.Kicker wanted then 1 else 0)
   -- One legal target per slot, FILTERED out of the offered set rather than built
   -- by hand, so CR 608.2b sees the recipient the prompt offered.
   Prompt.ChooseTargets _ _ _ sets -> Map.map (Set.take 1 . snd) sets
@@ -1612,8 +1612,8 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     Spec.assertEqWith
       s
       "one cost, {4}, and rule 702.33a's limit of one payment"
-      (fmap (Keyword.Engine.kickerCosts . Face.keywords) (Game.faceOf spellId gs))
-      (Just [(Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]), Cost.Type.components = []}, Just 1)])
+      (fmap (fmap Keyword.Engine.optionalCost . Keyword.Engine.optionalCosts . Face.keywords) (Game.faceOf spellId gs))
+      (Just [Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]), Cost.Type.components = []}, Just 1)])
   -- A card with no kicker is never asked, which is the other half of "where the
   -- rules leave nothing to ask, don't prompt".
   Spec.it s "CR 702.33a a spell without kicker (Lightning Bolt) is never offered one" $ do
@@ -1622,7 +1622,7 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     hillGiant <- S.printingOf s registry "Hill Giant"
     let (gs, spellId, giantId) = kickerBoard mountain lightningBolt hillGiant 5
         (asked, _) = castAndResolve (bursts (KickerDecision.MkKickerDecision 1) giantId) gs spellId
-    Spec.assertEqWith s "no kicker cost to offer" (fmap (Keyword.Engine.kickerCosts . Face.keywords) (Game.faceOf spellId gs)) (Just [])
+    Spec.assertEqWith s "no kicker cost to offer" (fmap (Keyword.Engine.optionalCosts . Face.keywords) (Game.faceOf spellId gs)) (Just [])
     Spec.assertEqWith s "so no kicker question was put, on a board that could pay one" (kickerAnnouncements asked) []
   -- CR 702.33a's "an additional cost", singular: kicker is payable once, so an
   -- answer of two is text Burst Lightning does not have. Nine Mountains, which is

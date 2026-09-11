@@ -96,7 +96,7 @@ blackCreature =
       Filter.designations = Set.empty,
       Filter.designationValues = Map.empty,
       Filter.classLevel = Nothing,
-      Filter.kicked = Map.empty,
+      Filter.paidCosts = Map.empty,
       Filter.castUsing = Nothing,
       Filter.manaSpentTags = Set.empty,
       -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
@@ -162,7 +162,7 @@ devoidBigCreature =
       Filter.designations = Set.empty,
       Filter.designationValues = Map.empty,
       Filter.classLevel = Nothing,
-      Filter.kicked = Map.empty,
+      Filter.paidCosts = Map.empty,
       Filter.castUsing = Nothing,
       Filter.manaSpentTags = Set.empty,
       Filter.nonManaActivatedAbility = False,

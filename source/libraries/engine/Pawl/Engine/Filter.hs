@@ -590,22 +590,23 @@ data View = MkView
     -- off the battlefield, a player, an event snapshot -- the vacuous posture
     -- `ringBearerFor` above takes.
     classLevel :: Maybe ClassLevel.ClassLevel,
-    -- CR 702.33d: how many times was each of this candidate's kicker costs
-    -- declared? Read off Object.kicked, and empty where there is no object to read
-    -- it off, both for the reasons `designations` above gives. Its readers are
-    -- Pawl.Engine.Quantity's WasKicked arm, answering Burst Lightning's clause
-    -- conditions and Monstrous War-Leech's CR 604.2 clause on its entry
-    -- replacement, and its TimesKickedWith arm, answering Gnarlid Pack's count and
-    -- Sunscape Battlemage's "kicked with its {1}{G} kicker".
+    -- CR 601.2b: how many times was each optional additional cost a keyword of
+    -- this candidate offers declared? Read off Object.paidCosts, and empty where
+    -- there is no object to read it off, both for the reasons `designations`
+    -- above gives. Its readers are Pawl.Engine.Quantity's WasKicked arm, answering
+    -- Burst Lightning's clause conditions and Monstrous War-Leech's CR 604.2
+    -- clause on its entry replacement, and its TimesPaid arm, answering Gnarlid
+    -- Pack's count, Sunscape Battlemage's "kicked with its {1}{G} kicker" and CR
+    -- 702.157a's and CR 702.175a's enters triggers.
     --
     -- Not a designation of a PERMANENT as that field holds -- rule 702.33d
     -- designates the SPELL -- but it comes through the view for the same reason
     -- those do: the reader holds a view and not a board. It is nonetheless filled
     -- for a permanent a kicked spell became, which is CR 400.7d's exception to
     -- the forgetting (see Pawl.Types.Object).
-    kicked :: Map.Map (Cost.Cost Keyword.Type.Keyword) Natural.Natural,
+    paidCosts :: Map.Map Keyword.Type.Keyword Natural.Natural,
     -- CR 601.2b / 400.7d: the keyword whose candidate cost this candidate was
-    -- cast for, read off Object.castUsing for `kicked` above's reasons, and
+    -- cast for, read off Object.castUsing for `paidCosts` above's reasons, and
     -- Nothing where there is no object. Pawl.Engine.Quantity's CastUsing arm is
     -- the reader.
     castUsing :: Maybe Keyword.Type.Keyword,
@@ -833,7 +834,7 @@ playerView pid =
       -- CR 716.2b: a level is a designation A PERMANENT can have, and a player is
       -- not one -- `designations` above, same sentence.
       classLevel = Nothing,
-      kicked = Map.empty,
+      paidCosts = Map.empty,
       castUsing = Nothing,
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
@@ -2277,6 +2278,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Disguise cost -> Keyword.Type.Disguise (rewriteCost pairs cost)
   -- CR 702.170a states a cost, so rewriteCost reaches it as flashback's does.
   Keyword.Type.Plot cost -> Keyword.Type.Plot (rewriteCost pairs cost)
+  Keyword.Type.Squad cost -> Keyword.Type.Squad (rewriteCost pairs cost)
+  Keyword.Type.Offspring cost -> Keyword.Type.Offspring (rewriteCost pairs cost)
   -- CR 702.143a states a cost too, so it is reached the same way.
   Keyword.Type.Foretell cost -> Keyword.Type.Foretell (rewriteCost pairs cost)
   -- CR 702.139a states a CONDITION rather than a cost, so `rewrite` reaches it

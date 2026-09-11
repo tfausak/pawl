@@ -348,6 +348,11 @@ abilitiesFor keyword count = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  -- CR 702.157b and CR 702.175b: each instance triggers on its OWN payments,
+  -- which Object.paidCosts keys by the keyword -- so identical instances share one
+  -- key, and one ability answers for it rather than one per instance.
+  Keyword.Squad cost -> [squad cost]
+  Keyword.Offspring cost -> [offspring cost]
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   -- CR 702.94a's linked triggered half, one per instance for CR 603.2's general
@@ -512,6 +517,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Squad _ -> []
+  Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   -- CR 702.94a's hand ability is TRIGGERED rather than activated, so it is
@@ -853,6 +860,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Squad _ -> []
+  Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
@@ -1235,6 +1244,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Squad _ -> []
+  Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
@@ -1765,6 +1776,8 @@ permissionsFor cardTypes keyword = case keyword of
   -- from EXILE belongs to the PLOTTED card and not to the keyword, so it is object
   -- state (Object.plotted) that Cast.permitsCastFromExile reads.
   Keyword.Plot _ -> []
+  Keyword.Squad _ -> []
+  Keyword.Offspring _ -> []
   -- CR 702.143a, the arm above's argument unchanged: CR 116.2h's special action in
   -- a hand, and CR 702.143d's permission belonging to the FORETOLD card
   -- (Object.foretold) rather than the keyword.
@@ -2073,26 +2086,37 @@ disguiseCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.33a: every ADDITIONAL cost this card's controller may pay as they cast
--- it, in ascending Set order and each paired with how many times CR 702.33 lets
--- it be paid -- Just 1 for kicker, and Nothing for CR 702.33c's multikicker,
--- which the rule makes payable "any number of times". Offered at CR 601.2b and
--- added to whichever candidate cost was announced (CR 601.2f).
+-- CR 601.2b: the OPTIONAL additional cost this keyword ability lets its spell's
+-- controller pay as they cast it, paired with how many times its rule lets it be
+-- paid -- Just 1 for kicker (CR 702.33a) and offspring (CR 702.175a), Nothing for
+-- multikicker (CR 702.33c) and squad (CR 702.157a), which their rules make
+-- payable "any number of times" -- and Nothing for every other keyword.
+--
+-- One function for all four because their rules say one thing: each pays its
+-- cost "following the rules for paying additional costs in rules 601.2b and
+-- 601.2f-h", so one announcement asks about them and Object.paidCosts records
+-- them. What each PAYS OFF differs, and is read back off that record by keyword.
+--
+-- A wildcard rather than an exhaustive case, entwineCosts' reason: this asks
+-- about four named constructors rather than classifying every keyword.
+optionalCost :: Keyword -> Maybe (Cost Keyword, Maybe Natural)
+optionalCost keyword = case keyword of
+  Keyword.Kicker cost -> Just (cost, Just 1)
+  Keyword.Multikicker cost -> Just (cost, Nothing)
+  Keyword.Squad cost -> Just (cost, Nothing)
+  Keyword.Offspring cost -> Just (cost, Just 1)
+  _ -> Nothing
+
+-- Every keyword of this card offering optionalCost's kind of cost, in ascending
+-- Set order. Offered at CR 601.2b and added to whichever candidate cost was
+-- announced (CR 601.2f).
 --
 -- A LIST, entwineCosts' shape and for its reason: CR 702.33b's "kicker [cost 1]
 -- and/or [cost 2]" is two kicker abilities on one object (Sunscape Battlemage),
 -- and CR 118.8a makes two additional costs a SUM rather than a choice. The
 -- summing is Pawl.Engine.Cast.castProposed's, entwineCosts' arrangement exactly.
---
--- A wildcard rather than an exhaustive case, entwineCosts' reason: this asks
--- about two named constructors rather than classifying every keyword.
-kickerCosts :: Set Keyword -> [(Cost Keyword, Maybe Natural)]
-kickerCosts keywords =
-  let costOf keyword = case keyword of
-        Keyword.Kicker cost -> Just (cost, Just 1)
-        Keyword.Multikicker cost -> Just (cost, Nothing)
-        _ -> Nothing
-   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+optionalCosts :: Set Keyword -> [Keyword]
+optionalCosts = filter (Maybe.isJust . optionalCost) . Set.toAscList
 
 -- CR 702.42a: every ADDITIONAL cost this card's controller may pay to choose all
 -- of its modes, in ascending Set order, and empty when it has no entwine. Offered
@@ -2140,11 +2164,11 @@ escalateCosts keywords =
 -- Nothing when the card has no buyback. Offered at CR 601.2b and added to
 -- whichever candidate cost was announced (CR 601.2f).
 --
--- A Maybe where kickerCosts above is a list, morphCost's shape: rule 702.27a
+-- A Maybe where optionalCosts above is a list, morphCost's shape: rule 702.27a
 -- states one cost and one payment of it, and Scryfall kw:buyback, 2026-09-07,
 -- has no printing with two -- a card printing "Buyback [cost 1]" and "Buyback
 -- [cost 2]" the way Sunscape Battlemage prints two kickers would refute this and
--- would want kickerCosts' list. First in ascending Set order, morphCost's tie
+-- would want optionalCosts' list. First in ascending Set order, morphCost's tie
 -- break, which no printing reaches.
 buybackCost :: Set Keyword -> Maybe (Cost Keyword)
 buybackCost keywords =
@@ -2648,6 +2672,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Squad _ -> []
+  Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   -- CR 702.94a's static half is a PERMISSION to reveal, not a replacement: CR
@@ -2849,6 +2875,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Squad _ -> []
+  Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
@@ -3076,6 +3104,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Squad _ -> []
+  Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
@@ -3176,6 +3206,8 @@ familyOf keyword = case keyword of
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Disguise _ -> Just KeywordFamily.Disguise
   Keyword.Plot _ -> Just KeywordFamily.Plot
+  Keyword.Squad _ -> Just KeywordFamily.Squad
+  Keyword.Offspring _ -> Just KeywordFamily.Offspring
   Keyword.Foretell _ -> Just KeywordFamily.Foretell
   -- CR 702.94a's parameterized keyword: "a card with miracle" drops the cost.
   Keyword.Miracle _ -> Just KeywordFamily.Miracle
@@ -4131,6 +4163,61 @@ evoke =
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening =
             Just (Condition.Compares (Compares.MkCompares (Quantity.CastUsing KeywordFamily.Evoke) Comparison.AtLeast (Quantity.Literal 1))),
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.157a's triggered ability: "When this creature enters, if its squad cost
+-- was paid, create a token that's a copy of it for each time its squad cost was
+-- paid."
+squad :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+squad cost = paidTokenCopies (Keyword.Squad cost) (Quantity.TimesPaid (Keyword.Squad cost)) []
+
+-- CR 702.175a's triggered ability: "When this permanent enters, if its offspring
+-- cost was paid, create a token that's a copy of it, except it's 1/1." CR 707.9b
+-- makes the 1/1 part of the token's copiable values.
+offspring :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+offspring cost = paidTokenCopies (Keyword.Offspring cost) (Quantity.Literal 1) [CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 1 1)]
+
+-- The ability CR 702.157a and CR 702.175a share: when this enters, if the
+-- additional cost that keyword offers was paid (CR 601.2b), create `quantity`
+-- token copies of it.
+--
+-- The intervening "if" is CR 603.4's, evoke's reading: Quantity.TimesPaid reads
+-- Object.paidCosts, which is not a copiable value (CR 707.2) and which CR 400.7
+-- clears on every move but the one CR 400.7d admits -- so a Clone of the
+-- permanent, one that re-enters, and the token copies themselves paid nothing
+-- and do not trigger. CR 608.2h's last known information answers both reads for
+-- a permanent that left before the ability resolved (Pawl.Types.LastKnown's
+-- `paidCosts`), and CreateCopy copies what it last was, as graveyardTokenCopy's.
+paidTokenCopies :: Keyword -> Quantity.Quantity -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card)] -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+paidTokenCopies keyword quantity exceptions =
+  let copied =
+        Effect.CreateCopy
+          CreateCopy.MkCreateCopy
+            { CreateCopy.quantity = quantity,
+              CreateCopy.ref = ObjectRef.InSlot Binding.triggerSource,
+              CreateCopy.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              CreateCopy.slot = Nothing,
+              CreateCopy.exceptions = exceptions
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton copied))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening =
+            Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid keyword) Comparison.AtLeast (Quantity.Literal 1))),
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 

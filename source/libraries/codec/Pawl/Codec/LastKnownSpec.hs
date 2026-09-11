@@ -9,8 +9,12 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -43,7 +47,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.attacking = False,
           LastKnown.attackTarget = Nothing,
           LastKnown.blocking = True,
-          LastKnown.protector = Just (PlayerId.MkPlayerId 7)
+          LastKnown.protector = Just (PlayerId.MkPlayerId 7),
+          LastKnown.paidCosts = Map.singleton (Keyword.Offspring (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) 1
         }
       ( " {\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
@@ -52,7 +57,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"copiable\":"
           <> minimalJson
           <> ",\"attached\":[9]"
-          <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7} "
+          <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
+          <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]} "
       )
   -- CR 109.3: neither an attachment nor a chosen name is a characteristic, and
   -- most objects have neither, so the absent case is written out rather than left
@@ -73,7 +79,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.attacking = True,
           LastKnown.attackTarget = Just (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
           LastKnown.blocking = False,
-          LastKnown.protector = Nothing
+          LastKnown.protector = Nothing,
+          LastKnown.paidCosts = Map.empty
         }
       ( " {\"characteristics\":"
           <> minimalJson

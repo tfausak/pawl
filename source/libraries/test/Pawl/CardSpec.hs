@@ -2612,6 +2612,9 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.MoreThanMeetsTheEye cost -> costFilters cost
   Keyword.Kicker cost -> costFilters cost
   Keyword.Multikicker cost -> costFilters cost
+  -- CR 702.157a and CR 702.175a: the squad and offspring costs, kicker's shape.
+  Keyword.Squad cost -> costFilters cost
+  Keyword.Offspring cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.120a: the escalate cost, whose components may hold a Filter exactly as
   -- entwine's may.
@@ -3135,7 +3138,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.DesignationValue _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
-  Quantity.Type.TimesKickedWith {} -> []
+  Quantity.Type.TimesPaid {} -> []
   Quantity.Type.CastUsing {} -> []
   Quantity.Type.TagWasSpent {} -> []
   Quantity.Type.WasToken -> []
