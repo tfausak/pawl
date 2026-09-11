@@ -1694,6 +1694,7 @@ castOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -1771,6 +1772,7 @@ discardOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -1854,6 +1856,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -1950,6 +1953,7 @@ damageDealt event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -2102,6 +2106,7 @@ lifeGainOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing

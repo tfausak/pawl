@@ -2206,9 +2206,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- than off the stack; what resolves here in the ordinary way is a triggered
   -- producer CR 605.1b leaves out, Burning-Tree Emissary's shape.
   --
-  -- Not implemented: CR 605.1b's other two triggers -- mana being added, and a
-  -- mana ability being activated -- so a producer that watches either still
-  -- resolves off the stack here (#1572).
+  -- Not implemented: CR 605.1b's trigger on a mana ability being activated, so
+  -- a producer that watches it still resolves off the stack here (#1572).
+  --
+  -- Not implemented: recording GameEvent.ManaAdded for the mana this arm adds,
+  -- so Caged Sun misses a land's ability resolving here (#3612).
   --
   -- CR 106.4: into the pool of the player the effect names, read through
   -- playerRefPlayers like every other slot read (CR 608.2b). The type and the CR

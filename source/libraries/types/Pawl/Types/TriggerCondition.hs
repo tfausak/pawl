@@ -1,6 +1,7 @@
 module Pawl.Types.TriggerCondition where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
@@ -259,13 +260,17 @@ data TriggerCondition
     -- attached to (Wild Growth), live rather than through last known
     -- information, as for the arm above.
     --
-    -- Not implemented: CR 605.1b's other two triggers, mana being added and a
-    -- mana ability being activated (#1572).
+    -- Not implemented: CR 605.1b's trigger on a mana ability being activated
+    -- (#1572).
     AttachedPermanentTappedForMana
   | -- | CR 106.12a read by a bystander: "whenever you tap a land creature for
     -- mana" (Autumn Willow, Harmony), the arm above's event under a relation and
     -- a filter instead of an attachment link.
     PermanentTappedForMana PermanentTappedForMana.PermanentTappedForMana
+  | -- | CR 605.1b's "mana being added to a player's mana pool": "whenever a
+    -- land's ability causes you to add one or more mana of the chosen color"
+    -- (Caged Sun).
+    AbilityAddsMana AbilityAddsMana.AbilityAddsMana
   | -- | CR 702.55b / 702.55c: "when the creature this card haunts dies", borne
     -- by the haunting card in exile.
     HauntedCreatureDies

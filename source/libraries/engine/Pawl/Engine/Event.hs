@@ -564,6 +564,7 @@ damageOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -627,6 +628,7 @@ revealOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -6992,6 +6994,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.AttachedPermanentTappedForMana -> False
   -- The same event under a relation and a filter, so the same answer.
   TriggerCondition.PermanentTappedForMana {} -> False
+  -- CR 605.1b's mana-added event: the same answer, for the same reason.
+  TriggerCondition.AbilityAddsMana {} -> False
   TriggerCondition.PermanentSacrificed {} -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
@@ -7113,6 +7117,8 @@ controllerTurnScoped cond = case cond of
   -- PermanentSacrificed arm's reason -- Autumn Willow, Harmony's controller taps
   -- a land creature for mana on an opponent's turn too.
   TriggerCondition.PermanentTappedForMana {} -> False
+  -- CR 605.1b's mana-added event: the same answer, for the same reason.
+  TriggerCondition.AbilityAddsMana {} -> False
   -- Rule 702.149c names no turn either, and the SelfAttacks arm below settles the
   -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.

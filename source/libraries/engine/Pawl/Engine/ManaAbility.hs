@@ -131,8 +131,8 @@ isTriggeredManaAbility ab =
 -- 605.1b names three events out of the whole trigger vocabulary, and every other
 -- condition in it watches something that is not mana. -Werror will therefore not
 -- name this site when a mana-watching condition is added, and each such
--- condition owes an arm here -- mana being added and a mana ability being
--- activated are the two #1572 still holds open.
+-- condition owes an arm here -- a mana ability being activated is the one
+-- #1572 still holds open.
 --
 -- CR 603.1b's AnyOf falls to the wildcard, which answers False for a disjunction
 -- one of whose disjuncts watches mana. No card prints one, and the rule would
@@ -145,6 +145,9 @@ triggersFromMana condition = case condition of
   -- The same resolution watched by a bystander rather than through an
   -- attachment link, so the same alternative and the same answer.
   TriggerCondition.PermanentTappedForMana {} -> True
+  -- CR 605.1b's second alternative in as many words, "mana being added to a
+  -- player's mana pool".
+  TriggerCondition.AbilityAddsMana {} -> True
   _ -> False
 
 -- CR 605.1a's library clause read of ONE cost component: does paying it move a

@@ -1497,6 +1497,9 @@ eventBindingSlots cond = case cond of
   -- The same slot for the bystander reading, stamped by the arm above for every
   -- match.
   TriggerCondition.PermanentTappedForMana {} -> Set.singleton Binding.manaSource
+  -- A deliberate empty: Caged Sun's "that color" is the bearer's chosen color,
+  -- and it names no source. A card that did would take manaSource.
+  TriggerCondition.AbilityAddsMana {} -> Set.empty
   -- Empty for SelfEvolves' reason and not for AttachedCreatureMentors' -- rule
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
