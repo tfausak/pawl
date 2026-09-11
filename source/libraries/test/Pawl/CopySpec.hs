@@ -94,6 +94,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -101,11 +102,14 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryR as EntryR
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
@@ -125,12 +129,14 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -434,6 +440,28 @@ mirrorlakeBoard forest island piker mirrorlake =
 -- mana ability CR 605.3b keeps off the stack, which no priority window offers.
 animationAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 animationAbility = Maybe.listToMaybe . drop 1 . Face.activatedAbilities . S.combinedFace
+
+-- The activated ability Mercurial Pretender's copy exception QUOTES (CR 707.9a),
+-- read off the printed card so the priority loop has to offer it on the engine's
+-- own account.
+quotedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+quotedAbility printing =
+  Maybe.listToMaybe
+    [ ability
+    | ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy asCopy)) <- fmap PrintedReplacement.effect (Face.replacementEffects (S.combinedFace printing)),
+      CopyException.GainAbility (GrantedAbility.Activated ability) <- AsCopy.exceptions asCopy
+    ]
+
+-- alice, with priority in her own precombat main phase and the rest of the turn
+-- ahead, so a priority loop run over the board can offer her an activation.
+readiedForAlice :: GameState.GameState -> GameState.GameState
+readiedForAlice gs =
+  gs
+    { GameState.priority = Just S.alice,
+      GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = S.alice,
+      GameState.remaining = S.phasesAfter Phase.PrecombatMain
+    }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
@@ -1052,10 +1080,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- Sakashima the Impostor to its owner's hand at the beginning of the next end
   -- step.\""
   --
-  -- Not implemented: that quoted activated ability, CR 707.9a's exception that
-  -- QUOTES an ability instead of pointing at this one (#1292). Omitting it leaves
-  -- pawl's card stricter than printed -- the clause only ever buys its controller
-  -- an escape -- and nothing below turns on it.
+  -- Not implemented: that quoted activated ability. CopyException.GainAbility
+  -- carries a quotation (Mercurial Pretender's case below), but this one arms a
+  -- delayed trigger, and Resolve.Effect.declaredDelayedAbility finds the
+  -- declaration on the source's PRINTED card, which a Clone of the copy is not
+  -- (#1292). Omitting it leaves pawl's card stricter than printed -- the clause
+  -- only ever buys its controller an escape -- and nothing below turns on it.
   --
   -- Read at GAMEPLAY level by CR 704.5j: two Sakashimas that copied
   -- NONLEGENDARY creatures share a name neither copied creature had and a
@@ -1110,6 +1140,49 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "a token copy of the survivor is a same-named legend too, so CR 704.5j takes it (CR 707.2)" (length (tokensOnBattlefield minted)) 0
         Spec.assertEqWith s "where a token copy of the nonlegendary Piker beside it stands" (length (tokensOnBattlefield plain)) 1
       others -> Spec.assertFailure s ("expected exactly one Sakashima, got " <> show (length others))
+
+  -- THE PROVING TEST for CR 707.9a's QUOTED arm, CopyException.GainAbility.
+  -- Mercurial Pretender {4}{U} Creature -- Shapeshifter 0/0: "You may have this
+  -- creature enter as a copy of a creature you control, except it has \"{2}{U}{U}:
+  -- Return this creature to its owner's hand.\"" (Oracle text checked against
+  -- api.scryfall.com, 2026-09-11.)
+  --
+  -- The Pretender copies a Goblin Piker, which prints no activated ability, and a
+  -- Clone then copies the Pretender. Each leg activates the quoted ability off ONE
+  -- of the two through the priority loop -- `activates` takes it only if the
+  -- engine offers it -- so a bounce is the ability existing on that permanent,
+  -- and WHICH permanent leaves is its source (CR 113.7). The Clone's leg is CR
+  -- 707.9a's "becomes part of the copiable values" read through CR 707.2: a CR
+  -- 613 grant on the Pretender would not reach the Clone.
+  --
+  -- The control is the same board with the Clone copying the Piker instead: one
+  -- thing differs, and that Clone is offered nothing.
+  Spec.it s "Mercurial Pretender's copy has the quoted ability, and so does a Clone of it (CR 707.9a)" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    pretender <- S.printingOf s registry "Mercurial Pretender"
+    case quotedAbility pretender of
+      Nothing -> Spec.assertFailure s "Mercurial Pretender quotes no activated ability"
+      Just quoted -> do
+        let (pikerId, board0) = S.addPermanent piker S.alice (S.landsInPlay island 4)
+            entering victim printing gs = resolveAndSettle (copyNamed victim) (snd (S.spellOnStack printing S.alice gs))
+            entered = entering pikerId pretender board0
+        case printedOnBattlefield "Mercurial Pretender" entered of
+          [pretenderId] -> do
+            let cloned = entering pretenderId clone entered
+                control = entering pikerId clone entered
+                bounce srcId gs = resolveAll (activates srcId quoted) (readiedForAlice gs)
+            case (clonesOnBattlefield cloned, clonesOnBattlefield control) of
+              ([cloneId], [controlId]) -> do
+                -- THE GAMEPLAY ASSERTIONS, ahead of every diagnostic.
+                Spec.assertEqWith s "the Pretender's copy returns itself, not the Piker it copied (CR 707.9a)" (onBattlefield pretenderId (bounce pretenderId cloned), onBattlefield pikerId (bounce pretenderId cloned)) (False, True)
+                Spec.assertEqWith s "a Clone of the copy has the ability too, and returns itself (CR 707.2)" (onBattlefield cloneId (bounce cloneId cloned), onBattlefield pretenderId (bounce cloneId cloned)) (False, True)
+                Spec.assertBool s (onBattlefield controlId (bounce controlId control)) "where a Clone of the Piker itself is offered nothing"
+                -- Diagnostic, after the behaviour: the copy really was the Piker.
+                Spec.assertEqWith s "the Pretender entered as the Piker's 2/1" (S.powerToughnessOf pretenderId entered) $ Just (2, 1)
+              _ -> Spec.assertFailure s "expected one Clone on each board"
+          others -> Spec.assertFailure s ("expected exactly one Mercurial Pretender, got " <> show (length others))
 
   -- THE PROVING TEST for the copiable stamp. The target is itself a copy, so
   -- its printed card (Clone, a 0/0 with an as-enters copy ability) and its

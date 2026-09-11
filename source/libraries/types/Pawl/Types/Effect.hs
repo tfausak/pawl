@@ -287,7 +287,7 @@ data Effect card ability
     -- Not implemented: the rest of the EntryRiders record beyond CR 122.6's
     -- counters, and a bound slot for CR 603.7c's "it" -- Kiki-Jiki's hasty token
     -- and the delayed sacrifice that names it (#2302).
-    CreateCopy CreateCopy.CreateCopy
+    CreateCopy (CreateCopy.CreateCopy ability)
   | -- | CR 707.4 / 613.1a: make a permanent already on the battlefield a copy of
     -- another object (Unstable Shapeshifter), by writing CR 707.2's copiable
     -- values themselves.
@@ -298,7 +298,7 @@ data Effect card ability
     -- Not implemented: a stated duration ("until your next turn", Crystalline
     -- Resonance), which needs a layer-1 continuous effect beside the stamp
     -- (#1753).
-    BecomeCopy BecomeCopy.BecomeCopy
+    BecomeCopy (BecomeCopy.BecomeCopy ability)
   | -- | CR 707.10: put a copy of a spell or of an activated or triggered ability
     -- on the stack onto the stack (Twincast, Lithoform Engine), cloning the
     -- original stack object so CR 707.10's "all decisions made for it" carries
@@ -307,7 +307,7 @@ data Effect card ability
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition asked as the event
     -- would happen (CR 614.1). Targetless.
-    Replace (Replace.Replace card (Effect card ability))
+    Replace (Replace.Replace card ability (Effect card ability))
   | -- | CR 614.10a: each player the PlayerRef names skips their next occurrence
     -- of this step or phase (Fatigue, Stonehorn Dignitary).
     SkipNextPhase SkipNextPhase.SkipNextPhase

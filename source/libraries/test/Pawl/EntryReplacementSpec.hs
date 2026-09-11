@@ -958,7 +958,7 @@ castColdsteel mountain coldsteel pick =
 
 -- Take the candidate carrying `rewrite`. Total, falling back on the canonical
 -- first the way the engine's own out-of-range handling does.
-pickRewrite :: EntryRewrite.EntryRewrite (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
+pickRewrite :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Card) (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
 pickRewrite rewrite entries =
   let wanted e = ReplacementEntry.effect e == ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource rewrite)
    in maybe 0 Int.toNaturalSaturating (List.findIndex wanted entries)

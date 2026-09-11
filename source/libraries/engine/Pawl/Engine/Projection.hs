@@ -833,7 +833,7 @@ viewUpToGiven grants bound cands gs oid =
 -- CR 707.2a: the replacement effects this object's copiable rules text gives it,
 -- staticAbilitiesOf's sibling for the ability kind CR 614 asks about, written
 -- the same way for the same two reasons.
-copiableReplacementsOf :: ObjectId -> GameState -> [PrintedReplacement.PrintedReplacement Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+copiableReplacementsOf :: ObjectId -> GameState -> [PrintedReplacement.PrintedReplacement Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 copiableReplacementsOf oid gs = case copiableSnapshotOf oid gs of
   Just snapshot -> PC.replacementEffects snapshot
   Nothing -> foldMap Face.replacementEffects (Game.faceOf oid gs)
@@ -3583,14 +3583,14 @@ abilitiesGiven pcs oid gs = abilitiesFromCharacteristics (fullView gs) (projectG
 -- leaves the suite green -- so it is a regression fence resting on CR 113.6b's
 -- "only" rather than a proved behaviour. What IS proved is the empty-set limb,
 -- by Pawl.ZoneReplacementSpec's Rest in Peace pair.
-replacementsOf :: Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
+replacementsOf :: Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsOf = replacementsOfGiven Map.empty
 
 -- The same rows off a board the CALLER has already projected. replacementsAffecting
 -- is why it exists: its walk asks this of every battlefield permanent, and a fresh
 -- `project` apiece was one gather per permanent; see #435. projectGiven is the snapshot
 -- argument, and the empty map above is its own fallback.
-replacementsOfGiven :: Map ObjectId ProjectedCharacteristics -> Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
+replacementsOfGiven :: Map ObjectId ProjectedCharacteristics -> Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsOfGiven pcs zone oid gs =
   let pc = projectGiven pcs oid gs
       -- CR 113.6b first and CR 604.2 second: which zone the row functions from,
@@ -3623,7 +3623,7 @@ replacementsOfGiven pcs zone oid gs =
 -- a row wherever the row functions: replacementsAffecting's off-battlefield
 -- walks ask it of the printed face, where replacementsOf asks it of the
 -- projection.
-printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement card effect -> Bool
+printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement card ability effect -> Bool
 printedRowLives oid gs pr = case PrintedReplacement.condition pr of
   Nothing -> True
   Just cond -> Condition.holds (fullView gs) (Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)) (boardAsEntering gs) oid cond
@@ -3632,7 +3632,7 @@ printedRowLives oid gs pr = case PrintedReplacement.condition pr of
 -- functionsFromZone's twin for rows, with the same empty-set reading -- a row
 -- that states no zone leaves CR 113.6's own defaults standing, and a stated set
 -- is the rule's "only", so it replaces them rather than adding to them.
-functionsFromZoneOfRow :: Zone.Zone -> PrintedReplacement.PrintedReplacement card effect -> Bool
+functionsFromZoneOfRow :: Zone.Zone -> PrintedReplacement.PrintedReplacement card ability effect -> Bool
 functionsFromZoneOfRow zone pr =
   let zones = PrintedReplacement.functionsFrom pr
    in Set.null zones || Set.member zone zones
@@ -3640,7 +3640,7 @@ functionsFromZoneOfRow zone pr =
 -- CR 113.6b's stated set without that default folded in, statesZone's twin: the
 -- question a zone CR 113.6 gives no default to has to ask, where "states no zone"
 -- must mean "not here" rather than "wherever the caller is looking".
-statesZoneOfRow :: Zone.Zone -> PrintedReplacement.PrintedReplacement card effect -> Bool
+statesZoneOfRow :: Zone.Zone -> PrintedReplacement.PrintedReplacement card ability effect -> Bool
 statesZoneOfRow zone = Set.member zone . PrintedReplacement.functionsFrom
 
 -- mayStateZone's twin for printed replacement rows, and cheap for its reason: a
@@ -3680,7 +3680,7 @@ phyrexianLifePaidOf oid gs = maybe 0 Object.phyrexianLifePaid (Game.lookupObject
 -- half's self-scope is likewise read off its SOURCE in Replacement.applies
 -- rather than baked into DamagePattern.whichRecipient, which is compared to the
 -- event's Recipient TAG (CR 510.1b) and not to which permanent was hit.
-shieldOf :: ObjectId -> GameState -> [ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+shieldOf :: ObjectId -> GameState -> [ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 shieldOf oid gs =
   if shieldCounters oid gs == 0
     then []
@@ -3741,7 +3741,7 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- reach the other zones cannot carry it: CR 113.6b gathers PRINTED rows and this
 -- one is minted. Filter.IsSource is the rule's "this permanent", the self-scope
 -- CR 614.1c's entry rows use.
-finalityOf :: ObjectId -> GameState -> [ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+finalityOf :: ObjectId -> GameState -> [ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 finalityOf oid gs =
   if finalityCounters oid gs == 0
     then []
@@ -3788,7 +3788,7 @@ finalityCounters oid gs = case Game.lookupObject oid gs of
 -- Replacement.applies matches this row against its own source alone, which is
 -- rule 122.1d's "a permanent with a stun counter on it" -- the counters that
 -- create the effect are the ones on the permanent it protects.
-stunOf :: ObjectId -> GameState -> [ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+stunOf :: ObjectId -> GameState -> [ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 stunOf oid gs =
   if stunCounters oid gs == 0
     then []
@@ -3826,7 +3826,7 @@ stunCounters oid gs = case Game.lookupObject oid gs of
 -- where the two orders disagree. Read off the same finished projection, so a
 -- compleated ability the CR 613 fold removed is gone -- which is what a keyword
 -- needs, where CR 306.5b's loyalty itself is a rule and stays.
-intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
   ( -- CR 614.1c: the entering object is the ability's own source, so the pattern
     -- is Filter.IsSource.
@@ -3917,7 +3917,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- No face is looked up here any more: each of those four readers falls back to
 -- the printed face on its own, and an object that has none answers False from
 -- inside them rather than from a guard around the lot.
-replacementsAffecting :: GameState -> [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
+replacementsAffecting :: GameState -> [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
       -- CR 122.1c's pair, CR 122.1h's row and CR 122.1d's row are minted from

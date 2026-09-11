@@ -21,14 +21,14 @@ spec s = Spec.describe s "Pawl.Codec.CreateCopy" $ do
   Spec.it s "MkCreateCopy, a single copy: the count is omitted" $
     Common.assertCodec
       s
-      CreateCopy.codec
+      (CreateCopy.codec Common.text)
       (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue [])
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- Kicked Rite of Replication's five.
   Spec.it s "MkCreateCopy, a count above one: it is written" $
     Common.assertCodec
       s
-      CreateCopy.codec
+      (CreateCopy.codec Common.text)
       (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue [])
       " {\"quantity\":{\"type\":\"Literal\",\"value\":5},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- Littjara Mirrorlake's "except it enters with an additional +1/+1 counter on
@@ -37,7 +37,7 @@ spec s = Spec.describe s "Pawl.Codec.CreateCopy" $ do
   Spec.it s "MkCreateCopy, the counters the copy enters with" $
     Common.assertCodec
       s
-      CreateCopy.codec
+      (CreateCopy.codec Common.text)
       (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue {EntryRiders.counters = Map.singleton CounterKind.PlusOnePlusOne (Quantity.Literal 1)} [])
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"riders\":{\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]}} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s CreateCopy.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (CreateCopy.codec Common.text)

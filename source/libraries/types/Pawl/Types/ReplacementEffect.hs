@@ -72,14 +72,17 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- parameter, so a card writing a rider onto anything but a prevention is a lint's
 -- job rather than the type's.
 --
+-- Parametric in the ABILITY for Pawl.Types.EntryRewrite's AsCopy, whose CR
+-- 707.9a exception may quote one.
+--
 -- Parametric in the CARD for Pawl.Types.Create's reason: the token TokenR
 -- appends (Pawl.Types.TokenR.plus) is card data nested inside card data.
 --
 -- The sole rules-casing site is Pawl.Engine.Replacement (CR 616.1's loop).
 -- Pawl.Codec also cases on every constructor, but only as the JSON data boundary.
-data ReplacementEffect card effect
+data ReplacementEffect card ability effect
   = ZoneChangeR ZoneChangeR.ZoneChangeR
-  | EntryR (EntryR.EntryR effect)
+  | EntryR (EntryR.EntryR ability effect)
   | DamageR (DamageR.DamageR effect)
   | DestructionR DestructionRewrite.DestructionRewrite
   | CounterR CounterR.CounterR

@@ -48,7 +48,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- to record an expiry. Not implemented: a copy effect the card gives a duration
 -- ("until your next turn", Crystalline Resonance), which needs a layer-1
 -- continuous effect beside the stamp (#1753).
-data BecomeCopy = MkBecomeCopy
+data BecomeCopy ability = MkBecomeCopy
   { original :: ObjectRef.ObjectRef,
     subject :: ObjectRef.ObjectRef,
     -- | CR 707.9's "except ..." clause, empty for a copy effect that states none.
@@ -57,6 +57,6 @@ data BecomeCopy = MkBecomeCopy
     -- stamps, which is what CR 707.9a asks for: the gained ability "becomes part
     -- of the copiable values for the copy", so a token copy of the Shapeshifter
     -- taken afterwards has it too (CR 707.2).
-    exceptions :: [CopyException.CopyException]
+    exceptions :: [CopyException.CopyException ability]
   }
   deriving (Eq, Ord, Show)

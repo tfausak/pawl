@@ -16,11 +16,11 @@ spec s = Spec.describe s "Pawl.Codec.EntryR" $ do
   Spec.it s "MkEntryR" $
     Common.assertCodec
       s
-      (EntryR.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryR.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       ( EntryR.MkEntryR
           { EntryR.matching = Filter.IsSource,
             EntryR.rewrite = EntryRewrite.Tapped
           }
       )
       " {\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"Tapped\"}} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s (EntryR.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+  Spec.it s "has a schema" $ Common.assertHasSchema s (EntryR.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))

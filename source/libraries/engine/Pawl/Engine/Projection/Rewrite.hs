@@ -985,7 +985,7 @@ rewriteTriggeredAbility pairs ability =
 -- makes a static ability's continuous effect and so text in the same text box as
 -- a triggered ability's. Two carriers: the ability's own "as long as" clause, and
 -- the effect itself.
-rewritePrintedReplacement :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PrintedReplacement.PrintedReplacement Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> PrintedReplacement.PrintedReplacement Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+rewritePrintedReplacement :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PrintedReplacement.PrintedReplacement Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> PrintedReplacement.PrintedReplacement Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewritePrintedReplacement pairs printed =
   printed
     { PrintedReplacement.condition = fmap (rewriteCondition pairs) (PrintedReplacement.condition printed),
@@ -999,7 +999,7 @@ rewritePrintedReplacement pairs printed =
 --
 -- Classification, not identity: every arm is a CR 614.1 event class, and the
 -- descent is by the field shapes those classes carry.
-rewriteReplacementEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+rewriteReplacementEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewriteReplacementEffect pairs effect = case effect of
   -- CR 400.3's owner and the destination Zone name no word; the moving object's
   -- Filter does.
@@ -1131,16 +1131,16 @@ rewriteDrawRewrite pairs rewrite = case rewrite of
 --
 -- NO BOARD OBSERVES IT, the ChoiceByCoinFlip arm's position below: what changes
 -- is a keyword that CARRIES a word, or CR 707.9b's subtype clause, and no card in
--- data/cards puts a text-changing effect on either -- neither producer of the CR
--- 707.9a arm names a word (Dack's Duplicate grants haste and dethrone,
--- Omni-Changeling changeling), and Wall of Stolen Identity's "a Wall" would need
+-- data/cards puts a text-changing effect on either -- no producer of the CR
+-- 707.9a arms names a word (Dack's Duplicate grants haste and dethrone,
+-- Omni-Changeling changeling, Mercurial Pretender a bounce), and Wall of Stolen Identity's "a Wall" would need
 -- an Artificial Evolution aimed at it. The arms are the rule rather than a proven
 -- behaviour -- an "except it has islandwalk", or that Artificial Evolution, would
 -- be what proves them. CR 707.9b's remaining arms name no word CR 612.2's
 -- subtype swap reaches: the pair is two literals, the type clause names CR
 -- 205.2a's card types, the supertype clauses CR 205.4a's supertypes, and the name
 -- clause a name, which CR 612.2's last sentence puts out of reach outright.
-rewriteCopyException :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CopyException.CopyException -> CopyException.CopyException
+rewriteCopyException :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card) -> CopyException.CopyException (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteCopyException pairs exception = case exception of
   CopyException.SetPowerToughness _ -> exception
   CopyException.GainKeywords keywords -> CopyException.GainKeywords (Set.map (Filter.rewriteKeyword pairs) keywords)
@@ -1169,10 +1169,12 @@ rewriteCopyException pairs exception = case exception of
   -- at is the resolving one, which the projection already rewrote where it was
   -- read (rewriteTriggeredAbility).
   CopyException.GainThisAbility -> exception
+  -- A quoted ability is card text like any other, so its subtype words move.
+  CopyException.GainAbility granted -> CopyException.GainAbility (rewriteGrantedAbility pairs granted)
 
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.
-rewriteEntryRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+rewriteEntryRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewriteEntryRewrite pairs rewrite = case rewrite of
   -- The "which permanents" clause names a word, and so does CR 707.9a's gained
   -- ability -- a keyword, and a keyword may carry one (rewriteCopyException).

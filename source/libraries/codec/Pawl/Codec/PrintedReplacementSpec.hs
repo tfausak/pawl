@@ -24,7 +24,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
   -- The effect codec the card boundary would pass in (CR 615.5's riders ride
   -- the DamageR arm underneath).
-  let codec = PrintedReplacement.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
+  let codec = PrintedReplacement.codec Card.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
   -- CR 604.2's unconditional case, which is every producer in the pool but one.
   Spec.it s "MkPrintedReplacement, condition elided" $
     Common.assertCodec
