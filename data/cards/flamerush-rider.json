@@ -2,14 +2,14 @@
   "faces": [
     {
       "delayedAbilities": {
-        "return it": {
+        "exile the token": {
           "condition": {
             "type": "StepBegins",
             "value": {
               "phase": {
                 "type": "Combat",
                 "value": {
-                  "type": "DeclareAttackers"
+                  "type": "EndOfCombat"
                 }
               },
               "scope": {
@@ -28,18 +28,10 @@
                         "value": {
                           "ref": {
                             "type": "InSlot",
-                            "value": "exiled"
-                          },
-                          "riders": {
-                            "attacking": {
-                              "type": "Chosen"
-                            },
-                            "tapped": {
-                              "type": "Tapped"
-                            }
+                            "value": "token"
                           },
                           "zone": {
-                            "type": "Battlefield"
+                            "type": "Exile"
                           }
                         }
                       }
@@ -51,49 +43,29 @@
           }
         }
       },
-      "keywords": [
-        {
-          "type": "Landwalk",
-          "value": {
-            "type": "HasSubtype",
-            "value": {
-              "type": "Island"
-            }
-          }
-        }
-      ],
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
+          "value": 4
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Green"
-            }
-          }
-        },
-        {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
-              "type": "Green"
+              "type": "Red"
             }
           }
         }
       ],
-      "name": "Meandering Towershell",
+      "name": "Flamerush Rider",
       "power": {
         "type": "Literal",
-        "value": 5
+        "value": 3
       },
       "toughness": {
         "type": "Literal",
-        "value": 9
+        "value": 3
       },
       "triggeredAbilities": [
         {
@@ -110,30 +82,53 @@
                   {
                     "effects": [
                       {
-                        "type": "MoveToZone",
+                        "type": "CreateCopy",
                         "value": {
                           "ref": {
                             "type": "InSlot",
-                            "value": "self"
+                            "value": "target"
                           },
-                          "slot": "exiled",
-                          "zone": {
-                            "type": "Exile"
-                          }
+                          "riders": {
+                            "attacking": {
+                              "type": "Chosen"
+                            },
+                            "tapped": {
+                              "type": "Tapped"
+                            }
+                          },
+                          "slot": "token"
                         }
                       },
                       {
                         "type": "ArmDelayedTrigger",
                         "value": {
-                          "name": "return it",
-                          "onset": {
-                            "type": "FromYourNextTurn"
-                          }
+                          "name": "exile the token"
                         }
                       }
                     ]
                   }
-                ]
+                ],
+                "targetSlots": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsSource"
+                          }
+                        },
+                        {
+                          "type": "IsAttacking"
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
               }
             ]
           }
@@ -142,7 +137,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Turtle"
+            "type": "Human"
+          },
+          {
+            "type": "Warrior"
           }
         ],
         "types": [

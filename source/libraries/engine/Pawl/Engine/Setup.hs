@@ -1118,6 +1118,7 @@ applyCrossings finalSub parent =
                 (Object.chosenNames obj)
                 -- CR 508.1k, the sibling read of the same record.
                 (Game.isAttacking oid g)
+                (Game.attackTargetOf oid g)
                 (Game.isBlocking oid g)
                 -- CR 310.9a, read straight off the object like the owner above:
                 -- Nothing for everything that is not a battle.

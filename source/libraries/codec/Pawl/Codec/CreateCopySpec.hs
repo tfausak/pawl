@@ -8,10 +8,12 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TapState as TapState
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CreateCopy" $ do
@@ -22,14 +24,14 @@ spec s = Spec.describe s "Pawl.Codec.CreateCopy" $ do
     Common.assertCodec
       s
       (CreateCopy.codec Common.text)
-      (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue [])
+      (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue Nothing [])
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- Kicked Rite of Replication's five.
   Spec.it s "MkCreateCopy, a count above one: it is written" $
     Common.assertCodec
       s
       (CreateCopy.codec Common.text)
-      (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue [])
+      (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue Nothing [])
       " {\"quantity\":{\"type\":\"Literal\",\"value\":5},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- Littjara Mirrorlake's "except it enters with an additional +1/+1 counter on
   -- it": CR 122.6's rider on the copy opcode, elided above when it is CR 110.5b's
@@ -38,6 +40,14 @@ spec s = Spec.describe s "Pawl.Codec.CreateCopy" $ do
     Common.assertCodec
       s
       (CreateCopy.codec Common.text)
-      (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue {EntryRiders.counters = Map.singleton CounterKind.PlusOnePlusOne (Quantity.Literal 1)} [])
+      (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue {EntryRiders.counters = Map.singleton CounterKind.PlusOnePlusOne (Quantity.Literal 1)} Nothing [])
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"riders\":{\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]}} "
+  -- Flamerush Rider's "tapped and attacking", and the slot its delayed exile
+  -- names (CR 603.7c).
+  Spec.it s "MkCreateCopy, tapped and attacking, with a bound slot" $
+    Common.assertCodec
+      s
+      (CreateCopy.codec Common.text)
+      (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen} (Just (SlotName.MkSlotName (Text.pack "token"))) [])
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":{\"type\":\"Chosen\"}},\"slot\":\"token\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s (CreateCopy.codec Common.text)

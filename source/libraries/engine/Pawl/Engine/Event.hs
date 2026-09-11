@@ -4869,7 +4869,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- id moves before its host, and the live board has already
                         -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
                         -- in the same batch, ahead of its host" is the proof.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
                       }
               -- CR 712.21: "If a melded permanent leaves the battlefield, one
               -- permanent leaves the battlefield and two cards are put into the
@@ -6586,7 +6586,7 @@ forgetObject gs oid = case Game.lookupObject oid gs of
         cleared = Game.removeFromZones (Object.owner obj) oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown cleared)
           }
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i

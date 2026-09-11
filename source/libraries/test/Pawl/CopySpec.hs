@@ -17,7 +17,8 @@
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
 -- count buys, kicked Rite of Replication; CR 122.6's entry rider on it,
--- Littjara Mirrorlake; and CR 707.9b's exception riding it, Multiversal
+-- Littjara Mirrorlake; its tap and attack riders and its bound slot, Flamerush
+-- Rider; and CR 707.9b's exception riding it, Multiversal
 -- Recruitment's "except it isn't legendary" read by CR 704.5j; CR 702.128a's
 -- embalm and CR 702.129a's eternalize, whose colour, mana-cost, subtype and P/T
 -- exceptions a Clone of the token keeps -- graveyardTokenCopySpec) and its BecomeCopy arm (CR 707.4's
@@ -3363,3 +3364,29 @@ graveyardTokenCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             Spec.assertEqWith s "and has mana value 0" (PC.manaValue (Projection.project cloneId cloned)) (Just 0)
           Nothing -> Spec.assertFailure s "the Clone should be on the battlefield"
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+-- CR 707.2's token copy entering tapped and attacking (CR 110.5b, CR 508.4), and
+-- named later in the same resolution (CR 603.7c): Flamerush Rider, "Whenever this
+-- creature attacks, create a token that's a copy of another target attacking
+-- creature and that's tapped and attacking. Exile the token at end of combat."
+--
+-- Its dash is omitted, leaving pawl's card stricter than printed (#3498).
+--
+-- alice attacks bob with the 3/3 Rider and a 2/1 Goblin Piker; the trigger's one
+-- legal target is the Piker, so the token is a second 2/1 Piker.
+flamerushRiderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+flamerushRiderSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
+  Spec.it s "CR 508.4 Flamerush Rider's copy of the Piker enters tapped and attacking, deals damage, and is exiled at end of combat" $ do
+    rider <- S.printingOf s registry "Flamerush Rider"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = S.combatBoardOf [rider, piker] []
+        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        tokens = S.tokensOf atBlockers
+        after = S.runCombat S.aggressiveAnswer gs
+    Spec.assertEqWith
+      s
+      "CR 110.5b / CR 508.4 one Piker token, tapped and attacking bob"
+      (fmap (\oid -> (PC.names (Projection.project oid atBlockers), fmap Object.tapped (Game.lookupObject oid atBlockers), Map.lookup oid (Combat.Type.attackers (GameState.combat atBlockers)))) tokens)
+      [(Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just TapState.Tapped, Just (AttackTarget.OfPlayer S.bob))]
+    Spec.assertEqWith s "CR 510.1b bob takes 3 from the Rider, 2 from the Piker and 2 from its copy" (S.lifeOf S.bob after) (Just 13)
+    Spec.assertEqWith s "CR 603.7c the token named by the trigger is exiled at end of combat" (S.tokensOf after) []

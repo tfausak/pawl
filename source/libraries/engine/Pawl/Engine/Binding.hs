@@ -392,6 +392,17 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 sacrificedPermanent :: SlotName
 sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 
+-- CR 601.2h: the reserved slot under which the permanents a COST payment
+-- returned to hand are bound -- what CR 702.49c's "the creature that was
+-- returned to its owner's hand" names. sacrificedPermanent's route and its
+-- posture: the permanent is a new object in a hand by the time the ability
+-- resolves (CR 400.7), so every read is CR 608.2h's last known information.
+--
+-- Not a target, so the same CR 608.2b posture and the same "no card's
+-- targetSlots may name it" sweep as sacrificedPermanent above.
+returnedPermanent :: SlotName
+returnedPermanent = SlotName.MkSlotName (Text.pack "thatReturnedPermanent")
+
 -- CR 601.2f: the reserved slot under which the permanents a COST payment TAPPED
 -- are bound -- "the tapped creature" in Unerring Sling's "deals damage equal to
 -- the tapped creature's power". Stamped by Pawl.Engine.Activate off the payment

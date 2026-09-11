@@ -392,9 +392,11 @@ data Prompt r where
   -- where the candidates are indistinguishable in effect and, where
   -- Replacement.readsApplier, in CR 109.5's "you".
   ChooseReplacement :: Decider.Decider -> PlayerId.PlayerId -> [ReplacementEntry.ReplacementEntry] -> Prompt Natural.Natural
-  -- | CR 603.7c: which of several minted tokens a Create's slot binds for a
-  -- delayed trigger's "it"; reachable only through a replacement scaling the
-  -- count (CR 614.16), and a choice by CR 707.10e's analogue.
+  -- | CR 603.7c: which of several minted tokens a Create's or CreateCopy's slot
+  -- binds for a later "it".
+  --
+  -- Not implemented: binding every token minted, which the rulings on Doubling
+  -- Season and Flamerush Rider require, so that nothing is asked (#3185).
   ChooseBoundToken :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 701.21a: which of the payer's matching permanents are sacrificed to
   -- pay a cost, the Natural how many; asked only with more candidates than the

@@ -185,6 +185,7 @@ import qualified Pawl.Codec.EachCardInHandSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndTurnSignalSpec
 import qualified Pawl.Codec.EndingStepSpec
+import qualified Pawl.Codec.EntryAttackSpec
 import qualified Pawl.Codec.EntryFlipSpec
 import qualified Pawl.Codec.EntryOptionSpec
 import qualified Pawl.Codec.EntryRSpec
@@ -811,6 +812,7 @@ spec s registry = do
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndTurnSignalSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
+  Pawl.Codec.EntryAttackSpec.spec s
   Pawl.Codec.EntryFlipSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
   Pawl.Codec.EntryRSpec.spec s
@@ -1109,6 +1111,7 @@ spec s registry = do
   Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.zadaSpec s registry
   Pawl.CopySpec.graveyardTokenCopySpec s registry
+  Pawl.CopySpec.flamerushRiderSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry

@@ -16,6 +16,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Asked as Asked
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -331,6 +332,22 @@ removeFromCombat oid gs =
 -- must not answer it differently.
 isAttacking :: ObjectId -> GameState -> Bool
 isAttacking oid gs = Map.member oid (Combat.attackers (GameState.combat gs))
+
+-- CR 508.1b: what this creature is attacking. Nothing for a creature CR 506.4c
+-- has left attacking nothing, whose Combat.attackers entry stands but which "is
+-- not attacking any player, planeswalker, or battle" -- Combat.attackingNothing
+-- is the record of that.
+attackTargetOf :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
+attackTargetOf oid gs =
+  let c = GameState.combat gs
+   in if Set.member oid (Combat.attackingNothing c) then Nothing else Map.lookup oid (Combat.attackers c)
+
+-- attackTargetOf through CR 608.2h: for an object that has left, what it was
+-- attacking as it left (Pawl.Types.LastKnown.attacking).
+attackTargetWithLastKnown :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
+attackTargetWithLastKnown oid gs = case lookupObject oid gs of
+  Just _ -> attackTargetOf oid gs
+  Nothing -> LastKnown.attackTarget =<< Map.lookup oid (GameState.lastKnown gs)
 
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup.
