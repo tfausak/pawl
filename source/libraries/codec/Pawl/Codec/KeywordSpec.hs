@@ -1155,6 +1155,26 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Improvise
       " {\"type\":\"Improvise\"} "
+  -- CR 702.41a's [text] rides on the wire as a Filter, landwalk's shape: the
+  -- printed qualities run past card types (Frogmite's artifacts) to subtypes
+  -- ("affinity for Islands") and to conjunctions ("affinity for artifact
+  -- creatures"), so the criterion cannot flatten to a card type.
+  Spec.it s "Affinity carries its quality" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Affinity (Filter.HasCardType CardType.Artifact))
+      " {\"type\":\"Affinity\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Affinity (Filter.HasCardType CardType.Artifact)) /= Codec.encode Keyword.codec (Keyword.Affinity (Filter.HasSubtype Subtype.Island)))
+      "affinity for artifacts and affinity for Islands encode differently"
+  Spec.it s "Undaunted" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Undaunted
+      " {\"type\":\"Undaunted\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 

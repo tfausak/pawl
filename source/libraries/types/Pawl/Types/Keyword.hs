@@ -175,6 +175,11 @@ data Keyword
     -- you cast the spell, copy it for each other spell cast before it this turn;
     -- you may choose new targets for the copies.
     Storm
+  | -- | 702.41a: "affinity for [text]" -- this spell costs {1} less to cast for
+    -- each [text] you control. The Filter is the [text] alone; "you control" is
+    -- the rule's own and is written into the reduction
+    -- Pawl.Engine.Keyword.selfCostReductionsFor mints.
+    Affinity (Filter.Filter Keyword)
   | -- | 702.42a: you may choose all modes of this modal spell (CR 700.2) instead
     -- of the number specified, paying an additional cost if you do.
     Entwine (Cost.Cost Keyword)
@@ -407,6 +412,8 @@ data Keyword
     -- types." A deck-construction ability like Partner above, read by
     -- Pawl.Engine.Commander.designations.
     DoctorsCompanion
+  | -- | 702.125a: this spell costs {1} less to cast for each opponent you have.
+    Undaunted
   | -- | 702.126a: for each generic mana in this spell's total cost you may tap an
     -- untapped artifact you control rather than pay that mana. Convoke's
     -- neighbour above in every respect -- CR 702.126b places it where CR 702.51b

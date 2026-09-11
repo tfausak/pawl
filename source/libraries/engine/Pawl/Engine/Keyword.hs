@@ -49,6 +49,7 @@ import qualified Pawl.Types.CopyTargets as CopyTargets
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -373,6 +374,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Affinity _ -> []
+  Keyword.Undaunted -> []
 
 -- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
 -- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
@@ -537,6 +540,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Affinity _ -> []
+  Keyword.Undaunted -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
@@ -876,6 +881,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Affinity _ -> []
+  Keyword.Undaunted -> []
 
 -- CR 702.84a's whole ability, minted from the one cost the keyword carries, as
 -- four effects in one clause -- the return, the haste, the delayed exile and the
@@ -1264,6 +1271,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Affinity _ -> []
+  Keyword.Undaunted -> []
 
 -- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
@@ -1804,6 +1813,8 @@ permissionsFor cardTypes keyword = case keyword of
   -- Bestow's arm above and for its reason.
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Affinity _ -> []
+  Keyword.Undaunted -> []
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
@@ -1933,6 +1944,66 @@ bestowCosts keywords =
         Keyword.Bestow cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 601.2f: the reductions a spell's own KEYWORDS apply to its own cost, in
+-- ascending Set order -- the keyword-borne half of what Pawl.Types.CostReduction
+-- carries for a card that prints the sentence out (Thrasta, Tempest's Roar).
+-- Pawl.Engine.Cost.selfReductions folds these in beside Face.costReductions and
+-- evaluates each Quantity there, at CR 601.2f, which is what locks the count in.
+--
+-- Both arms are rule-702 sentences reduced to one shape -- {1} off once per thing
+-- counted -- so neither reaches a card's text for anything but affinity's
+-- [text]. Nothing here confines the reduction to coloured mana or floors it above
+-- {0}: CR 118.7a already keeps a generic reduction off the coloured component,
+-- and CR 601.2f's own {0} is the floor.
+--
+-- CR 702.41b and CR 702.125c make every instance apply. Face.keywords is a Set,
+-- so two affinities naming different qualities are two members and a repeated
+-- identical instance collapses to one -- the direction that leaves the spell
+-- dearer, and no printing carries a duplicate.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+selfCostReductionsOf :: Set Keyword -> [CostReduction.CostReduction]
+selfCostReductionsOf = concatMap selfCostReductionsFor . Set.toAscList
+
+-- CR 702.41a and CR 702.125a written out, each as the {1} and the count that
+-- rule states.
+selfCostReductionsFor :: Keyword -> [CostReduction.CostReduction]
+selfCostReductionsFor keyword = case keyword of
+  -- CR 702.41a's "for each [text] YOU CONTROL": the card carries the [text] and
+  -- the rule carries the control clause and the battlefield, so the Filter the
+  -- count runs is the conjunction. EachPlayer's battlefield and not yours,
+  -- because CR 108.3 indexes that zone by OWNER -- Filter.ControlledBy is the
+  -- control question.
+  Keyword.Affinity quality ->
+    [ oneLessPerEach
+        ( Count.MkCount
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+            (Filter.And [quality, Filter.ControlledBy PlayerRelation.You])
+            Aggregation.Members
+        )
+    ]
+  -- CR 702.125a's "for each opponent you have", over the PLAYERS rather than
+  -- their objects. CR 702.125b's departed seat needs nothing here:
+  -- Pawl.Engine.Count.playersFor folds through Game.stillPlaying already.
+  Keyword.Undaunted ->
+    [ oneLessPerEach
+        ( Count.MkCount
+            (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
+            (Filter.And [])
+            Aggregation.Members
+        )
+    ]
+  _ -> []
+
+-- "This spell costs {1} less to cast for each ..." -- the sentence rule 702.41a
+-- and rule 702.125a share, with the count filled in.
+oneLessPerEach :: Count.Count Quantity.Quantity -> CostReduction.CostReduction
+oneLessPerEach count =
+  CostReduction.MkCostReduction
+    { CostReduction.amount = ManaCost.MkManaCost [ManaSymbol.Generic 1],
+      CostReduction.perEach = Quantity.Count count
+    }
 
 -- CR 702.160a / CR 718.1: the PROTOTYPE inset frames -- the second mana cost,
 -- power and toughness a prototype card prints -- offered as an alternative cost
@@ -2703,6 +2774,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR DestructionRewrite.UmbraArmor)
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Affinity _ -> []
+  Keyword.Undaunted -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
@@ -2898,6 +2971,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Affinity _ -> []
+  Keyword.Undaunted -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
@@ -3126,6 +3201,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Affinity _ -> []
+  Keyword.Undaunted -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
 -- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
@@ -3303,6 +3380,8 @@ familyOf keyword = case keyword of
   Keyword.UmbraArmor -> Nothing
   Keyword.Convoke -> Nothing
   Keyword.Improvise -> Nothing
+  Keyword.Affinity _ -> Just KeywordFamily.Affinity
+  Keyword.Undaunted -> Nothing
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.
