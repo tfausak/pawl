@@ -449,6 +449,24 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (unearth 1)
       " {\"type\":\"Unearth\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (unearth 1) /= Codec.encode Keyword.codec (unearth 5)) "the cost is part of the encoding"
+  -- CR 702.128a's and CR 702.129a's payloads are a Cost, Unearth's shape.
+  Spec.it s "Embalm carries its cost" $ do
+    let embalm n = Keyword.Embalm (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (embalm 3)
+      " {\"type\":\"Embalm\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (embalm 3) /= Codec.encode Keyword.codec (embalm 4)) "the cost is part of the encoding"
+  Spec.it s "Eternalize carries its cost" $ do
+    let eternalize n = Keyword.Eternalize (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (eternalize 4)
+      " {\"type\":\"Eternalize\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (eternalize 4) /= Codec.encode Keyword.codec (eternalize 5)) "the cost is part of the encoding"
+    Spec.assertBool s (Codec.encode Keyword.codec (eternalize 4) /= Codec.encode Keyword.codec (Keyword.Embalm (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []))) "and the tag tells it from embalm"
   -- CR 702.87a's payload is a Cost, and the tag must not collide with the level
   -- COUNTER's -- CounterKind's "Level" and this keyword's "LevelUp" are two
   -- different wire tags for the two halves of rule 711.

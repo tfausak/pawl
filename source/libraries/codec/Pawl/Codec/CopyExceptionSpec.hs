@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
@@ -85,6 +86,20 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
       CopyException.codec
       CopyException.GainThisAbility
       " {\"type\":\"GainThisAbility\"} "
+
+  Spec.it s "SetColors round-trips, ascending by colour" $
+    Common.assertCodec
+      s
+      CopyException.codec
+      (CopyException.SetColors (Set.fromList [Color.Black, Color.White]))
+      " {\"type\":\"SetColors\",\"value\":[{\"type\":\"White\"},{\"type\":\"Black\"}]} "
+
+  Spec.it s "NoManaCost round-trips as a bare tag" $
+    Common.assertCodec
+      s
+      CopyException.codec
+      CopyException.NoManaCost
+      " {\"type\":\"NoManaCost\"} "
 
   Spec.it s "rejects a payload of the wrong length" $
     Spec.assertBool
