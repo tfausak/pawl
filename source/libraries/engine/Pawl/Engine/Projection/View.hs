@@ -256,7 +256,7 @@ viewOfCard face =
           Filter.manaSpentTags = Set.empty,
           -- CR 602.1 / 605.1a off the PRINTED face: the card's printed abilities
           -- plus rule 702's HAND ones (CR 702.29b, CR 702.77b) and GRAVEYARD ones
-          -- (CR 702.84a), not the battlefield ones, which are minted from the
+          -- (CR 702.84a, 702.128a, 702.129a), not the battlefield ones, which are minted from the
           -- post-layer keyword map.
           Filter.nonManaActivatedAbility =
             not
@@ -1405,9 +1405,9 @@ functionsFromZone zone sa =
 -- viewOfCharacteristics calls.
 --
 -- CR 702.29b and CR 702.77b are why handAbilitiesOf is in this list, and CR
--- 702.84a why graveyardAbilitiesOf is beside it: a cycling, reinforce or unearth
--- ability exists in every zone, so the object HAS it here; it just cannot be
--- activated here (CR 113.6m).
+-- 702.84a why graveyardAbilitiesOf is beside it: a cycling, reinforce, unearth,
+-- embalm or eternalize ability exists in every zone, so the object HAS it here;
+-- it just cannot be activated here (CR 113.6j, 113.6m).
 --
 -- CR 613.1: the gate's board comes in as a parameter. Taking fullView here would
 -- not terminate for a caller inside the fold -- it re-enters `gather`, with no

@@ -154,16 +154,18 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
     Nothing -> []
     Just face -> Keyword.handAbilitiesOf (Face.keywords face) <> zoneAbilitiesOf Zone.Hand oid gs
   -- The hand arm's shape one zone over, on TWO rules rather than one: rule 702's
-  -- MINTED graveyard abilities -- CR 702.84a's unearth is the only one today --
-  -- plus the card's own AUTHORED ones that name the graveyard, disjoint by the
-  -- same construction.
+  -- MINTED graveyard abilities (Pawl.Engine.Keyword.graveyardAbilitiesOf) plus
+  -- the card's own AUTHORED ones that name the graveyard, disjoint by the same
+  -- construction.
   --
-  -- The AUTHORED half is CR 113.6j's, as the hand arm is. The MINTED half is not:
-  -- rule 702.84a's cost is plain mana, payable on the battlefield as readily as
-  -- in a graveyard, so rule 113.6j reaches it nowhere. What puts it here is CR
-  -- 113.6b -- rule 702.84a states the zone its ability functions in -- together
-  -- with CR 113.6m, the reading zoneFunctionedFrom below actually implements off
-  -- the return's MoveToZone.origin. See Pawl.Engine.Keyword.unearth.
+  -- The AUTHORED half is CR 113.6j's, as the hand arm is. The MINTED half is CR
+  -- 113.6b's -- each rule states the zone its ability functions in -- and
+  -- enforced two ways. Rule 702.84a's cost is plain mana, payable on the
+  -- battlefield as readily as in a graveyard, so unearth leans on CR 113.6m, the
+  -- reading zoneFunctionedFrom below implements off the return's
+  -- MoveToZone.origin (Pawl.Engine.Keyword.unearth). Rules 702.128a's and
+  -- 702.129a's costs exile the card from a graveyard, which CR 113.6j confines
+  -- there on its own (Pawl.Engine.Keyword.graveyardTokenCopy).
   Just Zone.Graveyard -> Keyword.graveyardAbilitiesOf (maybe Set.empty Face.keywords (Game.faceOf oid gs)) <> zoneAbilitiesOf Zone.Graveyard oid gs
   -- CR 114.4 and CR 902.7's third limb, "its activated abilities may be
   -- activated". The narrowing to the objects rule 113.6p names is inside

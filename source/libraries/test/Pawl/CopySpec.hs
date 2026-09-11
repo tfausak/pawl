@@ -17,7 +17,9 @@
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
 -- count buys, kicked Rite of Replication; CR 122.6's entry rider on it,
 -- Littjara Mirrorlake; and CR 707.9b's exception riding it, Multiversal
--- Recruitment's "except it isn't legendary" read by CR 704.5j) and its BecomeCopy arm (CR 707.4's
+-- Recruitment's "except it isn't legendary" read by CR 704.5j; CR 702.128a's
+-- embalm and CR 702.129a's eternalize, whose colour, mana-cost, subtype and P/T
+-- exceptions a Clone of the token keeps -- graveyardTokenCopySpec) and its BecomeCopy arm (CR 707.4's
 -- change of a permanent already on the battlefield, and CR 707.9a's "except it
 -- has this ability" riding it -- Unstable Shapeshifter, which copies twice
 -- because of it, and whose token copy copies again because CR 707.9a put the
@@ -73,6 +75,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
@@ -102,6 +105,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
@@ -3161,3 +3165,127 @@ faceDownCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "CR 708.2 the listed 2/2, not the copied 1/5" (S.powerToughnessOf cloneId down) (Just (2, 2))
         Spec.assertEqWith s "CR 708.2 no name, not the copied one" (Projection.namesOf cloneId down) Set.empty
         Spec.assertEqWith s "CR 708.2 the listed subtype, not the copied Construct" (Projection.subtypesOf cloneId down) (Set.singleton Subtype.Cyberman)
+
+-- alice with one copy of `card` in her graveyard and `lands` untapped, holding
+-- priority in her main phase with an empty stack, so CR 602.5d's sorcery timing
+-- is met. `twins` more copies of `card` sit on her battlefield.
+graveyardCopyBoard :: Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId, [ObjectId], GameState.GameState)
+graveyardCopyBoard card land lands twins =
+  let add (ids, gs) _ = let (oid, gs') = S.addPermanent card S.alice gs in (ids <> [oid], gs')
+      (twinIds, withTwins) = List.foldl' add ([], S.landsInPlay land lands) [1 .. twins]
+      (gyId, withCard) = S.addGraveyardCard card S.alice withTwins
+   in ( gyId,
+        twinIds,
+        withCard
+          { GameState.priority = Just S.alice,
+            GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PostcombatMain
+          }
+      )
+
+-- Activate the one ability the graveyard card offers and resolve it. The roster
+-- is matched on exactly one ability, so a board that offered none or two comes
+-- back unchanged and fails the token match rather than passing elsewhere.
+activateFromGraveyard :: ObjectId -> GameState.GameState -> GameState.GameState
+activateFromGraveyard gyId gs = case Activate.abilitiesFor gyId gs of
+  [ability] -> S.runPure S.identityAnswer gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+  _ -> gs
+
+isActivationOf :: ObjectId -> A.Action -> Bool
+isActivationOf oid a = case a of
+  A.Activate o _ -> o == oid
+  _ -> False
+
+-- Is Doom Blade, sitting in alice's hand, castable? CR 601.2c: only with a legal
+-- target, and its one slot is "target nonblack creature".
+doomBladeOffered :: ObjectId -> GameState.GameState -> Bool
+doomBladeOffered bladeId gs =
+  any
+    ( \a -> case a of
+        A.Cast o _ _ -> o == bladeId
+        _ -> False
+    )
+    (Action.legalActions S.alice gs)
+
+-- CR 702.128a and CR 702.129a, Pawl.Engine.Keyword.graveyardTokenCopy: the card
+-- is exiled as a cost and a token copy of it is created with CR 707.9b's
+-- exceptions -- colour, no mana cost, Zombie, and eternalize's 4/4.
+--
+-- Tah-Crop Skirmisher {1}{U} Creature -- Snake Warrior 2/1, "Embalm {3}{U}", and
+-- Proven Combatant {U} Creature -- Human Warrior 1/1, "Eternalize {4}{U}{U}"
+-- (Oracle text checked against Scryfall): blue cards with a mana cost, so the
+-- white or black token with none differs on every excepted characteristic.
+--
+-- A Clone of each token is the copiable-values tripwire (CR 707.2 / 707.9b): it
+-- takes the exceptions with it, where a Clone of the printed card beside it on
+-- the same board is the control.
+graveyardTokenCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graveyardTokenCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
+  Spec.it s "CR 702.128a embalm exiles the card for a white Zombie token copy with no mana cost, and a Clone of it keeps all three" $ do
+    island <- S.printingOf s registry "Island"
+    skirmisher <- S.printingOf s registry "Tah-Crop Skirmisher"
+    clone <- S.printingOf s registry "Clone"
+    let (gyId, twinIds, board) = graveyardCopyBoard skirmisher island 8 1
+        embalmed = activateFromGraveyard gyId board
+        zombieSnakeWarrior = Set.fromList [Subtype.Snake, Subtype.Warrior, Subtype.Zombie]
+    Spec.assertBool s (any (isActivationOf gyId) (Action.legalActions S.alice board)) "embalm is offered from the graveyard"
+    -- CR 113.6j: the Skirmisher on the battlefield HAS the ability too, and the
+    -- same Islands would pay its mana, but its cost exiles a graveyard card.
+    Spec.assertBool s (not (any (\a -> any (`isActivationOf` a) twinIds) (Action.legalActions S.alice board))) "CR 113.6j but not from the battlefield"
+    -- CR 602.5d: the same board a step later, so only the timing differs.
+    Spec.assertBool
+      s
+      (not (any (isActivationOf gyId) (Action.legalActions S.alice (board {GameState.phase = Phase.Ending EndingStep.EndStep}))))
+      "CR 602.5d but not in the end step"
+    case (tokensOnBattlefield embalmed, twinIds) of
+      ([tokenId], [twinId]) -> do
+        Spec.assertEqWith s "CR 707.9b the token is white, not the card's blue" (Projection.colorsOf tokenId embalmed) (Set.singleton Color.White)
+        Spec.assertEqWith s "CR 202.3a with no mana cost its mana value is 0" (PC.manaValue (Projection.project tokenId embalmed)) (Just 0)
+        Spec.assertEqWith s "and it has no mana cost" (PC.manaCost (Projection.project tokenId embalmed)) Nothing
+        Spec.assertEqWith s "CR 205.1b a Zombie in addition to its other types" (Projection.subtypesOf tokenId embalmed) zombieSnakeWarrior
+        Spec.assertEqWith s "CR 707.2 otherwise the card: its 2/1" (S.powerToughnessOf tokenId embalmed) (Just (2, 1))
+        Spec.assertEqWith s "the card was exiled to pay the cost" (length (Game.zoneMembers Zone.Exile S.alice embalmed)) 1
+        Spec.assertEqWith s "and left the graveyard" (Game.zoneMembers Zone.Graveyard S.alice embalmed) []
+        let cloned = castAndResolve (copyNamed tokenId) clone embalmed
+            control = castAndResolve (copyNamed twinId) clone embalmed
+        case (cloneOnBattlefield cloned, cloneOnBattlefield control) of
+          (Just cloneId, Just controlId) -> do
+            Spec.assertEqWith s "CR 707.9b a Clone of the token is white" (Projection.colorsOf cloneId cloned) (Set.singleton Color.White)
+            Spec.assertEqWith s "CR 707.9b with mana value 0" (PC.manaValue (Projection.project cloneId cloned)) (Just 0)
+            Spec.assertEqWith s "CR 707.9b and a Zombie" (Projection.subtypesOf cloneId cloned) zombieSnakeWarrior
+            Spec.assertEqWith s "where a Clone of the card is blue" (Projection.colorsOf controlId control) (Set.singleton Color.Blue)
+            Spec.assertEqWith s "with mana value 2" (PC.manaValue (Projection.project controlId control)) (Just 2)
+            Spec.assertEqWith s "and no Zombie" (Projection.subtypesOf controlId control) (Set.fromList [Subtype.Snake, Subtype.Warrior])
+          _ -> Spec.assertFailure s "both Clones should be on the battlefield"
+      (tokens, _) -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- Doom Blade is the gameplay reader for colour: "Destroy target nonblack
+  -- creature" has a target only while something on the board is not black. The
+  -- two boards differ in one Proven Combatant on the battlefield, which is what
+  -- makes the negative mean the tokens are black rather than that the Blade is
+  -- uncastable.
+  Spec.it s "CR 702.129a eternalize makes a black 4/4 Zombie token copy, and neither it nor a Clone of it is a Doom Blade target" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    combatant <- S.printingOf s registry "Proven Combatant"
+    clone <- S.printingOf s registry "Clone"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let (gyId, _, board) = graveyardCopyBoard combatant island 10 0
+        eternalized = activateFromGraveyard gyId board
+    case tokensOnBattlefield eternalized of
+      [tokenId] -> do
+        let cloned = castAndResolve (copyNamed tokenId) clone eternalized
+            (withBlade, bladeId) = S.handOne doomBlade (S.landsFor swamp S.alice 2 cloned)
+            (_, withTwin) = S.addPermanent combatant S.alice withBlade
+        -- THE GAMEPLAY ASSERTIONS, ahead of every characteristic read.
+        Spec.assertBool s (not (doomBladeOffered bladeId withBlade)) "CR 707.9b the token and its Clone are black, so Doom Blade has no target"
+        Spec.assertBool s (doomBladeOffered bladeId withTwin) "where a Proven Combatant beside them is a target"
+        Spec.assertEqWith s "CR 707.9b the token is 4/4, not 1/1" (S.powerToughnessOf tokenId eternalized) (Just (4, 4))
+        Spec.assertEqWith s "CR 202.3a with mana value 0" (PC.manaValue (Projection.project tokenId eternalized)) (Just 0)
+        Spec.assertEqWith s "CR 205.1b and a Zombie Human Warrior" (Projection.subtypesOf tokenId eternalized) (Set.fromList [Subtype.Human, Subtype.Warrior, Subtype.Zombie])
+        case cloneOnBattlefield cloned of
+          Just cloneId -> do
+            Spec.assertEqWith s "CR 707.9b a Clone of the token is 4/4 too" (S.powerToughnessOf cloneId cloned) (Just (4, 4))
+            Spec.assertEqWith s "and has mana value 0" (PC.manaValue (Projection.project cloneId cloned)) (Just 0)
+          Nothing -> Spec.assertFailure s "the Clone should be on the battlefield"
+      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))

@@ -43,6 +43,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CopyException as CopyException
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -52,6 +53,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
+import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
@@ -133,6 +135,7 @@ import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -240,6 +243,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Flanking -> List.genericReplicate count flanking
   Keyword.Exalted -> List.genericReplicate count exalted
   Keyword.Unearth _ -> []
+  Keyword.Embalm _ -> []
+  Keyword.Eternalize _ -> []
   Keyword.Melee -> List.genericReplicate count melee
   Keyword.Mentor -> List.genericReplicate count mentor
   Keyword.Afterlife n -> List.genericReplicate count (afterlife n)
@@ -450,9 +455,12 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Wither -> []
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
-  -- CR 702.84a functions in a GRAVEYARD, so graveyardAbilitiesFor below is the
-  -- roster that mints it and this hand one grants nothing.
+  -- CR 702.84a, 702.128a and 702.129a function in a GRAVEYARD, so
+  -- graveyardAbilitiesFor below is the roster that mints them and this hand one
+  -- grants nothing.
   Keyword.Unearth _ -> []
+  Keyword.Embalm _ -> []
+  Keyword.Eternalize _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -707,23 +715,22 @@ ninjutsu cost =
         }
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card in a GRAVEYARD,
--- handAbilitiesOf's sibling one zone over. Today CR 702.84a's unearth is the only
--- one.
+-- handAbilitiesOf's sibling one zone over: CR 702.84a's unearth, CR 702.128a's
+-- embalm and CR 702.129a's eternalize.
 --
 -- PRINTED keywords, as handAbilitiesOf takes them and for the same reason: the
 -- projection does not reach a graveyard card (#1859; see
 -- Pawl.Engine.Projection.projectGiven), and Pawl.Engine.Activate's graveyard arm
 -- is what calls this.
 --
--- MEMBERSHIP and not a count: rule 702.84a's ability returns the one card, so a
+-- MEMBERSHIP and not a count: each of these abilities moves the one card, so a
 -- second instance has nothing left to do once the first has resolved.
 graveyardAbilitiesOf :: Set Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 graveyardAbilitiesOf = concatMap graveyardAbilitiesFor . Set.toAscList
 
 -- Exhaustive for the reason handAbilitiesFor is: the next keyword that functions
--- from a graveyard -- CR 702.97a's scavenge and CR 702.128a's embalm are the
--- ones the pool will reach first -- must break this build rather than silently
--- produce nothing.
+-- from a graveyard -- CR 702.97a's scavenge is the one the pool will reach
+-- first -- must break this build rather than silently produce nothing.
 graveyardAbilitiesFor :: Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Cycling _ -> []
@@ -795,6 +802,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
   Keyword.Unearth cost -> [unearth cost]
+  Keyword.Embalm cost -> [embalm cost]
+  Keyword.Eternalize cost -> [eternalize cost]
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -995,6 +1004,78 @@ unearthExile =
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
+-- CR 702.128a: embalm's token copy is white, has no mana cost, and is a Zombie
+-- in addition to its other types.
+embalm :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+embalm =
+  graveyardTokenCopy
+    [ CopyException.SetColors (Set.singleton Color.White),
+      CopyException.NoManaCost,
+      CopyException.AddSubtypes (Set.singleton Subtype.Zombie)
+    ]
+
+-- CR 702.129a: eternalize's is black and 4/4 as well, in the rule's order.
+eternalize :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+eternalize =
+  graveyardTokenCopy
+    [ CopyException.SetColors (Set.singleton Color.Black),
+      CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 4 4),
+      CopyException.NoManaCost,
+      CopyException.AddSubtypes (Set.singleton Subtype.Zombie)
+    ]
+
+-- The ability CR 702.128a and CR 702.129a share: "[Cost], Exile this card from
+-- your graveyard: Create a token that's a copy of this card, except ...
+-- Activate only as a sorcery."
+--
+-- THE EXILE is a cost component appended to the keyword's own cost, so it is
+-- paid on activation (CR 602.2b / 601.2h), and it is what confines the ability
+-- to a graveyard: CR 113.6j, enforced by Pawl.Engine.Cost.canPayComponent.
+--
+-- THE COPY names Binding.triggerSource, the graveyard card. That card is gone by
+-- resolution (CR 400.7), so CreateCopy reads its copiable values (CR 707.2)
+-- through CR 608.2h's last known information.
+--
+-- THE EXCEPTIONS ride the CreateCopy, so CR 707.9b writes them into the
+-- token's copiable values and a copy of the token inherits them, which
+-- Pawl.CopySpec's graveyardTokenCopySpec proves with a Clone.
+graveyardTokenCopy :: [CopyException.CopyException] -> Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+graveyardTokenCopy exceptions cost =
+  let copied =
+        Effect.CreateCopy
+          CreateCopy.MkCreateCopy
+            { CreateCopy.quantity = CreateCopy.defaultQuantity,
+              CreateCopy.ref = ObjectRef.InSlot Binding.triggerSource,
+              CreateCopy.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = False,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              CreateCopy.exceptions = exceptions
+            }
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ExileThisFromGraveyard]},
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton copied))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          -- CR 602.5d, the rules' "Activate only as a sorcery".
+          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          -- Nothing on every keyword-minted ability, unearth's reason.
+          ActivatedAbility.name = Nothing,
+          -- Written by `mintedBy` at the roster, unearth's reason.
+          ActivatedAbility.keyword = Nothing
+        }
+
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
 -- sibling one zone over.
 --
@@ -1092,6 +1173,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
   Keyword.Unearth _ -> []
+  Keyword.Embalm _ -> []
+  Keyword.Eternalize _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -1597,6 +1680,9 @@ permissionsFor cardTypes keyword = case keyword of
   -- RETURNS the card to the battlefield, it never casts it. Cycling's reading
   -- above, one zone over.
   Keyword.Unearth _ -> []
+  -- CR 702.128a and 702.129a likewise: the card is exiled and a token created.
+  Keyword.Embalm _ -> []
+  Keyword.Eternalize _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -2410,6 +2496,8 @@ mintedReplacementsFor keyword count = case keyword of
   -- RESOLUTION rather than standing on the card, so they are effects inside
   -- `unearth` above and not rows here.
   Keyword.Unearth _ -> []
+  Keyword.Embalm _ -> []
+  Keyword.Eternalize _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -2629,6 +2717,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
   Keyword.Unearth _ -> []
+  Keyword.Embalm _ -> []
+  Keyword.Eternalize _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -2852,6 +2942,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
   Keyword.Unearth _ -> []
+  Keyword.Embalm _ -> []
+  Keyword.Eternalize _ -> []
   Keyword.Mentor -> []
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
@@ -3015,6 +3107,8 @@ familyOf keyword = case keyword of
   Keyword.Devour _ -> Just KeywordFamily.Devour
   Keyword.Exalted -> Nothing
   Keyword.Unearth _ -> Just KeywordFamily.Unearth
+  Keyword.Embalm _ -> Just KeywordFamily.Embalm
+  Keyword.Eternalize _ -> Just KeywordFamily.Eternalize
   Keyword.Mentor -> Nothing
   Keyword.Afterlife _ -> Just KeywordFamily.Afterlife
   Keyword.Provoke -> Nothing

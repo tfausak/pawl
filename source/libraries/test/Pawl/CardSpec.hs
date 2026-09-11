@@ -2757,6 +2757,8 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.107a's payload is a COST, and a cost's Filters are its components'.
   Keyword.LevelUp cost -> costFilters cost
   Keyword.Unearth cost -> costFilters cost
+  Keyword.Embalm cost -> costFilters cost
+  Keyword.Eternalize cost -> costFilters cost
   Keyword.Outlast cost -> costFilters cost
   -- CR 702.108a names no quality either: the "+1/+1" and the noncreature-spell
   -- condition are written into the ability Pawl.Engine.Keyword mints, not into
@@ -3927,8 +3929,8 @@ playerEffectFilters playerEffect = case playerEffect of
 
 -- CR 707.9's "except ..." clauses. Only the GainKeywords arm reaches a Filter,
 -- and only through the keyword it names; CR 707.9b's other arms name a pair of
--- literals, a name, and sets over the parts of CR 205.1's type line, none of
--- which narrows anything.
+-- literals, a name, colours, the absence of a mana cost, and sets over the parts
+-- of CR 205.1's type line, none of which narrows anything.
 copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 copyExceptionFilters exception = case exception of
   CopyException.SetPowerToughness _ -> []
@@ -3938,6 +3940,8 @@ copyExceptionFilters exception = case exception of
   CopyException.AddSupertypes _ -> []
   CopyException.RemoveSupertypes _ -> []
   CopyException.SetName _ -> []
+  CopyException.SetColors _ -> []
+  CopyException.NoManaCost -> []
   -- CR 707.9a's "this ability" carries no payload, so nothing to narrow. The
   -- ability it points at is the resolving one, which this walk reaches where the
   -- card prints it.

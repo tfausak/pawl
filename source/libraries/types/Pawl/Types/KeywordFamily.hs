@@ -124,6 +124,10 @@ data KeywordFamily
     -- with unearth" names, as against unearth {B}; no card in the pool asks yet,
     -- and it is owed at the keyword rather than at the first asker.
     Unearth
+  | -- | CR 702.128a: embalm [cost].
+    Embalm
+  | -- | CR 702.129a: eternalize [cost].
+    Eternalize
   | -- | CR 702.86a: annihilator N.
     Annihilator
   | -- | CR 702.87a: level up [cost]. The family a card writing "a creature with
