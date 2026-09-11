@@ -588,6 +588,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Explore (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"Explore\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- Raffine's Informant's "it connives", against the trigger-source slot.
+  Spec.it s "Connive" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Connive (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      " {\"type\":\"Connive\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}} "
   Spec.it s "Mill" $
     Common.assertJsonCodec
       s

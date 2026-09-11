@@ -4105,6 +4105,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- permanent that has left (CR 701.44c).
     ordered <- forEachOrder resolving id (objectRefRecipients legal resolving controller source gs ref)
     Monad.mapM_ exploreOne (Maybe.mapMaybe Recipient.objectOf ordered)
+  Effect.Connive ref -> do
+    gs <- State.get
+    -- Explore's sweep and order, CR 701.50c stating CR 701.44d's rule over again,
+    -- its seats read through last known information by CR 701.50b.
+    ordered <- forEachOrder resolving id (objectRefRecipients legal resolving controller source gs ref)
+    Monad.mapM_ conniveOne (Maybe.mapMaybe Recipient.objectOf ordered)
   -- The card names the set, so CR 701.9b's default choice -- the discarding
   -- player's -- does not arise and the discarding player is not prompted. Named
   -- ONCE as this instruction is reached (CR 608.2c) and then fixed (CR 608.2f),
@@ -7623,3 +7629,37 @@ exploreOne oid = do
       -- id nobody ever controlled explores nothing; but not inside the library
       -- case, that rule firing even when the actions were impossible.
       State.modify' (Event.recordEvent (GameEvent.Explored oid))
+
+-- CR 701.50a: one permanent's connive.
+--
+-- The controller comes from last known information (CR 701.50b), so a permanent
+-- gone before the instruction resolves still connives: its controller draws and
+-- discards, and the counter lands on nothing -- the id is gone (CR 400.7), so
+-- putCounters places none.
+--
+-- "Nonland" is asked of each card the discard funnel MINTED, through its CR 613
+-- projection, exploreOne's reading: the hand incarnation is gone by then, and a
+-- double-faced card in a graveyard has only its front face's characteristics
+-- (CR 712.8a).
+conniveOne :: ObjectId -> Game ()
+conniveOne oid = do
+  gs <- State.get
+  Monad.forM_ (Projection.controllerWithLastKnown oid gs) $ \pid -> do
+    Event.drawCard pid
+    drawn <- State.get
+    let held = Game.zoneMembers Zone.Hand pid drawn
+    chosen <- case held of
+      -- An empty hand discards nothing, and one card leaves nothing to choose.
+      [] -> pure []
+      [sole] -> pure [sole]
+      first : _ -> do
+        -- CR 701.9b: the discarding player chooses. Filtered, and completed with
+        -- the first card, Effect.Discard's posture.
+        answer <- Game.choose (Prompt.ChooseDiscard (Decide.deciderFor pid drawn) pid held 1)
+        pure (take 1 (filter (\c -> List.elem c held) answer <> [first]))
+    moved <- fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary pid) chosen)
+    after <- State.get
+    let nonland c = not (Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject c after)))
+    -- CR 122.6 through the one counter funnel, as exploreOne's grow.
+    Monad.when (any nonland moved) $
+      Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne 1)

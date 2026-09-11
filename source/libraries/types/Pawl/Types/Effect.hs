@@ -239,6 +239,12 @@ data Effect card ability
   | -- | CR 701.44a: the permanents the ObjectRef names each explore, ordered
     -- across seats by CR 701.44d.
     Explore ObjectRef.ObjectRef
+  | -- | CR 701.50a: the permanents the ObjectRef names each connive, ordered
+    -- across seats by CR 701.50c.
+    --
+    -- Not implemented: CR 701.50d's connive N (#3637) and the CR 701.50f event
+    -- a "whenever ... connives" trigger reads (#3638).
+    Connive ObjectRef.ObjectRef
   | -- | CR 701.9: the slot's target player discards this many, choosing which
     -- (CR 701.9b); a hand smaller than the count discards all of it (CR 609.3).
     Discard Discard.Discard

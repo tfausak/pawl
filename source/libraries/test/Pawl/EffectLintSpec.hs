@@ -249,6 +249,7 @@ ownQuantities effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.Explore {} -> []
+  Effect.Connive {} -> []
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> [quantity]
     Discard.These {} -> []
@@ -1180,6 +1181,7 @@ effectObjectRefs effect =
         Effect.Surveil {} -> []
         Effect.Fateseal {} -> []
         Effect.Explore ref -> read_ [ref]
+        Effect.Connive ref -> read_ [ref]
         Effect.Discard subject -> case subject of
           Discard.Counted {} -> []
           Discard.These ref -> [(AsksDiscardArm, ref)]
