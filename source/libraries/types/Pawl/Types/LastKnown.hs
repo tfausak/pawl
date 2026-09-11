@@ -17,7 +17,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Eleven things rather than the characteristics alone, because the other ten
+-- Twelve things rather than the characteristics alone, because the other eleven
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -31,11 +31,11 @@ import qualified Pawl.Types.Source as Source
 -- names "what an Aura enchants" as an example of what is not one. Nor are the
 -- CHOSEN NAMES, the sixth, for the reason its own field gives. Nor is the
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
--- its own field gives. Nor is either half of the COMBAT STATUS, the eighth and
--- ninth, for the reason their own fields give. Nor is the PROTECTOR, the tenth,
--- for the reason its own field gives.
+-- its own field gives. Nor is the COMBAT STATUS, the eighth through tenth, for
+-- the reason their own fields give. Nor is the PROTECTOR, the eleventh, for the
+-- reason its own field gives.
 --
--- All eleven fields STRICT (!): entries are keyed by an id that no longer exists
+-- All twelve fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -123,10 +123,9 @@ data LastKnown = MkLastKnown
     -- changes nothing the projection folds. So it sits beside them for
     -- `controller`'s reason.
     chosenNames :: !(Set.Set CardName.CardName),
-    -- | CR 508.1k: what it was attacking as it left -- its Combat.attackers
-    -- entry, whose presence is the membership Pawl.Engine.Filter.View's
-    -- `attacking` reports through the one lookup Game.attackTargetOf, read off
-    -- GameState.combat before the object ceased.
+    -- | CR 508.1k: was it attacking as it left -- the same membership
+    -- Pawl.Engine.Filter.View's `attacking` reports, through the one classifier
+    -- Game.isAttacking, read off GameState.combat before the object ceased.
     --
     -- Not a characteristic either (CR 109.3's list has no combat status), and not
     -- recoverable from anything above, for `blocking`'s reason turned to the other
@@ -136,14 +135,16 @@ data LastKnown = MkLastKnown
     -- English "if" gating one clause (CR 608.2c) rather than CR 603.4's
     -- intervening one.
     --
-    -- The TARGET and not a Bool because CR 702.49c asks it of a creature ninjutsu
-    -- has returned to hand: the ninja attacks "the same player, planeswalker, or
-    -- battle as the creature that was returned". The entry CR 506.4c keeps for a
-    -- creature attacking nothing is recorded as it stands, which is what a later
-    -- CR 508.4 arrival would be sent at. The three Filter.View fields that follow
-    -- the lookup to the ATTACKED permanent (Filter.attackingPlayer,
-    -- attackingPlaneswalkerController, attackingBattleProtector) still read live.
-    attacking :: !(Maybe AttackTarget.AttackTarget),
+    -- A Bool, the whole of what Filter.attacking reports; what it was attacking
+    -- is `attackTarget` below, because CR 506.4c separates the two.
+    attacking :: !Bool,
+    -- | CR 702.49c: WHAT it was attacking as it left, through Game.attackTargetOf
+    -- -- the question ninjutsu asks of the creature it returned to hand. Nothing
+    -- when it was not attacking, and Nothing when it was attacking nothing: CR
+    -- 506.4c's creature "is not attacking any player, planeswalker, or battle",
+    -- which Combat.attackingNothing records. Pawl.BattleSpec's Ninja returning a
+    -- Piker whose Siege was stolen is the proof.
+    attackTarget :: !(Maybe AttackTarget.AttackTarget),
     -- | CR 509.1g: was it blocking as it left -- the same membership
     -- Pawl.Engine.Filter.View's `blocking` reports, read off GameState.combat
     -- before the object ceased.

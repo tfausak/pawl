@@ -328,9 +328,14 @@ bindMinted controller source resolving mSlot quantity minted = case (mSlot, name
   -- One token is the whole candidate list, so there is nothing to ask.
   (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
   -- CR 614.16 got there first: a replacement multiplied the count, so
-  -- several tokens stand where CR 603.7c's "it" names one. CR 707.10e
-  -- is the codified analogue, so this asks. FILTERED, NOT TRUSTED: an
-  -- answer naming something not minted falls back to the first.
+  -- several tokens stand where the card's "it" names one, and this asks which.
+  -- FILTERED, NOT TRUSTED: an answer naming something not minted falls back to
+  -- the first.
+  --
+  -- Not implemented: binding every token minted, which is what the rulings
+  -- say -- Flamerush Rider under Doubling Season exiles each of its tokens, and
+  -- Doubling Season's own rulings say the same of a create-with-rider card
+  -- (#3185).
   (Just slot, False, first : second : rest) -> do
     gs1 <- State.get
     let candidates = first NonEmpty.:| (second : rest)

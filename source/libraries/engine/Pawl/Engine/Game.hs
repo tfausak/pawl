@@ -327,23 +327,27 @@ removeFromCombat oid gs =
 -- the declaration keys by ATTACKER -- the line isBlocking below is careful not to
 -- be.
 --
--- The ONE lookup, attackTargetOf below, for isBlocking's reason:
--- Pawl.Engine.Projection's live Filter.attacking and the CR 608.2h record
--- Pawl.Types.LastKnown.attacking keeps must not answer it differently.
+-- The ONE lookup, for isBlocking's reason: Pawl.Engine.Projection's live
+-- Filter.attacking and the CR 608.2h record Pawl.Types.LastKnown.attacking keeps
+-- must not answer it differently.
 isAttacking :: ObjectId -> GameState -> Bool
-isAttacking oid gs = Maybe.isJust (attackTargetOf oid gs)
+isAttacking oid gs = Map.member oid (Combat.attackers (GameState.combat gs))
 
--- CR 508.1b: what this creature is attacking, as Combat.attackers records it --
--- which CR 506.4c leaves standing for a creature attacking nothing.
+-- CR 508.1b: what this creature is attacking. Nothing for a creature CR 506.4c
+-- has left attacking nothing, whose Combat.attackers entry stands but which "is
+-- not attacking any player, planeswalker, or battle" -- Combat.attackingNothing
+-- is the record of that.
 attackTargetOf :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
-attackTargetOf oid gs = Map.lookup oid (Combat.attackers (GameState.combat gs))
+attackTargetOf oid gs =
+  let c = GameState.combat gs
+   in if Set.member oid (Combat.attackingNothing c) then Nothing else Map.lookup oid (Combat.attackers c)
 
 -- attackTargetOf through CR 608.2h: for an object that has left, what it was
 -- attacking as it left (Pawl.Types.LastKnown.attacking).
 attackTargetWithLastKnown :: ObjectId -> GameState -> Maybe AttackTarget.AttackTarget
 attackTargetWithLastKnown oid gs = case lookupObject oid gs of
   Just _ -> attackTargetOf oid gs
-  Nothing -> LastKnown.attacking =<< Map.lookup oid (GameState.lastKnown gs)
+  Nothing -> LastKnown.attackTarget =<< Map.lookup oid (GameState.lastKnown gs)
 
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup.
