@@ -6411,9 +6411,13 @@ meldable victims gs = do
 -- fixes this stamp's timestamp at the merge, so what the flip may reach is
 -- decided here or nowhere.
 --
+-- CR 730.2i's double-faced components are stamped as a THIRD reading, both
+-- sides read again through Projection.copiableCharacteristicsTurned, which
+-- Game.turnFaceOver swaps in when the merged permanent transforms -- for the
+-- flipped reading's reason.
+--
 -- Not implemented: CR 730.2g's instant or sorcery component, which cannot be
--- turned face up (#3392); CR 730.2i's double-faced component, which transforms
--- in place (#3428).
+-- turned face up (#3392).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
@@ -6449,6 +6453,8 @@ merge sid target side = do
               MutateSide.Under -> Projection.withMergedAbilities ofSpell ofHost
             resulting = fold spellPc hostPc
             resultingFlipped = fold spellFlippedPc hostFlippedPc
+            -- CR 730.2i's reading: each double-faced component turned over.
+            resultingTurned = fold (Projection.copiableCharacteristicsTurned sid gs) (Projection.copiableCharacteristicsTurned target gs)
         State.modify' (`forgetObject` sid)
         State.modify'
           ( \g ->
@@ -6459,7 +6465,7 @@ merge sid target side = do
                           o
                             { Object.source = Source.OfMerge merged,
                               Object.facing = facing,
-                              Object.bindings = Binding.setMergeCopy resulting resultingFlipped (Object.bindings o)
+                              Object.bindings = Binding.setMergeCopy resulting resultingFlipped resultingTurned (Object.bindings o)
                             }
                       )
                       target
