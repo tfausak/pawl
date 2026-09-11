@@ -176,7 +176,7 @@ riders :: EntryRiders.EntryRiders Natural
 riders =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = TapState.Untapped,
-      EntryRiders.attacking = False,
+      EntryRiders.attacking = Nothing,
       EntryRiders.blocking = Nothing,
       EntryRiders.transformed = False,
       EntryRiders.counters = Map.empty,

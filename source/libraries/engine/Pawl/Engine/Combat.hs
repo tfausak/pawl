@@ -1893,15 +1893,13 @@ attemptAttackDeclaration perform pid rejected = do
 -- which Hanweir Garrison's and Meandering Towershell's rulings both require;
 -- elided at one candidate.
 --
--- Not implemented: the effects rule 508.4 parenthesizes, which specify what the
--- entering creature attacks and so should not reach this prompt at all. CR
--- 702.49c is one -- a ninja arriving through ninjutsu attacks whatever the
--- returned creature was attacking -- and Ninja of the Deep Hours is it in the
--- pool; its controller is asked here instead (#3019). Identical on a board with
--- one thing to attack, which is the board Pawl.ActivateSpec's Ninjutsu group
--- runs on.
-putOntoBattlefieldAttacking :: ObjectId -> Game ()
-putOntoBattlefieldAttacking oid = do
+-- `specified` is rule 508.4's parenthetical: an effect that says what the
+-- creature attacks (CR 702.49c) asks nobody. A specified target outside the
+-- candidates is CR 508.4a's no-op, the candidates being exactly the players,
+-- planeswalkers and battles that rule still allows. Pawl.ActivateSpec's
+-- Ninjutsu group proves a ninja takes the returned creature's planeswalker.
+putOntoBattlefieldAttacking :: Maybe AttackTarget.AttackTarget -> ObjectId -> Game ()
+putOntoBattlefieldAttacking specified oid = do
   gs <- State.get
   let c = GameState.combat gs
       -- declarableTargets with CR 506.3c / CR 508.4a's liveness filter applied
@@ -1923,46 +1921,45 @@ putOntoBattlefieldAttacking oid = do
           -- CR 508.4's chooser is the creature's controller, whom the guard above
           -- makes the attacking player -- which is what lets CR 508.1b's
           -- announcement and this one share a prompt.
-          target <- announceAttackTarget controller oid options
-          State.put
-            gs
-              { GameState.combat =
-                  c
-                    { Combat.attackers = Map.insert oid target (Combat.attackers c),
-                      -- CR 506.4's comparand: this is where the creature joins
-                      -- combat.
-                      Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c),
-                      -- CR 802.2a's third sentence, declareAttackers' write on
-                      -- the CR 508.4 road: this is where THIS creature joins
-                      -- combat, so this is the seat rule 802.2a remembers for
-                      -- it, whatever seat an earlier attacker recorded for the
-                      -- same permanent.
-                      Combat.attackedUnder =
-                        Maybe.maybe
-                          (Combat.attackedUnder c)
-                          (\seat -> Map.insert oid seat (Combat.attackedUnder c))
-                          (Defender.playerOf Projection.controllerWithLastKnown target gs),
-                      -- CR 506.4's controller clause for a battle, on the CR
-                      -- 508.4 road: THIS creature joins combat now, so the seat
-                      -- it compares against is who controls the battle now --
-                      -- whatever seat an earlier attacker recorded for it.
-                      --
-                      -- Not implemented: a board that drives rule 506.4's removal
-                      -- down this road, the ordering it needs being beyond a pure
-                      -- answerer; only a record assertion covers this write
-                      -- (#2986).
-                      Combat.attackedControlledBy =
-                        Maybe.maybe
-                          (Combat.attackedControlledBy c)
-                          (\seat -> Map.insert oid seat (Combat.attackedControlledBy c))
-                          (attackedBattleController target gs),
-                      -- CR 508.8's SECOND clause, written inside the guards rather
-                      -- than in Resolve's Create arm: CR 506.3a-c and CR 508.4a
-                      -- each let the permanent enter without ever becoming an
-                      -- attacking creature.
-                      Combat.attacked = Set.insert target (Combat.attacked c)
-                    }
-              }
+          mTarget <- case specified of
+            Nothing -> fmap Just (announceAttackTarget controller oid options)
+            Just target -> pure (if List.elem target (NonEmpty.toList options) then Just target else Nothing)
+          Monad.forM_ mTarget $ \target ->
+            State.put
+              gs
+                { GameState.combat =
+                    c
+                      { Combat.attackers = Map.insert oid target (Combat.attackers c),
+                        -- CR 506.4's comparand: this is where the creature joins
+                        -- combat.
+                        Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c),
+                        -- CR 802.2a's third sentence, declareAttackers' write on
+                        -- the CR 508.4 road: this is where THIS creature joins
+                        -- combat, so this is the seat rule 802.2a remembers for
+                        -- it, whatever seat an earlier attacker recorded for the
+                        -- same permanent.
+                        Combat.attackedUnder =
+                          Maybe.maybe
+                            (Combat.attackedUnder c)
+                            (\seat -> Map.insert oid seat (Combat.attackedUnder c))
+                            (Defender.playerOf Projection.controllerWithLastKnown target gs),
+                        -- CR 506.4's controller clause for a battle, on the CR
+                        -- 508.4 road: THIS creature joins combat now, so the seat
+                        -- it compares against is who controls the battle now --
+                        -- whatever seat an earlier attacker recorded for it.
+                        -- Pawl.BattleSpec's Ninja against Word of Seizing proves it.
+                        Combat.attackedControlledBy =
+                          Maybe.maybe
+                            (Combat.attackedControlledBy c)
+                            (\seat -> Map.insert oid seat (Combat.attackedControlledBy c))
+                            (attackedBattleController target gs),
+                        -- CR 508.8's SECOND clause, written inside the guards rather
+                        -- than in Resolve's Create arm: CR 506.3a-c and CR 508.4a
+                        -- each let the permanent enter without ever becoming an
+                        -- attacking creature.
+                        Combat.attacked = Set.insert target (Combat.attacked c)
+                      }
+                }
     _ -> pure ()
 
 -- CR 509.4: a creature put onto the battlefield blocking. The ATTACKER is a

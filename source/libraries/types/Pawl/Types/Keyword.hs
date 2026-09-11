@@ -204,10 +204,6 @@ data Keyword
     -- duration, so a second one would only reveal an already revealed card.
     -- Pawl.Engine.Activate.revealIfHidden is where it happens.
     --
-    -- Not implemented: CR 702.49c's rider, under which the arriving creature
-    -- attacks whatever the returned creature was attacking; the entering
-    -- creature's controller is asked instead (#3019).
-    --
     -- Not implemented: CR 702.49d's commander ninjutsu, which also functions
     -- from the command zone (#3436).
     Ninjutsu (Cost.Cost Keyword)

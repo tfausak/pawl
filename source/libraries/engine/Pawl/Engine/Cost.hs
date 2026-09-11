@@ -3998,9 +3998,9 @@ payComponent moment slots pid oid component = case component of
   -- ReturnThis' call and for its reason, with CR 400.3 making the bare Zone.Hand
   -- the printed "its owner's".
   --
-  -- Binds NO slot, unlike the two arms above: no card in `data/cards/` reads
-  -- what its own cost returned, and a returned permanent is a new object (CR
-  -- 400.7) that last known information would have to answer for.
+  -- Binds Binding.returnedPermanent, the ids as they were BEFORE the move: CR
+  -- 702.49c's ninja reads what the returned creature was attacking, which CR
+  -- 608.2h's last known information answers off the old id (CR 400.7).
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> do
     gs <- State.get
     let candidates = returnCandidates slots pid oid criterion gs
@@ -4012,7 +4012,7 @@ payComponent moment slots pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (\returned -> Event.changeZone returned Zone.Hand) (Set.toAscList chosen)
-        pure bindsNothing
+        pure (Payment.Paid (Map.singleton Binding.returnedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
   -- Elided only when forced -- as many MATCHING cards in hand as the count, which

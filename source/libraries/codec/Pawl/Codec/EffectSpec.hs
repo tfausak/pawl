@@ -65,6 +65,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -423,7 +424,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     let slot = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
         bound = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))
         boundSlot = SlotName.MkSlotName (Text.pack "exiled")
-        attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
+        attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
     Common.assertJsonCodec
       s
       toJson
@@ -441,13 +442,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone (MoveToZone.MkMoveToZone bound Zone.Battlefield attacking Nothing Nothing LibraryPlacement.defaultValue Nothing))
-      " {\"type\":\"MoveToZone\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true}}} "
+      " {\"type\":\"MoveToZone\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":{\"type\":\"Chosen\"}}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.MoveToZone (MoveToZone.MkMoveToZone bound Zone.Battlefield attacking (Just boundSlot) Nothing LibraryPlacement.defaultValue Nothing))
-      " {\"type\":\"MoveToZone\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true},\"slot\":\"exiled\"}} "
+      " {\"type\":\"MoveToZone\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":{\"type\":\"Chosen\"}},\"slot\":\"exiled\"}} "
     -- CR 113.6m's origin zone alone, the shape a card states when its effect
     -- moves its own source out of a named zone with nothing else to say.
     Common.assertJsonCodec
@@ -463,7 +464,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone (MoveToZone.MkMoveToZone slot Zone.Battlefield attacking Nothing (Just Zone.Graveyard) LibraryPlacement.defaultValue Nothing))
-      " {\"type\":\"MoveToZone\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true},\"origin\":{\"type\":\"Graveyard\"}}} "
+      " {\"type\":\"MoveToZone\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":{\"type\":\"Chosen\"}},\"origin\":{\"type\":\"Graveyard\"}}} "
     -- All four extras at once, so the encoder's order is pinned and the reader
     -- is shown to need none of it. The origin zone and the library position sit
     -- next to each other here, which is the pair only their disjoint tags tell
@@ -473,7 +474,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone (MoveToZone.MkMoveToZone slot Zone.Battlefield attacking (Just boundSlot) (Just Zone.Exile) (LibraryPlacement.Stated LibraryPosition.Top) Nothing))
-      " {\"type\":\"MoveToZone\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true},\"slot\":\"exiled\",\"origin\":{\"type\":\"Exile\"},\"placement\":{\"type\":\"Stated\",\"value\":{\"type\":\"Top\"}}}} "
+      " {\"type\":\"MoveToZone\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":{\"type\":\"Chosen\"}},\"slot\":\"exiled\",\"origin\":{\"type\":\"Exile\"},\"placement\":{\"type\":\"Stated\",\"value\":{\"type\":\"Top\"}}}} "
     -- Griptide's shape: a library destination with the end it arrives at, and
     -- nothing else. The position is the only extra, so this is what proves it is
     -- not read positionally as the riders.
@@ -687,7 +688,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
   -- were once the middle two of four emitted forms, told apart at decode by JSON
   -- TYPE.
   Spec.it s "Create round-trips every combination of its three elided keys" $ do
-    let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
+    let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = Just EntryAttack.Chosen, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
         plain = EntryRiders.defaultValue
         slot = SlotName.MkSlotName (Text.pack "token")
         card = Text.pack "Goblin Piker"
@@ -709,13 +710,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.Create (Create.MkCreate (Quantity.Literal 2) card attacking Nothing you))
-      " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":2},\"card\":\"Goblin Piker\",\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true}}} "
+      " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":2},\"card\":\"Goblin Piker\",\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":{\"type\":\"Chosen\"}}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.Create (Create.MkCreate (Quantity.Literal 1) card attacking (Just slot) you))
-      " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Goblin Piker\",\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true},\"slot\":\"token\"}} "
+      " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Goblin Piker\",\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":{\"type\":\"Chosen\"}},\"slot\":\"token\"}} "
     -- CR 111.2's creator, the one key of the three that is not a card's own
     -- name: Rampage of the Clans writes the controller of the permanent the
     -- loop around it bound.
@@ -749,13 +750,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue []))
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue Nothing []))
       " {\"type\":\"CreateCopy\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) EntryRiders.defaultValue []))
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) EntryRiders.defaultValue Nothing []))
       " {\"type\":\"CreateCopy\",\"value\":{\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}}}}} "
   -- Kicked Rite of Replication's five. Before #1305 this was a second payload
   -- SHAPE told apart by length; it is now the same shape with the defaulted key
@@ -765,7 +766,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue []))
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue Nothing []))
       " {\"type\":\"CreateCopy\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":5},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   -- Twincast's second sentence and Zada, Hedron Grinder's, against CR 707.10
   -- alone. The three fixtures differ in exactly the key that carries the

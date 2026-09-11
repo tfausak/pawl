@@ -261,7 +261,7 @@ ownQuantities effect = case effect of
   Effect.DecreaseSpeed d -> [SpeedDecrease.quantity d]
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> [quantity]
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> quantity : Resolve.riderQuantities riders
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
   Effect.BecomeCopy {} -> []
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> [quantity]
   Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
@@ -1186,7 +1186,7 @@ effectObjectRefs effect =
         -- a time. CreateEmblem answers the same way for CR 114.2's emblem.
         Effect.Create {} -> []
         Effect.Conjure {} -> []
-        Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _) -> read_ [ref]
+        Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> read_ [ref]
         Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _) -> read_ (ref : copyTargetsRefs targets)
         Effect.Replace {} -> []
@@ -1736,6 +1736,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- binding for one token and ASKING where CR 614.16 multiplied the
           -- count.
           Effect.Create (Create.MkCreate quantity _ _ mSlot _)
+            | Resolve.namesEveryToken quantity ->
+                Maybe.maybeToList mSlot
+          -- Create's arm and Create's test: Resolve.bindMinted binds both.
+          Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ _ mSlot _)
             | Resolve.namesEveryToken quantity ->
                 Maybe.maybeToList mSlot
           _ -> []
@@ -2387,36 +2391,37 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any (anyFace (any entersFaceDown . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
     Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- Effect.CreateCopy carries the SAME EntryRiders record Create and MoveToZone
-  -- do, but Pawl.Engine.Resolve's arm reads only CR 122.6's `counters` -- what
-  -- Littjara Mirrorlake's "except it enters with an additional +1/+1 counter on
-  -- it" says. This is the fence for every other field, and ONE lint rather than a
-  -- CreateCopy arm added to each above: the lints above each fence one field
-  -- across the opcodes that carry it, where here every field but one is unread,
-  -- so a card setting any of them would say something nothing performs.
+  -- do, but Pawl.Engine.Resolve's arm reads only CR 122.6's `counters`, CR
+  -- 110.5b's `tapped` and CR 508.4's `attacking` -- Littjara Mirrorlake's
+  -- counter and Flamerush Rider's "tapped and attacking". This is the fence for
+  -- every other field, and ONE lint rather than a CreateCopy arm added to each
+  -- above, so a card setting any of them would say something nothing performs.
   --
   -- Why each is unread rather than merely unwired. `underOwner` is inert by CR
   -- 111.2, which makes the creating player a token's owner anyway. `transformed`
   -- and `faceDown` are inert for the reason the two lints above give: a token is
   -- not a card (CR 111.1), and CR 707.8a decides a copy token's face by copy rules.
   -- `exiledFaceDown` is inert because a token is created onto the battlefield and
-  -- CR 111.7 would end one anywhere else. `tapped`, `attacking` and `blocking`
-  -- are the three a printing could really write, and none is implemented (gap
-  -- #2302).
-  Spec.it s "no CreateCopy carries an entry rider but CR 122.6's counters" $ do
+  -- CR 111.7 would end one anywhere else.
+  --
+  -- Not implemented: CR 509.4's `blocking` on a copy token, Mirror Match's
+  -- "a token that's a copy of that creature and that's blocking that creature"
+  -- (#3621).
+  Spec.it s "no CreateCopy carries an entry rider but counters, tapped and attacking" $ do
     ps <- S.allPrintings s
-    let bare riders = riders == EntryRiders.defaultValue {EntryRiders.counters = EntryRiders.counters riders}
+    let bare riders = riders == EntryRiders.defaultValue {EntryRiders.counters = EntryRiders.counters riders, EntryRiders.tapped = EntryRiders.tapped riders, EntryRiders.attacking = EntryRiders.attacking riders}
         offends effect = case effect of
-          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders _) -> not (bare riders)
+          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders _ _) -> not (bare riders)
           _ -> False
         counters effect = case effect of
-          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders _) -> not (Map.null (EntryRiders.counters riders))
+          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders _ _) -> not (Map.null (EntryRiders.counters riders))
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no copy token carrying a rider at all
     -- this would pass whatever the arm read. Littjara Mirrorlake is the card that
     -- prints one.
     Spec.assertBool s (any (anyFace (any counters . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a copy token with counters on it"
-    Spec.assertEqWith s "a copy token reads only CR 122.6's counters" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "a copy token reads only counters, tapped and attacking" (fmap (S.nameOf . Printing.card) offenders) []
   -- The lint this used to be held that no printing authored a WithCounters
   -- turn-up rewrite, which is what Pawl.Engine.Replacement.applies rested on when
   -- it gated that whole rewrite CLASS on CR 702.37b's "if its megamorph cost was

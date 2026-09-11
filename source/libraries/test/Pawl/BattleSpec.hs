@@ -86,6 +86,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
@@ -675,19 +676,71 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     Spec.assertBool s (Set.member piker (Combat.Type.attackingNothing (GameState.combat byCarol))) "CR 506.4c: the Piker is attacking nothing"
     Spec.assertEqWith s "CR 802.2: both opponents defend" (Combat.Type.defenders (GameState.combat byCarol)) [S.bob, S.carol]
     Spec.assertEqWith s "CR 802.2a's third sentence: carol is the recorded seat" (Map.lookup piker (Combat.Type.attackedUnder (GameState.combat byCarol))) (Just S.carol)
+  Spec.it s "CR 506.4 whole cards: a Ninja put onto the battlefield attacking the Siege is removed when bob steals it" $ do
+    -- The Word of Seizing pair above, down CR 508.4's road: alice's Piker is
+    -- declared at the Siege, ninjutsu returns it, and the Ninja enters attacking
+    -- the Siege (CR 702.49c) before bob steals it in the declare blockers step.
+    -- Ninjutsu is an activation rather than a trigger, so the arrival lands
+    -- between the declaration and the theft without ordering either on a stack.
+    (gs, battle, mine, theirs, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker", "Island", "Island"] (replicate 5 "Mountain") []
+    ninja <- S.printingOf s registry "Ninja of the Deep Hours"
+    let (ninjaId, withNinja) = S.addHandCard ninja S.alice gs
+    (board, spell) <- seizing s registry S.bob withNinja
+    let declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackTheBattle battle) board {GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.DeclareAttackers)}
+        ready = declared {GameState.priority = Just S.alice}
+    case (Activate.abilitiesFor ninjaId ready, theirs) of
+      ([ability], land : _) -> do
+        let activated = S.runPure S.identityAnswer ready (Activate.activateAbility S.alice ninjaId ability)
+            arrived = S.runPure S.identityAnswer activated Stack.resolveTop
+            leg victim = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (seizeAnswer battle spell victim) arrived
+            stolen = leg battle
+            elsewhere = leg land
+            ninjas = Set.toList (Set.difference (GameState.battlefield arrived) (GameState.battlefield activated))
+        -- GAMEPLAY FIRST: the Ninja is a 2/2 and the Siege prints defense 5.
+        Spec.assertEqWith s "CR 510.1b: a Siege removed from combat is assigned no combat damage" (S.counterOf CounterKind.Defense battle stolen) 5
+        Spec.assertEqWith s "the twin, one target apart: the Siege bob never took is dealt the Ninja's 2" (S.counterOf CounterKind.Defense battle elsewhere) 3
+        Spec.assertEqWith s "CR 702.49c the Ninja entered attacking the Siege" (fmap (\oid -> Map.lookup oid (Combat.Type.attackers (GameState.combat arrived))) ninjas) [Just (AttackTarget.OfBattle battle)]
+        Spec.assertBool s (not (any (`S.onBattlefield` arrived) (take 1 mine))) "and the Piker went home to pay for it"
+      _ -> Spec.assertFailure s "fixture should offer one ninjutsu ability and give bob five Mountains"
+  Spec.it s "CR 506.4c whole cards: a Ninja returning a Piker whose Siege was stolen attacks nothing" $ do
+    -- The board above in the other order: bob steals the Siege in the declare
+    -- blockers step, which leaves the Piker attacking nothing (CR 506.4c), and
+    -- only then does alice ninjutsu it. The Ninja attacks what the Piker was
+    -- attacking (CR 702.49c), which is nothing -- though carol still protects
+    -- the Siege, so it would pass CR 508.4a's check if the Piker's stale entry
+    -- were read.
+    (gs, battle, mine, theirs, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker", "Island", "Island"] (replicate 5 "Mountain") []
+    ninja <- S.printingOf s registry "Ninja of the Deep Hours"
+    let (ninjaId, withNinja) = S.addHandCard ninja S.alice gs
+    (board, spell) <- seizing s registry S.bob withNinja
+    let declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackTheBattle battle) board {GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.DeclareAttackers)}
+        seized victim = (S.runToStep (Phase.Combat CombatStep.CombatDamage) (seizeAnswer battle spell victim) declared) {GameState.priority = Just S.alice}
+        leg victim =
+          let before = seized victim
+           in case Activate.abilitiesFor ninjaId before of
+                [ability] ->
+                  let activated = S.runPure S.identityAnswer before (Activate.activateAbility S.alice ninjaId ability)
+                      arrived = S.runPure S.identityAnswer activated Stack.resolveTop
+                      ninjas = Set.toList (Set.difference (GameState.battlefield arrived) (GameState.battlefield activated))
+                   in Just (fmap (\oid -> Map.lookup oid (Combat.Type.attackers (GameState.combat arrived))) ninjas, S.runToStep (Phase.Combat CombatStep.EndOfCombat) (attackTheBattle battle) arrived)
+                _ -> Nothing
+    case (leg battle, theirs, mine) of
+      (Just (stolenNinja, stolen), land : _, piker : _) -> do
+        -- GAMEPLAY FIRST: the Ninja is a 2/2 and the Siege prints defense 5.
+        Spec.assertEqWith s "CR 506.4c the Ninja attacks what the Piker was attacking, which is nothing" stolenNinja [Nothing]
+        Spec.assertEqWith s "CR 510.1b so the stolen Siege is dealt no combat damage" (S.counterOf CounterKind.Defense battle stolen) 5
+        Spec.assertEqWith s "the twin, one target apart: the Ninja attacks the Siege bob never took" (fmap fst (leg land)) (Just [Just (AttackTarget.OfBattle battle)])
+        Spec.assertBool s (Set.member piker (Combat.Type.attackingNothing (GameState.combat (seized battle)))) "CR 506.4c: the Piker was attacking nothing when it was returned"
+      _ -> Spec.assertFailure s "fixture should offer one ninjutsu ability and give bob five Mountains"
   Spec.it s "CR 508.4 the other road into combat records the same two seats" $ do
     -- CR 506.4's comparand is written by both writers of `attackers`, and a
     -- creature put onto the battlefield attacking never went through CR 508.1b.
-    -- Read off the RECORD and not off a board: that road's producers are attack
-    -- triggers (Hanweir Garrison, Hero of Bladehold), so the creature arrives
-    -- while a trigger resolves, and a pure answerer cannot order that against the
-    -- instant that would then move the battle (see the vacuity traps in
-    -- docs/agents/implementing.md). The pair above is where the record is proved
-    -- to matter; this case is what keeps the second writer from going dead.
+    -- Read off the RECORD here; the Ninja pair above is where this road's record
+    -- is proved to matter.
     (gs, battle, mine, _, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker"] [] []
     case mine of
       [arrival] -> do
-        let after = S.runPure (attackTheBattle battle) gs (Combat.putOntoBattlefieldAttacking arrival)
+        let after = S.runPure (attackTheBattle battle) gs (Combat.putOntoBattlefieldAttacking Nothing arrival)
             combat = GameState.combat after
         Spec.assertEqWith s "it is attacking the Siege" (Map.lookup arrival (Combat.Type.attackers combat)) (Just (AttackTarget.OfBattle battle))
         -- The two records hold DIFFERENT seats, which is the whole reason there

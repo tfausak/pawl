@@ -85,6 +85,7 @@ import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
@@ -145,6 +146,7 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -308,6 +310,39 @@ declaredDelayedAbility source name gs =
               (Game.cardsOfWithLastKnown source gs)
           )
    in onFace <|> onCard
+
+-- CR 603.7c: bind the tokens a Create or a CreateCopy minted under the slot the
+-- effect names, so a later effect of this resolution or a delayed ability it
+-- arms can name them.
+bindMinted :: PlayerId -> ObjectId -> ObjectId -> Maybe SlotName -> Quantity.Type.Quantity -> [ObjectId] -> Game ()
+bindMinted controller source resolving mSlot quantity minted = case (mSlot, namesEveryToken quantity, minted) of
+  (Nothing, _, _) -> pure ()
+  -- Nothing was minted, so no slot names anything: an unevaluable or
+  -- non-positive count, a creator reference naming nobody (CR 101.3), a
+  -- creator who has left the game (CR 800.4b), or CR 111.5's prohibited
+  -- token, which createTokens refuses to mint at all.
+  (Just _, _, []) -> pure ()
+  -- The card says "those tokens", so the slot holds EVERY token this
+  -- effect minted (CR 111.1) and there is nothing to ask.
+  (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
+  -- One token is the whole candidate list, so there is nothing to ask.
+  (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
+  -- CR 614.16 got there first: a replacement multiplied the count, so
+  -- several tokens stand where the card's "it" names one, and this asks which.
+  -- FILTERED, NOT TRUSTED: an answer naming something not minted falls back to
+  -- the first.
+  --
+  -- Not implemented: binding every token minted, which is what the rulings
+  -- say -- Flamerush Rider under Doubling Season exiles each of its tokens, and
+  -- Doubling Season's own rulings say the same of a create-with-rider card
+  -- (#3185).
+  (Just slot, False, first : second : rest) -> do
+    gs1 <- State.get
+    let candidates = first NonEmpty.:| (second : rest)
+        decider = Decide.deciderFor controller gs1
+    answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
+    let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
+    State.modify' (bindSlot resolving slot named)
 
 -- Does a Create's slot name EVERY token it minted rather than one particular one
 -- (CR 603.7c's "it")? CR 111 gives the opcode no way to carry the word, and the
@@ -801,6 +836,20 @@ slotOne :: SlotName -> ObjectId -> GameState -> Maybe ObjectId
 slotOne slot resolving gs = do
   obj <- Game.lookupObject resolving gs
   Recipient.objectOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+
+-- CR 508.4: what an entry rider says the arriving creature attacks. Nothing: it
+-- does not enter attacking. Just Nothing: its controller chooses, which
+-- Combat.putOntoBattlefieldAttacking asks. Just (Just target): the effect
+-- specified it (CR 702.49c), read through CR 608.2h for a slot whose object has
+-- left (ninjutsu's returned creature, CR 400.7). A slot naming no creature that
+-- was attacking specifies nothing to attack, so nothing enters attacking.
+entryAttack :: ObjectId -> EntryRiders.EntryRiders count -> GameState -> Maybe (Maybe AttackTarget.AttackTarget)
+entryAttack resolving entry gs = case EntryRiders.attacking entry of
+  Nothing -> Nothing
+  Just EntryAttack.Chosen -> Just Nothing
+  Just (EntryAttack.SameAs slot) -> do
+    named <- slotOne slot resolving gs
+    fmap Just (Game.attackTargetWithLastKnown named gs)
 
 -- CR 608.2g: make the offer Effect.OfferCast carries, and cast if it is taken.
 --
@@ -3168,7 +3217,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- member of a batch entering the battlefield. A card whose ZoneChangeR
         -- watched the battlefield and could match a member of such a batch would
         -- separate them.
-        moveOne mBlocked frozen before (sofar, acc) (target, position) = do
+        moveOne mAttack mBlocked frozen before (sofar, acc) (target, position) = do
           mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position frozen (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
           -- 603.7c). Nothing entered, so there is nothing to bind.
@@ -3176,8 +3225,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- CR 508.4, via Pawl.Engine.Combat -- which is also what keeps this
             -- from looking like a declaration, so CR 508.3a's attack triggers see
             -- nothing. CR 506.3b refuses a controller who is not the active
-            -- player, which the funnel above has already settled.
-            Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
+            -- player, which the funnel above has already settled. What it
+            -- attacks was read ONCE ahead of this fold (see mAttack below).
+            Monad.forM_ mAttack (\specified -> Combat.putOntoBattlefieldAttacking specified newId)
             -- CR 509.4, the blocking twin one rule over, through the same
             -- Pawl.Engine.Combat function the Create arm hands its tokens to, so
             -- CR 506.3e and CR 509.4a's two no-op conditions are decided in one
@@ -3499,6 +3549,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 pure $ case named of
                   [attacker] -> Just attacker
                   _ -> Nothing
+            -- CR 508.4's rider, read ONCE off the same pre-move board for
+            -- mBlocked's reason.
+            let mAttack = entryAttack resolving entry before
             -- ONE event, which is what Event.simultaneously stamps on everything the
             -- fold records: CR 608.2f processes an action taken on multiple objects
             -- simultaneously, and one opcode is one such action however many objects
@@ -3540,8 +3593,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 then fmap concat . Monad.forM arrivals $ \arrival -> do
                   now <- State.get
                   let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
-                  fmap (reverse . snd) (Event.simultaneously (moveOne mBlocked riders now (Set.empty, []) arrival))
-                else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals))
+                  fmap (reverse . snd) (Event.simultaneously (moveOne mAttack mBlocked riders now (Set.empty, []) arrival))
+                else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
             Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
@@ -4395,6 +4448,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         pure $ case named of
           [attacker] -> Just attacker
           _ -> Nothing
+    -- CR 508.4's rider, read ONCE ahead of the minting loop for mBlocked's
+    -- reason.
+    let mAttack = entryAttack resolving entry gs
     -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
     -- seat's tokens cannot change how many the next seat gets.
     minted <- fmap concat . Monad.forM creators $ \creating ->
@@ -4412,7 +4468,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- defending player chosen in Pawl.Engine.Combat, and CR 508.3a's
               -- attack triggers see nothing. After the entry loops rather than
               -- inside them: CR 614.16's replacement settles the COUNT first.
-              Monad.when (EntryRiders.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking made)
+              Monad.forM_ mAttack (\specified -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking specified) made)
               -- CR 509.4, the blocking twin one rule over, and in the same place
               -- for the same reason: CR 614.16's replacement settles the COUNT
               -- first, and CR 506.3e / CR 509.4a's no-op conditions live in
@@ -4420,31 +4476,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\made2 -> Combat.putOntoBattlefieldBlocking made2 attacker) made)
               pure made
         _ -> pure []
-    case (mSlot, namesEveryToken quantity, minted) of
-      (Nothing, _, _) -> pure ()
-      -- Nothing was minted, so no slot names anything: an unevaluable or
-      -- non-positive count, a creator reference naming nobody (CR 101.3), a
-      -- creator who has left the game (CR 800.4b), or CR 111.5's prohibited
-      -- token, which createTokens refuses to mint at all.
-      (Just _, _, []) -> pure ()
-      -- The card says "those tokens", so the slot holds EVERY token this
-      -- Create minted (CR 111.1) and there is nothing to ask.
-      (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
-      -- CR 603.7c: bind the minted token so a delayed ability this same
-      -- resolution arms can name it. One token is the whole candidate
-      -- list, so there is nothing to ask.
-      (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
-      -- CR 614.16 got there first: a replacement multiplied the count, so
-      -- several tokens stand where CR 603.7c's "it" names one. CR 707.10e
-      -- is the codified analogue, so this asks. FILTERED, NOT TRUSTED: an
-      -- answer naming something not minted falls back to the first.
-      (Just slot, False, first : second : rest) -> do
-        gs1 <- State.get
-        let candidates = first NonEmpty.:| (second : rest)
-            decider = Decide.deciderFor controller gs1
-        answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
-        let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
-        State.modify' (bindSlot resolving slot named)
+    bindMinted controller source resolving mSlot quantity minted
   -- Alchemy's conjure keyword action. Digital-only, so there is no rule to cite;
   -- what the CR settles is that the result is a CARD and not CR 111.1's token,
   -- which is what Pawl.Engine.Event's conjure and conjureOntoBattlefield mint.
@@ -4494,7 +4526,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- under, which conjureOntoBattlefield stamps.
             ConjureDestination.Battlefield -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n))
       _ -> pure ()
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry exceptions) -> do
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry mSlot exceptions) -> do
     gs <- State.get
     -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the
     -- same CR 111.2 funnel, carrying the copied permanent's COPIABLE values
@@ -4511,12 +4543,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 608.2h: the counters the copies enter with, settled ONCE off the
         -- pre-effect board, outside the loop over named permanents below.
         frozen = freezeRiders viewOf context gs resolving source entry
+        -- CR 508.4's rider, read ONCE off the pre-effect board for Create's
+        -- reason.
+        mAttack = entryAttack resolving entry gs
     -- The count is Create's, read the same way and off the same `gs` (CR 707.1).
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+    minted <- case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
-            Monad.forM_ sources $ \src ->
-              Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
+            fmap concat . Monad.forM sources $ \src ->
+              fmap concat . Monad.forM (Maybe.maybeToList (Game.cardOfWithLastKnown src gs)) $ \card -> do
                 -- CR 707.2 copies no counters, so what the token arrives with
                 -- is what the EFFECT said and nothing the original carried --
                 -- Littjara Mirrorlake's "except it enters with an additional
@@ -4524,9 +4559,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- argument, CR 122.6's door, so CR 614.16's replacements see
                 -- them; Create's arm one case up hands over the same value.
                 --
-                -- Untapped rather than the rider's tap state: only `counters` is
-                -- read here, and Pawl.CardSpec lints that no CreateCopy in the
-                -- pool sets any other rider (gap #2302).
+                -- CR 110.5b's tap state rides through the same funnel, Create's
+                -- road; Pawl.EffectLintSpec lints that no CreateCopy in the pool
+                -- sets a rider this arm does not read.
                 --
                 -- ONE call per named permanent, with the whole count: CR 614.12's
                 -- entry loop is handed the batch, so the copies enter
@@ -4538,8 +4573,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- 707.9b) -- Multiversal Recruitment's "except it isn't
                 -- legendary". "This ability" is the resolving object's, read the
                 -- way the BecomeCopy arm below reads it.
-                Monad.void (Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
-      _ -> pure ()
+                made <- Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen)
+                -- CR 508.4, after the entry loop for Create's reason.
+                Monad.forM_ mAttack (\specified -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking specified) made)
+                pure made
+      _ -> pure []
+    bindMinted controller source resolving mSlot quantity minted
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef exceptions) ->
     State.modify' $ \gs ->
       -- CR 707.1: each named subject becomes a copy of the named original, in

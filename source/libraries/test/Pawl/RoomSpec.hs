@@ -202,7 +202,7 @@ roomPermanent gs =
 -- for: CR 110.5b's untapped and face up, no CR 508.1 attacking entry, and CR
 -- 712.14's untransformed default.
 plainEntry :: EntryRiders.EntryRiders Natural
-plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
+plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
 
 -- The second Room's two doors, and the burn spell the CR 707.2a case below reads
 -- its replacement effect through.

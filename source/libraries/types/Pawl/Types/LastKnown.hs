@@ -3,6 +3,7 @@ module Pawl.Types.LastKnown where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
@@ -16,7 +17,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Eleven things rather than the characteristics alone, because the other ten
+-- Twelve things rather than the characteristics alone, because the other eleven
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -30,11 +31,11 @@ import qualified Pawl.Types.Source as Source
 -- names "what an Aura enchants" as an example of what is not one. Nor are the
 -- CHOSEN NAMES, the sixth, for the reason its own field gives. Nor is the
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
--- its own field gives. Nor is either half of the COMBAT STATUS, the eighth and
--- ninth, for the reason their own fields give. Nor is the PROTECTOR, the tenth,
--- for the reason its own field gives.
+-- its own field gives. Nor is the COMBAT STATUS, the eighth through tenth, for
+-- the reason their own fields give. Nor is the PROTECTOR, the eleventh, for the
+-- reason its own field gives.
 --
--- All eleven fields STRICT (!): entries are keyed by an id that no longer exists
+-- All twelve fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -134,18 +135,16 @@ data LastKnown = MkLastKnown
     -- English "if" gating one clause (CR 608.2c) rather than CR 603.4's
     -- intervening one.
     --
-    -- A Bool rather than what it was attacking, for `blocking`'s reason: that is
-    -- the whole of what Filter.attacking reports, and the three neighbouring
-    -- fields that follow the same GameState.combat lookup to the ATTACKED
-    -- permanent (Filter.attackingPlayer, attackingPlaneswalkerController,
-    -- attackingBattleProtector) go on reading live. Scryfall o:"it was attacking
-    -- you" and o:"it was attacking a", 2026-09-10, no hit -- no printing asks any
-    -- of the three about a permanent that is gone, and Fyndhorn Druid's "if it was
-    -- blocked this turn" is a CR 608.2i fold over GameState.events rather than a
-    -- question for this record. A printing whose leaves-the-battlefield trigger
-    -- asked WHICH player, planeswalker or battle the departed creature had been
-    -- attacking would refute that and want this field widened.
+    -- A Bool, the whole of what Filter.attacking reports; what it was attacking
+    -- is `attackTarget` below, because CR 506.4c separates the two.
     attacking :: !Bool,
+    -- | CR 702.49c: WHAT it was attacking as it left, through Game.attackTargetOf
+    -- -- the question ninjutsu asks of the creature it returned to hand. Nothing
+    -- when it was not attacking, and Nothing when it was attacking nothing: CR
+    -- 506.4c's creature "is not attacking any player, planeswalker, or battle",
+    -- which Combat.attackingNothing records. Pawl.BattleSpec's Ninja returning a
+    -- Piker whose Siege was stolen is the proof.
+    attackTarget :: !(Maybe AttackTarget.AttackTarget),
     -- | CR 509.1g: was it blocking as it left -- the same membership
     -- Pawl.Engine.Filter.View's `blocking` reports, read off GameState.combat
     -- before the object ceased.

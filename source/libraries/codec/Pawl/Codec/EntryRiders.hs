@@ -4,6 +4,7 @@ module Pawl.Codec.EntryRiders where
 
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.CounterKind as CounterKind
+import qualified Pawl.Codec.EntryAttack as EntryAttack
 import qualified Pawl.Codec.FaceDownState as FaceDownState
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Quantity as Quantity
@@ -40,7 +41,7 @@ counter = Fields.object $ do
 codec :: Codec.Codec (EntryRiders.EntryRiders Quantity.Type.Quantity)
 codec = Fields.object $ do
   tapped <- Fields.defaulted "tapped" defaultTapped TapState.codec EntryRiders.tapped
-  attacking <- Fields.defaulted "attacking" False Common.boolean EntryRiders.attacking
+  attacking <- Fields.defaulted "attacking" Nothing (Common.maybe EntryAttack.codec) EntryRiders.attacking
   blocking <- Fields.defaulted "blocking" Nothing (Common.maybe SlotName.codec) EntryRiders.blocking
   transformed <- Fields.defaulted "transformed" False Common.boolean EntryRiders.transformed
   counters <- Fields.defaulted "counters" Map.empty (Common.keyedList counter) EntryRiders.counters
@@ -70,7 +71,7 @@ defaultValue :: EntryRiders.EntryRiders count
 defaultValue =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = defaultTapped,
-      EntryRiders.attacking = False,
+      EntryRiders.attacking = Nothing,
       EntryRiders.blocking = Nothing,
       EntryRiders.transformed = False,
       EntryRiders.counters = Map.empty,
