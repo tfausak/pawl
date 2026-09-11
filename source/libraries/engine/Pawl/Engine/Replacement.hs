@@ -2068,8 +2068,8 @@ applyEntryOption oid option gs =
 --
 -- Into BOTH readings of a copy of a flip card, since CR 707.9b makes the
 -- exception a copiable value whichever half the copy's status picks (CR 707.3)
--- -- CR 110.5c's flipped Dimir Doppelganger keeps "this ability". A regression
--- fence: no test copies a flip card under an exception.
+-- -- CR 110.5c's flipped Dimir Doppelganger keeps "this ability". Proved by
+-- Pawl.FlipSpec's flipped Sakashima.
 applyCopyExceptions :: Maybe Source.Source -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card)] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
 applyCopyExceptions this exceptions snapshot =
   let excepted pc = List.foldl' (applyCopyException this) pc exceptions
