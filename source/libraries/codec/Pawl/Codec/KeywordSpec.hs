@@ -16,6 +16,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MorphVariant as MorphVariant
+import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
@@ -921,6 +922,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Partner
       " {\"type\":\"Partner\"} "
+  -- CR 702.124i's text rides the constructor, since only the same text pairs.
+  Spec.it s "PartnerText carries its text" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.PartnerText PartnerText.FriendsForever)
+      " {\"type\":\"PartnerText\",\"value\":{\"type\":\"FriendsForever\"}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.PartnerText PartnerText.FriendsForever) /= Codec.encode Keyword.codec (Keyword.PartnerText PartnerText.CharacterSelect)) "two texts encode differently"
   Spec.it s "ChooseABackground" $
     Common.assertCodec
       s

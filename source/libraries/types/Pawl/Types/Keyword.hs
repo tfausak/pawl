@@ -6,6 +6,7 @@ import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Morph as Morph
+import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
@@ -383,9 +384,12 @@ data Keyword
     -- that functions before the game begins (CR 702.124a), read by
     -- Pawl.Engine.Commander.designations.
     --
-    -- Not implemented: CR 702.124i's partner—[text] and CR 702.124j's partner
-    -- with [name], which CR 702.124f keeps distinct from this one (#939).
+    -- Not implemented: CR 702.124j's partner with [name], which CR 702.124f
+    -- keeps distinct from this one (#939).
     Partner
+  | -- | 702.124i: partner—[text], pairing only with the same text; read by
+    -- Pawl.Engine.Commander.designations.
+    PartnerText PartnerText.PartnerText
   | -- | 702.124k: "You may designate two cards as your commander rather than one
     -- if one of them is this card and the other is a legendary Background
     -- enchantment card." A deck-construction ability like Partner above, read by
