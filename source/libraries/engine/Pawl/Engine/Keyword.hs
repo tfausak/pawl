@@ -2224,7 +2224,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Riot))
   -- CR 702.138a mints nothing: the exile-as-it-leaves-the-stack replacement is
   -- rule 702.34a's SECOND ability, and rule 702.138a prints no such sentence, so an
-  -- escaped spell goes to the graveyard under CR 608.2m like any other.
+  -- escaped permanent spell becomes a permanent under CR 608.3a like any other, and
+  -- an escaped instant or sorcery goes to its owner's graveyard under CR 608.2n.
   Keyword.Escape _ -> []
   -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.
   -- Filter.IsSource and one row per instance for riot's reasons.

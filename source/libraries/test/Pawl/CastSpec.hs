@@ -3147,6 +3147,7 @@ escapeSpec s registry = Spec.describe s "Escape" $ do
         cast = S.runPure S.identityAnswer gs (S.cast S.alice inGraveyard)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
     Spec.assertBool s (not (Card.isInstant (S.combinedFace chimera)) && not (Card.isSorcery (S.combinedFace chimera))) "neither an instant nor a sorcery"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "the cast is offered from her graveyard"
     Spec.assertEqWith s "the creature is on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 6
     Spec.assertEqWith s "CR 406.2 three other cards were exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 3
     Spec.assertEqWith s "the fourth is still in the graveyard, and the Chimera is not" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
