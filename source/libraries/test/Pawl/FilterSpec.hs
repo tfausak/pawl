@@ -97,6 +97,7 @@ blackCreature =
       Filter.designationValues = Map.empty,
       Filter.classLevel = Nothing,
       Filter.kicked = Map.empty,
+      Filter.castUsing = Nothing,
       Filter.manaSpentTags = Set.empty,
       -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
       -- atom's own cases below say which view they want rather than inheriting it.
@@ -162,6 +163,7 @@ devoidBigCreature =
       Filter.designationValues = Map.empty,
       Filter.classLevel = Nothing,
       Filter.kicked = Map.empty,
+      Filter.castUsing = Nothing,
       Filter.manaSpentTags = Set.empty,
       Filter.nonManaActivatedAbility = False,
       Filter.hasActivatedAbility = False,

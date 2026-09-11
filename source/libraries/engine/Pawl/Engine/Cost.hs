@@ -301,6 +301,14 @@ candidateCostsGiven permitted pid name oid gs =
                 fmap
                   (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
                   (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+              -- CR 702.74a: evoke, offered from EVERY zone for bestow's reason --
+              -- "a static ability that functions in any zone from which the card
+              -- with evoke can be cast" -- wrapped in `withAdditional` for
+              -- flashback's, and read off the PROJECTION for bestow's.
+              evoked =
+                fmap
+                  (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Evoke cost)) (withAdditional cost))
+                  (Keyword.evokeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
               -- which the spell may be cast".
@@ -339,7 +347,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- not permit; a printing whose back face had a mana cost would be the
               -- card that told the two apart.
               orConverted zoneCandidates = if null converted then zoneCandidates else converted
-           in (<> (bestowed <> prototyped <> mutated)) . orConverted $ case Object.zone obj of
+           in (<> (bestowed <> prototyped <> mutated <> evoked)) . orConverted $ case Object.zone obj of
                 -- Four shapes, differing in what they do to the printed cost.
                 -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
                 -- `withAdditional`, and escape (CR 702.138a) is that same shape in

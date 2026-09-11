@@ -1572,6 +1572,7 @@ rewriteQuantity pairs quantity = case quantity of
   -- (Game.faceOf), so rewriting the identifier here would ask about a cost no
   -- announcement was ever recorded under.
   Quantity.Type.TimesKickedWith _ -> quantity
+  Quantity.Type.CastUsing _ -> quantity
   Quantity.Type.TagWasSpent {} -> quantity
   Quantity.Type.WasToken -> quantity
   Quantity.Type.WasAttacking -> quantity

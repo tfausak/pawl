@@ -1839,6 +1839,7 @@ handAppend printing pid gs =
             Object.manaSpent = Mana.Type.MkMana [],
             Object.announcedX = Nothing,
             Object.castFrom = Nothing,
+            Object.castUsing = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,

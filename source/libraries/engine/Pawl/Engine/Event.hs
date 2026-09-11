@@ -758,6 +758,7 @@ mintCard pid under printingId dest position gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.castFrom = Nothing,
+            Object.castUsing = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
@@ -950,6 +951,7 @@ createEmblem pid card = do
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,
                 Object.castFrom = Nothing,
+                Object.castUsing = Nothing,
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,
@@ -4744,7 +4746,12 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- BATTLEFIELD ONLY, `kicked`'s gate and for its reason: rule
                     -- 400.7d speaks about a permanent, and a countered spell
                     -- becomes a card no such ability can be on.
-                    Object.manaSpent = if dest == Zone.Battlefield then Object.manaSpent obj else Mana.MkMana []
+                    Object.manaSpent = if dest == Zone.Battlefield then Object.manaSpent obj else Mana.MkMana [],
+                    -- CR 400.7d a fifth time: which keyword's cost was paid, what
+                    -- CR 702.74a's "if its evoke cost was paid" and CR 702.138b's
+                    -- "escaped" ask of the permanent. BATTLEFIELD ONLY, `kicked`'s
+                    -- gate and for its reason.
+                    Object.castUsing = if dest == Zone.Battlefield then Object.castUsing obj else Nothing
                   }
               -- CR 604.2's override, handed over as the permanent leaves the
               -- battlefield. lingeringHandover below is the whole of it; this
@@ -6062,6 +6069,7 @@ createTokens controller card copy n tapped entering = do
                       Object.manaSpent = Mana.MkMana [],
                       Object.announcedX = Nothing,
                       Object.castFrom = Nothing,
+                      Object.castUsing = Nothing,
                       Object.detainedUntil = Set.empty,
                       Object.goadedBy = Set.empty,
                       Object.doesNotUntapNext = False,
@@ -6255,6 +6263,7 @@ meld controller victims resultCard = do
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,
                 Object.castFrom = Nothing,
+                Object.castUsing = Nothing,
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,

@@ -604,6 +604,11 @@ data View = MkView
     -- for a permanent a kicked spell became, which is CR 400.7d's exception to
     -- the forgetting (see Pawl.Types.Object).
     kicked :: Map.Map (Cost.Cost Keyword.Type.Keyword) Natural.Natural,
+    -- CR 601.2b / 400.7d: the keyword whose candidate cost this candidate was
+    -- cast for, read off Object.castUsing for `kicked` above's reasons, and
+    -- Nothing where there is no object. Pawl.Engine.Quantity's CastUsing arm is
+    -- the reader.
+    castUsing :: Maybe Keyword.Type.Keyword,
     -- CR 400.7d / CR 107.4h: the production tags of the mana that was spent to
     -- cast the spell this candidate is, or was, or to activate the CR 602.2a
     -- ability it is -- read off Object.manaSpent, and empty where there is no
@@ -829,6 +834,7 @@ playerView pid =
       -- not one -- `designations` above, same sentence.
       classLevel = Nothing,
       kicked = Map.empty,
+      castUsing = Nothing,
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
       manaSpentTags = Set.empty,
@@ -2232,6 +2238,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Fabricate _ -> keyword
   Keyword.Type.Riot -> keyword
   Keyword.Type.Escape cost -> Keyword.Type.Escape (rewriteCost pairs cost)
+  Keyword.Type.Evoke cost -> Keyword.Type.Evoke (rewriteCost pairs cost)
   Keyword.Type.Unleash -> keyword
   -- CR 702.150a names no word CR 612.2 can swap: it is written about loyalty
   -- counters and Phyrexian mana symbols, both the rules' own vocabulary.

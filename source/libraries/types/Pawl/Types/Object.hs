@@ -581,6 +581,23 @@ data Object = MkObject
     -- newIncarnation: CR 400.7d's exception is about costs paid, and the zone a
     -- spell came from is not one.
     castFrom :: Maybe Zone.Zone,
+    -- | CR 601.2b: the keyword ability that offered the cost this SPELL was cast
+    -- for -- Pawl.Types.CandidateCost's tag, stamped by Pawl.Engine.Cast onto the
+    -- stack incarnation. Nothing for a printed or effect-granted cost. Read by
+    -- Quantity.CastUsing: CR 702.74a's "if its evoke cost was paid" and CR
+    -- 702.138b's "escaped".
+    --
+    -- One field for every such keyword rather than a Bool per keyword, beside
+    -- `bestowed` and `prototyped` above, which stay: each has its own clearing
+    -- rule (CR 702.103e/f, CR 718.4) that this record has not.
+    --
+    -- Per-incarnation, save for CR 400.7d's exception -- the permanent a spell
+    -- became may reference "what costs were paid" -- so
+    -- Pawl.Engine.Event.changeZoneAttaching carries it across that one move,
+    -- `kicked`'s route. NOT a copiable value (CR 707.2): a Clone of an evoked
+    -- permanent was not cast for that cost. A copy of the SPELL is (CR 707.10),
+    -- and Pawl.Engine.Resolve.Effect's copy is the spell's own record updated.
+    castUsing :: Maybe Keyword.Keyword,
     -- | CR 701.35a: this permanent is DETAINED -- it "can't attack or block and
     -- its activated abilities can't be activated" -- until the next turn of each
     -- player named here.
@@ -753,6 +770,9 @@ newIncarnation object =
       announcedX = Nothing,
       -- Nothing writes it back: no permanent reads it.
       castFrom = Nothing,
+      -- CR 400.7d's exception is written back by
+      -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
+      castUsing = Nothing,
       -- CR 701.35a: the detained permanent that comes back is a new object, and
       -- nothing detained that one.
       detainedUntil = Set.empty,

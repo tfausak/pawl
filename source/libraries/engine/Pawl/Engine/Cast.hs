@@ -640,6 +640,17 @@ stampPrototyped sid gs =
         Map.adjust (\o -> o {Object.prototyped = True}) sid (GameState.objects gs)
     }
 
+-- CR 601.2b: record on the spell the keyword that offered the candidate the
+-- announcement settled on (`castFor`), read back by Quantity.CastUsing.
+-- stampKicked's shape: an idempotent write of a field no layer computes, which a
+-- rejected proposal takes back with the spell.
+stampCastUsing :: Maybe Keyword -> ObjectId -> GameState -> GameState
+stampCastUsing castFor sid gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.castUsing = castFor}) sid (GameState.objects gs)
+    }
+
 -- CR 601.2a: record on the spell the zone it was moved to the stack from, which
 -- CR 400.7 otherwise leaves it no memory of. `asProposed` wrote the same value
 -- onto the card before the move, for the gate; this is the write CR 601.2f's
@@ -2130,6 +2141,9 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- that target can be chosen.
               Monad.when (castMutating castFor) (State.modify' (stampMutating sid))
               Monad.when (castPrototyped castFor) (State.modify' (stampPrototyped sid))
+              -- CR 601.2b: which keyword's candidate this is, for CR 702.74a's
+              -- "if its evoke cost was paid" and CR 702.138b's "escaped".
+              State.modify' (stampCastUsing castFor sid)
               -- Re-read, because `gs` above predates the stamp and both CR 601.2c
               -- and CR 601.2f have to be judged on the spell as rule 702.103b
               -- left it -- CR 702.103d's "only its characteristics as modified by
@@ -2371,15 +2385,13 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                         -- this restore must not undo that too.
                         Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
                         -- WHICH of the candidate costs was paid is `castFor`
-                        -- above, and it lives no longer than this announcement:
-                        -- the one rule that asks (CR 702.34a) asks as the cast
-                        -- completes, and armCastFromGraveyard turns the answer
-                        -- into a replacement effect that outlives it. CR
-                        -- 702.33d's kicker designation is a different record --
-                        -- it says an additional cost was announced, never which
-                        -- candidate carried it -- and is stamped on the object,
-                        -- because "if this spell was kicked" is read at
-                        -- resolution.
+                        -- above, stamped on the spell as Object.castUsing. CR
+                        -- 702.34a asks as the cast completes, and
+                        -- armCastFromGraveyard turns the answer into a
+                        -- replacement effect that outlives it. CR 702.33d's
+                        -- kicker designation is a different record -- it says an
+                        -- additional cost was announced, never which candidate
+                        -- carried it.
                         Payment.Paid bound -> do
                           -- CR 601.2f: the slots the PAYMENT bound -- the card a
                           -- RevealCardFromHand component showed -- folded onto
@@ -2487,11 +2499,11 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
 -- its own pays an untagged candidate, and rule 702.34a's clause is not
 -- satisfied by it.
 --
--- The answer is turned into a replacement effect HERE rather than stored on the
--- spell, and that is the whole of what has to survive: the record is read once,
--- as the cast completes, and CR 614.3's row it installs is what the leave-the-
--- stack move consults later. A spell countered on the stack still leaves it and
--- is still exiled by the row, which is rule 702.34a's "any time it would leave
+-- The answer is turned into a replacement effect HERE rather than read back off
+-- Object.castUsing later: the record is read once, as the cast completes, and
+-- CR 614.3's row it installs is what the leave-the-stack move consults later. A
+-- spell countered on the stack still leaves it and is still exiled by the row,
+-- which is rule 702.34a's "any time it would leave
 -- the stack"; a COPY of the spell is put onto the stack rather than cast (CR
 -- 707.10), so it never reaches this line and carries no row.
 --

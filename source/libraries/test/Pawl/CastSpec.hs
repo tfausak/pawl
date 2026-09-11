@@ -722,6 +722,7 @@ handInPlay printing board =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.castFrom = Nothing,
+            Object.castUsing = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
@@ -3110,19 +3111,14 @@ flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
     Spec.assertBool s (S.castable S.alice inGraveyard gs) "castable from the graveyard"
     Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "and offered"
 
--- CR 702.138a's one static ability, on Loathsome Chimera {2}{G} 4/1 Creature --
--- Chimera, whose whole text box is "Escape--{4}{G}, Exile three other cards from
--- your graveyard."
+-- CR 702.138a's static ability, on Loathsome Chimera {2}{G} 4/1 Creature --
+-- Chimera, "Escape--{4}{G}, Exile three other cards from your graveyard. This
+-- creature escapes with a +1/+1 counter on it." (oracle checked on Scryfall)
 --
 -- Flashback's near twin and the one card type flashback cannot be: rule 702.34a
 -- gates its permission on the resulting spell being an instant or sorcery
 -- (flashbackCardTypeSpec above) and rule 702.138a states no such clause, so a
 -- CREATURE escaping is what tells the two permissions apart.
---
--- Not implemented: the printed "This creature escapes with a +1/+1 counter on
--- it.", CR 702.138c over CR 702.138b's "escaped" designation, which leaves pawl's
--- Chimera a 4/1 where paper makes it a 5/2 -- stricter than printed, never weaker
--- (#3603).
 --
 -- EVERY BOARD BELOW CARRIES FIVE FORESTS, positives and negatives alike, so the
 -- only thing a negative can be turning on is the graveyard.
@@ -3171,6 +3167,55 @@ escapeSpec s registry = Spec.describe s "Escape" $ do
     Spec.assertEqWith s "and the Chimera is still in the graveyard with them" (length (Game.zoneMembers Zone.Graveyard S.alice (attempt tooShallow shallow))) 3
     Spec.assertEqWith s "with three, the Chimera is on the stack" (length (GameState.stack (attempt deepEnough deep))) 1
     Spec.assertEqWith s "and the three are exiled" (length (Game.zoneMembers Zone.Exile S.alice (attempt deepEnough deep))) 3
+  -- CR 702.138b/c: "escapes with" is a CR 614.1c entry replacement on "if this
+  -- permanent escaped". The control is the same card on the same five Forests
+  -- cast from HAND, which did not escape.
+  Spec.it s "CR 702.138c the escaped Chimera enters with a +1/+1 counter; cast from hand it does not" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    chimera <- S.printingOf s registry "Loathsome Chimera"
+    let (inGraveyard, graveyardBoard) = escapeBoard forest chimera piker 4
+        (inHand, handBoard) = inHandWith forest chimera 5
+        castAndResolveAlice oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice oid)) Stack.resolveTop
+        escaped = castAndResolveAlice inGraveyard graveyardBoard
+        hardCast = castAndResolveAlice inHand handBoard
+    Spec.assertEqWith s "CR 702.138c the escaped Chimera is a 5/2" (fmap (`S.powerToughnessOf` escaped) (chimerasOn escaped)) [Just (5, 2)]
+    Spec.assertEqWith s "CR 702.138b cast from hand it did not escape: the printed 4/1" (fmap (`S.powerToughnessOf` hardCast) (chimerasOn hardCast)) [Just (4, 1)]
+  -- CR 707.2: "escaped" is not a copiable value. Rite of Replication's token copy
+  -- copies the "escapes with" replacement, which then asks about the TOKEN --
+  -- never cast, so never escaped. The Islands arrive after the escape, so its
+  -- {4}{G} cannot have spent them.
+  Spec.it s "CR 707.2 a token copy of the escaped Chimera did not escape" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    chimera <- S.printingOf s registry "Loathsome Chimera"
+    rite <- S.printingOf s registry "Rite of Replication"
+    let (inGraveyard, gs) = escapeBoard forest chimera piker 4
+        escaped = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice inGraveyard)) Stack.resolveTop
+        (riteId, withRite) = S.addHandCard rite S.alice (S.landsFor island S.alice 4 escaped)
+    case chimerasOn escaped of
+      [original] -> do
+        let copied = S.runPure (riteAt original) (S.runPure (riteAt original) withRite (S.cast S.alice riteId)) (Stack.resolveTop >> Engine.settleForPriority)
+        Spec.assertEqWith s "CR 707.2 the token copy is the printed 4/1" (fmap (`S.powerToughnessOf` copied) (filter (/= original) (chimerasOn copied))) [Just (4, 1)]
+        Spec.assertEqWith s "and the escaped original is still a 5/2" (S.powerToughnessOf original copied) (Just (5, 2))
+      other -> Spec.assertFailure s ("expected one Chimera, got " <> show (length other))
+
+-- The battlefield's Loathsome Chimeras, by name: CR 400.7 gives the permanent a
+-- new id.
+chimerasOn :: GameState.GameState -> [ObjectId.ObjectId]
+chimerasOn = namedOnBattlefield "Loathsome Chimera"
+
+namedOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
+namedOnBattlefield name gs = filter (\o -> Projection.hasName (CardName.MkCardName (Text.pack name)) o gs) (Set.toList (GameState.battlefield gs))
+
+-- Rite of Replication unkicked, aimed at `victim` -- pinned to that id so an
+-- answerer cannot find another legal target after a mutation.
+riteAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+riteAt victim p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
+  _ -> S.identityAnswer p
 
 -- alice on turn with five untapped Forests, `printing` in her graveyard under `n`
 -- other copies of `fodder`. Five Forests because rule 702.138a's cost is {4}{G},
@@ -3180,6 +3225,72 @@ escapeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> In
 escapeBoard land printing fodder n =
   let (oid, gs) = inGraveyardWith land printing 5
    in (oid, List.foldl' (\acc _ -> snd (S.addGraveyardCard fodder S.alice acc)) gs [1 .. n])
+
+-- CR 702.74a on Mulldrifter {4}{U} 2/2 Creature -- Elemental, "Flying / When
+-- this creature enters, draw two cards. / Evoke {2}{U}" (oracle checked on
+-- Scryfall).
+--
+-- ONE BOARD for every case: five Islands, three Plains, Mulldrifter and Flicker of
+-- Fate in hand, six library cards. Both of Mulldrifter's costs are payable on
+-- it, so the cases differ only in which candidate `payingFor` names.
+evokeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+evokeSpec s registry = Spec.describe s "Evoke" $ do
+  -- The evoke cost paid: CR 603.4's "if" holds as the permanent enters, so it
+  -- triggers and the Mulldrifter is sacrificed. The same board paying the
+  -- printed {4}{U} is the control: nothing sacrifices it.
+  Spec.it s "CR 702.74a evoked, the Mulldrifter is sacrificed as it enters; cast for its mana cost it stays" $ do
+    (board, mulldrifter, _) <- evokeBoard s registry
+    let evoked = drainEvoke (payingFor evokeCost) mulldrifter board
+        hardCast = drainEvoke (payingFor mulldrifterCost) mulldrifter board
+    Spec.assertEqWith s "CR 702.74a the evoked Mulldrifter was sacrificed" (length (namedOnBattlefield "Mulldrifter" evoked)) 0
+    Spec.assertEqWith s "CR 603.4 cast for {4}{U}, it stays on the battlefield" (length (namedOnBattlefield "Mulldrifter" hardCast)) 1
+    Spec.assertEqWith s "and the evoked one drew its two cards first" (length (Game.zoneMembers Zone.Hand S.alice evoked)) 3
+  -- CR 603.4 and CR 400.7: Flicker of Fate, cast with the sacrifice trigger on
+  -- the stack, returns a NEW Mulldrifter nobody paid an evoke cost for, so its
+  -- own instance's "if" fails and it does not trigger. The evoked one's trigger
+  -- then has no object left to sacrifice -- a CR 400.7 fact this board cannot
+  -- tell from CR 608.2a's re-check, which leaving out stays green here.
+  Spec.it s "CR 603.4 a flickered evoked Mulldrifter is not sacrificed" $ do
+    (board, mulldrifter, flicker) <- evokeBoard s registry
+    let entered = S.runPure (payingFor evokeCost) (S.runPure (payingFor evokeCost) board (S.cast S.alice mulldrifter)) (Stack.resolveTop >> Engine.settleForPriority)
+        flickered = S.runPure S.identityAnswer (S.runPure S.identityAnswer entered (S.cast S.alice flicker)) (Stack.resolveTop >> Engine.settleForPriority)
+        after = S.runPure S.identityAnswer flickered (Monad.replicateM_ (4 :: Int) (Stack.resolveTop >> Engine.settleForPriority))
+    Spec.assertEqWith s "two triggers waited on the stack for Flicker of Fate" (length (GameState.stack entered)) 2
+    Spec.assertEqWith s "CR 603.4 the returned Mulldrifter is still on the battlefield" (length (namedOnBattlefield "Mulldrifter" after)) 1
+    Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+
+-- Mulldrifter's printed {4}{U} and its evoke {2}{U}.
+mulldrifterCost, evokeCost :: [ManaSymbol.ManaSymbol]
+mulldrifterCost = [ManaSymbol.Generic 4, theBlue]
+evokeCost = [ManaSymbol.Generic 2, theBlue]
+
+theBlue :: ManaSymbol.ManaSymbol
+theBlue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+
+-- CR 601.2b's announcement answered by naming a cost's mana, graveRecitalSpec's
+-- `paying`.
+payingFor :: [ManaSymbol.ManaSymbol] -> Prompt.Prompt r -> r
+payingFor wanted p = case p of
+  Prompt.ChooseCost _ _ _ candidates ->
+    Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost wanted)) . Cost.Type.mana) candidates)
+  _ -> S.identityAnswer p
+
+-- Cast Mulldrifter answering with `answer`, resolve it, and resolve both its
+-- triggers.
+drainEvoke :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+drainEvoke answer mulldrifter board =
+  S.runPure answer (S.runPure answer board (S.cast S.alice mulldrifter)) (Stack.resolveTop >> Engine.settleForPriority >> Monad.replicateM_ (2 :: Int) (Stack.resolveTop >> Engine.settleForPriority))
+
+evokeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+evokeBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  plains <- S.printingOf s registry "Plains"
+  mulldrifter <- S.printingOf s registry "Mulldrifter"
+  flicker <- S.printingOf s registry "Flicker of Fate"
+  let (mulldrifterId, gs1) = S.addHandCard mulldrifter S.alice (S.landsFor plains S.alice 3 (S.landsInPlay island 5))
+      (flickerId, gs2) = S.addHandCard flicker S.alice gs1
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) gs2 [1 :: Int .. 6]
+  pure (aliceOnTurn stocked, mulldrifterId, flickerId)
 
 -- CR 702.133a's two static abilities, on Direct Current {1}{R}{R} Sorcery,
 -- "Direct Current deals 2 damage to any target." plus jump-start.
@@ -3460,6 +3571,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   fireboltSpec s registry
   flashbackCardTypeSpec s registry
   escapeSpec s registry
+  evokeSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry

@@ -112,6 +112,8 @@ data KeywordFamily
     Frenzy
   | -- | CR 702.70a: poisonous N.
     Poisonous
+  | -- | CR 702.74a: evoke [cost]; the family Quantity.CastUsing names.
+    Evoke
   | -- | CR 702.75a: hideaway N. The family a card writing "a permanent with
     -- hideaway" names, as against hideaway 4; no card in the pool asks yet, and
     -- it is owed at the keyword rather than at the first asker.

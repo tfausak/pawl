@@ -372,6 +372,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
   Quantity.Type.TimesKickedWith {} -> False
+  Quantity.Type.CastUsing {} -> False
   Quantity.Type.TagWasSpent {} -> False
   Quantity.Type.WasToken -> False
   Quantity.Type.WasAttacking -> False

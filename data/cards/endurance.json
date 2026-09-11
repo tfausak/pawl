@@ -7,6 +7,23 @@
         },
         {
           "type": "Reach"
+        },
+        {
+          "type": "Evoke",
+          "value": {
+            "components": [
+              {
+                "type": "ExileCardFromHand",
+                "value": {
+                  "type": "HasColor",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              }
+            ],
+            "mana": []
+          }
         }
       ],
       "manaCost": [

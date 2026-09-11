@@ -563,11 +563,9 @@ amnesiaSpec s registry = Spec.describe s "Amnesia" $ do
 -- When this creature enters, up to one target player puts all the cards from
 -- their graveyard on the bottom of their library in a random order. / Evoke--
 -- Exile a green card from your hand." (name, cost, type line, power, toughness
--- and Oracle text checked against api.scryfall.com, 2026-08-20).
---
--- EVOKE IS NOT TRANSCRIBED: pawl has no such keyword, so the card loses an
--- alternative cost and pawl's Endurance is STRICTER than printed -- one fewer way
--- to cast it, never a cast the printing would refuse. CR 702.74 is #3482.
+-- and Oracle text checked against api.scryfall.com, 2026-08-20). Evoke is
+-- Pawl.CastSpec's "Evoke" group's; this group puts Endurance straight onto the
+-- battlefield.
 --
 -- THE RANDOMNESS IS THE ANSWERER'S, which is what makes this observable at all:
 -- the engine rolls nothing, it asks Prompt.Shuffle, so a fixture that names a
