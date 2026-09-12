@@ -3,6 +3,7 @@ module Pawl.Types.AsCopy where
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.WithCounters as WithCounters
 
 -- | CR 707.5 / 614.1c: the payload of Pawl.Types.EntryRewrite's @AsCopy@ arm --
 -- "you may have this permanent enter as a copy of [any enchantment on the
@@ -37,6 +38,37 @@ data AsCopy ability = MkAsCopy
     -- Not a CopyException: CR 707.2 excludes status from the copiable values, so
     -- this may not be written into the snapshot. It goes onto the object through
     -- Pawl.Engine.Event.enterTapped, the same write EntryRewrite.Tapped makes.
-    tapped :: Bool
+    tapped :: Bool,
+    -- | CR 707.9e: the exception that is an ADDITIONAL EFFECT rather than a
+    -- modification of a characteristic -- Altered Ego's "except it enters with X
+    -- additional +1\/+1 counters on it". Nothing for a clause stating none.
+    --
+    -- Not a CopyException, for `tapped`'s reason one rule over: every arm of that
+    -- type writes a characteristic into the copiable snapshot (CR 707.9a, CR
+    -- 707.9b), and a counter is not a characteristic at all (CR 122.1). The same
+    -- sentence over CR 707.1's token mint is Littjara Mirrorlake's, and it is
+    -- CreateCopy's `riders` rather than one of its `exceptions` for exactly this
+    -- reason.
+    --
+    -- The WithCounters payload EntryRewrite's own CR 614.1c row carries, rather
+    -- than an EntryRiders record: the other riders are already said elsewhere or
+    -- cannot be said here -- `tapped` above is CR 614.1d's own field, and no
+    -- printed copy exception puts a permanent onto the battlefield attacking,
+    -- blocking, transformed or face down. So the narrow payload is the whole
+    -- sayable clause, and Pawl.Engine.Event's AsCopy arm places it through
+    -- addEnteringCounters, the same funnel the CR 614.1c row uses, so CR 614.16
+    -- sees it (Doubling Season).
+    --
+    -- Placed only where the copy is actually MADE, `exceptions`' reason: CR 707.9
+    -- makes the clause a modification of the copying process, so declining
+    -- Clone's "may" leaves the permanent its printed self and no counters.
+    --
+    -- CR 707.9e's second sentence -- a copy effect applied to the object AFTER
+    -- this one suppresses the exception's effect -- has no reader, and needs
+    -- none: every printed copy effect that applies as a permanent ENTERS is that
+    -- permanent's own (Filter.IsSource), so nothing can be applied after this one
+    -- while the counters are still pending, and a CR 707.4 change afterwards
+    -- finds them already on the object, where CR 122.1 leaves them.
+    counters :: Maybe WithCounters.WithCounters
   }
   deriving (Eq, Ord, Show)

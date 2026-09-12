@@ -209,6 +209,22 @@ copyNamedKeepingFirstLegend wanted p = case p of
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   _ -> copyNamed wanted p
 
+-- copyNamed with CR 601.2b's announcement answered: Altered Ego's {X} is chosen
+-- as the spell is cast, and CR 107.3m is what carries that number to the entry
+-- replacement. Pinned to one value, copyNamed's reason -- an answerer taking the
+-- maximum would follow the mana rather than the test.
+copyNamedAnnouncing :: Natural.Natural -> ObjectId -> Prompt.Prompt r -> r
+copyNamedAnnouncing x wanted p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> copyNamed wanted p
+
+-- The declining half of the pair above: the same announcement, and the copy
+-- refused.
+declineAnnouncing :: Natural.Natural -> Prompt.Prompt r -> r
+declineAnnouncing x p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> declineCopy p
+
 copyNewest :: Prompt.Prompt r -> r
 copyNewest p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> newest legal
@@ -1112,7 +1128,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- carries a quotation (Mercurial Pretender's case below), but this one arms a
   -- delayed trigger, and Resolve.Effect.declaredDelayedAbility finds the
   -- declaration on the source's PRINTED card, which a Clone of the copy is not
-  -- (#1292). Omitting it leaves pawl's card stricter than printed -- the clause
+  -- (#3661). Omitting it leaves pawl's card stricter than printed -- the clause
   -- only ever buys its controller an escape -- and nothing below turns on it.
   --
   -- Read at GAMEPLAY level by CR 704.5j: two Sakashimas that copied
@@ -1293,6 +1309,58 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "where the Wraith it copied is black" (Projection.colorsOf wraithId after) (Set.singleton Color.Black)
         Spec.assertEqWith s "and so is the Evangel it copied first" (Projection.colorsOf evangelId after) (Set.singleton Color.Black)
       others -> Spec.assertFailure s ("expected exactly one Doppelganger, got " <> show (length others))
+
+  -- THE PROVING TEST for CR 707.9e, the exception that is an ADDITIONAL EFFECT
+  -- rather than a modification of a characteristic -- AsCopy's `counters`.
+  -- Altered Ego {X}{2}{G}{U} Creature -- Shapeshifter 0/0: "This spell can't be
+  -- countered. You may have this creature enter as a copy of any creature on the
+  -- battlefield, except it enters with X additional +1/+1 counters on it."
+  -- (Oracle text checked against api.scryfall.com, 2026-09-12. Scryfall
+  -- o:"except it enters", 2026-09-12, returns this card, Spark Double,
+  -- Undercover Operative and Littjara Mirrorlake, and the last three all
+  -- condition the clause or write it over a token mint.)
+  --
+  -- CAST rather than staged onto the stack, which the X is what forces: CR
+  -- 107.3m reads the value announced for the SPELL at CR 601.2b, and a permanent
+  -- put onto the battlefield by hand announced none. Six lands in two colours pay
+  -- {2}{G}{U} with X = 2.
+  --
+  -- Three distinct sizes, so no reading of the board is a coincidence: the Hill
+  -- Giant's 3/3 is what was copied, the copy is 5/5, and Altered Ego's own
+  -- printed body is 0/0.
+  --
+  -- The control differs in ONE decision: the same spell, the same X, the same
+  -- board, with the copy DECLINED. CR 707.9 makes the exception a modification of
+  -- the copying process, so no copy is no counters -- and the 0/0 that arrives
+  -- is buried by CR 704.5f, where two +1/+1 counters would have left a 2/2
+  -- standing. That is what makes the control an assertion rather than a shrug.
+  --
+  -- A Clone of the copy is the copiable-values tripwire (CR 707.2): counters are
+  -- not characteristics (CR 122.1), so the Clone is the Giant's 3/3 and not the
+  -- 5/5 it is standing next to.
+  Spec.it s "CR 707.9e Altered Ego's copy enters with the announced X in +1/+1 counters, and declining the copy places none" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    clone <- S.printingOf s registry "Clone"
+    alteredEgo <- S.printingOf s registry "Altered Ego"
+    let (giantId, board0) = S.addPermanent hillGiant S.alice (S.landsFor forest S.alice 3 (S.landsInPlay island 3))
+        copied = castAndResolve (copyNamedAnnouncing 2 giantId) alteredEgo board0
+        declined = castAndResolve (declineAnnouncing 2) alteredEgo board0
+    case printedOnBattlefield "Altered Ego" copied of
+      [egoId] -> do
+        -- THE GAMEPLAY ASSERTIONS, ahead of every diagnostic.
+        Spec.assertEqWith s "CR 707.9e the copy is the Giant's 3/3 with the announced X = 2 in +1/+1 counters on top" (S.powerToughnessOf egoId copied) (Just (5, 5))
+        Spec.assertEqWith s "where declining the copy places no counters, so the 0/0 dies (CR 704.5f)" (length (printedOnBattlefield "Altered Ego" declined)) 0
+        let cloned = resolveAndSettle (copyNamed egoId) (snd (S.spellOnStack clone S.alice copied))
+        case clonesOnBattlefield cloned of
+          [cloneId] -> Spec.assertEqWith s "CR 707.2 a Clone of the copy is the copiable 3/3, the counters being no part of the copiable values" (S.powerToughnessOf cloneId cloned) (Just (3, 3))
+          _ -> Spec.assertFailure s "expected one Clone of Altered Ego's copy"
+        -- Diagnostics, after the behaviour: the copy really is the Giant, and the
+        -- counters really are on it.
+        Spec.assertEqWith s "the copy is the Giant by name (CR 707.2)" (Projection.namesOf egoId copied) . Set.singleton . CardName.MkCardName $ Text.pack "Hill Giant"
+        Spec.assertEqWith s "and the Giant it copied is still its printed 3/3" (S.powerToughnessOf giantId copied) (Just (3, 3))
+      others -> Spec.assertFailure s ("expected exactly one Altered Ego, got " <> show (length others))
 
   -- CR 707.9a's quoted arm over a TRIGGERED ability. Copycrook {2}{U}{U}
   -- Creature -- Shapeshifter Rogue 0/0: "You may have this creature enter as a
