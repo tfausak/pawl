@@ -1477,8 +1477,8 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Create (Create.MkCreate quantity card riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders <> tokenBoxQuantities card)
   -- Every candidate is literal text THROUGHOUT, unlike Create's token above:
   -- nothing bakes a conjured card's printed box, so Pawl.Engine.Resolve.Effect
-  -- hands the one it picks to Event.conjure exactly as written. The COUNT is the effect
-  -- speaking, read in the resolution's own slots.
+  -- hands the one it picks to Event.conjure exactly as written. The COUNT is
+  -- the effect speaking, read in the resolution's own slots.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True

@@ -668,9 +668,9 @@ combatReplaySpec s =
         -- #136 / CR 729.2: "Randomly determine which player goes first." The
         -- determination is randomness, not a choice, so the prompt carries NO
         -- Decider -- Shuffle, RandomObject, RandomOpponent and RandomCard below
-        -- are the others. Recording it
-        -- is what keeps a subgame replayable: the randomness lives in the
-        -- interpreter, and the transcript carries what it rolled.
+        -- are the others. Recording it is what keeps a subgame replayable: the
+        -- randomness lives in the interpreter, and the transcript carries what
+        -- it rolled.
         Spec.it s "RandomFirstPlayer round-trips through the transcript" $ do
           let p = Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob])
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
