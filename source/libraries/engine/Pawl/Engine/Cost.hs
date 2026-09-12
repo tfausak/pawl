@@ -310,6 +310,30 @@ candidateCostsGiven permitted pid name oid gs =
                 fmap
                   (\(keyword, cost) -> CandidateCost.MkCandidateCost (Just keyword) (withAdditional cost))
                   (Keyword.plainAlternativeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+              -- CR 702.117a and CR 702.137a: surge and spectacle, evoked's offer
+              -- with a GATE -- read off the projection, wrapped by
+              -- `withAdditional` and tagged with the keyword for that list's
+              -- reasons, and offered from every zone because rule 702.117a's
+              -- ability functions "while the spell with surge is on the stack"
+              -- and rule 702.137a's "on the stack", which CR 113.6e reaches from
+              -- wherever the cast begins.
+              --
+              -- A clause that does not hold is no offer at all rather than an
+              -- offer withheld, which is the shape `available` gives a printed
+              -- alternative cost's condition and the mayhem arm below gives rule
+              -- 702.187b's. Both clauses are read HERE, live at CR 601.2b, rather
+              -- than off anything captured earlier.
+              --
+              -- The player each clause asks about is the CASTER, rule 702.117a's
+              -- and rule 702.137a's "you".
+              surged =
+                if Game.yourTeamCastASpellThisTurn pid gs
+                  then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Surge cost)) (withAdditional cost)) (Keyword.surgeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  else []
+              spectacled =
+                if Game.opponentLostLifeThisTurn pid gs
+                  then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Spectacle cost)) (withAdditional cost)) (Keyword.spectacleCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  else []
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
               -- which the spell may be cast".
@@ -357,7 +381,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- cost, or rule 702.162a's converted cast. Pawl.CastSpec's "CR
               -- 702.170d a Mulldrifter Aven Interrupter plotted is offered no evoke
               -- cost" proves it.
-              ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked
+              ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> surged <> spectacled
            in orConverted $ case Object.zone obj of
                 -- Three shapes, differing in what they do to the printed cost, plus
                 -- an effect's permission. Flashback (CR 702.34a) REPLACES the mana

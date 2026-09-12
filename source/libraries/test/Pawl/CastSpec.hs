@@ -3379,6 +3379,81 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
     Spec.assertEqWith s "CR 702.152a and drew a card as it died" (drew blitzed) 1
     Spec.assertEqWith s "cast for {1}{R} and bolted, it died and made its Treasure without drawing" (drew bolted, dead bolted) (0, (0, 1))
 
+-- CR 702.117a on Boulder Salvo {4}{R} Sorcery, "Surge {1}{R} / Boulder Salvo
+-- deals 4 damage to target creature." (Oracle text checked on Scryfall,
+-- 2026-09-11).
+--
+-- ONE board for all three cases: alice on turn with four Mountains, the Salvo
+-- and a Lightning Bolt in hand; bob with a Goblin Piker, a Mountain and a Bolt
+-- of his own. They differ only in which Bolt was cast first, and the case that
+-- casts none has MORE mana left than the surged one, so no negative here can be
+-- a shortage.
+surgeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+surgeSpec s registry = Spec.describe s "Surge" $ do
+  Spec.it s "CR 702.117a after alice's own Bolt the Salvo is cast for {1}{R}; after nobody's and after bob's, its {4}{R} is unpayable" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    salvo <- S.printingOf s registry "Boulder Salvo"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, gs0) = S.addPermanent piker S.bob (S.landsFor mountain S.bob 1 (S.landsInPlay mountain 4))
+        (salvoId, gs1) = S.addHandCard salvo S.alice gs0
+        (aliceBolt, gs2) = S.addHandCard bolt S.alice gs1
+        (bobBolt, gs3) = S.addHandCard bolt S.bob gs2
+        board = aliceOnTurn gs3
+        salvoAt :: Prompt.Prompt r -> r
+        salvoAt p = case p of
+          Prompt.ChooseTargets {} -> aimedAt pikerId p
+          _ -> payingFor surgeCost p
+        surging = castResolved salvoAt salvoId
+        alicesBolt = castResolved (boltAt S.bob) aliceBolt board
+        bobsBolt = S.runPure (boltAt S.alice) (S.runPure (boltAt S.alice) board (S.cast S.bob bobBolt)) (Stack.resolveTop >> Engine.settleForPriority)
+        alive gs = length (namedOnBattlefield "Goblin Piker" gs)
+    Spec.assertEqWith s "CR 702.117a alice cast a spell first, so the surged Salvo killed the Piker" (alive (surging alicesBolt)) 0
+    Spec.assertEqWith s "CR 702.117a with no spell cast this turn the Salvo cannot be paid for and the Piker lives" (alive (surging board)) 1
+    Spec.assertEqWith s "CR 102.3 bob's Bolt is not alice's spell, so the Piker lives" (alive (surging bobsBolt)) 1
+    Spec.assertEqWith s "the control: both Bolts resolved" (S.lifeOf S.bob alicesBolt, S.lifeOf S.alice bobsBolt) (Just 17, Just 17)
+
+-- CR 702.137a on Skewer the Critics {2}{R} Sorcery, "Spectacle {R} / Skewer the
+-- Critics deals 3 damage to any target." (Oracle text checked on Scryfall,
+-- 2026-09-11).
+--
+-- ONE board: alice on turn with two Mountains, the Skewer and a Lightning Bolt
+-- in hand. The cases differ only in whom the Bolt was aimed at, or whether it
+-- was cast at all, and the case that casts nothing has MORE mana left than the
+-- spectacle one -- Boulder Salvo's reasoning above.
+spectacleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+spectacleSpec s registry = Spec.describe s "Spectacle" $ do
+  Spec.it s "CR 702.137a after bob lost life the Skewer is cast for {R}; with nobody hurt and with only alice hurt, its {2}{R} is unpayable" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    skewer <- S.printingOf s registry "Skewer the Critics"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (skewerId, gs1) = S.addHandCard skewer S.alice (S.landsInPlay mountain 2)
+        (boltId, gs2) = S.addHandCard bolt S.alice gs1
+        board = aliceOnTurn gs2
+        skewering :: Prompt.Prompt r -> r
+        skewering p = case p of
+          Prompt.ChooseTargets {} -> boltAt S.bob p
+          _ -> payingFor spectacleCost p
+        after = castResolved skewering skewerId
+        boltedBob = castResolved (boltAt S.bob) boltId board
+        boltedAlice = castResolved (boltAt S.alice) boltId board
+    Spec.assertEqWith s "CR 702.137a bob lost life, so the spectacle Skewer took him to 14" (S.lifeOf S.bob (after boltedBob)) (Just 14)
+    Spec.assertEqWith s "CR 702.137a with nobody hurt the Skewer cannot be paid for and bob stays at 20" (S.lifeOf S.bob (after board)) (Just 20)
+    Spec.assertEqWith s "CR 102.3 alice is not her own opponent, so bob stays at 20" (S.lifeOf S.bob (after boltedAlice), S.lifeOf S.alice (after boltedAlice)) (Just 20, Just 17)
+
+-- Every CR 601.2c target slot aimed at one PLAYER, FILTERED from what was
+-- offered so a mutation cannot be repaired by another legal answer -- aimedAt's
+-- shape over CR 120.3a's other recipient.
+boltAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+boltAt pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (Set.filter ((== Just pid) . Recipient.playerOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Boulder Salvo's surge {1}{R} and Skewer the Critics' spectacle {R}.
+surgeCost, spectacleCost :: [ManaSymbol.ManaSymbol]
+surgeCost = [ManaSymbol.Generic 1, theRed]
+spectacleCost = [theRed]
+
 -- CR 702.157a on Galadhrim Brigade {2}{G} 2/2 Creature -- Elf Soldier, "Squad
 -- {1}{G} / Other Elves you control get +1/+1." (Oracle text checked on Scryfall,
 -- 2026-09-11).
@@ -3992,6 +4067,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   evokeSpec s registry
   dashSpec s registry
   blitzSpec s registry
+  surgeSpec s registry
+  spectacleSpec s registry
   squadSpec s registry
   offspringSpec s registry
   grantedFlashbackSpec s registry
