@@ -7,6 +7,7 @@
 -- machinery.
 module Pawl.AttackKeywordTriggerSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -33,6 +34,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
@@ -1559,6 +1561,176 @@ krasisSpec s registry =
           Spec.assertEqWith s "the Krasis took the counter" (plusOnes krasis after) 1
           Spec.assertEqWith s "and nothing evolved, so nothing was paid out" (plusOnes mine after) 1
 
+-- CR 702.116a's myriad: an attack trigger whose loop mints a token copy per
+-- opponent OTHER than the defending player, each entering tapped and attacking
+-- that opponent, and one CR 603.7 delayed ability exiling the whole batch at end
+-- of combat (CR 511.2).
+--
+-- Wyrm's Crossing Patrol {W} Creature -- Human Soldier 1/1 is the producer: its
+-- whole text is myriad, so nothing else on the card can supply the token.
+--
+-- THREE SEATS and CR 802's option, which S.threePlayerCombat sets: at two seats
+-- the loop is empty (the only opponent IS the defending player) and at three the
+-- board can tell the opponent the Patrol attacked from the one it did not. The
+-- Goblin Piker beside it is the control -- another creature alice attacked bob
+-- with, so "everything that attacked was exiled" cannot pass the end-of-combat
+-- case.
+--
+-- The answerer aims every declaration at BOB. That is what makes the CR 702.116a
+-- narrowing observable rather than incidental: the token's own CR 508.4 choice is
+-- elided because carol is its only candidate, and a narrowing that admitted every
+-- defending player would take bob instead.
+myriadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+myriadSpec s registry =
+  let patrolName = CardName.MkCardName (Text.pack "Wyrm's Crossing Patrol")
+      plan :: Prompt.Prompt r -> r
+      plan p = case p of
+        Prompt.ChooseAttackTarget {} -> S.attackTo S.bob p
+        -- CR 603.5's printed "may", taken.
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      declining :: Prompt.Prompt r -> r
+      declining p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Declines
+        _ -> plan p
+      attackedBy oid gs = Map.lookup oid (Combat.Type.attackers (GameState.combat gs))
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      board = do
+        patrol <- S.printingOf s registry "Wyrm's Crossing Patrol"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (gs0, mine, _, _) = S.threePlayerCombat [patrol, piker] [] []
+        pure (mine, gs0)
+   in Spec.describe s "Myriad (CR 702.116)" $ do
+        Spec.it s "CR 702.116a a token copy enters tapped and attacking the opponent the Patrol did not" $ do
+          (mine, gs0) <- board
+          let after = atBlockers plan gs0
+          -- THE gameplay assertion, and ahead of every proxy: it says both HOW
+          -- MANY tokens the loop minted and whom each attacks, so a loop that
+          -- swept the wrong seats reddens here rather than in a pattern match.
+          Spec.assertEqWith
+            s
+            "CR 702.116a one token, attacking the opponent the Patrol did not"
+            (fmap (`attackedBy` after) (S.tokensOf after))
+            [Just (AttackTarget.OfPlayer S.carol)]
+          case (mine, S.tokensOf after) of
+            ([patrolId, pikerId], [token]) -> do
+              Spec.assertBool s (Game.isTapped token after) "CR 702.116a and it entered tapped"
+              -- Read through the projection (CR 707.2's copiable values), never
+              -- off the token's printed card.
+              Spec.assertBool s (Projection.hasName patrolName token after) "CR 702.116a and it is a copy of the Patrol"
+              Spec.assertEqWith s "while the Patrol itself attacks bob" (attackedBy patrolId after) (Just (AttackTarget.OfPlayer S.bob))
+              Spec.assertEqWith s "as does the Piker beside it" (attackedBy pikerId after) (Just (AttackTarget.OfPlayer S.bob))
+            (_, other) -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+        -- CR 511.2: "at end of combat" triggers as the end of combat step begins.
+        -- ONE delayed ability over the batch, armed by the instruction after the
+        -- loop (CR 608.2f leaves the body-defined name holding the union).
+        Spec.it s "CR 702.116a the tokens are exiled at end of combat" $ do
+          (mine, gs0) <- board
+          let after = atBlockers plan gs0
+          case (mine, S.tokensOf after) of
+            ([patrolId, pikerId], [token]) -> do
+              let final = S.runToStep Phase.PostcombatMain plan after
+              -- CR 111.7: a token that leaves the battlefield ceases to exist,
+              -- so the exile is read as "gone from the battlefield" -- and
+              -- nothing on this board damages or destroys it, carol declaring no
+              -- blockers, so leaving is the exile and nothing else.
+              Spec.assertBool s (not (S.onBattlefield token final)) "CR 702.116a the token is gone from the battlefield"
+              Spec.assertBool s (S.onBattlefield patrolId final) "while the Patrol that made it is still there"
+              Spec.assertBool s (S.onBattlefield pikerId final) "and so is the Piker that attacked beside it"
+            (_, other) -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+        -- THE PROJECTION TRIPWIRE. Nothing alice controls PRINTS myriad: her
+        -- creature is a Clone, and the keyword, the trigger and the token's
+        -- characteristics all come off CR 707.2's copiable values. A read of the
+        -- printed card anywhere on this road answers "Clone" and mints nothing.
+        --
+        -- The Patrol is BOB's, so the only myriad on the battlefield that attacks
+        -- is the copy's, and a second token would say the printed one triggered
+        -- too.
+        Spec.it s "CR 707.2 a Clone of the Patrol has myriad and mints a copy of the Patrol" $ do
+          patrol <- S.printingOf s registry "Wyrm's Crossing Patrol"
+          clone <- S.printingOf s registry "Clone"
+          let (gs0, _, theirs, _) = S.threePlayerCombat [] [patrol] []
+              (_, staged) = S.spellOnStack clone S.alice gs0
+              copying p = case p of
+                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
+                _ -> S.identityAnswer p
+              resolved = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
+              -- CR 302.6: the Clone entered this turn. Settling it is the one
+              -- fixture step here that is not the cards' own doing.
+              alices = filter (\oid -> Projection.controllerOf oid resolved == Just S.alice) (Set.toList (GameState.battlefield resolved))
+              settle gs oid = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects gs)}
+              ready = List.foldl' settle resolved alices
+              after = atBlockers plan ready
+          case (theirs, alices) of
+            ([bobsPatrol], [cloneId]) -> do
+              Spec.assertBool s (Projection.hasName patrolName cloneId after) "the Clone copied the Patrol"
+              Spec.assertEqWith
+                s
+                "CR 702.116a the Clone's own token attacks carol"
+                (fmap (`attackedBy` after) (S.tokensOf after))
+                [Just (AttackTarget.OfPlayer S.carol)]
+              case S.tokensOf after of
+                [token] -> Spec.assertBool s (Projection.hasName patrolName token after) "and it is a copy of the Patrol, not of the Clone's printed card"
+                other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+              Spec.assertBool s (S.onBattlefield bobsPatrol after) "while bob's printed Patrol never attacked"
+            (_, other) -> Spec.assertFailure s ("expected alice to control exactly the Clone, got " <> show (length other))
+        -- THE PAIR. Same board and the same declarations; only the answer to CR
+        -- 603.5's "may" differs, so a token that appeared anyway would not be
+        -- myriad's.
+        Spec.it s "CR 603.5 a declined may mints no token" $ do
+          (mine, gs0) <- board
+          let after = atBlockers declining gs0
+          case mine of
+            [patrolId, _] -> do
+              Spec.assertEqWith s "no token was created" (S.tokensOf after) []
+              Spec.assertEqWith s "though the Patrol did attack bob" (attackedBy patrolId after) (Just (AttackTarget.OfPlayer S.bob))
+            _ -> Spec.assertFailure s "fixture should give alice a Patrol and a Piker"
+        -- TWO SEATS, the default game size, where rule 702.116a's loop has NO
+        -- member: bob is alice's only opponent and bob is the defending player.
+        -- The rule then offers no "may" and creates no token, so its "if one or
+        -- more tokens are created this way" leaves nothing armed -- and an armed
+        -- CR 603.7 delayed ability would be a real triggered ability at CR 511.2,
+        -- which data/cards/stifle.json could counter.
+        --
+        -- THE PAIR is the three-seat board below, same answerer and same
+        -- declarations, differing only in the seat count; without it a zero
+        -- reads as "nothing ran" rather than "the gate held".
+        --
+        -- A pure answerer cannot see a prompt that was never raised, so this one
+        -- threads a counter -- Pawl.CopySpec's countingAnswer shape.
+        Spec.it s "CR 702.116a at two seats the loop is empty, so no may is asked and nothing is armed" $ do
+          patrol <- S.printingOf s registry "Wyrm's Crossing Patrol"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let counting :: Prompt.Prompt r -> State.State Int r
+              counting p = case p of
+                Prompt.ChooseOptional {} -> do
+                  State.modify' (+ 1)
+                  pure OptionalDecision.Exercises
+                _ -> pure (plan p)
+              stepTo :: Phase.Phase -> Int -> GameState.GameState -> State.State Int GameState.GameState
+              stepTo target n g =
+                if n <= 0 || GameState.phase g == target
+                  then pure g
+                  else do
+                    (_, g') <- Engine.runGame counting g Engine.runStep
+                    stepTo target (n - 1) g'
+              toBlockers g = State.runState (stepTo (Phase.Combat CombatStep.DeclareBlockers) 8 g) 0
+              (twoSeat, _, _) = S.combatBoardOf [patrol, piker] []
+              (three, _, _, _) = S.threePlayerCombat [patrol, piker] [] []
+              (afterTwo, askedTwo) = toBlockers twoSeat
+              (afterThree, askedThree) = toBlockers three
+          -- THE gameplay assertion, ahead of every proxy: CR 603.7's delayed
+          -- ability is what CR 511.2 would put on the stack, and rule 702.116a
+          -- creates none here.
+          Spec.assertEqWith s "CR 702.116a at two seats no delayed exile is armed" (length (GameState.delayedTriggers afterTwo)) 0
+          Spec.assertEqWith s "CR 603.5 and its may is never asked" askedTwo 0
+          Spec.assertEqWith s "CR 702.116a and no token was minted" (S.tokensOf afterTwo) []
+          -- The control: one seat more, and every one of the three flips.
+          Spec.assertEqWith s "CR 702.116a at three seats the exile IS armed" (length (GameState.delayedTriggers afterThree)) 1
+          Spec.assertEqWith s "CR 603.5 and the may is asked once" askedThree 1
+          Spec.assertEqWith s "CR 702.116a and one token was minted" (length (S.tokensOf afterThree)) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   frenzySpec s registry
@@ -1568,6 +1740,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   trainingSpec s registry
   saviorOfOllenbockSpec s registry
   decayedSpec s registry
+  myriadSpec s registry
   provokeSpec s registry
   trygonPredatorSpec s registry
   questingBeastSpec s registry

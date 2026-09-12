@@ -1689,6 +1689,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- The whole table but one seat -- EachPlayer's answer, and for its
           -- reason.
           PlayerRef.EachPlayerExcept _ -> False
+          -- The opponents but one seat -- the arm above's answer, for its reason.
+          PlayerRef.EachOpponentExcept _ -> False
           -- One seat -- InSlot's answer. Unreachable from card data, which the
           -- sweep below is what enforces.
           PlayerRef.Specific _ -> True

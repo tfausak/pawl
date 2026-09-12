@@ -133,6 +133,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         PlayerRef.ControllerOfBound _ -> Count.playersFor viewOf context gs ref
         PlayerRef.EachPlayer -> Count.playersFor viewOf context gs ref
         PlayerRef.EachPlayerExcept _ -> Count.playersFor viewOf context gs ref
+        PlayerRef.EachOpponentExcept _ -> Count.playersFor viewOf context gs ref
         PlayerRef.Relative _ -> Count.playersFor viewOf context gs ref
         PlayerRef.InSlot _ -> Count.playersFor viewOf context gs ref
         -- InSlot's plural, answered there too: off the resolution's own slots, or
@@ -1087,6 +1088,8 @@ playerRefIsSlotless ref = case ref of
   -- The exclusion names a slot, so this reads one -- InSlot's answer, even though
   -- the slot decides who is left OUT rather than who is in.
   PlayerRef.EachPlayerExcept _ -> False
+  -- The arm above's answer, for its reason.
+  PlayerRef.EachOpponentExcept _ -> False
   PlayerRef.Relative _ -> True
   PlayerRef.InSlot _ -> False
   -- InSlot's answer: this reads a slot too, and every one of them.
@@ -1161,6 +1164,7 @@ forCandidate pid =
         PlayerRef.Candidate -> PlayerRef.Specific pid
         PlayerRef.EachPlayer -> ref
         PlayerRef.EachPlayerExcept _ -> ref
+        PlayerRef.EachOpponentExcept _ -> ref
         PlayerRef.Relative _ -> ref
         PlayerRef.InSlot _ -> ref
         PlayerRef.EachInSlot _ -> ref
@@ -1186,6 +1190,8 @@ bakePlayerRef players ref = case ref of
   -- traverses reads exactly one player (see the LifeTotal arm above) and so
   -- answers Nothing for this reference baked or not.
   PlayerRef.EachPlayerExcept _ -> ref
+  -- LEFT STANDING, the arm above's posture and for its reason.
+  PlayerRef.EachOpponentExcept _ -> ref
   PlayerRef.Relative _ -> ref
   PlayerRef.Specific _ -> ref
   -- Nothing to bake: the candidate is supplied by whichever fold is running when

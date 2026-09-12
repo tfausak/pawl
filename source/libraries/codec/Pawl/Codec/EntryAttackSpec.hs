@@ -17,4 +17,10 @@ spec s = Spec.describe s "Pawl.Codec.EntryAttack" $ do
       EntryAttack.codec
       (EntryAttack.SameAs (SlotName.MkSlotName (Text.pack "thatReturnedPermanent")))
       " {\"type\":\"SameAs\",\"value\":\"thatReturnedPermanent\"} "
+  Spec.it s "UnderPlayer" $
+    Common.assertCodec
+      s
+      EntryAttack.codec
+      (EntryAttack.UnderPlayer (SlotName.MkSlotName (Text.pack "myriad opponent")))
+      " {\"type\":\"UnderPlayer\",\"value\":\"myriad opponent\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s EntryAttack.codec
