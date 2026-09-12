@@ -170,5 +170,7 @@ codec =
       Arm.nullary "UmbraArmor" Keyword.UmbraArmor,
       Arm.nullary "Convoke" Keyword.Convoke,
       Arm.nullary "Undaunted" Keyword.Undaunted,
-      Arm.nullary "Improvise" Keyword.Improvise
+      Arm.nullary "Improvise" Keyword.Improvise,
+      Arm.nullary "Retrace" Keyword.Retrace,
+      Arm.payload "Mayhem" (Cost.codec codec) Keyword.Mayhem (\x -> case x of Keyword.Mayhem y -> Just y; _ -> Nothing)
     ]

@@ -214,4 +214,7 @@ data KeywordFamily
   | -- | CR 702.153a: casualty N. No card in the pool asks yet, and it is owed at
     -- the keyword rather than at the first asker.
     Casualty
+  | -- | CR 702.187b: mayhem [cost]. No card in the pool asks yet, and it is owed
+    -- at the keyword rather than at the first asker.
+    Mayhem
   deriving (Bounded, Enum, Eq, Ord, Show)

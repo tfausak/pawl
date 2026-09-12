@@ -359,17 +359,20 @@ candidateCostsGiven permitted pid name oid gs =
               -- cost" proves it.
               ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked
            in orConverted $ case Object.zone obj of
-                -- Four shapes, differing in what they do to the printed cost.
-                -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
-                -- `withAdditional`, and escape (CR 702.138a) is that same shape in
-                -- rule 702.138a's own words; aftermath (CR 702.127a) replaces nothing,
-                -- so it is `printed`; jump-start (CR 702.133a) ADDS a discard to
-                -- `printed`, one however many such abilities the card has; and CR
-                -- 601.3 / Yawgmoth's Will is an EFFECT stating no cost, offering the
-                -- hand's list BESIDE the three rather than instead of them. Rule
-                -- 702.34a's "if the resulting spell is an instant or sorcery spell"
-                -- gates the PERMISSION (Keyword.permissionsFor) and is not re-asked
-                -- here; rule 702.138a states no such clause to gate.
+                -- Three shapes, differing in what they do to the printed cost, plus
+                -- an effect's permission. Flashback (CR 702.34a) REPLACES the mana
+                -- cost, so it is wrapped by `withAdditional`, and escape (CR
+                -- 702.138a) and mayhem (CR 702.187b) are that same shape in their
+                -- own rules' words; aftermath (CR 702.127a) replaces nothing, so it
+                -- is `printed`; jump-start (CR 702.133a) and retrace (CR 702.81a)
+                -- ADD a discard to `printed`, one however many such abilities the
+                -- card has; and CR 601.3 / Yawgmoth's Will is an EFFECT stating no
+                -- cost, offering the hand's list BESIDE the rest rather than instead
+                -- of them. Rule 702.34a's "if the resulting spell is an instant or
+                -- sorcery spell" gates the PERMISSION (Keyword.permissionsFor) and is
+                -- not re-asked here; rule 702.138a and rule 702.81a state no such
+                -- clause to gate, and rule 702.187b's own clause is asked here
+                -- rather than there, at the mayhem offer below.
                 Zone.Graveyard ->
                   let -- CR 613.1: the keywords the card HAS in the graveyard, not
                       -- the ones it prints, an ability granted there (CR 113.6f)
@@ -388,8 +391,29 @@ candidateCostsGiven permitted pid name oid gs =
                       -- spells it; the "other" needs no exclusion, exileCandidates'
                       -- CR 601.2a note below.
                       escape cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Escape cost)) (withAdditional cost)
+                      -- CR 702.187b's cost, read as flashback's is and wrapped by
+                      -- `withAdditional` for the same reason, rule 702.187b sending
+                      -- the cast through CR 601.2f-h in its own words. Offered only
+                      -- while its own "as long as you discarded this card this turn"
+                      -- holds -- the shape `available` gives a printed alternative
+                      -- cost's condition above: a clause that does not hold is not an
+                      -- offer withheld, it is no offer at all. The discarder asked
+                      -- about is the CASTER, rule 702.187b's "you".
+                      mayhem cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Mayhem cost)) (withAdditional cost)
                    in fmap flashback (Keyword.flashbackCosts keywords)
                         <> fmap escape (Keyword.escapeCosts keywords)
+                        <> (if Game.discardedThisTurnBy pid oid gs then fmap mayhem (Keyword.mayhemCosts keywords) else [])
+                        <> ( if Keyword.hasRetrace keywords
+                               then
+                                 [ CandidateCost.MkCandidateCost
+                                     (Just Keyword.Type.Retrace)
+                                     -- CR 702.81a ADDS to the printed cost rather than
+                                     -- replacing it, jump-start's shape below, and
+                                     -- names a QUALITY where rule 702.133a names none.
+                                     printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.HasCardType CardType.Land))]}
+                                 ]
+                               else []
+                           )
                         <> (if Keyword.hasAftermath keywords then [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed] else [])
                         <> ( if Keyword.hasJumpStart keywords
                                then

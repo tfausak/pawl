@@ -580,6 +580,17 @@ data Keyword
     -- replacement, minted from this constructor onto the Aura rather than
     -- printed; CR 702.89b's "totem armor" is the same ability's old name.
     UmbraArmor
+  | -- | 702.81a: cast this card from your graveyard by discarding a land card as
+    -- an ADDITIONAL cost, jump-start's shape with a quality on the discard and
+    -- no exile after.
+    Retrace
+  | -- | 702.187b: "mayhem [cost]" -- cast this card from your graveyard for
+    -- [cost] rather than its mana cost, as long as you discarded it this turn.
+    --
+    -- Not implemented: CR 702.187c's mayhem with NO cost, which permits PLAYING
+    -- the card rather than casting it and so needs a land-play permission
+    -- (#3645).
+    Mayhem (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

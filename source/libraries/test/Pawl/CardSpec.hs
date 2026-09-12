@@ -2892,6 +2892,12 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.125a names no quality: the opponents it counts are written into the
   -- reduction Pawl.Engine.Keyword.selfCostReductionsFor mints.
   Keyword.Undaunted -> []
+  -- CR 702.81a names no quality the CARD supplies: the land its discard names is
+  -- the rule's own word, written into the criterion
+  -- Pawl.Engine.Cost.candidateCostsGiven mints.
+  Keyword.Retrace -> []
+  -- CR 702.187b's payload is a whole Cost, flashback's shape.
+  Keyword.Mayhem cost -> costFilters cost
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]

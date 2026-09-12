@@ -2015,6 +2015,26 @@ damagedPlayer event = damageRecipient event >>= Recipient.playerOf
 damagedObject :: GameEvent -> Maybe ObjectId
 damagedObject event = damageRecipient event >>= Recipient.objectOf
 
+-- CR 702.187b / 608.2i: did this player discard THIS card this turn?
+-- wasDealtDamageThisTurn's shape below over the discard log, and the reader is
+-- Pawl.Engine.Cost.candidateCostsGiven's mayhem offer. The turn scope is
+-- GameState.events itself, that function's reason.
+--
+-- The id compared is the one the CR 400.7 funnel minted, which is what
+-- Pawl.Engine.Event.discardReturning records: the hand incarnation ceased as the
+-- card was discarded, so the graveyard object asking this question is the only
+-- one either side can name. That is also what keeps rule 702.187b honest about a
+-- card that LEFT the graveyard and came back -- the return mints a third
+-- incarnation, which no discard this turn names.
+--
+-- The CAUSE is not consulted, discardOf's reason above.
+discardedThisTurnBy :: PlayerId -> ObjectId -> GameState -> Bool
+discardedThisTurnBy pid oid gs =
+  let discardedIt event = case event of
+        GameEvent.Discarded discarded -> Discarded.player discarded == pid && Discarded.card discarded == oid
+        _ -> False
+   in any (discardedIt . LoggedEvent.event) (GameState.events gs)
+
 -- CR 120.1 / 608.2i: was this PLAYER dealt damage this turn? The log fold
 -- damagedPlayer exists for, written once here because two callers ask it --
 -- Pawl.Engine.Count.playerView, which fills the player candidate's

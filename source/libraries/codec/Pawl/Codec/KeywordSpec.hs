@@ -1180,6 +1180,26 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Undaunted
       " {\"type\":\"Undaunted\"} "
+  -- CR 702.81a: nullary for jump-start's reason -- the land discard the rule
+  -- names is the rule's, not the card's.
+  Spec.it s "Retrace" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Retrace
+      " {\"type\":\"Retrace\"} "
+  -- CR 702.187b's payload is a whole Cost, Electro's Bolt's {1}{R}, and it must
+  -- not share Flashback's tag: rule 702.187b gates its permission on the discard
+  -- this turn and rule 702.34a on the card type, so the two answer differently.
+  Spec.it s "Mayhem carries its cost, and is not Flashback" $ do
+    let mayhem n = Keyword.Mayhem (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (mayhem 2)
+      " {\"type\":\"Mayhem\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (mayhem 2) /= Codec.encode Keyword.codec (flashbackOf 2)) "the same cost under two keywords encodes differently"
   -- CR 702.92a, CR 702.163a and CR 702.182a: nullary, because each rule states
   -- one fixed token and takes no parameter. Three arms rather than one
   -- parameterised by the token, so a card cannot spell a token the CR never

@@ -2333,11 +2333,22 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Convoke -> keyword
   Keyword.Type.Improvise -> keyword
   -- CR 702.41a's [text] is a printed quality, so `rewrite` reaches it as
-  -- landwalk's criterion is reached -- a Magical Hack naming Island turns
-  -- affinity for Islands into affinity for whatever it named.
+  -- landwalk's criterion is reached.
+  --
+  -- Nothing observes the swap today: affinity's one reader is
+  -- Pawl.Engine.Cost.selfReductions, which takes Face.keywords off Game.faceOf --
+  -- the PRINTED face (gap #1859) -- so the rewritten keyword this produces never
+  -- reaches a cost.
   Keyword.Type.Affinity quality -> Keyword.Type.Affinity (rewrite pairs quality)
   -- CR 702.125a counts OPPONENTS, so there is no printed word here to swap.
   Keyword.Type.Undaunted -> keyword
+  -- CR 702.81a names "a land card", the rules' own vocabulary, and the criterion
+  -- is written in Pawl.Engine.Cost rather than on the card -- so CR 612.2 has no
+  -- printed word here to swap.
+  Keyword.Type.Retrace -> keyword
+  -- CR 702.187b's cost is printed, so its components take the same descent
+  -- flashback's do.
+  Keyword.Type.Mayhem cost -> Keyword.Type.Mayhem (rewriteCost pairs cost)
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is

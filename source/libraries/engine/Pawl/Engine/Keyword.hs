@@ -388,6 +388,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Improvise -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
+  Keyword.Retrace -> []
+  Keyword.Mayhem _ -> []
 
 -- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
 -- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
@@ -559,6 +561,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Improvise -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
+  Keyword.Retrace -> []
+  Keyword.Mayhem _ -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
@@ -905,6 +909,11 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Improvise -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
+  -- CR 702.81a and CR 702.187b function in a graveyard, but neither mints an
+  -- ACTIVATED ability there: each is a permission to cast the card, which
+  -- permissionsFor grants and Pawl.Engine.Cost prices.
+  Keyword.Retrace -> []
+  Keyword.Mayhem _ -> []
 
 -- CR 702.84a's whole ability, minted from the one cost the keyword carries, as
 -- four effects in one clause -- the return, the haste, the delayed exile and the
@@ -1300,6 +1309,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Improvise -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
+  Keyword.Retrace -> []
+  Keyword.Mayhem _ -> []
 
 -- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
@@ -1847,6 +1858,19 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Improvise -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
+  -- CR 702.81a's permission, ungated: rule 702.81a states no clause of rule
+  -- 702.34a's kind, so a card of any type with retrace may be cast from its
+  -- owner's graveyard. What the rule ADDS is the land discard, and that half is
+  -- Pawl.Engine.Cost.candidateCostsGiven's.
+  Keyword.Retrace -> [CastingPermission.CastFromGraveyard]
+  -- CR 702.187b's permission. Its "as long as you discarded this card this turn"
+  -- is not asked here: the clause reads the turn's event log, which this function
+  -- is not given, so it gates the COST offer instead
+  -- (Pawl.Engine.Cost.candidateCostsGiven), where the state is in hand. The two
+  -- readings cannot be told apart -- rule 702.187b's permission and its cost are
+  -- one sentence, so a card whose mayhem cost is withheld has nothing to be cast
+  -- for, and a permission from somewhere else brings its own cost.
+  Keyword.Mayhem _ -> [CastingPermission.CastFromGraveyard]
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
@@ -1880,6 +1904,31 @@ hasFlash = Set.member Keyword.Flash
 -- count, the rule taking no parameter.
 hasJumpStart :: Set Keyword -> Bool
 hasJumpStart = Set.member Keyword.JumpStart
+
+-- | CR 702.81a's ADDITIONAL cost, "discarding a land card": whether this card's
+-- keywords add one to a cast from a graveyard. hasJumpStart's shape above and for
+-- its reasons -- a Bool because rule 702.81a states the cost itself, membership
+-- because the rule takes no parameter -- differing only in the QUALITY the
+-- discard names, which Cost.candidateCostsGiven writes as the criterion.
+hasRetrace :: Set Keyword -> Bool
+hasRetrace = Set.member Keyword.Retrace
+
+-- CR 702.187b: every cost this card may be cast from the graveyard for under its
+-- mayhem ability, in ascending Set order. Read by
+-- Pawl.Engine.Cost.candidateCostsGiven, which offers them only while the object
+-- is in a graveyard AND its caster discarded it this turn -- the zone half and
+-- the "as long as" half of the same sentence.
+--
+-- A LIST for flashbackCosts' reason: rule 702.187b states no limit on how many
+-- mayhem abilities an object has, and CR 601.2b makes two of them a CHOICE.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+mayhemCosts :: Set Keyword -> [Cost Keyword]
+mayhemCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Mayhem cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
 -- CR 702.102a: does this card's keyword set let both halves be cast as one fused
 -- split spell? Its one reader is Pawl.Engine.Card.fusedFace, which builds the
@@ -2834,6 +2883,11 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Improvise -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
+  -- Neither rule 702.81a nor rule 702.187b prints CR 702.34a's second sentence:
+  -- a spell cast with retrace or with mayhem goes wherever it would go, which is
+  -- its owner's graveyard, and may be cast again on a later turn.
+  Keyword.Retrace -> []
+  Keyword.Mayhem _ -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
@@ -3036,6 +3090,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Improvise -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
+  Keyword.Retrace -> []
+  Keyword.Mayhem _ -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
@@ -3271,6 +3327,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Improvise -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
+  Keyword.Retrace -> []
+  Keyword.Mayhem _ -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
 -- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
@@ -3455,6 +3513,9 @@ familyOf keyword = case keyword of
   Keyword.Improvise -> Nothing
   Keyword.Affinity _ -> Just KeywordFamily.Affinity
   Keyword.Undaunted -> Nothing
+  -- CR 702.81a carries no parameter, so there is no family to name it by.
+  Keyword.Retrace -> Nothing
+  Keyword.Mayhem _ -> Just KeywordFamily.Mayhem
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.
