@@ -2229,6 +2229,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- is in the row Pawl.Engine.Keyword mints.
   Keyword.Type.Devour _ -> keyword
   Keyword.Type.Exalted -> keyword
+  -- CR 702.92a, 702.163a and 702.182a are nullary: their creature-type words
+  -- (Germ, Rebel, Hero) are in the TOKEN Pawl.Engine.Keyword mints, which
+  -- Pawl.Engine.Projection.Rewrite's Effect.Create arm rewrites as card data, so
+  -- CR 612.2a reaches them there rather than here.
   Keyword.Type.LivingWeapon -> keyword
   Keyword.Type.ForMirrodin -> keyword
   Keyword.Type.JobSelect -> keyword

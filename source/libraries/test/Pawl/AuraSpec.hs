@@ -3713,12 +3713,13 @@ equipmentTokenSpec s registry = Spec.describe s "EquipmentToken" $ do
     Spec.assertEqWith s "CR 701.3b/704.5f: nothing attached to it, so the 0/0 Germ is buried" (fmap (\oid -> S.powerToughnessOf oid goneSettled) goneMinted) [Nothing]
     Spec.assertEqWith s "the same board with the Husk alive keeps a 1/1" (fmap (\oid -> S.powerToughnessOf oid liveSettled) liveMinted) [Just (1, 1)]
     Spec.assertEqWith s "and the Husk was really gone before the trigger resolved" (Game.lookupObject equipmentId goneSettled) Nothing
-  -- CR 706.2: living weapon is a copiable value, so a permanent entering as a
+  -- CR 707.2: living weapon is printed rules text and so a copiable value, and
+  -- CR 707.5 gives the copy's own entry trigger its chance -- a permanent entering as a
   -- COPY of the Husk mints its own Germ and equips that one. Phyrexian
   -- Metamorph is the tripwire board: the keyword is read off the PROJECTION
   -- (Projection.mintedTriggeredAbilitiesOf over PC.keywords), never off the
   -- printed card, which here says "Phyrexian Metamorph".
-  Spec.it s "CR 706.2 whole cards: a Phyrexian Metamorph copying Flayer Husk mints a second Germ and equips that one" $ do
+  Spec.it s "CR 707.2/707.5 whole cards: a Phyrexian Metamorph copying Flayer Husk mints a second Germ and equips that one" $ do
     husk <- S.printingOf s registry "Flayer Husk"
     metamorph <- S.printingOf s registry "Phyrexian Metamorph"
     let (huskId, firstGerm, afterHusk) = enterAndTrigger (Setup.emptyGame S.bothPlayers) husk
@@ -3729,7 +3730,7 @@ equipmentTokenSpec s registry = Spec.describe s "EquipmentToken" $ do
         settled = S.runPure (copyOf huskId) triggered Engine.settleForPriority
         secondGerm = filter (\oid -> notElem oid firstGerm) (S.tokensOf triggered)
         metamorphIds = printedOnBattlefield "Phyrexian Metamorph" settled
-    Spec.assertEqWith s "CR 706.2: the copy's own Germ is a 1/1, so the copied living weapon both minted and attached" (fmap (\oid -> S.powerToughnessOf oid settled) secondGerm) [Just (1, 1)]
+    Spec.assertEqWith s "CR 707.5: the copy's own Germ is a 1/1, so the copied living weapon both minted and attached" (fmap (\oid -> S.powerToughnessOf oid settled) secondGerm) [Just (1, 1)]
     Spec.assertEqWith s "CR 701.3a: the Metamorph equips its OWN Germ, not the Husk's" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid settled)) metamorphIds) [Just (fmap Recipient.ToCreature (Maybe.listToMaybe secondGerm))]
     Spec.assertEqWith s "and the Husk's own Germ is still a 1/1 wearing the Husk" (fmap (\oid -> S.powerToughnessOf oid settled) firstGerm) [Just (1, 1)]
     Spec.assertEqWith s "the copy really happened: it is a Flayer Husk by name (CR 707.2)" (fmap (\oid -> Projection.namesOf oid settled) metamorphIds) [Set.singleton (CardName.MkCardName (Text.pack "Flayer Husk"))]
