@@ -30,6 +30,7 @@ import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
@@ -46,6 +47,7 @@ import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Power as Power
@@ -284,6 +286,22 @@ data Face card = MkFace
     -- why a cost naming cards of a stated quality in a hidden zone (Magmatic
     -- Insight's discarded land) excuses a cast an effect instructs "if able".
     additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
+    -- | CR 700.2h: the additional cost printed before a mode's effect, keyed by
+    -- that mode's index into 'spell' -- CR 702.172a's spree and CR 702.183a's
+    -- tiered are the two keywords that print them. Absent for a mode that lists
+    -- none, which is every mode of every other card.
+    --
+    -- On the FACE and not on Pawl.Types.Mode, because rule 700.2h scopes itself
+    -- to modal SPELLS: the same Mode type carries an activated or triggered
+    -- ability's modes, where no such cost can be printed, and this is cast-time
+    -- cost data of the additionalCosts family above. Paid at CR 601.2f-h with
+    -- them, once the modes are announced -- Pawl.Engine.Cast.modeCostTotal, which
+    -- charges a mode chosen twice twice (CR 700.2d).
+    --
+    -- Keys outside 'spell''s mode range are rejected by Pawl.Codec.Face rather
+    -- than ignored here: a card whose cost names a mode it does not have is
+    -- mistranscribed, not free.
+    modeCosts :: Map.Map ModeIndex.ModeIndex (Cost.Cost Keyword.Keyword),
     -- | CR 101.1: the ceilings this face's own words put on the value of X its
     -- controller announces at CR 601.2b -- Soul Immolation's "X can't be greater
     -- than the greatest toughness among creatures you control". Empty for every

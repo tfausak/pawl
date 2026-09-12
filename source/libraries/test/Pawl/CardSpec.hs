@@ -343,6 +343,7 @@ vanillaFace name typeLine =
       Face.openingHandActions = [],
       Face.specialActions = [],
       Face.additionalCosts = [],
+      Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
@@ -1284,10 +1285,14 @@ revealsAsCost =
 -- The alternatives are taken UNWRAPPED, unlike costsFor's `withAdditional`: the
 -- printed cost in the head of this list already carries the additional costs, so
 -- wrapping them again would change no `any`.
+--
+-- CR 700.2h's per-mode costs are here too: they are additional costs of the same
+-- CR 601.2f total, and one declaring X would bind Binding.variableX as any other
+-- does. No printing puts an X in one.
 spellCostsOf :: Face.Face Card.Type.Card -> [Cost.Type.Cost Keyword.Keyword]
 spellCostsOf face =
-  Cost.Type.MkCost (Face.manaCost face) (Face.additionalCosts face)
-    : fmap AlternativeCost.cost (Face.alternativeCosts face)
+  (Cost.Type.MkCost (Face.manaCost face) (Face.additionalCosts face) : fmap AlternativeCost.cost (Face.alternativeCosts face))
+    <> Map.elems (Face.modeCosts face)
 
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
 -- every clause. A READER of X rather than a declarer: Clash of Wills' "unless its
@@ -2813,6 +2818,8 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   -- CR 702.134a is payload-free too: the Filter its minted ability carries -- the
   -- target slot's -- is the ENGINE's, never a card's.
   Keyword.Mentor -> []

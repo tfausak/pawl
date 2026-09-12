@@ -125,6 +125,7 @@ faceDownFace listed =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
@@ -422,6 +423,11 @@ merge2 l r =
           Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
           Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
           Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
+          -- Left-biased, with Face.spell, which merge2 also leaves as the left
+          -- half's: CR 700.2h's costs index THAT half's modes, so the right
+          -- half's keys would name modes this view does not have. Both sides are
+          -- empty today: fuseSpells builds no fused face from a modal half.
+          Face.modeCosts = Face.modeCosts l,
           Face.alternativeCosts = Face.alternativeCosts l <> Face.alternativeCosts r,
           -- CR 709.4c again: a cost reduction a half prints about itself is an
           -- ability in that half's text box, so the combined view has both, and CR
@@ -1479,6 +1485,7 @@ subtractHalf face =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],

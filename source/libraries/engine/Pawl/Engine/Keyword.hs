@@ -252,6 +252,10 @@ abilitiesFor keyword count = case keyword of
   Keyword.ForMirrodin -> List.genericReplicate count (attachToOwnToken rebelToken)
   Keyword.JobSelect -> List.genericReplicate count (attachToOwnToken heroToken)
   Keyword.Evolve -> List.genericReplicate count evolve
+  -- CR 702.172a and 702.183a mint nothing: both are static abilities of a
+  -- spell on the stack, read at CR 601.2b by Pawl.Engine.Cast.
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   -- CR 702.105b: each instance triggers separately.
   Keyword.Dethrone -> List.genericReplicate count dethrone
   Keyword.Fuse -> []
@@ -505,6 +509,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   -- CR 702.84a, 702.128a and 702.129a function in a GRAVEYARD, so
   -- graveyardAbilitiesFor below is the roster that mints them and this hand one
   -- grants nothing.
@@ -865,6 +871,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   Keyword.Unearth cost -> [unearth cost]
   Keyword.Embalm cost -> [embalm cost]
   Keyword.Eternalize cost -> [eternalize cost]
@@ -1260,6 +1268,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   Keyword.Unearth _ -> []
   Keyword.Embalm _ -> []
   Keyword.Eternalize _ -> []
@@ -1782,6 +1792,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   -- CR 702.84a is an ACTIVATED ability and not a casting permission: unearth
   -- RETURNS the card to the battlefield, it never casts it. Cycling's reading
   -- above, one zone over.
@@ -2874,6 +2886,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   -- CR 702.84a's two replacement-shaped clauses are created by the ability's
   -- RESOLUTION rather than standing on the card, so they are effects inside
   -- `unearth` above and not rows here.
@@ -3119,6 +3133,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   Keyword.Unearth _ -> []
   Keyword.Embalm _ -> []
   Keyword.Eternalize _ -> []
@@ -3362,6 +3378,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   Keyword.Unearth _ -> []
   Keyword.Embalm _ -> []
   Keyword.Eternalize _ -> []
@@ -3542,6 +3560,8 @@ familyOf keyword = case keyword of
   Keyword.LivingWeapon -> Nothing
   Keyword.ForMirrodin -> Nothing
   Keyword.JobSelect -> Nothing
+  Keyword.Spree -> Nothing
+  Keyword.Tiered -> Nothing
   Keyword.Unearth _ -> Just KeywordFamily.Unearth
   Keyword.Embalm _ -> Just KeywordFamily.Embalm
   Keyword.Eternalize _ -> Just KeywordFamily.Eternalize
@@ -4614,6 +4634,7 @@ spiritToken =
               Face.enchant = [],
               Face.counterability = Counterability.Counterable,
               Face.additionalCosts = [],
+              Face.modeCosts = Map.empty,
               Face.maximumX = [],
               Face.alternativeCosts = [],
               Face.costReductions = [],
@@ -4739,6 +4760,7 @@ servoToken =
               Face.enchant = [],
               Face.counterability = Counterability.Counterable,
               Face.additionalCosts = [],
+              Face.modeCosts = Map.empty,
               Face.maximumX = [],
               Face.alternativeCosts = [],
               Face.costReductions = [],
@@ -4871,6 +4893,7 @@ creatureToken name subtypes colors power toughness =
               Face.enchant = [],
               Face.counterability = Counterability.Counterable,
               Face.additionalCosts = [],
+              Face.modeCosts = Map.empty,
               Face.maximumX = [],
               Face.alternativeCosts = [],
               Face.costReductions = [],

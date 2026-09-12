@@ -14,6 +14,7 @@ module Pawl.Codec.Face where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.ActivationProhibition as ActivationProhibition
@@ -29,6 +30,7 @@ import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
+import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.CostReduction as CostReduction
 import qualified Pawl.Codec.CounterRestriction as CounterRestriction
@@ -44,6 +46,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.Modal as Modal
+import qualified Pawl.Codec.ModeIndex as ModeIndex
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.Power as Power
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
@@ -64,7 +67,19 @@ import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Counterability as Counterability.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.ModeIndex as ModeIndex.Type
 import qualified Pawl.Types.TypeLine as TypeLine
+
+-- | CR 700.2h's cost belongs to a mode the face HAS: a key past the end of
+-- `spell`'s mode list is a mistranscription, and silently dropping it would make
+-- that mode free.
+modeCostsInRange :: Face.Face card -> Either Text.Text (Face.Face card)
+modeCostsInRange f =
+  let indices = fmap ModeIndex.Type.MkModeIndex (take (Seq.length (Modal.Type.modes (Face.spell f))) [0 ..])
+   in if all (\i -> elem i indices) (Map.keys (Face.modeCosts f))
+        then Right f
+        else Left (Text.pack "modeCosts names a mode the spell does not have")
 
 -- | @Eq card@ because several fields below carry card-shaped payloads and
 -- 'Fields.defaulted' omits a key by comparing its value to the default.
@@ -72,7 +87,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
 codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Face.Face card)
-codec cardCodec = Fields.object $ do
+codec cardCodec = Fields.objectWith modeCostsInRange $ do
   name <- Fields.required "name" CardName.codec Face.name
   -- CR 205.1 puts a type line on every card and CR 114.3 gives an emblem no
   -- types at all, so the key is optional and its absence means the latter: an
@@ -127,6 +142,10 @@ codec cardCodec = Fields.object $ do
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
   blockCosts <- Fields.defaulted "blockCosts" [] (Common.list BlockCost.codec) Face.blockCosts
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
+  -- CR 700.2h: the cost printed before a mode's effect, keyed by that mode's
+  -- index into `spell` -- an object rather than an array so a card lists only
+  -- the modes that print one (Pawl.Types.Face).
+  modeCosts <- Fields.defaulted "modeCosts" Map.empty (Common.naturalMap ModeIndex.codec (Cost.codec Keyword.codec)) Face.modeCosts
   -- CR 101.1: the ceilings this face's own words put on CR 601.2b's announced X
   -- (Pawl.Types.Face).
   maximumX <- Fields.defaulted "maximumX" [] (Common.list Quantity.codec) Face.maximumX
@@ -182,6 +201,7 @@ codec cardCodec = Fields.object $ do
         Face.attackCosts = attackCosts,
         Face.blockCosts = blockCosts,
         Face.additionalCosts = additionalCosts,
+        Face.modeCosts = modeCosts,
         Face.maximumX = maximumX,
         Face.alternativeCosts = alternativeCosts,
         Face.costReductions = costReductions,
