@@ -1770,6 +1770,30 @@ apply batch candidate event =
                 -- entered untapped, since the printed "may" governs both halves
                 -- at once.
                 Monad.when (AsCopy.tapped asCopy) (enterTapped oid)
+                -- CR 707.9e, on this branch alone for the same reason: the
+                -- exception is an ADDITIONAL EFFECT rather than a modification of
+                -- a characteristic (Altered Ego's "except it enters with X
+                -- additional +1/+1 counters on it"), so it is not folded into the
+                -- snapshot above but placed on the object -- and it happens only
+                -- where a copy was actually made.
+                --
+                -- Through addEnteringCounters, the WithCounters arm's funnel and
+                -- for its reasons: CR 122.6's counters must be on the permanent
+                -- before it exists on the battlefield, and CR 614.16 applies
+                -- inside this entry's own CR 616.1 loop (Doubling Season). The
+                -- amount is read the same way too -- CR 107.3m's announced X
+                -- substituted in (Altered Ego announces X on the spell, and CR
+                -- 400.7 leaves the permanent none), and evaluated against
+                -- boardAsEntering rather than the live battlefield.
+                Foldable.for_ (AsCopy.counters asCopy) $ \withCounters -> do
+                  gs2 <- State.get
+                  let viewOf = Projection.viewWithLastKnown oid gs2
+                      context = Replacement.candidateContext gs2 candidate
+                      announcedX = Projection.announcedXOf oid gs2
+                  Foldable.for_ (Map.toList (WithCounters.counters withCounters)) $ \(kind, quantity) ->
+                    case Quantity.evaluate viewOf context (Projection.boardAsEntering gs2) oid (Quantity.substituteAnnouncedX announcedX quantity) of
+                      Nothing -> pure () -- unevaluable quantity: no counters, the WithCounters arm's posture
+                      Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
                 pure (Just event)
       -- CR 614.1c / 208.2b: Primal Plasma's choice of which printed
       -- power/toughness-and-keywords option to become. Written into the COPIABLE

@@ -1226,7 +1226,9 @@ addFilter filter_ (filters, quantities) = (filter_ : filters, quantities)
 -- answers vacuously at the event.
 entryRewriteReads :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 entryRewriteReads rewrite = case rewrite of
-  EntryRewrite.AsCopy asCopy -> ([AsCopy.eligible asCopy], [])
+  -- CR 707.9e's additional counters are Quantities beside the eligible filter,
+  -- and read at the entry exactly as the CR 614.1c row's below are.
+  EntryRewrite.AsCopy asCopy -> ([AsCopy.eligible asCopy], foldMap (Map.elems . WithCounters.counters) (AsCopy.counters asCopy))
   EntryRewrite.ChoiceOf _ -> ([], [])
   EntryRewrite.ChoiceByCoinFlip _ -> ([], [])
   EntryRewrite.ChooseColor -> ([], [])

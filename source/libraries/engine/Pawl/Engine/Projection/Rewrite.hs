@@ -1184,11 +1184,18 @@ rewriteEntryRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRe
 rewriteEntryRewrite pairs rewrite = case rewrite of
   -- The "which permanents" clause names a word, and so does CR 707.9a's gained
   -- ability -- a keyword, and a keyword may carry one (rewriteCopyException).
+  -- CR 707.9e's additional counters take rewriteWithCounters' descent, the same
+  -- one the CR 614.1c row below gets: the amount is a Quantity and the kind may
+  -- be a whole keyword. A REGRESSION FENCE, the Create arm's reason: Altered
+  -- Ego's amount is CR 601.2b's X and its kind is +1/+1, neither of which holds
+  -- a word, so neutralizing this half leaves the suite green. The `tapped` flag
+  -- is the one field passed through, and holds no word (Vesuva).
   EntryRewrite.AsCopy c ->
     EntryRewrite.AsCopy
       c
         { AsCopy.eligible = Filter.rewrite pairs (AsCopy.eligible c),
-          AsCopy.exceptions = fmap (rewriteCopyException pairs) (AsCopy.exceptions c)
+          AsCopy.exceptions = fmap (rewriteCopyException pairs) (AsCopy.exceptions c),
+          AsCopy.counters = fmap (rewriteWithCounters pairs) (AsCopy.counters c)
         }
   -- CR 702.14a's word again, this time inside a keyword an option grants.
   EntryRewrite.ChoiceOf os -> EntryRewrite.ChoiceOf (fmap (\o -> o {EntryOption.keywords = Set.map (Filter.rewriteKeyword pairs) (EntryOption.keywords o)}) os)
