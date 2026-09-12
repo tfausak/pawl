@@ -138,18 +138,18 @@ data Object = MkObject
     -- newIncarnation. Not purely stored: Engine.checkControlContinuity drops the
     -- claim when the derived controller stops matching it.
     sickness :: Sickness.Sickness,
-    -- | CR 702.30a's clock: for each player who has come to control this
-    -- permanent, how many of that player's upkeeps have begun since, capped at
-    -- the one the rule asks about. A missing entry is "more than one, or never";
+    -- | CR 702.30a's window, per player: for a seat that has come to control
+    -- this permanent, how far the rule's "since the beginning of your last
+    -- upkeep" has run. A seat with no entry has no open window;
     -- Pawl.Types.ControlClock says why two states are needed where a flag is not
-    -- enough.
+    -- enough, and why there is no third.
     --
     -- SAMPLED rather than hooked, for `sickness` above's reason -- control is
-    -- DERIVED (CR 613.1b) and nothing announces a change.
-    -- Engine.sampleControlClock adds `Gained` for a permanent's live controller
-    -- wherever Engine.sampleControl looks, and Engine.advanceControlClock
-    -- advances one seat's entry at the beginning of that seat's upkeep. Its one
-    -- reader is Filter.ControlGainedSinceLastUpkeep.
+    -- DERIVED (CR 613.1b) and nothing announces a change. Engine.sampleControl
+    -- opens a seat's window wherever it finds the permanent has arrived under
+    -- them, and Engine.advanceControlClock moves that seat's window on at the
+    -- beginning of their upkeep. Its one reader is
+    -- Filter.ControlGainedSinceLastUpkeep.
     --
     -- Per-incarnation: reset by newIncarnation (CR 400.7), which is rule 702.30a
     -- read straight -- the permanent that comes back came under your control

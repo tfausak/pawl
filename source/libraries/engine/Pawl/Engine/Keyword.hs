@@ -6158,11 +6158,17 @@ cumulativeUpkeep cost =
 -- Pawl.Types.Object.controlClock, which is per-incarnation, so only a permanent
 -- still on the battlefield has one to read.
 --
--- Not implemented: rule 702.30a prints no "if this permanent is on the
--- battlefield" -- that clause is rule 702.24a's, not this one's -- so a
--- permanent that leaves in response should still resolve the ability and offer
--- the payment, and here the count reads zero and the ability is removed instead
--- (#3675).
+-- Not implemented, both halves of one thing -- the count reads the LIVE
+-- battlefield where the rule reads the ability's own state, so CR 608.2a's
+-- re-check asks the wrong question twice over (#3675). Rule 702.30a prints no
+-- "if this permanent is on the battlefield" -- that clause is rule 702.24a's,
+-- not this one's -- so a permanent that leaves in response should still resolve
+-- the ability and offer the payment, and here the count reads zero and the
+-- ability is removed instead. And rule 702.30a's "your" is CR 603.3a's
+-- controller of the ability, fixed when it triggered, where
+-- Filter.ControlGainedSinceLastUpkeep asks about the candidate's controller NOW:
+-- control moved in response makes the re-check read the thief's clock, and the
+-- payment is elided there too.
 echo :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 echo cost =
   let cameUnderYourControl =

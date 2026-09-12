@@ -831,6 +831,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (upkeep 1)
       " {\"type\":\"CumulativeUpkeep\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (upkeep 2) /= Codec.encode Keyword.codec (Keyword.Ward (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))) "and is not ward"
+  -- CR 702.30a's payload is a Cost too, and the tag must not collide with the
+  -- upkeep cost above: what a permanent owes at the first upkeep after it came
+  -- under your control is not what it owes at every upkeep thereafter. No arm of
+  -- the keyword codec is forced (#2262), so this is the round trip that would
+  -- catch a missing one.
+  Spec.it s "Echo carries its cost, and is not CumulativeUpkeep" $ do
+    let echo n = Keyword.Echo (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (echo 1)
+      " {\"type\":\"Echo\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (echo 2) /= Codec.encode Keyword.codec (Keyword.CumulativeUpkeep (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))) "and is not cumulative upkeep"
   -- CR 702.130a's N rides the constructor the same way, and must not share a tag
   -- with the other payloaded keywords either.
   Spec.it s "Afflict carries its N" $ do

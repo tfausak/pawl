@@ -2209,17 +2209,20 @@ echoSpec s registry =
       -- step between two of them, deliberately -- alice's Forests stay tapped, so
       -- a second payment is visible as a second Forest rather than as the same
       -- one twice.
-      atUpkeepOf pid gs =
+      atStepOf step pid gs =
         gs
-          { GameState.phase = upkeep,
+          { GameState.phase = step,
             GameState.activePlayer = pid,
             GameState.priority = Just pid,
-            GameState.remaining = S.phasesAfter upkeep
+            GameState.remaining = S.phasesAfter step
           }
+      atUpkeepOf = atStepOf upkeep
       ranUpkeep :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> GameState.GameState -> (((), GameState.GameState), [Response.Response])
       ranUpkeep answer pid gs = Replay.record answer (atUpkeepOf pid gs) Engine.runStep
       afterUpkeep :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
       afterUpkeep answer pid gs = S.runPure answer (atUpkeepOf pid gs) Engine.runStep
+      afterStep :: (forall r. Prompt.Prompt r -> r) -> Phase.Phase -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+      afterStep answer step pid gs = S.runPure answer (atStepOf step pid gs) Engine.runStep
       jaguarBoard forests = do
         forest <- S.printingOf s registry "Forest"
         jaguar <- S.printingOf s registry "Pouncing Jaguar"
@@ -2284,6 +2287,34 @@ echoSpec s registry =
           Spec.assertBool s (S.onBattlefield oid bobs) "so the Jaguar survived under its new controller"
           Spec.assertEqWith s "alice, who already paid once, spent nothing more" (S.tappedCount S.alice bobs) 1
           Spec.assertEqWith s "and bob was the one offered it" (length (payResponses bobLog)) 1
+        -- CR 702.30a asks whether the permanent came under your control since
+        -- your last upkeep, NOT whether this is the first time you ever
+        -- controlled it. alice's window has already closed when bob borrows the
+        -- Jaguar for a turn, and CR 514.2 ending the Act of Treason gives it back
+        -- to her -- which is a fresh coming-under-her-control and opens hers
+        -- again. CR 400.7 is not involved: the permanent never left the
+        -- battlefield, so this is the same incarnation with the same clock.
+        --
+        -- The settle after the Act of Treason resolves is a REAL precondition and
+        -- not tidiness: Engine.sampleControl sees control move by diffing two
+        -- samples, so a theft and a hand-back that both fell between one sample
+        -- and the next would be invisible to it. A game gives bob priority there;
+        -- this script has to say so.
+        Spec.it s "CR 702.30a control coming back re-opens the window it closed" $ do
+          (oid, gs0) <- jaguarBoard 4
+          mountain <- S.printingOf s registry "Mountain"
+          treason <- S.printingOf s registry "Act of Treason"
+          let elapsed = afterUpkeep (paysFor S.alice) S.alice (afterUpkeep (paysFor S.alice) S.alice gs0)
+              (held, staged) = S.addHandCard treason S.bob (S.landsFor mountain S.bob 3 elapsed)
+              stolen = S.runPure (paysFor S.bob) (atStepOf S.precombatMain S.bob staged) (S.cast S.bob held >> Stack.resolveTop >> Engine.settleForPriority)
+              reverted = afterStep (paysFor S.bob) (Phase.Ending EndingStep.Cleanup) S.bob stolen
+              ((_, back), backLog) = ranUpkeep (paysFor S.alice) S.alice reverted
+          Spec.assertEqWith s "alice's two upkeeps spent one Forest and shut her window" (S.tappedCount S.alice elapsed) 1
+          Spec.assertEqWith s "the Jaguar really was bob's" (Projection.View.controllerOf oid stolen) (Just S.bob)
+          Spec.assertEqWith s "CR 514.2 and alice's again once bob's turn ended" (Projection.View.controllerOf oid reverted) (Just S.alice)
+          Spec.assertEqWith s "CR 702.30a a second Forest of alice's paid echo, so her window re-opened" (S.tappedCount S.alice back) 2
+          Spec.assertBool s (S.onBattlefield oid back) "and the Jaguar survived that upkeep too"
+          Spec.assertEqWith s "she being offered it once" (length (payResponses backLog)) 1
         -- The copy tripwire. A Clone of the Jaguar HAS echo -- CR 707.2 copies the
         -- printed keyword -- and CR 702.30a's clock starts for the copy as it
         -- enters. An implementation reading the PRINTED card (Game.faceOf) rather

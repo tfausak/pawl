@@ -286,18 +286,21 @@ checkControlContinuity = do
   State.put gs {GameState.objects = foldr interrupted (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
 
 -- CR 702.30a's clock, one seat at a time: `pid`'s upkeep is beginning, so an
--- entry of theirs moves on one place. Only `pid`'s, rule 702.30a measuring the
--- window in the upkeeps of the player whose control it asks about, so a
--- permanent stolen and given back has an untouched clock for the seat that did
--- not take a turn in between.
+-- open window of theirs moves on one place and one that has already run its
+-- upkeep is dropped. Only `pid`'s, rule 702.30a measuring the window in the
+-- upkeeps of the player whose control it asks about, so a permanent stolen and
+-- given back has an untouched clock for the seat that did not take a turn in
+-- between. Dropping rather than marking spent: `sampleControl` below opens a
+-- window on an ARRIVAL and never on an absence, so there is nothing for a
+-- tombstone to suppress, and Pawl.Types.ControlClock says why "no window" then
+-- has one representation.
 advanceControlClock :: PlayerId -> Game ()
 advanceControlClock pid = do
   gs <- State.get
   let step clock = case clock of
-        ControlClock.Gained -> ControlClock.SinceLastUpkeep
-        ControlClock.SinceLastUpkeep -> ControlClock.Elapsed
-        ControlClock.Elapsed -> ControlClock.Elapsed
-      tick obj = obj {Object.controlClock = Map.adjust step pid (Object.controlClock obj)}
+        ControlClock.Gained -> Just ControlClock.SinceLastUpkeep
+        ControlClock.SinceLastUpkeep -> Nothing
+      tick obj = obj {Object.controlClock = Map.update step pid (Object.controlClock obj)}
   State.put gs {GameState.objects = foldr (Map.adjust tick) (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
 
 -- CR 704.5k asks how long each permanent has "had the world supertype", and
@@ -348,11 +351,17 @@ sampleWorldSince = do
 -- come home. Terminates: it only mints on a difference.
 --
 -- CR 702.30a's clock rides the same pass, because it asks the same question of
--- the same map and Projection.controlGrants is the expensive part. It only ever
--- ADDS -- `advanceControlClock` above moves an entry on and CR 400.7's
--- newIncarnation drops one -- and unlike the event above, FIRST SIGHTING IS A
--- GAIN: rule 702.30a's window opens when the permanent comes under your control,
--- and CR 110.2's battlefield entry is that.
+-- the same map and Projection.controlGrants is the expensive part. A window
+-- opens on every ARRIVAL -- each difference the diff above found, plus the first
+-- sighting it declines to mint an event for, CR 110.2's battlefield entry being
+-- one of those. OVERWRITING, and on a RETURN as much as on a first arrival: rule
+-- 702.30a asks whether the permanent came under your control since your last
+-- upkeep, not whether this is the first time you ever controlled it, so a seat
+-- whose window ran out gets a fresh one when control comes back to it
+-- (Pawl.KeywordTriggerSpec's "control coming back re-opens the window it
+-- closed"). Two samples straddling a change and a change back see no difference
+-- and open nothing, which is the gap `checkControlContinuity` above documents,
+-- for that function's reason.
 sampleControl :: Game Bool
 sampleControl = do
   gs <- State.get
@@ -367,12 +376,14 @@ sampleControl = do
         Just before <- [Map.lookup oid (GameState.controlSample gs)]
         Monad.guard (before /= after)
         pure (GameEvent.ControlChanged (ControlChanged.MkControlChanged oid before after))
+      arrivals = do
+        (oid, after) <- Map.toList sampled
+        Monad.guard (Map.lookup oid (GameState.controlSample gs) /= Just after)
+        pure (oid, after)
       gain (oid, who) objs = case Map.lookup oid objs of
-        Just obj
-          | Map.notMember who (Object.controlClock obj) ->
-              Map.insert oid obj {Object.controlClock = Map.insert who ControlClock.Gained (Object.controlClock obj)} objs
-        _ -> objs
-  State.put gs {GameState.controlSample = sampled, GameState.objects = foldr gain (GameState.objects gs) (Map.toList sampled)}
+        Just obj -> Map.insert oid obj {Object.controlClock = Map.insert who ControlClock.Gained (Object.controlClock obj)} objs
+        Nothing -> objs
+  State.put gs {GameState.controlSample = sampled, GameState.objects = foldr gain (GameState.objects gs) arrivals}
   -- CR 603.2's simultaneity: two permanents whose control reverted in the same CR
   -- 514.2 sweep changed hands at the same moment, so the batch is one event group.
   Monad.unless (null changes) . Event.simultaneously $

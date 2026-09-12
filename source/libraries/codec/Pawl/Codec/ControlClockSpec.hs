@@ -19,12 +19,6 @@ spec s = Spec.describe s "Pawl.Codec.ControlClock" $ do
       ControlClock.codec
       ControlClock.SinceLastUpkeep
       " {\"type\":\"SinceLastUpkeep\"} "
-  Spec.it s "Elapsed" $
-    Common.assertCodec
-      s
-      ControlClock.codec
-      ControlClock.Elapsed
-      " {\"type\":\"Elapsed\"} "
   -- Pawl.Codec.DamageDirectionSpec's reason: Arm.enum derives the arm list from
   -- the type, so this is what would catch a constructor the derivation missed.
   Spec.it s "round trips every constructor" $ Common.assertEnumCodec s ControlClock.codec
