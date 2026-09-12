@@ -426,7 +426,7 @@ merge2 l r =
           -- Left-biased, with Face.spell, which merge2 also leaves as the left
           -- half's: CR 700.2h's costs index THAT half's modes, so the right
           -- half's keys would name modes this view does not have. Both sides are
-          -- empty today -- fuseSpells refuses a modal half (CR 702.102).
+          -- empty today: fuseSpells builds no fused face from a modal half.
           Face.modeCosts = Face.modeCosts l,
           Face.alternativeCosts = Face.alternativeCosts l <> Face.alternativeCosts r,
           -- CR 709.4c again: a cost reduction a half prints about itself is an
