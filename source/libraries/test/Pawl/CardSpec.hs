@@ -1713,6 +1713,10 @@ countReadsX count = case count of
   SlotCount.Printed _ -> False
   SlotCount.AnnouncedX -> True
   SlotCount.UpToAnnouncedX -> True
+  -- A computed count reads X only where the number it counts by does -- Mogis's
+  -- Marauder's devotion does not, and a count reading CR 107.3m's inherited X
+  -- would.
+  SlotCount.UpToComputed quantity -> Set.member Binding.variableX (QuantitySlot.slots quantity)
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
 -- (Face.replacementEffects, Eon Hub's) and the ones an effect of its own
@@ -2983,6 +2987,8 @@ targetSlotFilters slot =
     -- and has to be swept, or the cross-checks below would report an atom buried
     -- in one as zero rather than as an offence.
     <> concatMap quantityFilters (Maybe.maybeToList (TargetSlot.amount slot))
+    -- CR 601.2c's computed count is a Quantity on the same footing.
+    <> concatMap quantityFilters (Maybe.maybeToList (SlotCount.quantity (TargetSlot.count slot)))
 
 -- A continuous effect's affected set (Pawl.Types.Affected), wherever one is
 -- written -- a static ability, a combat restriction, an attack or block
