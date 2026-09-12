@@ -64,6 +64,16 @@ data CastOffer = MkCastOffer
     -- Matched in Pawl.Engine.Resolve.Effect.offerCast against the FACE's own view
     -- and the resolution's Filter.Context, so Filter.ManaValueLessThanSource
     -- reads the same source mana value here that the exiling walk read.
-    restriction :: Maybe (Filter.Filter Keyword.Keyword)
+    restriction :: Maybe (Filter.Filter Keyword.Keyword),
+    -- | CR 601.2b: the keyword ability whose cost this offer states, or Nothing
+    -- for an offer no keyword ability is behind -- which is every offer but rule
+    -- 702.62a's third ability. Pawl.Engine.Resolve.Effect.offerCast writes it
+    -- onto the candidate it builds, so it reaches Pawl.Types.Object's castUsing
+    -- as any printed alternative's tag does.
+    --
+    -- A rider of its OWN, `payingInstead`'s reason: it names WHO offered the
+    -- cost and narrows neither the payment nor the face, and the same cost
+    -- offered by an effect rather than by a keyword carries no tag.
+    offeredBy :: Maybe Keyword.Keyword
   }
   deriving (Eq, Ord, Show)

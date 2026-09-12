@@ -249,10 +249,9 @@ data Keyword
   | -- | 702.62a: suspend N--[cost] -- three abilities. CR 116.2f's special
     -- action exiles the card from hand with N time counters for [cost]
     -- (Pawl.Engine.Suspend); the two triggered abilities function in exile and
-    -- are minted by Pawl.Engine.Keyword.exileTriggeredAbilitiesOf.
-    --
-    -- Not implemented: rule 702.62a's last sentence, the haste a creature spell
-    -- cast this way gains until its caster loses control of it (#3355).
+    -- are minted by Pawl.Engine.Keyword.exileTriggeredAbilitiesOf. The last
+    -- sentence's haste is Pawl.Engine.Stack.armBecame's, off the tag the third
+    -- ability's offer leaves on Pawl.Types.Object's castUsing.
     Suspend (Suspend.Suspend Keyword)
   | -- | 702.63a: vanishing N -- enter with N time counters, remove one at each
     -- upkeep, and sacrifice the permanent when the last one goes. Nothing is CR
