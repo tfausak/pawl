@@ -829,7 +829,7 @@ mendingHandsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -
 mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
   let -- One noncombat damage event, from `src`, at `n`.
       hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       -- Order a contested batch by preferring the event from `src`, by SOURCE id
       -- rather than by position, so the assertion does not depend on the order
@@ -1016,7 +1016,7 @@ chosenSourcesIn =
 healingGraceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 healingGraceSpec s registry = Spec.describe s "Healing Grace (CR 609.7a)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
   Spec.it s "CR 609.7a the shield watches the source its controller chose and no other" $ do
     plains <- S.printingOf s registry "Plains"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -1112,7 +1112,7 @@ choosePlayerAndSource pid src p = case p of
 auriokReplicaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
   Spec.it s "CR 609.7a the unbounded shield watches the source its controller chose and no other" $ do
     plains <- S.printingOf s registry "Plains"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -1412,7 +1412,7 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
 payNoHeedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 payNoHeedSpec s registry = Spec.describe s "Pay No Heed (CR 615.1)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
   -- The chosen source is deliberately NOT the head of CR 609.7a's pool --
   -- alice's Plains, the three creatures and the spell itself, sorted ascending --
   -- so an engine ignoring the answer would shield the Plains and every assertion
@@ -1460,7 +1460,7 @@ payNoHeedSpec s registry = Spec.describe s "Pay No Heed (CR 615.1)" $ do
 burrentonForgeTenderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 burrentonForgeTenderSpec s registry = Spec.describe s "Burrenton Forge-Tender (CR 615.9)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
   Spec.it s "CR 615.9 only a source with the printed properties can be chosen" $ do
     forgeTender <- S.printingOf s registry "Burrenton Forge-Tender"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -1511,7 +1511,7 @@ burrentonForgeTenderSpec s registry = Spec.describe s "Burrenton Forge-Tender (C
 scarecrowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 scarecrowSpec s registry = Spec.describe s "Scarecrow (CR 609.7b)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
   Spec.it s "CR 609.7b the shield covering a player watches every source with the printed properties, and no other" $ do
     plains <- S.printingOf s registry "Plains"
     scarecrow <- S.printingOf s registry "Scarecrow"
@@ -1590,7 +1590,7 @@ packLeaderSpec s registry = Spec.describe s "Pack Leader (CR 611.2c)" $ do
         -- set could not.
         (latecomer, board) = S.addPermanent kinGuard S.alice atBlockers
         hit src recipient n =
-          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Combat
+          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Combat
         -- ONE source for every case, so each pair below differs in the recipient
         -- alone: the shield says nothing about its source, and a case that
         -- swapped sources would not be a twin of the one beside it.
@@ -1632,7 +1632,7 @@ packLeaderSpec s registry = Spec.describe s "Pack Leader (CR 611.2c)" $ do
     let (gs, mine, theirs) = S.combatBoardOf [leader, tracker, cheetah] [piker]
         (evolutionId, ready) = S.addHandCard evolution S.alice (S.landsFor island S.alice 1 gs)
         hit src recipient n =
-          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Combat
+          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Combat
         strike src oid n g = S.damageOf oid (S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature oid) n]))
     case (mine, theirs) of
       ([leaderId, ourDog, ourCat], [theirPiker]) -> do
@@ -1699,7 +1699,7 @@ evolvingDogAt oid p = case p of
 wardingChantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 wardingChantSpec s registry = Spec.describe s "Synthetic Warding Chant (CR 612.1)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
   Spec.it s "CR 612.1 the swap reaches the word the shield's SOURCE predicate names" $ do
     (bobHuman, bobGoblin, _, _, evolved) <- wardingChantBoard s registry True
@@ -1837,7 +1837,7 @@ communalBulwarkSpec s registry = Spec.describe s "Synthetic Communal Bulwark (CR
             }
         shielded = S.runPure (targetingOnly warded) ready (S.cast S.alice bulwarkId Monad.>> Stack.resolveTop)
         hit recipient n =
-          DamageEvent.MkDamageEvent attacker recipient n False False False 0 Nothing DamageKind.Noncombat
+          DamageEvent.MkDamageEvent attacker recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
         -- ONE source and one starting board for every case below, so each pair
         -- differs in the RECIPIENT alone.
         strike recipient n = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit recipient n])
@@ -2009,7 +2009,7 @@ selectiveMuzzleSpec s registry = Spec.describe s "Synthetic Selective Muzzle (CR
             }
         shielded = S.runPure (targetingOnly muzzled) ready (S.cast S.alice muzzleId Monad.>> Stack.resolveTop)
         hit src recipient n =
-          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
         -- ONE board for every case below, so each pair differs in the source or
         -- the recipient alone.
         strike src recipient n = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit src recipient n])
@@ -2069,7 +2069,7 @@ selectiveMuzzleSpec s registry = Spec.describe s "Synthetic Selective Muzzle (CR
 healingGraceReferentSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 healingGraceReferentSpec s registry = Spec.describe s "Healing Grace and Auriok Replica (CR 609.7a)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
   Spec.it s "CR 609.7a a source only a waiting shield's baked field still names is offered" $ do
     plains <- S.printingOf s registry "Plains"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -2237,7 +2237,7 @@ galvanicBlastReferentSpec s registry = Spec.describe s "Galvanic Blast (CR 609.7
 communalBulwarkReferentSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 communalBulwarkReferentSpec s registry = Spec.describe s "Synthetic Communal Bulwark and Healing Grace (CR 609.7a)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
   Spec.it s "CR 609.7a a source only a waiting row's captured slot still names is offered" $ do
     plains <- S.printingOf s registry "Plains"
     ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
@@ -2310,7 +2310,7 @@ communalBulwarkReferentSpec s registry = Spec.describe s "Synthetic Communal Bul
 comeBackWrongSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 comeBackWrongSpec s registry = Spec.describe s "Come Back Wrong and Auriok Replica (CR 609.7a)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
   Spec.it s "CR 609.7a a source only a waiting delayed trigger still refers to is offered" $ do
     plains <- S.printingOf s registry "Plains"
     swamp <- S.printingOf s registry "Swamp"
@@ -2391,7 +2391,7 @@ comeBackWrongSpec s registry = Spec.describe s "Come Back Wrong and Auriok Repli
 turnTheBladeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 turnTheBladeSpec s registry = Spec.describe s "Synthetic Turn the Blade (CR 612.1)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
   Spec.it s "CR 612.1 the swap reaches the word the redirection's CHOSEN SOURCE names" $ do
     (bobHuman, bobGoblin, cat, evolved) <- turnTheBladeBoard s registry True
@@ -2772,7 +2772,7 @@ aimCreature oid p = case p of
 whippoorwillSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 whippoorwillSpec s registry = Spec.describe s "Whippoorwill (CR 615.12)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       -- alice's board: the Bird, the creature its ability will name, a bystander
       -- beside it, and one Mending Hands shield on EACH of the two. Two shields
       -- rather than one is the whole discrimination: a clause that baked no

@@ -2454,8 +2454,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (gs1, fogId) = S.handOne fog gs0
         cast = snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice fogId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Combat])
-        spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Noncombat])
+        combat = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat])
+        spell = S.runPure S.identityAnswer resolved (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
     Spec.assertEqWith s "Fog installed one replacement" (length (GameState.replacements resolved)) 1
     Spec.assertEqWith s "combat damage prevented (the cancel shape)" (S.damageOf victim combat) (Just 0)
     -- The falsifier: a tag-blind Fog would also blunt this spell damage.

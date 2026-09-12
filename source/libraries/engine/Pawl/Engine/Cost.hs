@@ -52,6 +52,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
@@ -334,6 +335,27 @@ candidateCostsGiven permitted pid name oid gs =
                 if Game.opponentLostLifeThisTurn pid gs
                   then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Spectacle cost)) (withAdditional cost)) (Keyword.spectacleCosts (Map.keysSet (Projection.keywordsOf oid gs)))
                   else []
+              -- CR 702.76a and CR 702.173a: prowl and freerunning, surged's shape
+              -- with a clause of their own -- a player dealt combat damage this
+              -- turn by something that was then yours. Offered from every zone
+              -- for that pair's reason: both rules' static abilities function on
+              -- the stack, which CR 113.6e reaches from wherever the cast begins.
+              --
+              -- Rule 702.76a's clause names THIS SPELL's creature types, so the
+              -- gate is passed the projection's subtypes rather than the printed
+              -- face's -- CR 613.1, and a CR 612.2 text change or a CR 205.1b
+              -- type-changing effect on the card in hand moves what prowl asks
+              -- about. Filtered to creature types because rule 702.76a says
+              -- creature types; a Kindred card's other subtypes are not offered
+              -- to the comparison.
+              prowled =
+                if Game.prowlDamageThisTurn pid (Set.filter Subtype.isCreatureType (Projection.subtypesOf oid gs)) gs
+                  then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Prowl cost)) (withAdditional cost)) (Keyword.prowlCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  else []
+              freerun =
+                if Game.freerunningDamageThisTurn pid gs
+                  then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Freerunning cost)) (withAdditional cost)) (Keyword.freerunningCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  else []
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
               -- which the spell may be cast".
@@ -381,7 +403,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- cost, or rule 702.162a's converted cast. Pawl.CastSpec's "CR
               -- 702.170d a Mulldrifter Aven Interrupter plotted is offered no evoke
               -- cost" proves it.
-              ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> surged <> spectacled
+              ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> surged <> spectacled <> prowled <> freerun
            in orConverted $ case Object.zone obj of
                 -- Three shapes, differing in what they do to the printed cost, plus
                 -- an effect's permission. Flashback (CR 702.34a) REPLACES the mana

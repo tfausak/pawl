@@ -122,6 +122,9 @@ data KeywordFamily
     -- hideaway" names, as against hideaway 4; no card in the pool asks yet, and
     -- it is owed at the keyword rather than at the first asker.
     Hideaway
+  | -- | CR 702.76a: prowl [cost]; the family Quantity.CastUsing names for Morsel
+    -- Theft's "if this spell's prowl cost was paid".
+    Prowl
   | -- | CR 702.77a: reinforce N-[cost].
     Reinforce
   | -- | CR 702.82a: devour N.
@@ -188,6 +191,10 @@ data KeywordFamily
     -- spectacle" would name; no card in the pool asks yet, and it is owed at the
     -- keyword rather than at the first asker.
     Spectacle
+  | -- | CR 702.173a: freerunning [cost]. The family a card writing "a card with
+    -- freerunning" would name; no card in the pool asks yet, and it is owed at
+    -- the keyword rather than at the first asker.
+    Freerunning
   | -- | CR 702.170a: plot [cost].
     Plot
   | -- | CR 702.143a: foretell [cost].

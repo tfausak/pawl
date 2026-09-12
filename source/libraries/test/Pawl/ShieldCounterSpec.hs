@@ -90,7 +90,7 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
          in S.runPure (raceAnswer victim victim) g1 (S.cast S.alice held >> Stack.resolveTop)
       -- One noncombat damage event, from `src`, at `n`.
       hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       -- alice's Palace Guard with `n` shield counters written onto it, bob's
       -- Spider-Punk beside it when `withPunk`, and two Mountains for the Bolt the

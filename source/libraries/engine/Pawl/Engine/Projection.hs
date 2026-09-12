@@ -786,6 +786,14 @@ controllerWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> Just (LastKnown.controller lk)
   Nothing -> controllerOf oid gs
 
+-- subtypesOf with the same fallback (CR 702.76a and CR 702.173a for why the
+-- types are wanted; CR 608.2h for the authority) -- a creature that dealt combat
+-- damage and then died still has to answer what its creature types were.
+subtypesWithLastKnown :: ObjectId -> GameState -> Set Subtype.Type.Subtype
+subtypesWithLastKnown oid gs = case lastKnownOf oid gs of
+  Just lk -> PC.subtypes (LastKnown.characteristics lk)
+  Nothing -> subtypesOf oid gs
+
 -- powerGiven with the same fallback, on CR 608.2b's own sentence about target
 -- re-validation -- so a mentor (CR 702.134a) killed in response leaves its
 -- trigger's target legal rather than fizzling it.

@@ -2051,7 +2051,7 @@ moonmistShieldChain s registry swap = do
             S.cast S.alice evolutionId
             Stack.resolveTop
       shielded = S.runPure S.identityAnswer evolved Stack.resolveTop
-      hit src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing DamageKind.Combat
+      hit src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing Nothing mempty False DamageKind.Combat
       after = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit wolf 3, hit werewolf 3, hit piker 2])
   pure (wolf, werewolf, piker, shielded, after)
 
@@ -3327,7 +3327,7 @@ indestructibleSpec s registry = Spec.describe s "Indestructible" $ do
     let (myrId, gs) = S.addPermanent darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
         -- Zero marked damage (so 704.5g is silent) plus a deathtouch event isolates
         -- the 704.5h path; indestructible must guard it too (CR 700.4).
-        wounded = S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False False 0 Nothing DamageKind.Combat)] gs
+        wounded = S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 900) (Recipient.ToCreature myrId) 1 True False False 0 Nothing Nothing mempty False DamageKind.Combat)] gs
         after = S.settleSba wounded
     Spec.assertEqWith s "Myr survives deathtouch" (S.creaturesInPlay S.bob after) 1
   Spec.it s "CR 704.5f indestructible does NOT save a creature with toughness <= 0" $ do

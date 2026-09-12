@@ -219,7 +219,7 @@ strongSpec s registry = Spec.describe s "Strong, the Brutish Thespian" $ do
           S.runPure
             S.identityAnswer
             after
-            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Noncombat])
+            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
     Spec.assertEqWith s "CR 614.6 alice gains the 2 rather than losing it: 20 + 2 = 22" (S.lifeOf S.alice after) (Just 22)
     Spec.assertEqWith s "CR 120.4c damage is not radiation, so the same row leaves it alone: 22 - 3 = 19" (S.lifeOf S.alice hit) (Just 19)
 
