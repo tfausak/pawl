@@ -3759,7 +3759,7 @@ mayhemSpec s registry = Spec.describe s "Mayhem" $ do
     Spec.assertBool s (maybe True (\oid -> not (S.castable S.alice oid notDiscarded)) (boltIn notDiscarded)) "and not castable where the same card lay in the graveyard undiscarded"
   -- Crux: ALTERNATIVE, not additional. The offer is the mayhem cost alone, and it
   -- is offered only while rule 702.187b's clause holds -- the undiscarded board
-  -- is offered nothing at all, which is CR 604.2.
+  -- is offered nothing at all.
   Spec.it s "CR 702.187b the mayhem cost replaces the mana cost, and only for the card discarded this turn" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"

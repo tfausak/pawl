@@ -394,11 +394,11 @@ candidateCostsGiven permitted pid name oid gs =
                       -- CR 702.187b's cost, read as flashback's is and wrapped by
                       -- `withAdditional` for the same reason, rule 702.187b sending
                       -- the cast through CR 601.2f-h in its own words. Offered only
-                      -- while its "as long as you discarded this card this turn"
-                      -- holds, which is CR 604.2 as `available` reads it for a
-                      -- printed alternative cost above: a clause that does not hold
-                      -- is not an offer withheld, it is no offer at all. The
-                      -- discarder asked about is the CASTER, rule 702.187b's "you".
+                      -- while its own "as long as you discarded this card this turn"
+                      -- holds -- the shape `available` gives a printed alternative
+                      -- cost's condition above: a clause that does not hold is not an
+                      -- offer withheld, it is no offer at all. The discarder asked
+                      -- about is the CASTER, rule 702.187b's "you".
                       mayhem cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Mayhem cost)) (withAdditional cost)
                    in fmap flashback (Keyword.flashbackCosts keywords)
                         <> fmap escape (Keyword.escapeCosts keywords)
