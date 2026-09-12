@@ -1571,7 +1571,7 @@ eventTriggers events gs =
             -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard ctrl (TriggeredAbility.condition ab) event) Nothing
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard ctrl (TriggeredAbility.condition ab) event) Nothing (Just event)
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
             -- is per-occurrence and every member of the batch is its own trigger
@@ -2486,7 +2486,7 @@ stateTriggers gs
             -- instancesOnStack describes, written without ever needing an Ord on
             -- a triggered ability.
             armed (before, ab) = 1 + length (filter (ab ==) before) > instancesOnStack oid ab
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty Nothing
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty Nothing Nothing
          in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
 -- CR 603.7: delayed abilities whose trigger event is among these events. An entry
@@ -2636,6 +2636,8 @@ delayedPending grouped gs =
           -- CR 603.7a: what tells the ability this becomes apart from one its
           -- source simply has, once it is on the stack.
           (Just (DelayedTrigger.createdAt entry))
+          -- CR 603.2's event, the same one the slots above were read off.
+          (Just event)
       store = GameState.delayedTriggers gs
       -- CR 603.12's exception to all of the above, and the ONE place the reflexive
       -- form differs from an ordinary CR 603.7 entry: it is "checked immediately
@@ -2673,6 +2675,9 @@ delayedPending grouped gs =
           -- reflexive transforms -- so this is CR 701.27f as the rule states it
           -- rather than a behaviour a test pins.
           (Just (DelayedTrigger.createdAt entry))
+          -- CR 603.12: the entry's existence is the affirmative answer, so there
+          -- is no one event this fired from.
+          Nothing
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means. Per occurrence, since CR 603.4
       -- asks about the moment the event occurs. AFTER firedBy rather than inside

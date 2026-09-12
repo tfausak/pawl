@@ -1,6 +1,7 @@
 module Pawl.Types.ManaAdded where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -16,6 +17,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 data ManaAdded = MkManaAdded
   { player :: PlayerId.PlayerId,
     source :: ObjectId.ObjectId,
-    mana :: Set.Set ManaType.ManaType
+    mana :: Set.Set ManaType.ManaType,
+    -- | CR 605.5a's question about this addition: was it an activated mana
+    -- ability that added the mana? Pawl.Engine.ManaAbility.isTriggeredManaAbility
+    -- is the one reader.
+    cause :: ManaAddedCause.ManaAddedCause
   }
   deriving (Eq, Ord, Show)

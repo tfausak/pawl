@@ -3,6 +3,7 @@ module Pawl.Types.PendingTrigger where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SlotName as SlotName
@@ -38,6 +39,12 @@ data PendingTrigger = MkPendingTrigger
     -- entry, and Nothing for one an object simply has. Engine.placeBorne hands
     -- it to the stack object; TriggeredAbilitySource.createdAt says what reads
     -- it there.
-    createdAt :: Maybe Timestamp.Timestamp
+    createdAt :: Maybe Timestamp.Timestamp,
+    -- | CR 603.2's trigger event, and Nothing where there is none to name -- a
+    -- state trigger (CR 603.8), a reflexive one (CR 603.12) and every inherent
+    -- ability the rulebook states. Read by
+    -- Pawl.Engine.ManaAbility.isTriggeredManaAbility, CR 605.5a asking what
+    -- added the mana rather than only what the ability watches.
+    firedBy :: Maybe GameEvent.GameEvent
   }
   deriving (Eq, Ord, Show)

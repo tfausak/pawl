@@ -182,6 +182,8 @@ import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
+import qualified Pawl.Types.ManaAdded as ManaAdded
+import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Meld as Meld
@@ -2367,8 +2369,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Not implemented: CR 605.1b's trigger on a mana ability being activated, so
   -- a producer that watches it still resolves off the stack here (#1572).
   --
-  -- Not implemented: recording GameEvent.ManaAdded for the mana this arm adds,
-  -- so Caged Sun misses a land's ability resolving here (#3612).
+  -- CR 605.1b's "mana being added to a player's mana pool" is recorded here as
+  -- well as on Cost's road, one event per recipient, carrying
+  -- ManaAddedCause.Resolution so that CR 605.5a can tell the two apart
+  -- (Pawl.Engine.ManaAbility.firedFromManaAbility). A trigger watching it is
+  -- therefore an ORDINARY triggered ability and uses the stack, which is what
+  -- Pawl.ManaSpec's "Caged Sun" group proves off Crumbling Vestige.
   --
   -- CR 106.4: into the pool of the player the effect names, read through
   -- playerRefPlayers like every other slot read (CR 608.2b). The type and the CR
@@ -2385,6 +2391,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.AddMana (ManaAddition.MkManaAddition ref production count retention restriction rider) -> do
     gs0 <- State.get
     let howMany = Natural.toIntSaturating count
+        -- CR 605.1b's event, per recipient. Nothing is recorded where the
+        -- instruction added no mana: an addition of none is no addition, and CR
+        -- 605.1b's clause is about mana that arrived.
+        recordAdded pid manaTypes =
+          Monad.when (howMany > 0) $
+            State.modify'
+              ( Event.recordEvent
+                  ( GameEvent.ManaAdded
+                      ( ManaAdded.MkManaAdded
+                          { ManaAdded.player = pid,
+                            ManaAdded.source = source,
+                            ManaAdded.mana = manaTypes,
+                            ManaAdded.cause = ManaAddedCause.Resolution
+                          }
+                      )
+                  )
+              )
     case Mana.producedTypes source gs0 production of
       -- One settled type needs no question; the COUNT is how many units this one
       -- instruction adds, and a clause adding mana of two DIFFERENT types writes
@@ -2398,7 +2421,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   ManaUnit.restriction = restriction,
                   ManaUnit.rider = rider
                 }
-         in State.modify' (\gs -> foldr (\pid -> Mana.addMana pid (replicate howMany unit)) gs (playerRefPlayers legal controller gs0 ref))
+            recipients = playerRefPlayers legal controller gs0 ref
+         in do
+              State.modify' (\gs -> foldr (\pid -> Mana.addMana pid (replicate howMany unit)) gs recipients)
+              Monad.mapM_ (\pid -> recordAdded pid (Set.singleton manaType)) recipients
       -- No type at all is CR 607.2d's "the chosen color" with nothing chosen:
       -- adding nothing is the honest answer.
       [] -> pure ()
@@ -2433,6 +2459,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ManaUnit.rider = rider
                       }
               State.modify' (Mana.addMana pid (replicate howMany unit))
+              recordAdded pid (Set.singleton manaType)
   -- CR 608.2c's instruction, carried out by somebody other than this spell's
   -- controller: Drain Power's first sentence has the TARGETED player activate a
   -- mana ability of each of their lands. Each activation then runs by CR 605.3,

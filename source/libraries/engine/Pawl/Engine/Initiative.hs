@@ -172,7 +172,7 @@ inherentPending events gs =
   let held = case GameState.initiative gs of
         Nothing -> []
         Just holder -> upkeeps holder <> handoffs holder
-      sourceless controller ability bindings = PendingTrigger.MkPendingTrigger TriggerSource.Sourceless controller ability bindings Nothing
+      sourceless controller ability bindings = PendingTrigger.MkPendingTrigger TriggerSource.Sourceless controller ability bindings Nothing Nothing
       upkeeps holder = fmap (\_ -> sourceless holder upkeepVenture Map.empty) (filter (beginsHoldersUpkeep holder gs) events)
       -- Each pair is a damaging creature and who controlled it AS THE DAMAGE WAS
       -- DEALT (Event.combatDamagerAgainst, which is also what screens the event
