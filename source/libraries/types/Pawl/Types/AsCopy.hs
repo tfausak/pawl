@@ -45,7 +45,8 @@ data AsCopy ability = MkAsCopy
     --
     -- Not a CopyException, for `tapped`'s reason one rule over: every arm of that
     -- type writes a characteristic into the copiable snapshot (CR 707.9a, CR
-    -- 707.9b), and a counter is not a characteristic at all (CR 122.1). The same
+    -- 707.9b), and CR 122.1 makes a counter a marker placed ON an object rather
+    -- than one of its characteristics, so there is nothing to write. The same
     -- sentence over CR 707.1's token mint is Littjara Mirrorlake's, and it is
     -- CreateCopy's `riders` rather than one of its `exceptions` for exactly this
     -- reason.
@@ -64,11 +65,14 @@ data AsCopy ability = MkAsCopy
     -- Clone's "may" leaves the permanent its printed self and no counters.
     --
     -- CR 707.9e's second sentence -- a copy effect applied to the object AFTER
-    -- this one suppresses the exception's effect -- has no reader, and needs
-    -- none: every printed copy effect that applies as a permanent ENTERS is that
-    -- permanent's own (Filter.IsSource), so nothing can be applied after this one
-    -- while the counters are still pending, and a CR 707.4 change afterwards
-    -- finds them already on the object, where CR 122.1 leaves them.
+    -- this one suppresses the exception's effect -- has no reader here, and no
+    -- board in data/cards/ reaches it. Every EntryR AsCopy row in the pool
+    -- matches Filter.IsSource, which is what CR 707.5's sentence is ("you may
+    -- have this permanent enter as a copy of ..."), so no second copy effect
+    -- applies to this entry; one applied later is CR 707.4's change, and by then
+    -- the counters are on the permanent and no rule takes them off. What would
+    -- refute this is a printed copy effect that copies an object OTHER than its
+    -- own source as that object enters.
     counters :: Maybe WithCounters.WithCounters
   }
   deriving (Eq, Ord, Show)

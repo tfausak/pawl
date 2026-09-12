@@ -1335,9 +1335,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- is buried by CR 704.5f, where two +1/+1 counters would have left a 2/2
   -- standing. That is what makes the control an assertion rather than a shrug.
   --
-  -- A Clone of the copy is the copiable-values tripwire (CR 707.2): counters are
-  -- not characteristics (CR 122.1), so the Clone is the Giant's 3/3 and not the
-  -- 5/5 it is standing next to.
+  -- A Clone of the copy is the copiable-values tripwire (CR 707.2): CR 122.1's
+  -- counter is a marker on the object and not one of its copiable values, so the
+  -- Clone is the Giant's 3/3 and not the 5/5 it is standing next to.
   Spec.it s "CR 707.9e Altered Ego's copy enters with the announced X in +1/+1 counters, and declining the copy places none" $ do
     island <- S.printingOf s registry "Island"
     forest <- S.printingOf s registry "Forest"
