@@ -2887,6 +2887,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
+  Keyword.Delve -> []
   Keyword.Improvise -> []
   -- CR 702.41a's [text], which is a Filter rather than a Cost. KeywordFramed like
   -- the rest: Pawl.Engine.Keyword.selfCostReductionsFor drops it into a Count over

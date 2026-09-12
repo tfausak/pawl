@@ -391,6 +391,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Delve -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
@@ -566,6 +567,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Delve -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
@@ -916,6 +918,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Delve -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
   -- CR 702.81a and CR 702.187b function in a graveyard, but neither mints an
@@ -1318,6 +1321,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Delve -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
@@ -1864,12 +1868,13 @@ permissionsFor cardTypes keyword = case keyword of
   -- CR 702.184a permits no casting; the station card is cast for its own cost.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
-  -- CR 702.51b and CR 702.126b grant no permission and mint no ability: each is
-  -- a substitute for part of a total cost already determined, which is CR 601.2h
-  -- and not CR 601.3. Pawl.Engine.Cost.tapSubstitutions is where the offer lives,
-  -- Bestow's arm above and for its reason.
+  -- CR 702.51b, CR 702.66b and CR 702.126b grant no permission and mint no
+  -- ability: each is a substitute for part of a total cost already determined,
+  -- which is CR 601.2h and not CR 601.3. Pawl.Engine.Cost.manaSubstitutions is
+  -- where the offer lives, Bestow's arm above and for its reason.
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Delve -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
   -- CR 702.81a's permission, ungated: rule 702.81a states no clause of rule
@@ -2441,33 +2446,54 @@ foretellCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.51a / 702.126a: the permanents these keywords let the caster TAP rather
--- than pay ONE stated mana of a spell's total cost, as a criterion over the
--- battlefield -- Nothing where no keyword here offers a substitute for that
--- symbol, which is every symbol on a spell with neither keyword.
+-- | What CR 702.51a, CR 702.66a and CR 702.126a let a caster spend rather than
+-- pay one stated mana of a spell's total cost. A CLASSIFICATION of the payment,
+-- which is all Pawl.Engine.Cost.manaSubstitutions needs to name the candidates
+-- and mint the component: the two arms differ in the ZONE they spend out of and
+-- in what spending means there.
+data Substitute
+  = -- | CR 702.51a / 702.126a: tap one untapped permanent the Filter admits.
+    TapUntapped (Filter Keyword)
+  | -- | CR 702.66a: exile one card the Filter admits from your own graveyard.
+    ExileFromGraveyard (Filter Keyword)
+  deriving (Eq, Ord, Show)
+
+-- CR 702.51a / 702.66a / 702.126a: what these keywords let the caster spend
+-- rather than pay ONE stated mana of a spell's total cost -- empty where no
+-- keyword here offers a substitute for that symbol, which is every symbol on a
+-- spell with none of them.
 --
 -- Asked per SYMBOL because rule 702.51a answers differently for the two kinds it
 -- names: a colored mana wants a creature OF THAT COLOR and a generic mana any
--- creature. Every other symbol answers Nothing, and two of them are worth
+-- creature. Every other symbol answers nothing, and two of them are worth
 -- naming: CR 107.4c's {C} is colorless and so is not colored mana, and CR
 -- 107.4h's {S} is separated from generic mana by its own sentence. CR 601.2b has
 -- settled the hybrid and Phyrexian symbols before any caller asks
 -- (Pawl.Engine.Mana.announce), so a cost reaching here holds neither.
 --
--- The criterion is MINTED here rather than printed, rule 702's own words being
--- what says which permanents are eligible -- so CR 612.2 has no word of a card's
--- to swap in it (Pawl.Engine.Filter's rewriteKeyword), and Pawl.CardSpec's
--- filter traversals never see it.
+-- Rule 702.66a's criterion is "a card from your graveyard" and states no other
+-- quality, so it is Filter.And [], the trivial predicate: the pool's narrowing to
+-- the payer's OWN graveyard is Pawl.Engine.Cost.exileCandidates' (CR 400.3).
 --
--- Or'd where a spell carries BOTH keywords, since either ability may pay a given
--- generic mana; CR 702.51d and CR 702.126c make a second instance of ONE of them
--- redundant, which a Set already is.
+-- The criteria are MINTED here rather than printed, rule 702's own words being
+-- what says what is eligible -- so CR 612.2 has no word of a card's to swap in
+-- them (Pawl.Engine.Filter's rewriteKeyword), and Pawl.CardSpec's filter
+-- traversals never see them.
+--
+-- Or'd WITHIN an arm where a spell carries two keywords that spend the same way,
+-- since either ability may pay a given generic mana, and left as two entries
+-- across arms, where no one criterion can say it: CR 702.51d, CR 702.66c and CR
+-- 702.126c make a second instance of ONE of them redundant, which a Set already
+-- is. Scryfall `keyword:convoke keyword:delve`, 2026-09-12, answers Hogaak,
+-- Arisen Necropolis alone, and that one cannot be transcribed -- its "You can't
+-- spend mana to cast this spell" has no representation -- so the two-entry answer
+-- is a fence rather than proven behaviour.
 --
 -- The case is a WILDCARD, morphCost's caveat and for its reason: a new keyword
 -- stating this kind of substitute owes an arm here, and -Werror will not ask for
 -- it.
-tapSubstituteFor :: ManaSymbol.ManaSymbol -> Set Keyword -> Maybe (Filter Keyword)
-tapSubstituteFor symbol keywords =
+manaSubstitutesFor :: ManaSymbol.ManaSymbol -> Set Keyword -> [Substitute]
+manaSubstitutesFor symbol keywords =
   let untapped cardType narrower =
         Filter.And
           ( [ Filter.HasCardType cardType,
@@ -2476,7 +2502,7 @@ tapSubstituteFor symbol keywords =
             ]
               <> narrower
           )
-      criterionOf keyword = case keyword of
+      tapCriterionOf keyword = case keyword of
         Keyword.Convoke -> case symbol of
           ManaSymbol.Generic _ -> Just (untapped CardType.Creature [])
           ManaSymbol.OfType (ManaType.Colored color) -> Just (untapped CardType.Creature [Filter.HasColor color])
@@ -2485,10 +2511,16 @@ tapSubstituteFor symbol keywords =
           ManaSymbol.Generic _ -> Just (untapped CardType.Artifact [])
           _ -> Nothing
         _ -> Nothing
-   in case Maybe.mapMaybe criterionOf (Set.toAscList keywords) of
-        [] -> Nothing
-        [one] -> Just one
-        many -> Just (Filter.Or many)
+      exileCriterionOf keyword = case keyword of
+        Keyword.Delve -> case symbol of
+          ManaSymbol.Generic _ -> Just (Filter.And [])
+          _ -> Nothing
+        _ -> Nothing
+      gather wrap criterionOf = case Maybe.mapMaybe criterionOf (Set.toAscList keywords) of
+        [] -> []
+        [one] -> [wrap one]
+        many -> [wrap (Filter.Or many)]
+   in gather TapUntapped tapCriterionOf <> gather ExileFromGraveyard exileCriterionOf
 
 -- The one exile CR 702.34a, CR 702.127a and CR 702.133a all print, in the same
 -- words. Filter.IsSource, because the rule says "this card". `whenDestination =
@@ -2928,6 +2960,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR DestructionRewrite.UmbraArmor)
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Delve -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
   -- Neither rule 702.81a nor rule 702.187b prints CR 702.34a's second sentence:
@@ -3137,6 +3170,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Delve -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
@@ -3376,6 +3410,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.UmbraArmor -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
+  Keyword.Delve -> []
   Keyword.Affinity _ -> []
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
@@ -3564,6 +3599,7 @@ familyOf keyword = case keyword of
   Keyword.UmbraArmor -> Nothing
   Keyword.Convoke -> Nothing
   Keyword.Improvise -> Nothing
+  Keyword.Delve -> Nothing
   Keyword.Affinity _ -> Just KeywordFamily.Affinity
   Keyword.Undaunted -> Nothing
   -- CR 702.81a carries no parameter, so there is no family to name it by.

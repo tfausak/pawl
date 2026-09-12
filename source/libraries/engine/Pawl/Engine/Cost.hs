@@ -727,28 +727,30 @@ totalManas adjustments =
   let resolutions = adjustmentResolutions adjustments
    in \manaCost -> concatMap (NonEmpty.toList . fmap snd . (`reductionOrders` manaCost)) resolutions
 
--- CR 702.51b / 702.126b: the ways a keyword on this object lets part of an
--- already TOTALLED mana cost be paid by tapping a permanent rather than with
--- mana. One entry per distinct set of symbols the substitutes could cover, each a
--- residual mana cost paired with the components the taps it spends are written
--- as; the FIRST entry substitutes nothing, which is rule 702.51a's "you may" said
--- of every symbol at once.
+-- CR 702.51b / 702.66b / 702.126b: the ways a keyword on this object lets part of
+-- an already TOTALLED mana cost be paid by spending something else -- tapping a
+-- permanent, or exiling a card from a graveyard -- rather than with mana. One
+-- entry per distinct set of symbols the substitutes could cover, each a residual
+-- mana cost paired with the components that spending is written as; the FIRST
+-- entry substitutes nothing, which is rule 702.51a's "you may" said of every
+-- symbol at once.
 --
 -- A COSTCOMPONENT and not a cost reduction, which is CR 702.51b read twice: the
--- substitution is no part of CR 601.2f's total, so a convoked spell's mana value
--- is unchanged, and the tap is a payment the payer makes rather than arithmetic.
--- Carrying it as a component is also what puts it on ClaimAxis.Tapping beside
--- every other claim on the untapped permanents (`claimOf`), so one creature
--- cannot both convoke and be tapped for mana, and what makes `payComponent`'s
--- existing arm ask WHICH permanents through Prompt.ChooseTaps.
+-- substitution is no part of CR 601.2f's total, so a convoked or delved spell's
+-- mana value is unchanged, and the tap or the exile is a payment the payer makes
+-- rather than arithmetic. Carrying it as a component is also what puts it on the
+-- ClaimAxis beside every other claim on those objects (`claimOf`), so one
+-- creature cannot both convoke and be tapped for mana and one card cannot be
+-- delved away twice, and what makes `payComponent`'s existing arms ask WHICH
+-- objects (`substituteComponent`).
 --
--- ONE component per symbol KIND and not one per tapped permanent: rule 702.51a's
--- eligibility is a function of the symbol, so the green symbols' taps and the
--- generic ones' are two pools Hall's condition has to weigh against each other
--- (Pawl.Engine.Claim.satisfiable) -- a creature that is green serves either, and
--- a creature that is not serves only the generic one.
+-- ONE component per symbol KIND and per substitute, not one per object spent:
+-- rule 702.51a's eligibility is a function of the symbol, so the green symbols'
+-- taps and the generic ones' are two pools Hall's condition has to weigh against
+-- each other (Pawl.Engine.Claim.satisfiable) -- a creature that is green serves
+-- either, and a creature that is not serves only the generic one.
 --
--- The count offered for a kind is CAPPED by how many permanents its criterion
+-- The count offered is CAPPED by how many objects the substitute's criterion
 -- admits. Not a correctness condition -- `jointlyPayable` is what refuses an
 -- unsatisfiable set -- but an enumeration bound: a {8} cost beside two creatures
 -- offers three entries rather than nine.
@@ -758,8 +760,8 @@ totalManas adjustments =
 -- half Cast.asProposed stamped. So this reads the PRINTED face, and a spell that
 -- is a copy of a convoke spell finds no convoke here -- the pre-existing bound
 -- that carrier has, see #1859, and not something this function narrows.
-tapSubstitutions :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
-tapSubstitutions slots pid oid gs manaCost =
+manaSubstitutions :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
+manaSubstitutions slots pid oid gs manaCost =
   let keywords = maybe Set.empty Face.keywords (Game.faceOf oid gs)
       -- The cost's symbols as one entry per KIND, a Generic counting for its own
       -- amount (CR 107.4b) where every other symbol is one mana.
@@ -767,20 +769,47 @@ tapSubstitutions slots pid oid gs manaCost =
         ManaSymbol.Generic n -> (ManaSymbol.Generic 1, n)
         other -> (other, 1)
       kinds = Map.toAscList (Map.fromListWith (+) (fmap sizeOf (ManaCost.unwrap manaCost)))
-      offered (symbol, n) = do
-        criterion <- Keyword.tapSubstituteFor symbol keywords
-        pure (symbol, criterion, min n (Natural.length (tapCandidates slots pid oid criterion gs)))
-      offers = Maybe.mapMaybe offered kinds
-      -- The cartesian product over how many of each kind are substituted for,
+      offered (symbol, n) =
+        [ (symbol, n, substitute, min n (Natural.length (substituteCandidates slots pid oid substitute gs)))
+        | substitute <- Keyword.manaSubstitutesFor symbol keywords
+        ]
+      offers = concatMap offered kinds
+      -- The cartesian product over how many of each offer is substituted for,
       -- ascending, which is what puts the substitute-nothing entry first.
-      vectors = traverse (\(symbol, criterion, cap) -> fmap (\k -> (symbol, criterion, k)) [0 .. cap]) offers
+      vectors = filter withinCost (traverse (\(symbol, n, substitute, cap) -> fmap (\k -> (symbol, n, substitute, k)) [0 .. cap]) offers)
+      -- One symbol kind can carry TWO offers -- convoke and delve both substitute
+      -- for generic mana -- and rule 702.51a's "for each generic mana" bounds the
+      -- two together rather than apiece. A FENCE: the only printing that states
+      -- both is Hogaak, Arisen Necropolis, which cannot be transcribed (see
+      -- Pawl.Engine.Keyword.manaSubstitutesFor), so no card in `data/cards/`
+      -- reaches a vector this drops.
+      withinCost vector = all (\(symbol, n, _, _) -> sum [k | (s, _, _, k) <- vector, s == symbol] <= n) vector
       entry vector =
-        ( List.foldl' (\acc (symbol, _, k) -> withoutMana symbol k acc) manaCost vector,
-          [CostComponent.TapPermanents (TapPermanents.MkTapPermanents k criterion) | (_, criterion, k) <- vector, k > 0]
+        ( List.foldl' (\acc (symbol, _, _, k) -> withoutMana symbol k acc) manaCost vector,
+          [substituteComponent substitute k | (_, _, substitute, k) <- vector, k > 0]
         )
    in fmap entry vectors
 
--- `tapSubstitutions`' mana halves folded into a TOTALLING, which is the shape
+-- The objects a Keyword.Substitute may be paid with, per its arm: CR 702.51a's
+-- and CR 702.126a's out of the battlefield, CR 702.66a's out of the payer's own
+-- graveyard. Read for its SIZE by manaSubstitutions above, which is how many of a
+-- symbol kind the offer can reach.
+substituteCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Keyword.Substitute -> GameState -> [ObjectId]
+substituteCandidates slots pid oid substitute gs = case substitute of
+  Keyword.TapUntapped criterion -> tapCandidates slots pid oid criterion gs
+  Keyword.ExileFromGraveyard criterion -> exileCandidates slots pid criterion gs
+
+-- The component that SPENDS this many of a Keyword.Substitute's objects. Carrying
+-- the substitution as a component is what puts it on the same ClaimAxis as every
+-- other claim on those objects (`claimOf`) and what makes `payComponent`'s
+-- existing arm ask WHICH ones -- Prompt.ChooseTaps for the one, and
+-- Prompt.ChooseExilesFromGraveyard for the other.
+substituteComponent :: Keyword.Substitute -> Natural -> CostComponent.CostComponent Keyword.Type.Keyword
+substituteComponent substitute n = case substitute of
+  Keyword.TapUntapped criterion -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion)
+  Keyword.ExileFromGraveyard criterion -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion)
+
+-- `manaSubstitutions`' mana halves folded into a TOTALLING, which is the shape
 -- Mana.announce's `total` parameter takes. That offer decides whether to ask
 -- which half of a hybrid symbol is announced, and it asks only where two halves
 -- are payable -- so a totalling blind to CR 702.51b would find NO half payable on
@@ -792,17 +821,17 @@ tapSubstitutions slots pid oid gs manaCost =
 -- fails a payment CR 601.2h would have failed anyway, where a route withheld is a
 -- choice taken away from the payer.
 --
--- A FENCE and not proven behaviour: no card in `data/cards/` states convoke
--- beside a hybrid symbol, so reverting this to a bare `total_` leaves the suite
--- green. Merrow Skyswimmer is the printing that would observe it (gap #3585).
-tapSubstitutedManas :: (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [ManaCost.ManaCost]
-tapSubstitutedManas total_ pid oid gs manaCost = concatMap (fmap fst . tapSubstitutions Map.empty pid oid gs) (total_ manaCost)
+-- PROVEN, not a fence: Pawl.CostSpec's "CR 601.2b the payer announces a convoked
+-- spell's hybrid halves, both blue" reddens on a bare `total_`, Merrow Skyswimmer
+-- being the transcribable printing that states convoke beside a hybrid symbol.
+substitutedManas :: (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [ManaCost.ManaCost]
+substitutedManas total_ pid oid gs manaCost = concatMap (fmap fst . manaSubstitutions Map.empty pid oid gs) (total_ manaCost)
 
--- `tapSubstitutions`' answer for a payment no keyword offers a substitute for,
--- which every ACTIVATION is: CR 702.51a and CR 702.126a both function while a
--- SPELL is on the stack, and an activated ability's cost is not that.
-noTapSubstitutions :: ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
-noTapSubstitutions manaCost = [(manaCost, [])]
+-- `manaSubstitutions`' answer for a payment no keyword offers a substitute for,
+-- which every ACTIVATION is: CR 702.51a, CR 702.66a and CR 702.126a all function
+-- while a SPELL is on the stack, and an activated ability's cost is not that.
+noManaSubstitutions :: ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
+noManaSubstitutions manaCost = [(manaCost, [])]
 
 -- This much of ONE kind of mana taken out of a cost: a generic amount comes off
 -- the generic symbols in printed order, and any other kind drops that many
@@ -2238,11 +2267,11 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- `total` answers MANY totals, one per CR 118.7e resolution, and this asks `any`
 -- of them: a cost this gate refuses has to be one NO half could have paid (#595).
 --
--- `substitute` is CR 702.51b's and CR 702.126b's offer, applied AFTER `total_`
--- because both rules place it after the total cost is determined: it answers one
--- residual cost per set of symbols a tap could pay for, each with the components
--- that spends (`tapSubstitutions`), and this asks `any` of those too. Every
--- caller but a CAST passes `noTapSubstitutions`.
+-- `substitute` is CR 702.51b's, CR 702.66b's and CR 702.126b's offer, applied
+-- AFTER `total_` because all three rules place it after the total cost is
+-- determined: it answers one residual cost per set of symbols a substitute could
+-- pay for, each with the components that spends (`manaSubstitutions`), and this
+-- asks `any` of those too. Every caller but a CAST passes `noManaSubstitutions`.
 canPaySomeCompletion :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletion slots subject spending pid oid total_ substitute cost gs =
   let pcs = Projection.projectAll gs
@@ -2318,8 +2347,9 @@ canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ subs
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy (Cost.components cost)
         claimed = claimsOf slots pid oid (Cost.components cost) gs
-        -- CR 702.51b's substitutes come with components of their own
-        -- (`tapSubstitutions`), and CR 118.3 weighs those against the cost's own
+        -- CR 702.51b's and CR 702.66b's substitutes come with components of
+        -- their own (`manaSubstitutions`), and CR 118.3 weighs those against the
+        -- cost's own
         -- rather than beside them: a creature tapped for convoke is one the
         -- printed cost cannot also tap. So the claims and the component gates are
         -- asked of the UNION, once per entry -- and the no-substitute entry every
@@ -2806,17 +2836,17 @@ restoreKeepingLibraryActions before = do
   gs <- State.get
   State.put (keepingLibraryActions gs before)
 
--- CR 702.51b / 702.126b: the payer picks which of `tapSubstitutions`' entries
--- this cast takes -- after CR 601.2f locked the total cost in, which is where
--- both rules say the ability applies, and before CR 601.2h's payment.
+-- CR 702.51b / 702.66b / 702.126b: the payer picks which of `manaSubstitutions`'
+-- entries this cast takes -- after CR 601.2f locked the total cost in, which is
+-- where all three rules say the ability applies, and before CR 601.2h's payment.
 --
--- FILTERED, NOT TRUSTED. CR 118.3 is the filter: an entry whose taps the board
--- cannot satisfy together is never offered. An unrecognised answer reads as the
--- FIRST entry, which `tapSubstitutions` makes the substitute-nothing one -- a
+-- FILTERED, NOT TRUSTED. CR 118.3 is the filter: an entry whose taps or exiles
+-- the board cannot satisfy together is never offered. An unrecognised answer reads as the
+-- FIRST entry, which `manaSubstitutions` makes the substitute-nothing one -- a
 -- fallback must not tap a creature the payer did not offer up.
 --
--- ELIDED where one entry is left, which is every cast by a spell with neither
--- keyword and every board with no eligible permanent: rule 702.51a's "you may"
+-- ELIDED where one entry is left, which is every cast by a spell with none of
+-- the keywords and every board with no eligible object: rule 702.51a's "you may"
 -- then has nothing to ask.
 --
 -- Not implemented: taking this decision after CR 601.2g's mana window rather than
@@ -2825,15 +2855,15 @@ restoreKeepingLibraryActions before = do
 -- place -- they are components, and `pay` pays the mana first -- but a payer
 -- holding Birds of Paradise commits to how many creatures convoke a Siege Wurm
 -- before choosing which colour the Birds make (#3584).
-announceTapSubstitutions :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
-announceTapSubstitutions pid oid cost = case Cost.mana cost of
+announceManaSubstitutions :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
+announceManaSubstitutions pid oid cost = case Cost.mana cost of
   -- CR 118.6: an unpayable cost states no symbol to substitute for.
   Nothing -> pure cost
   Just manaCost -> do
     gs <- State.get
     let slots = announcedSlots (Just oid) gs
         variant (residual, extra) = cost {Cost.mana = Just residual, Cost.components = Cost.components cost <> extra}
-        offered = filter (\candidate -> componentsPayable slots pid oid (Cost.components candidate) gs) (fmap variant (tapSubstitutions slots pid oid gs manaCost))
+        offered = filter (\candidate -> componentsPayable slots pid oid (Cost.components candidate) gs) (fmap variant (manaSubstitutions slots pid oid gs manaCost))
     case offered of
       -- Unreachable: the substitute-nothing entry carries the cost's own
       -- components, which the gate that offered this cast already measured. Left

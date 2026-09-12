@@ -2107,6 +2107,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   reversalRigSpec s registry
   siegeWurmSpec s registry
   foundryAssemblerSpec s registry
+  treasureCruiseSpec s registry
+  merrowSkyswimmerSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -4286,3 +4288,118 @@ foundryAssemblerSpec s registry = Spec.describe s "Foundry Assembler" $ do
         resolved = S.runPure answer cast Stack.resolveTop
     Spec.assertEqWith s "a fourth Assembler resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Foundry Assembler")) S.alice resolved) 4
     Spec.assertEqWith s "and the three artifacts joined the two Forests in being tapped" (S.tappedCount S.alice resolved) 5
+
+-- alice controls `islands` Islands, her graveyard holds `fuel` Goblin Pikers,
+-- her library holds five more, and she holds `card` with priority in her own
+-- precombat main phase. ONE mana source at most, convokeBoard's posture: the
+-- Island pays the one symbol rule 702.66a does not reach, so anything beyond it
+-- can only have been paid by exiling cards. The library is stocked so that CR
+-- 104.3c does not decide the game before a draw is read.
+delveBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, GameState.GameState)
+delveBoard island piker card islands fuel =
+  let (_, gs1) = addPermanents island islands (Setup.emptyGame S.bothPlayers)
+      gs2 = List.foldl' (\acc _ -> snd (S.addGraveyardCard piker S.alice acc)) gs1 (replicate fuel ())
+      gs3 = List.foldl' (\acc _ -> snd (S.addLibraryCard piker S.alice acc)) gs2 (replicate 5 ())
+      (spell, gs4) = S.addHandCard card S.alice gs3
+   in ( spell,
+        gs4
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Treasure Cruise {7}{U} Sorcery: "Delve. Draw three cards."
+--
+-- CR 702.66a's one clause, and the cheapest printing that states delve and
+-- nothing else. The graveyard holds one card MORE than the cost can spend, so
+-- Prompt.ChooseExilesFromGraveyard is a real choice rather than a forced one.
+treasureCruiseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+treasureCruiseSpec s registry = Spec.describe s "Treasure Cruise" $ do
+  Spec.it s "CR 702.66a delve pays seven of a Treasure Cruise's eight mana by exiling seven cards" $ do
+    cruise <- S.printingOf s registry "Treasure Cruise"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (spell, gs) = delveBoard island piker cruise 1 8
+        -- The entry that substitutes for every generic symbol, named by the mana
+        -- it leaves: the {U} rule 702.66a does not reach, which the Island pays.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter ((== Just delvedResidual) . Cost.Type.mana) candidates)
+          -- Pinned BY INDEX and not by search, so a mutation cannot be repaired
+          -- into a second legal answer; the count is the engine's own.
+          Prompt.ChooseExilesFromGraveyard _ _ _ candidates n -> Set.fromList (List.genericTake n candidates)
+          _ -> S.identityAnswer p
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "the Cruise resolved and alice drew three cards" (S.handSize S.alice resolved) 3
+    -- The exiles themselves, which the assertion above does not see: a cast that
+    -- paid {7}{U} out of nowhere would also have drawn three.
+    Spec.assertEqWith s "and seven of the eight cards in her graveyard paid for it" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 7
+    -- The eighth, plus the Cruise itself: CR 608.2n puts a resolved sorcery into
+    -- its owner's graveyard.
+    Spec.assertEqWith s "leaving the eighth where it was" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 2
+  -- The pair, varying the ISLAND and nothing else: same graveyard, same hand,
+  -- same seats. CR 702.66a names "each generic mana", so eight cards in the
+  -- graveyard reach the {7} and never the {U}.
+  Spec.it s "CR 702.66a delve reaches a generic mana and not a colored one" $ do
+    cruise <- S.printingOf s registry "Treasure Cruise"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (withIsland, islandBoard) = delveBoard island piker cruise 1 8
+        (landless, landlessBoard) = delveBoard island piker cruise 0 8
+    Spec.assertBool s (S.castable S.alice withIsland islandBoard) "eight cards in the graveyard and an Island pay {7}{U}"
+    Spec.assertBool s (not (S.castable S.alice landless landlessBoard)) "eight cards and no blue source do not"
+
+-- The residual a Treasure Cruise fully delved leaves, and the half of a Merrow
+-- Skyswimmer's cost the Island pays: {U}, an announced blue symbol.
+delvedResidual :: ManaCost.ManaCost
+delvedResidual = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)]
+
+-- Merrow Skyswimmer {3}{W/U}{W/U} Creature -- Merfolk Soldier 2/2: "Convoke.
+-- Flying, vigilance. When this creature enters, create a 1/1 white and blue
+-- Merfolk creature token."
+--
+-- What makes Pawl.Engine.Cost.substitutedManas observable: CR 601.2b's
+-- announcement is measured through a totalling that counts rule 702.51b's
+-- substitutes, so both halves are payable and the payer is asked. Scryfall
+-- `keyword:convoke m:/{\w\/\w}/`, 2026-09-12, answers this and Hogaak, Arisen
+-- Necropolis, whose "You can't spend mana to cast this spell" cannot be
+-- transcribed; a third printing of that shape would refute the pair.
+merrowSkyswimmerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+merrowSkyswimmerSpec s registry = Spec.describe s "Merrow Skyswimmer" $ do
+  Spec.it s "CR 601.2b the payer announces a convoked spell's hybrid halves, both blue" $ do
+    skyswimmer <- S.printingOf s registry "Merrow Skyswimmer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    galleon <- S.printingOf s registry "Armored Galleon"
+    island <- S.printingOf s registry "Island"
+    -- Three red creatures for the {3}, one white and one blue for the halves, and
+    -- one Island: three ways to pay two symbols, so which halves are announced
+    -- decides which permanents end up tapped.
+    let (pikerIds, gs1) = addPermanents piker 3 (Setup.emptyGame S.bothPlayers)
+        (whiteId, gs2) = S.addPermanent palaceGuard S.alice gs1
+        (_, gs3) = S.addPermanent galleon S.alice gs2
+        (_, gs4) = S.addPermanent island S.alice gs3
+        (spell, gs5) = S.addHandCard skyswimmer S.alice gs4
+        gs =
+          gs5
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        blue = ManaType.Colored Color.Blue
+        -- Blue for both halves, which is NOT Pawl.Engine.Mana.announce's fallback
+        -- -- that is the left half, white -- so the assertion below reads the
+        -- answer and not the fallback.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.AnnounceHybridHalf _ _ _ _ halves ->
+            if elem blue (NonEmpty.toList halves) then blue else NonEmpty.head halves
+          _ -> convoking delvedResidual pikerIds p
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "the Skyswimmer resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Merrow Skyswimmer")) S.alice resolved) 1
+    -- Which halves were announced, which the assertion above does not see: a
+    -- white half would have convoked the Palace Guard instead.
+    Spec.assertBool s (not (isTapped whiteId resolved)) "and the white creature is untapped, both halves having been announced blue"
