@@ -142,6 +142,7 @@ import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
+import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -1338,12 +1339,14 @@ rewritePayGate pairs gate =
 -- REGRESSION FENCE rather than a proved behaviour, bakeSlot's posture one module
 -- over: no committed bound reaches a Filter -- the pool's bounds name either
 -- Quantity.LifeGainedThisTurn or Quantity.InSlot, and neither arm carries one --
--- so no board today tells the two readings apart.
+-- so no board today tells the two readings apart. The slot's computed COUNT is
+-- a Quantity on the same footing and is descended into beside it.
 rewriteTargetSlot :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TargetSlot.TargetSlot -> TargetSlot.TargetSlot
 rewriteTargetSlot pairs slot =
   slot
     { TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot),
-      TargetSlot.amount = fmap (rewriteQuantity pairs) (TargetSlot.amount slot)
+      TargetSlot.amount = fmap (rewriteQuantity pairs) (TargetSlot.amount slot),
+      TargetSlot.count = SlotCount.mapQuantity (rewriteQuantity pairs) (TargetSlot.count slot)
     }
 
 -- CR 612.1 through a trigger's own condition. Exhaustive rather than a wildcard,

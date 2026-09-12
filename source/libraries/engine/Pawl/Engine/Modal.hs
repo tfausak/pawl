@@ -28,6 +28,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import Pawl.Types.TargetSlot (TargetSlot)
@@ -222,8 +223,9 @@ ownSlot mi declared slot = if Set.member slot declared then instanceSlot mi slot
 -- the atoms beside it, which Pawl.Engine.Filter.renameBound and boundSlots share
 -- one walk over), and the CR 202.3 computed bound the slot's `amount` carries
 -- (Pawl.Engine.QuantitySlot.renameSlots, paired with that module's `slots` the
--- same way). Those three fields are the whole of what a TargetSlot names:
--- `count` is a number or CR 601.2b's announced X, and neither is a slot.
+-- same way). Those four fields are the whole of what a TargetSlot names; a
+-- `count` that is a printed number or CR 601.2b's announced X names no slot, and
+-- a computed one is a Quantity renamed exactly as the bound beside it is.
 --
 -- `rename` is ownSlot above, so a name the mode does not declare passes through.
 instanceScope :: (SlotName -> SlotName) -> TargetSlot -> TargetSlot
@@ -231,7 +233,8 @@ instanceScope rename slot =
   slot
     { TargetSlot.pool = instancePool rename (TargetSlot.pool slot),
       TargetSlot.filter = fmap (Filter.renameBound rename) (TargetSlot.filter slot),
-      TargetSlot.amount = fmap (QuantitySlot.renameSlots rename) (TargetSlot.amount slot)
+      TargetSlot.amount = fmap (QuantitySlot.renameSlots rename) (TargetSlot.amount slot),
+      TargetSlot.count = SlotCount.mapQuantity (QuantitySlot.renameSlots rename) (TargetSlot.count slot)
     }
 
 -- instanceScope's rename over the pool itself: the two arms carrying a

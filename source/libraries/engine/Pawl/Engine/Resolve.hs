@@ -81,6 +81,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
+import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
@@ -132,7 +133,11 @@ targetSlotSlots slot =
       -- 400.7j's Scope.OverBound visible to the equality above.
       -- Pawl.AbilitySlotLintSpec's "the lint itself catches a computed bound
       -- naming a slot through a player" is the case that proves it.
-      maybe Map.empty quantitySlots (TargetSlot.amount slot)
+      maybe Map.empty quantitySlots (TargetSlot.amount slot),
+      -- CR 601.2c's computed COUNT is a Quantity too, and names slots the same
+      -- way its bound does, so it is reported beside it or a slot named only
+      -- there would dangle.
+      maybe Map.empty quantitySlots (SlotCount.quantity (TargetSlot.count slot))
     ]
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless

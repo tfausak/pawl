@@ -42,6 +42,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -1418,6 +1419,84 @@ infesting x n wanted p = case p of
 pestName :: CardName.CardName
 pestName = CardName.MkCardName (Text.pack "Pest Token")
 
+-- CR 601.2c: a slot counted 0 to a number the BOARD supplies, on a triggered
+-- ability -- where CR 601.2b's announced X is not available at all, a trigger
+-- being neither cast nor activated (CR 603.3d).
+--
+-- Mogis's Marauder {2}{B} 2/2 (data/cards/mogiss-marauder.json): "When this
+-- creature enters, up to X target creatures each gain intimidate and haste until
+-- end of turn, where X is your devotion to black."
+--
+-- Devotion to black is THREE on the first board, and the black symbols are split
+-- so no other reading gives three: alice's Marauder prints one {B} and each of
+-- her two Typhoid Rats one more, while bob's own Rats prints a fourth that CR
+-- 700.5's "permanents you control" excludes -- so counting every permanent would
+-- read four, counting the Marauder alone one, and counting nothing zero. Six
+-- creatures stand on the battlefield, twice the count, so the announcement is a
+-- real choice rather than a prompt short-circuited by having exactly as many
+-- candidates as it needs.
+--
+-- The answerer announces SIX and is clamped back, which is what makes the
+-- ceiling the devotion's rather than the board's.
+--
+-- The two boards differ in the mana costs of alice's two other creatures --
+-- Typhoid Rats ({B}) or Goblin Piker ({1}{R}) -- so both offer the same six
+-- candidates and only the devotion moves.
+computedCountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+computedCountSpec s registry = Spec.describe s "ComputedCount" $ do
+  Spec.it s "CR 601.2c a trigger's target count reads alice's devotion to black" $ do
+    (named, spared, gs) <- marauderBoard s registry True
+    let after = marauderTrigger named gs
+    Spec.assertEqWith s "the three creatures alice named gained intimidate" (fmap (intimidating after) named) [True, True, True]
+    Spec.assertEqWith s "and haste with it" (fmap (hasty after) named) [True, True, True]
+    Spec.assertEqWith s "the two she had no target left for are untouched" (fmap (intimidating after) spared) [False, False]
+  -- Two black symbols fewer, and nothing else different.
+  Spec.it s "CR 601.2c a devotion of one counts one target" $ do
+    (named, spared, gs) <- marauderBoard s registry False
+    let after = marauderTrigger named gs
+    Spec.assertEqWith s "one creature gained intimidate" (length (filter (intimidating after) (named <> spared))) 1
+
+-- Mogis's Marauder on alice's stack over five creatures already on the
+-- battlefield: bob's Typhoid Rats, Goblin Piker and Wall of Stone, and two of
+-- alice's own -- Typhoid Rats when `black`, Goblin Pikers otherwise. Answers the
+-- three ids the trigger should reach and the two it should not.
+marauderBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  m ([ObjectId.ObjectId], [ObjectId.ObjectId], GameState.GameState)
+marauderBoard s registry black = do
+  marauder <- S.printingOf s registry "Mogis's Marauder"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  piker <- S.printingOf s registry "Goblin Piker"
+  wall <- S.printingOf s registry "Wall of Stone"
+  let hers = if black then rats else piker
+      (aliceFirstId, g1) = S.addPermanent hers S.alice (Setup.emptyGame S.bothPlayers)
+      (aliceSecondId, g2) = S.addPermanent hers S.alice g1
+      (ratsId, g3) = S.addPermanent rats S.bob g2
+      (pikerId, g4) = S.addPermanent piker S.bob g3
+      (wallId, g5) = S.addPermanent wall S.bob g4
+      (_, gs) = S.spellOnStack marauder S.alice g5
+  pure ([pikerId, ratsId, wallId], [aliceFirstId, aliceSecondId], gs)
+
+-- Resolve the Marauder so it enters, place its trigger -- CR 603.3d, where the
+-- count is read and the targets are chosen -- and resolve that.
+marauderTrigger :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+marauderTrigger wanted gs =
+  let answer :: Prompt.Prompt r -> r
+      answer = takingTargets 6 wanted
+      entered = S.runPure answer (S.runPure answer gs Stack.resolveTop) Engine.settleForPriority
+   in S.runPure answer entered Stack.resolveTop
+
+-- CR 702.13, the keyword half of the Marauder's grant.
+intimidating :: GameState.GameState -> ObjectId.ObjectId -> Bool
+intimidating gs oid = Projection.hasKeyword Keyword.Intimidate oid gs
+
+-- CR 702.10, the other half.
+hasty :: GameState.GameState -> ObjectId.ObjectId -> Bool
+hasty gs oid = Projection.hasKeyword Keyword.Haste oid gs
+
 -- CR 701.39 bolster, which is an opcode: Effect.Bolster over a Quantity, whose
 -- candidate pool and counter kind are rule 701.39a's rather than the card's.
 --
@@ -2048,6 +2127,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   multiTargetSpec s registry
   supportSpec s registry
   upToXSpec s registry
+  computedCountSpec s registry
   bolsterSpec s registry
   amassSpec s registry
   blightSpec s registry
