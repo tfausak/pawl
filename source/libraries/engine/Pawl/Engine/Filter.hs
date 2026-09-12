@@ -2215,6 +2215,9 @@ rewriteKeyword pairs keyword = case keyword of
   -- is in the row Pawl.Engine.Keyword mints.
   Keyword.Type.Devour _ -> keyword
   Keyword.Type.Exalted -> keyword
+  Keyword.Type.LivingWeapon -> keyword
+  Keyword.Type.ForMirrodin -> keyword
+  Keyword.Type.JobSelect -> keyword
   Keyword.Type.Mentor -> keyword
   -- CR 702.135a's N is a number and not a word, so CR 612.2 has nothing to swap
   -- HERE. "Spirit" is a word CR 612.2a does reach, but it is in the ability
