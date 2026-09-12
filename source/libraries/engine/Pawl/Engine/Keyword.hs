@@ -353,6 +353,11 @@ abilitiesFor keyword count = case keyword of
   -- draw is granted by mintedStaticAbilitiesOf.
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  -- CR 702.117a's and CR 702.137a's static abilities state an alternative cost
+  -- and nothing else, so they mint no ability of their own either:
+  -- Pawl.Engine.Cost.candidateCostsGiven is the whole of what they do.
+  Keyword.Surge _ -> []
+  Keyword.Spectacle _ -> []
   Keyword.Unleash -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -527,6 +532,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Surge _ -> []
+  Keyword.Spectacle _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -879,6 +886,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Surge _ -> []
+  Keyword.Spectacle _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1275,6 +1284,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Surge _ -> []
+  Keyword.Spectacle _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -1801,11 +1812,14 @@ permissionsFor cardTypes keyword = case keyword of
   -- Pawl.Engine.Cost.candidateCostsFor's, and rule 702.138a grants no exile
   -- replacement, so castFromGraveyardReplacementsOf stays flashback's.
   Keyword.Escape _ -> [CastingPermission.CastFromGraveyard]
-  -- CR 702.74a, 702.109a and 702.152a state an alternative cost and no
-  -- permission: the card is cast from wherever something else lets it be.
+  -- CR 702.74a, 702.109a, 702.117a, 702.137a and 702.152a state an alternative
+  -- cost and no permission: the card is cast from wherever something else lets
+  -- it be.
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Surge _ -> []
+  Keyword.Spectacle _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
@@ -2008,6 +2022,37 @@ plainAlternativeCosts keywords =
         Keyword.Evoke cost -> Just (keyword, cost)
         Keyword.Dash cost -> Just (keyword, cost)
         Keyword.Blitz cost -> Just (keyword, cost)
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.117a: every cost this card may be cast for by surging, in ascending Set
+-- order, and empty when it has no surge. Read by
+-- Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is offered, rule
+-- 702.117a's static ability functioning "while the spell with surge is on the
+-- stack", which CR 113.6e reaches from wherever the cast begins. That function
+-- gates the offer on rule 702.117a's own "if you or one of your teammates has
+-- cast another spell this turn" (Pawl.Engine.Game.yourTeamCastASpellThisTurn),
+-- which is why the gate is not here: this answers what the keyword says, not
+-- whether it may be paid.
+--
+-- A list and a wildcard for flashbackCosts' reasons.
+surgeCosts :: Set Keyword -> [Cost Keyword]
+surgeCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Surge cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.137a: surgeCosts' twin over spectacle, whose static ability "functions
+-- on the stack" and whose gate is rule 702.137a's "if an opponent lost life this
+-- turn" (Pawl.Engine.Game.opponentLostLifeThisTurn), asked at the same caller
+-- and for the same reason.
+--
+-- A list and a wildcard for flashbackCosts' reasons.
+spectacleCosts :: Set Keyword -> [Cost Keyword]
+spectacleCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Spectacle cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -2615,6 +2660,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Surge _ -> []
+  Keyword.Spectacle _ -> []
   -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.
   -- Filter.IsSource and one row per instance for riot's reasons.
   Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Unleash))
@@ -2940,6 +2987,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Surge _ -> []
+  Keyword.Spectacle _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -3158,6 +3207,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Surge _ -> []
+  Keyword.Spectacle _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -3495,6 +3546,8 @@ familyOf keyword = case keyword of
   Keyword.Evoke _ -> Just KeywordFamily.Evoke
   Keyword.Dash _ -> Just KeywordFamily.Dash
   Keyword.Blitz _ -> Just KeywordFamily.Blitz
+  Keyword.Surge _ -> Just KeywordFamily.Surge
+  Keyword.Spectacle _ -> Just KeywordFamily.Spectacle
   Keyword.Unleash -> Nothing
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing

@@ -2035,6 +2035,42 @@ discardedThisTurnBy pid oid gs =
         _ -> False
    in any (discardedIt . LoggedEvent.event) (GameState.events gs)
 
+-- CR 702.117a / 608.2i: has this player or one of their teammates cast a spell
+-- this turn? discardedThisTurnBy's shape above over the cast log, and the reader
+-- is Pawl.Engine.Cost.candidateCostsGiven's surge offer. The turn scope is
+-- GameState.events itself, that function's reason.
+--
+-- Rule 702.117a's "another" needs no exclusion here: CR 601.2i files the cast
+-- event at the END of casting, and this is asked at CR 601.2b, so the spell
+-- being priced has filed nothing for its own offer to read.
+--
+-- CR 102.3's teammates through areOpponents rather than `== pid`, which rule
+-- 702.117a's "you or one of your teammates" is what asks for.
+yourTeamCastASpellThisTurn :: PlayerId -> GameState -> Bool
+yourTeamCastASpellThisTurn pid gs =
+  let castByYours event = case castOf event of
+        Just cast -> not (areOpponents gs pid (SpellWasCast.player cast))
+        Nothing -> False
+   in any (castByYours . LoggedEvent.event) (GameState.events gs)
+
+-- CR 702.137a / 608.2i: did an opponent of this player lose life this turn?
+-- yourTeamCastASpellThisTurn's shape over the life-loss log, and the reader is
+-- Pawl.Engine.Cost.candidateCostsGiven's spectacle offer.
+--
+-- CR 119.3's loss and not a negative gain, lifeGainOf's note below: a life
+-- TOTAL back where it started leaves the loss on the log, which is what rule
+-- 702.137a asks about.
+--
+-- Damage to a player is a life loss (CR 120.3a), and it reaches this log as its
+-- own GameEvent.LifeLost from Pawl.Engine.Damage, so no damage arm is needed
+-- here.
+opponentLostLifeThisTurn :: PlayerId -> GameState -> Bool
+opponentLostLifeThisTurn pid gs =
+  let lostIt event = case event of
+        GameEvent.LifeLost change -> areOpponents gs pid (LifeChange.player change)
+        _ -> False
+   in any (lostIt . LoggedEvent.event) (GameState.events gs)
+
 -- CR 120.1 / 608.2i: was this PLAYER dealt damage this turn? The log fold
 -- damagedPlayer exists for, written once here because two callers ask it --
 -- Pawl.Engine.Count.playerView, which fills the player candidate's
