@@ -2248,7 +2248,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.RedirectDamage {} -> False
   Effect.Counter {} -> False
   Effect.PutCounters {} -> False
-  -- CR 122.1c: a permanent with none of the kind has no counter to lose.
+  -- CR 122.1 / 608.2d: a permanent bearing none of the kind has none of
+  -- them to lose.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> case legalOne slot legal >>= Recipient.objectOf of
     Nothing -> False
     Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
