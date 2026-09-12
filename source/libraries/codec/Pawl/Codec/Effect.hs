@@ -92,6 +92,7 @@ import qualified Pawl.Codec.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Codec.TurnFaceDown as TurnFaceDown
+import qualified Pawl.Codec.Vote as Vote
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -126,6 +127,7 @@ codec cardCodec abilityCodec =
           Arm.optionalPayload "Venture" Subtype.codec Effect.Venture (\x -> case x of Effect.Venture y -> Just y; _ -> Nothing),
           Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,
           Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices (\x -> case x of Effect.PlayerSacrifices y -> Just y; _ -> Nothing),
+          Arm.payload "Vote" Vote.codec Effect.Vote (\x -> case x of Effect.Vote y -> Just y; _ -> Nothing),
           Arm.optionalPayload "RestartGame" ObjectRef.codec Effect.RestartGame (\x -> case x of Effect.RestartGame y -> Just y; _ -> Nothing),
           Arm.payload "ControlPlayerNextTurn" SlotName.codec Effect.ControlPlayerNextTurn (\x -> case x of Effect.ControlPlayerNextTurn y -> Just y; _ -> Nothing),
           Arm.payload "ControlPlayerThisResolution" ControlPlayer.codec Effect.ControlPlayerThisResolution (\x -> case x of Effect.ControlPlayerThisResolution y -> Just y; _ -> Nothing),

@@ -288,6 +288,7 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
+import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -1060,6 +1061,7 @@ ownCounts effect = case effect of
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
+  Effect.Vote {} -> []
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
   Effect.ControlPlayerThisResolution _ -> []
@@ -1414,6 +1416,7 @@ effectNestedEffects effect = case effect of
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
+  Effect.Vote {} -> []
   Effect.RestartGame {} -> []
   Effect.ControlPlayerNextTurn {} -> []
   Effect.ControlPlayerThisResolution {} -> []
@@ -1856,6 +1859,7 @@ effectReplacements effect = case effect of
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
+  Effect.Vote {} -> []
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
   Effect.ControlPlayerThisResolution _ -> []
@@ -2262,6 +2266,7 @@ effectMintedFaces effect = case effect of
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
+  Effect.Vote {} -> []
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
   Effect.ControlPlayerThisResolution _ -> []
@@ -4767,6 +4772,10 @@ effectFilters effect = case effect of
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed [f] <> frame Unframed (quantityFilters quantity)
+  -- Unframed, PlayerSacrifices' answer and for its reason: rule 701.38b's
+  -- listed choices are judged against each candidate on the battlefield, which
+  -- is neither an attach destination nor a target slot.
+  Effect.Vote (Vote.MkVote _ f _) -> unframed [f]
   -- Unframed, PlayerSacrifices' answer and for its reason: the filter names
   -- permanents on the battlefield, judged by the ordinary projection.
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities _ f) -> unframed [f]

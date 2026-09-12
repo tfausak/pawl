@@ -279,6 +279,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
@@ -2324,6 +2325,9 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.TemptWithTheRing {} -> False
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
+  -- CR 701.38b lists the choices, and an empty list is the naming-nobody case:
+  -- nobody votes and nothing is bound, which CR 609.3 carries out vacuously.
+  Effect.Vote {} -> False
   Effect.TakeExtraTurn {} -> False
   Effect.ShuffleIntoLibrary {} -> False
   Effect.Shuffle {} -> False
@@ -4803,6 +4807,54 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- One at a time rather than as one event, Effect.Sacrifice's fold above
     -- (#757). The reachable caller of the two: All Is Dust lands here.
     Monad.forM_ doomed (\(victim, oids) -> Monad.mapM_ (Event.sacrifice victim) oids)
+  -- CR 701.38a: each player, starting with the seat the payload specifies and
+  -- proceeding in turn order, votes for one of the listed choices; the objects
+  -- tied for most votes are bound at `slot` for a later effect of this
+  -- resolution to act on (Council's Judgment's exile).
+  --
+  -- The listed choices are swept ONCE, off the board as the vote begins, so
+  -- every voter chooses from the same list -- rule 701.38a votes "for one choice
+  -- from a list", singular. Through battlefieldMatching, so the sweep reads the
+  -- projection and a permanent that is a copy of something is judged by the
+  -- characteristics it copied.
+  --
+  -- Nothing on the board changes while the seats vote, so the decider and the
+  -- candidate list are both read off this one `gs`.
+  Effect.Vote (Vote.MkVote starter filter_ slot) -> do
+    gs <- State.get
+    let candidates = battlefieldMatching legal resolving controller source gs filter_
+        -- Rule 701.38a's "specified player". A reference naming several names the
+        -- first in PlayerId order, and one naming nobody falls back to CR 109.5's
+        -- "you" -- which is the starter every printing in the pool states anyway.
+        begin = case playerRefPlayers legal controller gs starter of
+          pid : _ -> pid
+          [] -> controller
+        -- turnOrderFrom answers the SEATING roster (CR 800.5), so stillPlaying
+        -- is what keeps a departed seat from being asked to vote.
+        voters = filter (\pid -> List.elem pid (Game.stillPlaying gs)) (Game.turnOrderFrom begin gs)
+    case candidates of
+      -- CR 101.3: an empty list of choices, so nobody votes and nothing is bound.
+      [] -> pure ()
+      first : rest -> do
+        ballots <- Monad.forM voters $ \voter -> case rest of
+          -- One choice is the whole of rule 701.38a's list, so voting decides
+          -- nothing and the prompt is elided -- where the rules leave nothing to
+          -- ask, don't prompt.
+          [] -> pure first
+          second : more -> do
+            let offered = first NonEmpty.:| (second : more)
+            answer <- Game.choose (Prompt.ChooseVote (Decide.deciderFor voter gs) voter resolving offered)
+            -- FILTERED, NOT TRUSTED, the ChooseBolster posture: an answer naming
+            -- something never offered falls back to the first choice, rule
+            -- 701.38a stating no way to abstain.
+            pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
+        let tallyOf oid = List.length (filter (== oid) ballots)
+            best = List.maximum (0 : fmap tallyOf candidates)
+            -- Every candidate on the winning tally, and none at all where nobody
+            -- voted. Rule 701.38a's vote determines "some aspect of the effect",
+            -- and the aspect this arm determines is which objects the slot names.
+            winners = if best <= 0 then [] else filter (\oid -> tallyOf oid == best) candidates
+        State.modify' (bindObjectsSlot resolving slot (Seq.fromList winners))
   Effect.Create (Create.MkCreate quantity card entry mSlot creator) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

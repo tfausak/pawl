@@ -79,6 +79,7 @@ import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
+import qualified Pawl.Types.Vote as Vote
 
 -- | The ISA (design.md section 1): first-order, non-recursive in CONTROL FLOW
 -- -- no branches and no recursive calls -- and with no functions in any field.
@@ -589,6 +590,10 @@ data Effect card ability
     -- permanents matching the Filter, each chosen by that player (Diabolic
     -- Edict) in APNAP order (CR 101.4b) before anything leaves the battlefield.
     PlayerSacrifices PlayerSacrifices.PlayerSacrifices
+  | -- | CR 701.38a: each player, starting with the seat the payload names and
+    -- proceeding in turn order, votes for one of the objects its Filter matches;
+    -- the objects tied for most votes are bound at its slot (Council's Judgment).
+    Vote Vote.Vote
   | -- | CR 500.7: the players the PlayerRef names each get the payload's count
     -- of extra turns (Ral Zarek's "for each coin that comes up heads"), added
     -- directly after the turn this resolves in. CR 500.11 / 614.1b: the

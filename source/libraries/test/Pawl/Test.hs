@@ -453,6 +453,7 @@ import qualified Pawl.Codec.UntapRewriteSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.VanguardSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
+import qualified Pawl.Codec.VoteSpec
 import qualified Pawl.Codec.WhileSpec
 import qualified Pawl.Codec.WithCountersSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
@@ -590,6 +591,7 @@ import qualified Pawl.UntapRestrictionSpec
 import qualified Pawl.Uri.FragmentSpec
 import qualified Pawl.VanguardSpec
 import qualified Pawl.VariableEffectSpec
+import qualified Pawl.VoteSpec
 import qualified Pawl.ZoneChangeSpec
 import qualified Pawl.ZoneReplacementSpec
 import qualified Pawl.ZoneTriggerSpec
@@ -1086,6 +1088,7 @@ spec s registry = do
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.VanguardSpec.spec s
   Pawl.Codec.VentureMarkerEnteredSpec.spec s
+  Pawl.Codec.VoteSpec.spec s
   Pawl.Codec.WhileSpec.spec s
   Pawl.Codec.WithCountersSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
@@ -1243,6 +1246,7 @@ spec s registry = do
   Pawl.Uri.FragmentSpec.spec s
   Pawl.VanguardSpec.spec s registry
   Pawl.VariableEffectSpec.spec s registry
+  Pawl.VoteSpec.spec s registry
   Pawl.ZoneChangeSpec.spec s registry
   Pawl.ZoneReplacementSpec.spec s registry
   Pawl.ZoneTriggerSpec.spec s registry

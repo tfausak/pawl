@@ -234,6 +234,7 @@ ownQuantities effect = case effect of
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> [quantity]
+  Effect.Vote {} -> []
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
   Effect.ControlPlayerThisResolution _ -> []
@@ -1168,6 +1169,7 @@ effectObjectRefs effect =
         Effect.Venture {} -> []
         Effect.ExileHandThenDraw -> []
         Effect.PlayerSacrifices {} -> []
+        Effect.Vote {} -> []
         -- CR 727.5's exemption, optional: a card saying nothing about it exempts
         -- nothing.
         Effect.RestartGame mRef -> read_ (Maybe.maybeToList mRef)
