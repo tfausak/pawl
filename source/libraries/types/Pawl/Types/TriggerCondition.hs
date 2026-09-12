@@ -466,6 +466,10 @@ data TriggerCondition
   | -- | CR 701.44b: "whenever a creature you control explores" (Wildgrowth
     -- Walker), once per completed explore including one whose library was empty.
     PermanentExplores (Filter.Filter Keyword.Keyword)
+  | -- | CR 701.50f: "whenever a creature you control connives" (Iron Monger,
+    -- Sadistic Tycoon), once per completed connive. CR 701.50e is why a connive
+    -- 0 does not reach it.
+    PermanentConnives (Filter.Filter Keyword.Keyword)
   | -- | CR 701.43d \/ 607.2h: "when you do" beside "you may exert this creature
     -- as it attacks" (Glory-Bound Initiate). Self-scoped, the linkage holding by
     -- construction.

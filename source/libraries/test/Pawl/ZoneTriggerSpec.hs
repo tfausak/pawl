@@ -2464,6 +2464,7 @@ representativeEvents cond =
         -- CR 701.44b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
         TriggerCondition.PermanentExplores _ -> one (GameEvent.Explored departed)
+        TriggerCondition.PermanentConnives _ -> one (GameEvent.Connived departed)
         -- CR 701.43a's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this condition binding nothing
@@ -2679,6 +2680,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesPlotted,
     TriggerCondition.PermanentExplores (Filter.Type.And []),
+    TriggerCondition.PermanentConnives (Filter.Type.And []),
     TriggerCondition.SelfExerted,
     TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And []),
     TriggerCondition.SelfBecomesAttachedTo (Filter.Type.And []),

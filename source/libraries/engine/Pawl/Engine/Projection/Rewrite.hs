@@ -1495,6 +1495,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
+  TriggerCondition.PermanentConnives f -> TriggerCondition.PermanentConnives (Filter.rewrite pairs f)
   TriggerCondition.SelfExerted -> condition
   TriggerCondition.SelfBecomesAttachedBy f -> TriggerCondition.SelfBecomesAttachedBy (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesAttachedTo f -> TriggerCondition.SelfBecomesAttachedTo (Filter.rewrite pairs f)

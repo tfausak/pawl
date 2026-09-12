@@ -2765,6 +2765,46 @@ raffineSchemingSeerSpec s registry =
               _ -> Spec.assertFailure s "fixture should give alice four lands in hand"
             Nothing -> Spec.assertFailure s "fixture should give alice Raffine, a Piker and a Raven"
 
+-- CR 701.50f over a whole card. Iron Monger, Sadistic Tycoon {2}{B} Legendary
+-- Artifact Creature -- Human Villain 2/2, "Flying / Whenever a creature you
+-- control connives, put a +1/+1 counter on each Villain you control." (Oracle
+-- text checked against api.scryfall.com, 2026-09-12.)
+--
+-- Two boards differing in ONE thing: who controls the conniving Raffine's
+-- Informant. alice's Monger grows off her own Informant and not off bob's, so
+-- the Filter is doing the work rather than the event's mere presence -- which
+-- both boards assert, so a reading that recorded nothing cannot pass either.
+--
+-- The conniving seat's hand is empty and its library holds one nonland card, so
+-- CR 609.3 forces the discard and no prompt arises.
+ironMongerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ironMongerSpec s registry =
+  let board conniver = do
+        monger <- S.printingOf s registry "Iron Monger, Sadistic Tycoon"
+        informant <- S.printingOf s registry "Raffine's Informant"
+        giant <- S.printingOf s registry "Hill Giant"
+        let (mongerId, g1) = S.addPermanent monger S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g2) = S.addLibraryCard giant conniver g1
+            (informantId, g3) = S.entersWithTrigger informant conniver g2
+        pure (mongerId, informantId, g3)
+      settle gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+   in Spec.describe s "Iron Monger, Sadistic Tycoon" $ do
+        Spec.it s "CR 701.50f whenever a creature you control connives, each Villain you control grows" $ do
+          (mongerId, informantId, gs) <- board S.alice
+          let after = settle gs
+          Spec.assertEqWith s "CR 701.50f alice's Monger took its +1/+1 counter" (S.powerToughnessOf mongerId after) (Just (3, 3))
+          Spec.assertBool s (elem (GameEvent.Connived informantId) (S.eventsOf after)) "the connive recorded its event"
+          Spec.assertEqWith s "and the Informant grew off its own nonland discard" (S.powerToughnessOf informantId after) (Just (3, 2))
+        -- The negative, one thing different: bob controls the Informant. The
+        -- connive still happens and still records its event, so what fails is the
+        -- Filter's "you control" and nothing else.
+        Spec.it s "CR 701.50f an opponent's connive leaves the Monger alone" $ do
+          (mongerId, informantId, gs) <- board S.bob
+          let after = settle gs
+          Spec.assertEqWith s "alice's Monger is still 2/2" (S.powerToughnessOf mongerId after) (Just (2, 2))
+          Spec.assertBool s (elem (GameEvent.Connived informantId) (S.eventsOf after)) "bob's Informant really did connive"
+          Spec.assertEqWith s "and bob's Informant grew off its own nonland discard" (S.powerToughnessOf informantId after) (Just (3, 2))
+
 -- CR 701.3a's attachment event, read from the HOST's side by
 -- TriggerCondition.SelfBecomesAttachedBy.
 --
@@ -3571,6 +3611,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   wildgrowthWalkerSpec s registry
   raffinesInformantSpec s registry
   raffineSchemingSeerSpec s registry
+  ironMongerSpec s registry
   rayOfCommandSpec s registry
   brambleElementalSpec s registry
   enormousEnergyBladeSpec s registry

@@ -4426,10 +4426,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Explore's sweep and order, CR 701.50c stating CR 701.44d's rule over again,
     -- its seats read through last known information by CR 701.50b.
     ordered <- forEachOrder resolving id (objectRefRecipients legal resolving controller source gs ref)
-    -- CR 701.50d's N, read ONCE as this instruction is reached (CR 608.2c) and
-    -- then fixed (CR 608.2f): Raffine, Scheming Seer's "the number of attacking
-    -- creatures" cannot move because an earlier conniver in the same instruction
-    -- discarded. Amass's arm for the unevaluable case.
+    -- CR 701.50d's N, read ONCE as this instruction is reached (CR 608.2c):
+    -- Raffine, Scheming Seer's "the number of attacking creatures" cannot move
+    -- because an earlier conniver in the same instruction drew and discarded.
+    -- Amass's arm for the unevaluable case.
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure ()
       Just n -> Monad.mapM_ (conniveOne (Integer.toNaturalSaturating n)) (Maybe.mapMaybe Recipient.objectOf ordered)
@@ -8010,7 +8010,10 @@ exploreOne oid = do
 -- discards, and the counters land on nothing -- the id is gone (CR 400.7), so
 -- putCounters places none.
 --
--- CR 701.50e: connive 0 is not a connive. No draw, no discard, no counter.
+-- CR 701.50e: connive 0 is not a connive. No draw, no discard, no counter, and
+-- none of CR 701.50f's event below. No printing in the pool counts something
+-- that can be zero when its connive resolves, so the guard is a regression
+-- fence rather than a proven behaviour (gap #3677).
 --
 -- "Nonland" is asked of each card the discard funnel MINTED, through its CR 613
 -- projection, exploreOne's reading: the hand incarnation is gone by then, and a
@@ -8051,3 +8054,9 @@ conniveOne n oid = Monad.when (n > 0) $ do
     -- one counter funnel, as exploreOne's grow.
     Monad.when (grown > 0) $
       Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne grown)
+    -- CR 701.50f: the permanent connives once the whole of rule 701.50d is done,
+    -- so this comes after every step above and fires even where they were
+    -- impossible -- exploreOne's CR 701.44b line. Inside the Just, since an id
+    -- nobody ever controlled connives nothing; CR 701.50e's zero never reaches
+    -- here, the guard above having returned.
+    State.modify' (Event.recordEvent (GameEvent.Connived oid))

@@ -147,6 +147,7 @@ codec =
           Arm.payload "PlayerWinsCoinFlip" PlayerRelation.codec TriggerCondition.PlayerWinsCoinFlip (\x -> case x of TriggerCondition.PlayerWinsCoinFlip y -> Just y; _ -> Nothing),
           Arm.nullary "SelfBecomesPlotted" TriggerCondition.SelfBecomesPlotted,
           Arm.payload "PermanentExplores" filterCodec TriggerCondition.PermanentExplores (\x -> case x of TriggerCondition.PermanentExplores y -> Just y; _ -> Nothing),
+          Arm.payload "PermanentConnives" filterCodec TriggerCondition.PermanentConnives (\x -> case x of TriggerCondition.PermanentConnives y -> Just y; _ -> Nothing),
           Arm.nullary "SelfExerted" TriggerCondition.SelfExerted,
           Arm.nullary "Reflexive" TriggerCondition.Reflexive,
           Arm.payload "SelfBecomesAttachedBy" filterCodec TriggerCondition.SelfBecomesAttachedBy (\x -> case x of TriggerCondition.SelfBecomesAttachedBy y -> Just y; _ -> Nothing),

@@ -959,6 +959,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
+  TriggerCondition.PermanentConnives _ -> []
   -- CR 701.68d's carries a PlayerRelation, which is no Count.
   TriggerCondition.PlayerBlights _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
@@ -3538,6 +3539,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
   TriggerCondition.PermanentExplores f -> unframed [f]
+  TriggerCondition.PermanentConnives f -> unframed [f]
   -- CR 701.43d carries nothing, so no Filter either.
   TriggerCondition.SelfExerted -> []
   -- CR 701.3a's carries one over the ATTACHMENT -- Bramble Elemental's "an
@@ -3733,6 +3735,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
+  TriggerCondition.PermanentConnives _ -> []
   TriggerCondition.SelfExerted -> []
   TriggerCondition.SelfBecomesAttachedBy _ -> []
   -- Neither attachment-scoped condition names a slot OUTRIGHT either: each binds
