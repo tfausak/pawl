@@ -330,6 +330,9 @@ data Keyword
     -- gets +1/+0 until end of turn; each instance triggers separately (CR
     -- 702.91b).
     BattleCry
+  | -- | 702.92a: "When this Equipment enters, create a 0\/0 black Phyrexian Germ
+    -- creature token, then attach this Equipment to it."
+    LivingWeapon
   | -- | 702.93a: when this permanent dies, if it had no +1/+1 counters on it,
     -- return it to the battlefield under its owner's control with one --
     -- Persist's mirror.
@@ -518,6 +521,9 @@ data Keyword
   | -- | 702.160a: a second mana cost, power and toughness the caster may choose
     -- instead of the printed ones as the card is cast (CR 718.3).
     Prototype Prototype.Prototype
+  | -- | 702.163a: "When this Equipment enters, create a 2\/2 red Rebel creature
+    -- token, then attach this Equipment to it."
+    ForMirrodin
   | -- | 702.164a: toxic N. CR 702.164b's total toxic value is the SUM over every
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic).
     Toxic Natural.Natural
@@ -543,6 +549,9 @@ data Keyword
     -- state-based action, read off the projection by Pawl.Engine.Sba rather than
     -- minted.
     StartYourEngines
+  | -- | 702.182a: "When this Equipment enters, create a 1\/1 colorless Hero
+    -- creature token, then attach this Equipment to it."
+    JobSelect
   | -- | 701.43d: "you may exert this creature as it attacks" is an optional cost
     -- to attack (CR 508.1g), read by Pawl.Engine.Combat.declareAttackers.
     --

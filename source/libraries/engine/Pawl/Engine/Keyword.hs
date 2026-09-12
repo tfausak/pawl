@@ -244,6 +244,13 @@ abilitiesFor keyword count = case keyword of
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
+  -- CR 603.2: none of the three rules states an "each instance" clause, so the
+  -- general reason gives one ability per instance -- a second copy of the
+  -- keyword mints a second token, and CR 301.5c leaves the Equipment on the
+  -- one its controller ends up attached to.
+  Keyword.LivingWeapon -> List.genericReplicate count (attachToOwnToken germToken)
+  Keyword.ForMirrodin -> List.genericReplicate count (attachToOwnToken rebelToken)
+  Keyword.JobSelect -> List.genericReplicate count (attachToOwnToken heroToken)
   Keyword.Evolve -> List.genericReplicate count evolve
   -- CR 702.105b: each instance triggers separately.
   Keyword.Dethrone -> List.genericReplicate count dethrone
@@ -489,6 +496,9 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Wither -> []
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
+  Keyword.LivingWeapon -> []
+  Keyword.ForMirrodin -> []
+  Keyword.JobSelect -> []
   -- CR 702.84a, 702.128a and 702.129a function in a GRAVEYARD, so
   -- graveyardAbilitiesFor below is the roster that mints them and this hand one
   -- grants nothing.
@@ -843,6 +853,9 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Wither -> []
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
+  Keyword.LivingWeapon -> []
+  Keyword.ForMirrodin -> []
+  Keyword.JobSelect -> []
   Keyword.Unearth cost -> [unearth cost]
   Keyword.Embalm cost -> [embalm cost]
   Keyword.Eternalize cost -> [eternalize cost]
@@ -1232,6 +1245,9 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Wither -> []
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
+  Keyword.LivingWeapon -> []
+  Keyword.ForMirrodin -> []
+  Keyword.JobSelect -> []
   Keyword.Unearth _ -> []
   Keyword.Embalm _ -> []
   Keyword.Eternalize _ -> []
@@ -1748,6 +1764,9 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Wither -> []
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
+  Keyword.LivingWeapon -> []
+  Keyword.ForMirrodin -> []
+  Keyword.JobSelect -> []
   -- CR 702.84a is an ACTIVATED ability and not a casting permission: unearth
   -- RETURNS the card to the battlefield, it never casts it. Cycling's reading
   -- above, one zone over.
@@ -2773,6 +2792,9 @@ mintedReplacementsFor keyword count = case keyword of
   -- back as a quantity (Marrow Chomper).
   Keyword.Devour n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber {SacrificeAnyNumber.filter = Filter.HasCardType CardType.Creature, SacrificeAnyNumber.kind = Just CounterKind.PlusOnePlusOne, SacrificeAnyNumber.each = n}))))
   Keyword.Exalted -> []
+  Keyword.LivingWeapon -> []
+  Keyword.ForMirrodin -> []
+  Keyword.JobSelect -> []
   -- CR 702.84a's two replacement-shaped clauses are created by the ability's
   -- RESOLUTION rather than standing on the card, so they are effects inside
   -- `unearth` above and not rows here.
@@ -3012,6 +3034,9 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Wither -> []
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
+  Keyword.LivingWeapon -> []
+  Keyword.ForMirrodin -> []
+  Keyword.JobSelect -> []
   Keyword.Unearth _ -> []
   Keyword.Embalm _ -> []
   Keyword.Eternalize _ -> []
@@ -3249,6 +3274,9 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Wither -> []
   Keyword.Devour _ -> []
   Keyword.Exalted -> []
+  Keyword.LivingWeapon -> []
+  Keyword.ForMirrodin -> []
+  Keyword.JobSelect -> []
   Keyword.Unearth _ -> []
   Keyword.Embalm _ -> []
   Keyword.Eternalize _ -> []
@@ -3425,6 +3453,9 @@ familyOf keyword = case keyword of
   Keyword.Wither -> Nothing
   Keyword.Devour _ -> Just KeywordFamily.Devour
   Keyword.Exalted -> Nothing
+  Keyword.LivingWeapon -> Nothing
+  Keyword.ForMirrodin -> Nothing
+  Keyword.JobSelect -> Nothing
   Keyword.Unearth _ -> Just KeywordFamily.Unearth
   Keyword.Embalm _ -> Just KeywordFamily.Embalm
   Keyword.Eternalize _ -> Just KeywordFamily.Eternalize
@@ -4605,6 +4636,138 @@ servoToken =
               Face.vanguard = Nothing,
               Face.keywords = Set.empty,
               Face.colorIndicator = Set.empty,
+              Face.characteristicPT = Nothing,
+              Face.staticAbilities = [],
+              Face.spell = Face.defaultSpell,
+              Face.activatedAbilities = [],
+              Face.replacementEffects = [],
+              Face.triggeredAbilities = [],
+              Face.delayedAbilities = Map.empty,
+              Face.rooms = Seq.empty,
+              Face.dungeonEntryQuality = Nothing,
+              Face.castingPermissions = [],
+              Face.castingRestrictions = [],
+              Face.enchant = [],
+              Face.counterability = Counterability.Counterable,
+              Face.additionalCosts = [],
+              Face.maximumX = [],
+              Face.alternativeCosts = [],
+              Face.costReductions = [],
+              Face.playerAbilities = [],
+              Face.blockRequirements = [],
+              Face.blockPermissions = [],
+              Face.attackRequirements = [],
+              Face.combatRestrictions = [],
+              Face.sacrificeRestrictions = [],
+              Face.untapRestrictions = [],
+              Face.attachRestrictions = [],
+              Face.counterRestrictions = [],
+              Face.crewRestrictions = [],
+              Face.activationProhibitions = [],
+              Face.entryRestrictions = [],
+              Face.attackCosts = [],
+              Face.blockCosts = [],
+              Face.mulliganActions = [],
+              Face.openingHandActions = [],
+              Face.specialActions = []
+            }
+    }
+
+-- CR 702.92a / CR 702.163a / CR 702.182a: living weapon, for Mirrodin! and job
+-- select are ONE sentence three times over -- "When this Equipment enters,
+-- create a [token], then attach this Equipment to it" -- differing only in the
+-- token each rule names. So one builder mints all three, and the three arms of
+-- `abilitiesFor` differ only in the Card they hand it. Fabricate's mint over CR
+-- 603.6a's entry event, so the condition is TriggerCondition.SelfEnters.
+--
+-- ONE clause holding TWO effects, not two clauses: rule 702.92a's "then" is a
+-- sequence inside a single sentence, and Resolve's per-effect re-read of the
+-- live bindings (CR 608.2c) is what lets the attach see the slot the create just
+-- bound. Harried Dronesmith is the card that already writes that shape.
+--
+-- Effect.Attach moves the effect's SOURCE, which is the Equipment (CR 113.7), so
+-- the rule's "this Equipment" needs no slot of its own. CR 701.3b is what makes
+-- the Equipment stay put when the token is gone or the Equipment itself has left
+-- the battlefield: Event.attach is the funnel that holds it, and the token is
+-- still created either way (CR 111.1).
+attachToOwnToken :: Card -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+attachToOwnToken token =
+  let spawn =
+        Effect.Create
+          Create.MkCreate
+            { Create.quantity = Quantity.Literal 1,
+              Create.card = token,
+              Create.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              -- A Literal 1, so namesEveryToken is False and the slot holds the
+              -- ONE token the rule's "it" names -- or, where CR 614.16 doubled
+              -- the count, the one its controller picks.
+              Create.slot = Just attachedTokenSlot,
+              -- CR 111.2 under CR 109.5: the keyword ability's own controller.
+              Create.creator = PlayerRef.Relative PlayerRelation.You
+            }
+      clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [spawn, Effect.Attach attachedTokenSlot])
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slot the create binds and the attach reads. Not a target: nothing is
+-- declared on the stack, so CR 608.2b never touches it.
+attachedTokenSlot :: SlotName.SlotName
+attachedTokenSlot = SlotName.MkSlotName (Text.pack "the token")
+
+-- | CR 702.92a's token: 0/0 black Phyrexian Germ creature. Phyrexian is a
+-- creature TYPE here rather than a supertype, so both words are subtypes, and CR
+-- 111.4 makes the name the subtypes plus "Token". A 0/0 with nothing attached
+-- dies to CR 704.5f, which is why rule 702.92a attaches the Equipment in the
+-- same resolution.
+germToken :: Card
+germToken = creatureToken (Text.pack "Phyrexian Germ Token") (Set.fromList [Subtype.Phyrexian, Subtype.Germ]) (Set.singleton Color.Black) 0 0
+
+-- | CR 702.163a's token: 2/2 red Rebel creature.
+rebelToken :: Card
+rebelToken = creatureToken (Text.pack "Rebel Token") (Set.singleton Subtype.Rebel) (Set.singleton Color.Red) 2 2
+
+-- | CR 702.182a's token: 1/1 colorless Hero creature. Colorless is the ABSENCE
+-- of a colorIndicator (CR 105.2, CR 202.2e) rather than a colour, servoToken's
+-- note one rule over.
+heroToken :: Card
+heroToken = creatureToken (Text.pack "Hero Token") (Set.singleton Subtype.Hero) Set.empty 1 1
+
+-- A vanilla creature token: CR 111.3's characteristics and nothing else, since
+-- none of the three rules gives its token an ability.
+creatureToken :: Text.Text -> Set.Set Subtype.Subtype -> Set.Set Color.Color -> Integer -> Integer -> Card
+creatureToken name subtypes colors power toughness =
+  Card.MkCard
+    { Card.layout = Layout.Normal,
+      Card.faces =
+        NonEmpty.singleton
+          Face.MkFace
+            { Face.name = CardName.MkCardName name,
+              Face.manaCost = Nothing,
+              Face.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) subtypes,
+              Face.power = Just (Power.MkPower (Quantity.Literal power)),
+              Face.toughness = Just (Toughness.MkToughness (Quantity.Literal toughness)),
+              Face.loyalty = Nothing,
+              Face.defense = Nothing,
+              Face.vanguard = Nothing,
+              Face.keywords = Set.empty,
+              Face.colorIndicator = colors,
               Face.characteristicPT = Nothing,
               Face.staticAbilities = [],
               Face.spell = Face.defaultSpell,

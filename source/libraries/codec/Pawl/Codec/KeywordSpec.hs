@@ -1200,6 +1200,28 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (mayhem 2)
       " {\"type\":\"Mayhem\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (mayhem 2) /= Codec.encode Keyword.codec (flashbackOf 2)) "the same cost under two keywords encodes differently"
+  -- CR 702.92a, CR 702.163a and CR 702.182a: nullary, because each rule states
+  -- one fixed token and takes no parameter. Three arms rather than one
+  -- parameterised by the token, so a card cannot spell a token the CR never
+  -- printed.
+  Spec.it s "LivingWeapon" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.LivingWeapon
+      " {\"type\":\"LivingWeapon\"} "
+  Spec.it s "ForMirrodin" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.ForMirrodin
+      " {\"type\":\"ForMirrodin\"} "
+  Spec.it s "JobSelect" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.JobSelect
+      " {\"type\":\"JobSelect\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 
