@@ -56,9 +56,11 @@ data Clause card ability = MkClause
     -- optional clause because CR 121.3 makes the draw happen whenever it is
     -- chosen, so the answer and the action cannot come apart.
     --
-    -- Not implemented: an option the named clause could not legally take is
-    -- offered anyway (CR 608.2d), so accepting "you may discard a card" with an
-    -- empty hand admits this clause (#2167).
+    -- An option the named clause could not take at all is not offered (CR
+    -- 608.2d, Pawl.Engine.Resolve.Effect.clauseIsImpossible), so "you may
+    -- discard a card" on an empty hand never admits this clause -- Tweeze is
+    -- Pawl.ResolveSpec's "CR 608.2d Tweeze's discard is not offered with an
+    -- empty hand".
     --
     -- NOT CR 603.12's reflexive triggered ability, the "when you do" spelling
     -- (Pawl.Types.TriggerCondition's Reflexive): that one creates a NEW ability

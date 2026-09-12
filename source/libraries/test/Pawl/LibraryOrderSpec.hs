@@ -243,6 +243,37 @@ countersSpec s registry = Spec.describe s "Counters" $ do
     Spec.assertEqWith s "declined: the counter is still there" (fmap Object.counters (Game.lookupObject victim declined)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
     Spec.assertEqWith s "exercised: pumped to 4/4" (Projection.powerOf victim exercised) (Just 4)
     Spec.assertEqWith s "exercised: no counters remain" (fmap Object.counters (Game.lookupObject victim exercised)) (Just Map.empty)
+  -- CR 608.2d on the same card: "the player can't choose an option that's
+  -- illegal or impossible", so "you may remove a -1/-1 counter from it" over a
+  -- creature that bears none is not offered at all.
+  --
+  -- A PAIR of boards differing in exactly one thing -- whether S.addCounter ran
+  -- -- because the board after resolution reads the same either way: a removal
+  -- that happened and one that could not both leave the creature with no -1/-1
+  -- counters. The transcript is what tells them apart, so it is the whole proof
+  -- here, and the counter-bearing half is the control that says the prompt
+  -- survives where the rule leaves a choice.
+  Spec.it s "CR 608.2d Shed Weakness's removal is not offered to a creature with no counter" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    shedWeakness <- S.printingOf s registry "Shed Weakness"
+    let build withCounter =
+          let (victim, withFoe) = S.addPermanent piker S.bob (S.landsInPlay forest 1)
+              placed = if withCounter then S.addCounter CounterKind.MinusOneMinusOne 1 victim withFoe else withFoe
+              (gs, spellId) = S.handOne shedWeakness placed
+           in (victim, gs, spellId)
+        resolveIt (_, gs, spellId) =
+          let ((_, after), asked) = Replay.record exerciseOptional gs (S.cast S.alice spellId >> Stack.resolveTop)
+           in (asked, after)
+        victimOf (victim, _, _) = victim
+        bare = build False
+        borne = build True
+        (bareAsked, bareAfter) = resolveIt bare
+        (borneAsked, borneAfter) = resolveIt borne
+    Spec.assertEqWith s "CR 608.2d with no counter to remove, the \"may\" is never put" (filter isOptionalResponse bareAsked) []
+    Spec.assertEqWith s "the control: the same card over a counter is still asked" (filter isOptionalResponse borneAsked) [Response.ChoseOptional OptionalDecision.Exercises]
+    Spec.assertEqWith s "and the mandatory pump landed on the bare creature all the same" (Projection.powerOf (victimOf bare) bareAfter) (Just 4)
+    Spec.assertEqWith s "the control's counter is what the answer removed" (fmap Object.counters (Game.lookupObject (victimOf borne) borneAfter)) (Just Map.empty)
   Spec.it s "CR 122.2 Unsummon removes a counter-bearing creature's counters" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"

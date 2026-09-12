@@ -505,14 +505,18 @@ data Prompt r where
   OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   -- | CR 603.5 / 608.2d: whether the named player exercises a printed "may",
   -- on the clause the ModeIndex and ClauseIndex name (CR 608.2e), asked of
-  -- each player it covers in APNAP order. Elided only where the clause is
-  -- inert (Pawl.Engine.Resolve.clauseIsInert, off the effects'
-  -- classification).
+  -- each player it covers in APNAP order. Elided where the clause is inert
+  -- (Pawl.Engine.Resolve.clauseIsInert) and where CR 608.2d leaves nothing to
+  -- choose because its instructions cannot be carried out at all
+  -- (Pawl.Engine.Resolve.Effect.clauseIsImpossible), both off the effects'
+  -- classification.
   ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Prompt OptionalDecision.OptionalDecision
   -- | CR 608.2d's "or": which of a mode's mutually exclusive clauses happens,
   -- announced at resolution once per group and per chooser
-  -- (Pawl.Types.OrElse.chooser), before ChooseOptional. Never elided. Not
-  -- ChooseModes, which CR 700.2 fixes at cast.
+  -- (Pawl.Types.OrElse.chooser), before ChooseOptional. Carries only the
+  -- branches CR 608.2d leaves to choose, and is elided where one or none
+  -- survives that filter (Pawl.Engine.Resolve.chosenBranch). Not ChooseModes,
+  -- which CR 700.2 fixes at cast.
   ChooseClause :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> NonEmpty.NonEmpty ClauseIndex.ClauseIndex -> Prompt ClauseIndex.ClauseIndex
   -- | CR 608.2g: whether the player casts the card a resolving effect allows
   -- them to (CR 310.12b), the CardName being the half CR 712.11a puts on the
