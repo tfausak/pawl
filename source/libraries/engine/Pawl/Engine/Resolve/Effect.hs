@@ -2376,6 +2376,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- therefore an ORDINARY triggered ability and uses the stack, which is what
   -- Pawl.ManaSpec's "Caged Sun" group proves off Crumbling Vestige.
   --
+  -- CR 605.4a's inline road reaches this arm too, and its addition is a
+  -- Resolution like any other: CR 605.5a's question is whether an ACTIVATED
+  -- mana ability added the mana, and a triggered mana ability is not one. What
+  -- the activation itself added is recorded by Pawl.Engine.Cost.tapForManaWith
+  -- instead, and carries ManaAddedCause.ManaAbility.
+  --
   -- CR 106.4: into the pool of the player the effect names, read through
   -- playerRefPlayers like every other slot read (CR 608.2b). The type and the CR
   -- 106.3 tags come from the ability's SOURCE, the payment path's own readers.
