@@ -629,6 +629,9 @@ data Keyword
     -- the card rather than casting it and so needs a land-play permission
     -- (#3645).
     Mayhem (Cost.Cost Keyword)
+  | -- | 702.35a: "madness [cost]" -- a discard of this card exiles it instead,
+    -- and a triggered ability then offers its owner the cast for [cost].
+    Madness (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

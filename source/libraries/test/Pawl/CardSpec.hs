@@ -2918,6 +2918,8 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Retrace -> []
   -- CR 702.187b's payload is a whole Cost, flashback's shape.
   Keyword.Mayhem cost -> costFilters cost
+  -- CR 702.35a's payload is a whole Cost, mayhem's shape.
+  Keyword.Madness cost -> costFilters cost
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]

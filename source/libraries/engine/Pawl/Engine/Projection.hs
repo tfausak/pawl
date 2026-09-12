@@ -4070,10 +4070,26 @@ replacementsAffecting gs =
              in fmap
                   (\pr -> (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr))
                   (filter (\pr -> keeps pr && printedRowLives oid gs pr) (Face.replacementEffects face))
+      -- CR 702.35a's replacement, minted for a card in a HAND rather than read
+      -- off its printed list -- `statedFrom`'s sibling, and the one place a
+      -- rule mints a row into a zone the two projecting walks above do not
+      -- reach. Pawl.Engine.Keyword.handReplacementsOf is what decides which
+      -- keywords reach it, and madness is the only one.
+      --
+      -- The PRINTED face, `statedFrom`'s read and for its reason: `project` is
+      -- what the short-circuit exists to skip, so a madness ability an effect
+      -- granted to a card in a hand mints nothing (gap #1859).
+      --
+      -- ReplacementProvenance.Minted, replacementsOfGiven's mark for every row a
+      -- rule writes onto an object rather than a face printing it.
+      mintedInHand oid = case Game.faceOf oid gs of
+        Nothing -> []
+        Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (Face.keywords face))
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
           <> foldZoneCards GameState.hand (statedFrom Zone.Hand) gs
+          <> foldZoneCards GameState.hand mintedInHand gs
           <> foldZoneCards GameState.library (statedFrom Zone.Library) gs
           <> concatMap (statedFrom Zone.Exile) (Set.toList (GameState.exile gs))
           <> concatMap (statedFrom Zone.Command) statingCommand

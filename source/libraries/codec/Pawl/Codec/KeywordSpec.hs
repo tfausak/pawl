@@ -1222,6 +1222,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (mayhem 2)
       " {\"type\":\"Mayhem\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (mayhem 2) /= Codec.encode Keyword.codec (flashbackOf 2)) "the same cost under two keywords encodes differently"
+  -- CR 702.35a's payload is a whole Cost, Arrogant Wurm's {2}{G}, and it must not
+  -- share Mayhem's tag: rule 702.35a casts from exile off a trigger and rule
+  -- 702.187b from a graveyard off a permission.
+  Spec.it s "Madness carries its cost, and is not Mayhem" $ do
+    let madness n = Keyword.Madness (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        mayhemOf n = Keyword.Mayhem (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (madness 3)
+      " {\"type\":\"Madness\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (madness 3) /= Codec.encode Keyword.codec (mayhemOf 3)) "the same cost under two keywords encodes differently"
   -- CR 702.92a, CR 702.163a and CR 702.182a: nullary, because each rule states
   -- one fixed token and takes no parameter. Three arms rather than one
   -- parameterised by the token, so a card cannot spell a token the CR never
