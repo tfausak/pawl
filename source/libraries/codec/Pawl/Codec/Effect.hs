@@ -25,6 +25,7 @@ import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Codec.Conjure as Conjure
+import qualified Pawl.Codec.Connive as Connive
 import qualified Pawl.Codec.ControlPlayer as ControlPlayer
 import qualified Pawl.Codec.CopyStackObject as CopyStackObject
 import qualified Pawl.Codec.Counter as Counter
@@ -144,7 +145,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Surveil" PlayerQuantity.codec Effect.Surveil (\x -> case x of Effect.Surveil y -> Just y; _ -> Nothing),
           Arm.payload "Fateseal" PlayerQuantity.codec Effect.Fateseal (\x -> case x of Effect.Fateseal y -> Just y; _ -> Nothing),
           Arm.payload "Explore" ObjectRef.codec Effect.Explore (\x -> case x of Effect.Explore y -> Just y; _ -> Nothing),
-          Arm.payload "Connive" ObjectRef.codec Effect.Connive (\x -> case x of Effect.Connive y -> Just y; _ -> Nothing),
+          Arm.payload "Connive" Connive.codec Effect.Connive (\x -> case x of Effect.Connive y -> Just y; _ -> Nothing),
           Arm.payload "Mill" Mill.codec Effect.Mill (\x -> case x of Effect.Mill y -> Just y; _ -> Nothing),
           Arm.payload "Discard" Discard.codec Effect.Discard (\x -> case x of Effect.Discard y -> Just y; _ -> Nothing),
           Arm.payload "LoseLife" LifeLoss.codec Effect.LoseLife (\x -> case x of Effect.LoseLife y -> Just y; _ -> Nothing),

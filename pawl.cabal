@@ -277,6 +277,7 @@ library codec
     Pawl.Codec.ConjureDestination
     Pawl.Codec.ConjureDestinationSpec
     Pawl.Codec.ConjureSpec
+    Pawl.Codec.Connive
     Pawl.Codec.ContinuousEffect
     Pawl.Codec.ContinuousEffectSpec
     Pawl.Codec.ControlChanged
@@ -1599,6 +1600,7 @@ library types
     Pawl.Types.Condition
     Pawl.Types.Conjure
     Pawl.Types.ConjureDestination
+    Pawl.Types.Connive
     Pawl.Types.ContinuousEffect
     Pawl.Types.ControlChanged
     Pawl.Types.ControlDuration

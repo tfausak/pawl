@@ -48,6 +48,7 @@ import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
@@ -551,7 +552,7 @@ effectObjectRefs effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore ref -> [ref]
-  Effect.Connive ref -> [ref]
+  Effect.Connive (Connive.MkConnive _ ref) -> [ref]
   Effect.Discard subject -> case subject of
     Discard.Counted {} -> []
     Discard.These ref -> [ref]
@@ -912,7 +913,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.Explore _ -> Map.empty
-  Effect.Connive _ -> Map.empty
+  Effect.Connive (Connive.MkConnive quantity _) -> quantitySlots quantity
   Effect.Discard subject -> case subject of
     -- The bound slot is a DEFINITION, not a read, so it is not joined in here.
     -- Many, PlayerSacrifices' arity and for its reason: CR 101.4's worked
@@ -1468,7 +1469,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Explore {} -> True
-  Effect.Connive {} -> True
+  Effect.Connive (Connive.MkConnive quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.slotsAreExhaustive quantity
     Discard.These {} -> True
@@ -1682,7 +1683,7 @@ readsX =
         Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.Explore {} -> False
-        Effect.Connive {} -> False
+        Effect.Connive (Connive.MkConnive quantity _) -> Quantity.readsX quantity
         Effect.Discard subject -> case subject of
           Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
           Discard.These {} -> False

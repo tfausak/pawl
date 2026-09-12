@@ -39,6 +39,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
@@ -595,8 +596,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Connive (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
-      " {\"type\":\"Connive\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}} "
+      (Effect.Connive (Connive.MkConnive (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self")))))
+      " {\"type\":\"Connive\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"ref\":{\"type\":\"InSlot\",\"value\":\"self\"}}} "
   Spec.it s "Mill" $
     Common.assertJsonCodec
       s

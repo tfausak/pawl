@@ -98,6 +98,7 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
@@ -547,7 +548,7 @@ objectRefPositions =
         ("reveal", Effect.Reveal (Reveal.MkReveal (plantedRef "rv") Nothing), [plantedRef "rv"]),
         ("look-at", Effect.LookAt (LookAt.MkLookAt (plantedRef "la") (SlotName.MkSlotName (Text.pack "seen"))), [plantedRef "la"]),
         ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
-        ("connive", Effect.Connive (plantedRef "cn"), [plantedRef "cn"]),
+        ("connive", Effect.Connive (Connive.MkConnive (Quantity.Type.Literal 1) (plantedRef "cn")), [plantedRef "cn"]),
         ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
         ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders Nothing []), [plantedRef "cc"]),
         ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject") []), [plantedRef "bc-original", plantedRef "bc-subject"]),
@@ -1074,7 +1075,9 @@ ownCounts effect = case effect of
   -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
   -- the one on top, so there is no number a card author writes.
   Effect.Explore {} -> []
-  Effect.Connive {} -> []
+  -- Connive's N is a Quantity like the Search's above, so its Counts are
+  -- reachable from here.
+  Effect.Connive (Connive.MkConnive quantity _) -> quantityCounts quantity
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> quantityCounts quantity
     Discard.These {} -> []
@@ -4797,7 +4800,7 @@ effectFilters effect = case effect of
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as PutCounters' does.
   Effect.Explore ref -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.Connive ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.Connive (Connive.MkConnive quantity ref) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
   -- The These arm's ref carries a Filter a card author writes -- Amnesia's
   -- "nonland" -- so the lint reaches it, as Reveal's does.
   Effect.Discard subject -> case subject of
