@@ -2,6 +2,7 @@ module Pawl.Engine.Cast where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -58,6 +59,7 @@ import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import Pawl.Types.ManaSpending (ManaSpending)
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -473,6 +475,24 @@ costTotal costs = case costs of
 escalateTotal :: [Cost Keyword] -> Natural -> Maybe (Cost Keyword)
 escalateTotal costs chosen =
   costTotal (concat (List.genericReplicate (if chosen <= 1 then 0 else chosen - 1) costs))
+
+-- CR 700.2h: the additional cost the modes just chosen levy -- the cost printed
+-- before each chosen mode's effect (Face.modeCosts), summed, or Nothing where no
+-- chosen mode prints one. CR 702.172a's spree and CR 702.183a's tiered are the
+-- keywords that print them, and neither is read here: the cost is on the mode,
+-- so a card is charged for what it prints rather than for the word above the
+-- list.
+--
+-- Over the CHOSEN sequence and not over the map, so a mode chosen twice is
+-- charged twice -- CR 700.2d treats the spell "as if that mode appeared that
+-- many times in sequence", and rule 700.2h's own "all additional costs must be
+-- paid" is what makes the several a sum (CR 118.8a).
+--
+-- Not a question, escalateTotal's reason: rule 700.2h says the cost "must be
+-- paid", so once the modes are announced there is nothing left to ask.
+modeCostTotal :: Map.Map ModeIndex.ModeIndex (Cost Keyword) -> Seq.Seq ModeIndex.ModeIndex -> Maybe (Cost Keyword)
+modeCostTotal costs chosen =
+  costTotal (Maybe.mapMaybe (\index -> Map.lookup index costs) (Foldable.toList chosen))
 
 -- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
 -- this modal spell's modes, or Nothing when entwining is not on offer at all.
@@ -2001,8 +2021,13 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- rule 601.2e's own process, not a divergence from it.
       let escalated = escalateTotal (Keyword.escalateCosts (Face.keywords face)) (Natural.length chosenModes)
           withEscalate candidate = maybe candidate (Cost.plus candidate) escalated
+          -- CR 700.2h: the chosen modes' own printed costs, levied HERE for
+          -- escalate's reason -- they are a function of the answer just given,
+          -- and they are additional costs CR 601.2f-h then totals.
+          modeCost = modeCostTotal (Face.modeCosts face) chosenModes
+          withModeCost candidate = maybe candidate (Cost.plus candidate) modeCost
           withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
-          announcedCandidates = fmap (withEscalate . withEntwine) candidates
+          announcedCandidates = fmap (withModeCost . withEscalate . withEntwine) candidates
           -- CR 702.33a/b/c's, CR 702.157a's and CR 702.175a's costs, read ONCE off
           -- the half being cast: the announcement below and the limit it is
           -- judged against are the same list.
@@ -2087,7 +2112,8 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
           withBuyback candidate = maybe candidate (Cost.plus candidate) boughtBack
           -- The additional costs are folded into each candidate's COST and
           -- never into its keyword: CR 702.33a's kicker, CR 702.42a's entwine,
-          -- CR 702.27a's buyback and CR 702.120a's escalate are paid ON TOP of
+          -- CR 702.27a's buyback, CR 702.120a's escalate and CR 700.2h's
+          -- per-mode costs are paid ON TOP of
           -- whichever candidate was chosen, so a kicked flashback cast is still
           -- the flashback cost being paid (CR 118.9d sends an additional cost
           -- through an alternative one unchanged).
@@ -2100,7 +2126,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
           payableCandidates =
             filter
               (\candidate -> payableCost spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate))
-              (fmap (\candidate -> candidate {CandidateCost.cost = withBuyback (withKicker (withEscalate (withEntwine (CandidateCost.cost candidate))))}) candidateCosts)
+              (fmap (\candidate -> candidate {CandidateCost.cost = withBuyback (withKicker (withModeCost (withEscalate (withEntwine (CandidateCost.cost candidate)))))}) candidateCosts)
           payable = fmap CandidateCost.cost payableCandidates
       if null payable || overKickerLimit
         then reject

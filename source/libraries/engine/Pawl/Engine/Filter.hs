@@ -2236,6 +2236,11 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.LivingWeapon -> keyword
   Keyword.Type.ForMirrodin -> keyword
   Keyword.Type.JobSelect -> keyword
+  -- CR 702.172a and 702.183a are nullary: what they name is the card's mode
+  -- selection and CR 700.2h's per-mode costs, and a cost holds no word CR 612.2
+  -- swaps.
+  Keyword.Type.Spree -> keyword
+  Keyword.Type.Tiered -> keyword
   Keyword.Type.Mentor -> keyword
   -- CR 702.135a's N is a number and not a word, so CR 612.2 has nothing to swap
   -- HERE. "Spirit" is a word CR 612.2a does reach, but it is in the ability

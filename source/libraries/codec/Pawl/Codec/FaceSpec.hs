@@ -1,5 +1,6 @@
 module Pawl.Codec.FaceSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -56,6 +57,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PerCreature as PerCreature
@@ -160,6 +162,7 @@ baseFace =
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.additionalCosts = [],
+      Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
@@ -199,6 +202,7 @@ minimalFace =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
@@ -272,6 +276,7 @@ populatedFace =
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller],
       Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))],
       Face.additionalCosts = [CostComponent.TapThis],
+      Face.modeCosts = Map.empty,
       Face.maximumX = [Quantity.ManaValue],
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
       Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)],
@@ -560,6 +565,23 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))]}
         (init baseFaceJson <> ",\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}}]}")
+    -- CR 700.2h, keyed by the mode's index into `spell` -- one mode here, so "0"
+    -- is the only key Pawl.Codec.Face's range check admits.
+    Spec.it s "modeCosts" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.modeCosts = Map.singleton (ModeIndex.MkModeIndex 0) (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])}
+        (init baseFaceJson <> ",\"modeCosts\":{\"0\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}}")
+    -- The other half of the same rule: a key naming a mode `spell` does not have
+    -- is refused rather than dropped, which is Pawl.Codec.Face.modeCostsInRange.
+    Spec.it s "modeCosts naming a mode the spell does not have is rejected" $
+      Spec.assertEqWith
+        s
+        "CR 700.2h: mode 1 of a one-mode spell is not a mode"
+        (Monad.void (Common.parse (Text.pack (init baseFaceJson <> ",\"modeCosts\":{\"1\":{\"mana\":[]}}}")) >>= decodeFace))
+        (Left (Text.pack "modeCosts names a mode the spell does not have"))
     Spec.it s "additionalCosts" $
       Common.assertJsonCodec
         s

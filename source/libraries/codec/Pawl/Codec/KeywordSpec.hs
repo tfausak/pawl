@@ -1233,6 +1233,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.JobSelect
       " {\"type\":\"JobSelect\"} "
+  Spec.it s "Spree" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Spree
+      " {\"type\":\"Spree\"} "
+  Spec.it s "Tiered, and not Spree" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Tiered
+      " {\"type\":\"Tiered\"} "
+    Spec.assertNeWith s "CR 702.183a is not CR 702.172a: two payload-free arms must not share one tag" (Codec.encode Keyword.codec Keyword.Tiered) (Codec.encode Keyword.codec Keyword.Spree)
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 
