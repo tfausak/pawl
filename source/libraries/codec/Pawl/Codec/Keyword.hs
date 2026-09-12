@@ -55,6 +55,7 @@ codec =
       Arm.nullary "Banding" Keyword.Banding,
       Arm.payload "Rampage" Common.natural Keyword.Rampage (\x -> case x of Keyword.Rampage y -> Just y; _ -> Nothing),
       Arm.payload "CumulativeUpkeep" (Cost.codec codec) Keyword.CumulativeUpkeep (\x -> case x of Keyword.CumulativeUpkeep y -> Just y; _ -> Nothing),
+      Arm.payload "Echo" (Cost.codec codec) Keyword.Echo (\x -> case x of Keyword.Echo y -> Just y; _ -> Nothing),
       Arm.nullary "Flanking" Keyword.Flanking,
       Arm.nullary "Phasing" Keyword.Phasing,
       Arm.payload "Buyback" (Cost.codec codec) Keyword.Buyback (\x -> case x of Keyword.Buyback y -> Just y; _ -> Nothing),

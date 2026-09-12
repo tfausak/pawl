@@ -2733,6 +2733,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Ninjutsu cost -> costFilters cost
   -- CR 702.24a carries a whole Cost, so a Filter inside it is the card's.
   Keyword.CumulativeUpkeep cost -> costFilters cost
+  Keyword.Echo cost -> costFilters cost
   Keyword.FirstStrike -> []
   -- CR 702.8a: flash is a static ability with no payload -- it changes WHEN the
   -- card may be cast, and names nothing to filter.
@@ -3851,6 +3852,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.DealtDamageThisTurn -> []
   Filter.Type.CrewedSourceThisTurn -> []
   Filter.Type.ControlledSinceTurnBegan -> []
+  Filter.Type.ControlGainedSinceLastUpkeep -> []
   -- DESCENT, for ControlsMoreThanYou's reason.
   Filter.Type.AttachedTo f -> filterSlotsReadSingly f
   -- DESCENT, for the atom above's reason.

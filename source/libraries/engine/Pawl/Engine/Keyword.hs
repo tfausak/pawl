@@ -278,6 +278,9 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.24b: each instance triggers separately, and each counts the one
   -- pile of age counters.
   Keyword.CumulativeUpkeep cost -> List.genericReplicate count (cumulativeUpkeep cost)
+  -- CR 702.30a states no per-instance rider, so two instances are two
+  -- triggers and each asks its own cost.
+  Keyword.Echo cost -> List.genericReplicate count (echo cost)
   Keyword.Compleated -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> List.genericReplicate count training
@@ -544,6 +547,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
+  Keyword.Echo _ -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
@@ -905,6 +909,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
+  Keyword.Echo _ -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
@@ -1310,6 +1315,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
+  Keyword.Echo _ -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
   Keyword.Evoke _ -> []
@@ -1842,6 +1848,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
+  Keyword.Echo _ -> []
   Keyword.Riot -> []
   -- CR 702.138a: "You may cast this card from your graveyard by paying [cost]
   -- rather than paying its mana cost." UNGATED, unlike flashback's arm above:
@@ -3048,6 +3055,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
+  Keyword.Echo _ -> []
   -- CR 702.145b's FIRST static ability: "if it is night and this permanent is
   -- represented by a double-faced card, it enters transformed". Filter.IsSource
   -- for riot's reason, CR 614.1d's "[this permanent] enters" being the entering
@@ -3297,6 +3305,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
+  Keyword.Echo _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   -- CR 702.147a's static half: "This creature can't block." Unleash's row with the
@@ -3546,6 +3555,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
+  Keyword.Echo _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -3657,6 +3667,7 @@ familyOf keyword = case keyword of
   Keyword.Fabricate _ -> Just KeywordFamily.Fabricate
   Keyword.Rampage _ -> Just KeywordFamily.Rampage
   Keyword.CumulativeUpkeep _ -> Just KeywordFamily.CumulativeUpkeep
+  Keyword.Echo _ -> Just KeywordFamily.Echo
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
   -- CR 702.160a's parameterized keyword: "a card with prototype" drops the
   -- inset frame's cost and box.
@@ -6126,6 +6137,65 @@ cumulativeUpkeep cost =
               (Seq.singleton (Mode.MkMode (Seq.fromList [ageClause, upkeepClause]) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Just onBattlefield,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.30a's whole ability: "At the beginning of your upkeep, if this
+-- permanent came under your control since the beginning of your last upkeep,
+-- sacrifice it unless you pay [cost]."
+--
+-- `cumulativeUpkeep` above's shape, one clause and one clock over: the same
+-- upkeep trigger under TurnScope.ControllersTurn for rule 702.30a's "your" (CR
+-- 603.3a), the same CR 118.12a rewriting of "unless" into the IfNotPaid branch
+-- of an Optional offer, and Effect.Sacrifice rather than Destroy because CR
+-- 701.21a says a sacrifice is not a destruction. No PayGate.perEach: rule
+-- 702.30a's cost is paid once, where rule 702.24a's is paid per age counter.
+--
+-- THE INTERVENING "IF" is rule 702.30a's own, so CR 603.4 keeps the ability off
+-- the stack when the clock has run out and CR 608.2a re-reads it at resolution.
+-- Written as a count of the battlefield keeping Filter.IsSource, for
+-- `cumulativeUpkeep`'s reason and one more: the clock is
+-- Pawl.Types.Object.controlClock, which is per-incarnation, so only a permanent
+-- still on the battlefield has one to read.
+--
+-- Not implemented: rule 702.30a prints no "if this permanent is on the
+-- battlefield" -- that clause is rule 702.24a's, not this one's -- so a
+-- permanent that leaves in response should still resolve the ability and offer
+-- the payment, and here the count reads zero and the ability is removed instead
+-- (#3675).
+echo :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+echo cost =
+  let cameUnderYourControl =
+        Condition.Compares
+          ( Compares.MkCompares
+              (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) (Filter.And [Filter.IsSource, Filter.ControlGainedSinceLastUpkeep]) Aggregation.Members))
+              Comparison.AtLeast
+              (Quantity.Literal 1)
+          )
+      gate =
+        PayGate.MkPayGate
+          { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+            PayGate.cost = cost,
+            PayGate.branch = PayBranch.IfNotPaid,
+            PayGate.obligation = PayObligation.Optional,
+            PayGate.perEach = Nothing,
+            PayGate.offeredAt = Nothing
+          }
+      sacrifice =
+        Clause.MkClause
+          Nothing
+          Nothing
+          Nothing
+          Optionality.Mandatory
+          (Just gate)
+          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController}))
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton sacrifice) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Just cameUnderYourControl,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 

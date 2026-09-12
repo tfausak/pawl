@@ -70,6 +70,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -284,6 +285,21 @@ checkControlContinuity = do
               else Map.insert oid obj {Object.sickness = Sickness.Sick} objs
   State.put gs {GameState.objects = foldr interrupted (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
 
+-- CR 702.30a's clock, one seat at a time: `pid`'s upkeep is beginning, so an
+-- entry of theirs moves on one place. Only `pid`'s, rule 702.30a measuring the
+-- window in the upkeeps of the player whose control it asks about, so a
+-- permanent stolen and given back has an untouched clock for the seat that did
+-- not take a turn in between.
+advanceControlClock :: PlayerId -> Game ()
+advanceControlClock pid = do
+  gs <- State.get
+  let step clock = case clock of
+        ControlClock.Gained -> ControlClock.SinceLastUpkeep
+        ControlClock.SinceLastUpkeep -> ControlClock.Elapsed
+        ControlClock.Elapsed -> ControlClock.Elapsed
+      tick obj = obj {Object.controlClock = Map.adjust step pid (Object.controlClock obj)}
+  State.put gs {GameState.objects = foldr (Map.adjust tick) (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
+
 -- CR 704.5k asks how long each permanent has "had the world supertype", and
 -- world-ness is DERIVED (layer 4, CR 613.1d) while the clock must be STORED -- so
 -- this samples it into Object.worldSince, as checkControlContinuity samples
@@ -330,6 +346,13 @@ sampleWorldSince = do
 -- event, and the snapshot is REBUILT from the battlefield -- CR 400.7 gives what
 -- comes back a new id, so a creature borrowed, killed and reanimated does not
 -- come home. Terminates: it only mints on a difference.
+--
+-- CR 702.30a's clock rides the same pass, because it asks the same question of
+-- the same map and Projection.controlGrants is the expensive part. It only ever
+-- ADDS -- `advanceControlClock` above moves an entry on and CR 400.7's
+-- newIncarnation drops one -- and unlike the event above, FIRST SIGHTING IS A
+-- GAIN: rule 702.30a's window opens when the permanent comes under your control,
+-- and CR 110.2's battlefield entry is that.
 sampleControl :: Game Bool
 sampleControl = do
   gs <- State.get
@@ -344,7 +367,12 @@ sampleControl = do
         Just before <- [Map.lookup oid (GameState.controlSample gs)]
         Monad.guard (before /= after)
         pure (GameEvent.ControlChanged (ControlChanged.MkControlChanged oid before after))
-  State.put gs {GameState.controlSample = sampled}
+      gain (oid, who) objs = case Map.lookup oid objs of
+        Just obj
+          | Map.notMember who (Object.controlClock obj) ->
+              Map.insert oid obj {Object.controlClock = Map.insert who ControlClock.Gained (Object.controlClock obj)} objs
+        _ -> objs
+  State.put gs {GameState.controlSample = sampled, GameState.objects = foldr gain (GameState.objects gs) (Map.toList sampled)}
   -- CR 603.2's simultaneity: two permanents whose control reverted in the same CR
   -- 514.2 sweep changed hands at the same moment, so the batch is one event group.
   Monad.unless (null changes) . Event.simultaneously $
@@ -865,6 +893,7 @@ placeBorne srcId pending = do
             Object.exileLookers = Set.empty,
             Object.damage = 0,
             Object.sickness = Sickness.Settled controller,
+            Object.controlClock = Map.empty,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.counterTimestamps = Map.empty,
@@ -1816,6 +1845,15 @@ runStepThatBegan phase = do
   -- during the untap step (CR 502.4), so an ability that triggers then is held
   -- until upkeep, where CR 503.1a puts it on the stack first.
   State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan phase (GameState.activePlayer gs))) gs)
+  -- CR 702.30a's clock, advanced HERE and not in `runTurnBasedActions`, which is
+  -- CR 703.4's enumeration and holds nothing rule 503 does not name. It must run
+  -- before the first priority boundary of this step, which is what gathers the
+  -- beginning-of-upkeep triggers CR 603.4 then reads the clock for. The sample
+  -- first, because no player receives priority during the untap step (CR 502.4),
+  -- so a permanent that arrived there has no Gained entry yet.
+  Monad.when (phase == Phase.Beginning BeginningStep.Upkeep) $ do
+    _ <- sampleControl
+    State.gets GameState.activePlayer >>= advanceControlClock
   runTurnBasedActions phase
   -- Asked BEFORE the CR 704.3 check below. For every step but one the order is
   -- free -- this line is pure there -- and for the cleanup step it is forced: CR

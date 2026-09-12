@@ -361,6 +361,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.DealtDamageThisTurn -> predicate
         Filter.Type.CrewedSourceThisTurn -> predicate
         Filter.Type.ControlledSinceTurnBegan -> predicate
+        Filter.Type.ControlGainedSinceLastUpkeep -> predicate
         -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
         -- call rather than an omission: `candidate` here is a PLAYER (the sole caller
         -- folds this over playerView), and CR 303.4b makes a player enchanted by
@@ -963,6 +964,9 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- CR 302.6 asks about an OBJECT under a player's control; this view
       -- describes a snapshot rather than one -- `milledThisTurn` above's reason.
       Filter.controlledSinceTurnBegan = False,
+      -- CR 702.30a asks about a PERMANENT one player came to control; this
+      -- view describes a snapshot rather than one -- the field above's reason.
+      Filter.controlGainedSinceLastUpkeep = False,
       -- CR 303.4 / 110.1: a snapshot is not an object on the battlefield and
       -- carries no attachment, so there is no host here for AttachedTo's nest.
       Filter.attachedToView = Nothing,

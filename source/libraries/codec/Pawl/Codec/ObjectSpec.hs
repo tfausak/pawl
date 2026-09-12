@@ -11,6 +11,7 @@ import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
@@ -67,6 +68,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.exileLookers = Set.empty,
           Object.damage = 0,
           Object.sickness = Sickness.Sick,
+          Object.controlClock = Map.empty,
           Object.bindings = Map.empty,
           Object.counters = Map.empty,
           Object.counterTimestamps = Map.empty,
@@ -141,6 +143,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.exiledFaceDown = True,
           Object.damage = 4,
           Object.sickness = Sickness.Settled (PlayerId.MkPlayerId 5),
+          Object.controlClock = Map.singleton (PlayerId.MkPlayerId 28) ControlClock.SinceLastUpkeep,
           Object.bindings =
             Map.singleton
               (SlotName.MkSlotName (Text.pack "target"))
@@ -220,6 +223,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"facing\":{\"type\":\"FaceDown\",\"value\":{\"reason\":{\"type\":\"Morphed\"},\"listed\":{}}}"
           <> ",\"flipped\":true,\"exiledFaceDown\":true,\"damage\":4"
           <> ",\"sickness\":{\"type\":\"Settled\",\"value\":5}"
+          <> ",\"controlClock\":[{\"player\":28,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]"
           <> ",\"bindings\":{\"target\":{\"targets\":[{\"type\":\"ToCreature\",\"value\":6}]}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}"
           <> ",{\"key\":{\"type\":\"Loyalty\"},\"value\":0}]"

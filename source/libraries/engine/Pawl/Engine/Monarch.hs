@@ -195,6 +195,7 @@ placeInherent pending = do
             Object.exileLookers = Set.empty,
             Object.damage = 0,
             Object.sickness = Sickness.Settled controller,
+            Object.controlClock = Map.empty,
             Object.bindings = bindings,
             Object.counters = Map.empty,
             Object.counterTimestamps = Map.empty,

@@ -32,6 +32,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
@@ -312,6 +313,7 @@ dirtied pid object =
       Object.exiledFaceDown = True,
       Object.damage = 1,
       Object.sickness = Sickness.Settled pid,
+      Object.controlClock = Map.singleton pid ControlClock.SinceLastUpkeep,
       Object.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "target")) Binding.empty,
       Object.counters = Map.singleton CounterKind.PlusOnePlusOne 1,
       Object.attachedTo = Just (Recipient.ToPlayer pid),

@@ -726,6 +726,7 @@ mintCard pid under printingId dest position gs =
             Object.exileLookers = Set.empty,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
+            Object.controlClock = Map.empty,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
             Object.counterTimestamps = Map.empty,
@@ -919,6 +920,7 @@ createEmblem pid card = do
                 Object.exileLookers = Set.empty,
                 Object.damage = 0,
                 Object.sickness = Sickness.Settled pid,
+                Object.controlClock = Map.empty,
                 Object.bindings = Map.empty,
                 Object.counters = Map.empty,
                 Object.counterTimestamps = Map.empty,
@@ -6058,6 +6060,7 @@ createTokens controller card copy n tapped entering = do
                       Object.exileLookers = Set.empty,
                       Object.damage = 0,
                       Object.sickness = Sickness.Sick,
+                      Object.controlClock = Map.empty,
                       -- CR 707.2 / 111.3: a token copy's copiable values are the
                       -- copied permanent's, stamped into the layer-1 snapshot the
                       -- projection starts from -- the same binding the CR 614.1c
@@ -6261,6 +6264,7 @@ meld controller victims resultCard = do
                 -- CR 302.6 through CR 400.7: a permanent that has just entered is
                 -- a new object nobody has controlled for any time.
                 Object.sickness = Sickness.Sick,
+                Object.controlClock = Map.empty,
                 Object.bindings = Map.empty,
                 Object.counters = Map.empty,
                 Object.counterTimestamps = Map.empty,
