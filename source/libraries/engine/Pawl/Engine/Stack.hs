@@ -14,6 +14,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -23,18 +24,25 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CarryOver as CarryOver
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.PlayerControl as PlayerControl
+import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -482,6 +490,9 @@ resolveCardBacked runSubgame oid rest printingId = do
                           armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs1) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried
     _ -> State.put gs {GameState.stack = rest}
 
+-- What a spell's Object.castUsing record buys the permanent it becomes: CR
+-- 702.109a's and CR 702.152a's delayed ability, and CR 702.62a's haste.
+--
 -- CR 702.109a's and CR 702.152a's second static ability: a spell cast for its
 -- dash or blitz cost creates, as it resolves (CR 603.7a), a delayed triggered
 -- ability naming "the permanent this spell becomes" -- the arrival, bound under
@@ -502,3 +513,46 @@ armBecame oid obj gs1 arrivals = do
       ability = Keyword.resolutionDelayedAbility (Object.castUsing obj) >>= Keyword.mintedDelayedAbility
       arm delayed permanent = Resolve.armDelayed delayed oid (Resolve.spellController obj oid gs1) (Map.singleton Keyword.becameSlot (Binding.toObject permanent)) Onset.Immediately Nothing
   Foldable.for_ ability (\delayed -> State.modify' (\g -> List.foldl' (flip (arm delayed)) g permanents))
+  -- CR 702.62a's last sentence, off the same record and at the same moment the
+  -- delayed abilities above are armed: a spell cast for the cost suspend's third
+  -- ability offered gains haste, which the permanent it becomes is what carries.
+  --
+  -- "IF YOU CAST A CREATURE SPELL THIS WAY" is asked of the SPELL, off the
+  -- projection rather than the printed card and on the pre-move board where it
+  -- still exists -- the reading the Aura branch above takes of its own subtype
+  -- question. So a spell whose type line an effect changed answers for what it
+  -- was, not for whatever the permanent turns out to be.
+  let hasted = if Set.member CardType.Creature (Projection.cardTypesOf oid gs1) then Keyword.castUsingHaste (Object.castUsing obj) else Nothing
+  Foldable.for_ hasted $ \duration ->
+    Foldable.for_ permanents (grantHaste duration (Resolve.spellController obj oid gs1))
+
+-- CR 611.2: one stored continuous effect granting haste, for a duration that
+-- ends when its own source stops being controlled by `controller`.
+--
+-- A STORED effect and not a stamp, Pawl.Engine.Event's riot arm's reasons: it
+-- lands in CR 613.1f's layer 6 with a timestamp for an ability-remover to be
+-- ordered against, and CR 611.2c fixes the affected set to the one permanent
+-- here rather than re-deriving it.
+--
+-- The SOURCE is the permanent itself, riot's reading of CR 113.7 one keyword
+-- over: it is the object the grant is about, and the duration's clause counts it
+-- through Filter.IsSource. No bindings: this is a resolution's aftermath rather
+-- than a clause of one, so the duration can name no slot.
+grantHaste :: Duration.Duration -> PlayerId -> ObjectId -> Game ()
+grantHaste duration controller permanent =
+  State.modify' $ \g ->
+    case Expiry.arm Map.empty controller permanent duration g of
+      -- CR 611.2b: the duration never started -- the caster does not control the
+      -- arrival -- so nothing is stored.
+      Nothing -> g
+      Just expiry ->
+        let (ts, g1) = Game.freshTimestamp g
+            eff =
+              ContinuousEffect.MkContinuousEffect
+                { ContinuousEffect.source = permanent,
+                  ContinuousEffect.timestamp = ts,
+                  ContinuousEffect.expiry = expiry,
+                  ContinuousEffect.modification = Modification.GainKeyword Keyword.Type.Haste,
+                  ContinuousEffect.affected = Affected.TheseObjects (Set.singleton permanent)
+                }
+         in g1 {GameState.continuousEffects = eff : GameState.continuousEffects g1}

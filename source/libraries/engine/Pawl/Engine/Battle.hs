@@ -322,7 +322,7 @@ siegeDefeat =
               -- is the resolving controller, and a "may".
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing}
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing}
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,

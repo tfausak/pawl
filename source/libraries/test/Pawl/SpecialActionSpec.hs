@@ -19,7 +19,10 @@
 -- CR 116.2f's suspend (Rift Bolt) is here too, on its own board: its window is a
 -- FOURTH shape -- the card's own castability, which is what CR 116.2f states
 -- instead of a phase -- and CR 702.62's other two abilities ride the same board,
--- since the countdown and the free play are what the exile was for.
+-- since the countdown and the free play are what the exile was for. Rule
+-- 702.62a's last sentence -- the haste -- is a second suspend board (Durkwood
+-- Baloth), because what it needs is a creature and a combat rather than a
+-- countdown.
 --
 -- CR 702.170c's OTHER route to a plotted card -- an effect rather than the
 -- special action (Kellan Joins Up, Pawl.Types.Effect's MakePlotted) -- is here
@@ -1161,6 +1164,72 @@ suspending s registry = Spec.describe s "CR 116.2f Rift Bolt" $ do
       (interveningOfTop placed, interveningOfTop pulled)
       (Just True, Just False)
 
+-- Durkwood Baloth (TSP 193) {4}{G}{G} 5/5 Creature -- Beast, "Suspend 5--{G}"
+-- (Oracle text checked on Scryfall, 2026-09-12). A vanilla creature but for the
+-- suspend, so the only thing either case below can be about is rule 702.62a's
+-- last sentence.
+--
+-- THE PAIR differs in the road the Baloth took and in nothing else: both boards
+-- give alice the same six Forests, and both put the Baloth onto the battlefield
+-- during her own turn. The positive starts it in exile with its LAST time
+-- counter on -- the board four upkeeps of the countdown leave -- so her upkeep
+-- removes it, rule 702.62a's third ability resolves, and the free cast resolves
+-- before combat. The negative leaves it in hand and casts it for {4}{G}{G} in
+-- the same precombat main phase.
+--
+-- STARTED ON BOB'S TURN so the countdown's upkeep is one the engine ENTERS: a
+-- board handed in already standing in the upkeep step has had its
+-- TriggerCondition.StepBegins moment go by.
+--
+-- THE LIBRARIES are stocked because alice draws on the way through (CR 104.3c).
+balothBoard :: Printing.Printing -> Printing.Printing -> Bool -> GameState.GameState
+balothBoard forest baloth exiled =
+  let base = S.landsInPlay forest 6
+      placed =
+        if exiled
+          then
+            let (oid, g) = S.addExiledCard baloth S.alice base
+             in -- CR 702.62b: in exile, with suspend, with a time counter on it
+                -- -- the definition, and the state the countdown's last upkeep
+                -- finds.
+                g {GameState.objects = Map.adjust (\o -> o {Object.counters = Map.singleton CounterKind.Time 1}) oid (GameState.objects g)}
+          else snd (S.addHandCard baloth S.alice base)
+      stocked = List.foldl' (\g pid -> List.foldl' (\h _ -> snd (S.addLibraryCard forest pid h)) g [1 :: Int .. 4]) placed [S.alice, S.bob]
+   in stocked
+        { GameState.activePlayer = S.bob,
+          GameState.phase = Phase.PostcombatMain,
+          GameState.priority = Just S.bob
+        }
+
+-- Accepts rule 702.62a's offered cast, casts from hand when one is affordable,
+-- and attacks bob with everything. ONE answerer for both boards, so the cases
+-- differ only in the board: on the exiled board alice's hand is empty and the
+-- casting arm never fires.
+balothAnswer :: Prompt.Prompt r -> r
+balothAnswer p = case p of
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  Prompt.ChooseAction {} -> S.castAnswer p
+  _ -> S.attackTo S.bob p
+
+suspendHaste :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
+  Spec.it s "CR 702.62a cast off its own suspend ability the Baloth attacks the turn it arrives; cast from hand that turn it cannot" $ do
+    forest <- S.printingOf s registry "Forest"
+    baloth <- S.printingOf s registry "Durkwood Baloth"
+    let stop g = GameState.phase g == Phase.PostcombatMain && GameState.activePlayer g == S.alice
+        played = runUntil balothAnswer stop . balothBoard forest baloth
+        suspended = played True
+        hardCast = played False
+    Spec.assertEqWith s "CR 702.62a the suspended Baloth had haste and attacked bob for 5" (S.lifeOf S.bob suspended) (Just 15)
+    Spec.assertEqWith s "CR 302.6 cast from hand for {4}{G}{G} the same turn, it could not attack" (S.lifeOf S.bob hardCast) (Just 20)
+    Spec.assertEqWith
+      s
+      "the control: both roads put one Baloth onto the battlefield, so neither case is a creature that never arrived"
+      ( S.countOnBattlefieldByName (S.printingName baloth) S.alice suspended,
+        S.countOnBattlefieldByName (S.printingName baloth) S.alice hardCast
+      )
+      (1, 1)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
@@ -1172,6 +1241,7 @@ spec s registry = do
   makePlotted s registry
   foretelling s registry
   suspending s registry
+  suspendHaste s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
 -- offered to (its own scope is EachPlayer, so every seat is offered it) and how

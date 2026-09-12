@@ -2038,9 +2038,17 @@ escapeCosts keywords =
 -- with escape, and a copy of a spell isn't cast. Pawl.CastSpec's "CR 702.138b a
 -- Double Major copy of the escaping Chimera did not escape" and "CR 707.10 a
 -- Double Major copy of a dashed Scout attacks and is returned" prove both halves.
+--
+-- CR 702.62a's suspend is dropped for escape's reason, one word further on: its
+-- last sentence asks whether "you CAST a creature spell this way", and a copy of
+-- a spell isn't cast, so the copy is not the thing that gains the haste. A
+-- REGRESSION FENCE rather than a proved line: the suite's two spell-copying
+-- boards (Pawl.CastSpec's and Pawl.MutateSpec's Double Major) copy no suspended
+-- spell, so nothing observes this arm.
 copiedCastUsing :: Maybe Keyword -> Maybe Keyword
 copiedCastUsing castUsing = case castUsing of
   Just (Keyword.Escape _) -> Nothing
+  Just (Keyword.Suspend _) -> Nothing
   _ -> castUsing
 
 -- CR 702.74a, 702.109a and 702.152a: every evoke, dash and blitz cost this card
@@ -3841,6 +3849,11 @@ myriadExile =
 -- Not implemented: rule 702.116a's "you may" is PER OPPONENT, and this asks it
 -- ONCE over the whole loop, so at four or more seats a controller cannot take a
 -- token against one opponent and refuse another (#3663).
+--
+-- Not implemented: each iteration's copy names one token, so under a
+-- token-doubling replacement the slot below binds one of the two and CR
+-- 702.116a's exile at end of combat reaches only that one -- and the binding is
+-- asked as a question the rules never pose (#3185).
 myriad :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 myriad =
   let copy =
@@ -5310,7 +5323,7 @@ miracle cost =
               -- trigger's controller, and a "may".
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing}
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing}
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfRevealedForMiracle,
@@ -5372,7 +5385,7 @@ printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 exileTriggeredAbilitiesOf keywords = case suspend keywords of
   Nothing -> []
-  Just _ -> [suspendUpkeep, suspendLastCounter]
+  Just ability -> [suspendUpkeep, suspendLastCounter ability]
 
 -- CR 702.85a's ability, "a triggered ability that functions only while the spell
 -- with cascade is on the stack", and CR 702.40a's storm, which "functions on the
@@ -5575,7 +5588,8 @@ cascade =
                     CastOffer.withoutPayingManaCost = True,
                     CastOffer.payingInstead = Nothing,
                     CastOffer.spending = ManaSpending.AsProduced,
-                    CastOffer.restriction = Just Filter.ManaValueLessThanSource
+                    CastOffer.restriction = Just Filter.ManaValueLessThanSource,
+                    CastOffer.offeredBy = Nothing
                   }
             }
       rest =
@@ -5674,11 +5688,13 @@ suspendedNow = Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters 
 -- player may move the card out of exile in the window that opens before it
 -- resolves.
 --
--- Not implemented: rule 702.62a's last sentence, the haste a creature spell cast
--- this way gains until its caster loses control of it -- Durkwood Baloth
--- ({4}{G}{G} Creature, "Suspend 5--{G}") is the card that needs it (#3355).
-suspendLastCounter :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-suspendLastCounter =
+-- CastOffer.offeredBy is rule 702.62a's LAST sentence, half of it: the offer
+-- states which keyword ability is behind the free cost, so the spell carries
+-- Object.castUsing = suspend and Pawl.Engine.Stack.armBecame can grant the
+-- haste to the permanent it becomes. The tag is the whole ability, payload and
+-- all, `plainAlternativeCosts`' spelling; nothing reads the payload.
+suspendLastCounter :: Suspend.Suspend Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+suspendLastCounter ability =
   let effect =
         Effect.OfferCast
           OfferCast.MkOfferCast
@@ -5687,7 +5703,7 @@ suspendLastCounter =
               -- trigger's controller, and a "may".
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing}
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just (Keyword.Suspend ability)}
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
@@ -5719,6 +5735,48 @@ stillExiled =
   Condition.Compares
     ( Compares.MkCompares
         (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Exile PlayerRef.EachPlayer)) Filter.IsSource Aggregation.Members))
+        Comparison.AtLeast
+        (Quantity.Literal 1)
+    )
+
+-- CR 702.62a's last sentence: "If you cast a creature spell this way, it gains
+-- haste until you lose control of the spell or the permanent it becomes." The
+-- DURATION, for a spell whose Object.castUsing says suspend offered its cost;
+-- Nothing for every other cast, which gains nothing.
+--
+-- CR 611.2b's shape and not a static ability's re-asked clause (see
+-- Pawl.Types.StaticAbility's `condition`): "until you lose control" ends once and
+-- for good, so a controller who loses the permanent and takes it back does not
+-- get the haste again. `whilePaid` above -- dash's and blitz's road -- is the
+-- other shape, and rule 702.62a states this one.
+--
+-- WHAT the duration counts is the effect's own source, which
+-- Pawl.Engine.Stack.armBecame makes the permanent the spell became: rule
+-- 702.62a's "the permanent it becomes", read through Filter.IsSource the way CR
+-- 611.2b's Master Thief clause is.
+--
+-- Not implemented: rule 702.62a's "the spell" half of that duration -- pawl arms
+-- against the controller the spell resolved under, so a spell whose control
+-- changed between the cast and the resolution grants the haste to the new
+-- controller rather than to nobody (#3666).
+castUsingHaste :: Maybe Keyword -> Maybe Duration.Duration
+castUsingHaste castUsing = case castUsing of
+  Just (Keyword.Suspend _) -> Just (Duration.ForAsLongAs youControlSource)
+  _ -> Nothing
+
+-- CR 611.2b's Master Thief clause, "for as long as you control this creature",
+-- over the effect's own source.
+youControlSource :: Condition.Condition
+youControlSource =
+  Condition.Compares
+    ( Compares.MkCompares
+        ( Quantity.Count
+            ( Count.MkCount
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                (Filter.And [Filter.IsSource, Filter.ControlledBy PlayerRelation.You])
+                Aggregation.Members
+            )
+        )
         Comparison.AtLeast
         (Quantity.Literal 1)
     )

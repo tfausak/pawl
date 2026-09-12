@@ -19,19 +19,22 @@ codec = Fields.object $ do
   payingInstead <- Fields.defaulted "payingInstead" Nothing (Common.maybe (Cost.codec Keyword.codec)) CastOffer.payingInstead
   spending <- Fields.defaulted "spending" ManaSpending.Type.AsProduced ManaSpending.codec CastOffer.spending
   restriction <- Fields.defaulted "restriction" Nothing (Common.maybe (Filter.codec Keyword.codec)) CastOffer.restriction
+  offeredBy <- Fields.defaulted "offeredBy" Nothing (Common.maybe Keyword.codec) CastOffer.offeredBy
   pure
     CastOffer.MkCastOffer
       { CastOffer.transformed = transformed,
         CastOffer.withoutPayingManaCost = withoutPayingManaCost,
         CastOffer.payingInstead = payingInstead,
         CastOffer.spending = spending,
-        CastOffer.restriction = restriction
+        CastOffer.restriction = restriction,
+        CastOffer.offeredBy = offeredBy
       }
 
 -- | The value the codec elides entirely: an offer that transforms nothing,
 -- applies no alternative cost, widens no payment and narrows no half is an
 -- ordinary cast of the card (CR 712.11's default face, CR 601.2b's own
--- candidates, CR 118.14 unsaid, CR 709.3a's halves all offered).
+-- candidates, CR 118.14 unsaid, CR 709.3a's halves all offered, and no keyword
+-- ability behind the cost).
 defaultValue :: CastOffer.CastOffer
 defaultValue =
   CastOffer.MkCastOffer
@@ -39,5 +42,6 @@ defaultValue =
       CastOffer.withoutPayingManaCost = False,
       CastOffer.payingInstead = Nothing,
       CastOffer.spending = ManaSpending.Type.AsProduced,
-      CastOffer.restriction = Nothing
+      CastOffer.restriction = Nothing,
+      CastOffer.offeredBy = Nothing
     }
