@@ -286,9 +286,11 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- outcomes is which halves were offered. TWO artifacts, so the Adventure has a
   -- legal target either way and an absent offer is never about targeting.
   --
-  -- Pawl.Engine.Resolve.Effect.offerCast directly rather than through a cascade,
-  -- because no printing is both cheap enough for Bloodbraid Elf's walk to find and
-  -- expensive enough on its other half for the bound to bite (gap #3578).
+  -- Pawl.Engine.Resolve.Effect.offerCast directly, so the bound is a parameter and
+  -- one board reads both sides of it. Pawl.KeywordTriggerSpec's "CR 702.85a
+  -- cascading into an adventurer card withholds the half the bound refuses" is the
+  -- same rule through a real cascade, where the bound is the cascading spell's own
+  -- mana value and only one side of it can be shown.
   Spec.it s "CR 702.85a an offer's restriction is asked of each castable half" $ do
     shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"

@@ -1885,6 +1885,57 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
     Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
     Spec.assertEqWith s "four lands paid the Elf's {2}{R}{G} and nothing paid the Piker's" (S.tappedCount S.alice after) 4
 
+  -- CR 702.85a's SECOND condition, driven through a real cascade rather than
+  -- through Pawl.Engine.Resolve.Effect.offerCast alone: Flaxen Intruder //
+  -- Welcome Home {G} Creature -- Human Berserker 1/2 // {5}{G}{G} Sorcery --
+  -- Adventure (Oracle text checked 2026-09-12) is a card of mana value 1, so the
+  -- Elf's walk stops at it, and its Adventure half (CR 715.3) has mana value 7, so
+  -- the bound the offer carries refuses that half alone.
+  --
+  -- The answerer PREFERS the Adventure by name, so a bound that admitted both
+  -- halves would put three Bear tokens on the battlefield and no Berserker. That
+  -- the Berserker enters is the offer being narrowed to one half, not a
+  -- preference of the engine's.
+  Spec.it s "CR 702.85a cascading into an adventurer card withholds the half the bound refuses" $ do
+    elf <- S.printingOf s registry "Bloodbraid Elf"
+    giant <- S.printingOf s registry "Hill Giant"
+    mountain <- S.printingOf s registry "Mountain"
+    intruder <- S.printingOf s registry "Flaxen Intruder"
+    think <- S.printingOf s registry "Think Twice"
+    forest <- S.printingOf s registry "Forest"
+    let base = Setup.emptyGame S.bothPlayers
+        -- Bottom first: the Giant is passed for being the Elf's own mana value,
+        -- the Mountain for being a land, and the Intruder ends the walk. Think
+        -- Twice is never reached.
+        (_, g1) = S.addLibraryCard think S.alice base
+        (_, g2) = S.addLibraryCard intruder S.alice g1
+        (_, g3) = S.addLibraryCard mountain S.alice g2
+        (_, g4) = S.addLibraryCard giant S.alice g3
+        (_, g5) = S.addPermanent mountain S.alice g4
+        (_, g6) = S.addPermanent mountain S.alice g5
+        (_, g7) = S.addPermanent forest S.alice g6
+        (_, g8) = S.addPermanent forest S.alice g7
+        (_, g9) = S.addHandCard elf S.alice g8
+        before =
+          g9
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        after = S.runPure cascadingIntoTheAdventure before Engine.priorityLoop
+        namesIn zone pid gs = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        named = CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "the creature half was the only one offered, so the Berserker entered and no Bear token did"
+      (namesIn Zone.Battlefield S.alice after)
+      (Set.fromList [named "Bloodbraid Elf", named "Flaxen Intruder", named "Mountain", named "Forest"])
+    -- Proxies, AFTER the behaviour: the walk really did stop at the Intruder
+    -- rather than run out of library, and nothing paid for the free half.
+    Spec.assertEqWith s "the two cards the walk passed over are back in the library under the one it never reached" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
+    Spec.assertEqWith s "four lands paid the Elf's {2}{R}{G} and nothing paid the Berserker's {G}" (S.tappedCount S.alice after) 4
+
 -- CR 702.40a's storm: "When you cast this spell, copy it for each other spell
 -- that was cast before it this turn."
 --
@@ -2067,6 +2118,16 @@ cascading p = case p of
     h : t -> t <> [h]
     [] -> []
   _ -> S.identityAnswer p
+
+-- The cascade answerer above, plus CR 715.3's choice between an adventurer card's
+-- two halves answered with the ADVENTURE, pinned by name: a bound that admitted
+-- both halves would then cast Welcome Home, so the Berserker entering is the
+-- offer having been narrowed rather than the answer.
+cascadingIntoTheAdventure :: Prompt.Prompt r -> r
+cascadingIntoTheAdventure p = case p of
+  Prompt.ChooseOfferedCastSpell _ _ options ->
+    Maybe.fromMaybe (NonEmpty.head options) (List.find ((== CardName.MkCardName (Text.pack "Welcome Home")) . snd) (NonEmpty.toList options))
+  _ -> cascading p
 
 isCast :: A.Action -> Bool
 isCast action = case action of
