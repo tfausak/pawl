@@ -519,6 +519,12 @@ spec s registry = Spec.describe s "Room" $ do
   -- implementation that ignored her answer and took the head would shut the red
   -- door instead and fail on the name, the mana value and the trigger count
   -- alike.
+  --
+  -- CR 608.2d rides on the same board: with both doors already open the unlock
+  -- branch has no locked half to choose, so the pair is not a choice and the
+  -- lock is forced with no prompt raised. The answerer names the UNLOCK -- the
+  -- branch that is not on offer -- so an engine that asked anyway would take it,
+  -- leave both doors open, and fail the name assertion below.
   Spec.it s "CR 709.5g locking a door takes its designation back away" $ do
     (roomId, wallId, gs) <- setUp s registry
     keys <- S.printingOf s registry "Keys to the House"
@@ -541,7 +547,7 @@ spec s registry = Spec.describe s "Room" $ do
           (fmap Object.unlockedHalves (Game.lookupObject permId opened))
           (Just (Set.fromList [furnaceName, saunaName]))
         Spec.assertBool s (lockOffered keys keysId opened) "CR 307.5: the lock ability is on alice's menu"
-        let locked = activateKeys keys keysId (keysAnswer permId (ClauseIndex.MkClauseIndex 0) saunaName) opened
+        let locked = activateKeys keys keysId (keysAnswer permId (ClauseIndex.MkClauseIndex 1) saunaName) opened
         -- THE GAMEPLAY-LEVEL ASSERTION, and it is CR 709.5's subtraction rather
         -- than a count: with the blue door shut the permanent stops having the
         -- NAME of that half. A lock that took the wrong door leaves this set

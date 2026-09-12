@@ -1052,6 +1052,24 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library still holds all three" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "nothing was discarded -- only Tweeze itself is in the graveyard" (namesIn Zone.Graveyard S.alice after) [nameOf "Tweeze"]
     Spec.assertEqWith s "CR 608.2c the ungated first clause still happened: bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
+  -- CR 608.2d, the half that says an option has to be a real one: "the player
+  -- can't choose an option that's illegal or impossible". The SAME Tweeze off a
+  -- board where alice's hand is empty once the spell is on the stack, so "you
+  -- may discard a card" cannot be carried out at all -- and the draw its "If you
+  -- do" hangs on was a card pawl handed her for nothing.
+  --
+  -- The answerer takes every "may" it is offered, so the empty transcript is
+  -- what says none was offered, and the hand and the library are the same fact
+  -- read off the board. Not an inert clause (Resolve.clauseIsInert): the `you`
+  -- slot the discard reads is bound and alive, which is why this needed a
+  -- second gate rather than a wider first one.
+  Spec.it s "CR 608.2d Tweeze's discard is not offered with an empty hand" $ do
+    (gs, tweezeId) <- emptyHandedTweezeBoard s registry
+    let ((_, after), asked) = Replay.record (tweezeAnswer OptionalDecision.Exercises tweezeId) gs (S.cast S.alice tweezeId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2d nothing was discarded and so nothing was drawn: alice's hand is empty" (namesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "and her library still holds all three Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+    Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
+    Spec.assertEqWith s "the control: the mandatory first clause still happened, so bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
   -- CR 608.2f / 603.12: does Effect.ForEach's own body run through the SAME
   -- happened-fold a clause's instructions do, or does every body instruction
   -- run unconditionally regardless of whether the one before it did anything?
@@ -1081,38 +1099,43 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- (Clause.orElse) over ONE target slot, which is what makes this not Dream's
   -- Grip: that card prints two MODES and CR 601.2b fixes them as it is cast.
   --
-  -- The first case is the load-bearing one. On an UNTAPPED Piker, announcing the
-  -- tap is the only reading that ends Tapped: both clauses running would tap then
-  -- untap (CR 608.2c's written order), announcing the untap does nothing to an
-  -- untapped permanent, and a prompt never raised leaves it alone too. The other
-  -- two cases separate the readings that first one cannot -- see each.
-  Spec.it s "CR 608.2d announcing Twiddle's tap taps the untapped Piker" $ do
+  -- The first case is the load-bearing one. On an UNTAPPED Piker, tapping is the
+  -- only reading that ends Tapped: both clauses running would tap then untap (CR
+  -- 608.2c's written order), untapping does nothing to an untapped permanent,
+  -- and a prompt never raised leaves it alone too. The other two cases separate
+  -- the readings that first one cannot -- see each.
+  --
+  -- And CR 608.2d's own filter is what the answerer's UNTAP settles: a permanent
+  -- is tapped or untapped and never both, so one branch of this pair is
+  -- impossible on every board and the rules leave nothing to choose. The
+  -- answerer names the branch that is NOT on offer, so an engine that asked
+  -- anyway would take the untap and leave the Piker as it found it.
+  Spec.it s "CR 608.2d an untapped Piker leaves Twiddle only its tap, and it is forced" $ do
     board <- twiddleBoard s registry False
-    let (asked, after) = twiddleResolved (ClauseIndex.MkClauseIndex 0) OptionalDecision.Exercises board
-    Spec.assertEqWith s "CR 608.2d the announced branch ran and its sibling did not: the Piker is tapped" (twiddleTapState (thirdOf board) after) (Just TapState.Tapped)
-    Spec.assertEqWith s "and the question was put exactly once, naming the tap" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 0]
-    Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the branch that won and not for the one that lost" (optionalsAnswered asked) [OptionalDecision.Exercises]
-  -- The same rule the other way up, and the case that separates "announced the
-  -- untap" from "declined": on a TAPPED Piker only the untap ends Untapped. It is
-  -- also what fails if the branch prompt is raised and its answer discarded, the
-  -- default being the tap (Replay.defaultAnswer).
-  Spec.it s "CR 608.2d announcing Twiddle's untap untaps the tapped Piker" $ do
-    board <- twiddleBoard s registry True
     let (asked, after) = twiddleResolved (ClauseIndex.MkClauseIndex 1) OptionalDecision.Exercises board
-    Spec.assertEqWith s "CR 608.2d the announced branch ran: the Piker is untapped" (twiddleTapState (thirdOf board) after) (Just TapState.Untapped)
-    Spec.assertEqWith s "and the question was put exactly once, naming the untap" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 1]
-    Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the winning branch alone" (optionalsAnswered asked) [OptionalDecision.Exercises]
+    Spec.assertEqWith s "CR 608.2d the possible branch ran and its sibling did not: the Piker is tapped" (twiddleTapState (thirdOf board) after) (Just TapState.Tapped)
+    Spec.assertEqWith s "and no branch question was put at all" (branchesAnnounced asked) []
+    Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the branch that survived and not for the one that did not" (optionalsAnswered asked) [OptionalDecision.Exercises]
+  -- The same rule the other way up, and the case that separates "took the untap"
+  -- from "declined": on a TAPPED Piker only the untap ends Untapped, and here it
+  -- is the tap the answerer names and CR 608.2d withholds.
+  Spec.it s "CR 608.2d a tapped Piker leaves Twiddle only its untap" $ do
+    board <- twiddleBoard s registry True
+    let (asked, after) = twiddleResolved (ClauseIndex.MkClauseIndex 0) OptionalDecision.Exercises board
+    Spec.assertEqWith s "CR 608.2d the possible branch ran: the Piker is untapped" (twiddleTapState (thirdOf board) after) (Just TapState.Untapped)
+    Spec.assertEqWith s "and no branch question was put at all" (branchesAnnounced asked) []
+    Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the surviving branch alone" (optionalsAnswered asked) [OptionalDecision.Exercises]
   -- CR 603.5 composed with CR 608.2d, on the FIRST case's board with exactly one
-  -- answer changed: the "may" is declined, so the announced tap does not happen.
+  -- answer changed: the "may" is declined, so the surviving tap does not happen.
   -- That pairing is what stops the first case passing because the clause ran
-  -- unconditionally, and it pins the ORDER -- the branch is announced before the
-  -- "may", so declining still leaves one ChoseClause in the transcript.
-  Spec.it s "CR 603.5 declining Twiddle's \"may\" leaves the announced tap undone" $ do
+  -- unconditionally, and CR 603.5's offer is still made over a branch CR 608.2d
+  -- forced -- one option settles which instruction, not whether to take it.
+  Spec.it s "CR 603.5 declining Twiddle's \"may\" leaves the forced tap undone" $ do
     board <- twiddleBoard s registry False
     let (asked, after) = twiddleResolved (ClauseIndex.MkClauseIndex 0) OptionalDecision.Declines board
     Spec.assertEqWith s "CR 603.5 the declined clause did nothing: the Piker is still untapped" (twiddleTapState (thirdOf board) after) (Just TapState.Untapped)
-    Spec.assertEqWith s "CR 608.2d the branch was still announced first, and only once" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 0]
-    Spec.assertEqWith s "and the loser's \"may\" was never offered as a second chance" (optionalsAnswered asked) [OptionalDecision.Declines]
+    Spec.assertEqWith s "CR 608.2d and no branch question was put" (branchesAnnounced asked) []
+    Spec.assertEqWith s "and the sibling's \"may\" was never offered as a second chance" (optionalsAnswered asked) [OptionalDecision.Declines]
   -- The SAME rider on the other resolution path. Pawl.Engine.Resolve keeps two
   -- hand-duplicated clause loops -- one for a spell, one for an activated or
   -- triggered ability (CR 113.7's separate source) -- and a Twiddle board reaches
@@ -1120,23 +1143,23 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- Kami -- "Sacrifice this creature: You may tap or untap target creature" -- is
   -- the printed producer for the second, and the pair below is the first pair's
   -- discrimination argument transplanted onto it.
-  Spec.it s "CR 608.2d announcing Teardrop Kami's tap taps the untapped Piker" $ do
+  Spec.it s "CR 608.2d an untapped Piker leaves Teardrop Kami only its tap" $ do
     (gs, ability, kamiId, pikerId) <- kamiBoard s registry False
     case ability of
       Nothing -> Spec.assertFailure s "Teardrop Kami should declare one activated ability"
       Just abil -> do
-        let (asked, after) = kamiResolved (ClauseIndex.MkClauseIndex 0) OptionalDecision.Exercises gs abil kamiId pikerId
-        Spec.assertEqWith s "CR 608.2d the announced branch ran and its sibling did not: the Piker is tapped" (twiddleTapState pikerId after) (Just TapState.Tapped)
-        Spec.assertEqWith s "and the question was put exactly once, naming the tap" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 0]
-        Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the winning branch alone" (optionalsAnswered asked) [OptionalDecision.Exercises]
-  Spec.it s "CR 608.2d announcing Teardrop Kami's untap untaps the tapped Piker" $ do
+        let (asked, after) = kamiResolved (ClauseIndex.MkClauseIndex 1) OptionalDecision.Exercises gs abil kamiId pikerId
+        Spec.assertEqWith s "CR 608.2d the possible branch ran and its sibling did not: the Piker is tapped" (twiddleTapState pikerId after) (Just TapState.Tapped)
+        Spec.assertEqWith s "and no branch question was put at all" (branchesAnnounced asked) []
+        Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the surviving branch alone" (optionalsAnswered asked) [OptionalDecision.Exercises]
+  Spec.it s "CR 608.2d a tapped Piker leaves Teardrop Kami only its untap" $ do
     (gs, ability, kamiId, pikerId) <- kamiBoard s registry True
     case ability of
       Nothing -> Spec.assertFailure s "Teardrop Kami should declare one activated ability"
       Just abil -> do
-        let (asked, after) = kamiResolved (ClauseIndex.MkClauseIndex 1) OptionalDecision.Exercises gs abil kamiId pikerId
-        Spec.assertEqWith s "CR 608.2d the announced branch ran: the Piker is untapped" (twiddleTapState pikerId after) (Just TapState.Untapped)
-        Spec.assertEqWith s "and the question was put exactly once, naming the untap" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 1]
+        let (asked, after) = kamiResolved (ClauseIndex.MkClauseIndex 0) OptionalDecision.Exercises gs abil kamiId pikerId
+        Spec.assertEqWith s "CR 608.2d the possible branch ran: the Piker is untapped" (twiddleTapState pikerId after) (Just TapState.Untapped)
+        Spec.assertEqWith s "and no branch question was put at all" (branchesAnnounced asked) []
   -- CR 607.2a's linked set, on the board that can tell it from "every card in
   -- exile": TWO Hoarding Dragons, each of which exiled a different artifact, and
   -- one of them dies. The pair below runs the SAME board twice and differs in
@@ -2967,6 +2990,19 @@ tweezeBoard s registry = do
       (_, withCharm) = S.addHandCard charm S.alice withMaiden
       stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) withCharm [1 :: Int .. 3]
   pure (stocked, tweezeId, maidenId)
+
+-- The same card with alice's hand holding nothing but the spell, so CR 608.2d's
+-- "impossible" is what the discard is: the three Mountains pay the {2}{R} and
+-- the three Goblin Pikers in her library make a draw visible by name, CR 104.3c
+-- having no chance to decide the game first.
+emptyHandedTweezeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+emptyHandedTweezeBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  tweeze <- S.printingOf s registry "Tweeze"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (base, tweezeId) = S.handOne tweeze (S.landsInPlay mountain 3)
+      stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) base [1 :: Int .. 3]
+  pure (stocked, tweezeId)
 
 -- One resolution of that board. The only thing the two cases vary is CR 603.5's
 -- answer, so the discard is pinned by id and the damage by seat.

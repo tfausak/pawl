@@ -106,6 +106,7 @@ import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.CoinReading as CoinReading
@@ -2138,6 +2139,204 @@ thisAbilitySource resolving gs = fmap Object.source (Game.lookupObject resolving
 -- one-candidate list, which raises no prompt.
 conjuredName :: Card.Type.Card -> CardName.CardName
 conjuredName card = Face.name (NonEmpty.head (Card.Type.faces card))
+
+-- CR 608.2d: can this clause's instructions not be carried out AT ALL on this
+-- board? What the rule turns on is that "the player can't choose an option
+-- that's illegal or impossible", so an option the engine offers has to be one
+-- the rules leave to choose -- Resolve.exercises' printed "may" and
+-- Resolve.chosenBranch's either-or are the two offers, and both consult this.
+--
+-- A CLASSIFICATION the consumers see as a Bool, never an identity: the case
+-- lives beside applyOneEffect, this module being the one legitimate home of
+-- `case effect of`, and Pawl.Engine.Resolve reads only the answer.
+--
+-- ALL its effects and not any, clauseIsInert's shape: an option whose
+-- instructions partly happen is carried out as much as possible (CR 609.3) and
+-- is still an option, so a clause is impossible only when nothing in it can
+-- happen. Every either-or and every printed "may" in data/cards carries one
+-- instruction, so no board tells the two readings apart today.
+--
+-- An EMPTY clause is not impossible, for the reason clauseIsInert gives.
+clauseIsImpossible :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+clauseIsImpossible resolving source controller legal gs clause =
+  let effects = Foldable.toList (Clause.effects clause)
+   in not (null effects) && all (effectIsImpossible resolving source controller legal gs) effects
+
+-- clauseIsImpossible's per-opcode half: the CR 608.2d question one instruction
+-- at a time.
+--
+-- Impossible means the instruction NAMES its subjects and not one of them can
+-- undergo it, so nothing at all happens. An instruction naming NOBODY is never
+-- impossible -- an empty sweep is vacuously carried out (CR 609.3), and that is
+-- also what keeps a slot a sibling effect of the same clause will define (Carth
+-- the Lion's Reveal then MoveToZone) from reading as impossible while it is
+-- still unbound. Drawing is never impossible either (CR 121.3), nor is
+-- searching (CR 701.23b's fail to find).
+--
+-- Exhaustive with no wildcard, ownSlotsAreExhaustive's shape and for its reason:
+-- a new opcode must answer here. Each arm below mirrors the read its
+-- applyOneEffect arm performs, so the offer and the execution cannot disagree.
+--
+-- Not implemented: every other opcode answers the conservative "not
+-- impossible", so an option that provably does nothing is still offered where
+-- its instruction is one of those -- a sacrifice by a player who controls
+-- nothing to sacrifice, a counter move off a permanent with none, a TurnFaceUp
+-- on a face-up permanent (#3673).
+effectIsImpossible :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+effectIsImpossible resolving source controller legal gs effect = case effect of
+  Effect.DealDamage {} -> False
+  Effect.Fight {} -> False
+  Effect.ModifyTarget {} -> False
+  Effect.ChangeText {} -> False
+  Effect.AddMana {} -> False
+  Effect.ActivateManaAbilities {} -> False
+  Effect.MoveMana {} -> False
+  Effect.Search {} -> False
+  Effect.ExileAllGraveyards {} -> False
+  Effect.RestartGame {} -> False
+  Effect.ControlPlayerNextTurn {} -> False
+  Effect.ControlPlayerThisResolution {} -> False
+  Effect.Destroy {} -> False
+  Effect.Sacrifice {} -> False
+  Effect.Attach {} -> False
+  Effect.AttachTarget {} -> False
+  Effect.AttachTargetToEach {} -> False
+  Effect.AttachBound {} -> False
+  Effect.MoveToZone {} -> False
+  Effect.Draw {} -> False
+  Effect.Mill {} -> False
+  Effect.Reveal {} -> False
+  Effect.FromOutsideTheGame {} -> False
+  Effect.ExileThisSpell {} -> False
+  Effect.LookAt {} -> False
+  Effect.Scry {} -> False
+  Effect.Surveil {} -> False
+  Effect.Fateseal {} -> False
+  Effect.Explore {} -> False
+  Effect.Connive {} -> False
+  -- "Discard THESE cards" names the cards themselves, so it is the naming-nobody
+  -- case: a ref matching none discards nothing and is not impossible.
+  Effect.Discard (Discard.These _) -> False
+  Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _)) ->
+    -- CR 701.9a: the victims are the slot's player recipients, read through
+    -- legalMany and Recipient.playerOf as the executing arm reads them, and the
+    -- amount is read per victim because a card may count something about them.
+    let victims = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+        emptyHanded victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
+          Just n | n > 0 -> null (Game.zoneMembers Zone.Hand victim gs)
+          _ -> False
+     in not (null victims) && all emptyHanded victims
+  Effect.LoseLife {} -> False
+  Effect.GainLife {} -> False
+  Effect.ExchangeLifeTotals {} -> False
+  Effect.SetLifeTotal {} -> False
+  Effect.RedistributeLifeTotals {} -> False
+  Effect.IncreaseSpeed {} -> False
+  Effect.DecreaseSpeed {} -> False
+  Effect.Create {} -> False
+  Effect.Conjure {} -> False
+  Effect.CreateCopy {} -> False
+  Effect.BecomeCopy {} -> False
+  Effect.CopyStackObject {} -> False
+  Effect.Replace {} -> False
+  Effect.SkipNextPhase {} -> False
+  Effect.PreventNextDamage {} -> False
+  Effect.PreventAllDamage {} -> False
+  Effect.PreventNextDamageInstance {} -> False
+  Effect.RedirectDamage {} -> False
+  Effect.Counter {} -> False
+  Effect.PutCounters {} -> False
+  -- CR 122.1c: a permanent with none of the kind has no counter to lose.
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> False
+    Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Just n | n > 0 -> maybe False ((== 0) . Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject target gs)
+      _ -> False
+  Effect.MoveCounters {} -> False
+  Effect.PutCountersFrom {} -> False
+  Effect.GainPlayerCounters {} -> False
+  Effect.RemovePlayerCounters {} -> False
+  Effect.PayAnyEnergy {} -> False
+  -- CR 701.26a: "only untapped permanents can be tapped", which is what
+  -- Pawl.Engine.Event.tap enforces, so a sweep whose every permanent is already
+  -- tapped taps nothing.
+  Effect.Tap ref -> noneNamedIs TapState.Untapped ref
+  -- CR 701.26b, tap's mirror and Pawl.Engine.Event.untap's own guard.
+  Effect.Untap ref -> noneNamedIs TapState.Tapped ref
+  Effect.Detain {} -> False
+  Effect.Goad {} -> False
+  Effect.DoesNotUntapNext {} -> False
+  Effect.Transform {} -> False
+  Effect.Convert {} -> False
+  Effect.Flip {} -> False
+  Effect.Meld {} -> False
+  Effect.PhaseOut {} -> False
+  Effect.TurnFaceDown {} -> False
+  Effect.TurnFaceUp {} -> False
+  Effect.RemoveFromCombat {} -> False
+  Effect.BecomesBlocked {} -> False
+  Effect.AddPhases {} -> False
+  Effect.EndTurn {} -> False
+  Effect.EndCombatPhase {} -> False
+  Effect.GainControl {} -> False
+  Effect.ArmDelayedTrigger {} -> False
+  Effect.AffectPlayers {} -> False
+  Effect.RequireBlock {} -> False
+  Effect.CantBeRegenerated {} -> False
+  Effect.RequireAttack {} -> False
+  Effect.ForbidBlock {} -> False
+  Effect.ForbidAttack {} -> False
+  Effect.ForbidActivation {} -> False
+  Effect.CreateEmblem {} -> False
+  Effect.BecomeMonarch {} -> False
+  Effect.TakeTheInitiative {} -> False
+  Effect.Designate {} -> False
+  Effect.SetClassLevel {} -> False
+  Effect.Unsuspect {} -> False
+  -- CR 709.5f/g: locking chooses an UNLOCKED half of the Room and unlocking a
+  -- locked one, so a Room holding no half of the wanted kind has nothing to
+  -- choose among. Both readers are the executing arm's.
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ locked slot) -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> False
+    Just target -> null (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
+  Effect.Evolve {} -> False
+  Effect.Mentor {} -> False
+  Effect.Train {} -> False
+  Effect.ItBecomes {} -> False
+  Effect.ExileUntilMonarch {} -> False
+  Effect.ExileHaunting {} -> False
+  Effect.PlaySubgame {} -> False
+  Effect.ChoosePlayer {} -> False
+  Effect.ChooseOpponentAtRandom {} -> False
+  Effect.RollDie {} -> False
+  Effect.FlipCoin {} -> False
+  Effect.ExileHandThenDraw {} -> False
+  Effect.Proliferate {} -> False
+  Effect.ChooseCardName {} -> False
+  Effect.Bolster {} -> False
+  Effect.Amass {} -> False
+  Effect.Blight {} -> False
+  Effect.Earthbend {} -> False
+  Effect.TemptWithTheRing {} -> False
+  Effect.Venture {} -> False
+  Effect.PlayerSacrifices {} -> False
+  Effect.TakeExtraTurn {} -> False
+  Effect.ShuffleIntoLibrary {} -> False
+  Effect.Shuffle {} -> False
+  Effect.OfferCast {} -> False
+  Effect.GrantPlayFromExile {} -> False
+  Effect.GrantLookAtExiled {} -> False
+  Effect.MakePlotted {} -> False
+  Effect.ForEach {} -> False
+  where
+    viewOf = effectViewOf source legal gs
+    context = effectContext gs controller source legal (slotBindings resolving gs)
+    -- The tap-state half of Effect.Tap's and Effect.Untap's arms: the sweep
+    -- names at least one permanent and none of them is in the state the
+    -- instruction needs to find.
+    noneNamedIs state ref =
+      let named = objectRefObjects legal resolving controller source gs ref
+       in not (null named) && not (any ((== Just state) . fmap Object.tapped . flip Game.lookupObject gs) named)
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
