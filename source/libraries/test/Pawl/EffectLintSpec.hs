@@ -2415,8 +2415,9 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- Effect.CreateCopy carries the SAME EntryRiders record Create and MoveToZone
   -- do, but Pawl.Engine.Resolve's arm reads only CR 122.6's `counters`, CR
-  -- 110.5b's `tapped` and CR 508.4's `attacking` -- Littjara Mirrorlake's
-  -- counter and Flamerush Rider's "tapped and attacking". This is the fence for
+  -- 110.5b's `tapped`, CR 508.4's `attacking` and CR 509.4's `blocking` --
+  -- Littjara Mirrorlake's counter, Flamerush Rider's "tapped and attacking" and
+  -- Mirror Match's "blocking that creature". This is the fence for
   -- every other field, and ONE lint rather than a CreateCopy arm added to each
   -- above, so a card setting any of them would say something nothing performs.
   --
@@ -2426,13 +2427,9 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- not a card (CR 111.1), and CR 707.8a decides a copy token's face by copy rules.
   -- `exiledFaceDown` is inert because a token is created onto the battlefield and
   -- CR 111.7 would end one anywhere else.
-  --
-  -- Not implemented: CR 509.4's `blocking` on a copy token, Mirror Match's
-  -- "a token that's a copy of that creature and that's blocking that creature"
-  -- (#3621).
-  Spec.it s "no CreateCopy carries an entry rider but counters, tapped and attacking" $ do
+  Spec.it s "no CreateCopy carries an entry rider but counters, tapped, attacking and blocking" $ do
     ps <- S.allPrintings s
-    let bare riders = riders == EntryRiders.defaultValue {EntryRiders.counters = EntryRiders.counters riders, EntryRiders.tapped = EntryRiders.tapped riders, EntryRiders.attacking = EntryRiders.attacking riders}
+    let bare riders = riders == EntryRiders.defaultValue {EntryRiders.counters = EntryRiders.counters riders, EntryRiders.tapped = EntryRiders.tapped riders, EntryRiders.attacking = EntryRiders.attacking riders, EntryRiders.blocking = EntryRiders.blocking riders}
         offends effect = case effect of
           Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders _ _) -> not (bare riders)
           _ -> False
@@ -2444,7 +2441,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- this would pass whatever the arm read. Littjara Mirrorlake is the card that
     -- prints one.
     Spec.assertBool s (any (anyFace (any counters . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a copy token with counters on it"
-    Spec.assertEqWith s "a copy token reads only counters, tapped and attacking" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "a copy token reads only counters, tapped, attacking and blocking" (fmap (S.nameOf . Printing.card) offenders) []
   -- The lint this used to be held that no printing authored a WithCounters
   -- turn-up rewrite, which is what Pawl.Engine.Replacement.applies rested on when
   -- it gated that whole rewrite CLASS on CR 702.37b's "if its megamorph cost was
