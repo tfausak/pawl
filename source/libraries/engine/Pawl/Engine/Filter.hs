@@ -2215,6 +2215,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Cascade -> keyword
   -- CR 702.40a is payload-free too.
   Keyword.Type.Storm -> keyword
+  -- CR 702.153a's N is a number and not a word, so CR 612.2 has nothing to swap;
+  -- the creature it names is in the cost Pawl.Engine.Keyword.casualtyCost mints.
+  Keyword.Type.Casualty _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
   -- CR 702.75a's N is a number and not a word, so CR 612.2 has nothing to swap;
@@ -2292,6 +2295,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Disguise cost -> Keyword.Type.Disguise (rewriteCost pairs cost)
   -- CR 702.170a states a cost, so rewriteCost reaches it as flashback's does.
   Keyword.Type.Plot cost -> Keyword.Type.Plot (rewriteCost pairs cost)
+  -- CR 702.56a states a cost, so rewriteCost reaches it as flashback's does.
+  Keyword.Type.Replicate cost -> Keyword.Type.Replicate (rewriteCost pairs cost)
   Keyword.Type.Squad cost -> Keyword.Type.Squad (rewriteCost pairs cost)
   Keyword.Type.Offspring cost -> Keyword.Type.Offspring (rewriteCost pairs cost)
   -- CR 702.143a states a cost too, so it is reached the same way.
