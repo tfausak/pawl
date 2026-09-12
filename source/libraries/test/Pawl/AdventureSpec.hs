@@ -304,7 +304,8 @@ spec s registry = Spec.describe s "Adventure" $ do
               CastOffer.withoutPayingManaCost = True,
               CastOffer.payingInstead = Nothing,
               CastOffer.spending = ManaSpending.AsProduced,
-              CastOffer.restriction = Just Filter.Type.ManaValueLessThanSource
+              CastOffer.restriction = Just Filter.Type.ManaValueLessThanSource,
+              CastOffer.offeredBy = Nothing
             }
         context bound = (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing) {Filter.sourceManaValue = Just bound}
         under bound = S.runPure preferringTheCreature gs (Resolve.offerCast (context bound) [exiledId] S.alice CastObligation.Optional offer)

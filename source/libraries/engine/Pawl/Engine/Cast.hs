@@ -1740,7 +1740,7 @@ castSpell perform = castSpellWith perform False Nothing ManaSpending.AsProduced
 -- mana toward whatever cost the two above settled on. Joined with the exile
 -- permission's rider by `spendingWith`, one step ahead of CR 601.2a's move for
 -- `spendingFor`'s reason.
-castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Maybe (Cost Keyword) -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
+castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Maybe CandidateCost.CandidateCost -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
 castSpellWith perform offered applied widened pid oid name facing = do
   before <- State.get
   -- The state the GATE measured, which is `before` with CR 709.3's half and CR
@@ -1782,7 +1782,8 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- that offered it (Cost.candidateCostsFor). The tag is what CR
           -- 702.34a's "if the flashback cost was paid" is asked of once the
           -- payment is made; a cost `applied` from another effect (CR 118.9)
-          -- carries none, because no keyword offered it.
+          -- carries the tag its OFFER stated (CastOffer.offeredBy) and otherwise
+          -- none, because no keyword offered it.
           --
           -- FILTERED by CR 601.3 and CR 601.2c one candidate at a time, the same
           -- predicates the gate above passed: CR 702.103d judges each announcement
@@ -1807,7 +1808,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
               (\candidate -> candidateAllowed pid oid (Face.name face) proposed candidate && candidateFillable pid oid name proposed candidate)
               ( fmap
                   (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
-                  (maybe (Cost.candidateCostsGiven offered pid name oid proposed) (pure . Cost.untagged) applied)
+                  (maybe (Cost.candidateCostsGiven offered pid name oid proposed) pure applied)
               )
           -- CR 400.7g / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move

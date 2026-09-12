@@ -969,13 +969,19 @@ offerCast context named caster optionality offer = do
             -- are asked in order, free first. CR 118.9d in both cases -- an
             -- alternative replaces only the MANA cost, so the face's additional
             -- costs ride along.
+            -- CR 601.2b's tag rides along: an offer stating which keyword
+            -- ability is behind its cost (rule 702.62a's third ability, the only
+            -- one today) hands that keyword to the candidate, so the cast records
+            -- it as Object.castUsing exactly as a printed alternative does.
+            -- CastOffer.offeredBy is Nothing for every other offer, which is
+            -- Cost.untagged's own value.
             applied
-              | CastOffer.withoutPayingManaCost offer = Just (Cost.withoutPayingManaCost face)
-              | otherwise = fmap (\c -> c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face}) (CastOffer.payingInstead offer)
+              | CastOffer.withoutPayingManaCost offer = Just (CandidateCost.MkCandidateCost (CastOffer.offeredBy offer) (Cost.withoutPayingManaCost face))
+              | otherwise = fmap (\c -> CandidateCost.MkCandidateCost (CastOffer.offeredBy offer) (c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face})) (CastOffer.payingInstead offer)
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
-            candidates = maybe (Cost.candidateCostsGiven True caster name oid proposed) (pure . Cost.untagged) applied
+            candidates = maybe (Cost.candidateCostsGiven True caster name oid proposed) pure applied
          in -- CR 702.85a's second condition, asked of THIS HALF: the offer may
             -- state a quality the resulting spell must have, and CR 709.3a makes
             -- that a per-half question like the two above. Against the face's own
