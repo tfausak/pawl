@@ -1756,7 +1756,13 @@ apply batch candidate event =
                   -- Nothing for "this ability": the copy effect here is a
                   -- replacement effect, and no printed one points at itself --
                   -- applyCopyExceptions records the query.
-                  let stamped = Replacement.applyCopyExceptions Nothing (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
+                  --
+                  -- The entering object's OWN copiable values ride along for CR
+                  -- 707.9c's "retain their original values" (Vesuvan
+                  -- Doppelganger). Read here, off the same board the copied
+                  -- snapshot is: the object is materialized with no copy binding
+                  -- yet, so this is its printed card's reading.
+                  let stamped = Replacement.applyCopyExceptions Nothing (Just (copiedSnapshot oid g)) (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
                       stamp o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 -- CR 614.1d, inside the same sentence: Vesuva enters TAPPED as a

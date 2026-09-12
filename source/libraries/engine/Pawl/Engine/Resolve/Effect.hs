@@ -4668,7 +4668,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- 707.9b) -- Multiversal Recruitment's "except it isn't
                 -- legendary". "This ability" is the resolving object's, read the
                 -- way the BecomeCopy arm below reads it.
-                made <- Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen)
+                -- Nothing for the subject's own copiable values: CR 707.9c's
+                -- retained original belongs to an object that already existed,
+                -- and a token minted by CR 707.1 did not.
+                made <- Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) Nothing exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen)
                 -- CR 508.4, after the entry loop for Create's reason.
                 Monad.forM_ mAttack (\specified -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking specified) made)
                 pure made
@@ -4701,10 +4704,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- have left (CR 113.7a). Not implemented: a stated duration (#1753).
       case objectRefObjects legal resolving controller source gs originalRef of
         [original] ->
-          let snapshot = Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown original gs)
-              write o = o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}
+          let copied = Event.copiedSnapshotWithLastKnown original gs
+              -- PER SUBJECT, because CR 707.9c's retained original value is the
+              -- subject's own (Vesuvan Doppelganger's "it doesn't copy that
+              -- creature's color"), and CR 707.4's road names a set. Read off
+              -- the pre-effect `gs` like everything else here (CR 608.2f), so a
+              -- subject written earlier in the fold does not change what a later
+              -- one retains.
+              snapshotFor subject = Replacement.applyCopyExceptions (thisAbilitySource resolving gs) (Just (Event.copiedSnapshot subject gs)) exceptions copied
+              write subject = Map.adjust (\o -> o {Object.bindings = Binding.setCopy (snapshotFor subject) (Object.bindings o)}) subject
               subjects = objectRefObjects legal resolving controller source gs subjectRef
-           in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
+           in gs {GameState.objects = foldr write (GameState.objects gs) subjects}
         _ -> gs
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity) -> do
     gs <- State.get

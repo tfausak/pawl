@@ -1,0 +1,146 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Vesuvan Doppelganger",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "AsCopy",
+                "value": {
+                  "eligible": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  "exceptions": [
+                    {
+                      "type": "DontCopyColors"
+                    },
+                    {
+                      "type": "GainAbility",
+                      "value": {
+                        "type": "Triggered",
+                        "value": {
+                          "condition": {
+                            "type": "StepBegins",
+                            "value": {
+                              "phase": {
+                                "type": "Beginning",
+                                "value": {
+                                  "type": "Upkeep"
+                                }
+                              },
+                              "scope": {
+                                "type": "ControllersTurn"
+                              }
+                            }
+                          },
+                          "modal": {
+                            "modes": [
+                              {
+                                "clauses": [
+                                  {
+                                    "effects": [
+                                      {
+                                        "type": "BecomeCopy",
+                                        "value": {
+                                          "exceptions": [
+                                            {
+                                              "type": "DontCopyColors"
+                                            },
+                                            {
+                                              "type": "GainThisAbility"
+                                            }
+                                          ],
+                                          "original": {
+                                            "type": "InSlot",
+                                            "value": "copied"
+                                          },
+                                          "subject": {
+                                            "type": "EachMatching",
+                                            "value": {
+                                              "type": "IsSource"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "optionality": {
+                                      "type": "Optional"
+                                    }
+                                  }
+                                ],
+                                "targetSlots": {
+                                  "copied": {
+                                    "pool": {
+                                      "type": "Creatures"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 0
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Shapeshifter"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

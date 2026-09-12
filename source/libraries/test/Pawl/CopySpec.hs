@@ -25,7 +25,10 @@
 -- change of a permanent already on the battlefield, and CR 707.9a's "except it
 -- has this ability" riding it -- Unstable Shapeshifter, which copies twice
 -- because of it, and whose token copy copies again because CR 707.9a put the
--- ability in the copiable values).
+-- ability in the copiable values; and CR 707.9c's decline-to-copy exception
+-- riding both roads at once -- Vesuvan Doppelganger, whose copy keeps its own
+-- colour on entry and keeps it again when the ability it quoted copies a second
+-- creature).
 -- Gameplay-level: Clone enters via the zone-change funnel, the Counterpart is
 -- cast and resolved, the Radstag evolves and the Shapeshifter's trigger resolves,
 -- and their projected characteristics are asserted.
@@ -98,6 +101,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -114,6 +118,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -142,6 +147,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
@@ -464,6 +470,26 @@ readiedForAlice gs =
       GameState.activePlayer = S.alice,
       GameState.remaining = S.phasesAfter Phase.PrecombatMain
     }
+
+-- `aimByFiltering`, plus CR 603.5's "you may" taken. Vesuvan Doppelganger's
+-- quoted trigger is both optional and targeted, and declining it would leave the
+-- copy it already is.
+becomesCopyOf :: ObjectId -> Prompt.Prompt r -> r
+becomesCopyOf victim p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> aimByFiltering victim p
+
+-- One upkeep for alice: CR 500.1's step beginning recorded so CR 603.3 gathers
+-- what it triggers, then the priority loop run to exhaustion so the trigger
+-- resolves.
+upkeepForAlice :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+upkeepForAlice answer gs =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      began =
+        Event.recordEvent
+          (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
+          (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice, GameState.remaining = S.phasesAfter upkeep})
+   in resolveAll answer (settle answer began)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
@@ -1185,6 +1211,88 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
                 Spec.assertEqWith s "the Pretender entered as the Piker's 2/1" (S.powerToughnessOf pretenderId entered) $ Just (2, 1)
               _ -> Spec.assertFailure s "expected one Clone on each board"
           others -> Spec.assertFailure s ("expected exactly one Mercurial Pretender, got " <> show (length others))
+
+  -- THE PROVING TEST for CR 707.9c, CopyException.DontCopyColors. Vesuvan
+  -- Doppelganger {3}{U}{U} Creature -- Shapeshifter 0/0: "You may have this
+  -- creature enter as a copy of any creature on the battlefield, except it
+  -- doesn't copy that creature's color and it has \"At the beginning of your
+  -- upkeep, you may have this creature become a copy of target creature, except
+  -- it doesn't copy that creature's color and it has this ability.\"" (Oracle
+  -- text checked against api.scryfall.com, 2026-09-12. Scryfall o:"doesn't copy",
+  -- 2026-09-12, returns this card and nothing else.)
+  --
+  -- Doom Blade is the gameplay reader for colour, graveyardTokenCopySpec's:
+  -- "Destroy target nonblack creature" is castable only while some creature on
+  -- the board is not black. The Doppelganger copies a black Cabal Evangel (2/2),
+  -- so the Blade has a target exactly when the copy kept its printed blue.
+  --
+  -- The control differs in ONE thing: a Clone -- also a blue 0/0 Shapeshifter,
+  -- also entering as a copy of that same Evangel, off the same board with the
+  -- same two Swamps -- copies the colour, so nothing nonblack stands.
+  --
+  -- A Clone of the DOPPELGANGER'S COPY is the copiable-values tripwire (CR 707.2
+  -- / 707.9c): the retained blue is part of the copy's own copiable values, so a
+  -- Clone reads it, where a CR 613 layer-5 write would be left behind.
+  Spec.it s "CR 707.9c Vesuvan Doppelganger's copy keeps its own colour, and a Clone of that copy keeps it too" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    vesuvan <- S.printingOf s registry "Vesuvan Doppelganger"
+    clone <- S.printingOf s registry "Clone"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let (evangelId, board0) = S.addPermanent evangel S.alice (readiedForAlice (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers)))
+        entering victim printing gs = resolveAndSettle (copyNamed victim) (snd (S.spellOnStack printing S.alice gs))
+        entered = entering evangelId vesuvan board0
+        control = entering evangelId clone board0
+    case (printedOnBattlefield "Vesuvan Doppelganger" entered, clonesOnBattlefield control) of
+      ([vesuvanId], [controlId]) -> do
+        let cloned = entering vesuvanId clone entered
+            (withBlade, bladeId) = S.handOne doomBlade entered
+            (controlBlade, controlBladeId) = S.handOne doomBlade control
+        -- THE GAMEPLAY ASSERTIONS, ahead of every characteristic read.
+        Spec.assertBool s (doomBladeOffered bladeId withBlade) "CR 707.9c the copy did not copy the Evangel's black, so Doom Blade has a target"
+        Spec.assertBool s (not (doomBladeOffered controlBladeId controlBlade)) "where a Clone of the same Evangel is black and the Blade has none"
+        case clonesOnBattlefield cloned of
+          [cloneId] -> Spec.assertEqWith s "CR 707.2 a Clone of the copy reads the retained blue out of its copiable values" (Projection.colorsOf cloneId cloned) (Set.singleton Color.Blue)
+          _ -> Spec.assertFailure s "expected one Clone of the Doppelganger's copy"
+        -- Diagnostics, after the behaviour: the copy really was the Evangel, and
+        -- the control really copied its colour.
+        Spec.assertEqWith s "the Doppelganger entered as the Evangel's 2/2" (S.powerToughnessOf vesuvanId entered) (Just (2, 2))
+        Spec.assertEqWith s "and it is blue, not the Evangel's black" (Projection.colorsOf vesuvanId entered) (Set.singleton Color.Blue)
+        Spec.assertEqWith s "where the Clone without the exception is black" (Projection.colorsOf controlId control) (Set.singleton Color.Black)
+      _ -> Spec.assertFailure s "expected one Doppelganger and one Clone, one per board"
+
+  -- CR 707.9c on the OTHER road: the same clause is written inside the ability
+  -- the entry exception quotes, so the copy the CR 707.4 BecomeCopy opcode makes
+  -- must retain the colour too (Pawl.Engine.Resolve.Effect's BecomeCopy arm,
+  -- which reads the subject's own copiable values per subject).
+  --
+  -- The Doppelganger enters as the black Cabal Evangel (2/2), then its upkeep
+  -- trigger copies a black Bog Wraith (3/3): every creature on the board is
+  -- black, so Doom Blade has a target only if the SECOND copy retained the blue
+  -- as well. Three distinct printed pairs -- 0/0, 2/2, 3/3 -- so the P/T read
+  -- below names which copy happened rather than a coincidence.
+  Spec.it s "CR 707.9c the ability the copy kept copies again, and that copy keeps the colour too" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    wraith <- S.printingOf s registry "Bog Wraith"
+    vesuvan <- S.printingOf s registry "Vesuvan Doppelganger"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let (evangelId, board0) = S.addPermanent evangel S.alice (readiedForAlice (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers)))
+        (wraithId, board1) = S.addPermanent wraith S.alice board0
+        entered = resolveAndSettle (copyNamed evangelId) (snd (S.spellOnStack vesuvan S.alice board1))
+    case printedOnBattlefield "Vesuvan Doppelganger" entered of
+      [vesuvanId] -> do
+        let after = readiedForAlice (upkeepForAlice (becomesCopyOf wraithId) entered)
+            (withBlade, bladeId) = S.handOne doomBlade after
+        -- THE GAMEPLAY ASSERTION, ahead of every characteristic read.
+        Spec.assertBool s (doomBladeOffered bladeId withBlade) "CR 707.9c the second copy did not copy the Wraith's black either, so Doom Blade has a target"
+        -- Diagnostics, after the behaviour: the second copy really happened, and
+        -- the two creatures it was made from really are black.
+        Spec.assertEqWith s "CR 707.4 the Doppelganger is the Wraith's 3/3 now" (S.powerToughnessOf vesuvanId after) (Just (3, 3))
+        Spec.assertEqWith s "and still blue" (Projection.colorsOf vesuvanId after) (Set.singleton Color.Blue)
+        Spec.assertEqWith s "where the Wraith it copied is black" (Projection.colorsOf wraithId after) (Set.singleton Color.Black)
+        Spec.assertEqWith s "and so is the Evangel it copied first" (Projection.colorsOf evangelId after) (Set.singleton Color.Black)
+      others -> Spec.assertFailure s ("expected exactly one Doppelganger, got " <> show (length others))
 
   -- CR 707.9a's quoted arm over a TRIGGERED ability. Copycrook {2}{U}{U}
   -- Creature -- Shapeshifter Rogue 0/0: "You may have this creature enter as a

@@ -2066,20 +2066,30 @@ applyEntryOption oid option gs =
 -- two words (Scryfall @o:"enter as a copy" o:"except it has this ability"@,
 -- 2026-09-06, no hit; Copycrook would refute it by quoting an ability instead).
 --
+-- The second argument is the SUBJECT's own copiable values, read off the board
+-- before this copy effect applied -- CR 707.9c's "the affected objects instead
+-- retain their original values", which is the one thing an exception cannot get
+-- from the copied object. Nothing on the CR 707.1 token road, where the subject
+-- did not exist a moment ago. Per subject and not per effect: CR 707.4's road
+-- names a set, and two Doppelgangers becoming copies of the same original retain
+-- their own colours apart.
+--
 -- Into BOTH readings of a copy of a flip card, since CR 707.9b makes the
 -- exception a copiable value whichever half the copy's status picks (CR 707.3)
 -- -- CR 110.5c's flipped Dimir Doppelganger keeps "this ability". Proved by
--- Pawl.FlipSpec's flipped Sakashima.
-applyCopyExceptions :: Maybe Source.Source -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card)] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
-applyCopyExceptions this exceptions snapshot =
-  let excepted pc = List.foldl' (applyCopyException this) pc exceptions
+-- Pawl.FlipSpec's flipped Sakashima. The retained value the CR 707.9c arm writes
+-- is the subject's UNFLIPPED reading in both, since no flip card prints a
+-- decline-to-copy clause.
+applyCopyExceptions :: Maybe Source.Source -> Maybe PC.ProjectedCharacteristics -> [CopyException.CopyException (GrantedAbility.GrantedAbility Card)] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
+applyCopyExceptions this own exceptions snapshot =
+  let excepted pc = List.foldl' (applyCopyException this own) pc exceptions
    in (excepted snapshot) {PC.flipped = fmap excepted (PC.flipped snapshot)}
 
 -- One arm per CopyException constructor, no wildcard, for Event.apply's reason: a
 -- new exception shape must break the build here rather than silently copy without
 -- it.
-applyCopyException :: Maybe Source.Source -> PC.ProjectedCharacteristics -> CopyException.CopyException (GrantedAbility.GrantedAbility Card) -> PC.ProjectedCharacteristics
-applyCopyException this snapshot exception = case exception of
+applyCopyException :: Maybe Source.Source -> Maybe PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics -> CopyException.CopyException (GrantedAbility.GrantedAbility Card) -> PC.ProjectedCharacteristics
+applyCopyException this own snapshot exception = case exception of
   -- CR 707.9b sets the pair; CR 707.9d is the second write -- an exception that
   -- "provides a specific set of values for a certain characteristic" does not
   -- copy the characteristic-defining ability that defines it, and leaving the CDA
@@ -2229,6 +2239,35 @@ applyCopyException this snapshot exception = case exception of
   -- nothing to strip.
   CopyException.NoManaCost ->
     snapshot {PC.manaCost = Nothing, PC.manaValue = Just 0}
+  -- CR 707.9c over CR 105.2: "it doesn't copy that creature's color" (Vesuvan
+  -- Doppelganger), so the copy RETAINS its own colours where SetColors above
+  -- states new ones. `own` is the subject's copiable values read off the
+  -- pre-effect board, which on the CR 707.5 entry road is its printed card and
+  -- on CR 707.4's road whatever a previous copy effect left -- and since that
+  -- previous copy took this same exception, a Doppelganger that has copied
+  -- before is still its printed blue.
+  --
+  -- The keyword strip is CR 707.9d's first two sentences, SetColors' reason: an
+  -- effect that "doesn't copy a certain characteristic" does not copy the
+  -- characteristic-defining ability defining it, and for colour the colour
+  -- indicator too. Devoid (CR 702.114a) is the one such ability
+  -- Projection.applyColorDefining would read out of the snapshot at layer 5.
+  --
+  -- The strip is a REGRESSION FENCE rather than a proven behaviour, SetColors'
+  -- reason: no devoid creature is a Doppelganger target any test builds, and a
+  -- board with one is what would prove it.
+  --
+  -- Nothing for `own` is the CR 707.1 token mint, where there is no earlier
+  -- object to retain a value from and so nothing to do. No printed card reaches
+  -- it: every decline-to-copy clause is Vesuvan Doppelganger's, on the two
+  -- roads above.
+  CopyException.DontCopyColors -> case own of
+    Nothing -> snapshot
+    Just mine ->
+      snapshot
+        { PC.colors = PC.colors mine,
+          PC.keywords = Map.filterWithKey (\keyword _ -> not (Projection.definesColorless (Set.singleton keyword))) (PC.keywords snapshot)
+        }
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- permanents matching the rewrite's printed noun phrase, other than itself, minus

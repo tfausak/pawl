@@ -101,6 +101,15 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
       CopyException.NoManaCost
       " {\"type\":\"NoManaCost\"} "
 
+  -- CR 707.9c's decline-to-copy arm is NULLARY too, so the tag alone is the
+  -- whole value.
+  Spec.it s "DontCopyColors round-trips as a bare tag" $
+    Common.assertCodec
+      s
+      (CopyException.codec Common.text)
+      CopyException.DontCopyColors
+      " {\"type\":\"DontCopyColors\"} "
+
   -- CR 707.9a's quoted ability rides the ability codec it is handed; a string
   -- stands in for a Pawl.Types.GrantedAbility here.
   Spec.it s "GainAbility round-trips through the ability codec" $
