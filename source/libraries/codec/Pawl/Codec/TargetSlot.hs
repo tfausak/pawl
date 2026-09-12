@@ -5,6 +5,7 @@ module Pawl.Codec.TargetSlot where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SlotCount as SlotCount
@@ -27,19 +28,22 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- The amount key is omitted the same way, and for a sharper version of the same
 -- reason: only the handful of slots printing a computed mana-value bound name one
 -- (Pawl.Types.TargetSlot's `amount`), so every other slot in the corpus renders
--- unchanged.
+-- unchanged. The chooser key is omitted on the same terms: CR 115.1's default is
+-- the ability's controller, which every slot but Cuombajj Witches' second takes.
 codec :: Codec.Codec TargetSlot.TargetSlot
 codec = Fields.object $ do
   pool <- Fields.required "pool" Pool.codec TargetSlot.pool
   filter_ <- Fields.defaulted "filter" Nothing (Common.maybe (Filter.codec Keyword.codec)) TargetSlot.filter
   count <- Fields.defaulted "count" (SlotCount.Printed TargetCount.one) SlotCount.codec TargetSlot.count
   amount <- Fields.defaulted "amount" Nothing (Common.maybe Quantity.codec) TargetSlot.amount
+  chooser <- Fields.defaulted "chooser" Nothing (Common.maybe PlayerRelation.codec) TargetSlot.chooser
   pure
     TargetSlot.MkTargetSlot
       { TargetSlot.pool = pool,
         TargetSlot.filter = filter_,
         TargetSlot.count = count,
-        TargetSlot.amount = amount
+        TargetSlot.amount = amount,
+        TargetSlot.chooser = chooser
       }
 
 -- | A slot-keyed map as a JSON object keyed by the slot name (#1303).

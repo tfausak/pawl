@@ -257,11 +257,16 @@ data Prompt r where
   AssignCombatDamage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map Recipient.Recipient Natural.Natural -> Natural.Natural -> Prompt (Map.Map Recipient.Recipient Natural.Natural)
   -- | CR 601.2c: per named slot of the object being cast, how many targets it
   -- takes and the legal recipients; only the slots AnnounceTargets settled
-  -- are offered, so a declined CR 115.6 slot is absent.
+  -- are offered, so a declined CR 115.6 slot is absent. The PlayerId is the seat
+  -- announcing, which CR 115.1 makes the controller for every slot but one the
+  -- card hands to somebody else (Pawl.Types.TargetSlot's `chooser`) -- so one
+  -- announcement can raise this prompt more than once, at a different seat each
+  -- time, over disjoint slots.
   ChooseTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (Natural.Natural, Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
   -- | CR 601.2c, before ChooseTargets: how many targets each variable slot
   -- takes, within a range the board can supply
-  -- (Pawl.Types.TargetCount.ceilingOn).
+  -- (Pawl.Types.TargetCount.ceilingOn). Its PlayerId is ChooseTargets' -- the
+  -- seat announcing those slots, not necessarily the controller.
   AnnounceTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (TargetCount.TargetCount, Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName Natural.Natural)
   -- | CR 612: the two basic land types a text-changing effect's slot swaps,
   -- asked as the effect is applied (CR 608.2d); the Set is the words the new
@@ -367,10 +372,12 @@ data Prompt r where
   -- Filter against it.
   ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Prompt CardName.CardName
   -- | Which opponent a card's text names, as a permanent enters (CR 614.12a),
-  -- at resolution for CR 701.29a's fateseal, or for a resolving
+  -- at resolution for CR 701.29a's fateseal, for a resolving
   -- Pawl.Types.Effect.ChoosePlayer whose scope leaves the chooser out
-  -- (Skullwinder); the chooser is CR 109.5's "you" at entry and the rule's
-  -- actor at the fateseal.
+  -- (Skullwinder), or at CR 601.2c for which opponent ANNOUNCES a slot the
+  -- controller does not (CR 801.5a, Cuombajj Witches); the chooser is CR 109.5's
+  -- "you" at entry, the rule's actor at the fateseal, and the ability's
+  -- controller at the announcement.
   ChooseOpponent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 310.9a: which player protects the battle, chosen by its controller as
   -- it enters and again under CR 310.11's state-based action; the candidates

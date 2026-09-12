@@ -975,7 +975,7 @@ placeBorne srcId pending = do
             -- Not implemented: a slot counting by an X the trigger INHERITS (CR
             -- 107.3m, CR 701.37c); Pawl.CardSpec refuses a triggered ability
             -- whose slot counts by X (#3633).
-            chosen <- Target.chooseTargets decider controller abilId 0 slots sets
+            chosen <- Target.chooseTargets controller abilId 0 slots sets
             if Target.jointlyCoherent (Just controller) bound srcId slots chosen gs
               then pure (Just chosen)
               else

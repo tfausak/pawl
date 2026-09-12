@@ -14,6 +14,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Exile as Exile
 import qualified Pawl.Engine.Filter as Filter
@@ -28,7 +29,6 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Binding as Binding.Type
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
-import Pawl.Types.Decider (Decider)
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
@@ -44,6 +44,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Pile as Pile
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -107,6 +108,10 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 --   * `perspective` is CR 109.5's "you", supplied by the caller. "A creature an
 --     opponent controls" is a ControlledBy Opponent filter, and a player
 --     candidate is narrowed by the same fold through the IsPlayer atom (#168).
+--     It is the ability's CONTROLLER even where somebody else announces the
+--     slot (TargetSlot.chooser, Cuombajj Witches): hexproof asks who controls
+--     the ability (CR 702.11b), not who points it, so only chooseTargets'
+--     prompt moves.
 --
 -- Deriving the perspective here as `Projection.controllerOf source` instead
 -- returns Nothing once the source leaves the battlefield, making ControlledBy
@@ -808,9 +813,8 @@ poolsGiven pcs gs =
 -- name a GRAVEYARD or EXILE read it -- `bindings` only the graveyard ones: CR
 -- 400.1's per-player zones make a pool that names one have to say whose, and a
 -- ZoneScope answers with either the Context's perspective (CR 109.5's
--- would-be controller, the player CR 601.2c has choosing targets) or another
--- slot's own answer. Every battlefield and stack arm ignores both, because those
--- zones are shared by all players (CR 400.1 again) -- which is what lets those
+-- would-be controller) or another slot's own answer. Every battlefield and stack
+-- arm ignores both, because those zones are shared by all players (CR 400.1 again) -- which is what lets those
 -- arms be hoisted into Pools and leaves a graveyard one built here, per slot,
 -- against that slot's own Context. Exile is shared too and stays hoisted; CR
 -- 406.4's per-chooser narrowing is `piledOffer`'s, taken at the prompt rather
@@ -1425,28 +1429,104 @@ slotCapacities counting x slots sets gs =
                    in elsewhere + sum (take (Natural.toIntSaturating k) per)
    in Map.mapWithKey capacity slots
 
--- CR 601.2c's two announcements over one slot map, in the rule's own order: how
--- many targets each variable slot gets, then the targets themselves.
+-- CR 601.2c's announcement over one slot map, split by WHO announces each slot
+-- (CR 115.1) and asked of each such seat in turn -- Cuombajj Witches' first
+-- target is its controller's and its second an opponent's.
+--
+-- ONE OFFER, many prompts. Every group is narrowed from the same `sets`, built
+-- once by the caller off the board before any answer, so CR 601.2c's "all at
+-- once" still holds of what may be named; what the split changes is only which
+-- seat is asked. A later group therefore cannot be offered less because an
+-- earlier one answered, and the joint check (selectionLegal, jointlyCoherent) is
+-- still taken over the whole announcement afterwards.
+--
+-- The controller's slots go first (Ord on Maybe), and the rest follow in the
+-- relation's own order. Rule 601.2c fixes no order between choosers; this one is
+-- deterministic, which a replay needs.
+chooseTargets :: PlayerId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
+chooseTargets pid oid x slots sets = do
+  let groups = Map.fromListWith Set.union [(TargetSlot.chooser slot, Set.singleton name) | (name, slot) <- Map.toList slots]
+  answers <-
+    traverse
+      ( \(relation, mine) -> do
+          seat <- chooserOf pid oid relation
+          case seat of
+            -- CR 601.2c has nobody to announce with, which is CR 102.2's game of one
+            -- seat under an "of an opponent's choice" slot. The slots go unanswered,
+            -- which the callers' own gate then refuses (CR 601.2e, CR 602.2, CR
+            -- 603.3d's removal).
+            Nothing -> pure Map.empty
+            Just chooser -> askChooser pid chooser oid x slots sets mine
+      )
+      (Map.toAscList groups)
+  pure (Map.unions answers)
+
+-- CR 115.1 with CR 601.2c: which seat announces the slots a relation names.
+--
+-- Nothing on the slot is the rule's default and asks nobody -- the controller
+-- announces. A relation admitting SEVERAL seats is a choice the CONTROLLER makes,
+-- CR 801.5a's example being the rule text that says so ("choosing Rob as the
+-- opponent who picks the other target"); one seat is elided, and none leaves the
+-- slots unanswered.
+--
+-- Which prompt is picked by whether the offer holds the controller, the posture
+-- Pawl.Engine.Resolve.Effect's CR 608.2d choice takes: Prompt.ChooseOpponent
+-- promises never to offer them, Prompt.ChoosePlayer is the one that may. An
+-- answer naming somebody never offered falls back to the first, the announcement
+-- being mandatory.
+--
+-- Off Game.stillPlaying, so a seat that has left (CR 104.3a) neither chooses nor
+-- is counted towards eliding the question.
+chooserOf :: PlayerId -> ObjectId -> Maybe PlayerRelation.PlayerRelation -> Game (Maybe PlayerId)
+chooserOf controller oid relation = case relation of
+  Nothing -> pure (Just controller)
+  Just r -> do
+    gs <- State.get
+    case List.filter (PlayerRelation.holds (Game.teams gs) r controller) (Game.stillPlaying gs) of
+      [] -> pure Nothing
+      [sole] -> pure (Just sole)
+      first : second : rest -> do
+        let offered = first NonEmpty.:| (second : rest)
+            decider = Decide.deciderFor controller gs
+            question =
+              if List.elem controller (NonEmpty.toList offered)
+                then Prompt.ChoosePlayer decider controller oid offered
+                else Prompt.ChooseOpponent decider controller oid offered
+        answer <- Game.choose question
+        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+
+-- CR 601.2c's two announcements over ONE chooser's slots, in the rule's own
+-- order: how many targets each variable slot gets, then the targets themselves.
 --
 -- A slot whose count the card or the board already fixes is not offered at the
 -- first prompt, there being one legal answer; a count outside the offered range
 -- is clamped back into it, which is the same game as answering its nearest end.
 -- Neither prompt is raised when it has nothing to ask.
 --
+-- `mine` is the slots THIS seat announces; `slots` and `sets` stay whole, since
+-- slotCapacities resolves a ZoneScope.InSlot pool against the named slot wherever
+-- it sits -- another chooser's included.
+--
+-- The perspectives are two different questions and split here. CR 406.4's
+-- "allowed to look at" is the CHOOSER's, so piledOffer takes them; CR 109.5's
+-- "you" for a computed count belongs to the ability, so countingByGiven takes the
+-- controller whoever hands in the answer.
+--
 -- The answer is NOT validated here -- `selectionLegal` below is that, asked by
 -- the callers that reverse an announcement (CR 601.2e, CR 602.2).
-chooseTargets :: Decider -> PlayerId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
-chooseTargets decider pid oid x slots sets = do
+askChooser :: PlayerId -> PlayerId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Set SlotName -> Game (Map SlotName (Set Recipient))
+askChooser controller chooser oid x slots sets mine = do
   gs <- State.get
-  let offered = fmap (piledOffer (Just pid) gs) sets
-      counting = countingByGiven (Projection.projectAll gs) (Just pid) oid gs
-      ranges = Map.intersectionWith (announcedRange counting x) slots (slotCapacities counting x slots offered gs)
+  let decider = Decide.deciderFor chooser gs
+      offered = fmap (piledOffer (Just chooser) gs) sets
+      counting = countingByGiven (Projection.projectAll gs) (Just controller) oid gs
+      ranges = Map.restrictKeys (Map.intersectionWith (announcedRange counting x) slots (slotCapacities counting x slots offered gs)) mine
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
       offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (SlotCount.at counting x (TargetSlot.count targetSlot), legal)) slots offered) variable
   announced <-
     if Map.null offers
       then pure Map.empty
-      else Game.choose (Prompt.AnnounceTargets decider pid oid offers)
+      else Game.choose (Prompt.AnnounceTargets decider chooser oid offers)
   let counts =
         Map.filter (> 0) $
           Map.mapWithKey
@@ -1456,11 +1536,11 @@ chooseTargets decider pid oid x slots sets = do
   if Map.null asked
     then pure Map.empty
     else do
-      answer <- Game.choose (Prompt.ChooseTargets decider pid oid asked)
+      answer <- Game.choose (Prompt.ChooseTargets decider chooser oid asked)
       -- CR 406.4's draw, taken before selectionLegal judges the announcement:
       -- the drawn card can be one the slot's Filter refuses, and CR 601.2e is
       -- what then reverses the casting.
-      traverse (drawFromPiles (Just pid)) answer
+      traverse (drawFromPiles (Just chooser)) answer
 
 -- CR 406.4's second half, taken over one slot's legal set as a prompt is built:
 -- a candidate this chooser may not name specifically -- a card exiled face down
