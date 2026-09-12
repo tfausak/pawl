@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Binding as Binding.Type
 import Pawl.Types.Card (Card)
@@ -1241,7 +1242,7 @@ boundNamesSibling declared = not . Set.null . boundSiblings declared
 -- then cannot answer against the plural union the second pass hands it (#2967).
 boundSiblings :: Set SlotName -> TargetSlot -> Set SlotName
 boundSiblings declared slot =
-  Set.intersection declared (foldMap QuantitySlot.allSlots (TargetSlot.amount slot))
+  Set.intersection declared (foldMap QuantitySlot.allSlots (Maybe.maybeToList (TargetSlot.amount slot) <> Maybe.maybeToList (SlotCount.quantity (TargetSlot.count slot))))
 
 -- Must this slot's answer be judged against what its SIBLING slots were answered
 -- with (CR 601.2c)? Three ways one slot depends on another, and they are the
@@ -1317,6 +1318,33 @@ zoneScopeSlot scope = case scope of
   ZoneScope.InSlot slot -> Just slot
   ZoneScope.ControllerOfBound slot -> Just slot
 
+-- CR 601.2c: the number a slot's COMPUTED count reads on this board -- Mogis's
+-- Marauder's "up to X target creatures ... where X is your devotion to black".
+--
+-- Evaluated against the SOURCE and the caller's perspective, exactly as
+-- slotContext evaluates CR 202.3's computed bound beside it and for the same
+-- reason: the count is one number for the whole slot rather than a question
+-- about a candidate. The context is that function's with no bound of its own,
+-- which is what keeps this non-circular -- a count and a bound are two numbers on
+-- one slot, and neither reads the other.
+--
+-- A number the board cannot supply reads zero, SlotCount.at's posture: an "up to"
+-- count of zero is a slot answered with no targets, which is what CR 601.2c gives
+-- a count nobody can name.
+--
+-- CR 601.2c: "once the number of targets ... is determined, that number doesn't
+-- change, even if the information used to determine the number of targets does".
+-- Nothing stores the determined number, and it holds anyway because no reader of
+-- a count stands after the announcement window: the gates run before it,
+-- selectionLegal runs at CR 601.2e on the board the offer was built from, and CR
+-- 707.10c's re-target counts the recipients the original already has
+-- (Resolve.Effect.chooseNewTargetsFor) rather than asking a count again.
+countingByGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> ObjectId -> GameState -> Quantity -> Natural
+countingByGiven pcs perspective source gs =
+  Integer.toNaturalSaturating
+    . Maybe.fromMaybe 0
+    . Quantity.evaluate (Projection.fullView gs) (slotContext pcs perspective False Map.empty source Nothing gs) gs source
+
 -- CR 601.2c: the range of numbers this slot may be answered with on this board
 -- -- the printed count, narrowed by how many legal recipients there actually
 -- are. A caster cannot announce more targets than they can then choose legally,
@@ -1337,9 +1365,13 @@ zoneScopeSlot scope = case scope of
 -- `capacity` is how many of the slot's legal recipients ONE announcement could
 -- name, which is the slot's own candidate count for every slot but a
 -- graveyard-scoped one -- see slotCapacities.
-announcedRange :: Natural -> TargetSlot -> Natural -> (Natural, Natural)
-announcedRange x slot capacity =
-  let count = SlotCount.at x (TargetSlot.count slot)
+--
+-- `counting` answers a slot counted by a COMPUTED number ("up to X target
+-- creatures ... where X is your devotion to black", Mogis's Marauder) -- see
+-- countingByGiven, which every caller builds from the board it is judging on.
+announcedRange :: (Quantity -> Natural) -> Natural -> TargetSlot -> Natural -> (Natural, Natural)
+announcedRange counting x slot capacity =
+  let count = SlotCount.at counting x (TargetSlot.count slot)
       ceiling_ = TargetCount.ceilingOn capacity count
    in (min (TargetCount.least count) ceiling_, ceiling_)
 
@@ -1370,8 +1402,8 @@ announcedRange x slot capacity =
 -- The named slot's own capacity is its plain candidate count rather than another
 -- pass through here, which is what makes this terminate: legalSetsGiven's second
 -- pass already answers a slot naming a dependent slot with nothing.
-slotCapacities :: Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Map SlotName Natural
-slotCapacities x slots sets gs =
+slotCapacities :: (Quantity -> Natural) -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Map SlotName Natural
+slotCapacities counting x slots sets gs =
   let legalOf name = Map.findWithDefault Set.empty name sets
       capacity name slot =
         let legal = legalOf name
@@ -1387,7 +1419,7 @@ slotCapacities x slots sets gs =
                 Just namedSlot ->
                   let candidates = legalOf named
                       pids = Maybe.mapMaybe playerOf (Set.toList candidates)
-                      k = snd (announcedRange x namedSlot (Natural.length candidates))
+                      k = snd (announcedRange counting x namedSlot (Natural.length candidates))
                       per = List.sortBy (flip compare) (fmap (\pid -> Natural.length (Set.intersection legal (graveyardsOf [pid] gs))) pids)
                       elsewhere = Natural.length (Set.difference legal (graveyardsOf pids gs))
                    in elsewhere + sum (take (Natural.toIntSaturating k) per)
@@ -1407,9 +1439,10 @@ chooseTargets :: Decider -> PlayerId -> ObjectId -> Natural -> Map SlotName Targ
 chooseTargets decider pid oid x slots sets = do
   gs <- State.get
   let offered = fmap (piledOffer (Just pid) gs) sets
-      ranges = Map.intersectionWith (announcedRange x) slots (slotCapacities x slots offered gs)
+      counting = countingByGiven (Projection.projectAll gs) (Just pid) oid gs
+      ranges = Map.intersectionWith (announcedRange counting x) slots (slotCapacities counting x slots offered gs)
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
-      offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (SlotCount.at x (TargetSlot.count targetSlot), legal)) slots offered) variable
+      offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (SlotCount.at counting x (TargetSlot.count targetSlot), legal)) slots offered) variable
   announced <-
     if Map.null offers
       then pure Map.empty
@@ -1589,11 +1622,12 @@ pileMembers perspective pile gs =
 selectionLegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
 selectionLegal perspective seed source x slots sets chosen gs =
   let pcs = Projection.projectAll gs
-      caps = slotCapacities x slots sets gs
+      counting = countingByGiven pcs perspective source gs
+      caps = slotCapacities counting x slots sets gs
       slotLegal slot targetSlot =
         let legal = Map.findWithDefault Set.empty slot sets
             picked = Map.findWithDefault Set.empty slot chosen
-            (_, hi) = announcedRange x targetSlot (Map.findWithDefault 0 slot caps)
+            (_, hi) = announcedRange counting x targetSlot (Map.findWithDefault 0 slot caps)
             -- The count the slot DEMANDS, unnarrowed by the board -- unlike the
             -- ceiling beside it, which the board is entitled to lower (a caster
             -- cannot choose more targets than there are). CR 601.2c gives no such
@@ -1608,7 +1642,7 @@ selectionLegal perspective seed source x slots sets chosen gs =
             -- place an X announced above what the board can supply is caught --
             -- Pawl.CombatSpec's "CR 601.2c announcing more X than there are
             -- creatures reverses the whole activation" proves it.
-            demanded = TargetCount.least (SlotCount.at x (TargetSlot.count targetSlot))
+            demanded = TargetCount.least (SlotCount.at counting x (TargetSlot.count targetSlot))
             size = Natural.length picked
          in Set.isSubsetOf picked legal && size >= demanded && size <= hi
    in Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
@@ -1694,13 +1728,14 @@ jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
       -- The slots being ENUMERATED: the ones a reader names, a reader that is
       -- itself named included.
       named = Map.restrictKeys slots (foldMap reads_ readers)
-      demanded slot = TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
+      counting = countingByGiven pcs perspective source gs
+      demanded slot = TargetCount.least (SlotCount.at counting 0 (TargetSlot.count slot))
       legalOf name = Map.findWithDefault Set.empty name sets
       -- The sizes ONE announcement could name this slot at, measured against
       -- slotCapacities for that function's reason rather than against the union.
-      caps = slotCapacities 0 slots sets gs
+      caps = slotCapacities counting 0 slots sets gs
       sizesOf name slot =
-        let (lo, hi) = announcedRange 0 slot (Map.findWithDefault 0 name caps)
+        let (lo, hi) = announcedRange counting 0 slot (Map.findWithDefault 0 name caps)
          in [lo .. hi]
       assignments =
         List.foldr
@@ -1759,7 +1794,8 @@ fillableModes perspective seed source extra modal gs =
 -- apiece to answer it (#716).
 fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card (GrantedAbility.GrantedAbility Card) -> GameState -> Set ModeIndex
 fillableModesGiven pcs grants pools perspective seed source extra modal gs =
-  let ms = Foldable.toList (Modal.modes modal)
+  let counting = countingByGiven pcs perspective source gs
+      ms = Foldable.toList (Modal.modes modal)
       fillable i m =
         let slots = Map.union extra (Mode.targetSlots m)
             -- CR 601.2b's other FLOOR, the one `short` below cannot spell: a
@@ -1795,7 +1831,7 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
          in -- CR 115.6 / 601.2c: a slot is unfillable when the board cannot supply
             -- the MINIMUM its count demands. An "up to one" slot with no legal
             -- recipient demands none, and is answered with zero targets.
-            if or (Map.elems (Map.intersectionWith short slots (slotCapacities 0 slots sets gs)))
+            if or (Map.elems (Map.intersectionWith short slots (slotCapacities counting 0 slots sets gs)))
               || not (jointlyFillableGiven pcs grants pools perspective seed source slots sets gs)
               then Nothing
               else Just (ModeIndex.MkModeIndex i)
@@ -1807,7 +1843,7 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
       -- function's reason: a graveyard-scoped slot is offered the union over the
       -- named slot's players, and a minimum no ONE of those graveyards can supply
       -- is a mode with no legal announcement rather than a fillable one.
-      short slot capacity = capacity < TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
+      short slot capacity = capacity < TargetCount.least (SlotCount.at counting 0 (TargetSlot.count slot))
    in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Natural ..] ms))
 
 -- CR 603.2: every target slot with its "that player" atoms baked against this
@@ -1842,7 +1878,12 @@ bakeSlot :: Map SlotName PlayerId -> TargetSlot -> TargetSlot
 bakeSlot players slot =
   slot
     { TargetSlot.filter = fmap (Filter.bakeBound players) (TargetSlot.filter slot),
-      TargetSlot.amount = fmap (Quantity.bakeBound players) (TargetSlot.amount slot)
+      TargetSlot.amount = fmap (Quantity.bakeBound players) (TargetSlot.amount slot),
+      -- CR 601.2c's count reads a Quantity of its own, so it is baked beside the
+      -- bound for that field's reason. A REGRESSION FENCE rather than a proved
+      -- behaviour: Mogis's Marauder's devotion names PlayerRef.Relative, which
+      -- baking leaves alone, so no board today tells the two readings apart.
+      TargetSlot.count = SlotCount.mapQuantity (Quantity.bakeBound players) (TargetSlot.count slot)
     }
 
 -- bakeSlots over a whole modal payload, for the caller that must bake BEFORE the

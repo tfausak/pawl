@@ -1,5 +1,6 @@
 module Pawl.Codec.SlotCount where
 
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.TargetCount as TargetCount
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -13,5 +14,6 @@ codec =
   Arm.tagged
     [ Arm.payload "Printed" TargetCount.codec SlotCount.Printed (\x -> case x of SlotCount.Printed y -> Just y; _ -> Nothing),
       Arm.nullary "AnnouncedX" SlotCount.AnnouncedX,
-      Arm.nullary "UpToAnnouncedX" SlotCount.UpToAnnouncedX
+      Arm.nullary "UpToAnnouncedX" SlotCount.UpToAnnouncedX,
+      Arm.payload "UpToComputed" Quantity.codec SlotCount.UpToComputed (\x -> case x of SlotCount.UpToComputed y -> Just y; _ -> Nothing)
     ]
