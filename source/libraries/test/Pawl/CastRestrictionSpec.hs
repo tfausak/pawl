@@ -215,7 +215,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     rally <- S.printingOf s registry "Rally the Troops"
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
         mine = Projection.controls S.alice board
-        joined = S.runPure S.identityAnswer board (Foldable.traverse_ (Combat.putOntoBattlefieldAttacking Nothing) mine)
+        joined = S.runPure S.identityAnswer board (Foldable.traverse_ (Combat.putOntoBattlefieldAttacking Combat.Any) mine)
         combat = GameState.combat joined
     Spec.assertEqWith s "nothing was DECLARED" (S.attackerDeclarationsOf joined) []
     -- CR 508.8's record does count it -- that is the rule's second clause, and

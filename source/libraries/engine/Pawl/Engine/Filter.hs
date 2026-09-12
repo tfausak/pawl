@@ -2277,6 +2277,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.115a is payload-free, so it holds no word to swap: the library it
   -- names is "their" own, written into the rule rather than into the keyword.
   Keyword.Type.Ingest -> keyword
+  Keyword.Type.Myriad -> keyword
   -- CR 702.122a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Crew _ -> keyword
   Keyword.Type.Fabricate _ -> keyword

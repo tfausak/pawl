@@ -1730,6 +1730,8 @@ zoneOwners pid ref gs = case ref of
   PlayerRef.InSlot _ -> []
   PlayerRef.EachInSlot _ -> []
   PlayerRef.EachPlayerExcept _ -> []
+  -- The arm above's answer, for its reason.
+  PlayerRef.EachOpponentExcept _ -> []
   PlayerRef.Candidate -> []
   PlayerRef.ControllerOfBound _ -> []
   PlayerRef.Attacking _ -> []

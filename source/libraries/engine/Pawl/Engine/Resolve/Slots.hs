@@ -266,7 +266,11 @@ riderSlots :: EntryRiders.EntryRiders count -> Map.Map SlotName SlotArity
 riderSlots riders =
   let attacked = case EntryRiders.attacking riders of
         Just (EntryAttack.SameAs slot) -> oneSlot slot
-        _ -> Map.empty
+        -- CR 702.116a's slot, read singly too: the rule names ONE player, whom
+        -- the token attacks or whose planeswalker it does.
+        Just (EntryAttack.UnderPlayer slot) -> oneSlot slot
+        Just EntryAttack.Chosen -> Map.empty
+        Nothing -> Map.empty
    in joinTwo attacked (maybe Map.empty oneSlot (EntryRiders.blocking riders))
 
 -- The slots a PlayerRef reads. Five arms name one: EachPlayerExcept, InSlot,
@@ -278,6 +282,8 @@ playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
   -- The excluded seat is one player, so one slot read singly.
   PlayerRef.EachPlayerExcept slot -> Map.singleton slot SlotArity.One
+  -- CR 702.116a's excluded seat is one player too.
+  PlayerRef.EachOpponentExcept slot -> Map.singleton slot SlotArity.One
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
   -- Read at arity MANY, which is the whole of what parts it from the arm above.
@@ -2004,6 +2010,11 @@ playerRefPlayers legal controller gs ref =
         PlayerRef.EachPlayerExcept slot ->
           let excluded = legalOne slot legal >>= Recipient.playerOf
            in filter (\pid -> Just pid /= excluded) everyone
+        -- CR 702.116a's "each opponent other than defending player": the arm above
+        -- narrowed by CR 102.1, off the same read and with the same collapse.
+        PlayerRef.EachOpponentExcept slot ->
+          let excluded = legalOne slot legal >>= Recipient.playerOf
+           in filter (\pid -> Just pid /= excluded && PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller pid) everyone
         -- The baked seat, unreachable from card data. Not filtered against the roster:
         -- it names one specific player who arrived from elsewhere.
         PlayerRef.Specific pid -> [pid]

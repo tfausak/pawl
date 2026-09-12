@@ -79,6 +79,7 @@ import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
@@ -285,6 +286,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Undying -> List.genericReplicate count undying
   -- CR 702.115b: each instance triggers separately.
   Keyword.Ingest -> List.genericReplicate count ingest
+  Keyword.Myriad -> List.genericReplicate count myriad
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -526,6 +528,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Changeling -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
+  Keyword.Myriad -> []
   Keyword.Skulk -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
@@ -887,6 +890,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Changeling -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
+  Keyword.Myriad -> []
   Keyword.Skulk -> []
   Keyword.Partner -> []
   Keyword.PartnerText _ -> []
@@ -1288,6 +1292,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
+  Keyword.Myriad -> []
   Keyword.Skulk -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
@@ -1818,6 +1823,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
+  Keyword.Myriad -> []
   Keyword.Skulk -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
@@ -2939,6 +2945,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
+  Keyword.Myriad -> []
   Keyword.Skulk -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
@@ -3182,6 +3189,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
+  Keyword.Myriad -> []
   Keyword.Skulk -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
@@ -3429,6 +3437,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
+  Keyword.Myriad -> []
   Keyword.Skulk -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
@@ -3624,6 +3633,7 @@ familyOf keyword = case keyword of
   Keyword.SplitSecond -> Nothing
   Keyword.Devoid -> Nothing
   Keyword.Ingest -> Nothing
+  Keyword.Myriad -> Nothing
   Keyword.Skulk -> Nothing
   -- CR 702.124h carries no parameter, so there is no family to name it by.
   Keyword.Partner -> Nothing
@@ -3741,6 +3751,127 @@ ingest =
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slots rule 702.116a's loop needs: the opponent this iteration is aimed at,
+-- and the tokens the loop minted. Both DEFINITIONS and never targets (CR
+-- 115.10a); the token slot holds the whole batch, which is what lets ONE delayed
+-- ability exile them all.
+myriadOpponentSlot, myriadTokenSlot :: SlotName.SlotName
+myriadOpponentSlot = SlotName.MkSlotName (Text.pack "myriad opponent")
+myriadTokenSlot = SlotName.MkSlotName (Text.pack "myriad token")
+
+-- The name rule 702.116a's delayed ability is filed under, decayedSacrificeName's
+-- position. A card may not declare one under this name (Pawl.AbilitySlotLintSpec).
+myriadExileName :: AbilityName
+myriadExileName = AbilityName.MkAbilityName (Text.pack "myriad")
+
+-- CR 702.116a's "exile the tokens at end of combat", decayedSacrifice's timing
+-- (CR 511.2) with an exile of the whole batch for a sacrifice of one permanent.
+--
+-- ONE ability over every token, not one per opponent: CR 608.2f's loop leaves a
+-- body-defined name holding the union across its members once it is over, so the
+-- arming opcode after the loop names the whole batch.
+--
+-- Rule 702.116a's "if one or more tokens are created this way" needs no gate: an
+-- unarmed loop leaves the slot naming nothing and the exile moves nothing, which
+-- is what that condition comes to.
+myriadExile :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+myriadExile =
+  let effect =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot myriadTokenSlot,
+              MoveToZone.zone = Zone.Exile,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Nothing,
+              MoveToZone.origin = Nothing,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) Nothing TurnScope.EachTurn),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.116a. Battle cry's SelfAttacks EveryTime condition (CR 508.3a), over CR
+-- 608.2f's loop: one iteration per opponent other than the defending player,
+-- which Binding.triggerPlayer names -- PlayerRef.EachOpponentExcept is exactly
+-- that phrase, and CR 102.1's narrowing is what drops the attacking player, whom
+-- EachPlayerExcept would keep.
+--
+-- The copy is the BEARER (Filter.IsSource, rule 702.116a's "this creature"), read
+-- through Effect.CreateCopy so CR 707.2's copiable values are what the token gets
+-- -- a Clone of a myriad creature mints copies of the Clone's copied text.
+--
+-- EntryAttack.UnderPlayer is rule 702.116a's "attacking that player or a
+-- planeswalker they control": a CR 508.4 choice narrowed to the iteration's
+-- opponent, made by the controller in Pawl.Engine.Combat and elided at one
+-- candidate. An opponent who is not a defending player narrows to nothing, and
+-- the token enters not attacking (CR 508.4a) -- which is what a game not using CR
+-- 802's option leaves.
+--
+-- Not implemented: rule 702.116a's "you may" is PER OPPONENT, and this asks it
+-- ONCE over the whole loop, so at four or more seats a controller cannot take a
+-- token against one opponent and refuse another (#3663).
+myriad :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+myriad =
+  let copy =
+        Effect.CreateCopy
+          CreateCopy.MkCreateCopy
+            { CreateCopy.quantity = CreateCopy.defaultQuantity,
+              CreateCopy.ref = ObjectRef.EachMatching Filter.IsSource,
+              CreateCopy.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Tapped,
+                    EntryRiders.attacking = Just (EntryAttack.UnderPlayer myriadOpponentSlot),
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              CreateCopy.slot = Just myriadTokenSlot,
+              CreateCopy.exceptions = []
+            }
+      loop =
+        Effect.ForEach
+          ForEach.MkForEach
+            { ForEach.ref = ObjectRef.Players (PlayerRef.EachOpponentExcept Binding.triggerPlayer),
+              ForEach.slot = myriadOpponentSlot,
+              ForEach.body = Seq.singleton copy
+            }
+      arm =
+        Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = myriadExileName,
+              ArmDelayedTrigger.onset = Onset.Immediately,
+              ArmDelayedTrigger.duration = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [loop, arm]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -4257,7 +4388,7 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice)]
+mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.
