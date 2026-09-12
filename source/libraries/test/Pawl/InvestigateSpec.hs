@@ -1169,6 +1169,124 @@ decliningTargets p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (const 0) offers
   _ -> S.identityAnswer p
 
+-- CR 701.57a's discover: "Exile cards from the top of your library until you
+-- exile a nonland card with mana value N or less. You may cast that card without
+-- paying its mana cost if the resulting spell's mana value is less than or equal
+-- to N. If you don't cast it, put that card into your hand. Put the remaining
+-- exiled cards on the bottom of your library in a random order."
+--
+-- Trumpeting Carnosaur {4}{R}{R} Creature -- Dinosaur 7/6 -- "Trample / When this
+-- creature enters, discover 5. / {2}{R}, Discard this card: It deals 3 damage to
+-- target creature or planeswalker." (Oracle text checked 2026-09-12) -- is the
+-- producer.
+--
+-- CARD DATA AND NO OPCODE. Rule 701.57a is four instructions the effect DSL
+-- already has, in the order the rule states them: CR 702.85a's walk
+-- (ObjectRef.TopOfLibraryUntil) into exile, CR 608.2g's offer, "that card" back
+-- out of the same slot into the hand, and the rest to the bottom. The third and
+-- fourth read the slot after the offer and find the card gone if it was cast, CR
+-- 400.7 having deleted the exiled incarnation -- Heirloom Blade's shape with an
+-- offer wedged into it.
+--
+-- The library is stocked so each conjunct of the walk is what passes or stops it:
+-- an Ainok Tracker of mana value 6 (one over the bound, so "N or less" is a bound
+-- and not the whole library), a Mountain (a LAND, so cheapness alone is not
+-- enough), and an Armored Galleon of mana value 5 EXACTLY, which ends it -- a
+-- "less than N" reading would pass it by. Think Twice sits under the Galleon and
+-- is never reached, which is what makes the walk's stopping visible.
+--
+-- TWO LEGS off one board, differing only in the answer to CR 608.2g's offer:
+-- taken, the Galleon is cast for free and enters; declined, rule 701.57a's third
+-- sentence puts it in alice's hand. Neither leg puts it on the bottom, which is
+-- the reading the last sentence does NOT have.
+trumpetingCarnosaurSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+trumpetingCarnosaurSpec s registry = Spec.describe s "TrumpetingCarnosaur" $ do
+  let named = CardName.MkCardName . Text.pack
+      -- Cast the Carnosaur for its printed {4}{R}{R} and resolve everything: the
+      -- spell, then the entry trigger it put on the stack (CR 603.3), then
+      -- whatever the offer casts.
+      play :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
+      play answer (oid, gs) =
+        let step g action = snd (Engine.runGamePure answer g (action >> Engine.settleForPriority))
+            drain g = if null (GameState.stack g) then g else drain (step g Stack.resolveTop)
+         in drain (step gs (S.cast S.alice oid))
+      bottomed = fmap Just [named "Think Twice", named "Ainok Tracker", named "Mountain"]
+      onBattlefield gs = Set.fromList (Maybe.catMaybes (namesIn Zone.Battlefield S.alice gs))
+      setUp carnosaur tracker mountain galleon think =
+        -- S.addLibraryCard puts each card ON TOP, so this stocks bottom first.
+        let base = S.landsFor mountain S.alice 6 (Setup.emptyGame S.bothPlayers)
+            (_, g1) = S.addLibraryCard think S.alice base
+            (_, g2) = S.addLibraryCard galleon S.alice g1
+            (_, g3) = S.addLibraryCard mountain S.alice g2
+            (_, g4) = S.addLibraryCard tracker S.alice g3
+            (carnosaurId, g5) = S.addHandCard carnosaur S.alice g4
+         in ( carnosaurId,
+              g5
+                { GameState.activePlayer = S.alice,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.alice
+                }
+            )
+      board = do
+        carnosaur <- S.printingOf s registry "Trumpeting Carnosaur"
+        tracker <- S.printingOf s registry "Ainok Tracker"
+        mountain <- S.printingOf s registry "Mountain"
+        galleon <- S.printingOf s registry "Armored Galleon"
+        think <- S.printingOf s registry "Think Twice"
+        pure (setUp carnosaur tracker mountain galleon think)
+  -- THE PROVING TEST.
+  Spec.it s "CR 701.57a discover 5 exiles past the Tracker and the Mountain, stops at the Galleon and casts it free" $ do
+    after <- fmap (play discovering) board
+    Spec.assertEqWith
+      s
+      "the Galleon the walk stopped at was cast without paying its mana cost"
+      (onBattlefield after)
+      (Set.fromList [named "Trumpeting Carnosaur", named "Armored Galleon", named "Mountain"])
+    -- A rotation of TWO is its own inverse, so this pins the order the batch came
+    -- back in rather than proving the channel was consulted; Cascade's three-card
+    -- batch is where that is proved (Pawl.KeywordTriggerSpec).
+    Spec.assertEqWith
+      s
+      "the two cards the walk passed over sit under the card it never reached"
+      (namesIn Zone.Library S.alice after)
+      bottomed
+    -- Proxies, AFTER the two behavioural assertions: rule 701.57a's last sentence
+    -- empties exile, and six lands paid for the Carnosaur alone.
+    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) []
+    Spec.assertEqWith s "six lands paid the Carnosaur's {4}{R}{R} and nothing paid the Galleon's {4}{U}" (S.tappedCount S.alice after) 6
+  -- CR 701.57a's third sentence, the same board with the offer declined.
+  Spec.it s "CR 701.57a the discovered card goes to the hand when the offer is declined" $ do
+    after <- fmap (play declining) board
+    Spec.assertEqWith s "the Galleon is in alice's hand rather than on the battlefield" (namesIn Zone.Hand S.alice after) [Just (named "Armored Galleon")]
+    Spec.assertEqWith
+      s
+      "and the two cards the walk passed over are on the bottom either way"
+      (namesIn Zone.Library S.alice after)
+      bottomed
+    -- Proxies, AFTER the behaviour: the Galleon did not enter, and exile is empty.
+    Spec.assertEqWith
+      s
+      "only the Carnosaur and the lands are on the battlefield"
+      (onBattlefield after)
+      (Set.fromList [named "Trumpeting Carnosaur", named "Mountain"])
+    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) []
+
+-- Takes CR 608.2g's offer and rotates the batch rule 701.57a's last sentence
+-- hands the random-order channel; `declining` refuses the offer and answers
+-- everything else the same way, so a pair of legs differs in that answer alone.
+discovering :: Prompt.Prompt r -> r
+discovering p = case p of
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  Prompt.Shuffle ids -> case ids of
+    h : t -> t <> [h]
+    [] -> []
+  _ -> S.identityAnswer p
+
+declining :: Prompt.Prompt r -> r
+declining p = case p of
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
+  _ -> discovering p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   cookbookSpec s registry
@@ -1180,3 +1298,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   runeBrandJugglerSpec s registry
   randomRevealSpec s registry
   wildEvocationSpec s registry
+  trumpetingCarnosaurSpec s registry

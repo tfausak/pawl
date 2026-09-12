@@ -5314,7 +5314,9 @@ storm =
 -- The offer carries the SAME atom as CR 702.85a's second condition, and that is
 -- the whole of its work: the card's mana value is already less by the walk, so
 -- what is left to ask is the RESULTING spell's -- an adventurer card's other
--- half, whose mana value may exceed the card's (Fae of Wishes' Granted).
+-- half, whose mana value may exceed the card's. Flaxen Intruder // Welcome Home
+-- is the printing that shows it; Pawl.KeywordTriggerSpec's "CR 702.85a cascading
+-- into an adventurer card withholds the half the bound refuses" is the proof.
 cascade :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 cascade =
   let plain =
