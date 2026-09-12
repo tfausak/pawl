@@ -253,6 +253,9 @@ damageEvent gs kind source target amount =
       -- instance's N rather than a membership test -- Projection.totalToxic's
       -- fold, taken over the same map so it shares the fallback.
       toxic = Projection.toxicIn keywords
+      -- CR 608.2h once for the two riders that ask it: rule 702.15b's payee and
+      -- rule 702.76a's and rule 702.173a's "under your control".
+      controller = Projection.controllerWithLastKnown source gs
    in DamageEvent.MkDamageEvent
         { DamageEvent.source = source,
           DamageEvent.target = target,
@@ -263,9 +266,9 @@ damageEvent gs kind source target amount =
           DamageEvent.dealtByToxic = toxic,
           DamageEvent.dealtByLifelink =
             if has Keyword.Lifelink
-              then Projection.controllerWithLastKnown source gs
+              then controller
               else Nothing,
-          DamageEvent.dealtByController = Projection.controllerWithLastKnown source gs,
+          DamageEvent.dealtByController = controller,
           DamageEvent.dealtByCreatureTypes = Set.filter Subtype.isCreatureType (Projection.subtypesWithLastKnown source gs),
           DamageEvent.dealtByCommander = Commander.isCommander source gs,
           DamageEvent.kind = kind
