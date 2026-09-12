@@ -650,8 +650,9 @@ data View = MkView
     -- LAZY, for attachedToView's cost reason: filling it re-asks CR 702.178a's
     -- grant condition, which reaches a second projection, and `affects` builds a
     -- view from inside a projection already. Nothing forces it unless a Filter
-    -- actually contains the atom, and the pool's one printing (Tsabo's Web) is
-    -- read outside the layer fold.
+    -- actually contains the atom: Tsabo's Web reads it outside the layer fold,
+    -- while Synthetic Artificers' Ascent and Synthetic Ability Audit read it from
+    -- inside one, which the bounded reader below is what makes safe.
     --
     -- Bounded like attachedToView, and for the same reason: the condition is
     -- asked through the reader Pawl.Engine.Projection.View.viewOfCharacteristics was

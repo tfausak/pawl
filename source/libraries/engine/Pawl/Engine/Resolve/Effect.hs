@@ -5630,7 +5630,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- the boolean marks into.
   --
   -- BECOMES rather than increments, and the level bar's own
-  -- ActivatedAbility.condition is the only thing that keeps the ladder in order
+  -- ActivationRestriction.OnlyIf is the only thing that keeps the ladder in order
   -- (CR 716.2a's "activate only if this Class is level N-1"). Nothing is re-checked
   -- here, which is CR 113.7a: once activated, an ability exists on the stack
   -- independently of its source, so a level that moved in between changes nothing.

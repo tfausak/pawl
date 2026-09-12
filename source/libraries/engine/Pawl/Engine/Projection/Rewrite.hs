@@ -956,6 +956,10 @@ replaceWholeWord from to =
 -- 702.178a's "as long as" gate, and the ACTIVATION COST (CR 118.1, CR 602.1a),
 -- so a Magical Hack naming Forest moves which land Dark Heart of the Wood's cost
 -- demands.
+--
+-- Not implemented: CR 602.5's "activate only if" rider, which prints words like
+-- any other text and is not in the update below -- Magical Hack on Nimbus Maze
+-- (#3668).
 rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteActivatedAbility pairs ability =
   ability

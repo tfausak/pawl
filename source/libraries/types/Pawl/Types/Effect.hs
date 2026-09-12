@@ -481,7 +481,8 @@ data Effect card ability
     Designate Designate.Designate
   | -- | CR 716.2a's first half: "[Cost]: This Class's level becomes N." Writes
     -- Object.classLevel, CR 716.2b making a level a designation; the "only if
-    -- this Class is level N-1" half rides the ability's own condition.
+    -- this Class is level N-1" half rides the ability's own
+    -- ActivationRestriction.OnlyIf, CR 602.5's rider.
     SetClassLevel SetClassLevel.SetClassLevel
   | -- | CR 701.60a's other ending: the named permanents are no longer suspected.
     -- Not a designation-parameterised inverse of Designate, that ending
