@@ -813,8 +813,8 @@ poolsGiven pcs gs =
 -- name a GRAVEYARD or EXILE read it -- `bindings` only the graveyard ones: CR
 -- 400.1's per-player zones make a pool that names one have to say whose, and a
 -- ZoneScope answers with either the Context's perspective (CR 109.5's
--- would-be controller) or another slot's own answer. Every battlefield and stack arm ignores both, because those
--- zones are shared by all players (CR 400.1 again) -- which is what lets those
+-- would-be controller) or another slot's own answer. Every battlefield and stack
+-- arm ignores both, because those zones are shared by all players (CR 400.1 again) -- which is what lets those
 -- arms be hoisted into Pools and leaves a graveyard one built here, per slot,
 -- against that slot's own Context. Exile is shared too and stays hoisted; CR
 -- 406.4's per-chooser narrowing is `piledOffer`'s, taken at the prompt rather
@@ -1510,7 +1510,7 @@ chooserOf controller oid relation = case relation of
 -- The perspectives are two different questions and split here. CR 406.4's
 -- "allowed to look at" is the CHOOSER's, so piledOffer takes them; CR 109.5's
 -- "you" for a computed count belongs to the ability, so countingByGiven takes the
--- controller however hands the answer.
+-- controller whoever hands in the answer.
 --
 -- The answer is NOT validated here -- `selectionLegal` below is that, asked by
 -- the callers that reverse an announcement (CR 601.2e, CR 602.2).
