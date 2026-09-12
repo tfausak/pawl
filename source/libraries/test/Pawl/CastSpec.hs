@@ -1557,6 +1557,133 @@ escalateSpec s registry = Spec.describe s "Escalate" $ do
     Spec.assertEqWith s "mode 1 never ran, so the Wall of Stone is untouched" (S.powerToughnessOf wallId after) (Just (0, 8))
     Spec.assertEqWith s "{B} and nothing more: the one Swamp is tapped" (S.tappedCount S.alice after) 1
 
+-- Explosive Derailment's two modes, in printed order (CR 700.2 /
+-- data/cards/explosive-derailment.json):
+--   0. "{2} -- Explosive Derailment deals 4 damage to target creature." -- slot
+--      "creature"
+--   1. "{2} -- Destroy target artifact." -- slot "artifact"
+-- under CR 702.172a's spree, which is the printed "Choose one or more --"
+-- (ModeSelection.ChooseBetween 1 2) plus CR 700.2h's per-mode costs.
+--
+-- The board: alice has `lands` untapped Mountains, bob has a Hill Giant (3/3) and
+-- a Chromatic Sphere, and the spell is in alice's hand. One victim for each mode,
+-- of different card types, so neither mode's effect can be mistaken for the
+-- other's.
+derailmentBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+derailmentBoard mountain derailment hillGiant sphere lands =
+  let (giantId, gs1) = S.addPermanent hillGiant S.bob (S.landsInPlay mountain lands)
+      (sphereId, gs2) = S.addPermanent sphere S.bob gs1
+      (gs, spellId) = S.handOne derailment gs2
+   in (gs, spellId, giantId, sphereId)
+
+-- Answers CR 601.2b's mode question with `modes` and aims each mode's slot at the
+-- one permanent it is for, FILTERED out of the offered set for `malevolences`'
+-- reason.
+derailments ::
+  [Natural] ->
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  Prompt.Prompt r ->
+  r
+derailments modes toBurn toDestroy p = case p of
+  Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex modes)
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.map
+      (\(_, options) -> Set.filter (\r -> r == Recipient.ToCreature toBurn || r == Recipient.ToObject toDestroy) options)
+      sets
+  _ -> S.identityAnswer p
+
+-- CR 702.172: spree, and with it CR 700.2h -- the first additional cost the CARD
+-- prints per mode rather than once for the spell.
+spreeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spreeSpec s registry = Spec.describe s "Spree" $ do
+  -- CR 700.2h's "if more than one such mode is chosen, all additional costs must
+  -- be paid": {R} plus {2} plus {2}, which five Mountains pay exactly.
+  Spec.it s "CR 700.2h both modes cost {R} plus {2} plus {2}: all five Mountains are tapped, and both modes land" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    derailment <- S.printingOf s registry "Explosive Derailment"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    let (gs, spellId, giantId, sphereId) = derailmentBoard mountain derailment hillGiant sphere 5
+        (_, after) = castAndResolve (derailments [0, 1] giantId sphereId) gs spellId
+        settled = S.settleSba after
+    Spec.assertEqWith s "{R} plus both modes' {2}: all five Mountains are tapped" (S.tappedCount S.alice settled) 5
+    Spec.assertEqWith s "mode 0 dealt 4 to the Hill Giant, which is lethal" (S.countOnBattlefieldByName (S.printingName hillGiant) S.bob settled) 0
+    Spec.assertEqWith s "mode 1 destroyed the Chromatic Sphere" (S.countOnBattlefieldByName (S.printingName sphere) S.bob settled) 0
+  -- The complement on the same board, differing only in the ANSWER: one mode owes
+  -- ONE {2}, so an engine charging for every mode the card prints rather than for
+  -- the modes chosen is caught here.
+  Spec.it s "CR 700.2h one mode costs {R} plus one {2}: three Mountains are tapped, and mode 0 never runs" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    derailment <- S.printingOf s registry "Explosive Derailment"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    let (gs, spellId, giantId, sphereId) = derailmentBoard mountain derailment hillGiant sphere 5
+        (_, after) = castAndResolve (derailments [1] giantId sphereId) gs spellId
+        settled = S.settleSba after
+    Spec.assertEqWith s "{R} plus mode 1's {2}: three Mountains are tapped" (S.tappedCount S.alice settled) 3
+    Spec.assertEqWith s "mode 1 destroyed the Chromatic Sphere" (S.countOnBattlefieldByName (S.printingName sphere) S.bob settled) 0
+    Spec.assertEqWith s "mode 0 never ran, so the Hill Giant is unharmed" (S.damageOf giantId settled) (Just 0)
+
+-- Fire Magic's three modes, in printed order (CR 700.2 /
+-- data/cards/fire-magic.json), each dealing its own damage to each creature:
+--   0. "{0} -- Fire Magic deals 1 damage to each creature."
+--   1. "{2} -- Fire Magic deals 2 damage to each creature."
+--   2. "{5} -- Fire Magic deals 3 damage to each creature."
+-- under CR 702.183a's tiered, which is the printed "Choose one --" plus CR
+-- 700.2h's per-mode costs. Three DIFFERENT costs, so a total that reads the wrong
+-- mode's cost cannot pass.
+--
+-- The board: alice has `lands` untapped Mountains and bob a Wall of Stone (0/8),
+-- whose eight toughness outlives every mode, so the damage each one marks is
+-- readable rather than inferred from a death.
+fireMagicBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+fireMagicBoard mountain fireMagic wallOfStone lands =
+  let (wallId, gs1) = S.addPermanent wallOfStone S.bob (S.landsInPlay mountain lands)
+      (gs, spellId) = S.handOne fireMagic gs1
+   in (gs, spellId, wallId)
+
+fireMagics :: Natural -> Prompt.Prompt r -> r
+fireMagics mode p = case p of
+  Prompt.ChooseModes {} -> Seq.singleton (ModeIndex.MkModeIndex mode)
+  _ -> S.identityAnswer p
+
+-- CR 702.183: tiered, spree's twin at one mode -- CR 700.2h again, where the cost
+-- differs per mode rather than being the same figure twice.
+tieredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tieredSpec s registry = Spec.describe s "Tiered" $ do
+  -- CR 118.5: mode 0's {0} is a real, payable cost and not the absence of one, so
+  -- the cast is the printed {R} and nothing more.
+  Spec.it s "CR 700.2h mode 0 costs {R} plus {0}: one Mountain is tapped, and the Wall takes 1" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    fireMagic <- S.printingOf s registry "Fire Magic"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, wallId) = fireMagicBoard mountain fireMagic wallOfStone 6
+        (_, after) = castAndResolve (fireMagics 0) gs spellId
+    Spec.assertEqWith s "{R} plus mode 0's {0}: one Mountain is tapped" (S.tappedCount S.alice after) 1
+    Spec.assertEqWith s "mode 0 dealt 1 to the Wall of Stone" (S.damageOf wallId after) (Just 1)
+  -- The same board and the same spell for mode 2, whose cost is {5}: six Mountains
+  -- rather than one, which is what tells the CHOSEN mode's cost from any other's.
+  Spec.it s "CR 700.2h mode 2 costs {R} plus {5}: all six Mountains are tapped, and the Wall takes 3" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    fireMagic <- S.printingOf s registry "Fire Magic"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, wallId) = fireMagicBoard mountain fireMagic wallOfStone 6
+        (_, after) = castAndResolve (fireMagics 2) gs spellId
+    Spec.assertEqWith s "{R} plus mode 2's {5}: all six Mountains are tapped" (S.tappedCount S.alice after) 6
+    Spec.assertEqWith s "mode 2 dealt 3 to the Wall of Stone" (S.damageOf wallId after) (Just 3)
+
 -- CR 702.33: kicker, the first OPTIONAL ADDITIONAL COST whose payoff is read back
 -- during resolution rather than settled while the spell is cast.
 kickerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -4058,6 +4185,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   modalCastSpec s registry
   entwineSpec s registry
   escalateSpec s registry
+  spreeSpec s registry
+  tieredSpec s registry
   kickerSpec s registry
   buybackSpec s registry
   auraTargetSpec s registry

@@ -343,6 +343,7 @@ vanillaFace name typeLine =
       Face.openingHandActions = [],
       Face.specialActions = [],
       Face.additionalCosts = [],
+      Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
@@ -2813,6 +2814,8 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
   Keyword.JobSelect -> []
+  Keyword.Spree -> []
+  Keyword.Tiered -> []
   -- CR 702.134a is payload-free too: the Filter its minted ability carries -- the
   -- target slot's -- is the ENGINE's, never a card's.
   Keyword.Mentor -> []

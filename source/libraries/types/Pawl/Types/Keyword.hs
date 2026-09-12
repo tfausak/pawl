@@ -550,6 +550,11 @@ data Keyword
     -- Lost on the Range), which Pawl.Engine.Plot.canPlot's Zone.Hand test refuses
     -- (#2091).
     Plot (Cost.Cost Keyword)
+  | -- | 702.172a: "Choose one or more modes. As an additional cost to cast this
+    -- spell, pay the costs associated with those modes." Payload-free: the
+    -- selection is the card's Pawl.Types.ModeSelection and the per-mode costs are
+    -- CR 700.2h's Pawl.Types.Face.modeCosts.
+    Spree
   | -- | 702.175a: "You may pay an additional [cost] as you cast this spell", and
     -- an enters trigger making a 1\/1 token copy if it was paid.
     Offspring (Cost.Cost Keyword)
@@ -560,6 +565,10 @@ data Keyword
   | -- | 702.182a: "When this Equipment enters, create a 1\/1 colorless Hero
     -- creature token, then attach this Equipment to it."
     JobSelect
+  | -- | 702.183a: "Choose one. As an additional cost to cast this spell, pay the
+    -- cost associated with that mode." Spree's twin at one mode, and payload-free
+    -- for its reason.
+    Tiered
   | -- | 701.43d: "you may exert this creature as it attacks" is an optional cost
     -- to attack (CR 508.1g), read by Pawl.Engine.Combat.declareAttackers.
     --

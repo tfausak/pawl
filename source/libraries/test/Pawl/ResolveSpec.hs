@@ -3693,6 +3693,7 @@ subgameSpellOn borrowed name effects gs0 =
             Face.openingHandActions = [],
             Face.specialActions = [],
             Face.additionalCosts = [],
+            Face.modeCosts = Map.empty,
             Face.maximumX = [],
             Face.alternativeCosts = [],
             Face.costReductions = [],

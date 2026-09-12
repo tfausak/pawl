@@ -55,6 +55,7 @@ bareFace n =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
