@@ -257,11 +257,11 @@ tokenBoxQuantities card =
 -- Quantity (riderQuantities above). Each read singly -- CR 509.4 names one
 -- attacking creature, CR 702.49c one returned creature.
 --
--- BOTH opcodes reach it, and both apply it: a Create hands its tokens to
--- Pawl.Engine.Combat.putOntoBattlefieldBlocking from the minting loop (Flash
--- Foliage), a MoveToZone hands the card it moved to the same function from
--- moveOne (Aetherplasm). What stays inert is the rider on a destination other
--- than the battlefield, which Pawl.CardSpec lints.
+-- ALL THREE opcodes reach it, and all three apply it: a Create hands its tokens
+-- to Pawl.Engine.Combat.putOntoBattlefieldBlocking from the minting loop (Flash
+-- Foliage), a CreateCopy its copies (Mirror Match), and a MoveToZone the card it
+-- moved, from moveOne (Aetherplasm). What stays inert is the rider on a
+-- destination other than the battlefield, which Pawl.CardSpec lints.
 riderSlots :: EntryRiders.EntryRiders count -> Map.Map SlotName SlotArity
 riderSlots riders =
   let attacked = case EntryRiders.attacking riders of
@@ -1952,7 +1952,9 @@ boundSlots effect = case effect of
   Effect.Shuffle {} -> Set.empty
   Effect.OfferCast {} -> Set.empty
   Effect.GrantPlayFromExile {} -> Set.empty
-  -- The loop's member slot, plus every name the BODY authors.
+  -- The loop's member slot, plus every name the BODY authors -- which the loop
+  -- really does leave bound once it is over, to the union across its members
+  -- (Pawl.Engine.Resolve.Effect's arm).
   Effect.ForEach (ForEach.MkForEach _ slot body) -> Set.insert slot (foldMap boundSlots body)
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take

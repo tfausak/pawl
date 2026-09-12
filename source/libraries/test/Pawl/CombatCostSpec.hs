@@ -1347,6 +1347,41 @@ battlefieldNamed :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameStat
 battlefieldNamed wanted pid gs =
   filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just wanted) (Game.zoneMembers Zone.Battlefield pid gs)
 
+-- alice attacks with a Palace Guard (1/4) and a Foriysian Brigade (2/4); bob
+-- defends with NO creature and holds Mirror Match plus the six Islands that pay
+-- its {4}{U}{U}. Returns the two attackers.
+--
+-- No blocker for bob removes the declaration route, so nothing on this board can
+-- confer blocking status except the spell -- foliageBoard's reason. Both
+-- attackers have TOUGHNESS ABOVE POWER, which is what keeps the tokens alive
+-- through the combat damage step: a copy blocking its own original trades equal
+-- damage in both directions, and a 1/4 or a 2/4 survives it. A token that died
+-- in combat would make the end-of-combat exile unobservable (CR 111.7).
+--
+-- DIFFERENT POWER (1 and 2), so bob's life at end of combat tells every partial
+-- reading apart: 20 with both attackers blocked, 19 with only the Brigade
+-- blocked, 18 with only the Guard, 17 with neither.
+mirrorMatchBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, [ObjectId.ObjectId])
+mirrorMatchBoard island guard brigade mirror =
+  let (gs0, ours, _) = S.combatBoardOf [guard, brigade] []
+      lands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) gs0 [1 :: Int, 2, 3, 4, 5, 6]
+      (_, withCard) = S.addHandCard mirror S.bob lands
+   in (withCard, ours)
+
+-- Decline every block -- bob has nothing to declare -- and cast whatever is
+-- castable, which on this board is Mirror Match alone. The spell takes no
+-- target, so nothing here pins a recipient.
+castMirrorMatch :: Prompt.Prompt r -> r
+castMirrorMatch p = case p of
+  Prompt.ChooseAction {} -> S.castAnswer p
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
 -- CR 509.4: "If a creature is put onto the battlefield blocking, its controller
 -- chooses which attacking creature it's blocking as it enters the battlefield
 -- (unless the effect that put it onto the battlefield specifies what it's
@@ -1737,6 +1772,56 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         -- Golem above is the assertion that separates them.
         Spec.assertEqWith s "control: and the Sentry destroyed itself, as its own text says" (length (battlefieldNamed sentryName S.bob declared)) 0
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker on each board"
+  -- CR 509.4 over Effect.CreateCopy rather than Effect.Create, and CR 608.2f's
+  -- loop over the whole batch, on one board.
+  --
+  -- Mirror Match {4}{U}{U} INSTANT -- "Cast this spell only during the declare
+  -- blockers step. / For each creature attacking you or a planeswalker you
+  -- control, create a token that's a copy of that creature and that's blocking
+  -- that creature. / Exile those tokens at end of combat." (Scryfall,
+  -- 2026-09-12.)
+  --
+  -- TWO attackers is the rule, not decoration. The blocking rider is read per
+  -- iteration and the slot it names is the loop's own member, so one attacker
+  -- would not tell the rider from a token attached to whatever came first --
+  -- and "those tokens" is a reference to the whole batch, which one token
+  -- cannot distinguish from one iteration's own.
+  Spec.it s "CR 509.4 / 608.2f whole card: Mirror Match blocks every attacker with its own copy, and exiles them all" $ do
+    island <- S.printingOf s registry "Island"
+    guardP <- S.printingOf s registry "Palace Guard"
+    brigadeP <- S.printingOf s registry "Foriysian Brigade"
+    mirror <- S.printingOf s registry "Mirror Match"
+    case mirrorMatchBoard island guardP brigadeP mirror of
+      (gs, [guard, brigade]) -> do
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            -- The same answerer three times: stopped before combat damage, where
+            -- the tokens are alive and the combat record reads against them; at
+            -- the end of combat step, where the life totals are; and past it,
+            -- where the delayed ability has resolved.
+            blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) castMirrorMatch atBlockers
+            atEnd = runToEndOfCombat castMirrorMatch atBlockers
+            after = S.runToStep Phase.PostcombatMain castMirrorMatch atBlockers
+            liveTokens g = filter (`S.onBattlefield` g) (S.tokensOf g)
+        Spec.assertEqWith s "the leg hands over at the declare blockers step, which is the only window the spell may be cast in" (GameState.phase atBlockers) (Phase.Combat CombatStep.DeclareBlockers)
+        -- GAMEPLAY FIRST: neither attacker's damage reached bob, so BOTH
+        -- iterations put their token onto the battlefield blocking the creature
+        -- that iteration copied.
+        Spec.assertEqWith s "CR 509.4 / 510.1c: both attackers were blocked by their own copy, so neither the Guard's 1 nor the Brigade's 2 reached bob" (S.lifeOf S.bob atEnd) (Just 20)
+        -- CR 608.2f's batch, at gameplay level: the delayed ability named EVERY
+        -- token the loop minted, not the last iteration's alone.
+        Spec.assertEqWith s "CR 603.7 / 608.2f: \"those tokens\" is the whole batch, so the end of combat step leaves none of them on the battlefield" (length (liveTokens after)) 0
+        -- Anti-vacuity for the exile: the tokens were alive going into the end
+        -- of combat step, so their absence after it is the delayed ability
+        -- rather than CR 704.5g or a spell that minted nothing.
+        Spec.assertEqWith s "both tokens survived combat damage, so the exile is what removed them" (length (liveTokens atEnd)) 2
+        Spec.assertEqWith s "CR 707.1: one copy per attacker, and no more" (length (liveTokens blocking)) 2
+        Spec.assertEqWith s "CR 509.4: the Guard is blocked by exactly one creature" (length (liveBlockersOf guard blocking)) 1
+        Spec.assertEqWith s "and so is the Brigade, by a different one" (length (liveBlockersOf brigade blocking)) 1
+        Spec.assertEqWith s "CR 509.4: and between them the blockers are the two tokens, so neither token blocks both" (Set.fromList (liveBlockersOf guard blocking <> liveBlockersOf brigade blocking)) (Set.fromList (liveTokens blocking))
+        -- CR 509.4b: nothing was declared, on the board the tokens are blocking.
+        Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events atEnd))) "CR 509.4: no blocker was declared on this board"
+        Spec.assertBool s (S.onBattlefield guard atEnd && S.onBattlefield brigade atEnd) "and both attackers survived their copy's damage, which is what keeps the tokens alive to be exiled"
+      _ -> Spec.assertFailure s "fixture should have two attackers"
 
 -- CR 506.7b's window, "only during combat after blockers are declared", proved
 -- step by step on ONE board.

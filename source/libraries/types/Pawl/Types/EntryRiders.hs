@@ -46,9 +46,9 @@ import qualified Pawl.Types.TapState as TapState
 -- "unless the effect that put it onto the battlefield specifies what it's
 -- blocking" -- is the case every printing of this shape is in: Flash Foliage
 -- names a target and Aetherplasm names a trigger's binding, both in the pool;
--- Brimaz, King of Oreskos names a trigger's binding too and Mirror Match names
--- the attacker it copied, neither pooled. So the field names the
--- SLOT the effect specified, and the engine never asks. A Bool plus a prompt
+-- Mirror Match names the attacker it copied, over a CreateCopy, and Brimaz,
+-- King of Oreskos names a trigger's binding too and is not pooled. So the
+-- field names the SLOT the effect specified, and the engine never asks. A Bool plus a prompt
 -- would put a question to the player that the effect has already answered.
 --
 -- Not implemented: CR 509.4's unspecified form, where the creature's controller
@@ -59,11 +59,13 @@ import qualified Pawl.Types.TapState as TapState
 -- Applied by Pawl.Engine.Combat.putOntoBattlefieldBlocking, which is where CR
 -- 506.3e and CR 509.4a's two no-op conditions live and where CR 509.4b's
 -- exemption from the declaration's requirements and restrictions is what NOT
--- asking canBlock amounts to. READ BY BOTH opcodes, like `counters` below: a
--- Create hands its tokens to that function from the minting loop (Flash
--- Foliage), a MoveToZone hands the card it moved to it from moveOne
+-- asking canBlock amounts to. READ BY ALL THREE opcodes: a Create hands its
+-- tokens to that function from the minting loop (Flash
+-- Foliage), a CreateCopy hands its copies to it from the same place (Mirror
+-- Match's "a token that's a copy of that creature and that's blocking that
+-- creature"), and a MoveToZone hands the card it moved to it from moveOne
 -- (Aetherplasm's "put a creature card from your hand onto the battlefield
--- blocking that creature"). Nothing in CR 509.4 privileges either door -- the
+-- blocking that creature"). Nothing in CR 509.4 privileges any door -- the
 -- rule is worded "put onto the battlefield", which a card does as much as a
 -- token. Pawl.CardSpec's corpus lint fences the DESTINATION instead: on any zone
 -- but the battlefield the rider says something nothing reads.

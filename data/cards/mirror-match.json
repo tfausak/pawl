@@ -1,0 +1,169 @@
+{
+  "faces": [
+    {
+      "castingRestrictions": [
+        {
+          "type": "DuringPhase",
+          "value": {
+            "scope": {
+              "type": "EachTurn"
+            },
+            "window": {
+              "type": "Step",
+              "value": {
+                "type": "Combat",
+                "value": {
+                  "type": "DeclareBlockers"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "delayedAbilities": {
+        "exile those tokens": {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Combat",
+                "value": {
+                  "type": "EndOfCombat"
+                }
+              },
+              "scope": {
+                "type": "EachTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "token"
+                          },
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Mirror Match",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ForEach",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "CreateCopy",
+                          "value": {
+                            "ref": {
+                              "type": "InSlot",
+                              "value": "attacker"
+                            },
+                            "riders": {
+                              "blocking": "attacker"
+                            },
+                            "slot": "token"
+                          }
+                        }
+                      ],
+                      "ref": {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "Or",
+                              "value": [
+                                {
+                                  "type": "IsAttackingPlayer",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                {
+                                  "type": "IsAttackingPlaneswalker",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "slot": "attacker"
+                    }
+                  },
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": {
+                      "name": "exile those tokens"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
