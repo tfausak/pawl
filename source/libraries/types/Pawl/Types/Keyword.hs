@@ -629,6 +629,12 @@ data Keyword
     -- the card rather than casting it and so needs a land-play permission
     -- (#3645).
     Mayhem (Cost.Cost Keyword)
+  | -- | 702.35a: "madness [cost]" -- two abilities. The static one replaces a
+    -- discard of this card with an exile
+    -- (Pawl.Engine.Keyword.handReplacementsOf); the triggered one then offers
+    -- its owner the cast for [cost], or the graveyard
+    -- (Pawl.Engine.Keyword.exileTriggeredAbilitiesOf).
+    Madness (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

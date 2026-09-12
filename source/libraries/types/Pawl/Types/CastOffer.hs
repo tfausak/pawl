@@ -32,9 +32,9 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 -- CR 118.9a allows a spell only ONE alternative cost, so the two cost riders are
 -- never both meaningful at once; Pawl.Engine.Resolve.Effect.offerCast reads
 -- `withoutPayingManaCost` first, and no producer sets both. Rule 702.94a's
--- miracle is what sets this one, carried here rather than on the card for this
--- type's own reason: the cost is not a characteristic, and the same card cast
--- any other way pays what it prints.
+-- miracle and rule 702.35a's madness are what set this one, carried here rather
+-- than on the card for this type's own reason: the cost is not a characteristic,
+-- and the same card cast any other way pays what it prints.
 data CastOffer = MkCastOffer
   { transformed :: Bool,
     withoutPayingManaCost :: Bool,
@@ -67,7 +67,8 @@ data CastOffer = MkCastOffer
     restriction :: Maybe (Filter.Filter Keyword.Keyword),
     -- | CR 601.2b: the keyword ability whose cost this offer states, or Nothing
     -- for an offer no keyword ability is behind -- which is every offer but rule
-    -- 702.62a's third ability. Pawl.Engine.Resolve.Effect.offerCast writes it
+    -- 702.62a's third ability and rule 702.35a's second.
+    -- Pawl.Engine.Resolve.Effect.offerCast writes it
     -- onto the candidate it builds, so it reaches Pawl.Types.Object's castUsing
     -- as any printed alternative's tag does.
     --

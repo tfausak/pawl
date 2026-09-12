@@ -232,4 +232,7 @@ data KeywordFamily
   | -- | CR 702.187b: mayhem [cost]. No card in the pool asks yet, and it is owed
     -- at the keyword rather than at the first asker.
     Mayhem
+  | -- | CR 702.35a: madness [cost]. No card in the pool asks yet, and it is owed
+    -- at the keyword rather than at the first asker.
+    Madness
   deriving (Bounded, Enum, Eq, Ord, Show)
