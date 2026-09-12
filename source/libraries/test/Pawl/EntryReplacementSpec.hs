@@ -468,7 +468,7 @@ bloodthirstSpec s registry =
         S.runPure
           S.identityAnswer
           gs
-          (Damage.applyDamage [DamageEvent.MkDamageEvent src target amount False False False 0 Nothing DamageKind.Noncombat])
+          (Damage.applyDamage [DamageEvent.MkDamageEvent src target amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
       enters = castAndResolve S.aggressiveAnswer
       vampireIn = newestNamed (CardName.MkCardName $ Text.pack "Bloodrage Vampire")
       woodKinIn = newestNamed (CardName.MkCardName $ Text.pack "Petrified Wood-Kin")
@@ -1034,7 +1034,7 @@ stuffyDollSpec s registry =
       -- DamageDealt entries, the settle puts what they triggered on the stack
       -- (CR 603.3), and the priority loop resolves it.
       dealing events gs = resolveAll (settleAll (S.runPure S.identityAnswer gs (Damage.applyDamage events)))
-      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing DamageKind.Noncombat
+      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       lives g = (S.lifeOf S.alice g, S.lifeOf S.bob g, S.lifeOf S.carol g)
       chosenOn oid g = Game.lookupObject oid g >>= Object.chosenPlayer
       -- alice casts the Doll off five Mountains on a three-seat board and answers

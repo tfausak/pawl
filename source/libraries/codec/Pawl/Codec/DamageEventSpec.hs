@@ -1,5 +1,6 @@
 module Pawl.Codec.DamageEventSpec where
 
+import qualified Data.Set as Set
 import qualified Pawl.Codec.DamageEvent as DamageEvent
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -8,13 +9,15 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
   -- A NONZERO toxic value, so the CR 702.164b rider round-trips rather than
   -- getting defaulted past, and CR 702.80b's wither bit set so it round-trips as
   -- a present key too. No lifelink, no infect, so dealtByInfect and
-  -- dealtByLifelink are both omitted keys.
+  -- dealtByLifelink are both omitted keys. CR 702.76a's and CR 702.173a's three
+  -- deal-time reads are all set away from their defaults for the same reason.
   Spec.it s "MkDamageEvent, dealt to a player" $
     Common.assertCodec
       s
@@ -28,9 +31,12 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.dealtByWither = True,
           DamageEvent.dealtByToxic = 2,
           DamageEvent.dealtByLifelink = Nothing,
+          DamageEvent.dealtByController = Just (PlayerId.MkPlayerId 4),
+          DamageEvent.dealtByCreatureTypes = Set.singleton Subtype.Rogue,
+          DamageEvent.dealtByCommander = True,
           DamageEvent.kind = DamageKind.Combat
         }
-      " {\"source\":1,\"target\":{\"type\":\"ToPlayer\",\"value\":2},\"amount\":3,\"dealtByDeathtouch\":true,\"dealtByWither\":true,\"dealtByToxic\":2,\"kind\":{\"type\":\"Combat\"}} "
+      " {\"source\":1,\"target\":{\"type\":\"ToPlayer\",\"value\":2},\"amount\":3,\"dealtByDeathtouch\":true,\"dealtByWither\":true,\"dealtByToxic\":2,\"dealtByController\":4,\"dealtByCreatureTypes\":[{\"type\":\"Rogue\"}],\"dealtByCommander\":true,\"kind\":{\"type\":\"Combat\"}} "
   -- CR 120.3c's recipient tag and CR 608's noncombat damage are each the other
   -- arm of their type. CR 702.15b's lifelink payee is a concrete PlayerId.
   Spec.it s "MkDamageEvent, dealt to a planeswalker, with lifelink" $
@@ -46,6 +52,9 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.dealtByWither = False,
           DamageEvent.dealtByToxic = 0,
           DamageEvent.dealtByLifelink = Just (PlayerId.MkPlayerId 2),
+          DamageEvent.dealtByController = Nothing,
+          DamageEvent.dealtByCreatureTypes = Set.empty,
+          DamageEvent.dealtByCommander = False,
           DamageEvent.kind = DamageKind.Noncombat
         }
       " {\"source\":1,\"target\":{\"type\":\"ToPlaneswalker\",\"value\":5},\"amount\":4,\"dealtByInfect\":true,\"dealtByLifelink\":2,\"kind\":{\"type\":\"Noncombat\"}} "
@@ -64,6 +73,9 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.dealtByWither = False,
           DamageEvent.dealtByToxic = 0,
           DamageEvent.dealtByLifelink = Nothing,
+          DamageEvent.dealtByController = Nothing,
+          DamageEvent.dealtByCreatureTypes = Set.empty,
+          DamageEvent.dealtByCommander = False,
           DamageEvent.kind = DamageKind.Combat
         }
       " {\"source\":1,\"target\":{\"type\":\"ToPlayer\",\"value\":2},\"amount\":3,\"kind\":{\"type\":\"Combat\"}} "

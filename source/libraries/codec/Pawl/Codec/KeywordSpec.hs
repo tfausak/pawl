@@ -358,6 +358,11 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
     Common.assertCodec s Keyword.codec (Keyword.Surge cost) " {\"type\":\"Surge\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Common.assertCodec s Keyword.codec (Keyword.Spectacle cost) " {\"type\":\"Spectacle\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+  -- CR 702.76a and CR 702.173a carry a whole Cost each, under tags of their own.
+  Spec.it s "Prowl and Freerunning carry their costs" $ do
+    let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
+    Common.assertCodec s Keyword.codec (Keyword.Prowl cost) " {\"type\":\"Prowl\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Common.assertCodec s Keyword.codec (Keyword.Freerunning cost) " {\"type\":\"Freerunning\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
   -- CR 702.157a and CR 702.175a carry a whole Cost each, under tags of their own.
   Spec.it s "Squad and Offspring carry their costs" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []

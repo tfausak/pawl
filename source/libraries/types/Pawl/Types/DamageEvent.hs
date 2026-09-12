@@ -1,10 +1,12 @@
 module Pawl.Types.DamageEvent where
 
+import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 
 -- | One instance of damage: a source dealt `amount` to `target`. The first reader
 -- is deathtouch's CR 704.5h SBA, which asks `dealtByDeathtouch`.
@@ -52,6 +54,30 @@ data DamageEvent = MkDamageEvent
     --
     -- Read for EVERY damage event and not just combat ones (CR 702.15d).
     dealtByLifelink :: Maybe PlayerId.PlayerId,
+    -- | CR 702.76a / 702.173a: WHO controlled the source when this damage was
+    -- dealt, or Nothing when nobody did. Both rules ask about a source that "at
+    -- the time it dealt that damage, was under your control", so the answer has
+    -- to be captured here rather than re-asked when the alternative cost is
+    -- priced -- by then the creature that connected may be dead, stolen, or
+    -- neither. Read by Pawl.Engine.Game.prowlDamageThisTurn and
+    -- freerunningDamageThisTurn.
+    dealtByController :: Maybe PlayerId.PlayerId,
+    -- | CR 702.76a: the source's CREATURE TYPES when this damage was dealt --
+    -- rule 702.76a's "had any of this spell's creature types" -- and CR 702.173a's
+    -- "was an Assassin", which is the same read. Captured at deal time for
+    -- dealtByController's reason; CR 613.1d's layer changes them, so a creature
+    -- that has since lost or gained a type must not be able to rewrite what it
+    -- did.
+    --
+    -- CREATURE types alone, filtered by Subtype.isCreatureType: rule 702.76a
+    -- names no other kind, and a source's land or artifact types have no bearing
+    -- on either gate.
+    dealtByCreatureTypes :: Set.Set Subtype.Subtype,
+    -- | CR 702.173a: whether the source was a COMMANDER (CR 903.3) when this
+    -- damage was dealt. Captured for dealtByController's reason -- the live
+    -- reader Pawl.Engine.Commander.isCommander answers False for an id that
+    -- names nothing, which would silently drop a commander that died in combat.
+    dealtByCommander :: Bool,
     -- | CR 510 vs CR 608: combat damage or not. Set at deal time -- Damage tags
     -- Combat, Resolve's DealDamage tags Noncombat. Read by Replacement.applies's
     -- DamageR arm (CR 615.1's damage pattern).

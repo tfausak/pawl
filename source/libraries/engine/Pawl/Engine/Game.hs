@@ -22,6 +22,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Discarded as Discarded
 import Pawl.Types.Face (Face)
 import qualified Pawl.Types.Face as Face
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -2070,6 +2072,58 @@ opponentLostLifeThisTurn pid gs =
         GameEvent.LifeLost change -> areOpponents gs pid (LifeChange.player change)
         _ -> False
    in any (lostIt . LoggedEvent.event) (GameState.events gs)
+
+-- CR 702.76a / 608.2i: was a player dealt combat damage this turn by a source
+-- that was then under this player's control and had any of these creature types?
+-- opponentLostLifeThisTurn's shape over the damage log, and the reader is
+-- Pawl.Engine.Cost.candidateCostsGiven's prowl offer, which passes the SPELL's
+-- creature types (rule 702.76a's "any of this spell's creature types").
+--
+-- Every clause is read off the DamageEvent's deal-time riders rather than off
+-- the board now, which is rule 702.76a's own "at the time it dealt that damage".
+-- Pawl.Types.DamageEvent says why they are captured there.
+--
+-- `pid` exactly and not the team, which is rule 702.76a's "your control"; rule
+-- 702.117a's "or one of your teammates" is the wording that would have widened
+-- it, and prowl does not print it.
+--
+-- CR 120.8's zero fence rides in for free: the recipient is read through
+-- damagedPlayer, whose damageDealt fold drops an event of 0, so damage that was
+-- not dealt at all cannot turn a prowl cost on.
+prowlDamageThisTurn :: PlayerId -> Set.Set Subtype.Subtype -> GameState -> Bool
+prowlDamageThisTurn pid types gs =
+  let prowled logged = case LoggedEvent.event logged of
+        GameEvent.DamageDealt ev ->
+          DamageEvent.kind ev == DamageKind.Combat
+            && Maybe.isJust (damagedPlayer (LoggedEvent.event logged))
+            && DamageEvent.dealtByController ev == Just pid
+            && not (Set.disjoint types (DamageEvent.dealtByCreatureTypes ev))
+        _ -> False
+   in any prowled (GameState.events gs)
+
+-- CR 702.173a / 608.2i: prowlDamageThisTurn's twin, whose clause asks for an
+-- Assassin or a commander rather than for the spell's own creature types. The
+-- reader is Pawl.Engine.Cost.candidateCostsGiven's freerunning offer.
+--
+-- Rule 702.173a's "under your control" governs BOTH halves -- an Assassin you
+-- control or a commander you control -- which is what the printed reminder text
+-- says in its own words ("with an Assassin or commander"), so the controller
+-- test sits ahead of the disjunction rather than inside one arm.
+--
+-- Rule 702.173a says "by a CREATURE" where rule 702.76a says "by a source", and
+-- nothing here re-asks it: CR 510.1a has only attacking and blocking creatures
+-- assign combat damage, so a combat DamageEvent's source was a creature when it
+-- dealt it. There is no rider for a question no legal board can answer no.
+freerunningDamageThisTurn :: PlayerId -> GameState -> Bool
+freerunningDamageThisTurn pid gs =
+  let freeran logged = case LoggedEvent.event logged of
+        GameEvent.DamageDealt ev ->
+          DamageEvent.kind ev == DamageKind.Combat
+            && Maybe.isJust (damagedPlayer (LoggedEvent.event logged))
+            && DamageEvent.dealtByController ev == Just pid
+            && (Set.member Subtype.Assassin (DamageEvent.dealtByCreatureTypes ev) || DamageEvent.dealtByCommander ev)
+        _ -> False
+   in any freeran (GameState.events gs)
 
 -- CR 120.1 / 608.2i: was this PLAYER dealt damage this turn? The log fold
 -- damagedPlayer exists for, written once here because two callers ask it --

@@ -2627,6 +2627,9 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.117a and CR 702.137a: the surge and spectacle costs, flashback's shape.
   Keyword.Surge cost -> costFilters cost
   Keyword.Spectacle cost -> costFilters cost
+  -- CR 702.76a and CR 702.173a: the prowl and freerunning costs, flashback's shape.
+  Keyword.Prowl cost -> costFilters cost
+  Keyword.Freerunning cost -> costFilters cost
   -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
   -- flashback's may.
   Keyword.Bestow cost -> costFilters cost

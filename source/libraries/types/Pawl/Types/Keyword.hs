@@ -288,6 +288,11 @@ data Keyword
     -- the permanent that exiled it. CR 702.75b's "enters tapped" is that rule's
     -- errata on the older cards rather than part of the keyword.
     Hideaway Natural.Natural
+  | -- | 702.76a: prowl [cost] -- you may pay [cost] rather than this spell's mana
+    -- cost if a player was dealt combat damage this turn by a source that was
+    -- then under your control and had any of this spell's creature types, which
+    -- CR 601.2b and CR 601.2f-h price as an alternative cost.
+    Prowl (Cost.Cost Keyword)
   | -- | 702.77a: reinforce N-[cost] -- "[Cost], Discard this card: Put N +1/+1
     -- counters on target creature", functioning only while the card is in a
     -- player's hand.
@@ -565,6 +570,11 @@ data Keyword
   | -- | 702.175a: "You may pay an additional [cost] as you cast this spell", and
     -- an enters trigger making a 1\/1 token copy if it was paid.
     Offspring (Cost.Cost Keyword)
+  | -- | 702.173a: freerunning [cost] -- you may pay [cost] rather than this
+    -- spell's mana cost if a player was dealt combat damage this turn by a
+    -- creature that was then an Assassin or a commander under your control,
+    -- which CR 601.2b and CR 601.2f-h price as an alternative cost.
+    Freerunning (Cost.Cost Keyword)
   | -- | 702.179a: a static ability whose whole content is CR 704.5aa's
     -- state-based action, read off the projection by Pawl.Engine.Sba rather than
     -- minted.

@@ -1980,7 +1980,7 @@ representativeEvents cond =
       moved from to = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics)
       combatDamage =
         GameEvent.DamageDealt
-          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
+          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)
       -- A row whose arm reads no arrival table, which is every arm but one.
       noTable e = (Map.empty, e)
       one e = noTable e NonEmpty.:| []
@@ -2005,8 +2005,8 @@ representativeEvents cond =
         -- condition is the one damage arm that admits both: a floor claimed for
         -- one kind and not the other would come apart here.
         TriggerCondition.SelfIsDealtDamage ->
-          noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 2 False False False 0 Nothing DamageKind.Noncombat))
-            NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 3 False False False 0 Nothing DamageKind.Combat))]
+          noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 2 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat))
+            NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 3 False False False 0 Nothing Nothing mempty False DamageKind.Combat))]
         -- The same event read by a bystander, and the only one this condition
         -- admits.
         TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> one combatDamage

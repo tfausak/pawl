@@ -1233,7 +1233,7 @@ etbResolved oid gs =
 -- damage to bob, who must be the monarch for the inherent ability to match.
 damageToTheMonarch :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 damageToTheMonarch attacker gs =
-  let dmg = DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat
+  let dmg = DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat
       withEvent = S.withEvents [GameEvent.DamageDealt dmg] gs
    in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
 

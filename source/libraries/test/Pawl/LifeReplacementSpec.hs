@@ -263,7 +263,7 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
           S.runPure
             S.identityAnswer
             base
-            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Noncombat])
+            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
     Spec.assertEqWith s "CR 119.4 the payment bypasses Worship's floor: 2 - 2 = 0" (S.lifeOf S.alice paid) (Just 0)
     Spec.assertEqWith s "CR 120.4c the same board's DAMAGE is still floored at 1" (S.lifeOf S.alice damaged) (Just 1)
   -- CR 120.4c is untouched by this unit, and this is the case that says so: the
@@ -278,7 +278,7 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
           S.runPure
             S.identityAnswer
             g2
-            (Damage.applyDamage [DamageEvent.MkDamageEvent source (Recipient.ToPlayer S.bob) 3 False False False 0 Nothing DamageKind.Noncombat])
+            (Damage.applyDamage [DamageEvent.MkDamageEvent source (Recipient.ToPlayer S.bob) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
     Spec.assertEqWith s "3 damage costs bob 6 life, not the 12 a second application would" (S.lifeOf S.bob after) (Just 14)
     Spec.assertEqWith s "CR 120.4b the damage event itself is undiminished" (fmap DamageEvent.amount (S.damageEventsOf after)) [3]
   -- CR 119.5: "If an effect sets a player's life total to a specific number, the
@@ -909,7 +909,7 @@ ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 
           S.runPure
             S.identityAnswer
             stocked
-            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Noncombat])
+            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
     Spec.assertEqWith s "CR 120.4c alice loses the damage as life: 20 - 3 = 17" (S.lifeOf S.alice after) (Just 17)
     Spec.assertEqWith s "and her library, long enough to have covered it, is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "with nothing exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0

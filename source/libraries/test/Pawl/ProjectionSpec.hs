@@ -700,7 +700,7 @@ dealTo src victim amount gs =
     ( S.runPure
         S.identityAnswer
         gs
-        (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) amount False False False 0 Nothing DamageKind.Noncombat])
+        (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
     )
 
 -- Serra the Benevolent {2}{W}{W} Legendary Planeswalker -- Serra, loyalty 4.
@@ -754,7 +754,7 @@ dealToPlayer src victim amount gs =
     ( S.runPure
         S.identityAnswer
         gs
-        (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToPlayer victim) amount False False False 0 Nothing DamageKind.Noncombat])
+        (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToPlayer victim) amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
     )
 
 -- CR 702.16's quality: red, the colour Goblin Piker is and Cabal Evangel is not.
