@@ -1557,9 +1557,41 @@ countersOn :: CounterKind.CounterKind Keyword.Type.Keyword -> ObjectId -> GameSt
 countersOn kind oid gs =
   maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
 
+-- CR 601.2a: is this object the card whose cast is being PROPOSED right now? The
+-- card is put onto the stack before CR 601.2f determines the total cost and CR
+-- 601.2h pays it, so no pool a payability gate reads may count it -- neither the
+-- hand a mana source's own cost would spend nor the graveyard the spell's own
+-- cost would exile.
+--
+-- Read off the STAMP rather than taken as an argument, which is what lets one
+-- reading serve both: Pawl.Engine.Cast.asProposed writes castFrom one step ahead
+-- of the move and every offer gate measures the board it returns, so an object
+-- whose stamp names the zone it is STILL IN is exactly one CR 601.2a has yet to
+-- move -- whether the cost being measured is the spell's own or some mana
+-- source's. Nothing else in a game satisfies it: after the move the stack
+-- incarnation's zone is Stack and its stamp is the zone it left, and CR 400.7
+-- mints every other arrival a fresh incarnation with the field cleared.
+--
+-- An ACTIVATION stamps nothing, which is what keeps CR 602.2a's source in the
+-- pool its own cost draws on: an ability activated from a graveyard leaves its
+-- source there, a legal candidate for its own cost, and no reading of this can
+-- reach it.
+--
+-- Pawl.CostSpec's "CR 601.2a the cast is not offered: the Arbiter is not fuel for
+-- the Bloom" and Pawl.CastSpec's "CR 601.2a with two other cards the cast is not
+-- offered" are the two that prove it.
+beingCast :: GameState -> ObjectId -> Bool
+beingCast gs candidate = case Game.lookupObject candidate gs of
+  Nothing -> False
+  Just object -> Object.castFrom object == Just (Object.zone object)
+
 -- The cards this player may discard to pay a cost on `oid`: their hand, in its
 -- own order, narrowed by the criterion and minus `oid` itself -- see
 -- canPayComponent's DiscardCards arm for why that exclusion is CR 601.2a.
+--
+-- And minus the card being CAST, which is the same rule reaching an object this
+-- cost is not on: a mana source paying for a spell may not spend the spell
+-- (`beingCast`).
 --
 -- `slots` is what the announcement bound (announcedSlots), which every pool
 -- below takes for the same reason: CR 601.2c chooses the targets before CR
@@ -1577,7 +1609,7 @@ discardCandidates slots pid oid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
-   in filter (\candidate -> candidate /= oid && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
+   in filter (\candidate -> candidate /= oid && not (beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
 
 -- The cards this player may put onto the battlefield to pay a CR 118.12
 -- PutCardFromHandOntoBattlefield component on `oid`: discardCandidates' pool,
@@ -1625,20 +1657,18 @@ revealFromHandCandidates = discardCandidates
 -- this pool has a face: CR 111.7 with CR 704.5d makes a token in a graveyard
 -- cease to exist, and an ability exists only on the stack (CR 113.7a).
 --
--- No `oid` exclusion, unlike discardCandidates above. At PAYMENT time none is
--- owed, CR 601.2a having put the spell being cast on the STACK, and none can be
--- added unconditionally either: CR 602.2a leaves an ability activated FROM a
--- graveyard with its source still there, a legal candidate for its own cost.
---
--- Not implemented: the exclusion the two callers that ask BEFORE that move need --
--- canPayComponent, CR 118.3's gate on the offer, and claimOf -- which count
--- Loathsome Chimera among the cards its own escape cost could exile (#3604).
+-- No `oid` exclusion, unlike discardCandidates above: CR 602.2a leaves an ability
+-- activated FROM a graveyard with its source still there, a legal candidate for
+-- its own cost. What is excluded instead is the card being CAST (`beingCast`),
+-- which is the exclusion the callers asking BEFORE CR 601.2a's move need and the
+-- only one CR 601.2a states -- Loathsome Chimera is not among the cards its own
+-- escape cost can exile.
 exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates slots pid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
-   in filter matches (Game.zoneMembers Zone.Graveyard pid gs)
+   in filter (\candidate -> not (beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Graveyard pid gs)
 
 -- The one card an ExileTopFromGraveyard component takes: the TOP matching card
 -- of this player's graveyard, or Nothing where it holds none.
@@ -1806,10 +1836,9 @@ claimOf slots pid oid component gs =
         -- Bloom's cost has no mana part, so `repeatsOf` reads this claim to decide how
         -- many times the ability can be activated, which is the hand's size.
         --
-        -- The pool excludes only the object the COST is on, so a spell being offered
-        -- counts as fuel for the source that would pay for it -- CR 601.2a has moved it
-        -- to the stack by the time CR 601.2h pays, and this reading is one card too
-        -- generous at the offer (gap #3393).
+        -- The pool excludes the card being CAST as well as the object the cost is on
+        -- (`beingCast`), so a spell being offered is not fuel for the source that would
+        -- pay for it: CR 601.2a has it on the stack by the time CR 601.2h pays.
         CostComponent.ExileCardFromHand criterion ->
           claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
         CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->

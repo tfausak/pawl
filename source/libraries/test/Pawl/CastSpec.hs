@@ -3280,10 +3280,10 @@ escapeSpec s registry = Spec.describe s "Escape" $ do
   -- five Forests and the same Chimera in the same graveyard; only the cards it can
   -- exile differ, so nothing but rule 702.138a's cost can be stopping the cast.
   --
-  -- Asserted at the PAYMENT rather than at the offer: the two-card board is offered
-  -- the cast, because CR 118.3's check counts the Chimera itself among the cards it
-  -- could exile while CR 601.2a's payment no longer can (gap #3604). The cast then
-  -- rewinds under CR 601.2, which is what the Chimera staying in the graveyard says.
+  -- Asserted at the OFFER and then at the payment: CR 601.2a has the Chimera on the
+  -- stack before CR 118.3 counts what its own cost could exile, so a graveyard two
+  -- OTHER cards deep is not offered the cast at all. The three-card board is the
+  -- control, offered and paid.
   Spec.it s "CR 702.138a a graveyard two cards deep cannot pay the escape cost" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3291,6 +3291,8 @@ escapeSpec s registry = Spec.describe s "Escape" $ do
     let (tooShallow, shallow) = escapeBoard forest chimera piker 2
         (deepEnough, deep) = escapeBoard forest chimera piker 3
         attempt oid gs = S.runPure S.identityAnswer gs (S.cast S.alice oid)
+    Spec.assertBool s (not (S.castable S.alice tooShallow shallow)) "CR 601.2a with two other cards the cast is not offered: the Chimera is not its own fodder"
+    Spec.assertBool s (S.castable S.alice deepEnough deep) "and with three it is"
     Spec.assertEqWith s "with two other cards, nothing reached the stack" (length (GameState.stack (attempt tooShallow shallow))) 0
     Spec.assertEqWith s "and the Chimera is still in the graveyard with them" (length (Game.zoneMembers Zone.Graveyard S.alice (attempt tooShallow shallow))) 3
     Spec.assertEqWith s "with three, the Chimera is on the stack" (length (GameState.stack (attempt deepEnough deep))) 1
