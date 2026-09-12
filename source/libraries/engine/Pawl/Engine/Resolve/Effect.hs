@@ -92,6 +92,7 @@ import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CarryOver as CarryOver
 import qualified Pawl.Types.CastObligation as CastObligation
@@ -2099,6 +2100,14 @@ chooseNewTargetsFor controller copyId = do
 -- says it by casing on the arm rather than on the ability.
 thisAbilitySource :: ObjectId -> GameState -> Maybe Source.Source
 thisAbilitySource resolving gs = fmap Object.source (Game.lookupObject resolving gs)
+
+-- The name a conjure's candidate answers to, which is what
+-- Prompt.RandomCard offers and what its answer is matched back against. The
+-- FRONT face's (CR 712.8a): no printed spellbook holds a card with a second
+-- face, and a conjure that named one outright would still be picked out of a
+-- one-candidate list, which raises no prompt.
+conjuredName :: Card.Type.Card -> CardName.CardName
+conjuredName card = Face.name (NonEmpty.head (Card.Type.faces card))
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
@@ -4552,7 +4561,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- The conjurer is the resolving CONTROLLER (CR 109.5's "you"). Not implemented:
   -- a printing that states one instead, which is a shape rather than one card --
   -- Pawl.Types.Conjure lists the two forms (#2638).
-  Effect.Conjure (Conjure.MkConjure quantity card destination) -> do
+  Effect.Conjure (Conjure.MkConjure quantity cards destination) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -4577,7 +4586,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- that state an end all say the TOP -- Pawl.Types.ConjureDestination's
         -- Library arm names them and says why none of them is in data/cards/
         -- (#2638).
-        intoZone zone n = Monad.replicateM_ (Integer.toIntSaturating n) (Monad.void (Event.conjure controller card zone LibraryPosition.defaultValue))
+        --
+        -- The CANDIDATES are picked over once per card conjured, and the pick is
+        -- ASKED rather than rolled: docs/design.md section 2.2 makes randomness
+        -- a prompt, RandomObject's posture. A one-candidate list is the card the
+        -- sentence names outright, which no board can tell from a pick, so no
+        -- prompt is raised there (Pawl.Types.Prompt's rule). The answer is
+        -- filtered back to a candidate rather than trusted, and a name that
+        -- matches none takes the head. Two candidates sharing a name would be
+        -- indistinguishable to the answer, and the first is what is conjured.
+        --
+        -- Not implemented: "X random cards" picking X DISTINCT cards (Giant
+        -- Secrets' "conjure X random cards from Giant Secrets's spellbook into
+        -- your hand"). Each pick here is independent, so one card can come up
+        -- twice (#3648).
+        pick = case cards of
+          one NonEmpty.:| [] -> pure one
+          _ -> do
+            answer <- Game.ask (Prompt.RandomCard (fmap conjuredName cards))
+            pure (Maybe.fromMaybe (NonEmpty.head cards) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList cards)))
+        intoZone zone n = Monad.replicateM_ (Integer.toIntSaturating n) (pick >>= \card -> Monad.void (Event.conjure controller card zone LibraryPosition.defaultValue))
     case evaluateForRecipient viewOf context gs resolving source controller quantity of
       Just n
         | n > 0 -> case destination of
@@ -4586,7 +4614,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             ConjureDestination.Graveyard -> intoZone Zone.Graveyard n
             -- CR 110.2a: the resolving controller is who the permanent enters
             -- under, which conjureOntoBattlefield stamps.
-            ConjureDestination.Battlefield -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n))
+            -- One pick for the whole BATCH rather than one per card, which is
+            -- the card conjureOntoBattlefield mints every member of its CR
+            -- 614.12 entry loop from. Nothing in data/cards/ states a count
+            -- above one over a spellbook, so which reading this is stays a
+            -- regression fence (#3648).
+            ConjureDestination.Battlefield -> pick >>= \card -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n))
       _ -> pure ()
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry mSlot exceptions) -> do
     gs <- State.get

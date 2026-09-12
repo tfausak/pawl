@@ -16,9 +16,14 @@ module Pawl.Types.ConjureDestination where
 -- Dazzling Flameweaver\'s spellbook into exile", Gyox, Brutal Carnivora\'s
 -- "conjure X duplicates of it into exile"), which is an axis of its own rather
 -- than a fifth arm nothing else was waiting on -- Scryfall @o:conjure o:exile@,
--- 2026-08-29, five printings name this destination and not one of them names the
--- card it conjures, so each is held out by #2643, #3062 or #3063 as well and no
--- board reaches such an arm (#2653).
+-- 2026-09-11, five printings name this destination and every one of them also
+-- wants something else the opcode cannot say. Dazzling Flameweaver\'s "you may
+-- play that card until the end of your next turn" and Darigaaz, Shivan
+-- Champion\'s arrival "face down with three egg counters on it" both name the
+-- conjured card in a later clause, which wants the slot the conjure does not
+-- bind (#2638); Limitless Rekindling picks from outside the game (#3063); Gyox
+-- and Smog Smasher conjure a duplicate (#2643). So no board reaches such an arm
+-- (#2653).
 data ConjureDestination
   = -- | Emporium Thopterist\'s "conjure a card named Ornithopter into your
     -- hand".

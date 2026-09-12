@@ -200,79 +200,81 @@
                       {
                         "type": "Conjure",
                         "value": {
-                          "card": {
-                            "faces": [
-                              {
-                                "manaCost": [
-                                  {
-                                    "type": "Variable"
-                                  },
-                                  {
-                                    "type": "OfType",
-                                    "value": {
-                                      "type": "Colored",
-                                      "value": {
-                                        "type": "Red"
-                                      }
-                                    }
-                                  },
-                                  {
-                                    "type": "OfType",
-                                    "value": {
-                                      "type": "Colored",
-                                      "value": {
-                                        "type": "Red"
-                                      }
-                                    }
-                                  }
-                                ],
-                                "name": "Volcanic Geyser",
-                                "spell": {
-                                  "modes": [
+                          "cards": [
+                            {
+                              "faces": [
+                                {
+                                  "manaCost": [
                                     {
-                                      "clauses": [
-                                        {
-                                          "effects": [
-                                            {
-                                              "type": "DealDamage",
-                                              "value": {
-                                                "parts": [
-                                                  {
-                                                    "quantity": {
-                                                      "type": "InSlot",
-                                                      "value": "X"
-                                                    },
-                                                    "ref": {
-                                                      "type": "InSlot",
-                                                      "value": "target"
-                                                    }
-                                                  }
-                                                ]
-                                              }
-                                            }
-                                          ]
+                                      "type": "Variable"
+                                    },
+                                    {
+                                      "type": "OfType",
+                                      "value": {
+                                        "type": "Colored",
+                                        "value": {
+                                          "type": "Red"
                                         }
-                                      ],
-                                      "targetSlots": {
-                                        "target": {
-                                          "pool": {
-                                            "type": "AnyTarget"
+                                      }
+                                    },
+                                    {
+                                      "type": "OfType",
+                                      "value": {
+                                        "type": "Colored",
+                                        "value": {
+                                          "type": "Red"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "name": "Volcanic Geyser",
+                                  "spell": {
+                                    "modes": [
+                                      {
+                                        "clauses": [
+                                          {
+                                            "effects": [
+                                              {
+                                                "type": "DealDamage",
+                                                "value": {
+                                                  "parts": [
+                                                    {
+                                                      "quantity": {
+                                                        "type": "InSlot",
+                                                        "value": "X"
+                                                      },
+                                                      "ref": {
+                                                        "type": "InSlot",
+                                                        "value": "target"
+                                                      }
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        ],
+                                        "targetSlots": {
+                                          "target": {
+                                            "pool": {
+                                              "type": "AnyTarget"
+                                            }
                                           }
                                         }
                                       }
-                                    }
-                                  ]
-                                },
-                                "typeLine": {
-                                  "types": [
-                                    {
-                                      "type": "Instant"
-                                    }
-                                  ]
+                                    ]
+                                  },
+                                  "typeLine": {
+                                    "types": [
+                                      {
+                                        "type": "Instant"
+                                      }
+                                    ]
+                                  }
                                 }
-                              }
-                            ]
-                          },
+                              ]
+                            }
+                          ],
                           "destination": {
                             "type": "Library"
                           },

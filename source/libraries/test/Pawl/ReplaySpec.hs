@@ -667,10 +667,10 @@ combatReplaySpec s =
             printed
         -- #136 / CR 729.2: "Randomly determine which player goes first." The
         -- determination is randomness, not a choice, so the prompt carries NO
-        -- Decider -- Shuffle, RandomObject and RandomOpponent below are the
-        -- others. Recording it
-        -- is what keeps a subgame replayable: the randomness lives in the
-        -- interpreter, and the transcript carries what it rolled.
+        -- Decider -- Shuffle, RandomObject, RandomOpponent and RandomCard below
+        -- are the others. Recording it is what keeps a subgame replayable: the
+        -- randomness lives in the interpreter, and the transcript carries what
+        -- it rolled.
         Spec.it s "RandomFirstPlayer round-trips through the transcript" $ do
           let p = Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob])
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
@@ -728,6 +728,32 @@ combatReplaySpec s =
         Spec.it s "an opponent CHOICE does not decode as a random selection" $ do
           let p = Prompt.RandomOpponent (S.bob NonEmpty.:| [S.carol])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOpponent S.bob)) Nothing
+        -- The fifth Decider-less prompt: Tome of the Infinite's "conjure a
+        -- random card from Tome of the Infinite's spellbook". RandomObject's
+        -- reasons over NAMES, the candidates being card data rather than
+        -- objects.
+        Spec.it s "RandomCard round-trips through the transcript" $ do
+          let bolt = CardName.MkCardName (Text.pack "Lightning Bolt")
+              ponder = CardName.MkCardName (Text.pack "Ponder")
+              p = Prompt.RandomCard (bolt NonEmpty.:| [ponder])
+          Spec.assertEqWith s "Ponder round trips" (Replay.decode p (Replay.encode p ponder)) (Just ponder)
+          -- Discriminating: a decode that ignored the response and handed back
+          -- the head would pass the leg above by accident of the write order.
+          Spec.assertEqWith s "Lightning Bolt round trips" (Replay.decode p (Replay.encode p bolt)) (Just bolt)
+        Spec.it s "a short transcript takes the head of the offered spellbook" $
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.RandomCard (CardName.MkCardName (Text.pack "Lightning Bolt") NonEmpty.:| [CardName.MkCardName (Text.pack "Ponder")])))
+            (CardName.MkCardName (Text.pack "Lightning Bolt"))
+        -- The assertion that fails if RandomCard reuses Response.ChoseCardName
+        -- rather than getting its own constructor: both name one card name, so
+        -- the types would not object, and a player's DECISION replaying as
+        -- randomness is what Pawl.Types.Response's own rule forbids (CR 701.9b).
+        Spec.it s "a card-name CHOICE does not decode as a random selection" $ do
+          let bolt = CardName.MkCardName (Text.pack "Lightning Bolt")
+              p = Prompt.RandomCard (bolt NonEmpty.:| [CardName.MkCardName (Text.pack "Ponder")])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseCardName bolt)) Nothing
         -- Another Decider-less prompt: CR 706.1a's die. RandomOpponent's
         -- reasons, over a RANGE rather than a candidate list.
         Spec.it s "RollDie round-trips through the transcript" $ do

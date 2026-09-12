@@ -10,7 +10,9 @@
 -- Thopterist on the battlefield and begin its controller's upkeep so the printed
 -- trigger fires and resolves; the third declares a printed Toralf's Disciple as
 -- an attacker; the fourth and fifth enter a printed Shellfish Scholar; the sixth
--- casts a noncreature spell under a printed Lam, Storm Crane Elder.
+-- casts a noncreature spell under a printed Lam, Storm Crane Elder; the seventh
+-- activates a printed Tome of the Infinite, whose card file writes a printed
+-- SPELLBOOK rather than one card.
 --
 -- The first four CAST what the conjure created, which is the point -- conjure
 -- creates a CARD and not CR 111.1's token, and a token in a hand, a library or a
@@ -22,6 +24,10 @@
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
@@ -31,6 +37,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -335,3 +342,96 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "and it reached no other zone of alice's"
       (length (namedIn monasteryMentor Zone.Hand final), length (namedIn monasteryMentor Zone.Graveyard final))
       (0, 0)
+  -- Tome of the Infinite ({2}{U} Legendary Artifact -- Book, "{U}, {T}: Conjure
+  -- a random card from Tome of the Infinite's spellbook into your hand."), the
+  -- printed SPELLBOOK: ten candidates in the card file and one pick over them.
+  --
+  -- Not implemented: the rider, "It perpetually gains 'You may spend mana as
+  -- though it were mana of any color to cast this spell.'" A conjure binds its
+  -- card to no slot, so no later clause can name it; pawl's Tome is stricter
+  -- than the printing, never weaker (#2638).
+  --
+  -- Not implemented: the spellbook's Ponder puts the three cards it looks at
+  -- back in the order they were in, where the printing lets its controller
+  -- reorder them. Stricter, and the optional shuffle beside it is written
+  -- (#3649).
+  --
+  -- The answerer pins the pick to the LAST candidate, which the offered list's
+  -- head is not: Pawl.Engine.Replay.defaultAnswer takes the head, so an engine
+  -- that rolled the pick itself rather than honouring the answer lands on
+  -- Assault Strobe.
+  Spec.it s "a printed spellbook is offered whole, and the card randomness named is the one conjured" $ do
+    islandPrinting <- S.printingOf s registry "Island"
+    tome <- S.printingOf s registry "Tome of the Infinite"
+    let board0 = S.landsInPlay islandPrinting 1
+        (tomeId, board1) = S.addPermanent tome S.alice board0
+        board = board1 {GameState.phase = Phase.PrecombatMain}
+        logging :: Prompt.Prompt r -> State.State [[CardName.CardName]] r
+        logging p = case p of
+          Prompt.RandomCard offered -> do
+            State.modify' (NonEmpty.toList offered :)
+            pure (tomeAnswer tomeId swordsToPlowshares p)
+          _ -> pure (tomeAnswer tomeId swordsToPlowshares p)
+        (offers, final) = case State.runState (Engine.runGame logging board Engine.priorityLoop) [] of
+          ((_, gs), asked) -> (reverse asked, gs)
+    -- THE GAMEPLAY ASSERTION: the card in alice's hand is the one the answer
+    -- named, and it is a card of the spellbook rather than of her deck.
+    Spec.assertEqWith
+      s
+      "the conjured card in alice's hand is the one randomness named"
+      (namesIn Zone.Hand final)
+      [swordsToPlowshares]
+    -- Supporting, and LAST so it cannot absorb a mutation the assertion above
+    -- should catch: the whole spellbook was offered, once, in the card file's
+    -- order. Recorded off the prompt, since the candidate list is not readable
+    -- off the resulting board.
+    Spec.assertEqWith
+      s
+      "asked once, offering every card of the printed spellbook"
+      offers
+      [tomeSpellbook]
+
+-- The ten cards data/cards/tome-of-the-infinite.json prints as the Tome's
+-- spellbook, in the order the card file writes them.
+tomeSpellbook :: [CardName.CardName]
+tomeSpellbook =
+  fmap
+    (CardName.MkCardName . Text.pack)
+    [ "Assault Strobe",
+      "Dark Ritual",
+      "Duress",
+      "Fog",
+      "Force Spike",
+      "Giant Growth",
+      "Lightning Bolt",
+      "Light of Hope",
+      "Ponder",
+      "Swords to Plowshares"
+    ]
+
+swordsToPlowshares :: CardName.CardName
+swordsToPlowshares = CardName.MkCardName (Text.pack "Swords to Plowshares")
+
+-- Taps the Island for {U}, activates the Tome the first time its ability is
+-- offered -- once, since the activation taps it -- and pins the random pick to
+-- `who`. FILTERED out of the offered candidates rather than built, so a name
+-- the engine never offered cannot slip through, falling back to the head.
+tomeAnswer :: ObjectId.ObjectId -> CardName.CardName -> Prompt.Prompt r -> r
+tomeAnswer tome who p = case p of
+  Prompt.ChooseAction _ _ actions -> case List.find (activationOf tome) actions of
+    Just action -> action
+    Nothing -> case List.find manaActivation actions of
+      Just action -> action
+      Nothing -> Action.Pass
+  Prompt.RandomCard offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
+  _ -> S.identityAnswer p
+
+activationOf :: ObjectId.ObjectId -> Action.Action -> Bool
+activationOf oid action = case action of
+  Action.Activate o _ -> o == oid
+  _ -> False
+
+manaActivation :: Action.Action -> Bool
+manaActivation action = case action of
+  Action.ActivateManaAbility _ -> True
+  _ -> False

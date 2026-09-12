@@ -1,5 +1,6 @@
 module Pawl.Codec.ConjureSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Conjure as Conjure
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -24,11 +25,11 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
       codec
       ( Conjure.MkConjure
           { Conjure.quantity = Conjure.defaultQuantity,
-            Conjure.card = Text.pack "Ornithopter",
+            Conjure.cards = Text.pack "Ornithopter" NonEmpty.:| [],
             Conjure.destination = ConjureDestination.Hand
           }
       )
-      " {\"card\":\"Ornithopter\",\"destination\":{\"type\":\"Hand\"}} "
+      " {\"cards\":[\"Ornithopter\"],\"destination\":{\"type\":\"Hand\"}} "
   -- The other form: a stated count, which has to survive the elision guard, and
   -- the destination arm that is not the default-looking one.
   Spec.it s "MkConjure with a stated count" $
@@ -37,9 +38,22 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
       codec
       ( Conjure.MkConjure
           { Conjure.quantity = Quantity.Literal 4,
-            Conjure.card = Text.pack "Lightning Bolt",
+            Conjure.cards = Text.pack "Lightning Bolt" NonEmpty.:| [],
             Conjure.destination = ConjureDestination.Library
           }
       )
-      " {\"quantity\":{\"type\":\"Literal\",\"value\":4},\"card\":\"Lightning Bolt\",\"destination\":{\"type\":\"Library\"}} "
+      " {\"quantity\":{\"type\":\"Literal\",\"value\":4},\"cards\":[\"Lightning Bolt\"],\"destination\":{\"type\":\"Library\"}} "
+  -- A printed spellbook: two candidates in the list, which is the only shape
+  -- that tells this key from the singular one it replaced.
+  Spec.it s "MkConjure over a printed spellbook" $
+    Common.assertCodec
+      s
+      codec
+      ( Conjure.MkConjure
+          { Conjure.quantity = Conjure.defaultQuantity,
+            Conjure.cards = Text.pack "Ponder" NonEmpty.:| [Text.pack "Dark Ritual"],
+            Conjure.destination = ConjureDestination.Hand
+          }
+      )
+      " {\"cards\":[\"Ponder\",\"Dark Ritual\"],\"destination\":{\"type\":\"Hand\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

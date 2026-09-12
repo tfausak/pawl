@@ -222,11 +222,11 @@ permute xs order =
 --     decision. Engine.priorityLoop makes that call, being the only caller that
 --     knows the menu.
 --   * Prompt.Shuffle, Prompt.RandomFirstPlayer, Prompt.RandomObject,
---     Prompt.RandomOpponent, Prompt.RollDie and Prompt.FlipCoin, which ask for
---     RANDOMNESS rather than for a choice (CR 701.24, CR 729.2, CR 706.1a, CR
---     705.1, and CR 701.9b's acknowledgment that "at random" is not "the player
---     chooses"). A loop that reshuffles a library every cycle is still a loop of
---     mandatory actions. Prompt.CallCoin is NOT among them: CR 705.2's call is a
+--     Prompt.RandomOpponent, Prompt.RandomCard, Prompt.RollDie and
+--     Prompt.FlipCoin, which ask for RANDOMNESS rather than for a choice (CR
+--     701.24, CR 729.2, CR 706.1a, CR 705.1, and CR 701.9b's acknowledgment
+--     that "at random" is not "the player chooses"). A loop that reshuffles a
+--     library every cycle is still a loop of mandatory actions. Prompt.CallCoin is NOT among them: CR 705.2's call is a
 --     choice, so it comes through here.
 --
 -- Every other prompt site already elides its prompt when the answer is forced,

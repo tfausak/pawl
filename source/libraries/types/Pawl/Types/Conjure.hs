@@ -1,5 +1,6 @@
 module Pawl.Types.Conjure where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.Quantity as Quantity
 
@@ -24,13 +25,13 @@ import qualified Pawl.Types.Quantity as Quantity
 -- card is card DATA nested inside card data, and the parameter is what keeps
 -- 'Pawl.Types.Effect' from naming a concrete card type.
 --
--- Not implemented: a conjure whose card is not NAMED outright. A duplicate of an
--- object already in the game (Futurist Spellthief\'s "conjure a duplicate of
--- target spell into your hand") wants an
--- 'Pawl.Types.ObjectRef.ObjectRef' where this field holds text (#2643), and a
--- random pick from a printed spellbook (Tome of the Infinite\'s "conjure a random
--- card from Tome of the Infinite\'s spellbook") wants a list plus a choice the
--- engine makes (#3062). Neither is a card this field can hold.
+-- Not implemented: a conjure whose candidates are not WRITTEN OUT in the card
+-- file. A duplicate of an object already in the game (Futurist Spellthief\'s
+-- "conjure a duplicate of target spell into your hand") wants an
+-- 'Pawl.Types.ObjectRef.ObjectRef' where the list holds card data (#2643), and
+-- a pick from outside the game (Anina, Natural Parallelist\'s "conjure a random
+-- creature card with mana value X") wants the card registry a filter narrows
+-- (#3063). Neither is a list this type can hold.
 --
 -- Not implemented: a conjurer other than the resolving controller. That is a
 -- SHAPE and not one card -- a chosen player (Juggernaut Peddler\'s "that player
@@ -45,8 +46,20 @@ data Conjure card = MkConjure
   { -- | How many copies of the card. Toralf\'s Disciple\'s "conjure four cards
     -- named Lightning Bolt"; a printed "a card" is one.
     quantity :: Quantity.Quantity,
-    -- | The card conjured, written out in full.
-    card :: card,
+    -- | The candidates, each written out in full. ONE is a card the sentence
+    -- names outright (Emporium Thopterist\'s "a card named Ornithopter"); more
+    -- than one is the printed spellbook the sentence names instead (Tome of the
+    -- Infinite\'s "a random card from Tome of the Infinite\'s spellbook"), and
+    -- the conjure picks one of them at random. One list rather than a card and
+    -- an optional spellbook beside it: a named card is the pick over a
+    -- one-candidate pool, which no board can tell from taking it outright, and
+    -- 'Pawl.Types.Prompt.RandomCard' is raised only for two or more.
+    --
+    -- Not implemented: a spellbook a card picks from BY CHOICE (Follow the
+    -- Tracks\'s "conjure a card of your choice from Follow the Tracks\'s
+    -- spellbook onto the battlefield") rather than at random, which wants a
+    -- second field saying which question is asked (#3647).
+    cards :: NonEmpty.NonEmpty card,
     -- | The zone it arrives in.
     destination :: ConjureDestination.ConjureDestination
   }

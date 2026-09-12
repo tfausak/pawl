@@ -47,67 +47,69 @@
                       {
                         "type": "Conjure",
                         "value": {
-                          "card": {
-                            "faces": [
-                              {
-                                "manaCost": [
-                                  {
-                                    "type": "OfType",
-                                    "value": {
-                                      "type": "Colored",
+                          "cards": [
+                            {
+                              "faces": [
+                                {
+                                  "manaCost": [
+                                    {
+                                      "type": "OfType",
                                       "value": {
-                                        "type": "Red"
+                                        "type": "Colored",
+                                        "value": {
+                                          "type": "Red"
+                                        }
                                       }
                                     }
-                                  }
-                                ],
-                                "name": "Lightning Bolt",
-                                "spell": {
-                                  "modes": [
-                                    {
-                                      "clauses": [
-                                        {
-                                          "effects": [
-                                            {
-                                              "type": "DealDamage",
-                                              "value": {
-                                                "parts": [
-                                                  {
-                                                    "quantity": {
-                                                      "type": "Literal",
-                                                      "value": 3
-                                                    },
-                                                    "ref": {
-                                                      "type": "InSlot",
-                                                      "value": "target"
+                                  ],
+                                  "name": "Lightning Bolt",
+                                  "spell": {
+                                    "modes": [
+                                      {
+                                        "clauses": [
+                                          {
+                                            "effects": [
+                                              {
+                                                "type": "DealDamage",
+                                                "value": {
+                                                  "parts": [
+                                                    {
+                                                      "quantity": {
+                                                        "type": "Literal",
+                                                        "value": 3
+                                                      },
+                                                      "ref": {
+                                                        "type": "InSlot",
+                                                        "value": "target"
+                                                      }
                                                     }
-                                                  }
-                                                ]
+                                                  ]
+                                                }
                                               }
+                                            ]
+                                          }
+                                        ],
+                                        "targetSlots": {
+                                          "target": {
+                                            "pool": {
+                                              "type": "AnyTarget"
                                             }
-                                          ]
-                                        }
-                                      ],
-                                      "targetSlots": {
-                                        "target": {
-                                          "pool": {
-                                            "type": "AnyTarget"
                                           }
                                         }
                                       }
-                                    }
-                                  ]
-                                },
-                                "typeLine": {
-                                  "types": [
-                                    {
-                                      "type": "Instant"
-                                    }
-                                  ]
+                                    ]
+                                  },
+                                  "typeLine": {
+                                    "types": [
+                                      {
+                                        "type": "Instant"
+                                      }
+                                    ]
+                                  }
                                 }
-                              }
-                            ]
-                          },
+                              ]
+                            }
+                          ],
                           "destination": {
                             "type": "Library"
                           },

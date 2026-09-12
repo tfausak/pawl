@@ -50,6 +50,7 @@ encode p answer = case p of
   Prompt.Shuffle _ -> Response.Shuffled answer
   Prompt.RandomFirstPlayer _ -> Response.DeterminedFirstPlayer answer
   Prompt.RandomObject _ -> Response.SelectedAtRandom answer
+  Prompt.RandomCard _ -> Response.SelectedCardAtRandom answer
   Prompt.RandomOpponent _ -> Response.SelectedOpponentAtRandom answer
   Prompt.RollDie _ -> Response.RolledDie answer
   Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
@@ -180,6 +181,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RandomObject _ -> case response of
     Response.SelectedAtRandom oid -> Just oid
+    _ -> Nothing
+  Prompt.RandomCard _ -> case response of
+    Response.SelectedCardAtRandom name -> Just name
     _ -> Nothing
   Prompt.RandomOpponent _ -> case response of
     Response.SelectedOpponentAtRandom pid -> Just pid
@@ -538,6 +542,9 @@ defaultAnswer p = case p of
   -- The head of the offer is always one of the offered opponents, and FIXED for
   -- the reason RandomObject gives just above.
   Prompt.RandomOpponent candidates -> NonEmpty.head candidates
+  -- The head of the offer is always one of the offered cards, and FIXED for the
+  -- reason RandomObject gives just above.
+  Prompt.RandomCard candidates -> NonEmpty.head candidates
   -- CR 706.1a's FLOOR: every die has a 1, whatever its size, so this is the one
   -- answer that is in range for any N -- including the degenerate N of a
   -- malformed card. FIXED for the reason RandomObject gives above.
