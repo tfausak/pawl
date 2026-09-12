@@ -433,6 +433,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- Spawning's Corrupted clause is that card, and CastSpec's three-seat
         -- GrantedFlashback case is what proves the reading (a two-seat board cannot:
         -- there "an opponent" and "your opponent" name one player).
+        Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> case playersOf ref of
+          Just [pid] -> fmap (toInteger . Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
+          _ -> Nothing
         -- CR 700.5: that player's devotion. Nothing for a reference naming anything
         -- but exactly one player, LifeTotal's arity and for its reason -- "your
         -- devotion" is what every printing asks, and a table's worth of devotions
@@ -456,9 +459,6 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- keeps a devotion-gated continuous effect from reading its own output.
         Quantity.Devotion (Devotion.MkDevotion ref colors) -> case playersOf ref of
           Just [pid] -> Just (devotionOf viewOf colors pid gs)
-          _ -> Nothing
-        Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> case playersOf ref of
-          Just [pid] -> fmap (toInteger . Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
           _ -> Nothing
         -- CR 122.1's OBJECT reading, through the injected view exactly as the Power
         -- arm above is -- so this arm never learns whether it is looking at a live
@@ -1241,8 +1241,9 @@ readsX quantity = case quantity of
   Quantity.Count c -> QuantitySlot.anyCount readsX c
   -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
   -- The eight references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
-  -- IsStartingPlayer's, IsActivePlayer's, PlayerCounters', Devotion's) are PlayerRefs, whose InSlot names a
-  -- TARGET slot rather than an amount one, and X is only ever an amount.
+  -- IsStartingPlayer's, IsActivePlayer's, PlayerCounters', Devotion's) are
+  -- PlayerRefs, whose InSlot names a TARGET slot rather than an amount one, and X
+  -- is only ever an amount.
   Quantity.Literal _ -> False
   Quantity.ManaValue -> False
   Quantity.Power -> False
