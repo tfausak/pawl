@@ -1322,7 +1322,8 @@ eventTriggers events gs =
       -- 113.6's default has already been overridden by the rule that mints them,
       -- and asking again would only re-derive it from a condition (an upkeep)
       -- that says nothing about exile. Pawl.Engine.Keyword.exileTriggeredAbilitiesOf
-      -- is what decides which keywords reach this, and suspend is the only one.
+      -- is what decides which keywords reach this: suspend and CR 702.35a's
+      -- madness, whose own first ability is what put its card here.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
           case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> Keyword.exileTriggeredAbilitiesOf (Face.keywords face) of
@@ -2063,6 +2064,11 @@ zonesTriggeredFrom cond =
         -- the battlefield. No candidate source of its own is owed: `cycledCard`
         -- recovers the card the CYCLING cause named, which rule 702.29c makes narrower
         -- than this condition rather than a gap under it.
+        --
+        -- CR 702.35a's madness card is in EXILE when this same condition fires
+        -- for it, and this answer does not admit it: it comes through
+        -- eventTriggers' exile scan, which takes a card's keyword-minted list
+        -- without asking `functionsIn` at all.
         TriggerCondition.SelfDiscarded -> Set.singleton Zone.Graveyard
         -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
         -- graveyard does not see an opponent discard.

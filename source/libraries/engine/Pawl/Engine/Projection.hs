@@ -4031,9 +4031,11 @@ replacementsAffecting gs =
       -- is what the short-circuit beneath exists to skip. CR 604.2's clause still
       -- gates each row.
       --
-      -- MINTED rows are deliberately absent: CR 122.1's counters do not survive
-      -- the trip off the battlefield (CR 122.2), and every other minted row is
-      -- CR 614.1c's entry rewrite, which a card that is not entering cannot use.
+      -- MINTED rows are deliberately absent from THIS arm: CR 122.1's counters do
+      -- not survive the trip off the battlefield (CR 122.2), and every other
+      -- minted row a projection carries is CR 614.1c's entry rewrite, which a
+      -- card that is not entering cannot use. The one rule that mints a row into
+      -- a hidden zone is CR 702.35a, and `mintedInHand` below is its own arm.
       --
       -- CR 406.3a: a card exiled face down has no characteristics, so it carries
       -- no row to state anything. Object.exiledFaceDown is CR 406.3's status,
@@ -4070,10 +4072,26 @@ replacementsAffecting gs =
              in fmap
                   (\pr -> (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr))
                   (filter (\pr -> keeps pr && printedRowLives oid gs pr) (Face.replacementEffects face))
+      -- CR 702.35a's replacement, minted for a card in a HAND rather than read
+      -- off its printed list -- `statedFrom`'s sibling, and the one place a
+      -- rule mints a row into a zone the two projecting walks above do not
+      -- reach. Pawl.Engine.Keyword.handReplacementsOf is what decides which
+      -- keywords reach it, and madness is the only one.
+      --
+      -- The PRINTED face, `statedFrom`'s read and for its reason: `project` is
+      -- what the short-circuit exists to skip, so a madness ability an effect
+      -- granted to a card in a hand mints nothing (gap #1859).
+      --
+      -- ReplacementProvenance.Minted, replacementsOfGiven's mark for every row a
+      -- rule writes onto an object rather than a face printing it.
+      mintedInHand oid = case Game.faceOf oid gs of
+        Nothing -> []
+        Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (Face.keywords face))
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
           <> foldZoneCards GameState.hand (statedFrom Zone.Hand) gs
+          <> foldZoneCards GameState.hand mintedInHand gs
           <> foldZoneCards GameState.library (statedFrom Zone.Library) gs
           <> concatMap (statedFrom Zone.Exile) (Set.toList (GameState.exile gs))
           <> concatMap (statedFrom Zone.Command) statingCommand

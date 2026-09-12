@@ -166,9 +166,10 @@ asZoneChange event = case event of
 --      permanents ascending by id, then the command zone's emblems and vanguard
 --      cards, whose abilities CR 113.6p leaves functioning there, then the rows a card STATES
 --      it functions from elsewhere with (CR 113.6b) -- the stack, then the
---      graveyards, then the hands, then the libraries; each object's own effects
---      in printed order. Read from `sources`, which for a CR 608.2f batch is the
---      board the batch began in rather than the live one (see
+--      graveyards, then the hands, then the libraries -- and last the rows a
+--      RULE mints for a card in a hand (CR 702.35a's madness); each object's own
+--      effects in printed order. Read from `sources`, which for a CR 608.2f
+--      batch is the board the batch began in rather than the live one (see
 --      Event.applyReplacementsIn).
 --   2. The FLOATING store (GameState.replacements): newest first, since every
 --      installer prepends as it creates the row. Always the LIVE store, never a

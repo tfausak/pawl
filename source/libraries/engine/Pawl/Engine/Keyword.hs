@@ -405,6 +405,10 @@ abilitiesFor keyword count = case keyword of
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
+  -- CR 702.35a's two abilities are minted elsewhere, suspend's shape: the
+  -- static half by `handReplacementsOf` and the triggered half by
+  -- `exileTriggeredAbilitiesOf`, so this roster stays empty.
+  Keyword.Madness _ -> []
 
 -- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
 -- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
@@ -586,6 +590,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
+  Keyword.Madness _ -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
@@ -945,6 +950,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   -- permissionsFor grants and Pawl.Engine.Cost prices.
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
+  Keyword.Madness _ -> []
 
 -- CR 702.84a's whole ability, minted from the one cost the keyword carries, as
 -- four effects in one clause -- the return, the haste, the delayed exile and the
@@ -1350,6 +1356,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
+  Keyword.Madness _ -> []
 
 -- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
@@ -1919,6 +1926,11 @@ permissionsFor cardTypes keyword = case keyword of
   -- one sentence, so a card whose mayhem cost is withheld has nothing to be cast
   -- for, and a permission from somewhere else brings its own cost.
   Keyword.Mayhem _ -> [CastingPermission.CastFromGraveyard]
+  -- CR 702.35a states no standing permission: the cast is offered by rule
+  -- 702.35a's own triggered ability, which carries its cost as CR 608.2g's
+  -- offer (Pawl.Engine.Resolve.Effect.offerCast) rather than as a zone this
+  -- card may be cast from.
+  Keyword.Madness _ -> []
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
@@ -1975,6 +1987,24 @@ mayhemCosts :: Set Keyword -> [Cost Keyword]
 mayhemCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Mayhem cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.35a: every cost this card may be cast for under its madness ability, in
+-- ascending Set order. mayhemCosts' shape above, read by two callers a zone
+-- apart -- `handReplacementsOf`, which mints rule 702.35a's discard replacement
+-- while the card is in a hand, and `exileTriggeredAbilitiesOf`, which mints the
+-- triggered half once the replacement has put the card in exile.
+--
+-- A LIST for flashbackCosts' reason: rule 702.35 states no limit on how many
+-- madness abilities an object has, and rule 702.35a's second ability names its
+-- own cost, so two of them are two triggers.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+madnessCosts :: Set Keyword -> [Cost Keyword]
+madnessCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Madness cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -2633,6 +2663,59 @@ castFromGraveyardExile =
         False
     )
 
+-- | The replacement effects rule 702 mints for a card in a HAND, off its printed
+-- keywords -- `mintedReplacementsOf`'s sibling one zone over, and rule 702.35a's
+-- madness is the only one that reaches it.
+--
+-- Its own mint point rather than an arm of `mintedReplacementsFor`, because the
+-- two are gathered by different walks: that roster is read off the PROJECTION of
+-- a battlefield or command-zone object (Pawl.Engine.Projection.replacementsOf),
+-- and CR 122.2 keeps every row it holds off a card in a hand. This one is read
+-- off the printed face by Pawl.Engine.Projection.replacementsAffecting's hand
+-- walk, where a granted madness would not be seen (gap #1859) -- the reading
+-- `miracleCost` and `suspendOf` take one clause of CR 113.6 apart.
+--
+-- ONE ROW however many madness abilities, unlike riot's per-instance rows: rule
+-- 702.35a's replacement says only where the card goes, so two of them would be
+-- indistinguishable CR 616.1 candidates and cost the discarding player a choice
+-- between two identical answers. The COSTS are what differ, and they are the
+-- triggered half's (`madnessCast`). Scryfall `keyword:madness`, 2026-09-12,
+-- answers 62 cards and every one of them prints a single madness ability, so
+-- the card that would tell the two readings apart does not exist; a printing
+-- with two would refute this.
+handReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
+handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts keywords))]
+
+-- CR 702.35a's FIRST ability: "if a player would discard this card, that player
+-- discards it, but exiles it instead of putting it into their graveyard".
+--
+-- Filter.IsSource is the rule's "this card", castFromGraveyardExile's read one
+-- rule apart. `whenDestination = Just Graveyard` where that one names none,
+-- because rule 702.35a names one: it redirects the graveyard alone, so a discard
+-- some other effect has already sent elsewhere is not redirected again.
+--
+-- The pattern states no CAUSE, and Pawl.Types.ZoneChangePattern has no such
+-- field, so what this row actually intercepts is "would be put into a graveyard
+-- from a hand" rather than rule 701.9a's discard. The row is gathered only while
+-- its source is in a hand, which is what supplies the from-zone -- finality's
+-- argument in Pawl.Engine.Projection.finalityOf.
+--
+-- Not implemented: the difference between the two, a card put from a hand into a
+-- graveyard without being discarded (#3670).
+madnessDiscardExile :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
+madnessDiscardExile =
+  ReplacementEffect.ZoneChangeR
+    ( ZoneChangeR.MkZoneChangeR
+        ZoneChangePattern.MkZoneChangePattern
+          { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
+            ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+            ZoneChangePattern.whatObject = Filter.IsSource
+          }
+        Zone.Exile
+        False
+        False
+    )
+
 -- The static continuous abilities rule 702 states as a keyword's meaning, for the
 -- object those keywords are on: CR 702.161a's living metal, and the battlefield
 -- halves of CR 702.109a's dash and CR 702.152a's blitz.
@@ -3034,6 +3117,11 @@ mintedReplacementsFor keyword count = case keyword of
   -- its owner's graveyard, and may be cast again on a later turn.
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
+  -- CR 702.35a's replacement functions in a HAND, where this roster cannot
+  -- reach: Pawl.Engine.Projection.replacementsAffecting gathers it off the
+  -- projection of a battlefield or command-zone object. `handReplacementsOf`
+  -- above is where rule 702.35a's row is minted.
+  Keyword.Madness _ -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
@@ -3246,6 +3334,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
+  Keyword.Madness _ -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
@@ -3491,6 +3580,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Undaunted -> []
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
+  Keyword.Madness _ -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
 -- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
@@ -3686,6 +3776,7 @@ familyOf keyword = case keyword of
   -- CR 702.81a carries no parameter, so there is no family to name it by.
   Keyword.Retrace -> Nothing
   Keyword.Mayhem _ -> Just KeywordFamily.Mayhem
+  Keyword.Madness _ -> Just KeywordFamily.Madness
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.
@@ -5366,26 +5457,38 @@ printedTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbi
 printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 
 -- CR 702.62a's SECOND and THIRD abilities, "the second and third are triggered
--- abilities that function in the exile zone" -- the roster the exile scan in
--- Pawl.Engine.Event.Trigger mints, `printedTriggeredAbilitiesOf`'s sibling one
--- zone over.
+-- abilities that function in the exile zone", and CR 702.35a's second -- the
+-- roster the exile scan in Pawl.Engine.Event.Trigger mints,
+-- `printedTriggeredAbilitiesOf`'s sibling one zone over.
 --
 -- UNGATED BY CR 113.6, which is the whole reason it is its own function: rule
 -- 702.62a states the zone itself, so the exile scan takes this list without
 -- asking `functionsIn` -- where the same scan does ask it of the card's PRINTED
--- abilities, which state no zone.
+-- abilities, which state no zone. Rule 702.35a states no zone in those words,
+-- and reaches the same place by its own route: its first ability is what puts
+-- the card in exile, so the second cannot fire anywhere else. `functionsIn`
+-- would answer the GRAVEYARD for its condition (Pawl.Engine.Event.Trigger's
+-- zonesTriggeredFrom, CR 701.9a's ordinary destination) and drop it.
 --
--- Ordered as rule 702.62a prints them, which is also the order they fire in:
--- the upkeep removal takes the last counter off, and the free play watches that
--- removal. Vanishing's pair one rule over has the same two shapes.
+-- Suspend's pair is ordered as rule 702.62a prints them, which is also the
+-- order they fire in: the upkeep removal takes the last counter off, and the
+-- free play watches that removal. Vanishing's pair one rule over has the same
+-- two shapes.
 --
 -- A SET rather than a count-carrying Map, `printedTriggeredAbilitiesOf`'s
 -- reading: a printed keyword set holds one instance of each, and rule 702.62
 -- states no per-instance clause for a card printing two.
 exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-exileTriggeredAbilitiesOf keywords = case suspend keywords of
-  Nothing -> []
-  Just ability -> [suspendUpkeep, suspendLastCounter ability]
+exileTriggeredAbilitiesOf keywords =
+  ( case suspend keywords of
+      Nothing -> []
+      Just ability -> [suspendUpkeep, suspendLastCounter ability]
+  )
+    -- CR 702.35a's SECOND ability, ungated for rule 702.62a's reason: the
+    -- discard has already put the card in exile by the time this fires, so the
+    -- ability that watches it functions there. One per madness cost, rule
+    -- 702.35a's "[cost]" being what one instance differs from another by.
+    <> fmap madnessCast (madnessCosts keywords)
 
 -- CR 702.85a's ability, "a triggered ability that functions only while the spell
 -- with cascade is on the stack", and CR 702.40a's storm, which "functions on the
@@ -5738,6 +5841,84 @@ stillExiled =
         Comparison.AtLeast
         (Quantity.Literal 1)
     )
+
+-- CR 702.35a's SECOND ability: "when this card is exiled this way, its owner may
+-- cast it by paying [cost] rather than paying its mana cost. If that player
+-- doesn't, they put this card into their graveyard."
+--
+-- ONE MANDATORY clause holding TWO effects, suspendLastCounter's reading of the
+-- "may": the option governs the CAST alone, which is Prompt.OfferedCast's own
+-- question (CR 608.2g), and the graveyard sentence is not optional at all.
+--
+-- The COST rides the offer (CastOffer.payingInstead), miracle's field and for
+-- rule 118.9's reason -- rule 702.35b sends the payment through rules 601.2b and
+-- 601.2f-h, which is what that field means. CastOffer.offeredBy tags the
+-- candidate so the spell records Object.castUsing, suspendLastCounter's reason.
+--
+-- THE FALLTHROUGH is unconditional and needs no "if that player doesn't" to
+-- read: a cast moves the card to the stack through CR 400.7's funnel, which
+-- deletes the id this trigger bound, so the MoveToZone below resolves its
+-- reference to no object and moves nothing. The same mechanism `stillExiled`
+-- documents one ability over. It is therefore the DECLINE, and only the decline,
+-- that reaches the graveyard.
+--
+-- The CONDITION is CR 701.9a's discard read self-scoped, matched against the id
+-- the CR 400.7 funnel minted -- which is the exile incarnation, since rule
+-- 702.35a's replacement has already run. No intervening "if": rule 702.35a
+-- states none.
+--
+-- Not implemented: rule 702.35a's "this way". A card discarded while some OTHER
+-- replacement exiled it -- Rest in Peace's, chosen over madness's under CR 616.1
+-- -- reaches this trigger all the same, because the exile scan sees only that
+-- the card is in exile and was discarded (#3670).
+madnessCast :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+madnessCast cost =
+  let offer =
+        Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.ref = ObjectRef.InSlot Binding.triggerSource,
+              -- Rule 702.35a's "ITS OWNER may cast it": a card in exile has no
+              -- controller (CR 108.4), so CR 108.4a makes the owner this
+              -- trigger's controller and the two seats coincide.
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = CastObligation.Optional,
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just (Keyword.Madness cost)}
+            }
+      -- Rule 702.35a's last sentence. No riders and no slot: the destination is
+      -- a graveyard, which CR 400.3 makes the owner's, and nothing reads the
+      -- arrival. `origin` is Nothing because that field is
+      -- Pawl.Engine.Activate.zoneAbilitiesOf's question about where an ability
+      -- may be ACTIVATED from, and this is a trigger.
+      toGraveyard =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot Binding.triggerSource,
+              MoveToZone.zone = Zone.Graveyard,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Nothing,
+              MoveToZone.origin = Nothing,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfDiscarded,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [offer, toGraveyard]))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- CR 702.62a's last sentence: "If you cast a creature spell this way, it gains
 -- haste until you lose control of the spell or the permanent it becomes." The
