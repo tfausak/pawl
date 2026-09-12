@@ -4,23 +4,24 @@
 -- Covers CR 716's Class cards, which need no engine subsystem of their own. A
 -- class level bar is a keyword ability (CR 716.2) whose meaning rule 716.2a spells
 -- out in full, and both halves of that sentence are vocabulary the card model
--- already had: the activated half is an ordinary activated ability with an
--- ActivationRestriction.SorcerySpeed and an ActivatedAbility.condition, and the
--- static half is an ordinary StaticAbility with a CR 604.2 clause.
+-- already had: the activated half is an ordinary activated ability carrying rule
+-- 716.2a's two riders as ActivationRestriction.OnlyIf and
+-- ActivationRestriction.SorcerySpeed, and the static half is an ordinary
+-- StaticAbility with a CR 604.2 clause. The mark both halves read is
+-- Object.classLevel, written by Effect.SetClassLevel and read by
+-- Quantity.ClassLevel.
 --
--- Not implemented: CR 716.2a's "activate only if this Class is level N-1" as the
--- RESTRICTION the rule states. ActivatedAbility.condition is a grant gate, so
--- the bar is absent below the level rather than present and prohibited;
--- ActivationRestriction.OnlyIf is the faithful spelling and these cards do not
--- take it (#3193). What this unit
--- added is the mark those two clauses read -- Object.classLevel, written by
--- Effect.SetClassLevel and read by Quantity.ClassLevel.
+-- The "activate only if this Class is level N-1" rider is a RESTRICTION and not
+-- ActivatedAbility.condition's grant gate, which would make the bar absent below
+-- the level rather than present and prohibited (CR 602.5 prohibits activating an
+-- ability the object still HAS). barsHadSpec below is what tells the two
+-- readings apart.
 --
 -- So what this file exercises is that mark's lifecycle: Pawl.Engine.Resolve's
 -- SetClassLevel arm writes it, Pawl.Engine.Quantity's ClassLevel arm reads it back
--- through Pawl.Engine.Filter's view, Pawl.Engine.Projection.View.abilitiesFromCharacteristics
--- gates the next bar on it, and Pawl.Engine.Projection.gatherStatic gates the
--- section's continuous effect on it.
+-- through Pawl.Engine.Filter's view, Pawl.Engine.ActivationRestriction's OnlyIf
+-- arm gates the next bar's activation on it, and Pawl.Engine.Projection.gatherStatic
+-- gates the section's continuous effect on it.
 --
 -- Paladin Class, AFR 29, is the card under test for every group but the last,
 -- and it was picked
@@ -95,6 +96,7 @@ spec s registry = Spec.describe s "Class" $ do
   sectionSpec s registry
   levelThreeSpec s registry
   ladderSpec s registry
+  barsHadSpec s registry
   designationSpec s registry
   becomesLevelSpec s registry
 
@@ -213,11 +215,14 @@ barsOffered oid gs =
         pure ()
     )
 
--- Activate the first bar the enumeration offers and resolve it. Stack.resolveTop
--- rather than the priority loop: the narrowest path that shows the write, with no
--- settle in between that could sweep something.
+-- Activate the first bar alice is OFFERED on this permanent and resolve it.
+-- Offered rather than merely present: CR 716.2a leaves every bar on the Class at
+-- every level and CR 602.5's riders are what pick one out, so the enumeration is
+-- the only thing that knows which. Stack.resolveTop rather than the priority
+-- loop: the narrowest path that shows the write, with no settle in between that
+-- could sweep something.
 gainLevel :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-gainLevel oid gs = case Activate.abilitiesFor oid gs of
+gainLevel oid gs = case [ability | Action.Type.Activate o ability <- Action.legalActions S.alice gs, o == oid] of
   [] -> gs
   ability : _ ->
     let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability)
@@ -377,6 +382,71 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
         bobsTurn = gs {GameState.activePlayer = S.bob}
     Spec.assertEqWith s "offered on alice's own main phase" (barsOffered classId gs) 1
     Spec.assertEqWith s "not offered on bob's turn" (barsOffered classId bobsTurn) 0
+
+-- CR 716.2a's rider is "Activate only if this Class is level N-1", and CR 602.5
+-- makes that a prohibition on activating an ability the object HAS. The other
+-- reading -- ActivatedAbility.condition, which GRANTS the bar only at level N-1 --
+-- refuses the same activations, so the two come apart only where a card reads the
+-- abilities an object has rather than what it may do (CR 602.1).
+--
+-- Paladin Class at level THREE is where they differ most sharply: its ladder is
+-- spent, so under the grant gate neither bar is among its abilities and the Class
+-- has none, while rule 716.2a leaves both bars on it, prohibited.
+--
+-- Synthetic Ability Audit is the reader -- "Creatures get +1/+0 for each permanent
+-- with an activated ability that isn't a mana ability", which is
+-- Filter.HasNonManaActivatedAbility over the battlefield. Synthetic because no
+-- printing asks that question of an enchantment: Tsabo's Web and Ravager Wurm ask
+-- it of LANDS, Magewright's Stone of a creature, and Zirda, the Dawnwaker of the
+-- CARDS in a starting deck, which Pawl.Engine.Projection.View.viewOfCard answers
+-- off the printed face with no gate to apply, so both readings agree there. The
+-- Enigma Jewel's "four or more nonlands with activated abilities" would ask it of
+-- a permanent, but it is a craft cost and craft is unimplemented (gap #3526).
+--
+-- bob owns the Piker so that Paladin Class's own level-2 section -- "Creatures you
+-- control get +1/+1" -- cannot reach it, leaving the audit the only thing that
+-- moves a number; and the audit moves POWER only, so a modification landing on
+-- both axes could not pass for it. No land is on the board, so nothing but the
+-- Class can carry an activated ability of any kind.
+barsHadSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+barsHadSpec s registry = Spec.describe s "Bars the Class has" $ do
+  Spec.it s "CR 716.2a / CR 602.1 a Class has its level bars at every level, activatable or not" $ do
+    audit <- S.printingOf s registry "Synthetic Ability Audit"
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (topClass, topPiker, topBoard) = auditBoard audit paladinClass piker (Just 3)
+        (_, freshPiker, freshBoard) = auditBoard audit paladinClass piker (Just 1)
+        (_, lonePiker, loneBoard) = auditBoard audit paladinClass piker Nothing
+    Spec.assertEqWith
+      s
+      "CR 716.2a: bob's Piker is 3/1, the audit counting a level-3 Class whose bars are all prohibited"
+      (S.powerToughnessOf topPiker topBoard)
+      (Just (3, 1))
+    Spec.assertEqWith
+      s
+      "CR 716.2a: a level-1 Class, whose first bar IS activatable, is counted the same"
+      (S.powerToughnessOf freshPiker freshBoard)
+      (Just (3, 1))
+    Spec.assertEqWith
+      s
+      "the same board without the Class: the audit counts nothing and the Piker is its printed 2/1"
+      (S.powerToughnessOf lonePiker loneBoard)
+      (Just (2, 1))
+    Spec.assertEqWith s "CR 716.2b: the first board's Class is at level 3" (fmap (`levelOf` topBoard) topClass) (Just (Just (ClassLevel.MkClassLevel 3)))
+
+-- alice's audit and bob's Piker, plus alice's Class at the given level when there
+-- is one. The three boards differ in exactly one thing apiece: whether the Class
+-- is there at all, and what level it is at. The level is WRITTEN rather than
+-- climbed, there being no mana here to climb with, and the case asserts it.
+auditBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Natural.Natural -> (Maybe ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+auditBoard audit paladinClass piker level =
+  let (_, withAudit) = S.addPermanent audit S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, withPiker) = S.addPermanent piker S.bob withAudit
+   in case level of
+        Nothing -> (Nothing, pikerId, withPiker)
+        Just n ->
+          let (classId, withClass) = S.addPermanent paladinClass S.alice withPiker
+           in (Just classId, pikerId, atLevel classId n withClass)
 
 -- CR 716.2b: "A level is a designation that any permanent can have. A Class
 -- retains its level even if it stops being a Class."
@@ -707,7 +777,8 @@ talentBoard talent island bolt raiseDead =
 namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
 namesIn zone pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
 
--- Activate the first bar offered on the Class and drain the stack. The priority
+-- Activate the first bar alice is offered on the Class -- gainLevel's
+-- enumeration, for its reason -- and drain the stack. The priority
 -- loop rather than Stack.resolveTop, and that is load-bearing: resolving only the
 -- top object leaves the level set and the granted trigger not yet placed, which
 -- reads exactly like a trigger that never fired.
@@ -737,7 +808,7 @@ climbAiming classId aim gs =
             )
             sets
         _ -> S.aggressiveAnswer p
-   in case Activate.abilitiesFor classId gs of
+   in case [ability | Action.Type.Activate o ability <- Action.legalActions S.alice gs, o == classId] of
         [] -> gs
         ability : _ ->
           let activated = S.runPure answering gs (Activate.activateAbility S.alice classId ability)

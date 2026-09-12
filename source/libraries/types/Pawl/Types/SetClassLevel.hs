@@ -12,7 +12,7 @@ import qualified Pawl.Types.SlotName as SlotName
 --
 -- BECOMES rather than increments: rule 716.2a states an absolute, and the "only
 -- if this Class is level N-1" half of the same sentence is an
--- ActivatedAbility.condition on the bar rather than anything this effect checks.
+-- ActivationRestriction.OnlyIf on the bar rather than anything this effect checks.
 data SetClassLevel = MkSetClassLevel
   { level :: ClassLevel.ClassLevel,
     slot :: SlotName.SlotName

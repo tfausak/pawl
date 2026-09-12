@@ -3,21 +3,6 @@
     {
       "activatedAbilities": [
         {
-          "condition": {
-            "type": "Compares",
-            "value": {
-              "comparison": {
-                "type": "Exactly"
-              },
-              "measured": {
-                "type": "ClassLevel"
-              },
-              "threshold": {
-                "type": "Literal",
-                "value": 1
-              }
-            }
-          },
           "cost": {
             "mana": [
               {
@@ -56,26 +41,29 @@
           },
           "restrictions": [
             {
+              "type": "OnlyIf",
+              "value": {
+                "type": "Compares",
+                "value": {
+                  "comparison": {
+                    "type": "Exactly"
+                  },
+                  "measured": {
+                    "type": "ClassLevel"
+                  },
+                  "threshold": {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                }
+              }
+            },
+            {
               "type": "SorcerySpeed"
             }
           ]
         },
         {
-          "condition": {
-            "type": "Compares",
-            "value": {
-              "comparison": {
-                "type": "Exactly"
-              },
-              "measured": {
-                "type": "ClassLevel"
-              },
-              "threshold": {
-                "type": "Literal",
-                "value": 2
-              }
-            }
-          },
           "cost": {
             "mana": [
               {
@@ -113,6 +101,24 @@
             ]
           },
           "restrictions": [
+            {
+              "type": "OnlyIf",
+              "value": {
+                "type": "Compares",
+                "value": {
+                  "comparison": {
+                    "type": "Exactly"
+                  },
+                  "measured": {
+                    "type": "ClassLevel"
+                  },
+                  "threshold": {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                }
+              }
+            },
             {
               "type": "SorcerySpeed"
             }
