@@ -18,6 +18,7 @@ codec =
       -- The table minus one seat, which a card writes: Shahrazad's "each player
       -- who doesn't win the subgame".
       Arm.payload "EachPlayerExcept" SlotName.codec PlayerRef.EachPlayerExcept (\x -> case x of PlayerRef.EachPlayerExcept y -> Just y; _ -> Nothing),
+      Arm.payload "EachOpponentExcept" SlotName.codec PlayerRef.EachOpponentExcept (\x -> case x of PlayerRef.EachOpponentExcept y -> Just y; _ -> Nothing),
       Arm.payload "Relative" PlayerRelation.codec PlayerRef.Relative (\x -> case x of PlayerRef.Relative y -> Just y; _ -> Nothing),
       Arm.payload "InSlot" SlotName.codec PlayerRef.InSlot (\x -> case x of PlayerRef.InSlot y -> Just y; _ -> Nothing),
       -- InSlot's plural, which a card writes: Jungle Wayfinder's searchers are

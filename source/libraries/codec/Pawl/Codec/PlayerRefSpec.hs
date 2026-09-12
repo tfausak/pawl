@@ -62,6 +62,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
       PlayerRef.codec
       (PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers PlayerRelation.Opponent (SlotName.MkSlotName (Text.pack "attackedPlayer"))))
       " {\"type\":\"Attacking\",\"value\":{\"relation\":{\"type\":\"Opponent\"},\"attacked\":\"attackedPlayer\"}} "
+  Spec.it s "EachOpponentExcept" $
+    Common.assertCodec
+      s
+      PlayerRef.codec
+      (PlayerRef.EachOpponentExcept (SlotName.MkSlotName (Text.pack "defendingPlayer")))
+      " {\"type\":\"EachOpponentExcept\",\"value\":\"defendingPlayer\"} "
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool
       s

@@ -475,6 +475,9 @@ overPlayerRefSlots f ref = case ref of
   -- The slot decides who is left OUT rather than who is in, which changes nothing
   -- about whose namespace the name is in.
   PlayerRef.EachPlayerExcept slot -> fmap PlayerRef.EachPlayerExcept (f slot)
+  -- CR 702.116a's exclusion, the arm above narrowed to opponents and read the
+  -- same way.
+  PlayerRef.EachOpponentExcept slot -> fmap PlayerRef.EachOpponentExcept (f slot)
   PlayerRef.ControllerOfBound slot -> fmap PlayerRef.ControllerOfBound (f slot)
   PlayerRef.Attacking attacking -> fmap (\slot -> PlayerRef.Attacking attacking {AttackingPlayers.attacked = slot}) (f (AttackingPlayers.attacked attacking))
   -- The four that name no slot at all: the table, CR 109.5's relation, a baked

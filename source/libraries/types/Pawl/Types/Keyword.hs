@@ -393,6 +393,11 @@ data Keyword
     -- player exiles the top card of their library, face up (CR 406.3); each
     -- instance triggers separately (CR 702.115b).
     Ingest
+  | -- | 702.116a: whenever this creature attacks, for each opponent other than
+    -- defending player, you may create a tapped token copy of it attacking that
+    -- player or a planeswalker they control, and exile those tokens at end of
+    -- combat; each instance triggers separately (CR 702.116b).
+    Myriad
   | -- | 702.117a: surge [cost] -- you may pay [cost] rather than this spell's
     -- mana cost as you cast it if you or a teammate has cast another spell this
     -- turn, which CR 601.2b and CR 601.2f-h price as an alternative cost.

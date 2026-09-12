@@ -1869,6 +1869,21 @@ attemptAttackDeclaration perform pid rejected = do
               -- trigger from this declaration on the stack together.
               Monad.unless (null attacking) (State.modify' (Event.recordEvent (GameEvent.AttackersDeclared pid)))
 
+-- What an effect leaves open about CR 508.4's choice, which is a question about
+-- the EFFECT rather than about the board, so it is settled by
+-- Pawl.Engine.Resolve.Effect's read of Pawl.Types.EntryAttack and passed down.
+-- Engine-local rather than a Pawl.Types module: no card writes it, the arms
+-- naming a PlayerId the way Pawl.Types.AttackTarget's do.
+data AttackChoice
+  = -- | CR 508.4's main clause: the controller chooses among every legal subject.
+    Any
+  | -- | CR 508.4's parenthetical (CR 702.49c): the effect said what it attacks.
+    Specified AttackTarget.AttackTarget
+  | -- | CR 702.116a: the controller still chooses, among that player and the
+    -- planeswalkers they control.
+    Under PlayerId
+  deriving (Eq, Ord, Show)
+
 -- CR 508.4: a creature put onto the battlefield attacking has its controller
 -- choose what it is attacking as it enters. Resolve calls this for each permanent
 -- an effect's EntryRiders say is attacking.
@@ -1893,13 +1908,14 @@ attemptAttackDeclaration perform pid rejected = do
 -- which Hanweir Garrison's and Meandering Towershell's rulings both require;
 -- elided at one candidate.
 --
--- `specified` is rule 508.4's parenthetical: an effect that says what the
--- creature attacks (CR 702.49c) asks nobody. A specified target outside the
+-- `choice` is rule 508.4's parenthetical and rule 702.116a's narrowing, over the
+-- one candidate list: `Specified` is an effect that says what the creature
+-- attacks (CR 702.49c) and asks nobody, and a specified target outside the
 -- candidates is CR 508.4a's no-op, the candidates being exactly the players,
 -- planeswalkers and battles that rule still allows. Pawl.ActivateSpec's
 -- Ninjutsu group proves a ninja takes the returned creature's planeswalker.
-putOntoBattlefieldAttacking :: Maybe AttackTarget.AttackTarget -> ObjectId -> Game ()
-putOntoBattlefieldAttacking specified oid = do
+putOntoBattlefieldAttacking :: AttackChoice -> ObjectId -> Game ()
+putOntoBattlefieldAttacking choice oid = do
   gs <- State.get
   let c = GameState.combat gs
       -- declarableTargets with CR 506.3c / CR 508.4a's liveness filter applied
@@ -1911,7 +1927,23 @@ putOntoBattlefieldAttacking specified oid = do
         concatMap
           (\defender -> NonEmpty.toList (attackTargets defender gs))
           (filter (\defender -> List.elem defender playing) (Defender.defendingPlayers gs))
-  case (NonEmpty.nonEmpty targets, Projection.controllerOf oid gs) of
+      -- CR 702.116a's "that player or a planeswalker they control", narrowing the
+      -- CR 508.4 candidates above rather than the board: a planeswalker no
+      -- defending player controls is not among them to begin with, and a battle
+      -- that seat protects is not "a planeswalker they control". An empty
+      -- narrowing is CR 508.4a's no-op below, the creature entering unattacking.
+      narrowed = case choice of
+        Any -> targets
+        Specified _ -> targets
+        Under pid ->
+          filter
+            ( \target -> case target of
+                AttackTarget.OfPlayer p -> p == pid
+                AttackTarget.OfPlaneswalker walker -> Projection.controllerOf walker gs == Just pid
+                AttackTarget.OfBattle _ -> False
+            )
+            targets
+  case (NonEmpty.nonEmpty narrowed, Projection.controllerOf oid gs) of
     (Just options, Just controller)
       | Set.member oid (GameState.battlefield gs),
         -- CR 506.3a
@@ -1921,9 +1953,13 @@ putOntoBattlefieldAttacking specified oid = do
           -- CR 508.4's chooser is the creature's controller, whom the guard above
           -- makes the attacking player -- which is what lets CR 508.1b's
           -- announcement and this one share a prompt.
-          mTarget <- case specified of
-            Nothing -> fmap Just (announceAttackTarget controller oid options)
-            Just target -> pure (if List.elem target (NonEmpty.toList options) then Just target else Nothing)
+          mTarget <- case choice of
+            Any -> fmap Just (announceAttackTarget controller oid options)
+            -- The narrowing above already cut `options` to this seat's subjects,
+            -- so CR 702.116a's choice is the same announcement over fewer of
+            -- them -- elided, like every other, at one candidate.
+            Under _ -> fmap Just (announceAttackTarget controller oid options)
+            Specified target -> pure (if List.elem target (NonEmpty.toList options) then Just target else Nothing)
           Monad.forM_ mTarget $ \target ->
             State.put
               gs

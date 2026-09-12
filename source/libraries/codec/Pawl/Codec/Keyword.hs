@@ -139,6 +139,7 @@ codec =
       Arm.nullary "Changeling" Keyword.Changeling,
       Arm.nullary "Devoid" Keyword.Devoid,
       Arm.nullary "Ingest" Keyword.Ingest,
+      Arm.nullary "Myriad" Keyword.Myriad,
       Arm.nullary "Skulk" Keyword.Skulk,
       Arm.payload "Escalate" (Cost.codec codec) Keyword.Escalate (\x -> case x of Keyword.Escalate y -> Just y; _ -> Nothing),
       Arm.nullary "Melee" Keyword.Melee,

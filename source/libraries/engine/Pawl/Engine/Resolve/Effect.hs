@@ -85,7 +85,6 @@ import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
-import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
@@ -863,19 +862,43 @@ slotOne slot resolving gs = do
   obj <- Game.lookupObject resolving gs
   Recipient.objectOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
 
+-- slotOne's PLAYER twin (CR 115.1), read the same way and with the same
+-- collapse: a slot that is unbound, holds a group, or holds an object names
+-- nobody. CR 702.116a's loop slot is the one reader.
+slotOnePlayer :: SlotName -> ObjectId -> GameState -> Maybe PlayerId
+slotOnePlayer slot resolving gs = do
+  obj <- Game.lookupObject resolving gs
+  Recipient.playerOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+
+-- The ONE player a slot names, from CR 608.2b's surviving recipients first and
+-- from the resolving object's own bindings otherwise. Two sources for
+-- fromAmongMembers' reason one recipient kind over: CR 608.2f's loop binds this
+-- iteration's member into the handed-down maps and never onto the object, and a
+-- slot an earlier effect defined is only on the object. Nothing where the slot
+-- names none or several.
+onePlayerNamed :: Map.Map SlotName (Set Recipient) -> SlotName -> ObjectId -> GameState -> Maybe PlayerId
+onePlayerNamed legal slot resolving gs = case Maybe.mapMaybe Recipient.playerOf (legalMany slot legal) of
+  [pid] -> Just pid
+  _ -> slotOnePlayer slot resolving gs
+
 -- CR 508.4: what an entry rider says the arriving creature attacks. Nothing: it
--- does not enter attacking. Just Nothing: its controller chooses, which
--- Combat.putOntoBattlefieldAttacking asks. Just (Just target): the effect
+-- does not enter attacking. Combat.Any: its controller chooses, which
+-- Combat.putOntoBattlefieldAttacking asks. Combat.Specified: the effect
 -- specified it (CR 702.49c), read through CR 608.2h for a slot whose object has
 -- left (ninjutsu's returned creature, CR 400.7). A slot naming no creature that
 -- was attacking specifies nothing to attack, so nothing enters attacking.
-entryAttack :: ObjectId -> EntryRiders.EntryRiders count -> GameState -> Maybe (Maybe AttackTarget.AttackTarget)
-entryAttack resolving entry gs = case EntryRiders.attacking entry of
+--
+-- Combat.Under is CR 702.116a's narrowing: the slot names a PLAYER rather than an
+-- object, and a slot naming none narrows to nobody, so nothing enters attacking
+-- -- the myriad iteration whose opponent has left the game (CR 800.4a).
+entryAttack :: Map.Map SlotName (Set Recipient) -> ObjectId -> EntryRiders.EntryRiders count -> GameState -> Maybe Combat.AttackChoice
+entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
   Nothing -> Nothing
-  Just EntryAttack.Chosen -> Just Nothing
+  Just EntryAttack.Chosen -> Just Combat.Any
   Just (EntryAttack.SameAs slot) -> do
     named <- slotOne slot resolving gs
-    fmap Just (Game.attackTargetWithLastKnown named gs)
+    fmap Combat.Specified (Game.attackTargetWithLastKnown named gs)
+  Just (EntryAttack.UnderPlayer slot) -> fmap Combat.Under (onePlayerNamed legal slot resolving gs)
 
 -- CR 608.2g: make the offer Effect.OfferCast carries, and cast if it is taken.
 --
@@ -3629,7 +3652,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   _ -> Nothing
             -- CR 508.4's rider, read ONCE off the same pre-move board for
             -- mBlocked's reason.
-            let mAttack = entryAttack resolving entry before
+            let mAttack = entryAttack legal resolving entry before
             -- ONE event, which is what Event.simultaneously stamps on everything the
             -- fold records: CR 608.2f processes an action taken on multiple objects
             -- simultaneously, and one opcode is one such action however many objects
@@ -4562,7 +4585,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           _ -> Nothing
     -- CR 508.4's rider, read ONCE ahead of the minting loop for mBlocked's
     -- reason.
-    let mAttack = entryAttack resolving entry gs
+    let mAttack = entryAttack legal resolving entry gs
     -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
     -- seat's tokens cannot change how many the next seat gets.
     minted <- fmap concat . Monad.forM creators $ \creating ->
@@ -4681,7 +4704,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         frozen = freezeRiders viewOf context gs resolving source entry
         -- CR 508.4's rider, read ONCE off the pre-effect board for Create's
         -- reason.
-        mAttack = entryAttack resolving entry gs
+        mAttack = entryAttack legal resolving entry gs
     -- CR 509.4's parenthetical, read the way Create's arm reads it and for the
     -- same reasons: the attacking creature the effect SPECIFIED, named by slot,
     -- once and ahead of the minting loop, through fromAmongMembers. Mirror

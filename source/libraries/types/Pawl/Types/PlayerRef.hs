@@ -36,6 +36,18 @@ data PlayerRef
     -- also why this is a slot-EXCLUSION rather than a slot-read -- an unfilled
     -- slot makes InSlot's readers no-op, and here it must widen instead.
     EachPlayerExcept SlotName.SlotName
+  | -- | EachPlayerExcept narrowed to CR 102.2 / 102.3's opponents -- CR 702.116a's "each
+    -- opponent other than defending player", where the slot holds the player the
+    -- myriad creature attacked.
+    --
+    -- A THIRD arm rather than a flag on the one above, for that arm's own reason:
+    -- the two are different printed phrases, and the seat they differ over is the
+    -- perspective's own, which myriad must drop (the attacking player is nobody's
+    -- opponent) and Shahrazad must keep.
+    --
+    -- A SLOT NAMING NOBODY EXCLUDES NOBODY here too, so the set is every
+    -- opponent.
+    EachOpponentExcept SlotName.SlotName
   | -- | CR 109.5 / 102.2, resolved against the evaluation context's perspective.
     Relative PlayerRelation.PlayerRelation
   | -- | The player bound in a slot -- Sudden Impact's "that player's hand", where
