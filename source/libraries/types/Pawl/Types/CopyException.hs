@@ -186,9 +186,8 @@ data CopyException ability
     -- but the only printed decline-to-copy clause is this one (Scryfall
     -- @o:"doesn't copy"@, 2026-09-12, Vesuvan Doppelganger and nothing else; the
     -- rule's second sentence, "certain characteristics are not copied", matches
-    -- no printing at all), and a payload naming which characteristic would be a
-    -- second spelling of the CR 205.1 split Pawl.Types.ProjectedCharacteristics
-    -- already keeps in separate fields.
+    -- no printing at all), so a payload naming which characteristic would have
+    -- exactly one inhabitant any card can write.
     --
     -- RETAINS rather than clears, which is what separates this arm from
     -- SetColors: the exception states no value, so the copy keeps the colours it

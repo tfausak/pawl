@@ -479,9 +479,9 @@ becomesCopyOf victim p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> aimByFiltering victim p
 
--- One upkeep for alice: CR 500.1's step beginning recorded so CR 603.3 gathers
--- what it triggers, then the priority loop run to exhaustion so the trigger
--- resolves.
+-- One upkeep for alice: the step's beginning recorded as the event a trigger
+-- condition reads, then the priority loop run to exhaustion so what CR 603.3
+-- gathered resolves.
 upkeepForAlice :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 upkeepForAlice answer gs =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
