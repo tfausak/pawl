@@ -3,6 +3,7 @@ module Pawl.Types.TargetSlot where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotCount as SlotCount
@@ -79,7 +80,27 @@ data TargetSlot = MkTargetSlot
     -- card: the bound is the damage the event carried") and CR 601.2b's announced
     -- X on a spell (Stir the Grave's "mana value X or less", proved by that
     -- module's "CR 601.2c whole card: the bound is the X the caster announced").
-    amount :: Maybe Quantity.Quantity
+    amount :: Maybe Quantity.Quantity,
+    -- | CR 115.1 / 601.2c: WHO announces this slot's targets, as a relation to
+    -- the ability's controller -- Cuombajj Witches' "1 damage to any target of an
+    -- opponent's choice". Nothing is the rule's default, the controller, which is
+    -- every other slot in the corpus.
+    --
+    -- A RELATION and not a player, because a card prints one: rule 601.2c's
+    -- announcement happens before anything is bound, so a slot cannot name the
+    -- seat by id and there is nothing else to name it by. Resolving it to a seat
+    -- is Pawl.Engine.Target.chooserOf's, and where the relation admits more than
+    -- one seat the CONTROLLER picks which -- CR 801.5a's example is the rule text
+    -- that says so, "choosing Rob as the opponent who picks the other target".
+    --
+    -- ON THE SLOT rather than on the ability, because Cuombajj Witches prints
+    -- both readings in one activation: its first target is the controller's and
+    -- its second an opponent's.
+    --
+    -- Whose choice it is does NOT move CR 109.5's "you". Legality is still judged
+    -- from the ability's controller -- hexproof asks who controls the ability (CR
+    -- 702.11b), not who points it -- so only the prompt's seat changes.
+    chooser :: Maybe PlayerRelation.PlayerRelation
   }
   deriving (Eq, Ord, Show)
 
@@ -87,25 +108,32 @@ data TargetSlot = MkTargetSlot
 -- almost every slot in the engine and the corpus is one, so writing the count out
 -- at each would bury the handful that are not.
 required :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-required p f = MkTargetSlot p f (SlotCount.Printed TargetCount.one) Nothing
+required p f = MkTargetSlot p f (SlotCount.Printed TargetCount.one) Nothing Nothing
 
 -- CR 115.6 / 601.2c's "up to N targets": a slot the caster may fill any number of
 -- times up to N, the empty answer included.
 upTo :: Natural.Natural -> Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-upTo n p f = MkTargetSlot p f (SlotCount.Printed (TargetCount.upTo n)) Nothing
+upTo n p f = MkTargetSlot p f (SlotCount.Printed (TargetCount.upTo n)) Nothing Nothing
 
 -- CR 601.2c's "any number of target ...": the same slot with no printed ceiling,
 -- so the board's candidates are the only bound.
 anyNumber :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-anyNumber p f = MkTargetSlot p f (SlotCount.Printed TargetCount.anyNumber) Nothing
+anyNumber p f = MkTargetSlot p f (SlotCount.Printed TargetCount.anyNumber) Nothing Nothing
 
 -- CR 601.2c with CR 601.2b: a slot taking exactly the X the caster announced
 -- ("each of X target creatures", Rot-Curse Rakshasa).
 announcedX :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-announcedX p f = MkTargetSlot p f SlotCount.AnnouncedX Nothing
+announcedX p f = MkTargetSlot p f SlotCount.AnnouncedX Nothing Nothing
 
 -- CR 601.2c: the same slot with the computed bound its Filter compares against --
 -- see `amount` above. Separate from the three builders so that the slots that
 -- name no amount, which is almost every slot, stay spelled as they were.
 withAmount :: Quantity.Quantity -> TargetSlot -> TargetSlot
 withAmount q slot = slot {amount = Just q}
+
+-- CR 115.1's default overridden: the same slot announced by somebody other than
+-- the ability's controller. Separate from the four builders above so that the
+-- slots the controller chooses, which is almost every slot, stay spelled as they
+-- were.
+chosenBy :: PlayerRelation.PlayerRelation -> TargetSlot -> TargetSlot
+chosenBy relation slot = slot {chooser = Just relation}

@@ -70,8 +70,10 @@
 -- the stack.
 module Pawl.TargetSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -129,6 +131,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -2676,6 +2679,77 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- The joint check on the road no spell takes: CR 603.3d's placement, where an
   -- announcement that fails it is asked again rather than reversed.
   itzquinthSpec s registry
+  -- And the one slot in the corpus its CONTROLLER does not announce.
+  cuombajjSpec s registry
+
+-- CR 115.1 fixes the ability's controller as the seat that announces its
+-- targets. Cuombajj Witches overrides that for one of its two slots -- "{T}:
+-- This creature deals 1 damage to any target and 1 damage to any target of an
+-- opponent's choice" -- and CR 801.5a's example is the rule text that names the
+-- card, and that says the CONTROLLER picks which opponent picks.
+--
+-- Three seats, because at two the two readings collapse: CR 102.2 leaves "an
+-- opponent" one candidate, and nothing on the board can tell "alice chose it"
+-- from "bob did" when they would name the same seat.
+--
+-- Both cases run off one board and one activation, and differ only in which
+-- opponent alice names, so the seat that answers is the only thing between them.
+cuombajjSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cuombajjSpec s registry = Spec.describe s "A slot the controller does not announce (CR 115.1)" $ do
+  Spec.it s "CR 115.1 the opponent alice named picks the second target, and alice picks only the first" $ do
+    witches <- S.printingOf s registry "Cuombajj Witches"
+    case Face.activatedAbilities (S.combinedFace witches) of
+      [] -> Spec.assertFailure s "Cuombajj Witches should print one activated ability"
+      ability : _ -> do
+        let (srcId, board) = witchesBoard witches
+            after = S.runPure (answeringWitches S.bob) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+        -- The gameplay assertions first. alice is the seat BOB named, and alice
+        -- would never have named herself, so her life total is the whole claim.
+        Spec.assertEqWith s "alice, whom bob named, took bob's damage" (S.lifeOf S.alice after) (Just 19)
+        Spec.assertEqWith s "carol, whom alice named, took alice's" (S.lifeOf S.carol after) (Just 19)
+        Spec.assertEqWith s "and bob, who announced but was named by nobody, took none" (S.lifeOf S.bob after) (Just 20)
+        -- The proxy last: the ability really resolved and really tapped.
+        Spec.assertEqWith s "the Witches tapped to pay for it" (fmap Object.tapped (Game.lookupObject srcId after)) (Just TapState.Tapped)
+
+  -- CR 801.5a's other half: WHICH opponent announces is alice's to choose, so
+  -- naming carol instead of bob moves the second target with it. The engine may
+  -- not settle that question itself, which is what a three-seat board is for.
+  Spec.it s "CR 801.5a naming carol instead of bob routes the second announcement to carol" $ do
+    witches <- S.printingOf s registry "Cuombajj Witches"
+    case Face.activatedAbilities (S.combinedFace witches) of
+      [] -> Spec.assertFailure s "Cuombajj Witches should print one activated ability"
+      ability : _ -> do
+        let (srcId, board) = witchesBoard witches
+            after = S.runPure (answeringWitches S.carol) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+        Spec.assertEqWith s "bob, whom carol named, took carol's damage" (S.lifeOf S.bob after) (Just 19)
+        Spec.assertEqWith s "carol took alice's, and none of her own" (S.lifeOf S.carol after) (Just 19)
+        Spec.assertEqWith s "and alice, whom bob would have named had bob been asked, took none" (S.lifeOf S.alice after) (Just 20)
+
+-- alice's Witches, settled and untapped, at three seats with priority hers.
+witchesBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+witchesBoard witches =
+  let (srcId, gs) = S.addPermanent witches S.alice (Setup.emptyGame S.threePlayers)
+   in (srcId, gs {GameState.priority = Just S.alice})
+
+-- `chosen` is the opponent alice names at CR 801.5a's pick. Every announcing
+-- seat targets the seat BEFORE it, a rotation rather than a fixed victim, so
+-- each of the three possible askers names a different player and no two of them
+-- can be told apart by the board alone. Keyed on the ASKING seat, which the
+-- prompt carries; a pure answerer that read only the offer would answer both
+-- announcements alike. The answer is FILTERED out of the offer rather than
+-- built, so it is the recipient the pool actually produced (CR 608.2b).
+answeringWitches :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+answeringWitches chosen p = case p of
+  Prompt.ChooseOpponent _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (chosen ==) (NonEmpty.toList offered))
+  Prompt.ChooseTargets _ asker _ asked -> fmap (\(_, offered) -> Set.filter ((Just (previousSeat asker) ==) . Recipient.playerOf) offered) asked
+  _ -> S.identityAnswer p
+
+-- The rotation answeringWitches names its victim by.
+previousSeat :: PlayerId.PlayerId -> PlayerId.PlayerId
+previousSeat pid
+  | pid == S.alice = S.carol
+  | pid == S.bob = S.alice
+  | otherwise = S.bob
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
