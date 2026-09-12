@@ -1123,6 +1123,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   licidSpec s registry
   auraTextChangeSpec s registry
   sigardasAidSpec s registry
+  equipmentTokenSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -3649,3 +3650,114 @@ sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
     Spec.assertEqWith s "CR 702.16b: an enchantment's ability may still target it, so the trigger is on the stack" (length (GameState.stack placed)) 1
     Spec.assertEqWith s "CR 702.16d: the artifact Bonesplitter cannot equip it, so it is still a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
     Spec.assertEqWith s "and the Bonesplitter stayed put, unattached, rather than moving (CR 701.3b)" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid after)) (splitterOn after)) [Just Nothing]
+
+-- CR 702.92a / 702.163a / 702.182a: living weapon, for Mirrodin! and job select
+-- are one sentence three times over -- "When this Equipment enters, create a
+-- [token], then attach this Equipment to it" -- so Pawl.Engine.Keyword mints all
+-- three from one builder and these cases differ only in the token the rule
+-- names. They belong here rather than with the other keyword triggers because
+-- what is new is the ATTACH: the create binds a slot and the attach in the same
+-- clause reads it, which works only because Pawl.Engine.Resolve re-reads the live
+-- bindings per effect (CR 608.2c).
+--
+-- Each token's P/T is read AFTER state-based actions, which is what makes the
+-- assertion non-vacuous in both directions: an attach that did not happen leaves
+-- the Germ a 0/0 that CR 704.5f buries, and leaves the Rebel and the Hero at
+-- their printed sizes rather than their equipped ones. The three rules print
+-- three different sizes, so no case can pass on another's numbers.
+equipmentTokenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+equipmentTokenSpec s registry = Spec.describe s "EquipmentToken" $ do
+  Spec.it s "CR 702.92a whole card: Flayer Husk mints a 0/0 black Phyrexian Germ and equips it in the same resolution, so a 1/1 lives" $ do
+    husk <- S.printingOf s registry "Flayer Husk"
+    let (equipmentId, minted, settled) = enterAndTrigger (Setup.emptyGame S.bothPlayers) husk
+    Spec.assertEqWith s "CR 702.92a: the 0/0 Germ is wearing the Husk, so it is a 1/1 and lives through CR 704.5f" (fmap (\oid -> S.powerToughnessOf oid settled) minted) [Just (1, 1)]
+    Spec.assertEqWith s "CR 702.92a: black" (fmap (\oid -> Projection.colorsOf oid settled) minted) [Set.singleton Color.Black]
+    Spec.assertEqWith s "CR 702.92a: a Phyrexian Germ" (fmap (\oid -> Projection.subtypesOf oid settled) minted) [Set.fromList [Subtype.Phyrexian, Subtype.Germ]]
+    Spec.assertEqWith s "CR 701.3a: the Husk really is attached to the token it made" (fmap Object.attachedTo (Game.lookupObject equipmentId settled)) (Just (fmap Recipient.ToCreature (Maybe.listToMaybe minted)))
+  Spec.it s "CR 702.163a whole card: Barbed Batterfist mints a 2/2 red Rebel and equips it, making it a 3/1" $ do
+    batterfist <- S.printingOf s registry "Barbed Batterfist"
+    let (equipmentId, minted, settled) = enterAndTrigger (Setup.emptyGame S.bothPlayers) batterfist
+    Spec.assertEqWith s "CR 702.163a: the 2/2 Rebel wearing the Batterfist's +1/-1 is a 3/1" (fmap (\oid -> S.powerToughnessOf oid settled) minted) [Just (3, 1)]
+    Spec.assertEqWith s "CR 702.163a: red" (fmap (\oid -> Projection.colorsOf oid settled) minted) [Set.singleton Color.Red]
+    Spec.assertEqWith s "CR 702.163a: a Rebel" (fmap (\oid -> Projection.subtypesOf oid settled) minted) [Set.singleton Subtype.Rebel]
+    Spec.assertEqWith s "CR 701.3a: the Batterfist really is attached to the token it made" (fmap Object.attachedTo (Game.lookupObject equipmentId settled)) (Just (fmap Recipient.ToCreature (Maybe.listToMaybe minted)))
+  Spec.it s "CR 702.182a whole card: Monk's Fist mints a 1/1 colorless Hero and equips it, making it a 2/1 Hero Monk" $ do
+    fist <- S.printingOf s registry "Monk's Fist"
+    let (equipmentId, minted, settled) = enterAndTrigger (Setup.emptyGame S.bothPlayers) fist
+    Spec.assertEqWith s "CR 702.182a: the 1/1 Hero wearing the Fist's +1/+0 is a 2/1" (fmap (\oid -> S.powerToughnessOf oid settled) minted) [Just (2, 1)]
+    -- The Monk is the FIST's own AddSubtype, so it is visible only while the
+    -- attach held; the Hero is the rule's.
+    Spec.assertEqWith s "CR 702.182a: a Hero, and a Monk because it is the equipped creature" (fmap (\oid -> Projection.subtypesOf oid settled) minted) [Set.fromList [Subtype.Hero, Subtype.Monk]]
+    Spec.assertEqWith s "CR 702.182a: colorless, which is the ABSENCE of a colour rather than a colour" (fmap (\oid -> Projection.colorsOf oid settled) minted) [Set.empty]
+    Spec.assertEqWith s "CR 701.3a: the Fist really is attached to the token it made" (fmap Object.attachedTo (Game.lookupObject equipmentId settled)) (Just (fmap Recipient.ToCreature (Maybe.listToMaybe minted)))
+  -- The trap the rule states and the shape the opcode is built around: CR 113.7a
+  -- keeps the ability resolving after its source has left, so the token is
+  -- created either way (CR 111.1) and only the ATTACH is refused -- CR 701.3b,
+  -- there being no Equipment on the battlefield to move. A pair of boards
+  -- differing in exactly one thing: whether the Husk was destroyed while its own
+  -- trigger was on the stack.
+  Spec.it s "CR 701.3b/113.7a whole card: destroying the Husk in response still makes the Germ, and the 0/0 then dies to CR 704.5f" $ do
+    husk <- S.printingOf s registry "Flayer Husk"
+    let (equipmentId, staged) = S.entersWithTrigger husk S.alice (Setup.emptyGame S.bothPlayers)
+        placed = S.runPure S.identityAnswer staged Engine.settleForPriority
+        -- One thing different: the Husk is gone before its own trigger resolves.
+        killed = S.runPure S.identityAnswer placed (Event.destroy Regenerability.Regenerable [equipmentId])
+        run gs =
+          let resolved = S.runPure S.identityAnswer gs Stack.resolveTop
+           in (S.tokensOf resolved, S.runPure S.identityAnswer resolved Engine.settleForPriority)
+        (goneMinted, goneSettled) = run killed
+        (liveMinted, liveSettled) = run placed
+    -- The gameplay-level pair first: the token exists on both boards, and only
+    -- its survival differs.
+    Spec.assertEqWith s "CR 111.1: the Germ is created even though the Husk has left" (length goneMinted) 1
+    Spec.assertEqWith s "CR 701.3b/704.5f: nothing attached to it, so the 0/0 Germ is buried" (fmap (\oid -> S.powerToughnessOf oid goneSettled) goneMinted) [Nothing]
+    Spec.assertEqWith s "the same board with the Husk alive keeps a 1/1" (fmap (\oid -> S.powerToughnessOf oid liveSettled) liveMinted) [Just (1, 1)]
+    Spec.assertEqWith s "and the Husk was really gone before the trigger resolved" (Game.lookupObject equipmentId goneSettled) Nothing
+  -- CR 707.2: living weapon is printed rules text and so a copiable value, and
+  -- CR 707.5 gives the copy's own entry trigger its chance -- a permanent entering as a
+  -- COPY of the Husk mints its own Germ and equips that one. Phyrexian
+  -- Metamorph is the tripwire board: the keyword is read off the PROJECTION
+  -- (Projection.mintedTriggeredAbilitiesOf over PC.keywords), never off the
+  -- printed card, which here says "Phyrexian Metamorph".
+  Spec.it s "CR 707.2/707.5 whole cards: a Phyrexian Metamorph copying Flayer Husk mints a second Germ and equips that one" $ do
+    husk <- S.printingOf s registry "Flayer Husk"
+    metamorph <- S.printingOf s registry "Phyrexian Metamorph"
+    let (huskId, firstGerm, afterHusk) = enterAndTrigger (Setup.emptyGame S.bothPlayers) husk
+        (_, staged) = S.spellOnStack metamorph S.alice afterHusk
+        entered = S.runPure (copyOf huskId) staged Stack.resolveTop
+        placed = S.runPure (copyOf huskId) entered Engine.settleForPriority
+        triggered = S.runPure (copyOf huskId) placed Stack.resolveTop
+        settled = S.runPure (copyOf huskId) triggered Engine.settleForPriority
+        secondGerm = filter (\oid -> notElem oid firstGerm) (S.tokensOf triggered)
+        metamorphIds = printedOnBattlefield "Phyrexian Metamorph" settled
+    Spec.assertEqWith s "CR 707.5: the copy's own Germ is a 1/1, so the copied living weapon both minted and attached" (fmap (\oid -> S.powerToughnessOf oid settled) secondGerm) [Just (1, 1)]
+    Spec.assertEqWith s "CR 701.3a: the Metamorph equips its OWN Germ, not the Husk's" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid settled)) metamorphIds) [Just (fmap Recipient.ToCreature (Maybe.listToMaybe secondGerm))]
+    Spec.assertEqWith s "and the Husk's own Germ is still a 1/1 wearing the Husk" (fmap (\oid -> S.powerToughnessOf oid settled) firstGerm) [Just (1, 1)]
+    Spec.assertEqWith s "the copy really happened: it is a Flayer Husk by name (CR 707.2)" (fmap (\oid -> Projection.namesOf oid settled) metamorphIds) [Set.singleton (CardName.MkCardName (Text.pack "Flayer Husk"))]
+
+-- Put the Equipment onto the battlefield with its CR 603.6a entry event, let CR
+-- 603.3 place the keyword trigger on the stack, resolve it, then settle
+-- state-based actions. S.identityAnswer throughout: none of these three keywords
+-- asks anything, which is the point -- CR 111.2 names the creator and the rule
+-- names the token, so there is no choice to make.
+enterAndTrigger :: GameState.GameState -> Printing.Printing -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+enterAndTrigger gs printing =
+  let (equipmentId, staged) = S.entersWithTrigger printing S.alice gs
+      placed = S.runPure S.identityAnswer staged Engine.settleForPriority
+      resolved = S.runPure S.identityAnswer placed Stack.resolveTop
+   in (equipmentId, S.tokensOf resolved, S.runPure S.identityAnswer resolved Engine.settleForPriority)
+
+-- CR 707.5's as-enters copy choice, pinned to ONE object rather than searched,
+-- so a mutation cannot be repaired by the answerer finding another legal source
+-- (Pawl.CopySpec's copyNamed, the same posture).
+copyOf :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+copyOf wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  _ -> S.identityAnswer p
+
+-- The battlefield objects whose PRINTED face carries this name -- which is how a
+-- copy is found, its projected name being the copied card's.
+printedOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
+printedOnBattlefield name gs =
+  let isIt oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))
+   in filter isIt (Set.toList (GameState.battlefield gs))

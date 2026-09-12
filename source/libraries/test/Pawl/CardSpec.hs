@@ -2806,6 +2806,9 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.83a names no quality: "a creature you control" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Exalted -> []
+  Keyword.LivingWeapon -> []
+  Keyword.ForMirrodin -> []
+  Keyword.JobSelect -> []
   -- CR 702.134a is payload-free too: the Filter its minted ability carries -- the
   -- target slot's -- is the ENGINE's, never a card's.
   Keyword.Mentor -> []
