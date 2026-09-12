@@ -172,6 +172,7 @@ movedOf event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
@@ -223,6 +224,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  TriggerCondition.PermanentConnives _ -> False
   -- Not on CR 603.10a's list either, and no zone change at all: CR 701.68a
   -- puts counters on a permanent that stays where it is.
   TriggerCondition.PlayerBlights _ -> False
@@ -476,6 +478,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  TriggerCondition.PermanentConnives _ -> False
   -- Per-occurrence, and indistinguishable from the batch reading of Feywild
   -- Trickster's "one or more dice": one Effect.RollDie records exactly one
   -- GameEvent.DiceRolled however many dice CR 706.1's count threw, so the
@@ -915,6 +918,7 @@ eventTriggers events gs =
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
+        GameEvent.Connived _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
@@ -1175,6 +1179,7 @@ eventTriggers events gs =
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
+        GameEvent.Connived _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
@@ -1410,6 +1415,7 @@ eventTriggers events gs =
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
+        GameEvent.Connived _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
@@ -1553,6 +1559,7 @@ eventTriggers events gs =
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
+        GameEvent.Connived _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
@@ -1869,6 +1876,7 @@ zonesTriggeredFrom cond =
         TriggerCondition.RingTemptsPlayer _ -> battlefield
         TriggerCondition.PlayerSurveils _ -> battlefield
         TriggerCondition.PermanentExplores _ -> battlefield
+        TriggerCondition.PermanentConnives _ -> battlefield
         -- CR 113.6's default again: Synthetic Blight Chronicler is an ordinary
         -- creature, and a
         -- blight is a condition a battlefield permanent can watch, so CR 113.6k's
@@ -2287,6 +2295,7 @@ stateTriggers gs
               TriggerCondition.PlayerSurveils _ -> False
               TriggerCondition.SelfBecomesPlotted -> False
               TriggerCondition.PermanentExplores _ -> False
+              TriggerCondition.PermanentConnives _ -> False
               -- CR 603.2 once more: a blight is something that HAPPENS, with
               -- its own log entry, never a CR 603.8 state standing still.
               TriggerCondition.PlayerBlights _ -> False

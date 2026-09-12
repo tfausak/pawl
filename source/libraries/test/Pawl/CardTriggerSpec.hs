@@ -2687,6 +2687,124 @@ raffinesInformantSpec s registry =
           Spec.assertEqWith s "the Mountain was the card discarded" (graveyardNames after) ["Mountain"]
           Spec.assertEqWith s "and alice drew the Forest first" (handNames S.alice after) ["Forest", "Hill Giant"]
 
+-- CR 701.50d over a whole card. Raffine, Scheming Seer {W}{U}{B} Legendary
+-- Creature -- Sphinx Demon 1/4, "Flying, ward {1} / Whenever you attack, target
+-- attacking creature connives X, where X is the number of attacking creatures."
+-- (Oracle text checked against api.scryfall.com, 2026-09-12.)
+--
+-- THREE creatures are declared, so X is 3: a reading that kept CR 701.50a's one
+-- card draws two fewer and can grow the conniver by at most one. The target is
+-- the Goblin Piker rather than Raffine, so the counters have somewhere to land
+-- that is not the ability's source.
+--
+-- Two boards, differing in the HAND. On the first alice's hand is empty, so the
+-- three drawn cards are the whole hand and CR 609.3 forces the discard -- no
+-- prompt, and the counter count is the nonland question alone. On the second she
+-- holds four lands before the draw, so seven cards are offered against a count
+-- of three and the discard is a real choice, pinned by id. The three she picks
+-- are not the first three cards of her hand, so a reading that ignored the
+-- answer and took the hand in order would bin different cards.
+raffineSchemingSeerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+raffineSchemingSeerSpec s registry =
+  let -- Declares all three of alice's creatures at bob, targets the Piker with
+      -- the connive, and discards exactly the cards `picks` names -- FILTERED
+      -- out of what the engine offered rather than built, so a mutation cannot
+      -- be repaired by an answerer that goes looking for a legal option.
+      answering :: [ObjectId.ObjectId] -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering attackers aim picks p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> List.elem oid attackers) ids
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature aim) . snd) sets
+        Prompt.ChooseDiscard _ _ held _ -> filter (\oid -> List.elem oid held) picks
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      libraryOf = Game.zoneMembers Zone.Library S.alice
+      graveyardNames gs = List.sort (fmap (\oid -> Text.unpack (CardName.unwrap (S.soleFaceName oid gs))) (Game.zoneMembers Zone.Graveyard S.alice gs))
+      -- alice controls Raffine, a Goblin Piker and an Augury Raven, all Settled
+      -- and untapped; bob controls nothing, so no block intervenes. `top` is
+      -- stocked last and drawn first, `hand` starts in her hand.
+      fixture top hand = do
+        raffine <- S.printingOf s registry "Raffine, Scheming Seer"
+        piker <- S.printingOf s registry "Goblin Piker"
+        raven <- S.printingOf s registry "Augury Raven"
+        deep <- Monad.mapM (S.printingOf s registry) ["Swamp", "Plains"]
+        tops <- Monad.mapM (S.printingOf s registry) top
+        helds <- Monad.mapM (S.printingOf s registry) hand
+        case S.combatBoardOf [raffine, piker, raven] [] of
+          (gs, [raffineId, pikerId, ravenId], _) ->
+            let stock (acc, g) printing = let (oid, g1) = S.addLibraryCard printing S.alice g in (oid : acc, g1)
+                (stockedIds, stocked) = List.foldl' stock ([], gs) (deep <> reverse tops)
+                hold (acc, g) printing = let (oid, g1) = S.addHandCard printing S.alice g in (acc <> [oid], g1)
+                (heldIds, ready) = List.foldl' hold ([], stocked) helds
+             in pure (Just (raffineId, pikerId, ravenId, stockedIds, heldIds, ready))
+          _ -> pure Nothing
+   in Spec.describe s "Raffine, Scheming Seer" $ do
+        -- The proving case. Three attackers, three cards drawn, all three
+        -- discarded, two of them nonland: the Piker is 2/1 plus two counters.
+        Spec.it s "CR 701.50d whole card: three attackers connive 3, one counter per nonland discarded" $ do
+          built <- fixture ["Hill Giant", "Bird Maiden", "Mountain"] []
+          case built of
+            Just (raffineId, pikerId, ravenId, stockedIds, _, gs) -> do
+              let after = atBlockers (answering [raffineId, pikerId, ravenId] pikerId []) gs
+              Spec.assertEqWith s "CR 701.50d the Piker took one +1/+1 counter per nonland card discarded" (S.powerToughnessOf pikerId after) (Just (4, 3))
+              Spec.assertEqWith s "all three drawn cards were discarded" (graveyardNames after) ["Bird Maiden", "Hill Giant", "Mountain"]
+              Spec.assertEqWith s "and exactly three cards left the library" (length (libraryOf after)) (length stockedIds - 3)
+              Spec.assertEqWith s "leaving nothing in hand" (handNames S.alice after) []
+            Nothing -> Spec.assertFailure s "fixture should give alice Raffine, a Piker and a Raven"
+        -- The negative, one thing different: alice holds four lands before the
+        -- draw, so the discard is hers to choose and she bins three lands. Three
+        -- nonland cards were drawn and none discarded, so no counter lands.
+        Spec.it s "CR 701.50d the discard is the player's choice, and three lands discarded grow nothing" $ do
+          built <- fixture ["Hill Giant", "Bird Maiden", "Wall of Stone"] ["Mountain", "Forest", "Island", "Plains"]
+          case built of
+            Just (raffineId, pikerId, ravenId, _, heldIds, gs) -> case heldIds of
+              [_, forestId, islandId, plainsId] -> do
+                let after = atBlockers (answering [raffineId, pikerId, ravenId] pikerId [forestId, islandId, plainsId]) gs
+                Spec.assertEqWith s "CR 701.50d no nonland card was discarded, so the Piker is still 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+                Spec.assertEqWith s "the three lands alice chose are the three cards binned" (graveyardNames after) ["Forest", "Island", "Plains"]
+                Spec.assertEqWith s "and the three drawn cards stayed in hand beside the Mountain" (handNames S.alice after) ["Bird Maiden", "Hill Giant", "Mountain", "Wall of Stone"]
+              _ -> Spec.assertFailure s "fixture should give alice four lands in hand"
+            Nothing -> Spec.assertFailure s "fixture should give alice Raffine, a Piker and a Raven"
+
+-- CR 701.50f over a whole card. Iron Monger, Sadistic Tycoon {2}{B} Legendary
+-- Artifact Creature -- Human Villain 2/2, "Flying / Whenever a creature you
+-- control connives, put a +1/+1 counter on each Villain you control." (Oracle
+-- text checked against api.scryfall.com, 2026-09-12.)
+--
+-- Two boards differing in ONE thing: who controls the conniving Raffine's
+-- Informant. alice's Monger grows off her own Informant and not off bob's, so
+-- the Filter is doing the work rather than the event's mere presence -- which
+-- both boards assert, so a reading that recorded nothing cannot pass either.
+--
+-- The conniving seat's hand is empty and its library holds one nonland card, so
+-- CR 609.3 forces the discard and no prompt arises.
+ironMongerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ironMongerSpec s registry =
+  let board conniver = do
+        monger <- S.printingOf s registry "Iron Monger, Sadistic Tycoon"
+        informant <- S.printingOf s registry "Raffine's Informant"
+        giant <- S.printingOf s registry "Hill Giant"
+        let (mongerId, g1) = S.addPermanent monger S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g2) = S.addLibraryCard giant conniver g1
+            (informantId, g3) = S.entersWithTrigger informant conniver g2
+        pure (mongerId, informantId, g3)
+      settle gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+   in Spec.describe s "Iron Monger, Sadistic Tycoon" $ do
+        Spec.it s "CR 701.50f whenever a creature you control connives, each Villain you control grows" $ do
+          (mongerId, informantId, gs) <- board S.alice
+          let after = settle gs
+          Spec.assertEqWith s "CR 701.50f alice's Monger took its +1/+1 counter" (S.powerToughnessOf mongerId after) (Just (3, 3))
+          Spec.assertBool s (elem (GameEvent.Connived informantId) (S.eventsOf after)) "the connive recorded its event"
+          Spec.assertEqWith s "and the Informant grew off its own nonland discard" (S.powerToughnessOf informantId after) (Just (3, 2))
+        -- The negative, one thing different: bob controls the Informant. The
+        -- connive still happens and still records its event, so what fails is the
+        -- Filter's "you control" and nothing else.
+        Spec.it s "CR 701.50f an opponent's connive leaves the Monger alone" $ do
+          (mongerId, informantId, gs) <- board S.bob
+          let after = settle gs
+          Spec.assertEqWith s "alice's Monger is still 2/2" (S.powerToughnessOf mongerId after) (Just (2, 2))
+          Spec.assertBool s (elem (GameEvent.Connived informantId) (S.eventsOf after)) "bob's Informant really did connive"
+          Spec.assertEqWith s "and bob's Informant grew off its own nonland discard" (S.powerToughnessOf informantId after) (Just (3, 2))
+
 -- CR 701.3a's attachment event, read from the HOST's side by
 -- TriggerCondition.SelfBecomesAttachedBy.
 --
@@ -3492,6 +3610,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   aloeAlchemistSpec s registry
   wildgrowthWalkerSpec s registry
   raffinesInformantSpec s registry
+  raffineSchemingSeerSpec s registry
+  ironMongerSpec s registry
   rayOfCommandSpec s registry
   brambleElementalSpec s registry
   enormousEnergyBladeSpec s registry

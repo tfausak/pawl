@@ -519,6 +519,18 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Explored (ObjectId.MkObjectId 6))
       " {\"type\":\"Explored\",\"value\":6} "
+  -- CR 701.50f. Explored's payload exactly, so the TAG is all that separates the
+  -- two -- a codec that dropped it would turn a connive into an explore.
+  Spec.it s "Connived" $ do
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Connived (ObjectId.MkObjectId 6))
+      " {\"type\":\"Connived\",\"value\":6} "
+    Spec.assertBool
+      s
+      (Codec.encode GameEvent.codec (GameEvent.Connived (ObjectId.MkObjectId 6)) /= Codec.encode GameEvent.codec (GameEvent.Explored (ObjectId.MkObjectId 6)))
+      "a connive and an explore of the same object encode differently"
   -- CR 701.43a. Explored's payload exactly, so the TAG is all that separates the
   -- two -- a codec that dropped it would turn an exert into an explore.
   Spec.it s "Exerted" $ do

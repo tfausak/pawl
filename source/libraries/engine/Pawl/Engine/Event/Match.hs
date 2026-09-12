@@ -236,6 +236,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
@@ -342,6 +343,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -430,6 +432,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -496,6 +499,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -574,6 +578,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -647,6 +652,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -728,6 +734,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -815,6 +822,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -899,6 +907,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -970,6 +979,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1049,6 +1059,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1125,6 +1136,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1201,6 +1213,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1276,6 +1289,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1352,6 +1366,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1440,6 +1455,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1526,6 +1542,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1603,6 +1620,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1679,6 +1697,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1751,6 +1770,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -1852,6 +1872,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
   -- CR 508.3c: the player the payload names declared at least the payload's
@@ -1952,6 +1973,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
   -- CR 508.3b: the player this ability's source is attached to was attacked.
@@ -2023,6 +2045,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2100,6 +2123,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2198,6 +2222,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -2279,6 +2304,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -2356,6 +2382,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -2447,6 +2474,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -2514,6 +2542,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -2600,6 +2629,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -2673,6 +2703,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -2757,6 +2788,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -2836,6 +2868,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -2973,6 +3006,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
+          GameEvent.Connived _ -> False
           GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
@@ -3108,6 +3142,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
+          GameEvent.Connived _ -> False
           GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
@@ -3179,6 +3214,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -3250,6 +3286,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -3324,6 +3361,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -3427,6 +3465,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
+          GameEvent.Connived _ -> False
           GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
@@ -3500,6 +3539,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -3587,6 +3627,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -3669,6 +3710,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -3773,6 +3815,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -3864,6 +3907,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -3915,6 +3959,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4007,6 +4052,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4097,6 +4143,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4170,6 +4217,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4211,6 +4259,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4289,6 +4338,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
+          GameEvent.Connived _ -> False
           GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
@@ -4377,6 +4427,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
+          GameEvent.Connived _ -> False
           GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
@@ -4493,6 +4544,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4541,6 +4593,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
+          GameEvent.Connived _ -> False
           GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
@@ -4656,6 +4709,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4730,6 +4784,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4826,6 +4881,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -4916,6 +4972,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5000,6 +5057,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5084,6 +5142,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5139,6 +5198,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5220,6 +5280,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5331,6 +5392,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5448,6 +5510,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5540,6 +5603,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5578,6 +5642,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5659,6 +5724,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5753,6 +5819,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5839,6 +5906,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5913,6 +5981,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -5989,6 +6058,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6079,6 +6149,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6171,6 +6242,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6237,6 +6309,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6307,6 +6380,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6372,6 +6446,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6448,6 +6523,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6512,6 +6588,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6583,6 +6660,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6652,6 +6730,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6719,6 +6798,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6800,6 +6880,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6888,6 +6969,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -6997,6 +7079,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7065,6 +7148,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7134,6 +7218,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7239,6 +7324,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7308,6 +7394,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7376,6 +7463,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7440,6 +7528,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7513,6 +7602,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7582,6 +7672,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7650,6 +7741,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted plotted -> plotted == bearer
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7725,6 +7817,79 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Explored explorer -> case Projection.viewWithLastKnown explorer gs explorer of
       Nothing -> False
       Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 701.50f: a permanent the Filter admits completed a connive. Iron Monger,
+  -- Sadistic Tycoon's "a creature you control" describes the CONNIVER, so the
+  -- bearer only frames the match, PermanentExplores' arm above line for line --
+  -- including viewWithLastKnown aimed at the conniver twice over, which CR
+  -- 701.50b asks for in as many words.
+  --
+  -- CR 701.50e keeps a connive 0 out of here by recording no event at all, so
+  -- nothing filters it here.
+  TriggerCondition.PermanentConnives f -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived conniver -> case Projection.viewWithLastKnown conniver gs conniver of
+      Nothing -> False
+      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7791,6 +7956,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted oid -> oid == bearer
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7873,6 +8039,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -7954,6 +8121,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -8030,6 +8198,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -8100,6 +8269,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False

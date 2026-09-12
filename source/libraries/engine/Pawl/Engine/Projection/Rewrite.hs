@@ -42,6 +42,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
@@ -487,7 +488,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Surveil x -> Effect.Surveil (rewritePlayerQuantity pairs x)
   Effect.Fateseal x -> Effect.Fateseal (rewritePlayerQuantity pairs x)
   Effect.Explore ref -> Effect.Explore (rewriteObjectRef pairs ref)
-  Effect.Connive ref -> Effect.Connive (rewriteObjectRef pairs ref)
+  Effect.Connive (Connive.MkConnive quantity ref) -> Effect.Connive (Connive.MkConnive (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   -- The These arm's ref carries a Filter, so rule 612's text change reaches it
   -- exactly as Reveal's does; the Counted arm holds two slot NAMES and a count,
   -- and only the count is a word rule 612 can reach -- a slot name is not.
@@ -1494,6 +1495,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
+  TriggerCondition.PermanentConnives f -> TriggerCondition.PermanentConnives (Filter.rewrite pairs f)
   TriggerCondition.SelfExerted -> condition
   TriggerCondition.SelfBecomesAttachedBy f -> TriggerCondition.SelfBecomesAttachedBy (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesAttachedTo f -> TriggerCondition.SelfBecomesAttachedTo (Filter.rewrite pairs f)
