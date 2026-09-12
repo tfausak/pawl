@@ -934,8 +934,10 @@ headlessSkaabSpec s registry =
 --
 -- Silent Arbiter is {4} and targets nothing as it is cast, so every mana on
 -- these boards comes through the Bloom, and the Bloom has no {T} for CR 107.5 to
--- bar a second activation -- two cards in hand are two activations and {B}{B}{B}{B}.
--- Goblin Piker is the fuel: it is never cast, so nothing but the exile can move it.
+-- bar a second activation -- two FUEL cards in hand are two activations and
+-- {B}{B}{B}{B}. Goblin Piker is the fuel: it is never cast, so nothing but the
+-- exile can move it. The Arbiter is in that hand too and is not fuel, CR 601.2a
+-- putting it on the stack before the Bloom is asked to pay (Cost.beingCast).
 cadaverousBloomSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cadaverousBloomSpec s registry =
   Spec.describe s "Cadaverous Bloom" $ do
@@ -950,14 +952,16 @@ cadaverousBloomSpec s registry =
       Spec.assertEqWith s "CR 601.2g the Arbiter resolved off those two activations" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silent Arbiter")) S.alice resolved) 1
       Spec.assertEqWith s "and the hand is empty" (S.handSize S.alice resolved) 0
     -- The same board one fuel card short, which is the ONE thing that differs:
-    -- one activation adds {B}{B} and CR 118.3 refuses the rest, so CR 601.2
-    -- rewinds the whole cast and the card that would have paid is still in hand.
-    Spec.it s "CR 118.3 one card in hand is one activation, and {2} does not pay {4}" $ do
+    -- one activation adds {B}{B} and CR 118.3 refuses the rest, so the cast is
+    -- never offered. An attempt made anyway rewinds under CR 601.2, which is what
+    -- the three assertions after the offer say.
+    Spec.it s "CR 118.3 one fuel card in hand is one activation, and {2} does not pay {4}" $ do
       bloom <- S.printingOf s registry "Cadaverous Bloom"
       piker <- S.printingOf s registry "Goblin Piker"
       arbiter <- S.printingOf s registry "Silent Arbiter"
       let (spell, gs) = cadaverousBloomBoard bloom piker arbiter 1
           cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+      Spec.assertBool s (not (S.castable S.alice spell gs)) "CR 601.2a the cast is not offered: the Arbiter is not fuel for the Bloom"
       Spec.assertEqWith s "nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice cast)) 0
       Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
       Spec.assertEqWith s "and both cards are still in hand" (S.handSize S.alice cast) 2
