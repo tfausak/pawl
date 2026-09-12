@@ -133,13 +133,27 @@ unnecessary `GameState` field, a producer that proved nothing. Dispatch
 straight off the issue, and tell the agent the issue body is the artefact most
 often wrong.
 
-**Audit every few merges, for correctness only.** This is one of the audit
-lane's two standing jobs, and the only mechanism that looks ACROSS units. Two
-units each correct alone can compose wrong and no single unit's mutations see
-it: three consecutive rounds each found a real defect (#2505, #2529, and #2555
---- a regression the run itself had introduced five units earlier). Read the
-merged diffs, not the tests. Its brief must open with: read
+**Audit on a SIGNAL, not on a merge count, for correctness only.** This is one
+of the audit lane's two standing jobs, and the only mechanism that looks ACROSS
+units. Two units each correct alone can compose wrong and no single unit's
+mutations see it: three consecutive rounds each found a real defect (#2505,
+#2529, and #2555 --- a regression the run itself had introduced five units
+earlier). Read the merged diffs, not the tests. Its brief must open with: read
 `docs/agents/researching.md` first.
+
+The merge count stopped paying for it. Measured 2026-09-12 over that run: five
+cross-unit rounds cost ~970k subagent tokens for no finding at the bar below
+--- one filed issue (#3658) and one fold-in between them. So run a cross-unit
+round when a merged unit raises one of these, and not otherwise:
+
+- it changed a shared function's semantics for its EXISTING callers (#3659's
+  `ForEach` binding change);
+- it renamed or widened a widely-called function (#3654's substitution-family
+  rename);
+- it added a field to a widely-constructed record (#3667's cast-road tag).
+
+Each is a change whose blast radius no single unit's mutations can reach, which
+is what the three older findings had in common too.
 
 An audit round costs as much as an implementation, so its brief bounds what
 counts as a finding: behaviour that diverges from the CR, a rules-core arm that
@@ -264,7 +278,7 @@ still carries commits, and say so; the owner keeps review branches. The warm
 worktree is exempt from all of this: leave it, and run
 `script/warm-worktree.sh refresh` in the background once the reap is done.
 Reaping a worktree also makes its agent unresumable, so the send-back path in
-"Audit every few merges" no longer reaches it. When an audit round is about to
+the audit section above no longer reaches it. When an audit round is about to
 run over a unit, reap it only once the audit has reported.
 
 **Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
