@@ -40,9 +40,12 @@ data PendingTrigger = MkPendingTrigger
     -- it to the stack object; TriggeredAbilitySource.createdAt says what reads
     -- it there.
     createdAt :: Maybe Timestamp.Timestamp,
-    -- | CR 603.2's trigger event, and Nothing where there is none to name -- a
-    -- state trigger (CR 603.8), a reflexive one (CR 603.12) and every inherent
-    -- ability the rulebook states. Read by
+    -- | CR 603.2's trigger event, and Nothing where the gatherer names none --
+    -- a state trigger (CR 603.8) and a reflexive one (CR 603.12), which have no
+    -- event at all, and the inherent gathers that answer over a whole batch
+    -- (Pawl.Engine.Speed, Pawl.Engine.Rad) rather than per event. None of those
+    -- can be a mana ability, CR 605.1b's middle clause naming events an
+    -- inherent ability the rulebook states never watches. Read by
     -- Pawl.Engine.ManaAbility.isTriggeredManaAbility, CR 605.5a asking what
     -- added the mana rather than only what the ability watches.
     firedBy :: Maybe GameEvent.GameEvent

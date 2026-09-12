@@ -3213,6 +3213,9 @@ gauntletBoard s registry = do
 -- mana-added event can fire Caged Sun. The same board without Ashaya is the
 -- Filter's control -- a creature's ability, not a land's -- and bob's Swamp is
 -- the relation's: mana HE adds is not mana alice adds.
+--
+-- The second case is CR 605.5a's half, off a Crumbling Vestige whose ability
+-- adds its mana as it RESOLVES rather than as a mana ability.
 cagedSunSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cagedSunSpec s registry = Spec.describe s "Caged Sun" $ do
   Spec.it s "CR 605.1b a land's ability adding the chosen colour with no tap adds Caged Sun's additional mana" $ do
@@ -3275,10 +3278,12 @@ cagedSunBoard s registry = do
   Spec.assertEqWith s "the fixture: the Pet is tapped, so no {T} can be what fires Caged Sun" (fmap Object.tapped (Game.lookupObject pet board)) (Just TapState.Tapped)
   pure (pet, bobSwamp, board, withAshaya)
 
--- A Crumbling Vestige of alice's, entering TAPPED as it prints and with CR
--- 603.6a's event beside it so its ETB trigger is pending. Tapped for the Blood
--- Pet's reason: with no {T} ever paid, CR 106.12a's "tapped for mana" cannot be
--- what fires Caged Sun, and the mana-added event is the only road left.
+-- A Crumbling Vestige of alice's, with CR 603.6a's event beside it so its ETB
+-- trigger is pending, then tapped by a fixture write standing in for the
+-- printed "This land enters tapped" -- S.entersWithTrigger applies no entry
+-- replacement. Tapped for the Blood Pet's reason: with no {T} ever paid, CR
+-- 106.12a's "tapped for mana" cannot be what fires Caged Sun, and the
+-- mana-added event is the only road left.
 enterVestige :: Printing.Printing -> GameState.GameState -> GameState.GameState
 enterVestige printing gs =
   let (oid, withLand) = S.entersWithTrigger printing S.alice gs
