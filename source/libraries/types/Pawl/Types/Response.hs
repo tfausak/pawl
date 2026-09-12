@@ -73,6 +73,15 @@ data Response
     -- point -- a transcript of a player DECIDING must not satisfy a prompt that
     -- asked randomness, which is CR 701.9b's distinction.
     SelectedOpponentAtRandom PlayerId.PlayerId
+  | -- | The card randomness named out of a printed spellbook (Tome of the
+    -- Infinite's "conjure a random card from Tome of the Infinite's
+    -- spellbook").
+    --
+    -- Its own constructor rather than ChoseCardName reused, though both carry
+    -- one name: this type's rule at the top, and here the difference is the
+    -- whole point -- a transcript of a player DECIDING must not satisfy a prompt
+    -- that asked randomness, which is CR 701.9b's distinction.
+    SelectedCardAtRandom CardName.CardName
   | -- | CR 706.1a: the face a die came up, for Pawl.Types.Effect's RollDie
     -- (Ancient Copper Dragon's "roll a d20").
     --

@@ -89,42 +89,44 @@
                       {
                         "type": "Conjure",
                         "value": {
-                          "card": {
-                            "faces": [
-                              {
-                                "keywords": [
-                                  {
-                                    "type": "Flying"
-                                  }
-                                ],
-                                "manaCost": [],
-                                "name": "Ornithopter",
-                                "power": {
-                                  "type": "Literal",
-                                  "value": 0
-                                },
-                                "toughness": {
-                                  "type": "Literal",
-                                  "value": 2
-                                },
-                                "typeLine": {
-                                  "subtypes": [
+                          "cards": [
+                            {
+                              "faces": [
+                                {
+                                  "keywords": [
                                     {
-                                      "type": "Thopter"
+                                      "type": "Flying"
                                     }
                                   ],
-                                  "types": [
-                                    {
-                                      "type": "Artifact"
-                                    },
-                                    {
-                                      "type": "Creature"
-                                    }
-                                  ]
+                                  "manaCost": [],
+                                  "name": "Ornithopter",
+                                  "power": {
+                                    "type": "Literal",
+                                    "value": 0
+                                  },
+                                  "toughness": {
+                                    "type": "Literal",
+                                    "value": 2
+                                  },
+                                  "typeLine": {
+                                    "subtypes": [
+                                      {
+                                        "type": "Thopter"
+                                      }
+                                    ],
+                                    "types": [
+                                      {
+                                        "type": "Artifact"
+                                      },
+                                      {
+                                        "type": "Creature"
+                                      }
+                                    ]
+                                  }
                                 }
-                              }
-                            ]
-                          },
+                              ]
+                            }
+                          ],
                           "destination": {
                             "type": "Hand"
                           }

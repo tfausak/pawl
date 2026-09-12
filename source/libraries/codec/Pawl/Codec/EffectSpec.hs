@@ -1,5 +1,6 @@
 module Pawl.Codec.EffectSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -741,16 +742,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (Text.pack "Ornithopter") ConjureDestination.Hand))
-      " {\"type\":\"Conjure\",\"value\":{\"card\":\"Ornithopter\",\"destination\":{\"type\":\"Hand\"}}} "
+      (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (Text.pack "Ornithopter" NonEmpty.:| []) ConjureDestination.Hand))
+      " {\"type\":\"Conjure\",\"value\":{\"cards\":[\"Ornithopter\"],\"destination\":{\"type\":\"Hand\"}}} "
   -- Toralf's Disciple's form: a stated count and a library.
   Spec.it s "Conjure with a stated count" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Conjure (Conjure.MkConjure (Quantity.Literal 4) (Text.pack "Lightning Bolt") ConjureDestination.Library))
-      " {\"type\":\"Conjure\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":4},\"card\":\"Lightning Bolt\",\"destination\":{\"type\":\"Library\"}}} "
+      (Effect.Conjure (Conjure.MkConjure (Quantity.Literal 4) (Text.pack "Lightning Bolt" NonEmpty.:| []) ConjureDestination.Library))
+      " {\"type\":\"Conjure\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":4},\"cards\":[\"Lightning Bolt\"],\"destination\":{\"type\":\"Library\"}}} "
   -- Both ObjectRef arms have to survive. A count of one is elided, so both of
   -- these write the ref alone.
   Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do

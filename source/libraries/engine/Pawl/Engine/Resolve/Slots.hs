@@ -929,8 +929,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- riders' counts are: CR 111.3 has the CREATING effect define it, in this
   -- resolution's slots (tokenBoxQuantities).
   Effect.Create (Create.MkCreate quantity card riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders <> tokenBoxQuantities card)), riderSlots riders]
-  -- The COUNT only: the conjured card is literal card data, its destination is
-  -- a constructor, and the conjurer is the resolving controller.
+  -- The COUNT only: the conjure's candidates are literal card data, its
+  -- destination is a constructor, and the conjurer is the resolving controller.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   Effect.BecomeCopy {} -> Map.empty
@@ -1475,9 +1475,9 @@ ownSlotsAreExhaustive effect = case effect of
   -- Its entry riders are not either: CR 122.6's count per kind is the effect
   -- speaking, read in the resolution's own slots.
   Effect.Create (Create.MkCreate quantity card riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders <> tokenBoxQuantities card)
-  -- The conjured card is literal text THROUGHOUT, unlike Create's token above:
+  -- Every candidate is literal text THROUGHOUT, unlike Create's token above:
   -- nothing bakes a conjured card's printed box, so Pawl.Engine.Resolve.Effect
-  -- hands it to Event.conjure exactly as written. The COUNT is the effect
+  -- hands the one it picks to Event.conjure exactly as written. The COUNT is the effect
   -- speaking, read in the resolution's own slots.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)

@@ -74,6 +74,12 @@ data Prompt r where
   -- Neither Decider nor PlayerId: randomness is not a choice, and CR 701.24a
   -- makes who it is asked of unobservable; the caller filters the answer back.
   RandomObject :: NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | Which card randomness named out of a printed spellbook
+  -- (Pawl.Types.Conjure's card list). RandomObject's shape and its reasons for
+  -- carrying neither Decider nor PlayerId, over NAMES rather than object ids
+  -- because a conjure's candidates are card data and no object exists yet; the
+  -- caller filters the answer back to a candidate.
+  RandomCard :: NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
   -- | Which of the resolving controller's opponents randomness named
   -- (Pawl.Types.Effect.ChooseOpponentAtRandom); RandomObject's shape, asked
   -- only for two or more.

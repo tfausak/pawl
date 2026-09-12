@@ -2490,6 +2490,7 @@ promptDecider prompt = case prompt of
   Prompt.RandomFirstPlayer {} -> Nothing
   Prompt.RandomObject {} -> Nothing
   Prompt.RandomOpponent {} -> Nothing
+  Prompt.RandomCard {} -> Nothing
   Prompt.RollDie {} -> Nothing
   Prompt.ChooseDieResult decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.FlipCoin {} -> Nothing
@@ -2609,6 +2610,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.RandomFirstPlayer {} -> "RandomFirstPlayer"
   Prompt.RandomObject {} -> "RandomObject"
   Prompt.RandomOpponent {} -> "RandomOpponent"
+  Prompt.RandomCard {} -> "RandomCard"
   Prompt.RollDie {} -> "RollDie"
   Prompt.ChooseDieResult {} -> "ChooseDieResult"
   Prompt.FlipCoin {} -> "FlipCoin"
