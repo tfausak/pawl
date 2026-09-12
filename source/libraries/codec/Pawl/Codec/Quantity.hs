@@ -6,6 +6,7 @@ import qualified Pawl.Codec.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
+import qualified Pawl.Codec.Devotion as Devotion
 import qualified Pawl.Codec.Halved as Halved
 import qualified Pawl.Codec.InZone as InZone
 import qualified Pawl.Codec.Keyword as Keyword
@@ -63,6 +64,10 @@ codec =
       Arm.payload "IsStartingPlayer" PlayerRef.codec Quantity.IsStartingPlayer (\x -> case x of Quantity.IsStartingPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsActivePlayer" PlayerRef.codec Quantity.IsActivePlayer (\x -> case x of Quantity.IsActivePlayer y -> Just y; _ -> Nothing),
       Arm.payload "PlayerCounters" PlayerCounterTally.codec Quantity.PlayerCounters (\x -> case x of Quantity.PlayerCounters y -> Just y; _ -> Nothing),
+      -- CR 700.5's number: a PlayerRef and the colours it is measured to, which
+      -- Pawl.Types.Devotion holds as a SET so "to black and green" is one reading
+      -- rather than two summed.
+      Arm.payload "Devotion" Devotion.codec Quantity.Devotion (\x -> case x of Quantity.Devotion y -> Just y; _ -> Nothing),
       -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
       -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
       Arm.payload "ObjectCounters" (CounterKind.codec Keyword.codec) Quantity.ObjectCounters (\x -> case x of Quantity.ObjectCounters y -> Just y; _ -> Nothing),

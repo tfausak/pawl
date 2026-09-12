@@ -1,5 +1,6 @@
 module Pawl.Codec.QuantitySpec where
 
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Common as Common
@@ -8,11 +9,13 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastFrom as CastFrom
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Devotion as Devotion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
@@ -320,6 +323,21 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PlayerCounterKind.Experience))
       " {\"type\":\"PlayerCounters\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"kind\":{\"type\":\"Experience\"}}} "
+  -- CR 700.5, with both halves on the wire: a PlayerRef saying whose and the set
+  -- of colours saying to what. Fanatic of Mogis is the one-colour reading; the
+  -- two-colour one beside it is CR 700.5's second sentence, which no card in
+  -- data/cards prints yet and which the set is the whole reason for.
+  Spec.it s "Devotion, to one colour and to two" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.Devotion (Devotion.MkDevotion (PlayerRef.Relative PlayerRelation.You) (Set.singleton Color.Red)))
+      " {\"type\":\"Devotion\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"colors\":[{\"type\":\"Red\"}]}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.Devotion (Devotion.MkDevotion (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Set.fromList [Color.Black, Color.Green])))
+      " {\"type\":\"Devotion\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"colors\":[{\"type\":\"Black\"},{\"type\":\"Green\"}]}} "
   -- CR 122.1's OBJECT reading, with only a CounterKind on the wire: the object
   -- is whichever one the quantity is evaluated against, so there is no reference
   -- beside the kind. The payload-bearing CounterKind arm (CR 122.1b's keyword

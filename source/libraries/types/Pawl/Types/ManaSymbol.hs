@@ -44,7 +44,7 @@ data ManaSymbol
     -- A Color and not a ManaType, which makes CR 107.4f's first clause true by
     -- construction: the five Phyrexian symbols are all COLORED, so `Phyrexian
     -- Colorless` stays unsayable rather than a case every reader has to rule out.
-    -- Pawl.Engine.Projection's symbolColors cashes it: CR 202.2d makes the OBJECT
+    -- Pawl.Engine.Quantity's symbolColors cashes it: CR 202.2d makes the OBJECT
     -- that colour, so Mutagenic Growth is green even when 2 life paid for it.
     --
     -- The two ways are not two mana. Unlike the hybrids above, one of them spends
@@ -68,7 +68,7 @@ data ManaSymbol
     --
     -- TWO COLOURS, not two mana types, for Phyrexian's reason: CR 107.4f's ten
     -- symbols are all pairs of colours (Pawl.Types.HybridPhyrexian).
-    -- Pawl.Engine.Projection's symbolColors cashes CR 202.2d's "all of the
+    -- Pawl.Engine.Quantity's symbolColors cashes CR 202.2d's "all of the
     -- colors of those mana symbols" by answering BOTH, so Tamiyo is green and
     -- blue however her cost was paid.
     --

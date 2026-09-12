@@ -22,6 +22,7 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -99,6 +100,16 @@ data View = MkView
     -- there is no object at all -- a player view, or an event snapshot carrying
     -- none.
     manaValue :: Maybe Integer,
+    -- CR 202.1: the candidate's mana cost itself, read off the same place
+    -- `manaValue` above is and Nothing in the same places, plus one more -- CR
+    -- 202.1b's land, which has no mana cost at all where it still has a mana
+    -- value of 0.
+    --
+    -- Beside the value rather than instead of it, because CR 202.3 is not
+    -- recoverable in reverse: {B}{B} and {1}{B} are both 2, and CR 700.5's
+    -- devotion counts the SYMBOLS. Pawl.Engine.Quantity's Devotion arm is the one
+    -- reader; no Pawl.Types.Filter atom asks about it.
+    manaCost :: Maybe ManaCost.ManaCost,
     controller :: Maybe PlayerId.PlayerId,
     -- CR 108.3 / 110.2: the candidate's OWNER -- the player who started the game
     -- with the card in their deck, or (CR 111.2) the player who created the
@@ -705,6 +716,9 @@ playerView pid =
       -- CR 202.3 reads a mana cost, which is printed on an OBJECT (CR 202.1); a
       -- player has none.
       manaValue = Nothing,
+      -- CR 202.1 prints a mana cost on a CARD; a player has none, as they have
+      -- no mana value above.
+      manaCost = Nothing,
       controller = Nothing,
       -- CR 108.3 gives an owner to a CARD; a player owns cards and is not one.
       owner = Nothing,

@@ -377,6 +377,8 @@ library codec
     Pawl.Codec.DestroySpec
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DestructionRewriteSpec
+    Pawl.Codec.Devotion
+    Pawl.Codec.DevotionSpec
     Pawl.Codec.Discard
     Pawl.Codec.DiscardCards
     Pawl.Codec.DiscardCardsSpec
@@ -1394,6 +1396,7 @@ library test
     Pawl.DecideSpec
     Pawl.DepartureSpec
     Pawl.DetainSpec
+    Pawl.DevotionSpec
     Pawl.DiceSpec
     Pawl.DungeonSpec
     Pawl.EarthbendSpec
@@ -1651,6 +1654,7 @@ library types
     Pawl.Types.DestructionCause
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
+    Pawl.Types.Devotion
     Pawl.Types.Discard
     Pawl.Types.DiscardCards
     Pawl.Types.DiscardCause
