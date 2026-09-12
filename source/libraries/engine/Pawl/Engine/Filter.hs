@@ -2280,6 +2280,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Evoke cost -> Keyword.Type.Evoke (rewriteCost pairs cost)
   Keyword.Type.Dash cost -> Keyword.Type.Dash (rewriteCost pairs cost)
   Keyword.Type.Blitz cost -> Keyword.Type.Blitz (rewriteCost pairs cost)
+  Keyword.Type.Surge cost -> Keyword.Type.Surge (rewriteCost pairs cost)
+  Keyword.Type.Spectacle cost -> Keyword.Type.Spectacle (rewriteCost pairs cost)
   Keyword.Type.Unleash -> keyword
   -- CR 702.150a names no word CR 612.2 can swap: it is written about loyalty
   -- counters and Phyrexian mana symbols, both the rules' own vocabulary.

@@ -180,6 +180,14 @@ data KeywordFamily
     Disguise
   | -- | CR 702.152a: blitz [cost]; the family Quantity.CastUsing names.
     Blitz
+  | -- | CR 702.117a: surge [cost]. The family a card writing "a card with
+    -- surge" would name; no card in the pool asks yet, and it is owed at the
+    -- keyword rather than at the first asker.
+    Surge
+  | -- | CR 702.137a: spectacle [cost]. The family a card writing "a card with
+    -- spectacle" would name; no card in the pool asks yet, and it is owed at the
+    -- keyword rather than at the first asker.
+    Spectacle
   | -- | CR 702.170a: plot [cost].
     Plot
   | -- | CR 702.143a: foretell [cost].

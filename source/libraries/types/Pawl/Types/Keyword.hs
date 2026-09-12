@@ -381,6 +381,10 @@ data Keyword
     -- player exiles the top card of their library, face up (CR 406.3); each
     -- instance triggers separately (CR 702.115b).
     Ingest
+  | -- | 702.117a: surge [cost] -- you may pay [cost] rather than this spell's
+    -- mana cost as you cast it if you or a teammate has cast another spell this
+    -- turn, which CR 601.2b and CR 601.2f-h price as an alternative cost.
+    Surge (Cost.Cost Keyword)
   | -- | 702.118b: a creature with skulk can't be blocked by creatures with
     -- greater power.
     Skulk
@@ -456,6 +460,10 @@ data Keyword
     -- counter on it. If you don't, it gains haste." A CR 614.1c as-enters
     -- replacement; each instance works separately (CR 702.136b).
     Riot
+  | -- | 702.137a: spectacle [cost] -- you may pay [cost] rather than this
+    -- spell's mana cost if an opponent lost life this turn, which CR 601.2b and
+    -- CR 601.2f-h price as an alternative cost.
+    Spectacle (Cost.Cost Keyword)
   | -- | 702.138a: "escape--[cost]" -- you may cast this card from your graveyard
     -- by paying [cost] rather than paying its mana cost, which CR 601.2b and CR
     -- 601.2f-h price as an alternative cost.
