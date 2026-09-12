@@ -44,6 +44,7 @@ codec abilityCodec =
         CopyException.SetColors y -> Just y
         _ -> Nothing,
       Arm.nullary "NoManaCost" CopyException.NoManaCost,
+      Arm.nullary "DontCopyColors" CopyException.DontCopyColors,
       Arm.payload "GainAbility" abilityCodec CopyException.GainAbility $ \x -> case x of
         CopyException.GainAbility y -> Just y
         _ -> Nothing

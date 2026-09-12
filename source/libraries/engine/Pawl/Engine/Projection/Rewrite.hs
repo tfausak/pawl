@@ -1167,6 +1167,9 @@ rewriteCopyException pairs exception = case exception of
   -- no pair reaches a colour exception; a missing mana cost carries no word.
   CopyException.SetColors _ -> exception
   CopyException.NoManaCost -> exception
+  -- CR 707.9c's clause names a characteristic and no word, so CR 612.2's subtype
+  -- swap has nothing to reach.
+  CopyException.DontCopyColors -> exception
   -- CR 707.9a's "this ability" carries no word of its own. The ability it points
   -- at is the resolving one, which the projection already rewrote where it was
   -- read (rewriteTriggeredAbility).
