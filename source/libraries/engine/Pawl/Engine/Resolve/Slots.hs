@@ -2014,7 +2014,7 @@ playerRefPlayers legal controller gs ref =
           let excluded = legalOne slot legal >>= Recipient.playerOf
            in filter (\pid -> Just pid /= excluded) everyone
         -- CR 702.116a's "each opponent other than defending player": the arm above
-        -- narrowed by CR 102.1, off the same read and with the same collapse.
+        -- narrowed by CR 102.2 / 102.3, off the same read and with the same collapse.
         PlayerRef.EachOpponentExcept slot ->
           let excluded = legalOne slot legal >>= Recipient.playerOf
            in filter (\pid -> Just pid /= excluded && PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller pid) everyone

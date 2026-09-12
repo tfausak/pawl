@@ -36,7 +36,7 @@ data PlayerRef
     -- also why this is a slot-EXCLUSION rather than a slot-read -- an unfilled
     -- slot makes InSlot's readers no-op, and here it must widen instead.
     EachPlayerExcept SlotName.SlotName
-  | -- | EachPlayerExcept narrowed to CR 102.1's opponents -- CR 702.116a's "each
+  | -- | EachPlayerExcept narrowed to CR 102.2 / 102.3's opponents -- CR 702.116a's "each
     -- opponent other than defending player", where the slot holds the player the
     -- myriad creature attacked.
     --

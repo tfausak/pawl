@@ -529,7 +529,7 @@ playersFor viewOf context gs ref =
                     _ -> Nothing
                in Just (filter (\pid -> Just pid /= excluded) everyone)
         -- CR 702.116a's "each opponent other than defending player": the arm
-        -- above narrowed by CR 102.1, which needs the perspective, so an
+        -- above narrowed by CR 102.2 / 102.3, which needs the perspective, so an
         -- unframed evaluation is unanswerable here as it is under Relative.
         PlayerRef.EachOpponentExcept name ->
           case Filter.source context >>= \src -> Game.lookupObject src gs of

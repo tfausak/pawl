@@ -3776,9 +3776,9 @@ myriadExileName = AbilityName.MkAbilityName (Text.pack "myriad")
 -- body-defined name holding the union across its members once it is over, so the
 -- arming opcode after the loop names the whole batch.
 --
--- Rule 702.116a's "if one or more tokens are created this way" needs no gate: an
--- unarmed loop leaves the slot naming nothing and the exile moves nothing, which
--- is what that condition comes to.
+-- Rule 702.116a's "if one or more tokens are created this way" is myriad's own
+-- clause condition rather than anything here: the arming opcode shares a clause
+-- with the loop, so an empty loop arms nothing and this ability is never filed.
 myriadExile :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 myriadExile =
   let effect =
@@ -3815,8 +3815,8 @@ myriadExile =
 -- CR 702.116a. Battle cry's SelfAttacks EveryTime condition (CR 508.3a), over CR
 -- 608.2f's loop: one iteration per opponent other than the defending player,
 -- which Binding.triggerPlayer names -- PlayerRef.EachOpponentExcept is exactly
--- that phrase, and CR 102.1's narrowing is what drops the attacking player, whom
--- EachPlayerExcept would keep.
+-- that phrase, and CR 102.2 / 102.3's narrowing is what drops the attacking
+-- player, whom EachPlayerExcept would keep.
 --
 -- The copy is the BEARER (Filter.IsSource, rule 702.116a's "this creature"), read
 -- through Effect.CreateCopy so CR 707.2's copiable values are what the token gets
@@ -3828,6 +3828,15 @@ myriadExile =
 -- candidate. An opponent who is not a defending player narrows to nothing, and
 -- the token enters not attacking (CR 508.4a) -- which is what a game not using CR
 -- 802's option leaves.
+--
+-- The clause CONDITION is rule 702.116a's loop having a member at all, and it
+-- carries that rule's "if one or more tokens are created this way" with it: at
+-- two seats the only opponent IS the defending player, so the count is 0, and
+-- Pawl.Engine.Resolve.gateHolds runs BEFORE Pawl.Engine.Resolve.exercises -- no
+-- CR 603.5 "may" the rule offers nobody, and no delayed ability armed for an
+-- exile with nothing to exile. Resolve.clauseIsInert cannot stand in for it:
+-- ArmDelayedTrigger reads more than its slots, so it never answers inert.
+-- Pawl.AttackKeywordTriggerSpec's two-seat case is what proves it.
 --
 -- Not implemented: rule 702.116a's "you may" is PER OPPONENT, and this asks it
 -- ONCE over the whole loop, so at four or more seats a controller cannot take a
@@ -3867,11 +3876,24 @@ myriad =
               ArmDelayedTrigger.onset = Onset.Immediately,
               ArmDelayedTrigger.duration = Nothing
             }
+      anyOpponent =
+        Condition.Compares
+          Compares.MkCompares
+            { Compares.measured =
+                Quantity.Count
+                  ( Count.MkCount
+                      (Scope.OverPlayers (PlayerRef.EachOpponentExcept Binding.triggerPlayer))
+                      (Filter.And [])
+                      Aggregation.Members
+                  ),
+              Compares.comparison = Comparison.AtLeast,
+              Compares.threshold = Quantity.Literal 1
+            }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
           TriggeredAbility.modal =
             Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [loop, arm]))) Map.empty))
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Just anyOpponent) Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [loop, arm]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited

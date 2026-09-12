@@ -7,6 +7,7 @@
 -- machinery.
 module Pawl.AttackKeywordTriggerSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1685,6 +1686,50 @@ myriadSpec s registry =
               Spec.assertEqWith s "no token was created" (S.tokensOf after) []
               Spec.assertEqWith s "though the Patrol did attack bob" (attackedBy patrolId after) (Just (AttackTarget.OfPlayer S.bob))
             _ -> Spec.assertFailure s "fixture should give alice a Patrol and a Piker"
+        -- TWO SEATS, the default game size, where rule 702.116a's loop has NO
+        -- member: bob is alice's only opponent and bob is the defending player.
+        -- The rule then offers no "may" and creates no token, so its "if one or
+        -- more tokens are created this way" leaves nothing armed -- and an armed
+        -- CR 603.7 delayed ability would be a real triggered ability at CR 511.2,
+        -- which data/cards/stifle.json could counter.
+        --
+        -- THE PAIR is the three-seat board below, same answerer and same
+        -- declarations, differing only in the seat count; without it a zero
+        -- reads as "nothing ran" rather than "the gate held".
+        --
+        -- A pure answerer cannot see a prompt that was never raised, so this one
+        -- threads a counter -- Pawl.CopySpec's countingAnswer shape.
+        Spec.it s "CR 702.116a at two seats the loop is empty, so no may is asked and nothing is armed" $ do
+          patrol <- S.printingOf s registry "Wyrm's Crossing Patrol"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let counting :: Prompt.Prompt r -> State.State Int r
+              counting p = case p of
+                Prompt.ChooseOptional {} -> do
+                  State.modify' (+ 1)
+                  pure OptionalDecision.Exercises
+                _ -> pure (plan p)
+              stepTo :: Phase.Phase -> Int -> GameState.GameState -> State.State Int GameState.GameState
+              stepTo target n g =
+                if n <= 0 || GameState.phase g == target
+                  then pure g
+                  else do
+                    (_, g') <- Engine.runGame counting g Engine.runStep
+                    stepTo target (n - 1) g'
+              toBlockers g = State.runState (stepTo (Phase.Combat CombatStep.DeclareBlockers) 8 g) 0
+              (twoSeat, _, _) = S.combatBoardOf [patrol, piker] []
+              (three, _, _, _) = S.threePlayerCombat [patrol, piker] [] []
+              (afterTwo, askedTwo) = toBlockers twoSeat
+              (afterThree, askedThree) = toBlockers three
+          -- THE gameplay assertion, ahead of every proxy: CR 603.7's delayed
+          -- ability is what CR 511.2 would put on the stack, and rule 702.116a
+          -- creates none here.
+          Spec.assertEqWith s "CR 702.116a at two seats no delayed exile is armed" (length (GameState.delayedTriggers afterTwo)) 0
+          Spec.assertEqWith s "CR 603.5 and its may is never asked" askedTwo 0
+          Spec.assertEqWith s "CR 702.116a and no token was minted" (S.tokensOf afterTwo) []
+          -- The control: one seat more, and every one of the three flips.
+          Spec.assertEqWith s "CR 702.116a at three seats the exile IS armed" (length (GameState.delayedTriggers afterThree)) 1
+          Spec.assertEqWith s "CR 603.5 and the may is asked once" askedThree 1
+          Spec.assertEqWith s "CR 702.116a and one token was minted" (length (S.tokensOf afterThree)) 1
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
