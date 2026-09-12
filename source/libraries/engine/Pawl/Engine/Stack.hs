@@ -517,10 +517,11 @@ armBecame oid obj gs1 arrivals = do
   -- delayed abilities above are armed: a spell cast for the cost suspend's third
   -- ability offered gains haste, which the permanent it becomes is what carries.
   --
-  -- "IF YOU CAST A CREATURE SPELL THIS WAY" is asked of the SPELL and off the
-  -- projection (CR 613.1), on the pre-move board where it still exists -- so a
-  -- card suspended by an effect that granted it suspend answers for the spell it
-  -- actually was, not for whatever the permanent turns out to be.
+  -- "IF YOU CAST A CREATURE SPELL THIS WAY" is asked of the SPELL, off the
+  -- projection rather than the printed card and on the pre-move board where it
+  -- still exists -- the reading the Aura branch above takes of its own subtype
+  -- question. So a spell whose type line an effect changed answers for what it
+  -- was, not for whatever the permanent turns out to be.
   let hasted = if Set.member CardType.Creature (Projection.cardTypesOf oid gs1) then Keyword.castUsingHaste (Object.castUsing obj) else Nothing
   Foldable.for_ hasted $ \duration ->
     Foldable.for_ permanents (grantHaste duration (Resolve.spellController obj oid gs1))

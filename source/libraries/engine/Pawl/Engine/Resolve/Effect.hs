@@ -969,6 +969,7 @@ offerCast context named caster optionality offer = do
             -- are asked in order, free first. CR 118.9d in both cases -- an
             -- alternative replaces only the MANA cost, so the face's additional
             -- costs ride along.
+            --
             -- CR 601.2b's tag rides along: an offer stating which keyword
             -- ability is behind its cost (rule 702.62a's third ability, the only
             -- one today) hands that keyword to the candidate, so the cast records

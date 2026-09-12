@@ -1164,7 +1164,7 @@ suspending s registry = Spec.describe s "CR 116.2f Rift Bolt" $ do
       (interveningOfTop placed, interveningOfTop pulled)
       (Just True, Just False)
 
--- Durkwood Baloth (TSP 200) {4}{G}{G} 5/5 Creature -- Beast, "Suspend 5--{G}"
+-- Durkwood Baloth (TSP 193) {4}{G}{G} 5/5 Creature -- Beast, "Suspend 5--{G}"
 -- (Oracle text checked on Scryfall, 2026-09-12). A vanilla creature but for the
 -- suspend, so the only thing either case below can be about is rule 702.62a's
 -- last sentence.

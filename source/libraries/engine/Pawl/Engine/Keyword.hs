@@ -2042,8 +2042,9 @@ escapeCosts keywords =
 -- CR 702.62a's suspend is dropped for escape's reason, one word further on: its
 -- last sentence asks whether "you CAST a creature spell this way", and a copy of
 -- a spell isn't cast, so the copy is not the thing that gains the haste. A
--- REGRESSION FENCE rather than a proved line: no test copies a suspended
--- creature spell, so dropping this arm leaves the suite green.
+-- REGRESSION FENCE rather than a proved line: the suite's two spell-copying
+-- boards (Pawl.CastSpec's and Pawl.MutateSpec's Double Major) copy no suspended
+-- spell, so nothing observes this arm.
 copiedCastUsing :: Maybe Keyword -> Maybe Keyword
 copiedCastUsing castUsing = case castUsing of
   Just (Keyword.Escape _) -> Nothing
@@ -5691,7 +5692,7 @@ suspendedNow = Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters 
 -- states which keyword ability is behind the free cost, so the spell carries
 -- Object.castUsing = suspend and Pawl.Engine.Stack.armBecame can grant the
 -- haste to the permanent it becomes. The tag is the whole ability, payload and
--- all, `plainAlternativeCosts`' spelling: nothing reads more than its family.
+-- all, `plainAlternativeCosts`' spelling; nothing reads the payload.
 suspendLastCounter :: Suspend.Suspend Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 suspendLastCounter ability =
   let effect =
