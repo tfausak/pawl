@@ -971,9 +971,9 @@ offerCast context named caster optionality offer = do
             -- costs ride along.
             --
             -- CR 601.2b's tag rides along: an offer stating which keyword
-            -- ability is behind its cost (rule 702.62a's third ability, the only
-            -- one today) hands that keyword to the candidate, so the cast records
-            -- it as Object.castUsing exactly as a printed alternative does.
+            -- ability is behind its cost (rule 702.62a's third ability and rule
+            -- 702.35a's second) hands that keyword to the candidate, so the cast
+            -- records it as Object.castUsing exactly as a printed alternative does.
             -- CastOffer.offeredBy is Nothing for every other offer, which is
             -- Cost.untagged's own value.
             applied

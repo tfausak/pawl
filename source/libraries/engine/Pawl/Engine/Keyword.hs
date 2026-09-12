@@ -406,7 +406,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
   -- CR 702.35a's two abilities are minted elsewhere, suspend's shape: the
-  -- static half by `handReplacementsFor` and the triggered half by
+  -- static half by `handReplacementsOf` and the triggered half by
   -- `exileTriggeredAbilitiesOf`, so this roster stays empty.
   Keyword.Madness _ -> []
 
@@ -2679,9 +2679,10 @@ castFromGraveyardExile =
 -- 702.35a's replacement says only where the card goes, so two of them would be
 -- indistinguishable CR 616.1 candidates and cost the discarding player a choice
 -- between two identical answers. The COSTS are what differ, and they are the
--- triggered half's (`madnessCast`). No printing carries two madness abilities --
--- Scryfall `keyword:madness`, 2026-09-12, every hit prints one -- so the card
--- that would tell the two readings apart does not exist.
+-- triggered half's (`madnessCast`). Scryfall `keyword:madness`, 2026-09-12,
+-- answers 62 cards and every one of them prints a single madness ability, so
+-- the card that would tell the two readings apart does not exist; a printing
+-- with two would refute this.
 handReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts keywords))]
 
@@ -3118,8 +3119,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Mayhem _ -> []
   -- CR 702.35a's replacement functions in a HAND, where this roster cannot
   -- reach: Pawl.Engine.Projection.replacementsAffecting gathers it off the
-  -- projection of a battlefield or command-zone object. `handReplacementsFor`
-  -- below is where rule 702.35a's row is minted.
+  -- projection of a battlefield or command-zone object. `handReplacementsOf`
+  -- above is where rule 702.35a's row is minted.
   Keyword.Madness _ -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
