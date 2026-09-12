@@ -1105,7 +1105,7 @@ spinesplitterSpec s registry =
         S.runPure
           S.identityAnswer
           gs
-          (Damage.applyDamage [DamageEvent.MkDamageEvent src target amount False False False 0 Nothing DamageKind.Noncombat])
+          (Damage.applyDamage [DamageEvent.MkDamageEvent src target amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
    in Spec.describe s "Furious Spinesplitter" $ do
         Spec.it s "CR 120.1 a counter for each OPPONENT dealt damage, not for each damage event" $ do
           spinesplitter <- S.printingOf s registry "Furious Spinesplitter"

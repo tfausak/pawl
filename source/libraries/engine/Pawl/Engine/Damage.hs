@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AttackTarget (AttackTarget)
@@ -231,11 +232,19 @@ lethalRemaining gs oid =
 -- nothing, which would silently report every rider absent rather than as it last
 -- was, against CR 702.2e, CR 702.15c, CR 702.90d, CR 702.80b and CR 608.2h.
 --
--- One fallback for all five riders, not five: they are read here at a single
--- site off two readers that share one liveness test (Projection.lastKnownOf), so
--- deathtouch and lifelink cannot come to disagree about whether the source is
+-- One fallback for all of the riders, not one each: they are read here at a
+-- single site off readers that share one liveness test (Projection.lastKnownOf),
+-- so deathtouch and lifelink cannot come to disagree about whether the source is
 -- still there. Every damage the engine deals is built here, so no assignment
 -- site can capture two riders and forget the third.
+--
+-- CR 702.76a's and CR 702.173a's three reads join them for that reason and not
+-- only for uniformity: both rules ask what the source WAS "at the time it dealt
+-- that damage", so a creature that connected and then died has to keep
+-- answering. Commander.isCommander is the one read with no last-known fallback
+-- of its own -- CR 903.3's designation sits on the OWNER (Pawl.Types.Player), so
+-- it survives the object, but Game.componentsOf needs the object to find the
+-- card, which is why the answer is frozen here.
 damageEvent :: GameState -> DamageKind.DamageKind -> ObjectId -> Recipient.Recipient -> Natural -> DamageEvent.DamageEvent
 damageEvent gs kind source target amount =
   let keywords = Projection.keywordsWithLastKnown source gs
@@ -256,6 +265,9 @@ damageEvent gs kind source target amount =
             if has Keyword.Lifelink
               then Projection.controllerWithLastKnown source gs
               else Nothing,
+          DamageEvent.dealtByController = Projection.controllerWithLastKnown source gs,
+          DamageEvent.dealtByCreatureTypes = Set.filter Subtype.isCreatureType (Projection.subtypesWithLastKnown source gs),
+          DamageEvent.dealtByCommander = Commander.isCommander source gs,
           DamageEvent.kind = kind
         }
 

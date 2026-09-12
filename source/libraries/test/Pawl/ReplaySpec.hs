@@ -120,8 +120,8 @@ combatReplaySpec s =
       -- CR 615.7: two simultaneous combat damage events one shield could cover
       -- part of, which is the batch that prompt is asked over.
       orderDamageEvents =
-        [ DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.alice) 5 False False False 0 Nothing DamageKind.Combat,
-          DamageEvent.MkDamageEvent (ObjectId.MkObjectId 8) (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Combat
+        [ DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.alice) 5 False False False 0 Nothing Nothing mempty False DamageKind.Combat,
+          DamageEvent.MkDamageEvent (ObjectId.MkObjectId 8) (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing Nothing mempty False DamageKind.Combat
         ]
       -- CR 601.2h: Jarad, Golgari Lich Lord's two halves, the printed cost whose
       -- payment order is the payer's.

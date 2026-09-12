@@ -122,7 +122,7 @@ board island piker undercity =
 -- monarch group's posture one rule over.
 combatDamageTo :: PlayerId -> ObjectId -> GameEvent.GameEvent
 combatDamageTo holder damager =
-  GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer holder) 2 False False False 0 Nothing DamageKind.Combat)
+  GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer holder) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)
 
 -- A REAL combat, where `combatDamageTo` above is a hand-written event: alice
 -- attacks bob with `mine`, bob blocks with `theirs`, carol holds `hers` and never

@@ -1751,7 +1751,7 @@ monarchTriggerSpec s registry =
       -- combat: Monarch.inherentMatch reads the recorded DamageEvent, and
       -- ExpirySpec's monarch group drives the same rule the same way.
       combatDamageTo monarch damager =
-        S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False False 0 Nothing DamageKind.Combat)]
+        S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)]
       -- Attack bob with everything, block with everything, and divide a
       -- trampler's damage the way CR 510.1c and CR 702.19b together require --
       -- each blocker's own threshold first, the excess through to bob. The

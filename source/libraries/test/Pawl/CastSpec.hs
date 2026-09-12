@@ -3583,6 +3583,119 @@ surgeCost, spectacleCost :: [ManaSymbol.ManaSymbol]
 surgeCost = [ManaSymbol.Generic 1, theRed]
 spectacleCost = [theRed]
 
+-- CR 702.76a on Morsel Theft {2}{B}{B} Kindred Sorcery -- Rogue, "Prowl {1}{B} /
+-- Target player loses 3 life and you gain 3 life. If this spell's prowl cost was
+-- paid, draw a card." (Oracle text checked on Scryfall, 2026-09-12).
+--
+-- ONE board per case, differing ONLY in which creature alice attacked with:
+-- every case gives her the same two Swamps, so rule 702.76a's clause is the only
+-- thing that can turn the offer on. Two Swamps is deliberately short of the
+-- printed {2}{B}{B}, so a case that does not prowl cannot cast the Theft at all.
+--
+-- The Changeling case is why the source's creature types are read off the
+-- PROJECTION: CR 702.73a makes Woodland Changeling every creature type while its
+-- printed type line says Shapeshifter alone, so a read of the card would refuse
+-- the prowl this one earned.
+--
+-- The Bolt case is why they are captured at DEAL TIME: the Faerie has been dead
+-- since combat by the time the Theft is announced, and rule 702.76a asks what
+-- the source was "at the time it dealt that damage" (CR 608.2h).
+prowlSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+prowlSpec s registry = Spec.describe s "Prowl" $ do
+  Spec.it s "CR 702.76a a Rogue's combat damage buys the Theft for {1}{B}; a Goblin Warrior's does not" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    theft <- S.printingOf s registry "Morsel Theft"
+    macabre <- S.printingOf s registry "Faerie Macabre"
+    piker <- S.printingOf s registry "Goblin Piker"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let stealing :: Prompt.Prompt r -> r
+        stealing p = case p of
+          Prompt.ChooseTargets {} -> boltAt S.bob p
+          _ -> payingFor prowlCost p
+        after attacker =
+          let (theftId, _, board) = prowlBoard swamp theft attacker
+           in castResolved stealing theftId (S.runCombat (S.attackTo S.bob) board)
+        rogue = after macabre
+        warrior = after piker
+        shifter = after changeling
+        (killTheft, faerie, killBolt, killBoard) = prowlBoardKilling swamp mountain theft macabre bolt
+        fought = S.runCombat (S.attackTo S.bob) killBoard
+        bolted = S.runPure (aimedAt faerie) (S.runPure (aimedAt faerie) fought (S.cast S.bob killBolt)) (Stack.resolveTop >> Engine.settleForPriority)
+        killed = castResolved stealing killTheft bolted
+    Spec.assertEqWith s "CR 702.76a the Rogue connected, so the prowled Theft took bob from 18 to 15" (S.lifeOf S.bob rogue, S.lifeOf S.alice rogue) (Just 15, Just 23)
+    Spec.assertEqWith s "CR 702.76a a Goblin Warrior shares no creature type with the Theft, so its {2}{B}{B} is unpayable and bob stays at 18" (S.lifeOf S.bob warrior, S.lifeOf S.alice warrior) (Just 18, Just 20)
+    Spec.assertEqWith s "CR 702.73a/613.1 the Changeling is a Rogue by its own ability rather than by its type line, so the Theft prowls" (S.lifeOf S.bob shifter) (Just 15)
+    Spec.assertEqWith s "CR 608.2h the Faerie died to bob's Bolt after connecting, and the Theft prowls anyway" (S.lifeOf S.bob killed, length (namedOnBattlefield "Faerie Macabre" bolted)) (Just 15, 0)
+
+-- alice attacking bob with one creature, two Swamps up and Morsel Theft in hand
+-- over a stocked library -- CR 104.3c, since the Theft's second clause draws.
+prowlBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+prowlBoard swamp theft attacker =
+  let (combat, ours, _) = S.combatBoardOf [attacker] []
+      (_, g1) = S.addLibraryCard swamp S.alice (S.landsFor swamp S.alice 2 combat)
+      (_, g2) = S.addLibraryCard swamp S.alice g1
+      (theftId, g3) = S.addHandCard theft S.alice g2
+   in (theftId, Maybe.fromMaybe theftId (Maybe.listToMaybe ours), g3)
+
+-- prowlBoard with a Mountain and a Lightning Bolt for bob, so he can kill the
+-- attacker once it has connected.
+prowlBoardKilling :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+prowlBoardKilling swamp mountain theft attacker bolt =
+  let (theftId, attackerId, board) = prowlBoard swamp theft attacker
+      (boltId, g1) = S.addHandCard bolt S.bob (S.landsFor mountain S.bob 1 board)
+   in (theftId, attackerId, boltId, g1)
+
+-- CR 702.173a on Eagle Vision {4}{U} Sorcery, "Freerunning {1}{U} / Draw three
+-- cards." (Oracle text checked on Scryfall, 2026-09-12).
+--
+-- prowlSpec's board discipline: two Islands in every case, short of the printed
+-- {4}{U}, so only rule 702.173a's clause can put the Vision on the stack. The
+-- last two cases share a board and differ in the designation alone.
+freerunningSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+freerunningSpec s registry = Spec.describe s "Freerunning" $ do
+  Spec.it s "CR 702.173a an Assassin's or a commander's combat damage buys the Vision for {1}{U}; an ordinary creature's does not" $ do
+    island <- S.printingOf s registry "Island"
+    vision <- S.printingOf s registry "Eagle Vision"
+    offender <- S.printingOf s registry "Repeat Offender"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let after (visionId, board) = castResolved (payingFor freerunningCost) visionId (S.runCombat (S.attackTo S.bob) board)
+        (assassinId, _, assassinBoard) = freerunningBoard island vision offender
+        (pikerVision, pikerId, pikerBoard) = freerunningBoard island vision piker
+        assassin = after (assassinId, assassinBoard)
+        ordinary = after (pikerVision, pikerBoard)
+        general = after (pikerVision, asCommander pikerId pikerBoard)
+    Spec.assertEqWith s "CR 702.173a the Assassin connected, so the freerunning Vision drew alice three cards" (S.handSize S.alice assassin) 3
+    Spec.assertEqWith s "CR 702.173a an ordinary Goblin Warrior is neither, so the Vision's {4}{U} is unpayable and it stays in hand" (S.handSize S.alice ordinary) 1
+    Spec.assertEqWith s "CR 903.3 the same Goblin designated alice's commander buys the Vision" (S.handSize S.alice general) 3
+
+-- prowlBoard over two Islands, Eagle Vision and a library deep enough for its
+-- three cards (CR 104.3c).
+freerunningBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+freerunningBoard island vision attacker =
+  let (combat, ours, _) = S.combatBoardOf [attacker] []
+      stock g _ = snd (S.addLibraryCard island S.alice g)
+      g1 = List.foldl' stock (S.landsFor island S.alice 2 combat) [1 .. (4 :: Int)]
+      (visionId, g2) = S.addHandCard vision S.alice g1
+   in (visionId, Maybe.fromMaybe visionId (Maybe.listToMaybe ours), g2)
+
+-- CR 903.3: alice's commander is whatever printing this object was made from.
+-- The designation lives on the PLAYER (Pawl.Types.Player.commander), so a board
+-- needs no command zone to have one.
+asCommander :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+asCommander oid gs = case fmap Object.source (Game.lookupObject oid gs) of
+  Just (Source.OfCard printingId) -> gs {GameState.players = Map.adjust (\player -> player {Player.commander = Set.singleton printingId}) S.alice (GameState.players gs)}
+  _ -> gs
+
+-- Morsel Theft's prowl {1}{B} and Eagle Vision's freerunning {1}{U}.
+prowlCost, freerunningCost :: [ManaSymbol.ManaSymbol]
+prowlCost = [ManaSymbol.Generic 1, theBlack]
+freerunningCost = [ManaSymbol.Generic 1, theBlue]
+
+theBlack :: ManaSymbol.ManaSymbol
+theBlack = ManaSymbol.OfType (ManaType.Colored Color.Black)
+
 -- CR 702.157a on Galadhrim Brigade {2}{G} 2/2 Creature -- Elf Soldier, "Squad
 -- {1}{G} / Other Elves you control get +1/+1." (Oracle text checked on Scryfall,
 -- 2026-09-11).
@@ -4200,6 +4313,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   blitzSpec s registry
   surgeSpec s registry
   spectacleSpec s registry
+  prowlSpec s registry
+  freerunningSpec s registry
   squadSpec s registry
   offspringSpec s registry
   grantedFlashbackSpec s registry

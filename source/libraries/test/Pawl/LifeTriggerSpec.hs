@@ -194,7 +194,7 @@ lifeGainTriggerSpec s registry =
         Spec.it s "CR 119.9 a 0-damage lifelink event records no life gain at all" $ do
           childOfNight <- S.printingOf s registry "Child of Night"
           let (oid, gs0) = S.addPermanent childOfNight S.alice (Setup.emptyGame S.bothPlayers)
-              evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False False 0 (Just S.alice) DamageKind.Combat
+              evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False False 0 (Just S.alice) Nothing mempty False DamageKind.Combat
               gainsIn gs =
                 Maybe.mapMaybe
                   ( \event -> case event of
@@ -1292,7 +1292,7 @@ forthEorlingasSpec s registry =
         -- not the reading under test.
         Spec.it s "CR 704.3 two combat damage groups in one scan are two trigger events" $ do
           gs <- armed 2
-          let hit knight = GameEvent.DamageDealt (DamageEvent.MkDamageEvent knight (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
+          let hit knight = GameEvent.DamageDealt (DamageEvent.MkDamageEvent knight (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)
               staged = S.withEvents (fmap hit (knights gs)) gs
               placed = S.runPure S.identityAnswer staged Engine.settleForPriority
           Spec.assertEqWith s "one trigger per group, so two" (length (GameState.stack placed)) 2
@@ -1423,7 +1423,7 @@ enrageSpec s registry =
       -- alice's library is stocked, or CR 104.3c decks her before the assertion
       -- runs.
       stock printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
-      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing DamageKind.Noncombat
+      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       damageOn oid gs = fmap Object.damage (Game.lookupObject oid gs)
    in Spec.describe s "CR 120.3 enrage" $ do
         -- The noncombat half, and the CONTROL as a pair of boards differing in
@@ -1577,7 +1577,7 @@ belltowerSphinxSpec s registry =
       -- Every library is stocked past the largest mill, or the mill runs out of
       -- cards and both readings of the rule produce the same graveyard.
       stock printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
-      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing DamageKind.Noncombat
+      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       graveyardSize pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
       graves g = (graveyardSize S.alice g, graveyardSize S.bob g, graveyardSize S.carol g)
       damageOn oid gs = fmap Object.damage (Game.lookupObject oid gs)

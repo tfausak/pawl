@@ -601,14 +601,14 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
   Spec.it s "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (bobCreature, gs0) = S.addPermanent piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-        dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing DamageKind.Combat
+        dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat
         began = S.withEvents [GameEvent.DamageDealt dmg] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "bob took the crown" (GameState.monarch after) (Just S.bob)
   Spec.it s "CR 725.2 noncombat damage to the monarch does not hand over the crown" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (bobCreature, gs0) = S.addPermanent piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-        dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing DamageKind.Noncombat
+        dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
         began = S.withEvents [GameEvent.DamageDealt dmg] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "alice keeps the crown" (GameState.monarch after) (Just S.alice)
@@ -1556,7 +1556,7 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
         warMammoth <- S.printingOf s registry "War Mammoth"
         dovin <- S.printingOf s registry "Dovin, Hand of Control"
         act (dovinBoard plains piker warMammoth dovin)
-      hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       settleDamage gs batch = S.runPure S.identityAnswer gs (Damage.applyDamage batch)
   -- TWO rows for the one printed clause: pawl installs a shield per relation, so
@@ -1721,7 +1721,7 @@ oldFatSpiderSpec s registry = Spec.describe s "OldFatSpiderCantSeeMe" $ do
         warMammoth <- S.printingOf s registry "War Mammoth"
         spider <- S.printingOf s registry "Old Fat Spider Can't See Me"
         act (spiderBoard island piker warMammoth spider)
-      hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       settleDamage gs events = S.runPure S.identityAnswer gs (Damage.applyDamage events)
       -- The two dealers hit the SAME player for DIFFERENT amounts, so a board
