@@ -4071,7 +4071,9 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- CR 707.9a's gained ability is a Pawl.Types.Keyword, and CR 702.14c's
   -- landwalk is one that holds a Filter. The CR 614.1d `tapped` flag beside them
   -- holds none (Vesuva).
-  EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _) -> unframed [f] <> concatMap copyExceptionFilters exceptions
+  -- CR 707.9e's additional counters ride the same payload, and their kinds and
+  -- amounts hold card text on the WithCounters arm's axis below.
+  EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _ counters) -> unframed [f] <> concatMap copyExceptionFilters exceptions <> foldMap withCountersFilters counters
   -- CR 208.2b's options grant KEYWORDS, and a keyword may carry a Filter of its
   -- own (CR 702.14c's landwalk) -- the axis the AsCopy arm above reaches through
   -- CR 707.9a, on the payload beside it. Vacuous over `data/cards/` while Primal
@@ -5722,7 +5724,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- cannot see this one either.
         entryCountersReadX c =
           or $ do
-            ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters wc)) <- fmap PrintedReplacement.effect (Face.replacementEffects c)
+            ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) <- fmap PrintedReplacement.effect (Face.replacementEffects c)
+            -- CR 707.9e's additional counters are the same reader one rewrite
+            -- over: Altered Ego's "except it enters with X additional +1/+1
+            -- counters on it" announces X on the spell and reads it at the entry.
+            wc <- case rewrite of
+              EntryRewrite.WithCounters w -> [w]
+              EntryRewrite.AsCopy asCopy -> Maybe.maybeToList (AsCopy.counters asCopy)
+              _ -> []
             q <- Map.elems (WithCounters.counters wc)
             pure (Set.member Binding.variableX (QuantitySlot.slots q))
         readsX c =

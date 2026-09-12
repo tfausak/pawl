@@ -34,8 +34,10 @@ import qualified Pawl.Types.Supertype as Supertype
 -- layer-7b write on the object would be left behind (CR 707.2's exclusion of
 -- "other effects").
 --
--- Not implemented: CR 707.9e's exception that is an additional effect rather than
--- a characteristic (Altered Ego's additional counters) (#1292).
+-- CR 707.9e's exception -- one that is an ADDITIONAL EFFECT rather than a
+-- characteristic (Altered Ego's additional +1\/+1 counters) -- is not an arm here
+-- and cannot be, for the reason above: it writes no characteristic. It rides the
+-- carriers instead, as AsCopy's `counters` and CreateCopy's `riders`.
 --
 -- Parametric in the ABILITY for GainAbility's payload: a quoted ability is a
 -- Pawl.Types.GrantedAbility, which reaches Pawl.Types.Effect and so this module,
