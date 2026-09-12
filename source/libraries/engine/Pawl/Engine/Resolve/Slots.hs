@@ -252,10 +252,11 @@ tokenBoxQuantities card =
     (\face -> foldMap (pure . Power.unwrap) (Face.power face) <> foldMap (pure . Toughness.unwrap) (Face.toughness face))
     (Card.Type.faces card)
 
--- The slots an entry rider READS: CR 509.4's blocking rider and CR 508.4's
--- specified attack (EntryAttack.SameAs); every other rider is a flag or a
--- Quantity (riderQuantities above). Each read singly -- CR 509.4 names one
--- attacking creature, CR 702.49c one returned creature.
+-- The slots an entry rider READS: CR 509.4's blocking rider, CR 508.4's
+-- specified attack (EntryAttack.SameAs) and CR 702.116a's narrowed one
+-- (EntryAttack.UnderPlayer); every other rider is a flag or a Quantity
+-- (riderQuantities above). Each read singly -- CR 509.4 names one attacking
+-- creature, CR 702.49c one returned creature, CR 702.116a one player.
 --
 -- ALL THREE opcodes reach it, and all three apply it: a Create hands its tokens
 -- to Pawl.Engine.Combat.putOntoBattlefieldBlocking from the minting loop (Flash
@@ -273,10 +274,10 @@ riderSlots riders =
         Nothing -> Map.empty
    in joinTwo attacked (maybe Map.empty oneSlot (EntryRiders.blocking riders))
 
--- The slots a PlayerRef reads. Five arms name one: EachPlayerExcept, InSlot,
--- ControllerOfBound and Attacking at arity One, EachInSlot at arity Many. The
--- other four name none, and the arms below carry the reason for each arity that
--- is not self-evident.
+-- The slots a PlayerRef reads. Six arms name one: EachPlayerExcept,
+-- EachOpponentExcept, InSlot, ControllerOfBound and Attacking at arity One,
+-- EachInSlot at arity Many. The other four name none, and the arms below carry
+-- the reason for each arity that is not self-evident.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty

@@ -38,8 +38,9 @@ import qualified Pawl.Types.TapState as TapState
 --
 -- `attacking` is an EntryAttack rather than an AttackTarget because the effect
 -- names no seat or permanent a card could write: CR 508.4 has the controller
--- choose as it enters, and CR 702.49c's specified case reads what another object
--- was attacking. Pawl.Engine.Combat.putOntoBattlefieldAttacking applies either.
+-- choose as it enters, CR 702.49c's specified case reads what another object was
+-- attacking, and CR 702.116a's narrows that choice to the player a slot names.
+-- Pawl.Engine.Combat.putOntoBattlefieldAttacking applies each.
 --
 -- `blocking` is CR 509.4's rider, and that it has no counterpart to
 -- `attacking`'s Chosen is the design call rather than an oversight. CR 509.4's parenthetical --

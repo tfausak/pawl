@@ -1638,6 +1638,42 @@ myriadSpec s registry =
               Spec.assertBool s (S.onBattlefield patrolId final) "while the Patrol that made it is still there"
               Spec.assertBool s (S.onBattlefield pikerId final) "and so is the Piker that attacked beside it"
             (_, other) -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+        -- THE PROJECTION TRIPWIRE. Nothing alice controls PRINTS myriad: her
+        -- creature is a Clone, and the keyword, the trigger and the token's
+        -- characteristics all come off CR 707.2's copiable values. A read of the
+        -- printed card anywhere on this road answers "Clone" and mints nothing.
+        --
+        -- The Patrol is BOB's, so the only myriad on the battlefield that attacks
+        -- is the copy's, and a second token would say the printed one triggered
+        -- too.
+        Spec.it s "CR 707.2 a Clone of the Patrol has myriad and mints a copy of the Patrol" $ do
+          patrol <- S.printingOf s registry "Wyrm's Crossing Patrol"
+          clone <- S.printingOf s registry "Clone"
+          let (gs0, _, theirs, _) = S.threePlayerCombat [] [patrol] []
+              (_, staged) = S.spellOnStack clone S.alice gs0
+              copying p = case p of
+                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
+                _ -> S.identityAnswer p
+              resolved = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
+              -- CR 302.6: the Clone entered this turn. Settling it is the one
+              -- fixture step here that is not the cards' own doing.
+              alices = filter (\oid -> Projection.controllerOf oid resolved == Just S.alice) (Set.toList (GameState.battlefield resolved))
+              settle gs oid = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects gs)}
+              ready = List.foldl' settle resolved alices
+              after = atBlockers plan ready
+          case (theirs, alices) of
+            ([bobsPatrol], [cloneId]) -> do
+              Spec.assertBool s (Projection.hasName patrolName cloneId after) "the Clone copied the Patrol"
+              Spec.assertEqWith
+                s
+                "CR 702.116a the Clone's own token attacks carol"
+                (fmap (`attackedBy` after) (S.tokensOf after))
+                [Just (AttackTarget.OfPlayer S.carol)]
+              case S.tokensOf after of
+                [token] -> Spec.assertBool s (Projection.hasName patrolName token after) "and it is a copy of the Patrol, not of the Clone's printed card"
+                other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+              Spec.assertBool s (S.onBattlefield bobsPatrol after) "while bob's printed Patrol never attacked"
+            (_, other) -> Spec.assertFailure s ("expected alice to control exactly the Clone, got " <> show (length other))
         -- THE PAIR. Same board and the same declarations; only the answer to CR
         -- 603.5's "may" differs, so a token that appeared anyway would not be
         -- myriad's.

@@ -1716,8 +1716,8 @@ choiceCouldApply src criterion oid gs =
 -- permission naming nobody opens nothing, which is the honest answer rather than
 -- a silent fallback to the caster.
 --
--- EachPlayerExcept is the one that could have gone either way, and it names
--- nobody here rather than taking that arm's own stated reading (an unfilled slot
+-- The two excluding arms are the ones that could have gone either way, and they
+-- name nobody here rather than taking their own stated reading (an unfilled slot
 -- excludes nobody, so the set is the table). A permission is the direction where
 -- widening on an unanswerable reference reads WEAKER than printed, and no card
 -- writes this arm in this position; the count in a Scope is where the type's

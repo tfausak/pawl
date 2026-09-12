@@ -520,7 +520,7 @@ yieldUnits option = concatMap unitsOf (Map.elems (ManaOption.yield option))
 -- nothing the rules give.
 --
 -- Not implemented: a reference that names a BINDING SLOT -- EachPlayerExcept,
--- InSlot, EachInSlot, ControllerOfBound, Attacking. CR 605.3b gives this
+-- EachOpponentExcept, InSlot, EachInSlot, ControllerOfBound, Attacking. CR 605.3b gives this
 -- activation no object to have bound one, and the CR 601.2c announcement a mana
 -- ability makes binds nothing (CR 605.1a), so every one of them names nobody
 -- here. The injected view is Nothing for the same reason: the two arms that read
