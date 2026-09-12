@@ -1358,9 +1358,9 @@ battlefieldNamed wanted pid gs =
 -- damage in both directions, and a 1/4 or a 2/4 survives it. A token that died
 -- in combat would make the end-of-combat exile unobservable (CR 111.7).
 --
--- DIFFERENT POWER (1 and 2), so bob's life at end of combat tells apart three
--- boards: 20 with both attackers blocked, 19 with only the Brigade blocked, 18
--- with only the Guard, 17 with neither.
+-- DIFFERENT POWER (1 and 2), so bob's life at end of combat tells every partial
+-- reading apart: 20 with both attackers blocked, 19 with only the Brigade
+-- blocked, 18 with only the Guard, 17 with neither.
 mirrorMatchBoard ::
   Printing.Printing ->
   Printing.Printing ->
