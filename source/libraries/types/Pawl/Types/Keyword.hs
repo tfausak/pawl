@@ -216,7 +216,7 @@ data Keyword
     -- untapped creature of that color you control rather than pay that mana, and
     -- for each generic mana an untapped creature you control. CR 702.51b puts it
     -- after the total cost is determined, so the offer lives in
-    -- Pawl.Engine.Cost.tapSubstitutions rather than among the candidate costs;
+    -- Pawl.Engine.Cost.manaSubstitutions rather than among the candidate costs;
     -- CR 702.51d makes a second instance redundant, which a Set already is.
     --
     -- Not implemented: CR 702.51c's record of which creatures convoked the spell,
@@ -258,6 +258,13 @@ data Keyword
     -- upkeep, and sacrifice the permanent when the last one goes. Nothing is CR
     -- 702.63b's numberless printing, which states only the last two abilities.
     Vanishing (Maybe Natural.Natural)
+  | -- | 702.66a: for each generic mana in this spell's total cost you may exile a
+    -- card from your graveyard rather than pay that mana. Convoke's neighbour
+    -- below in placement -- CR 702.66b puts it where CR 702.51b puts that one, so
+    -- the offer lives in Pawl.Engine.Cost.manaSubstitutions -- and its opposite in
+    -- what it spends: cards out of a graveyard rather than untapped permanents.
+    -- CR 702.66c makes a second instance redundant, which a Set already is.
+    Delve
   | -- | 702.67a: "[Cost]: Attach this Fortification to target land you control.
     -- Activate only as a sorcery." One ability per instance (CR 702.67c).
     Fortify (Cost.Cost Keyword)

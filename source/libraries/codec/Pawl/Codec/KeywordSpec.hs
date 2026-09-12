@@ -1151,8 +1151,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.UmbraArmor
       " {\"type\":\"UmbraArmor\"} "
-  -- CR 702.51d and CR 702.126c make a second instance redundant, so neither
-  -- keyword carries a count on the wire either.
+  -- CR 702.51d, CR 702.66c and CR 702.126c make a second instance redundant, so
+  -- none of the three carries a count on the wire either.
+  Spec.it s "Delve" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Delve
+      " {\"type\":\"Delve\"} "
   Spec.it s "Convoke" $
     Common.assertCodec
       s
