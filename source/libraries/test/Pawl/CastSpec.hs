@@ -3662,6 +3662,142 @@ jumpStartSpec s registry = Spec.describe s "JumpStart" $ do
       (Keyword.Engine.permissionsFor (Set.singleton CardType.Creature) Keyword.JumpStart)
       []
 
+-- CR 702.81a's one static ability, on Flame Jab {R} Sorcery, "Flame Jab deals 1
+-- damage to any target." plus retrace.
+--
+-- Jump-start's twin one rule over: the discard is ADDITIONAL there too, so the
+-- printed {R} is still owed. The two differ in the only two places rule 702.81a
+-- differs from rule 702.133a -- the discard names a LAND card, and no exile
+-- follows the cast, so the sorcery lands back in the graveyard and may be cast
+-- again on a later turn.
+--
+-- EVERY BOARD BELOW CARRIES ONE MOUNTAIN, positives and negatives alike, so the
+-- only thing a negative can be turning on is the card in hand.
+retraceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+retraceSpec s registry = Spec.describe s "Retrace" $ do
+  -- The whole card end to end. The hand shrinking and the sorcery landing back in
+  -- the GRAVEYARD are the two discriminating readings: a cast that skipped the
+  -- additional cost leaves two cards in hand, and one that borrowed rule
+  -- 702.133a's second ability would have exiled it.
+  --
+  -- What this case does NOT prove is the PERMISSION, jump-start's caveat above:
+  -- S.cast goes straight to Cast.castSpell. The next case is where it is asked.
+  Spec.it s "CR 702.81a cast from the graveyard for {R} plus a land discard, and it returns to the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    flameJab <- S.printingOf s registry "Flame Jab"
+    let (inGraveyard, board) = inGraveyardWith mountain flameJab 1
+        (_, oneInHand) = S.addHandCard mountain S.alice board
+        -- TWO lands in hand, not one: the payment prompt short-circuits when the
+        -- candidates equal the count, so a one-card hand would prove the discard
+        -- happened without proving anybody was asked which card.
+        (_, gs) = S.addHandCard mountain S.alice oneInHand
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice inGraveyard)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+        graveyardNames = fmap (\oid -> S.soleFaceName oid resolved) (Game.zoneMembers Zone.Graveyard S.alice resolved)
+    Spec.assertEqWith s "it dealt 1 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice resolved) (Just 19)
+    Spec.assertBool s (elem (S.printingName flameJab) graveyardNames) "and the sorcery is back in the graveyard, where rule 702.81a leaves it"
+    Spec.assertEqWith s "nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 0
+    Spec.assertEqWith s "one land left in hand, so the discard was paid" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 1
+  -- The negative and its control, one card apart. Both boards afford the {R},
+  -- both hold the same sorcery in the same graveyard and one card in hand; only
+  -- that card's type differs, which is the whole of what rule 702.81a's "a land
+  -- card" adds to rule 702.133a's "a card".
+  Spec.it s "CR 702.81a the discard names a LAND card" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    flameJab <- S.printingOf s registry "Flame Jab"
+    let (inGraveyard, board) = inGraveyardWith mountain flameJab 1
+        (_, nonlandInHand) = S.addHandCard piker S.alice board
+        (_, landInHand) = S.addHandCard mountain S.alice board
+    Spec.assertBool s (not (S.castable S.alice inGraveyard nonlandInHand)) "a hand holding no land cannot pay it"
+    Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice nonlandInHand))) "and it is not offered"
+    Spec.assertBool s (S.castable S.alice inGraveyard landInHand) "castable once the hand holds a land"
+  -- Crux: ADDITIONAL, not alternative, jump-start's crux with a quality on the
+  -- discard. The mana part is the printed {R} in both zones.
+  Spec.it s "CR 702.81a the land discard is an additional cost, and only from the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    flameJab <- S.printingOf s registry "Flame Jab"
+    let (fromHand, handBoard) = inHandWith mountain flameJab 1
+        (fromGraveyard, graveyardBoard) = inGraveyardWith mountain flameJab 1
+        costsOf oid gs = fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor S.alice (S.printingName flameJab) oid gs)
+        printed = Just (ManaCost.MkManaCost [theRed])
+    Spec.assertEqWith s "from hand, the printed {R} and no components" (costsOf fromHand handBoard) [(printed, [])]
+    Spec.assertEqWith
+      s
+      "from the graveyard, the same {R} plus one land discard"
+      (costsOf fromGraveyard graveyardBoard)
+      [(printed, [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.HasCardType CardType.Land))])]
+
+-- CR 702.187b's one static ability, on Electro's Bolt {2}{R} Sorcery, "Electro's
+-- Bolt deals 4 damage to target creature." plus mayhem {1}{R}.
+--
+-- Flashback's shape -- the cost REPLACES the mana cost -- with rule 702.187b's
+-- own clause in front of it: "as long as you discarded this card this turn". That
+-- clause is what these cases are about, so the discard is performed by a card
+-- rather than stamped onto the board: alice casts Cathartic Reunion {1}{R}
+-- Sorcery, "As an additional cost to cast this spell, discard two cards. Draw
+-- three cards", and the bolt is one of the two cards it takes.
+--
+-- EVERY BOARD BELOW CARRIES FOUR MOUNTAINS and the same Reunion cast, positives
+-- and negatives alike, so the only thing a negative can be turning on is which
+-- card the discard moved.
+mayhemSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mayhemSpec s registry = Spec.describe s "Mayhem" $ do
+  Spec.it s "CR 702.187b a card discarded this turn is cast from the graveyard for its mayhem cost" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Electro's Bolt"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    let (discarded, notDiscarded) = mayhemBoards mountain piker bolt reunion
+        boltIn gs = case S.namedObjects (S.printingName bolt) gs of
+          oid : _ -> Just oid
+          [] -> Nothing
+        cast oid gs = S.runPure S.identityAnswer gs (S.cast S.alice oid)
+        resolved = S.settleSba (maybe discarded (\oid -> S.runPure S.identityAnswer (cast oid discarded) Stack.resolveTop) (boltIn discarded))
+    Spec.assertEqWith s "the 4 damage killed bob's Piker" (S.creaturesInPlay S.bob resolved) 0
+    Spec.assertBool s (maybe False (\oid -> S.castable S.alice oid discarded) (boltIn discarded)) "castable from the graveyard it was discarded into"
+    Spec.assertBool s (maybe True (\oid -> not (S.castable S.alice oid notDiscarded)) (boltIn notDiscarded)) "and not castable where the same card lay in the graveyard undiscarded"
+  -- Crux: ALTERNATIVE, not additional. The offer is the mayhem cost alone, and it
+  -- is offered only while rule 702.187b's clause holds -- the undiscarded board
+  -- is offered nothing at all, which is CR 604.2.
+  Spec.it s "CR 702.187b the mayhem cost replaces the mana cost, and only for the card discarded this turn" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Electro's Bolt"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    let (discarded, notDiscarded) = mayhemBoards mountain piker bolt reunion
+        costsOf gs = case S.namedObjects (S.printingName bolt) gs of
+          oid : _ -> fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor S.alice (S.printingName bolt) oid gs)
+          [] -> []
+    Spec.assertEqWith
+      s
+      "the discarded card is offered {1}{R} and nothing else"
+      (costsOf discarded)
+      [(Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, theRed]), [])]
+    Spec.assertEqWith s "the undiscarded one is offered no cost at all" (costsOf notDiscarded) []
+
+-- The mayhem pair: the same four Mountains, the same Goblin Piker under bob, the
+-- same Cathartic Reunion cast and resolved, and Electro's Bolt in alice's
+-- graveyard on both. They differ in ONE thing -- on the left the Reunion's
+-- discard is what put the bolt there, on the right the bolt was already there and
+-- the Reunion took two Mountains instead.
+mayhemBoards :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, GameState.GameState)
+mayhemBoards mountain piker bolt reunion =
+  let base = aliceOnTurn (snd (S.addPermanent piker S.bob (S.landsInPlay mountain 4)))
+      -- Four library cards, three for the Reunion's draw and one to spare: CR
+      -- 104.3c takes a player who draws from an empty library out before any
+      -- assertion below runs.
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) base [1 :: Int .. 4]
+      -- The Reunion's discard takes exactly the two cards left in hand, so which
+      -- two is settled by the board rather than by an answerer.
+      play gs =
+        let (reunionId, gs1) = S.addHandCard reunion S.alice gs
+            castGs = S.runPure S.identityAnswer gs1 (S.cast S.alice reunionId)
+         in S.runPure S.identityAnswer castGs Stack.resolveTop
+      discardedBoard = play (snd (S.addHandCard mountain S.alice (snd (S.addHandCard bolt S.alice stocked))))
+      undiscardedBoard = play (snd (S.addHandCard mountain S.alice (snd (S.addHandCard mountain S.alice (snd (S.addGraveyardCard bolt S.alice stocked))))))
+   in (discardedBoard, undiscardedBoard)
+
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
@@ -3868,6 +4004,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   arborTargetSpec s registry
   anyTypeSpec s registry
   jumpStartSpec s registry
+  retraceSpec s registry
+  mayhemSpec s registry
   legendarySpellSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).

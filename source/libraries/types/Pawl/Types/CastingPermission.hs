@@ -18,7 +18,8 @@ module Pawl.Types.CastingPermission where
 data CastingPermission
   = CastFromLibraryWhileSearching
   | -- | CR 702.34a's first static ability, the half functioning while the card is
-    -- in a graveyard, and with it CR 702.127a's, CR 702.133a's and CR 702.138a's.
+    -- in a graveyard, and with it CR 702.81a's, CR 702.127a's, CR 702.133a's, CR
+    -- 702.138a's and CR 702.187b's.
     -- Produced by Pawl.Engine.Keyword.castingPermissionsOf from the keyword that
     -- grants it, not printed in card JSON -- but a constructor here
     -- rather than a keyword read at the gate, so Pawl.Engine.Cast keeps asking
