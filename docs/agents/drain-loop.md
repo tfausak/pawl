@@ -141,7 +141,7 @@ mutations see it: three consecutive rounds each found a real defect (#2505,
 earlier). Read the merged diffs, not the tests. Its brief must open with: read
 `docs/agents/researching.md` first.
 
-The merge count stopped paying for it. Measured 2026-09-12 over that run: five
+The merge count stopped paying for it. Measured 2026-09-12, over one run: five
 cross-unit rounds cost ~970k subagent tokens for no finding at the bar below
 --- one filed issue (#3658) and one fold-in between them. So run a cross-unit
 round when a merged unit raises one of these, and not otherwise:
