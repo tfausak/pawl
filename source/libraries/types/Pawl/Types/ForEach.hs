@@ -31,6 +31,13 @@ data ForEach effect = MkForEach
     -- SEQUENCE is the whole point: an opcode naming a set applies ITSELF across
     -- it, where this applies a list of them to each member in turn, so a later
     -- instruction can act on what an earlier one produced FOR THAT MEMBER.
+    --
+    -- What the body BINDS is scoped to its own iteration and no further, which
+    -- Pawl.Engine.Resolve.Effect's arm states; once the loop is over those names
+    -- hold the UNION across every member, so an instruction after it names the
+    -- whole batch -- Mirror Match's "exile those tokens", ONE delayed ability
+    -- rather than one per member. Pawl.CombatCostSpec's
+    -- PutOntoBattlefieldBlocking group proves it.
     body :: Seq.Seq effect
   }
   deriving (Eq, Ord, Show)

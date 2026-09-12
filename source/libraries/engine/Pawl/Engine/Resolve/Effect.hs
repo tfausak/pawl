@@ -3813,7 +3813,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- The other half of the scoping, not tidiness: an iteration whose
         -- MoveToZone found an empty library binds nothing, and without this its
         -- DealDamage would read the card the PREVIOUS iteration exiled. Restoring
-        -- rather than deleting leaves the rest of the resolution its environment.
+        -- rather than deleting leaves the rest of the resolution its environment
+        -- for every name the loop's own accumulation (bindAcross below) does not
+        -- take back over.
         rescope gs =
           gs
             { GameState.objects =
@@ -3822,23 +3824,62 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   resolving
                   (GameState.objects gs)
             }
-    Monad.forM_ members $ \member -> do
-      State.modify' rescope
-      -- CR 608.2c: the body's instructions in written order, per member, through
-      -- the SAME fold a clause's own instructions run through -- CR 603.12's
-      -- "happened" is a question about THIS member's iteration, so it resets at
-      -- each member rather than carrying over from the previous one. Nihiloor's
-      -- "for each opponent, tap up to one untapped creature you control. When you
-      -- do, ..." is the shape: the reflexive is that opponent's own tap, not the
-      -- previous opponent's.
-      applyClauseEffects
-        source
-        ( \eff -> do
-            defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
-            applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
+        -- What THIS iteration bound, against what the loop started from: a name
+        -- rescope restored and the body never touched is the pre-loop
+        -- environment rather than this member's product.
+        produced gs =
+          Map.differenceWith
+            (\now before -> if now == before then Nothing else Just now)
+            (Map.restrictKeys (bindingsOf gs) bodyDefined)
+            beforeLoop
+        -- The union across the whole loop, over the two fields a body-defined
+        -- name can hold: bindSlot's ONE object lands in `targets` and
+        -- bindObjectsSlot's batch in `objects`, both of them definitions rather
+        -- than targets (CR 115.10a), so nothing here is subject to CR 608.2b.
+        -- Set union for the one and append for the other, which keeps the mint
+        -- order `objects` is documented to carry. mergeBinding's `<|>` is what
+        -- the remaining fields take, and no body-defined name populates them.
+        joinAcross a b =
+          (Binding.mergeBinding a b)
+            { Binding.Type.targets = Binding.Type.targets a <> Binding.Type.targets b,
+              Binding.Type.objects = Binding.Type.objects a <> Binding.Type.objects b
+            }
+        -- CR 608.2c: an instruction AFTER the loop names everything the body
+        -- produced, across every member -- Mirror Match's "exile those tokens",
+        -- ONE delayed ability over the whole batch rather than one per member.
+        -- Applied over rescope's restore, so the accumulation wins for the names
+        -- it holds and the pre-loop environment is what the rest keep.
+        bindAcross acc gs =
+          gs
+            { GameState.objects =
+                Map.adjust
+                  (\o -> o {Object.bindings = Map.union acc (Object.bindings o)})
+                  resolving
+                  (GameState.objects gs)
+            }
+    accumulated <-
+      Monad.foldM
+        ( \acc member -> do
+            State.modify' rescope
+            -- CR 608.2c: the body's instructions in written order, per member, through
+            -- the SAME fold a clause's own instructions run through -- CR 603.12's
+            -- "happened" is a question about THIS member's iteration, so it resets at
+            -- each member rather than carrying over from the previous one. Nihiloor's
+            -- "for each opponent, tap up to one untapped creature you control. When you
+            -- do, ..." is the shape: the reflexive is that opponent's own tap, not the
+            -- previous opponent's.
+            applyClauseEffects
+              source
+              ( \eff -> do
+                  defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
+                  applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
+              )
+              (Foldable.toList body)
+            State.gets (Map.unionWith joinAcross acc . produced)
         )
-        (Foldable.toList body)
-    State.modify' rescope
+        Map.empty
+        members
+    State.modify' (bindAcross accumulated . rescope)
   Effect.Draw (Draw.MkDraw ref quantity mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -4641,6 +4682,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 508.4's rider, read ONCE off the pre-effect board for Create's
         -- reason.
         mAttack = entryAttack resolving entry gs
+    -- CR 509.4's parenthetical, read the way Create's arm reads it and for the
+    -- same reasons: the attacking creature the effect SPECIFIED, named by slot,
+    -- once and ahead of the minting loop, through fromAmongMembers. Mirror
+    -- Match's "a token that's a copy of that creature and that's blocking that
+    -- creature" names the ForEach member it just copied, so the slot the ref
+    -- reads and the slot this reads are one name.
+    mBlocked <- case EntryRiders.blocking entry of
+      Nothing -> pure Nothing
+      Just blockedSlot -> do
+        named <- fromAmongMembers legal resolving chosen blockedSlot
+        pure $ case named of
+          [attacker] -> Just attacker
+          _ -> Nothing
     -- The count is Create's, read the same way and off the same `gs` (CR 707.1).
     minted <- case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
@@ -4674,6 +4728,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 made <- Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) Nothing exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen)
                 -- CR 508.4, after the entry loop for Create's reason.
                 Monad.forM_ mAttack (\specified -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking specified) made)
+                -- CR 509.4, the blocking twin one rule over, in the same place
+                -- and for the same reason Create's arm puts it there.
+                Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\token -> Combat.putOntoBattlefieldBlocking token attacker) made)
                 pure made
       _ -> pure []
     bindMinted controller source resolving mSlot quantity minted
