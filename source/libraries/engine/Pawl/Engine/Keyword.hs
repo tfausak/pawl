@@ -278,8 +278,8 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.24b: each instance triggers separately, and each counts the one
   -- pile of age counters.
   Keyword.CumulativeUpkeep cost -> List.genericReplicate count (cumulativeUpkeep cost)
-  -- CR 702.30a states no per-instance rider, so two instances are two
-  -- triggers and each asks its own cost.
+  -- Rule 702.30 prints no multiplicity clause the way rule 702.24b does; two
+  -- instances are two abilities all the same, each asking its own cost.
   Keyword.Echo cost -> List.genericReplicate count (echo cost)
   Keyword.Compleated -> []
   Keyword.ReadAhead -> []

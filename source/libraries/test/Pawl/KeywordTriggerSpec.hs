@@ -2162,7 +2162,7 @@ isPayResponse response = case response of
   Response.ChoseToPay _ -> True
   _ -> False
 
--- `paysFor` with CR 706.2's as-enters copy choice PINNED to one named permanent
+-- `paysFor` with CR 614.1c's as-enters copy choice PINNED to one named permanent
 -- -- Pawl.CopySpec's copyNamed posture and its reason, so a mutation cannot be
 -- repaired by the answerer finding some other legal source. The trigger order is
 -- pinned too: two echo triggers at one upkeep are CR 603.3b's choice.

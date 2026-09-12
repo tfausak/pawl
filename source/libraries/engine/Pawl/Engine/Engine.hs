@@ -1845,8 +1845,9 @@ runStepThatBegan phase = do
   -- during the untap step (CR 502.4), so an ability that triggers then is held
   -- until upkeep, where CR 503.1a puts it on the stack first.
   State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan phase (GameState.activePlayer gs))) gs)
-  -- CR 702.30a's clock, advanced HERE and not in `runTurnBasedActions`, which is
-  -- CR 703.4's enumeration and holds nothing rule 503 does not name. It must run
+  -- CR 702.30a's clock, advanced HERE and not in `runTurnBasedActions`: CR 503.1
+  -- gives the upkeep step no turn-based actions, and this is bookkeeping rather
+  -- than one of CR 703.4's list in any case. It must run
   -- before the first priority boundary of this step, which is what gathers the
   -- beginning-of-upkeep triggers CR 603.4 then reads the clock for. The sample
   -- first, because no player receives priority during the untap step (CR 502.4),
