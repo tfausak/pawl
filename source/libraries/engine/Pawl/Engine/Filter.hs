@@ -2329,10 +2329,11 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Station -> keyword
   Keyword.Type.UmbraArmor -> keyword
   -- CR 702.51a and CR 702.126a name "creature", "artifact" and a mana symbol's
-  -- own color, all the rules' own vocabulary, and the criterion they produce is
-  -- written in Pawl.Engine.Keyword rather than on the card -- so CR 612.2 has no
-  -- printed word here to swap.
+  -- own color, and CR 702.66a names no quality at all -- all the rules' own
+  -- vocabulary, and the criteria they produce are written in Pawl.Engine.Keyword
+  -- rather than on the card, so CR 612.2 has no printed word here to swap.
   Keyword.Type.Convoke -> keyword
+  Keyword.Type.Delve -> keyword
   Keyword.Type.Improvise -> keyword
   -- CR 702.41a's [text] is a printed quality, so `rewrite` reaches it as
   -- landwalk's criterion is reached.

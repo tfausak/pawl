@@ -452,8 +452,9 @@ data Prompt r where
   -- moments, both of them "which cost", which is why one constructor serves
   -- both: CR 601.2b\'s payable alternative and additional costs, after modes and
   -- before X and targets (CR 118.9b makes an alternative cost optional), and CR
-  -- 702.51b\'s and CR 702.126b\'s tap substitutes once the total cost is locked
-  -- in (Pawl.Engine.Cost.announceTapSubstitutions). The candidates are filtered
+  -- 702.51b\'s, CR 702.66b\'s and CR 702.126b\'s substitutes once the total cost is
+  -- locked
+  -- in (Pawl.Engine.Cost.announceManaSubstitutions). The candidates are filtered
   -- by payability at both, and an answer outside them is rejected.
   ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost Keyword.Keyword] -> Prompt (Cost.Cost Keyword.Keyword)
   -- | CR 601.2h: the order the non-mana components of a total cost are paid in,
