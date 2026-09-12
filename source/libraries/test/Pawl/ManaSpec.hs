@@ -3213,7 +3213,10 @@ gauntletBoard s registry = do
 -- mana-added event can fire Caged Sun. The same board without Ashaya is the
 -- Filter's control -- a creature's ability, not a land's -- and bob's Swamp is
 -- the relation's: mana HE adds is not mana alice adds.
-cagedSunSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+--
+-- The second case is CR 605.5a's half, off a Crumbling Vestige whose ability
+-- adds its mana as it RESOLVES rather than as a mana ability.
+cagedSunSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cagedSunSpec s registry = Spec.describe s "Caged Sun" $ do
   Spec.it s "CR 605.1b a land's ability adding the chosen colour with no tap adds Caged Sun's additional mana" $ do
     (pet, bobSwamp, board, withAshaya) <- cagedSunBoard s registry
@@ -3227,6 +3230,29 @@ cagedSunSpec s registry = Spec.describe s "Caged Sun" $ do
     Spec.assertEqWith s "the Filter: without Ashaya the Pet is no land, so its {B} stands alone" (poolTypes S.alice creature) [ManaType.Colored Color.Black]
     Spec.assertEqWith s "the PlayerRelation: bob's Swamp added the {B} to HIS pool, so Caged Sun gives alice nothing" (poolTypes S.alice theirs) []
     Spec.assertEqWith s "and the Pet really was sacrificed for it" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Blood Pet") S.alice sacrificed) 0
+  -- CR 605.5a's half of the same rule: a Crumbling Vestige ("This land enters
+  -- tapped." / "When this land enters, add one mana of any color." / "{T}: Add
+  -- {C}.") whose ETB trigger resolves off the stack adds mana too, and Caged
+  -- Sun's trigger then is NOT a mana ability -- "triggers from an event other
+  -- than activating a mana ability" -- so it uses the stack.
+  Spec.it s "CR 605.5a mana a land's ability adds as it RESOLVES fires Caged Sun, whose trigger then uses the stack" $ do
+    (_, _, board, _) <- cagedSunBoard s registry
+    vestige <- S.printingOf s registry "Crumbling Vestige"
+    let entered = enterVestige vestige board
+        -- The Vestige's own ETB trigger, placed and resolved: it is the ability
+        -- that adds the mana, and the colour it adds is a player's answer.
+        afterEntry = S.runPure (colourAnswer Color.Black) (S.runPure (colourAnswer Color.Black) entered Engine.settleForPriority) Stack.resolveTop
+        -- Caged Sun's trigger, gathered off that addition and placed like any
+        -- other: CR 605.4a's inline road would have left the stack empty here.
+        waiting = S.runPure S.identityAnswer afterEntry Engine.settleForPriority
+        settled = resolveDown waiting
+        -- The same board differing in exactly one thing: the colour the Vestige
+        -- added, which is not the one Caged Sun named.
+        other = resolveDown (S.runPure (colourAnswer Color.Green) (S.runPure (colourAnswer Color.Green) (S.runPure (colourAnswer Color.Green) entered Engine.settleForPriority) Stack.resolveTop) Engine.settleForPriority)
+    Spec.assertEqWith s "CR 605.1b alice's pool holds the Vestige's black and Caged Sun's additional one" (poolTypes S.alice settled) [ManaType.Colored Color.Black, ManaType.Colored Color.Black]
+    Spec.assertEqWith s "CR 605.5a Caged Sun's trigger went ON the stack, the resolving ability being no mana ability" (length (GameState.stack waiting)) 1
+    Spec.assertEqWith s "the specification: a Vestige adding green, not the chosen colour, leaves its one mana alone" (poolTypes S.alice other) [ManaType.Colored Color.Green]
+    Spec.assertEqWith s "the fixture: the Vestige is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Crumbling Vestige") S.alice settled) 1
 
 -- alice CASTS a Caged Sun off six Plains and names black, the Gauntlet of Power
 -- group's reason; then a TAPPED Blood Pet of hers and a Swamp of bob's are
@@ -3251,6 +3277,25 @@ cagedSunBoard s registry = do
   Spec.assertEqWith s "the fixture: Caged Sun resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Caged Sun") S.alice board) 1
   Spec.assertEqWith s "the fixture: the Pet is tapped, so no {T} can be what fires Caged Sun" (fmap Object.tapped (Game.lookupObject pet board)) (Just TapState.Tapped)
   pure (pet, bobSwamp, board, withAshaya)
+
+-- A Crumbling Vestige of alice's, with CR 603.6a's event beside it so its ETB
+-- trigger is pending, then tapped by a fixture write standing in for the
+-- printed "This land enters tapped" -- S.entersWithTrigger applies no entry
+-- replacement. Tapped for the Blood Pet's reason: with no {T} ever paid, CR
+-- 106.12a's "tapped for mana" cannot be what fires Caged Sun, and the
+-- mana-added event is the only road left.
+enterVestige :: Printing.Printing -> GameState.GameState -> GameState.GameState
+enterVestige printing gs =
+  let (oid, withLand) = S.entersWithTrigger printing S.alice gs
+   in S.tapObject oid withLand
+
+-- CR 105.4's answer for "one mana of any color", pinned to one colour so the
+-- pair of boards below differ in exactly it.
+colourAnswer :: Color.Color -> Prompt.Prompt r -> r
+colourAnswer colour p = case p of
+  Prompt.ChooseManaType _ _ _ offered ->
+    Maybe.fromMaybe (NonEmpty.head offered) (List.find (== ManaType.Colored colour) (NonEmpty.toList offered))
+  _ -> S.identityAnswer p
 
 -- Resolve the whole stack down, so a board that placed a triggered mana ability
 -- CR 605.4a forbids the stack reads differently from one that placed nothing: a

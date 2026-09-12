@@ -562,6 +562,8 @@ library codec
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.Mana
     Pawl.Codec.ManaAdded
+    Pawl.Codec.ManaAddedCause
+    Pawl.Codec.ManaAddedCauseSpec
     Pawl.Codec.ManaAddedSpec
     Pawl.Codec.ManaAddition
     Pawl.Codec.ManaAdditionSpec
@@ -1758,6 +1760,7 @@ library types
     Pawl.Types.Mana
     Pawl.Types.ManaAbilityPerformer
     Pawl.Types.ManaAdded
+    Pawl.Types.ManaAddedCause
     Pawl.Types.ManaAddition
     Pawl.Types.ManaCost
     Pawl.Types.ManaCount

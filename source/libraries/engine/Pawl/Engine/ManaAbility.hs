@@ -39,8 +39,11 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaAdded as ManaAdded
+import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.MoveToZone as MoveToZone
@@ -102,6 +105,15 @@ isManaAbility ab =
 -- applies one inline as the activation that triggered it finishes, and
 -- Pawl.Engine.Engine.placePendingTriggers refuses to put one on the stack.
 --
+-- Asked of the EVENT that fired it as well as of the ability, and CR 605.5a is
+-- why: an ability that could produce mana "but triggers from an event other
+-- than activating a mana ability" is not a mana ability. CR 605.1b's own second
+-- alternative is written without that qualification, so the two rules disagree
+-- on their face about mana a resolving ability adds; 605.5a is the narrower
+-- statement and Caged Sun's ruling (2022-06-10) reads it the same way -- its
+-- trigger skips the stack only "if the land's ability that caused you to add
+-- mana was an activated mana ability". `firedFromManaAbility` is that clause.
+--
 -- No library clause and no loyalty clause: CR 605.1b states neither, where CR
 -- 605.1a states both. A triggered ability that mills and adds mana is a mana
 -- ability by this rule, and answering otherwise would keep it off the stack of
@@ -110,12 +122,36 @@ isManaAbility ab =
 -- Asked of the WHOLE ability across every mode, `isManaAbility`'s reading of
 -- "could add mana", and CR 605.2 keeps it a mana ability where the game state
 -- stops it producing.
-isTriggeredManaAbility :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
-isTriggeredManaAbility ab =
+isTriggeredManaAbility :: Maybe GameEvent.GameEvent -> TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+isTriggeredManaAbility event ab =
   let effects = Modal.allEffects (TriggeredAbility.modal ab)
-   in triggersFromMana (TriggeredAbility.condition ab)
+   in firedFromManaAbility event
+        && triggersFromMana (TriggeredAbility.condition ab)
         && not (null (Maybe.mapMaybe manaProduced effects))
         && Map.null (Modal.allTargetSlots (TriggeredAbility.modal ab))
+
+-- CR 605.5a asked of the event a trigger fired from: was an activated mana
+-- ability what happened? `triggersFromMana` is the same question asked of the
+-- CONDITION, and the two are both asked -- that one is CR 605.1b as written,
+-- this one is 605.5a's narrowing of it, and a condition can match events of
+-- either kind (Caged Sun's does).
+--
+-- NOTHING for a trigger with no event to name -- a state trigger (CR 603.8), a
+-- reflexive one (CR 603.12), an inherent one -- which CR 605.1b's middle clause
+-- excludes anyway.
+--
+-- A WILDCARD, `triggersFromMana`'s posture and its reason: CR 605.1b names two
+-- events out of the whole vocabulary, and -Werror will not name this site when a
+-- third mana event is added.
+firedFromManaAbility :: Maybe GameEvent.GameEvent -> Bool
+firedFromManaAbility event = case event of
+  -- CR 106.12: being tapped for mana IS the resolution of an activated mana
+  -- ability, so the event carries no cause of its own.
+  Just (GameEvent.TappedForMana _) -> True
+  -- CR 605.1b's second alternative, narrowed by CR 605.5a to the additions an
+  -- activated mana ability made.
+  Just (GameEvent.ManaAdded added) -> ManaAdded.cause added == ManaAddedCause.ManaAbility
+  _ -> False
 
 -- CR 605.1b's middle clause, asked of one condition: does it trigger from the
 -- activation or resolution of an activated mana ability, or from mana being

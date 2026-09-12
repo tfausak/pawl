@@ -140,7 +140,7 @@ roomPending events gs =
         GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid room) -> do
           entered <- roomAt room (roomsOf oid gs)
           Monad.guard (fmap Object.owner (Game.lookupObject oid gs) == Just pid)
-          Just (PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) pid (roomAbility room entered) Map.empty Nothing)
+          Just (PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) pid (roomAbility room entered) Map.empty Nothing (Just event))
         _ -> Nothing
    in Maybe.mapMaybe pendingFor events
 

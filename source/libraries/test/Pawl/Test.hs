@@ -255,6 +255,7 @@ import qualified Pawl.Codec.LoggedEventSpec
 import qualified Pawl.Codec.LookAtSpec
 import qualified Pawl.Codec.LoyaltyKindSpec
 import qualified Pawl.Codec.LoyaltySpec
+import qualified Pawl.Codec.ManaAddedCauseSpec
 import qualified Pawl.Codec.ManaAddedSpec
 import qualified Pawl.Codec.ManaAdditionSpec
 import qualified Pawl.Codec.ManaCostSpec
@@ -884,6 +885,7 @@ spec s registry = do
   Pawl.Codec.LoggedEventSpec.spec s
   Pawl.Codec.LookAtSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
+  Pawl.Codec.ManaAddedCauseSpec.spec s
   Pawl.Codec.ManaAddedSpec.spec s
   Pawl.Codec.ManaAdditionSpec.spec s
   Pawl.Codec.LoyaltyKindSpec.spec s
