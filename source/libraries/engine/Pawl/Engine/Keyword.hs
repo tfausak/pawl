@@ -2697,9 +2697,10 @@ handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts key
 -- field, so what this row actually intercepts is "would be put into a graveyard
 -- from a hand" rather than rule 701.9a's discard. The row is gathered only while
 -- its source is in a hand, which is what supplies the from-zone -- finality's
--- argument in Pawl.Engine.Projection.finalityOf. Not implemented: the difference
--- between the two, a card put from a hand into a graveyard without being
--- discarded (#3671).
+-- argument in Pawl.Engine.Projection.finalityOf.
+--
+-- Not implemented: the difference between the two, a card put from a hand into a
+-- graveyard without being discarded (#3670).
 madnessDiscardExile :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
 madnessDiscardExile =
   ReplacementEffect.ZoneChangeR
@@ -5455,18 +5456,23 @@ printedTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbi
 printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 
 -- CR 702.62a's SECOND and THIRD abilities, "the second and third are triggered
--- abilities that function in the exile zone" -- the roster the exile scan in
--- Pawl.Engine.Event.Trigger mints, `printedTriggeredAbilitiesOf`'s sibling one
--- zone over.
+-- abilities that function in the exile zone", and CR 702.35a's second -- the
+-- roster the exile scan in Pawl.Engine.Event.Trigger mints,
+-- `printedTriggeredAbilitiesOf`'s sibling one zone over.
 --
 -- UNGATED BY CR 113.6, which is the whole reason it is its own function: rule
 -- 702.62a states the zone itself, so the exile scan takes this list without
 -- asking `functionsIn` -- where the same scan does ask it of the card's PRINTED
--- abilities, which state no zone.
+-- abilities, which state no zone. Rule 702.35a states no zone in those words,
+-- and reaches the same place by its own route: its first ability is what puts
+-- the card in exile, so the second cannot fire anywhere else. `functionsIn`
+-- would answer the GRAVEYARD for its condition (Pawl.Engine.Event.Trigger's
+-- zonesTriggeredFrom, CR 701.9a's ordinary destination) and drop it.
 --
--- Ordered as rule 702.62a prints them, which is also the order they fire in:
--- the upkeep removal takes the last counter off, and the free play watches that
--- removal. Vanishing's pair one rule over has the same two shapes.
+-- Suspend's pair is ordered as rule 702.62a prints them, which is also the
+-- order they fire in: the upkeep removal takes the last counter off, and the
+-- free play watches that removal. Vanishing's pair one rule over has the same
+-- two shapes.
 --
 -- A SET rather than a count-carrying Map, `printedTriggeredAbilitiesOf`'s
 -- reading: a printed keyword set holds one instance of each, and rule 702.62
@@ -5861,9 +5867,9 @@ stillExiled =
 -- states none.
 --
 -- Not implemented: rule 702.35a's "this way". A card discarded while some OTHER
--- replacement exiled it -- Leyline of the Void's, chosen over madness's under CR
--- 616.1 -- reaches this trigger all the same, because the exile scan sees only
--- that the card is in exile and was discarded (#3672).
+-- replacement exiled it -- Rest in Peace's, chosen over madness's under CR 616.1
+-- -- reaches this trigger all the same, because the exile scan sees only that
+-- the card is in exile and was discarded (#3670).
 madnessCast :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 madnessCast cost =
   let offer =

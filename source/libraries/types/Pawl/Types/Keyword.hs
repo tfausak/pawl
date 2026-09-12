@@ -629,8 +629,11 @@ data Keyword
     -- the card rather than casting it and so needs a land-play permission
     -- (#3645).
     Mayhem (Cost.Cost Keyword)
-  | -- | 702.35a: "madness [cost]" -- a discard of this card exiles it instead,
-    -- and a triggered ability then offers its owner the cast for [cost].
+  | -- | 702.35a: "madness [cost]" -- two abilities. The static one replaces a
+    -- discard of this card with an exile
+    -- (Pawl.Engine.Keyword.handReplacementsOf); the triggered one then offers
+    -- its owner the cast for [cost], or the graveyard
+    -- (Pawl.Engine.Keyword.exileTriggeredAbilitiesOf).
     Madness (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 

@@ -4158,6 +4158,7 @@ madnessSpec s registry = Spec.describe s "Madness" $ do
         -- S.identityAnswer declines every optional decision, so this resolution
         -- takes rule 702.35a's "if that player doesn't" leg.
         declined = S.runPure S.identityAnswer placed Stack.resolveTop
+    Spec.assertBool s (elem (S.printingName wurm) (namesIn Zone.Exile discarded)) "the discard put the Wurm in exile, which is what this leg is about"
     Spec.assertBool s (elem (S.printingName wurm) (namesIn Zone.Graveyard declined)) "the Wurm is in its owner's graveyard"
     Spec.assertBool s (notElem (S.printingName wurm) (namesIn Zone.Exile declined)) "and no longer in exile"
     Spec.assertEqWith s "and no Wurm was cast" (S.countOnBattlefieldByName (S.printingName wurm) S.alice declined) 0
@@ -4174,20 +4175,21 @@ madnessAnswer p = case p of
 namesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
 namesIn zone gs = fmap (\oid -> S.soleFaceName oid gs) (Game.zoneMembers zone S.alice gs)
 
--- alice, on her turn, with two Mountains and four Forests untapped, Cathartic
+-- alice, on her turn, with two Mountains and three Forests untapped, Cathartic
 -- Reunion cast off two of them and its additional cost already paid out of a hand
 -- holding exactly the Wurm and one Mountain -- so which two cards the discard
 -- takes is settled by the board rather than by an answerer.
 --
--- FOUR Forests where {2}{G} needs three: the Reunion's own generic {1} may be
--- paid with one of them, and a board that left the madness cast one mana short
--- would prove the payment rather than the keyword.
+-- FIVE lands, which is what makes the madness cost discriminating: the Reunion
+-- takes two of them whichever two it takes, and the three left over pay {2}{G}
+-- but never the printed {3}{G}{G}. A Wurm on the battlefield here was therefore
+-- cast for rule 702.35a's cost and not for its own.
 --
 -- Four library cards, three for the Reunion's draw and one to spare: CR 104.3c
 -- takes a player who draws from an empty library out before any assertion runs.
 madnessBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
 madnessBoard mountain forest wurm reunion =
-  let base = aliceOnTurn (S.landsFor forest S.alice 4 (S.landsInPlay mountain 2))
+  let base = aliceOnTurn (S.landsFor forest S.alice 3 (S.landsInPlay mountain 2))
       stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) base [1 :: Int .. 4]
       handed = snd (S.addHandCard mountain S.alice (snd (S.addHandCard wurm S.alice stocked)))
       (reunionId, ready) = S.addHandCard reunion S.alice handed

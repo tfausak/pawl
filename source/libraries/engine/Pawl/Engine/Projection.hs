@@ -4031,9 +4031,11 @@ replacementsAffecting gs =
       -- is what the short-circuit beneath exists to skip. CR 604.2's clause still
       -- gates each row.
       --
-      -- MINTED rows are deliberately absent: CR 122.1's counters do not survive
-      -- the trip off the battlefield (CR 122.2), and every other minted row is
-      -- CR 614.1c's entry rewrite, which a card that is not entering cannot use.
+      -- MINTED rows are deliberately absent from THIS arm: CR 122.1's counters do
+      -- not survive the trip off the battlefield (CR 122.2), and every other
+      -- minted row a projection carries is CR 614.1c's entry rewrite, which a
+      -- card that is not entering cannot use. The one rule that mints a row into
+      -- a hidden zone is CR 702.35a, and `mintedInHand` below is its own arm.
       --
       -- CR 406.3a: a card exiled face down has no characteristics, so it carries
       -- no row to state anything. Object.exiledFaceDown is CR 406.3's status,
