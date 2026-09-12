@@ -6,6 +6,7 @@ import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Devotion as Devotion
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
@@ -78,6 +79,10 @@ data Quantity
     IsStartingPlayer PlayerRef.PlayerRef
   | -- | CR 102.1: 1 if that player is the active player, else 0.
     IsActivePlayer PlayerRef.PlayerRef
+  | -- | CR 700.5: that player's devotion to the payload's colours -- how many
+    -- mana symbols of any of them appear among the mana costs of the permanents
+    -- they control.
+    Devotion Devotion.Devotion
   | -- | CR 122.1: how many counters of that kind that player has; an absent
     -- kind reads 0.
     PlayerCounters PlayerCounterTally.PlayerCounterTally

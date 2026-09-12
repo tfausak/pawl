@@ -25,6 +25,7 @@ import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.Devotion as Devotion
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.ManaCount as ManaCount.Type
@@ -125,6 +126,8 @@ overSlots f quantity =
         Quantity.IsActivePlayer _ -> pure quantity
         -- And an eighth. The PlayerCounterKind beside it names no slot either.
         Quantity.PlayerCounters {} -> pure quantity
+        -- And a ninth, CR 700.5's. The colour set beside it names no slot either.
+        Quantity.Devotion {} -> pure quantity
         -- A bare CounterKind, which names no slot at all -- this arm carries no
         -- reference of any sort, the object being the one the evaluation is aimed at.
         Quantity.ObjectCounters _ -> pure quantity
@@ -282,6 +285,7 @@ nestedRefs quantity = case quantity of
   Quantity.IsStartingPlayer ref -> Set.singleton (Left ref)
   Quantity.IsActivePlayer ref -> Set.singleton (Left ref)
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> Set.singleton (Left ref)
+  Quantity.Devotion d -> Set.singleton (Left (Devotion.player d))
   Quantity.ObjectCounters _ -> Set.empty
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
@@ -385,6 +389,7 @@ nestedCounts quantity = case quantity of
   Quantity.WasBlocking -> []
   Quantity.DamageDealtToThisTurn -> []
   Quantity.PlayerCounters {} -> []
+  Quantity.Devotion {} -> []
   -- CR 122.1's per-OBJECT tally: a CounterKind with no Count beside it. The KIND
   -- may carry a Filter of its own (CR 122.1b), which Pawl.CardSpec's
   -- quantityKindFilters is what digs out.
@@ -513,6 +518,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.IsStartingPlayer ref -> Quantity.IsStartingPlayer (f ref)
         Quantity.IsActivePlayer ref -> Quantity.IsActivePlayer (f ref)
         Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (f ref) kind)
+        Quantity.Devotion d -> Quantity.Devotion d {Devotion.player = f (Devotion.player d)}
         Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
         Quantity.AttackersDeclaredThisTurn ref -> Quantity.AttackersDeclaredThisTurn (f ref)
         Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)

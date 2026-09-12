@@ -17,6 +17,9 @@ import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -41,6 +44,10 @@ blackCreature =
       Filter.power = Just 2,
       Filter.toughness = Just 2,
       Filter.manaValue = Just 3,
+      -- CR 202.1: a cost totalling the 3 above. No Pawl.Types.Filter atom reads
+      -- it -- CR 700.5's devotion is the one reader and it is a Quantity, not a
+      -- filter -- so it is here to keep the record whole.
+      Filter.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Black)]),
       Filter.controller = Just (PlayerId.MkPlayerId 0),
       -- CR 108.3: OWNED by player 1 while CONTROLLED by player 0, the one board
       -- shape that tells OwnedBy and ControlledBy apart (Garland, Royal
@@ -119,6 +126,9 @@ devoidBigCreature =
       Filter.power = Just 5,
       Filter.toughness = Just 5,
       Filter.manaValue = Just 5,
+      -- CR 202.1: devoid, so the cost totalling the 5 above carries no coloured
+      -- symbol.
+      Filter.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 5]),
       Filter.controller = Nothing,
       Filter.owner = Nothing,
       Filter.zone = Nothing,

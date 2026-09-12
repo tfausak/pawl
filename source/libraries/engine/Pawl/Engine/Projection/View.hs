@@ -49,8 +49,6 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.Hybrid as Hybrid
-import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -58,8 +56,6 @@ import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSymbol as ManaSymbol
-import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modification as Modification
@@ -136,6 +132,9 @@ viewOfCard face =
           Filter.toughness = printedToughness face,
           -- CR 202.3: printed on the card, and rule 202.3 names no zone.
           Filter.manaValue = Just (Quantity.manaValueOf face),
+          -- CR 202.1 off the same printed box the value above totals; Nothing for
+          -- CR 202.1b's land, which has no mana cost where it still has a 0.
+          Filter.manaCost = Face.manaCost face,
           Filter.controller = Nothing,
           -- CR 108.3 gives an owner to a card IN THE GAME; this builder describes
           -- a printed FACE, so there is nothing to read Object.owner off.
@@ -378,6 +377,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 202.3 / 707.2 off the PROJECTION: mana cost is copiable, so layer 1
       -- replaces it. The printed cost is read in baseCharacteristics.
       Filter.manaValue = PC.manaValue pc,
+      -- CR 202.1 / 707.2 off the PROJECTION beside the value it totals, so CR
+      -- 700.5's devotion counts a Clone's copied symbols rather than its printed
+      -- ones (Pawl.DevotionSpec).
+      Filter.manaCost = PC.manaCost pc,
       Filter.controller = controller,
       -- CR 108.3 / 110.2 / 111.2: read off the OBJECT rather than through the
       -- `controller` parameter, since layer 2 has already moved control and
@@ -1339,35 +1342,7 @@ definesEveryCreatureType = Set.member Keyword.Type.Changeling
 manaCostColors :: Maybe ManaCost.ManaCost -> Set Color.Color
 manaCostColors mc = case mc of
   Nothing -> Set.empty
-  Just (ManaCost.MkManaCost symbols) -> Set.fromList (concatMap symbolColors symbols)
-
--- CR 202.2b: only a coloured mana symbol carries a colour; colourless is not a
--- colour (CR 105.2c). A list, since a hybrid is all of its colours (CR 107.4e).
-symbolColors :: ManaSymbol.ManaSymbol -> [Color.Color]
-symbolColors symbol = case symbol of
-  ManaSymbol.OfType (ManaType.Colored c) -> [c]
-  ManaSymbol.OfType ManaType.Colorless -> []
-  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Maybe.mapMaybe colorOfManaType [a, b]
-  -- CR 107.4b/107.4e: a monocolored hybrid's other half is generic, so the named
-  -- half is the whole contribution.
-  ManaSymbol.MonocoloredHybrid t -> Maybe.maybeToList (colorOfManaType t)
-  -- CR 107.4f / 202.2d: Phyrexian symbols are coloured mana symbols. Total `[c]`
-  -- since Phyrexian carries a Color -- there is no colourless Phyrexian symbol.
-  ManaSymbol.Phyrexian c -> [c]
-  -- CR 107.4f: "a hybrid Phyrexian mana symbol is BOTH of its component
-  -- colors", which CR 202.2d makes the object. Tamiyo, Compleated Sage is green
-  -- and blue whichever of her {G/U/P}'s three ways paid for her.
-  ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) -> [l, r]
-  -- CR 107.4h: snow is neither a colour nor a type of mana.
-  ManaSymbol.Snow -> []
-  ManaSymbol.Generic _ -> []
-  ManaSymbol.Variable -> []
-
--- CR 105.2c: colourless is not a colour, so a colourless hybrid half adds none.
-colorOfManaType :: ManaType.ManaType -> Maybe Color.Color
-colorOfManaType manaType = case manaType of
-  ManaType.Colored c -> Just c
-  ManaType.Colorless -> Nothing
+  Just (ManaCost.MkManaCost symbols) -> Set.fromList (concatMap Quantity.symbolColors symbols)
 
 -- CR 113.6 / 614.12: the battlefield permanents whose static abilities FUNCTION
 -- right now. Everything on the battlefield, minus the permanents entering beside

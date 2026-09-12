@@ -890,6 +890,9 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- (Projection.View.baseCharacteristics), so a Nothing here is a
       -- hand-built ProjectedCharacteristics rather than a rule's answer.
       Filter.manaValue = PC.manaValue snapshot,
+      -- CR 202.1 off the snapshot beside the value it totals, so CR 700.5's
+      -- devotion reads what the object's cost was AT THE EVENT.
+      Filter.manaCost = PC.manaCost snapshot,
       Filter.controller = mController,
       -- CR 108.3: an owner is read off an OBJECT and a ProjectedCharacteristics
       -- carries none, so it is the arm's to supply off CR 608.2h's record, as
@@ -1104,6 +1107,7 @@ overlaySnapshot snapshot live =
           Filter.power = Filter.power sampled,
           Filter.toughness = Filter.toughness sampled,
           Filter.manaValue = Filter.manaValue sampled,
+          Filter.manaCost = Filter.manaCost sampled,
           Filter.nonManaActivatedAbility = Filter.nonManaActivatedAbility sampled,
           Filter.hasActivatedAbility = Filter.hasActivatedAbility sampled,
           Filter.grantsStationToughness = Filter.grantsStationToughness sampled
