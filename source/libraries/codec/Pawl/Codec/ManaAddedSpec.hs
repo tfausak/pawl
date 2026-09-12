@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ManaAdded as ManaAdded
+import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -18,6 +19,6 @@ spec s = Spec.describe s "Pawl.Codec.ManaAdded" $ do
     Common.assertCodec
       s
       ManaAdded.codec
-      (ManaAdded.MkManaAdded {ManaAdded.player = PlayerId.MkPlayerId 2, ManaAdded.source = ObjectId.MkObjectId 7, ManaAdded.mana = Set.fromList [ManaType.Colored Color.Red, ManaType.Colorless]})
-      " {\"player\":2,\"source\":7,\"mana\":[{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},{\"type\":\"Colorless\"}]} "
+      (ManaAdded.MkManaAdded {ManaAdded.player = PlayerId.MkPlayerId 2, ManaAdded.source = ObjectId.MkObjectId 7, ManaAdded.mana = Set.fromList [ManaType.Colored Color.Red, ManaType.Colorless], ManaAdded.cause = ManaAddedCause.Resolution})
+      " {\"player\":2,\"source\":7,\"mana\":[{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}},{\"type\":\"Colorless\"}],\"cause\":{\"type\":\"Resolution\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaAdded.codec

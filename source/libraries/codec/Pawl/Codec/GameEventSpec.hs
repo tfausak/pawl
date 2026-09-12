@@ -45,6 +45,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAdded as ManaAdded
+import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
@@ -574,8 +575,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = PlayerId.MkPlayerId 1, ManaAdded.source = ObjectId.MkObjectId 9, ManaAdded.mana = Set.singleton (ManaType.Colored Color.Green)}))
-      " {\"type\":\"ManaAdded\",\"value\":{\"player\":1,\"source\":9,\"mana\":[{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}]}} "
+      (GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = PlayerId.MkPlayerId 1, ManaAdded.source = ObjectId.MkObjectId 9, ManaAdded.mana = Set.singleton (ManaType.Colored Color.Green), ManaAdded.cause = ManaAddedCause.ManaAbility}))
+      " {\"type\":\"ManaAdded\",\"value\":{\"player\":1,\"source\":9,\"mana\":[{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}],\"cause\":{\"type\":\"ManaAbility\"}}} "
   -- CR 701.3a's two ends, and the ORDER is what the distinct ids prove: the
   -- attachment first, then what it went onto. A swap would credit the host with
   -- becoming attached to the Aura.

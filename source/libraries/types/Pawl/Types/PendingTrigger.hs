@@ -3,6 +3,7 @@ module Pawl.Types.PendingTrigger where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SlotName as SlotName
@@ -38,6 +39,15 @@ data PendingTrigger = MkPendingTrigger
     -- entry, and Nothing for one an object simply has. Engine.placeBorne hands
     -- it to the stack object; TriggeredAbilitySource.createdAt says what reads
     -- it there.
-    createdAt :: Maybe Timestamp.Timestamp
+    createdAt :: Maybe Timestamp.Timestamp,
+    -- | CR 603.2's trigger event, and Nothing where the gatherer names none --
+    -- a state trigger (CR 603.8) and a reflexive one (CR 603.12), which have no
+    -- event at all, and the inherent gathers that answer over a whole batch
+    -- (Pawl.Engine.Speed, Pawl.Engine.Rad) rather than per event. None of those
+    -- can be a mana ability, CR 605.1b's middle clause naming events an
+    -- inherent ability the rulebook states never watches. Read by
+    -- Pawl.Engine.ManaAbility.isTriggeredManaAbility, CR 605.5a asking what
+    -- added the mana rather than only what the ability watches.
+    firedBy :: Maybe GameEvent.GameEvent
   }
   deriving (Eq, Ord, Show)

@@ -87,6 +87,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaAdded as ManaAdded
+import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
@@ -2363,7 +2364,7 @@ representativeEvents cond =
         TriggerCondition.PermanentTappedForMana {} -> one (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = departed, TappedForMana.mana = Set.singleton (ManaType.Colored Color.Green)}))
         -- CR 605.1b's mana-added event, on `departed` for the arm above's
         -- reason; the arm binds nothing either way.
-        TriggerCondition.AbilityAddsMana {} -> one (GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = S.alice, ManaAdded.source = departed, ManaAdded.mana = Set.singleton (ManaType.Colored Color.Green)}))
+        TriggerCondition.AbilityAddsMana {} -> one (GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = S.alice, ManaAdded.source = departed, ManaAdded.mana = Set.singleton (ManaType.Colored Color.Green), ManaAdded.cause = ManaAddedCause.ManaAbility}))
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.

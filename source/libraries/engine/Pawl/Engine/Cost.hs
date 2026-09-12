@@ -93,6 +93,7 @@ import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaAdded as ManaAdded
+import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -3795,7 +3796,7 @@ tapForManaWith perform inFlight oid = do
                     ]
                   -- CR 605.1b's other event, whether or not {T} was paid, and
                   -- recorded at the same moment for the same CR 605.4a reason.
-                  manaAdded = fmap (\(recipient, types) -> GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = recipient, ManaAdded.source = oid, ManaAdded.mana = types})) (Map.toList added)
+                  manaAdded = fmap (\(recipient, types) -> GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = recipient, ManaAdded.source = oid, ManaAdded.mana = types, ManaAdded.cause = ManaAddedCause.ManaAbility})) (Map.toList added)
               applyManaTriggers perform (tappedForMana <> manaAdded)
               pure True
 
@@ -3842,7 +3843,7 @@ applyManaTriggers perform events = do
   Monad.mapM_ (State.modify' . Event.recordEvent) events
   gs <- State.get
   let recorded = Foldable.toList (Seq.drop (Seq.length (GameState.events gs) - length events) (GameState.events gs))
-      fired = filter (ManaAbility.isTriggeredManaAbility . PendingTrigger.ability) (Event.reactionTriggers recorded gs)
+      fired = filter (\p -> ManaAbility.isTriggeredManaAbility (PendingTrigger.firedBy p) (PendingTrigger.ability p)) (Event.reactionTriggers recorded gs)
   Monad.mapM_ (ManaAbilityPerformer.triggered perform) fired
 
 -- CR 602.2b sends an activation cost through CR 601.2b-i, so a mana ability pays
