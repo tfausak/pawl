@@ -4291,10 +4291,10 @@ foundryAssemblerSpec s registry = Spec.describe s "Foundry Assembler" $ do
 
 -- alice controls `islands` Islands, her graveyard holds `fuel` Goblin Pikers,
 -- her library holds five more, and she holds `card` with priority in her own
--- precombat main phase. ONE mana source at most and no other, convokeBoard's
--- posture: a cast that succeeds off an empty pool can only have been paid by
--- exiling cards (CR 702.66a). The library is stocked so that CR 104.3c does not
--- decide the game before a draw is read.
+-- precombat main phase. ONE mana source at most, convokeBoard's posture: the
+-- Island pays the one symbol rule 702.66a does not reach, so anything beyond it
+-- can only have been paid by exiling cards. The library is stocked so that CR
+-- 104.3c does not decide the game before a draw is read.
 delveBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, GameState.GameState)
 delveBoard island piker card islands fuel =
   let (_, gs1) = addPermanents island islands (Setup.emptyGame S.bothPlayers)
@@ -4360,11 +4360,12 @@ delvedResidual = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.
 -- Flying, vigilance. When this creature enters, create a 1/1 white and blue
 -- Merfolk creature token."
 --
--- The only transcribable printing that states convoke beside a hybrid symbol,
--- which is what makes Pawl.Engine.Cost.substitutedManas observable: CR 601.2b's
+-- What makes Pawl.Engine.Cost.substitutedManas observable: CR 601.2b's
 -- announcement is measured through a totalling that counts rule 702.51b's
--- substitutes, so both halves are payable and the payer is asked. Hogaak, Arisen
--- Necropolis is the other printing and cannot be transcribed.
+-- substitutes, so both halves are payable and the payer is asked. Scryfall
+-- `keyword:convoke m:/{\w\/\w}/`, 2026-09-12, answers this and Hogaak, Arisen
+-- Necropolis, whose "You can't spend mana to cast this spell" cannot be
+-- transcribed; a third printing of that shape would refute the pair.
 merrowSkyswimmerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 merrowSkyswimmerSpec s registry = Spec.describe s "Merrow Skyswimmer" $ do
   Spec.it s "CR 601.2b the payer announces a convoked spell's hybrid halves, both blue" $ do

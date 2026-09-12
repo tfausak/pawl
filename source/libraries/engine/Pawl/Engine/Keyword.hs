@@ -2484,10 +2484,10 @@ data Substitute
 -- since either ability may pay a given generic mana, and left as two entries
 -- across arms, where no one criterion can say it: CR 702.51d, CR 702.66c and CR
 -- 702.126c make a second instance of ONE of them redundant, which a Set already
--- is. Hogaak, Arisen Necropolis is the printing that states convoke and delve
--- together; it cannot be transcribed, its "You can't spend mana to cast this
--- spell" having no representation, so the two-entry answer is a fence rather than
--- proven behaviour.
+-- is. Scryfall `keyword:convoke keyword:delve`, 2026-09-12, answers Hogaak,
+-- Arisen Necropolis alone, and that one cannot be transcribed -- its "You can't
+-- spend mana to cast this spell" has no representation -- so the two-entry answer
+-- is a fence rather than proven behaviour.
 --
 -- The case is a WILDCARD, morphCost's caveat and for its reason: a new keyword
 -- stating this kind of substitute owes an arm here, and -Werror will not ask for
