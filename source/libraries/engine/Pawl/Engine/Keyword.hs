@@ -260,6 +260,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
+  Keyword.Mobilize n -> List.genericReplicate count (mobilize n)
+  Keyword.Firebending n -> List.genericReplicate count (firebending n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
   -- CR 603.2: none of the three rules states an "each instance" clause, so the
@@ -546,6 +548,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
+  Keyword.Mobilize _ -> []
+  Keyword.Firebending _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -928,6 +932,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
+  Keyword.Mobilize _ -> []
+  Keyword.Firebending _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -1514,6 +1520,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
+  Keyword.Mobilize _ -> []
+  Keyword.Firebending _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -2058,6 +2066,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
+  Keyword.Mobilize _ -> []
+  Keyword.Firebending _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -3446,6 +3456,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
+  Keyword.Mobilize _ -> []
+  Keyword.Firebending _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -3734,6 +3746,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
+  Keyword.Mobilize _ -> []
+  Keyword.Firebending _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -3999,6 +4013,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
+  Keyword.Mobilize _ -> []
+  Keyword.Firebending _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -4151,6 +4167,8 @@ familyOf keyword = case keyword of
   Keyword.Frenzy _ -> Just KeywordFamily.Frenzy
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
+  Keyword.Mobilize _ -> Just KeywordFamily.Mobilize
+  Keyword.Firebending _ -> Just KeywordFamily.Firebending
   Keyword.Crew _ -> Just KeywordFamily.Crew
   Keyword.Fabricate _ -> Just KeywordFamily.Fabricate
   Keyword.Rampage _ -> Just KeywordFamily.Rampage

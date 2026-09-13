@@ -2281,6 +2281,13 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Sneak cost -> Keyword.Type.Sneak (rewriteCost pairs cost)
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
+  -- CR 702.181a's N is a number too, and "Warrior" is afterlife's "Spirit": a
+  -- word CR 612.2a reaches in the ability Pawl.Engine.Keyword.mobilize mints
+  -- rather than in this value.
+  Keyword.Type.Mobilize _ -> keyword
+  -- CR 702.189a's N is a number and the {R} is a mana symbol, so CR 612.2 has
+  -- nothing to swap at all.
+  Keyword.Type.Firebending _ -> keyword
   -- CR 702.75a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- the look and the exile are in the ability Pawl.Engine.Keyword.hideaway mints.
   Keyword.Type.Hideaway _ -> keyword
