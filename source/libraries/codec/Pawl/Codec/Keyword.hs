@@ -194,6 +194,7 @@ codec =
       Arm.nullary "Station" Keyword.Station,
       Arm.payload "Mutate" (Cost.codec codec) Keyword.Mutate (\x -> case x of Keyword.Mutate y -> Just y; _ -> Nothing),
       Arm.nullary "UmbraArmor" Keyword.UmbraArmor,
+      Arm.nullary "Epic" Keyword.Epic,
       Arm.nullary "Convoke" Keyword.Convoke,
       Arm.nullary "Delve" Keyword.Delve,
       Arm.nullary "Undaunted" Keyword.Undaunted,

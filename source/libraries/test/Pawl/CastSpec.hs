@@ -4568,6 +4568,71 @@ reboundSpec s registry = Spec.describe s "Rebound" $ do
     -- side: the rebound cast comes from exile, so it does not rebound again.
     Spec.assertEqWith s "and the card cast from exile does not rebound again" (length (GameState.exile after)) 0
 
+-- CR 702.50's whole keyword, on Endless Swarm {5}{G}{G}{G} Sorcery -- "Create a
+-- 1/1 green Snake creature token for each card in your hand. / Epic" (Oracle text
+-- fetched from Scryfall 2026-09-13, SOK). The payoff is an Effect.Create pawl
+-- already builds, counted off the caster's hand, so rule 702.50a's two spell
+-- abilities are the only things under test. It is the ONE epic printing that
+-- announces no target and no X, which is what pawl's archived spell can carry --
+-- Eternal Dominion is the card that needs the rest (#3708).
+--
+-- THE SNAKE COUNT is the observer, and it moves by a different amount at each
+-- upkeep, so no two readings can be confused: three as the spell resolves (three
+-- cards in hand), three more at alice's next upkeep, and four more at the one
+-- after, alice having drawn once in between. A copy that armed a copier of its
+-- own would make that last reading 14 rather than 10.
+--
+-- NINE FORESTS, one more than the spell's cost, so the Fog left in hand is
+-- affordable after it: a cast gate answers False for want of mana as readily as
+-- for rule 702.50b, and the pair of readings differs only in whether the spell
+-- has resolved.
+--
+-- NO LAND anywhere alice can reach -- her hand and her library are Fogs -- so her
+-- hand size moves only by her draws, which is what makes the two upkeep readings
+-- predictable. Twelve library cards apiece: CR 104.3c takes a player who draws
+-- from an empty library out before any assertion runs.
+epicBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+epicBoard forest fog swarm =
+  let stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard fog pid h)) g [1 :: Int .. 12]
+      stocked = List.foldl' stock (S.landsInPlay forest 9) [S.alice, S.bob]
+      (fogId, oneFog) = S.addHandCard fog S.alice stocked
+      handed = List.foldl' (\g _ -> snd (S.addHandCard fog S.alice g)) oneFog [1 :: Int .. 2]
+      (swarmId, ready) = S.addHandCard swarm S.alice handed
+   in -- reboundBoard's schedule, for its reason: the beginning phase this turn
+      -- still has queued would otherwise arrive after the main phase.
+      ((aliceOnTurn ready) {GameState.remaining = S.phasesAfter Phase.PrecombatMain}, swarmId, fogId)
+
+epicSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+epicSpec s registry = Spec.describe s "Epic" $ do
+  -- Rule 702.50a's second spell ability, driven to the two upkeeps it names. The
+  -- once-not-twice reading comes first: it is the one a copy carrying epic would
+  -- break, and the two readings behind it are ordinary counts.
+  Spec.it s "CR 702.50a the delayed ability copies the spell at each of its controller's upkeeps, and the copy arms no copier of its own" $ do
+    forest <- S.printingOf s registry "Forest"
+    fog <- S.printingOf s registry "Fog"
+    swarm <- S.printingOf s registry "Endless Swarm"
+    let (gs, swarmId, _) = epicBoard forest fog swarm
+        resolved = S.runPure S.identityAnswer gs (S.cast S.alice swarmId >> Stack.resolveTop)
+        startTurn = GameState.turnNumber resolved
+        atDrawOf n g = GameState.turnNumber g > startTurn + n && GameState.phase g == Phase.Beginning BeginningStep.DrawStep
+        -- bob's upkeep is the turn between, and rule 702.50a's "YOUR" excludes it.
+        betweenTurns = reboundRunUntil S.identityAnswer (atDrawOf 0) resolved
+        firstUpkeep = reboundRunUntil S.identityAnswer (atDrawOf 1) betweenTurns
+        secondUpkeep = reboundRunUntil S.identityAnswer (atDrawOf 3) firstUpkeep
+    Spec.assertEqWith s "alice's second upkeep copies the spell once more, not twice" (length (S.tokensOf secondUpkeep)) 10
+    Spec.assertEqWith s "her first upkeep after it copied the spell" (length (S.tokensOf firstUpkeep)) 6
+    Spec.assertEqWith s "and bob's upkeep in between did not" (length (S.tokensOf betweenTurns)) 3
+  -- Rule 702.50a's FIRST spell ability, read off the same two boards: CR 702.50b
+  -- dates it from the resolution, so the board before it is the control.
+  Spec.it s "CR 702.50b its controller can't cast spells once a spell with epic they control resolves" $ do
+    forest <- S.printingOf s registry "Forest"
+    fog <- S.printingOf s registry "Fog"
+    swarm <- S.printingOf s registry "Endless Swarm"
+    let (gs, swarmId, fogId) = epicBoard forest fog swarm
+        resolved = S.runPure S.identityAnswer gs (S.cast S.alice swarmId >> Stack.resolveTop)
+    Spec.assertBool s (not (S.castable S.alice fogId resolved)) "alice can't cast the Fog once the Endless Swarm has resolved"
+    Spec.assertBool s (S.castable S.alice fogId gs) "though the ninth Forest pays for it on the same board before it did"
+
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
@@ -4790,6 +4855,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   mayhemSpec s registry
   madnessSpec s registry
   reboundSpec s registry
+  epicSpec s registry
   legendarySpellSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).

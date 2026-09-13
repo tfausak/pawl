@@ -5117,11 +5117,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \original ->
       -- CR 707.10's three nouns: a spell (Game.isSpell) and an activated or
       -- triggered ability (Game.isAbility), each classifying off the object's
-      -- ZONE and its Source and never off which card it is. Everything else
-      -- copies nothing -- an ObjectRef that named a card in a graveyard reaches
-      -- CR 707.13's different act (#888), and a permanent on the battlefield is
-      -- the CreateCopy and BecomeCopy opcodes' subject rather than this one's.
-      Monad.forM_ (if Game.isSpell original gs || Game.isAbility original gs then Game.lookupObject original gs else Nothing) $ \obj ->
+      -- ZONE and its Source and never off which card it is. Every other LIVE
+      -- object copies nothing -- an ObjectRef that named a card in a graveyard
+      -- reaches CR 707.13's different act (#888), and a permanent on the
+      -- battlefield is the CreateCopy and BecomeCopy opcodes' subject rather
+      -- than this one's.
+      --
+      -- CR 707.10 over an object that has LEFT the stack, second: an effect
+      -- armed while the spell was still there copies it afterwards (CR 702.50a's
+      -- epic ability, at each of its controller's upkeeps for the rest of the
+      -- game), so a departed spell filed in GameState.stackArchive answers where
+      -- the live board no longer can. What is filed is the object AS THE ARMING
+      -- EFFECT COPIES IT, so nothing here cases on which keyword armed it.
+      --
+      -- The archive holds only what Pawl.Engine.Resolve.applyEpic filed, and an
+      -- ObjectId is never reused, so no card's ref can name one: every
+      -- Effect.CopyStackObject in data/cards/ names a slot holding a spell or an
+      -- ability that is still on the stack (a target CR 608.2b re-checks, or the
+      -- spell a trigger fired on, which resolves first). This branch is epic's
+      -- alone today.
+      Monad.forM_ (if Game.isSpell original gs || Game.isAbility original gs then Game.lookupObject original gs else Map.lookup original (GameState.stackArchive gs)) $ \obj ->
         Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(copySource, kind) -> Monad.replicateM_ copies $ do
           -- CR 707.10's answers, as the target maps to write: one EMPTY map
           -- where the copy keeps the decisions rule 707.10 copied (rule 707.10c
@@ -5172,8 +5187,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- snapshot on an ability copy anyway left the suite green
                 -- (2026-09-03), an ability having no characteristic any board can
                 -- read it back off.
+                -- An ARCHIVED spell brings its own snapshot -- the one the
+                -- arming effect filed, rule 702.50a's "except for its epic
+                -- ability" written into it -- and there is no live object left
+                -- to take a fresh reading off, so the copied bindings stand.
                 stampCopiable = case kind of
-                  StackObjectKind.Spell -> Binding.setCopy (Event.copiedSnapshot original gs)
+                  StackObjectKind.Spell | Maybe.isJust (Game.lookupObject original gs) -> Binding.setCopy (Event.copiedSnapshot original gs)
+                  StackObjectKind.Spell -> id
                   StackObjectKind.ActivatedAbility -> id
                   StackObjectKind.TriggeredAbility -> id
                 copy =

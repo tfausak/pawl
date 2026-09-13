@@ -234,6 +234,17 @@ data Keyword
     -- Not implemented: CR 702.49d's commander ninjutsu, which also functions
     -- from the command zone (#3436).
     Ninjutsu (Cost.Cost Keyword)
+  | -- | 702.50a: two spell abilities -- "for the rest of the game, you can't
+    -- cast spells", and a delayed triggered ability that copies this spell
+    -- except for its epic ability at the beginning of each of your upkeeps for
+    -- the rest of the game (CR 707.10). Pawl.Engine.Resolve.applyEpic performs
+    -- both as the spell finishes resolving, rule 702.50a calling them SPELL
+    -- abilities.
+    --
+    -- Not implemented: CR 707.10's copied decisions -- the targets, the modes and
+    -- the value of X -- which the archived spell carries none of, so an epic card
+    -- that announces one cannot be transcribed (Eternal Dominion, #3708).
+    Epic
   | -- | 702.51a: for each colored mana in this spell's total cost you may tap an
     -- untapped creature of that color you control rather than pay that mana, and
     -- for each generic mana an untapped creature you control. CR 702.51b puts it

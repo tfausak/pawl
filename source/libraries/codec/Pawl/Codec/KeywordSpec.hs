@@ -1308,6 +1308,12 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Delve
       " {\"type\":\"Delve\"} "
+  Spec.it s "Epic" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Epic
+      " {\"type\":\"Epic\"} "
   Spec.it s "Convoke" $
     Common.assertCodec
       s

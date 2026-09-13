@@ -100,6 +100,22 @@ data GameState = MkGameState
     -- | CR 608.2h / 113.7a: last known information, keyed by the id an object
     -- had before it left a zone (CR 400.7). Grows for the whole game.
     lastKnown :: Map.Map ObjectId.ObjectId LastKnown.LastKnown,
+    -- | CR 608.2h for a STACK object, keyed by the id it had before it left the
+    -- stack (CR 400.7): the whole object, so an effect armed while it was still
+    -- there can put a copy of it onto the stack afterwards (CR 707.10).
+    --
+    -- The whole object and not a LastKnown record, because CR 707.10 copies the
+    -- DECISIONS -- the modes, the targets, the value of X, the announced costs --
+    -- and CR 109.3 makes none of them a characteristic, so `lastKnown` has
+    -- nowhere to keep them.
+    --
+    -- Written where the copying effect is ARMED rather than by the zone-change
+    -- funnel, so what is filed is the object as that effect copies it: rule
+    -- 702.50a's epic files the spell without its own ability ("copy this spell
+    -- except for its epic ability") rather than making Effect.CopyStackObject
+    -- case on which keyword armed it. Pawl.Engine.Resolve.applyEpic is the one
+    -- writer today. Grows for the whole game, as `lastKnown` does.
+    stackArchive :: Map.Map ObjectId.ObjectId Object.Object,
     -- | CR 117.5: how far the trigger scan has consumed the event log.
     scannedThrough :: Natural.Natural,
     -- | CR 603.10: the battlefield as it stood immediately after each unscanned
