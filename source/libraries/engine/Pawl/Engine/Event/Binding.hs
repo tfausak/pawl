@@ -988,8 +988,8 @@ eventBindingSlots cond = case cond of
   -- Nothing here either, and for the group above's reason: CR 701.68d's event
   -- names the blighting player, and Synthetic Blight Chronicler's payload points
   -- at no one -- it draws and drains its own controller. CR 701.68c's "blighted
-  -- creature" would earn a slot, and it is a later clause of the INSTRUCTING
-  -- effect rather than a payload of this condition (gap #1492).
+  -- creature" is not this condition's to bind: it is a later clause of the
+  -- INSTRUCTING effect, which binds it at Pawl.Types.Blight's own slot.
   TriggerCondition.PlayerBlights _ -> Set.empty
   -- Nothing here either. CR 706.1's event names the roller, but Feywild
   -- Trickster's payload points at no one -- it creates a token for its own

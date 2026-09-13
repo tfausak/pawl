@@ -251,9 +251,9 @@ resolveOne answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
--- CR 701.47 amass, which is an opcode: Effect.Amass over a subtype and a Quantity,
--- whose Army token, candidate pool and counter kind are rule 701.47a's rather than
--- the card's.
+-- CR 701.47 amass, which is an opcode: Effect.Amass over a subtype, a Quantity and
+-- CR 701.47c's optional slot, whose Army token, candidate pool and counter kind are
+-- rule 701.47a's rather than the card's.
 --
 -- Relentless Advance {3}{U} Sorcery (data/cards/relentless-advance.json): "Amass
 -- Zombies 3.", and nothing else -- so every token and every counter on these boards
@@ -526,9 +526,9 @@ resolveFor pid answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast pid spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
--- CR 701.68 blight, which is an opcode: Effect.Blight over a PlayerRef and a
--- Quantity, whose candidate pool and counter kind are rule 701.68a's rather than
--- the card's. A bare printed "blight N" is CR 109.5's `Relative You`, which is
+-- CR 701.68 blight, which is an opcode: Effect.Blight over a PlayerRef, a Quantity
+-- and CR 701.68c's optional slot, whose candidate pool and counter kind are rule
+-- 701.68a's rather than the card's. A bare printed "blight N" is CR 109.5's `Relative You`, which is
 -- what every case here reads; blightPlayerSpec below is the other reading.
 --
 -- Sinister Gnarlbark {2}{B} 0/4 Creature -- Treefolk Warlock
