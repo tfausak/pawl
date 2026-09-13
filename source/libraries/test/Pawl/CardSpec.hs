@@ -2640,6 +2640,10 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Blitz cost -> costFilters cost
   -- CR 702.148a: the cleave cost, flashback's shape.
   Keyword.Cleave cost -> costFilters cost
+  -- CR 702.119a: the emerge cost, flashback's shape. The sacrifice the rule
+  -- states is appended at the offer (Pawl.Engine.Cost.candidateCostsGiven) and is
+  -- not part of the payload.
+  Keyword.Emerge cost -> costFilters cost
   -- CR 702.188a and CR 702.190a: the web-slinging and sneak costs, flashback's
   -- shape. The return each rule states is appended at the offer
   -- (Pawl.Engine.Keyword.plainAlternativeCosts) and is not part of the payload.

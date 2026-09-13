@@ -2362,6 +2362,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Dash cost -> Keyword.Type.Dash (rewriteCost pairs cost)
   Keyword.Type.Blitz cost -> Keyword.Type.Blitz (rewriteCost pairs cost)
   Keyword.Type.Cleave cost -> Keyword.Type.Cleave (rewriteCost pairs cost)
+  Keyword.Type.Emerge cost -> Keyword.Type.Emerge (rewriteCost pairs cost)
   Keyword.Type.Surge cost -> Keyword.Type.Surge (rewriteCost pairs cost)
   Keyword.Type.Spectacle cost -> Keyword.Type.Spectacle (rewriteCost pairs cost)
   Keyword.Type.Prowl cost -> Keyword.Type.Prowl (rewriteCost pairs cost)

@@ -263,4 +263,7 @@ data KeywordFamily
   | -- | CR 702.189a: firebending N. No card in the pool asks yet, and it is owed
     -- at the keyword rather than at the first asker.
     Firebending
+  | -- | CR 702.119a: emerge [cost]. No card in the pool asks yet, and it is owed
+    -- at the keyword rather than at the first asker.
+    Emerge
   deriving (Bounded, Enum, Eq, Ord, Show)

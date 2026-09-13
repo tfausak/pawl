@@ -106,6 +106,7 @@ codec =
       Arm.nullary "Conspire" Keyword.Conspire,
       Arm.payload "Affinity" (Filter.codec codec) Keyword.Affinity (\x -> case x of Keyword.Affinity y -> Just y; _ -> Nothing),
       Arm.payload "Cleave" (Cost.codec codec) Keyword.Cleave (\x -> case x of Keyword.Cleave y -> Just y; _ -> Nothing),
+      Arm.payload "Emerge" (Cost.codec codec) Keyword.Emerge (\x -> case x of Keyword.Emerge y -> Just y; _ -> Nothing),
       Arm.payload "Evoke" (Cost.codec codec) Keyword.Evoke (\x -> case x of Keyword.Evoke y -> Just y; _ -> Nothing),
       Arm.payload "Dash" (Cost.codec codec) Keyword.Dash (\x -> case x of Keyword.Dash y -> Just y; _ -> Nothing),
       Arm.payload "Blitz" (Cost.codec codec) Keyword.Blitz (\x -> case x of Keyword.Blitz y -> Just y; _ -> Nothing),

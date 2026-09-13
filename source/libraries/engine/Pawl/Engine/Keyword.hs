@@ -377,6 +377,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
+  Keyword.Emerge _ -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
@@ -590,6 +591,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ingest -> []
   Keyword.Myriad -> []
   Keyword.Skulk -> []
+  Keyword.Emerge _ -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
@@ -972,6 +974,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ingest -> []
   Keyword.Myriad -> []
   Keyword.Skulk -> []
+  Keyword.Emerge _ -> []
   Keyword.Partner -> []
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
@@ -1563,6 +1566,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Ingest -> []
   Keyword.Myriad -> []
   Keyword.Skulk -> []
+  Keyword.Emerge _ -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
@@ -2117,6 +2121,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Ingest -> []
   Keyword.Myriad -> []
   Keyword.Skulk -> []
+  Keyword.Emerge _ -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
@@ -2488,6 +2493,20 @@ surgeCosts :: Set Keyword -> [Cost Keyword]
 surgeCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Surge cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.119a: surgeCosts' twin over emerge -- the MANA half of rule 702.119a's
+-- alternative cost, which is all the card states. The sacrifice and the generic
+-- reduction the rule states beside it are the RULE's, so
+-- Pawl.Engine.Cost.candidateCostsGiven attaches them at the offer, where the
+-- board that fixes the reduction's amount is in hand.
+--
+-- A list and a wildcard for flashbackCosts' reasons.
+emergeCosts :: Set Keyword -> [Cost Keyword]
+emergeCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Emerge cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -3527,6 +3546,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Ingest -> []
   Keyword.Myriad -> []
   Keyword.Skulk -> []
+  Keyword.Emerge _ -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
@@ -3800,6 +3820,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Ingest -> []
   Keyword.Myriad -> []
   Keyword.Skulk -> []
+  Keyword.Emerge _ -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
@@ -4068,6 +4089,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Ingest -> []
   Keyword.Myriad -> []
   Keyword.Skulk -> []
+  Keyword.Emerge _ -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
@@ -4285,6 +4307,7 @@ familyOf keyword = case keyword of
   Keyword.Ingest -> Nothing
   Keyword.Myriad -> Nothing
   Keyword.Skulk -> Nothing
+  Keyword.Emerge _ -> Just KeywordFamily.Emerge
   -- CR 702.124h carries no parameter, so there is no family to name it by.
   Keyword.Partner -> Nothing
   -- CR 702.124k carries none either.

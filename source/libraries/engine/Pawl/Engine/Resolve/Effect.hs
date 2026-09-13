@@ -983,8 +983,8 @@ offerCast context named caster optionality offer = do
             -- CastOffer.offeredBy is Nothing for every other offer, which is
             -- Cost.untagged's own value.
             applied
-              | CastOffer.withoutPayingManaCost offer = Just (CandidateCost.MkCandidateCost (CastOffer.offeredBy offer) (Cost.withoutPayingManaCost face))
-              | otherwise = fmap (\c -> CandidateCost.MkCandidateCost (CastOffer.offeredBy offer) (c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face})) (CastOffer.payingInstead offer)
+              | CastOffer.withoutPayingManaCost offer = Just (CandidateCost.plain (CastOffer.offeredBy offer) (Cost.withoutPayingManaCost face))
+              | otherwise = fmap (\c -> CandidateCost.plain (CastOffer.offeredBy offer) (c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face})) (CastOffer.payingInstead offer)
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
