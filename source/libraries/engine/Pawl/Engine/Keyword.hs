@@ -363,6 +363,11 @@ abilitiesFor keyword count = case keyword of
   -- draw is granted by mintedStaticAbilitiesOf.
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  -- CR 702.148a's two static abilities print no triggered ability either: one is
+  -- an alternative cost (Pawl.Engine.Cost.candidateCostsGiven) and the other a CR
+  -- 612.1 text change, which Pawl.Types.Keyword's Cleave says the card states for
+  -- itself.
+  Keyword.Cleave _ -> []
   -- CR 702.76a's, CR 702.117a's, CR 702.137a's and CR 702.173a's static
   -- abilities state an alternative cost and nothing else, so they mint no
   -- ability of their own either:
@@ -557,6 +562,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -922,6 +928,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -1500,6 +1507,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -2039,12 +2047,13 @@ permissionsFor cardTypes keyword = case keyword of
   -- Pawl.Engine.Cost.candidateCostsFor's, and rule 702.138a grants no exile
   -- replacement, so castFromGraveyardReplacementsOf stays flashback's.
   Keyword.Escape _ -> [CastingPermission.CastFromGraveyard]
-  -- CR 702.74a, 702.76a, 702.109a, 702.117a, 702.137a, 702.152a and 702.173a
-  -- state an alternative cost and no permission: the card is cast from wherever
-  -- something else lets it be.
+  -- CR 702.74a, 702.76a, 702.109a, 702.117a, 702.137a, 702.148a, 702.152a and
+  -- 702.173a state an alternative cost and no permission: the card is cast from
+  -- wherever something else lets it be.
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -2275,19 +2284,25 @@ copiedCastUsing castUsing = case castUsing of
   Just (Keyword.Suspend _) -> Nothing
   _ -> castUsing
 
--- CR 702.74a, 702.109a and 702.152a: every evoke, dash and blitz cost this card
--- may be cast for, each beside the keyword that offers it -- the tag CR 601.2b
--- records as Object.castUsing -- in ascending Set order. Read by
--- Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is offered,
--- bestowCosts' reading: evoke's static ability functions "in any zone from which
--- the card with evoke can be cast", and dash and blitz name no zone. A list and a
--- wildcard for flashbackCosts' reasons.
+-- CR 702.74a, 702.109a, 702.148a and 702.152a: every evoke, dash, blitz and
+-- cleave cost this card may be cast for, each beside the keyword that offers it
+-- -- the tag CR 601.2b records as Object.castUsing -- in ascending Set order.
+-- Read by Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is
+-- offered, bestowCosts' reading: evoke's static ability functions "in any zone
+-- from which the card with evoke can be cast", dash and blitz name no zone, and
+-- cleave's functions "while a spell with cleave is on the stack", which CR
+-- 113.6e reaches from wherever the cast begins.
+--
+-- UNGATED, where surgeCosts' and spectacleCosts' callers gate: rule 702.148a
+-- states no clause of its own. A list and a wildcard for flashbackCosts'
+-- reasons.
 plainAlternativeCosts :: Set Keyword -> [(Keyword, Cost Keyword)]
 plainAlternativeCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Evoke cost -> Just (keyword, cost)
         Keyword.Dash cost -> Just (keyword, cost)
         Keyword.Blitz cost -> Just (keyword, cost)
+        Keyword.Cleave cost -> Just (keyword, cost)
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -3030,6 +3045,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -3377,6 +3393,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -3608,6 +3625,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -3962,6 +3980,7 @@ familyOf keyword = case keyword of
   Keyword.Evoke _ -> Just KeywordFamily.Evoke
   Keyword.Dash _ -> Just KeywordFamily.Dash
   Keyword.Blitz _ -> Just KeywordFamily.Blitz
+  Keyword.Cleave _ -> Just KeywordFamily.Cleave
   Keyword.Surge _ -> Just KeywordFamily.Surge
   Keyword.Spectacle _ -> Just KeywordFamily.Spectacle
   Keyword.Prowl _ -> Just KeywordFamily.Prowl
