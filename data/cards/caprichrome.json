@@ -3,11 +3,23 @@
     {
       "keywords": [
         {
+          "type": "Flash"
+        },
+        {
+          "type": "Vigilance"
+        },
+        {
           "type": "Devour",
           "value": {
             "count": {
               "type": "Fixed",
-              "value": 3
+              "value": 1
+            },
+            "quality": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Artifact"
+              }
             }
           }
         }
@@ -15,37 +27,37 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 2
+          "value": 3
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Red"
+              "type": "White"
             }
           }
         }
       ],
-      "name": "Thunder-Thrash Elder",
+      "name": "Caprichrome",
       "power": {
         "type": "Literal",
-        "value": 1
+        "value": 2
       },
       "toughness": {
         "type": "Literal",
-        "value": 1
+        "value": 2
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Lizard"
-          },
-          {
-            "type": "Warrior"
+            "type": "Goat"
           }
         ],
         "types": [
+          {
+            "type": "Artifact"
+          },
           {
             "type": "Creature"
           }

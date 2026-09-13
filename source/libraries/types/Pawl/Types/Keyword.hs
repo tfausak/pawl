@@ -3,6 +3,7 @@ module Pawl.Types.Keyword where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Cycling as Cycling
+import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Morph as Morph
@@ -350,12 +351,10 @@ data Keyword
     -- instead its controller puts that many -1/-1 counters on that creature (CR
     -- 120.3d).
     Wither
-  | -- | 702.82a: devour N -- as this object enters, you may sacrifice any number
-    -- of creatures, and it enters with N +1/+1 counters for each.
-    --
-    -- Not implemented: CR 702.82c's devour [quality], whose sacrifice names a
-    -- quality rather than "creature" -- Caprichrome's devour artifact (#3599).
-    Devour Natural.Natural
+  | -- | 702.82a \/ 702.82c: devour N, or devour [quality] N -- as this object
+    -- enters, you may sacrifice any number of creatures (or of [quality]
+    -- permanents), and it enters with N +1/+1 counters for each.
+    Devour (Devour.Devour Keyword)
   | -- | 702.83a: whenever a creature you control attacks alone, that creature
     -- gets +1/+1 until end of turn. Two instances are two abilities.
     Exalted

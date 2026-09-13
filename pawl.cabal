@@ -382,6 +382,10 @@ library codec
     Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.Devotion
     Pawl.Codec.DevotionSpec
+    Pawl.Codec.Devour
+    Pawl.Codec.DevourCount
+    Pawl.Codec.DevourCountSpec
+    Pawl.Codec.DevourSpec
     Pawl.Codec.Discard
     Pawl.Codec.DiscardCards
     Pawl.Codec.DiscardCardsSpec
@@ -1674,6 +1678,8 @@ library types
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
     Pawl.Types.Devotion
+    Pawl.Types.Devour
+    Pawl.Types.DevourCount
     Pawl.Types.Discard
     Pawl.Types.DiscardCards
     Pawl.Types.DiscardCause

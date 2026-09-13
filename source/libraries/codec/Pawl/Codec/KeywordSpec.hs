@@ -8,6 +8,8 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Cycling as Cycling
+import qualified Pawl.Types.Devour as Devour
+import qualified Pawl.Types.DevourCount as DevourCount
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -1120,9 +1122,26 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Devour 3)
-      " {\"type\":\"Devour\",\"value\":3} "
-    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Devour 1) /= Codec.encode Keyword.codec (Keyword.Devour 3)) "devour 1 and devour 3 encode differently"
+      (Keyword.Devour Devour.MkDevour {Devour.quality = Nothing, Devour.count = DevourCount.Fixed 3})
+      " {\"type\":\"Devour\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":3}}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Devour Devour.MkDevour {Devour.quality = Nothing, Devour.count = DevourCount.Fixed 1}) /= Codec.encode Keyword.codec (Keyword.Devour Devour.MkDevour {Devour.quality = Nothing, Devour.count = DevourCount.Fixed 3})) "devour 1 and devour 3 encode differently"
+  -- CR 702.82c: the quality rides on the same payload, so devour 1 and devour
+  -- artifact 1 are distinct keywords too.
+  Spec.it s "Devour carries CR 702.82c's quality" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Devour Devour.MkDevour {Devour.quality = Just (Filter.HasCardType CardType.Artifact), Devour.count = DevourCount.Fixed 1})
+      " {\"type\":\"Devour\",\"value\":{\"count\":{\"type\":\"Fixed\",\"value\":1},\"quality\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Devour Devour.MkDevour {Devour.quality = Nothing, Devour.count = DevourCount.Fixed 1}) /= Codec.encode Keyword.codec (Keyword.Devour Devour.MkDevour {Devour.quality = Just (Filter.HasCardType CardType.Artifact), Devour.count = DevourCount.Fixed 1})) "devour 1 and devour artifact 1 encode differently"
+  -- CR 702.82b: Thromok the Insatiable's N is the sacrifice's own count, which
+  -- carries no number to be distinct by.
+  Spec.it s "Devour carries CR 702.82b's restated N" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Devour Devour.MkDevour {Devour.quality = Nothing, Devour.count = DevourCount.Devoured})
+      " {\"type\":\"Devour\",\"value\":{\"count\":{\"type\":\"Devoured\"}}} "
   -- CR 702.38a's N multiplies the counters each revealed card buys, Devour's
   -- shape one zone over.
   Spec.it s "Amplify carries its N" $ do

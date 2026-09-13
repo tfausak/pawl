@@ -1259,7 +1259,10 @@ entryRewriteReads rewrite = case rewrite of
   -- whose CR 707.9a keywords are not reported either.
   EntryRewrite.WithKeywords _ -> ([], [])
   EntryRewrite.UnderSourceControl -> ([], [])
-  EntryRewrite.SacrificeAnyNumber sacrifice -> ([SacrificeAnyNumber.filter sacrifice], [])
+  -- BOTH halves: the permanents the sacrifice may take, and CR 702.82a's
+  -- per-sacrifice multiplier beside them, which is a Quantity that may name a
+  -- slot exactly as the WithCounters arm above is.
+  EntryRewrite.SacrificeAnyNumber sacrifice -> ([SacrificeAnyNumber.filter sacrifice], [SacrificeAnyNumber.each sacrifice])
   -- CR 702.38a names no slot: its offer is a set of creature types read off the
   -- entering object's projection, never a Filter a resolution could bind.
   EntryRewrite.Amplify _ -> ([], [])

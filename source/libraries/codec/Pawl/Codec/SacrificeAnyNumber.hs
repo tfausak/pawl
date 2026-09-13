@@ -5,6 +5,7 @@ module Pawl.Codec.SacrificeAnyNumber where
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -14,7 +15,7 @@ import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 -- array this payload used to be (#1464).
 codec :: Codec.Codec SacrificeAnyNumber.SacrificeAnyNumber
 codec = Fields.object $ do
-  each <- Fields.required "each" Common.natural SacrificeAnyNumber.each
+  each <- Fields.required "each" Quantity.codec SacrificeAnyNumber.each
   filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) SacrificeAnyNumber.filter
   kind <- Fields.required "kind" (Common.maybe (CounterKind.codec Keyword.codec)) SacrificeAnyNumber.kind
   pure

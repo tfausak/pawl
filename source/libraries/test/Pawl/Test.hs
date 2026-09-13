@@ -167,6 +167,8 @@ import qualified Pawl.Codec.DesignationSpec
 import qualified Pawl.Codec.DestroySpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DevotionSpec
+import qualified Pawl.Codec.DevourCountSpec
+import qualified Pawl.Codec.DevourSpec
 import qualified Pawl.Codec.DiscardCardsSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DiscardSpec
@@ -805,6 +807,8 @@ spec s registry = do
   Pawl.Codec.DestroySpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DevotionSpec.spec s
+  Pawl.Codec.DevourCountSpec.spec s
+  Pawl.Codec.DevourSpec.spec s
   Pawl.Codec.DiscardCardsSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
   Pawl.Codec.DiscardSpec.spec s
