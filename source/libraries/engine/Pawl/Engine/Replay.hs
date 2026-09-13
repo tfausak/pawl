@@ -76,6 +76,7 @@ encode p answer = case p of
   Prompt.ChooseAmass {} -> Response.ChoseAmass answer
   Prompt.ChooseBlight {} -> Response.ChoseBlight answer
   Prompt.ChooseVote {} -> Response.ChoseVote answer
+  Prompt.ChooseVoteWord {} -> Response.ChoseVoteWord answer
   Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
   Prompt.ChooseReadAheadChapter {} -> Response.ChoseReadAheadChapter answer
   Prompt.ChooseDamageSource {} -> Response.ChoseDamageSource answer
@@ -261,6 +262,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseVote {} -> case response of
     Response.ChoseVote oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseVoteWord {} -> case response of
+    Response.ChoseVoteWord slot -> Just slot
     _ -> Nothing
   Prompt.ChoosePaidEnergy {} -> case response of
     Response.ChosePaidEnergy n -> Just n
@@ -643,6 +647,9 @@ defaultAnswer p = case p of
   -- CR 701.38a: the prompt is only raised with two or more listed choices, and
   -- every one of them is a legal vote.
   Prompt.ChooseVote _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 701.38b: the prompt is only raised with two or more listed words, and
+  -- every one of them is a legal vote.
+  Prompt.ChooseVoteWord _ _ _ candidates -> NonEmpty.head candidates
   -- CR 609.7a: the prompt is only raised with two or more sources matching the
   -- shield's printed properties, and every one of them is a legal choice.
   Prompt.ChooseDamageSource _ _ _ candidates -> NonEmpty.head candidates

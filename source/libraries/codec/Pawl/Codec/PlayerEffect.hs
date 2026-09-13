@@ -63,5 +63,6 @@ codec =
           Arm.payload "PlayLandsFrom" InZone.codec PlayerEffect.PlayLandsFrom (\x -> case x of PlayerEffect.PlayLandsFrom y -> Just y; _ -> Nothing),
           Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),
           Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing),
-          Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing)
+          Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing),
+          Arm.payload "AdditionalVotes" Common.natural PlayerEffect.AdditionalVotes (\x -> case x of PlayerEffect.AdditionalVotes y -> Just y; _ -> Nothing)
         ]

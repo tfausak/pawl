@@ -165,6 +165,11 @@ data Prompt r where
   -- proceeding in turn order. Not raised for one candidate, where rule 701.38a's
   -- list holds a single choice and voting decides nothing.
   ChooseVote :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 701.38b: ChooseVote where the listed choices are words rather than
+  -- objects, each word named by the slot its tally is bound at (Plea for
+  -- Power's time and knowledge). Not raised for one candidate, ChooseVote's
+  -- reason.
+  ChooseVoteWord :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty SlotName.SlotName -> Prompt SlotName.SlotName
   -- | CR 122.5: which kind of counter a move takes off the first object onto
   -- the second, where the card leaves the kind open.
   ChooseMovedCounter :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (CounterKind.CounterKind Keyword.Keyword) -> Prompt (CounterKind.CounterKind Keyword.Keyword)

@@ -974,6 +974,8 @@ library codec
     Pawl.Codec.VentureMarkerEntered
     Pawl.Codec.VentureMarkerEnteredSpec
     Pawl.Codec.Vote
+    Pawl.Codec.VoteChoices
+    Pawl.Codec.VoteObjects
     Pawl.Codec.VoteSpec
     Pawl.Codec.While
     Pawl.Codec.WhileSpec
@@ -2013,6 +2015,8 @@ library types
     Pawl.Types.VariableChoice
     Pawl.Types.VentureMarkerEntered
     Pawl.Types.Vote
+    Pawl.Types.VoteChoices
+    Pawl.Types.VoteObjects
     Pawl.Types.While
     Pawl.Types.WithCounters
     Pawl.Types.Zone
