@@ -3136,8 +3136,8 @@ scavengeSpec s registry = Spec.describe s "Scavenge (CR 702.97)" $ do
       (not (any (isActivationOf gyId) (Action.legalActions S.alice (gs {GameState.phase = Phase.Ending EndingStep.EndStep}))))
       "CR 602.5d and not in the end step"
 
--- CR 702.141: encore, the other rule 702 ability activated out of a graveyard
--- whose payload is a token copy --- "[Cost], Exile this card from your graveyard:
+-- CR 702.141: encore, whose payload is a token copy per opponent --- "[Cost],
+-- Exile this card from your graveyard:
 -- For each opponent, create a token that's a copy of this card that attacks that
 -- opponent this turn if able. The tokens gain haste. Sacrifice them at the
 -- beginning of the next end step. Activate only as a sorcery."

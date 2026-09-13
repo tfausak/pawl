@@ -1206,16 +1206,14 @@ graveyardTokenCopy exceptions cost =
 -- graveyardTokenCopy's reason in full: CR 602.2b / 601.2h pay it on activation,
 -- and CR 113.6m is what then confines the ability to a graveyard.
 --
--- THE TARGET is reinforce's, the other rule 702 ability that puts +1/+1 counters
--- on one creature: chosen at CR 601.2c, before CR 601.2h pays, so the ability
--- outlives the card its own cost exiled (CR 113.7a).
+-- THE TARGET is reinforce's shape: chosen at CR 601.2c, before CR 601.2h pays,
+-- so the ability outlives the card its own cost exiled (CR 113.7a).
 --
 -- THE COUNT reads Quantity.Power off Binding.triggerSource, the card the cost
 -- exiled. Rule 702.97a says "the card you exiled" where the printed reminder
--- says "this card's power"; they name one object, and CR 608.2h's last known
--- information is what answers for it -- an AgainstSlot read goes through the
--- injected view, so a card whose power a continuous effect changed in the
--- graveyard is read as it last existed there.
+-- says "this card's power"; they name one object, and an AgainstSlot read goes
+-- through the injected view, which is what lets CR 608.2h answer for a card the
+-- cost has already moved.
 scavenge :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 scavenge cost =
   let slot = TargetSlot.required Pool.Creatures Nothing
@@ -1292,8 +1290,8 @@ encore cost =
                 EntryRiders.MkEntryRiders
                   { EntryRiders.tapped = TapState.Untapped,
                     -- NOT EntryAttack: rule 702.141a's token is created during a
-                    -- main phase (CR 602.5d above) and REQUIRED to attack later,
-                    -- where myriad's arrives already attacking mid-combat.
+                    -- main phase (CR 602.5d) and REQUIRED to attack later, where
+                    -- myriad's arrives already attacking mid-combat.
                     EntryRiders.attacking = Nothing,
                     EntryRiders.blocking = Nothing,
                     EntryRiders.transformed = False,
