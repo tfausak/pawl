@@ -343,8 +343,10 @@ candidateCostsGiven permitted pid name oid gs =
               -- CR 601.2h. Rule 701.21a is also why neither criterion states a
               -- control clause -- "a player can't sacrifice ... something that's a
               -- permanent they don't control", which that pool is already the
-              -- caster's -- and Filter.ControlledBy would be vacuously False here
-              -- anyway, a card in a hand having no controller (CR 108.4).
+              -- caster's. Filter.ControlledBy could not say it anyway:
+              -- Replacement.matchesPermanent asks every sacrifice criterion with NO
+              -- perspective, in every zone, so that atom is vacuously False there
+              -- whatever the criterion is on.
               emerged =
                 let criterion n =
                       Filter.Type.And
