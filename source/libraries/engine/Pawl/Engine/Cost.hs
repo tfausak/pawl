@@ -112,6 +112,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Prototype as Prototype
@@ -430,6 +431,12 @@ candidateCostsGiven permitted pid name oid gs =
                 fmap
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Warp cost)) (withAdditional cost))
                   (Keyword.warpCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+              -- CR 712.11d: the face this card may be cast TRANSFORMED or CONVERTED
+              -- as, which is what Pawl.Engine.Card.convertedFace answers and what
+              -- put that face in castableFaces. Asked through that function rather
+              -- than against Card.backFace so the pricing below cannot come to
+              -- disagree with the offer about which half either rule reaches.
+              isConvertedFace = fmap Face.name (Card.convertedFace card) == Just (Face.name face)
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
               -- which the spell may be cast".
@@ -447,27 +454,49 @@ candidateCostsGiven permitted pid name oid gs =
               -- more than meets the eye ability GRANTED to a card in a zone is
               -- therefore not expanded (gap #1859).
               converted =
-                if fmap Face.name (Card.backFace card) == Just (Face.name face)
+                if isConvertedFace
                   then
                     fmap
                       (\cost -> CandidateCost.plain (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
                       (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (Card.frontFace card)))
                   else []
-              -- `converted` REPLACES the zone's own list rather than joining it:
-              -- the back face is a candidate at all only because rule 702.162a's
-              -- permission put it there, so that permission's cost is the only route
-              -- to casting it. CR 712.11 makes the FRONT face the default and CR
-              -- 712.11a names the converted cast as the way to a back face; no rule
-              -- offers a nonmodal back face for its own printed cost. Empty for every
-              -- other face and for every card without the ability, so each zone arm
-              -- below is reached exactly as it was.
+              -- CR 702.146a: disturb, `converted`'s offer with rule 702.146a's ZONE
+              -- attached -- "you may cast this card transformed FROM YOUR GRAVEYARD
+              -- by paying [cost] rather than its mana cost". Read off the front
+              -- face's printed keywords and scoped to the back face for that list's
+              -- CR 712.11d reasons, and wrapped in `withAdditional` for flashback's.
               --
-              -- Unobservable in this pool either way: no nonmodal back face prints a
-              -- mana cost, so the candidate this drops would have been CR 118.6's
-              -- unpayable one. Written because the alternative is a cast the rules do
-              -- not permit; a printing whose back face had a mana cost would be the
-              -- card that told the two apart.
-              orConverted zoneCandidates = if null converted then zoneCandidates else converted
+              -- The graveyard half is asked at `orConverted` below rather than here,
+              -- beside the zone it names; the CR 601.3 permission that matches it is
+              -- Pawl.Engine.Cast.permitsDisturb's.
+              disturbed =
+                fmap
+                  (\cost -> CandidateCost.plain (Just (Keyword.Type.Disturb cost)) (withAdditional cost))
+                  (Keyword.disturbCosts (Face.keywords (Card.frontFace card)))
+              -- The converted face's candidates REPLACE the zone's own list rather
+              -- than joining it: the back face is a candidate at all only because
+              -- rule 702.162a's or rule 702.146a's permission put it there, so that
+              -- permission's cost is the only route to casting it. CR 712.11 makes
+              -- the FRONT face the default and CR 712.11a names the transformed cast
+              -- as the way to a back face; no rule offers a nonmodal back face for
+              -- its own printed cost. Reached only for that face, so each zone arm
+              -- below is otherwise exactly as it was.
+              --
+              -- Rule 702.146a's cost is offered in a GRAVEYARD and nowhere else,
+              -- which is the clause rule 702.162a does not state; a disturb card's
+              -- back face proposed from a hand is therefore offered nothing and is
+              -- not castable, where its front face is priced by the `_` arm below
+              -- like any other card in a hand.
+              --
+              -- Dropping the printed cost is unobservable in this pool either way:
+              -- no nonmodal back face prints a mana cost, so the candidate this drops
+              -- would have been CR 118.6's unpayable one. Written because the
+              -- alternative is a cast the rules do not permit; a printing whose back
+              -- face had a mana cost would be the card that told the two apart.
+              orConverted zoneCandidates =
+                if isConvertedFace
+                  then converted <> (if Object.zone obj == Zone.Graveyard then disturbed else [])
+                  else zoneCandidates
               -- CR 118.9a / 601.2b: the keyword alternatives ride BESIDE the printed
               -- cost, wherever the permission that lets the card be cast admits
               -- paying its printed cost or an alternative -- the hand, the `_` arm,
@@ -520,9 +549,71 @@ candidateCostsGiven permitted pid name oid gs =
                       -- offer withheld, it is no offer at all. The discarder asked
                       -- about is the CASTER, rule 702.187b's "you".
                       mayhem cost = CandidateCost.plain (Just (Keyword.Type.Mayhem cost)) (withAdditional cost)
+                      -- CR 702.180a's FIRST and SECOND static abilities, `emerged`
+                      -- above one characteristic over: the tap rides in the
+                      -- candidate's components and the generic reduction in
+                      -- CandidateCost.reductions. Read off the projection and
+                      -- wrapped in `withAdditional` for flashback's reason, rule
+                      -- 702.180a's last sentence sending the cast through CR
+                      -- 601.2f-h in its own words.
+                      --
+                      -- ONE CANDIDATE PER POWER an untapped creature this player
+                      -- controls has, which is how CR 702.180b's timing is kept:
+                      -- the creature is chosen "as you choose to pay a spell's
+                      -- harmonize cost (see rule 601.2b)" and CR 601.2f needs its
+                      -- power before the tap happens, so the amount is settled at
+                      -- the announcement. Picking the candidate IS rule 702.180b's
+                      -- choice; picking which creature of that power to tap is left
+                      -- to the payment, where two creatures sharing a power are
+                      -- still told apart and still prompted for.
+                      --
+                      -- PLUS the zero-creature candidate, first, which is rule
+                      -- 702.180a's "UP TO one untapped creature you control": the
+                      -- cost unreduced, tapping nothing. `emerged` has no analogue,
+                      -- rule 702.119a's sacrifice not being optional.
+                      --
+                      -- A creature with power 0 or less still gets a candidate of
+                      -- its own, reducing by nothing: rule 702.180a's reduction is
+                      -- "an amount of generic mana", and CR 107.1b uses
+                      -- zero where a calculation yields a negative number, so the
+                      -- amount saturates there while the criterion still pins that
+                      -- creature. Unobservable in this
+                      -- pool -- such a candidate costs what the zero-creature one
+                      -- costs and differs only in the tap -- and a card that cared
+                      -- whether a creature was tapped would be what told them
+                      -- apart.
+                      --
+                      -- Not implemented: a creature that stops being tappable
+                      -- between CR 601.2b and the payment leaves it to fail on the
+                      -- whole power rather than on the one creature rule 702.180b
+                      -- locked (#3702).
+                      --
+                      -- The pool is `tapCandidates`, the same one the payment draws
+                      -- on, so the powers offered are exactly the powers payable;
+                      -- its perspective is the payer, which is what lets rule
+                      -- 702.180a's "you control" be an atom here.
+                      harmonized =
+                        let untappedYours = [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsTapped, Filter.Type.ControlledBy PlayerRelation.You]
+                            criterion n = Filter.Type.And (untappedYours <> [Filter.Type.PowerAtLeast n, Filter.Type.PowerAtMost n])
+                            powers =
+                              Set.fromList
+                                ( Maybe.mapMaybe
+                                    (\vid -> Filter.power (Projection.viewOfObject vid gs))
+                                    (tapCandidates Map.empty pid oid (Filter.Type.And untappedYours) gs)
+                                )
+                            tappingOne cost n =
+                              CandidateCost.MkCandidateCost
+                                (Just (Keyword.Type.Harmonize cost))
+                                (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (criterion n))]})
+                                [ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]]
+                            tappingNone cost = CandidateCost.plain (Just (Keyword.Type.Harmonize cost)) (withAdditional cost)
+                         in concatMap
+                              (\cost -> tappingNone cost : fmap (tappingOne cost) (Set.toAscList powers))
+                              (Keyword.harmonizeCosts keywords)
                    in fmap flashback (Keyword.flashbackCosts keywords)
                         <> fmap escape (Keyword.escapeCosts keywords)
                         <> (if Game.discardedThisTurnBy pid oid gs then fmap mayhem (Keyword.mayhemCosts keywords) else [])
+                        <> harmonized
                         <> ( if Keyword.hasRetrace keywords
                                then
                                  [ CandidateCost.plain

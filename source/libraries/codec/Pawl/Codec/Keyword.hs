@@ -208,5 +208,7 @@ codec =
       Arm.payload "Scavenge" (Cost.codec codec) Keyword.Scavenge (\x -> case x of Keyword.Scavenge y -> Just y; _ -> Nothing),
       Arm.payload "Transmute" (Cost.codec codec) Keyword.Transmute (\x -> case x of Keyword.Transmute y -> Just y; _ -> Nothing),
       Arm.payload "Transfigure" (Cost.codec codec) Keyword.Transfigure (\x -> case x of Keyword.Transfigure y -> Just y; _ -> Nothing),
-      Arm.payload "Encore" (Cost.codec codec) Keyword.Encore (\x -> case x of Keyword.Encore y -> Just y; _ -> Nothing)
+      Arm.payload "Encore" (Cost.codec codec) Keyword.Encore (\x -> case x of Keyword.Encore y -> Just y; _ -> Nothing),
+      Arm.payload "Disturb" (Cost.codec codec) Keyword.Disturb (\x -> case x of Keyword.Disturb y -> Just y; _ -> Nothing),
+      Arm.payload "Harmonize" (Cost.codec codec) Keyword.Harmonize (\x -> case x of Keyword.Harmonize y -> Just y; _ -> Nothing)
     ]

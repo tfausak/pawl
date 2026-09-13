@@ -1585,8 +1585,33 @@ permitsCastWhileSearching face =
 -- to say "for this player".
 permitsCastFromGraveyard :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromGraveyard pid oid face gs =
-  (ownedBy pid oid gs && elem CastingPermission.CastFromGraveyard (permissionsWith (graveyardKeywords oid gs) face))
+  (ownedBy pid oid gs && (elem CastingPermission.CastFromGraveyard (permissionsWith (graveyardKeywords oid gs) face) || permitsDisturb oid face gs))
     || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs
+
+-- CR 702.146a's permission, which is the one rule 702 permission no keyword set
+-- of the PROPOSED half can carry: "you may cast this card TRANSFORMED from your
+-- graveyard", so the half being proposed is the back face and the ability is
+-- printed on the front. CR 712.11d is the rule that lets the front face's
+-- ability be read at all while the back face is what is evaluated, and
+-- Pawl.Engine.Card.convertedFace is the same read one function over -- it is what
+-- put this face in castableFaces in the first place, so the two cannot disagree
+-- about which half disturb reaches.
+--
+-- Scoped to the CONVERTED face for that reason. Answering True for the front
+-- face as well would make a disturb card castable from a graveyard for its
+-- PRINTED cost, which rule 702.146a does not say; the cost half
+-- (Pawl.Engine.Cost.candidateCostsGiven) is scoped the same way, so neither the
+-- permission nor the price reaches the front half.
+--
+-- The card is read PRINTED, which is CR 712.11d's own scope and the reading
+-- Pawl.Engine.Cost.candidateCostsGiven takes for rule 702.162a: a disturb ability
+-- granted to a card lying in a graveyard is not expanded (gap #1859).
+permitsDisturb :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+permitsDisturb oid face gs = case Game.cardOf oid gs of
+  Nothing -> False
+  Just card ->
+    fmap Face.name (Card.convertedFace card) == Just (Face.name face)
+      && not (null (Keyword.disturbCosts (Face.keywords (Card.frontFace card))))
 
 -- CR 400.1 / 400.3: is this the object's owner, and so the player whose copy of a
 -- per-player zone it lies in?

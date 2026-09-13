@@ -405,6 +405,11 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.185a prints none either, and for the first of those reasons: its
   -- delayed ability is created by the spell as it resolves.
   Keyword.Warp _ -> []
+  -- CR 702.146a and CR 702.180a print none either: disturb states one static
+  -- ability and harmonize three, and all four are casting permissions, costs or
+  -- a leaves-the-stack replacement rather than triggers.
+  Keyword.Disturb _ -> []
+  Keyword.Harmonize _ -> []
   -- CR 702.148a's two static abilities print no triggered ability either: one is
   -- an alternative cost (Pawl.Engine.Cost.candidateCostsGiven) and the other a CR
   -- 612.1 text change, which Pawl.Types.Keyword's Cleave says the card states for
@@ -627,6 +632,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
   Keyword.Warp _ -> []
+  Keyword.Disturb _ -> []
+  Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -1098,6 +1105,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
   Keyword.Warp _ -> []
+  Keyword.Disturb _ -> []
+  Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -1703,6 +1712,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
   Keyword.Warp _ -> []
+  Keyword.Disturb _ -> []
+  Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -2329,6 +2340,24 @@ permissionsFor cardTypes keyword = case keyword of
   -- 702.185a's own delayed ability and read by Cast.permitsCastWarped. The cost
   -- half is Pawl.Engine.Cost.candidateCostsGiven's hand arm.
   Keyword.Warp _ -> []
+  -- CR 702.146a permits a cast from a graveyard and still gets no permission
+  -- here, where escape's arm above gets one: the permission is to cast the card
+  -- TRANSFORMED, so it belongs to the back face, and this function is asked
+  -- about the keywords the proposed half has (Pawl.Engine.Cast.graveyardKeywords)
+  -- -- which for the back face are the back face's and never include this one.
+  -- Granting it here would make the FRONT face castable from a graveyard for its
+  -- printed cost, which rule 702.146a does not say.
+  -- Pawl.Engine.Cast.permitsCastFromGraveyard reads it off the front face
+  -- instead, CR 712.11d's own scope, and Pawl.Engine.Cost.candidateCostsGiven
+  -- prices it there.
+  Keyword.Disturb _ -> []
+  -- CR 702.180a's FIRST static ability, escape's arm above word for word --
+  -- "you may cast this card from your graveyard by paying [cost] ... rather than
+  -- paying this spell's mana cost" -- and ungated for its reason: rule 702.180a
+  -- names no card type. The cost half, tapped creature and reduction included,
+  -- is Pawl.Engine.Cost.candidateCostsGiven's; the third ability's exile is
+  -- castFromGraveyardReplacementsOf's.
+  Keyword.Harmonize _ -> [CastingPermission.CastFromGraveyard]
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -2564,6 +2593,43 @@ escapeCosts :: Set Keyword -> [Cost Keyword]
 escapeCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Escape cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.146a: every cost this card may be cast TRANSFORMED from the graveyard
+-- for, in ascending Set order, and empty when it has no disturb. escapeCosts'
+-- shape above and a list for flashbackCosts' reason -- rule 702.146a states no
+-- limit on how many disturb abilities a card has, and CR 601.2b makes two of
+-- them a choice.
+--
+-- Read off the card's FRONT face by both its callers
+-- (Pawl.Engine.Cast.permitsCastFromGraveyard, Pawl.Engine.Cost.candidateCostsGiven)
+-- rather than off the projection of the half being cast, which is CR 712.11d's
+-- own scope: the ability is "an ability of a double-faced card's front face" and
+-- the spell it permits is the back face. A disturb ability GRANTED to a card in
+-- a graveyard is therefore not expanded (gap #1859), which is the reading
+-- Pawl.Engine.Card.convertedFace already takes for rule 702.162a.
+disturbCosts :: Set Keyword -> [Cost Keyword]
+disturbCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Disturb cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.180a: every cost this card may be cast from the graveyard for by
+-- harmonizing, in ascending Set order, and empty when it has no harmonize.
+-- escapeCosts' shape above and a list for flashbackCosts' reason.
+--
+-- The BARE payload, where rule 702.180a's alternative cost is that payload "and
+-- tapping up to one untapped creature you control": the tap rides in the
+-- candidate's own components and its power in the candidate's reductions, since
+-- CR 702.180b settles which creature at CR 601.2b and CR 601.2f needs the amount
+-- before the tap happens. Pawl.Engine.Cost.candidateCostsGiven is where that is
+-- assembled, emerge's shape one characteristic over.
+harmonizeCosts :: Set Keyword -> [Cost Keyword]
+harmonizeCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Harmonize cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -3342,6 +3408,13 @@ castFromGraveyardReplacementsOf keywords castFor =
         -- jump-start candidate is the printed cost plus rule 702.133a's discard,
         -- which a permission offering the printed cost alone is not.
         <> (if hasJumpStart keywords && paidFor Keyword.JumpStart then [castFromGraveyardExile] else [])
+        -- CR 702.180a's THIRD static ability, the fourth rule to print that
+        -- sentence and so the fourth to share the one effect -- "if the harmonize
+        -- cost was paid, exile this card instead of putting it anywhere else any
+        -- time it would leave the stack". Its clause reads `castFor` exactly as
+        -- rule 702.34a's does, and against every harmonize the card has for that
+        -- arm's reason.
+        <> (if any (paidFor . Keyword.Harmonize) (harmonizeCosts keywords) then [castFromGraveyardExile] else [])
 
 castFromGraveyardExile :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
 castFromGraveyardExile =
@@ -3531,6 +3604,13 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
   Keyword.Warp _ -> []
+  -- CR 702.146a states no replacement. CR 702.180a's third static ability IS one
+  -- -- "exile this card instead of putting it anywhere else any time it would
+  -- leave the stack" -- but it is conditioned on the harmonize cost having been
+  -- paid, so castFromGraveyardReplacementsOf mints it on flashback's road rather
+  -- than this one.
+  Keyword.Disturb _ -> []
+  Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -3927,6 +4007,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
   Keyword.Warp _ -> []
+  Keyword.Disturb _ -> []
+  Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -4180,6 +4262,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
   Keyword.Warp _ -> []
+  Keyword.Disturb _ -> []
+  Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -4574,6 +4658,8 @@ familyOf keyword = case keyword of
   Keyword.Dash _ -> Just KeywordFamily.Dash
   Keyword.Blitz _ -> Just KeywordFamily.Blitz
   Keyword.Warp _ -> Just KeywordFamily.Warp
+  Keyword.Disturb _ -> Just KeywordFamily.Disturb
+  Keyword.Harmonize _ -> Just KeywordFamily.Harmonize
   Keyword.Cleave _ -> Just KeywordFamily.Cleave
   Keyword.Surge _ -> Just KeywordFamily.Surge
   Keyword.Spectacle _ -> Just KeywordFamily.Spectacle

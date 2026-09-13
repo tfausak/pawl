@@ -802,6 +802,19 @@ data Keyword
     -- Not implemented: CR 702.185c's "a spell was warped this turn", which no
     -- condition can yet ask (#3711).
     Warp (Cost.Cost Keyword)
+  | -- | 702.146a: disturb [cost] -- cast this card TRANSFORMED from your
+    -- graveyard for [cost] rather than its mana cost (CR 712.8c). The ability is
+    -- the FRONT face's and the spell is the BACK face, which is why
+    -- Pawl.Engine.Card.convertedFace and
+    -- Pawl.Engine.Cast.permitsCastFromGraveyard both read it off the front face
+    -- of the card being cast (CR 712.11d).
+    Disturb (Cost.Cost Keyword)
+  | -- | 702.180a: harmonize [cost] -- three static abilities, all minted from
+    -- this constructor: cast this card from your graveyard for [cost] plus
+    -- tapping up to one untapped creature you control, reduce the total cost by
+    -- that creature's power, and exile the card instead of putting it anywhere
+    -- else it would go from the stack.
+    Harmonize (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

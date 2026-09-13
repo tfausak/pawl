@@ -285,4 +285,10 @@ data KeywordFamily
     -- in the pool asks yet; it is owed at the keyword rather than at the first
     -- asker.
     Warp
+  | -- | CR 702.146a: disturb [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Disturb
+  | -- | CR 702.180a: harmonize [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Harmonize
   deriving (Bounded, Enum, Eq, Ord, Show)

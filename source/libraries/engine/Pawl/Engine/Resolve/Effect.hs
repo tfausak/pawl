@@ -914,9 +914,9 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 --   1. IS THERE ANYTHING TO OFFER -- an id the reference named (CR 400.7) may no
 --      longer resolve to an object (CR 603.7c).
 --   2. WHICH FACE: CR 712.11a for the `transformed` rider, otherwise
---      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3, CR 720.3), less the face CR
---      702.162a's alternative cost is the only road to when this offer states an
---      alternative cost of its own (CR 118.9a).
+--      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3, CR 720.3), less the face
+--      CR 702.162a's or CR 702.146a's alternative cost is the only road to, when
+--      this offer states an alternative cost of its own (CR 118.9a).
 --   3. WHAT IT COSTS (CR 118.9): `withoutPayingManaCost` or a stated
 --      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates, and
 --      how mana may be spent toward it (CR 118.14's `spending`).
@@ -951,9 +951,14 @@ offerCast context named caster optionality offer = do
       --
       -- Less Card.convertedFace under an alternative, which is CR 118.9a: a spell
       -- takes one alternative cost, and that face is on the list only because CR
-      -- 702.162a's alternative cost put it there, so an offer spending the
-      -- spell's one alternative on something else cannot also reach it. CR
-      -- 712.11's default -- the front face -- is then the whole answer.
+      -- 702.162a's or CR 702.146a's alternative cost put it there, so an offer
+      -- spending the spell's one alternative on something else cannot also reach
+      -- it. CR 712.11's default -- the front face -- is then the whole answer.
+      --
+      -- Unobserved for rule 702.146a's half: no board in the pool offers a cast
+      -- of a disturb card under an alternative cost of the offer's own, so only
+      -- rule 702.162a's limb is driven (Pawl.InvestigateSpec's "CR 118.9a a free
+      -- offer does not also offer the converted face").
       --
       -- Card.castableFaces carries the HALVES and never Card.fusedFace, so an
       -- offer naming a card in a hand offers each half and no fused cast. Not
