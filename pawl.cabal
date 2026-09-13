@@ -184,6 +184,7 @@ library codec
     Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
     Pawl.Codec.BindingSpec
+    Pawl.Codec.Blight
     Pawl.Codec.BlockCost
     Pawl.Codec.BlockCostSpec
     Pawl.Codec.BlockPermission
@@ -1565,6 +1566,7 @@ library types
     Pawl.Types.BecomeCopy
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
+    Pawl.Types.Blight
     Pawl.Types.BlockCost
     Pawl.Types.BlockPermission
     Pawl.Types.BlockRequirement
