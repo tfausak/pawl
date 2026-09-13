@@ -2932,6 +2932,9 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Madness cost -> costFilters cost
   -- CR 702.88a carries no payload, retrace's position.
   Keyword.Rebound -> []
+  -- CR 702.97a's and CR 702.141a's payloads are whole Costs, embalm's shape.
+  Keyword.Scavenge cost -> costFilters cost
+  Keyword.Encore cost -> costFilters cost
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]

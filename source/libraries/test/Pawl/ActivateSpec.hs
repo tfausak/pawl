@@ -144,6 +144,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   textChangedOfferedCostSpec s registry
   graveyardEffectZoneSpec s registry
   unearthSpec s registry
+  scavengeSpec s registry
+  encoreSpec s registry
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
   activationCostReductionSpec s registry
@@ -3072,6 +3074,155 @@ zombiesIn zone gs = length (filter (namedZombie gs) (Game.zoneMembers zone S.ali
 -- reach it once state-based actions are checked.
 withDamage :: Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 withDamage n oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.damage = n}) oid (GameState.objects gs)}
+
+-- CR 702.97: scavenge, reinforce's payload one zone over --- "[Cost], Exile this
+-- card from your graveyard: Put a number of +1/+1 counters equal to the power of
+-- the card you exiled on target creature. Activate only as a sorcery."
+--
+-- Deadbridge Goliath {2}{G}{G} Creature -- Insect 5/5, "Scavenge {4}{G}{G}"
+-- (Oracle text checked against Scryfall). Chosen because its printed text is
+-- that keyword and nothing else, so no second ability's effects have to be told
+-- apart from rule 702.97a's.
+--
+-- The TARGET is a 2/1 Goblin Piker, and the numbers are the whole point of the
+-- pairing: 5 counters on a 2/1 reads 7/6, where a count taken off the target
+-- would read 4/3 and a literal 1 would read 3/2. A second Goliath sits on the
+-- battlefield as CR 113.6m's control, and is also what makes the target prompt a
+-- real choice rather than a one-candidate short circuit.
+scavengeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+scavengeBoard s registry = do
+  goliath <- S.printingOf s registry "Deadbridge Goliath"
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (pikerId, g0) = S.addPermanent piker S.alice (S.landsInPlay forest 6)
+      (twinId, g1) = S.addPermanent goliath S.alice g0
+      (gyId, g2) = S.addGraveyardCard goliath S.alice g1
+  pure
+    ( gyId,
+      twinId,
+      pikerId,
+      g2
+        { GameState.priority = Just S.alice,
+          GameState.activePlayer = S.alice,
+          GameState.phase = Phase.PostcombatMain
+        }
+    )
+
+scavengeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+scavengeSpec s registry = Spec.describe s "Scavenge (CR 702.97)" $ do
+  Spec.it s "CR 702.97a scavenge exiles the card and puts counters equal to THAT card's power on the target" $ do
+    (gyId, twinId, pikerId, gs) <- scavengeBoard s registry
+    case Activate.abilitiesFor gyId gs of
+      [ability] -> do
+        let after = S.runPure (aimAtCreature pikerId) gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+        -- THE GAMEPLAY ASSERTION, ahead of every zone read: CR 608.2h answers for
+        -- the card the cost already exiled, so the count is the Goliath's 5 and
+        -- not the Piker's 2.
+        Spec.assertEqWith s "CR 702.97a the 2/1 Piker takes the Goliath's five counters and is a 7/6" (S.powerToughnessOf pikerId after) (Just (7, 6))
+        Spec.assertEqWith s "the Goliath beside it on the battlefield took none" (S.powerToughnessOf twinId after) (Just (5, 5))
+        Spec.assertEqWith s "the card the cost exiled is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+        Spec.assertEqWith s "and the graveyard is empty" (Game.zoneMembers Zone.Graveyard S.alice after) []
+      abilities -> Spec.assertFailure s ("expected one scavenge ability, got " <> show (length abilities))
+
+  -- CR 113.6m and CR 602.5d, on one board with one control apiece: the twin has
+  -- the same keyword and the same six Forests would pay for it, and the end-step
+  -- board differs from the offering one only in the phase.
+  Spec.it s "CR 113.6m / 602.5d scavenge is offered from a graveyard, not from the battlefield, and not at instant speed" $ do
+    (gyId, twinId, _, gs) <- scavengeBoard s registry
+    Spec.assertBool s (any (isActivationOf gyId) (Action.legalActions S.alice gs)) "scavenge is offered from the graveyard"
+    Spec.assertBool s (not (any (isActivationOf twinId) (Action.legalActions S.alice gs))) "CR 113.6m but not from the battlefield"
+    Spec.assertBool
+      s
+      (not (any (isActivationOf gyId) (Action.legalActions S.alice (gs {GameState.phase = Phase.Ending EndingStep.EndStep}))))
+      "CR 602.5d and not in the end step"
+
+-- CR 702.141: encore, whose payload is a token copy per opponent --- "[Cost],
+-- Exile this card from your graveyard:
+-- For each opponent, create a token that's a copy of this card that attacks that
+-- opponent this turn if able. The tokens gain haste. Sacrifice them at the
+-- beginning of the next end step. Activate only as a sorcery."
+--
+-- Impulsive Pilferer {R} Creature -- Goblin Pirate 1/1, "When this creature
+-- dies, create a Treasure token", "Encore {3}{R}" (Oracle text checked against
+-- Scryfall). Its dies trigger is not under test and fires only once rule
+-- 702.141a's own sacrifice has, which is why the counts below are taken over
+-- Pilferers by name rather than over S.tokensOf.
+--
+-- THREE SEATS, and that is the whole fixture: at two, "each opponent" and "that
+-- opponent" name one player and the per-iteration pairing this unit exists to
+-- prove is unobservable.
+encoreBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Phase.Phase -> m (ObjectId.ObjectId, GameState.GameState)
+encoreBoard s registry phase = do
+  pilferer <- S.printingOf s registry "Impulsive Pilferer"
+  mountain <- S.printingOf s registry "Mountain"
+  let (gyId, g1) = S.addGraveyardCard pilferer S.alice (S.landsFor mountain S.alice 4 S.threePlayerGame)
+  pure
+    ( gyId,
+      g1
+        { GameState.priority = Just S.alice,
+          GameState.activePlayer = S.alice,
+          GameState.phase = phase,
+          GameState.remaining = S.phasesAfter phase
+        }
+    )
+
+-- The Pilferers on the battlefield, read off the PROJECTION rather than
+-- Game.faceOf: these are token copies (CR 707.2), and the printed card a token
+-- carries is not what a copy effect stamped onto it.
+pilferersOn :: GameState.GameState -> [ObjectId.ObjectId]
+pilferersOn gs =
+  filter
+    (\oid -> Set.member (CardName.MkCardName (Text.pack "Impulsive Pilferer")) (PC.names (Projection.project oid gs)))
+    (Set.toList (GameState.battlefield gs))
+
+-- Activate the one ability the graveyard card offers and resolve it. The roster
+-- is matched on exactly one ability, so a board that offered none or two comes
+-- back unchanged and fails the token count rather than passing elsewhere.
+encoreFromGraveyard :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+encoreFromGraveyard gyId gs = case Activate.abilitiesFor gyId gs of
+  [ability] -> S.runPure S.identityAnswer gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+  _ -> gs
+
+encoreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+encoreSpec s registry = Spec.describe s "Encore (CR 702.141)" $ do
+  -- Rule 702.141a's first two sentences, read at CR 508.1d. The declaration
+  -- legality is the observable: a token that is summoning sick (CR 302.6, so the
+  -- haste sentence) is in no legal declaration at all, and a token pinned at the
+  -- wrong opponent makes its pairing disobey a requirement.
+  Spec.it s "CR 702.141a encore mints one hasty token copy per opponent, each required to attack its own" $ do
+    (gyId, gs) <- encoreBoard s registry Phase.PrecombatMain
+    let after = encoreFromGraveyard gyId gs
+        atAttackers = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) S.identityAnswer (S.runPure S.identityAnswer after Engine.runStep)
+        legal pairs = Combat.legalAttackDeclarationAs S.alice pairs atAttackers
+    case pilferersOn atAttackers of
+      [x, y] -> do
+        -- THE PAIRING. Exactly one of the two assignments obeys both
+        -- requirements, which is what makes rule 702.141a's "that opponent" a
+        -- per-iteration binding: a loop leaving both tokens pinned at one seat
+        -- leaves BOTH assignments disobedient and this reads False.
+        Spec.assertBool
+          s
+          (legal [(x, AttackTarget.OfPlayer S.bob), (y, AttackTarget.OfPlayer S.carol)] /= legal [(x, AttackTarget.OfPlayer S.carol), (y, AttackTarget.OfPlayer S.bob)])
+          "CR 508.1d exactly one of the two assignments obeys the requirements, so each token is pinned to its own opponent"
+        Spec.assertBool
+          s
+          (not (legal [(x, AttackTarget.OfPlayer S.bob), (y, AttackTarget.OfPlayer S.bob)]))
+          "and sending both at one opponent obeys only one of the two"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] atAttackers)) "nor may the tokens decline, which is rule 702.141a's haste as well as its requirement"
+      tokens -> Spec.assertFailure s ("expected one token per opponent, got " <> show (length tokens))
+
+  -- Rule 702.141a's third sentence and CR 513.2 behind it: the delayed ability is
+  -- created during the postcombat main phase, so the END STEP of this same turn
+  -- is the "next" one. Two steps run --- the rest of the main phase and the end
+  -- step itself, whose priority is where the delayed ability resolves.
+  Spec.it s "CR 513.2 the encore tokens are sacrificed at the beginning of the next end step" $ do
+    (gyId, gs) <- encoreBoard s registry Phase.PostcombatMain
+    let after = encoreFromGraveyard gyId gs
+        ended = List.foldl' (\g _ -> S.runPure S.identityAnswer g Engine.runStep) after [1 .. (2 :: Int)]
+    Spec.assertEqWith s "CR 702.141a one token copy per opponent while the turn runs" (length (pilferersOn after)) 2
+    Spec.assertEqWith s "CR 513.2 and neither is on the battlefield once the end step has begun" (pilferersOn ended) []
+    Spec.assertEqWith s "the card the cost exiled is still in exile" (length (Game.zoneMembers Zone.Exile S.alice ended)) 1
+    Spec.assertEqWith s "and the delayed ability is spent" (Seq.length (GameState.delayedTriggers ended)) 0
 
 -- CR 702.84a, every sentence of it: "[Cost]: Return this card from your graveyard
 -- to the battlefield. It gains haste. Exile it at the beginning of the next end

@@ -183,5 +183,7 @@ codec =
       Arm.nullary "Retrace" Keyword.Retrace,
       Arm.payload "Mayhem" (Cost.codec codec) Keyword.Mayhem (\x -> case x of Keyword.Mayhem y -> Just y; _ -> Nothing),
       Arm.payload "Madness" (Cost.codec codec) Keyword.Madness (\x -> case x of Keyword.Madness y -> Just y; _ -> Nothing),
-      Arm.nullary "Rebound" Keyword.Rebound
+      Arm.nullary "Rebound" Keyword.Rebound,
+      Arm.payload "Scavenge" (Cost.codec codec) Keyword.Scavenge (\x -> case x of Keyword.Scavenge y -> Just y; _ -> Nothing),
+      Arm.payload "Encore" (Cost.codec codec) Keyword.Encore (\x -> case x of Keyword.Encore y -> Just y; _ -> Nothing)
     ]

@@ -239,4 +239,10 @@ data KeywordFamily
   | -- | CR 702.35a: madness [cost]. No card in the pool asks yet, and it is owed
     -- at the keyword rather than at the first asker.
     Madness
+  | -- | CR 702.97a: scavenge [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Scavenge
+  | -- | CR 702.141a: encore [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Encore
   deriving (Bounded, Enum, Eq, Ord, Show)
