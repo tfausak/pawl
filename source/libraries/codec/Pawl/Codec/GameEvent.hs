@@ -26,6 +26,7 @@ import qualified Pawl.Codec.DamageEvent as DamageEvent
 import qualified Pawl.Codec.DamagePrevented as DamagePrevented
 import qualified Pawl.Codec.Discarded as Discarded
 import qualified Pawl.Codec.Drew as Drew
+import qualified Pawl.Codec.Exploited as Exploited
 import qualified Pawl.Codec.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Codec.LifeChange as LifeChange
 import qualified Pawl.Codec.ManaAdded as ManaAdded
@@ -86,6 +87,7 @@ codec =
       Arm.payload "Evolved" ObjectId.codec GameEvent.Evolved (\x -> case x of GameEvent.Evolved y -> Just y; _ -> Nothing),
       Arm.payload "Mutated" ObjectId.codec GameEvent.Mutated (\x -> case x of GameEvent.Mutated y -> Just y; _ -> Nothing),
       Arm.payload "Mentored" Mentored.codec GameEvent.Mentored (\x -> case x of GameEvent.Mentored y -> Just y; _ -> Nothing),
+      Arm.payload "Exploited" Exploited.codec GameEvent.Exploited (\x -> case x of GameEvent.Exploited y -> Just y; _ -> Nothing),
       Arm.payload "Trained" ObjectId.codec GameEvent.Trained (\x -> case x of GameEvent.Trained y -> Just y; _ -> Nothing),
       Arm.payload "Crewed" Crewing.codec GameEvent.Crewed (\x -> case x of GameEvent.Crewed y -> Just y; _ -> Nothing),
       Arm.payload "BecameCrewed" Crewing.codec GameEvent.BecameCrewed (\x -> case x of GameEvent.BecameCrewed y -> Just y; _ -> Nothing),

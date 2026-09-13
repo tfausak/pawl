@@ -20,6 +20,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
+import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAdded as ManaAdded
@@ -311,6 +312,12 @@ data GameEvent
     -- rather than Mentored's. ONE id, rule 702.149a putting its counter on the
     -- training creature itself.
     Trained ObjectId.ObjectId
+  | -- | CR 702.110b: a creature EXPLOITED another -- its controller sacrificed a
+    -- creature as rule 702.110a's ability resolved. TWO ids, in the rule's own
+    -- order, Mentored's shape and reasoning: the exploited creature is chosen as
+    -- the ability resolves and is not derivable from the exploiter. Recorded on
+    -- the sacrifice itself, so declining rule 702.110a's "may" records nothing.
+    Exploited Exploited.Exploited
   | -- | CR 702.122b: creatures CREWED a Vehicle, as they were tapped to pay its
     -- crew ability's cost.
     Crewed Crewing.Crewing

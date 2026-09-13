@@ -130,6 +130,7 @@ codec =
           Arm.nullary "SelfEvolves" TriggerCondition.SelfEvolves,
           Arm.nullary "SelfMutates" TriggerCondition.SelfMutates,
           Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
+          Arm.nullary "SelfExploits" TriggerCondition.SelfExploits,
           Arm.nullary "SelfTrains" TriggerCondition.SelfTrains,
           Arm.nullary "SelfBecomesCrewed" TriggerCondition.SelfBecomesCrewed,
           Arm.nullary "SelfCrewsVehicle" TriggerCondition.SelfCrewsVehicle,
