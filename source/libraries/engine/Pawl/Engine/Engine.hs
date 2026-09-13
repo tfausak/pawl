@@ -1006,25 +1006,26 @@ placeBorne srcId pending = do
           -- Judged against `gs`, the board `sets` was offered from, so the offer
           -- and this check cannot disagree about one announcement.
           --
-          -- Not implemented: Target.selectionLegal's other two conjuncts on this
-          -- road -- the announced count, and per-slot membership for the slots
-          -- Target.jointlyJudged skips. A jointly judged slot does get membership,
-          -- jointlyCoherent asking legalRecipientsGiven of each (#3091).
+          -- The WHOLE of Target.selectionLegal, which is what CR 603.3d's import
+          -- of rules 601.2c-d asks for: the announced count against the slot's
+          -- own range, per-slot membership for every slot, and the joint check.
+          -- The cast road (Cast.castProposed) and the activation road
+          -- (Activate.activateAbility) ask the same three.
           attempt rejected = do
             -- Zero, there being no announcement to read: CR 601.2b's is made
             -- while casting a spell or activating an ability, and a triggered
             -- ability is neither.
             --
             -- A slot counted by a COMPUTED number needs none of this: its
-            -- Quantity is read off the board where the count is asked about
-            -- (Target.countingByGiven), which is what lets Mogis's Marauder's
-            -- devotion count a trigger's targets.
+            -- Quantity is read off the board against `srcId`, CR 113.7's source
+            -- of this ability, which is what lets Mogis's Marauder's devotion
+            -- count a trigger's targets.
             --
             -- Not implemented: a slot counting by an X the trigger INHERITS (CR
             -- 107.3m, CR 701.37c); Pawl.CardSpec refuses a triggered ability
             -- whose slot counts by X (#3633).
-            chosen <- Target.chooseTargets controller abilId 0 slots sets
-            if Target.jointlyCoherent (Just controller) bound srcId slots chosen gs
+            chosen <- Target.chooseTargets controller abilId srcId 0 slots sets
+            if Target.selectionLegal (Just controller) bound srcId 0 slots sets chosen gs
               then pure (Just chosen)
               else
                 let key = Map.intersectionWith Set.intersection chosen sets
