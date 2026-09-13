@@ -1429,6 +1429,21 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.Encore cost)
       " {\"type\":\"Encore\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Encore cost) /= Codec.encode Keyword.codec (Keyword.Scavenge cost)) "CR 702.141a is not CR 702.97a"
+  -- CR 702.53a and CR 702.71a are one ability in two zones, so the two arms carry
+  -- the same payload type and only the tag tells them apart.
+  Spec.it s "Transmute carries its cost, and the tag tells it from transfigure" $ do
+    let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Transmute cost)
+      " {\"type\":\"Transmute\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Transfigure cost)
+      " {\"type\":\"Transfigure\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Transmute cost) /= Codec.encode Keyword.codec (Keyword.Transfigure cost)) "CR 702.53a is not CR 702.71a"
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 

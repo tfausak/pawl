@@ -146,6 +146,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   unearthSpec s registry
   scavengeSpec s registry
   encoreSpec s registry
+  transmuteSpec s registry
+  transfigureSpec s registry
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
   activationCostReductionSpec s registry
@@ -3182,6 +3184,183 @@ encoreFromGraveyard :: ObjectId.ObjectId -> GameState.GameState -> GameState.Gam
 encoreFromGraveyard gyId gs = case Activate.abilitiesFor gyId gs of
   [ability] -> S.runPure S.identityAnswer gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
   _ -> gs
+
+-- The card names in one player's zone, read off the PROJECTION rather than
+-- Game.faceOf -- the reading a copy or a merge would otherwise silently defeat --
+-- and sorted, so no assertion below depends on the order ids were minted in.
+namesInZone :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+namesInZone zone pid gs = List.sort (concatMap (\oid -> Set.toList (PC.names (Projection.project oid gs))) (Game.zoneMembers zone pid gs))
+
+-- CR 702.53: transmute, cycling's neighbour on the hand roster and the first
+-- keyword-minted ability whose SEARCH compares each candidate against the
+-- ability's own source.
+--
+-- Drift of Phantasms {2}{U} Creature -- Spirit 0/5, "Defender", "Flying",
+-- "Transmute {1}{U}{U}" (Oracle text checked against Scryfall). Its other two
+-- keywords are static and neither the cost nor the search reads them, so the
+-- tests below isolate rule 702.53a; the creature half is never cast.
+--
+-- THE LIBRARY is the fixture: one card at each of three mana values -- Goblin
+-- Piker at 2, Crucible of Worlds at 3, Deadbridge Goliath at 4 -- against a Drift
+-- whose own mana value is 3. Exactly one card matches, and the two that do not
+-- straddle it, so a comparison reading "less than" (CR 702.85a's cascade) or "at
+-- most" finds a different card rather than none. Crucible of Worlds is an
+-- ARTIFACT, which is rule 702.53a's "a card" as against rule 702.71a's "a
+-- creature card".
+--
+-- Three Islands pay the {1}{U}{U}, and the phase is a main phase because rule
+-- 702.53a ends "Activate only as a sorcery".
+transmuteBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+transmuteBoard s registry = do
+  drift <- S.printingOf s registry "Drift of Phantasms"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  crucible <- S.printingOf s registry "Crucible of Worlds"
+  goliath <- S.printingOf s registry "Deadbridge Goliath"
+  let g0 = S.landsInPlay island 3
+      -- The one match in FIRST and the two rejects after it, which is the offer's
+      -- order reversed (Pawl.Support.addLibraryCard puts each card on top): a
+      -- reject then sits at the head of every offer a looser comparison would
+      -- widen the search to, where the order the other way round would hand
+      -- findFirst the Crucible again and pass for no reason.
+      (_, g1) = S.addLibraryCard crucible S.alice g0
+      (_, g2) = S.addLibraryCard piker S.alice g1
+      (_, g3) = S.addLibraryCard goliath S.alice g2
+      (driftId, g4) = S.addHandCard drift S.alice g3
+  pure
+    ( driftId,
+      g4
+        { GameState.priority = Just S.alice,
+          GameState.activePlayer = S.alice,
+          GameState.phase = Phase.PostcombatMain
+        }
+    )
+
+transmuteSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+transmuteSpec s registry = Spec.describe s "Transmute (CR 702.53)" $ do
+  Spec.it s "CR 702.53a transmute discards the card and finds a card of THAT card's mana value" $ do
+    (driftId, gs) <- transmuteBoard s registry
+    case Activate.abilitiesFor driftId gs of
+      [ability] -> do
+        let after = S.runPure findFirst gs (Activate.activateAbility S.alice driftId ability >> Stack.resolveTop)
+        -- THE GAMEPLAY ASSERTION, ahead of every other read: CR 608.2h answers for
+        -- the card the cost already discarded, so the bound is the Drift's 3. An
+        -- engine comparing the wrong way finds the Piker at 2, one comparing
+        -- against nothing finds nothing, and either leaves this list different.
+        Spec.assertEqWith
+          s
+          "CR 702.53a the mana value 3 Crucible of Worlds is in her hand, not the 2 below it or the 4 above"
+          (namesInZone Zone.Hand S.alice after)
+          [CardName.MkCardName (Text.pack "Crucible of Worlds")]
+        Spec.assertEqWith
+          s
+          "the two the search rejected are still in the library"
+          (namesInZone Zone.Library S.alice after)
+          [CardName.MkCardName (Text.pack "Deadbridge Goliath"), CardName.MkCardName (Text.pack "Goblin Piker")]
+        Spec.assertEqWith
+          s
+          "and the cost discarded the Drift"
+          (namesInZone Zone.Graveyard S.alice after)
+          [CardName.MkCardName (Text.pack "Drift of Phantasms")]
+      abilities -> Spec.assertFailure s ("expected one transmute ability, got " <> show (length abilities))
+
+  -- CR 702.53a's two clauses that are not the effect, on one board with a control
+  -- apiece: a second Drift on the battlefield has the same keyword and the same
+  -- three Islands would pay for it (CR 702.53b), and the end-step board differs
+  -- from the offering one only in the phase.
+  Spec.it s "CR 702.53a/b transmute is offered from the hand, not from the battlefield, and not at instant speed" $ do
+    (driftId, gs) <- transmuteBoard s registry
+    drift <- S.printingOf s registry "Drift of Phantasms"
+    let (twinId, onField) = S.addPermanent drift S.alice gs
+    Spec.assertBool s (any (isActivationOf driftId) (Action.legalActions S.alice onField)) "transmute is offered from the hand"
+    Spec.assertBool s (not (any (isActivationOf twinId) (Action.legalActions S.alice onField))) "CR 702.53b but not from the battlefield"
+    Spec.assertBool
+      s
+      (not (any (isActivationOf driftId) (Action.legalActions S.alice (gs {GameState.phase = Phase.Ending EndingStep.EndStep}))))
+      "CR 602.5d and not in the end step"
+
+-- CR 702.71: transfigure, rule 702.53a's ability one zone over -- the cost
+-- sacrifices this permanent, the search is narrowed to a creature card, and the
+-- card found goes onto the battlefield.
+--
+-- Fleshwrither {2}{B}{B} Creature -- Horror 3/3, "Transfigure {1}{B}{B}" (Oracle
+-- text checked against Scryfall). Its printed text is that keyword and nothing
+-- else, so nothing has to be told apart from rule 702.71a's own effect.
+--
+-- THE LIBRARY separates the rule's two conjuncts, which one card alone cannot:
+-- Hill Giant is a mana value 4 CREATURE and is the only match; Day of Judgment is
+-- a mana value 4 NONCREATURE, rejected by the card type alone; Drift of Phantasms
+-- is a mana value 3 CREATURE, rejected by the mana value alone. The Fleshwrither's
+-- own mana value is 4.
+--
+-- Three Swamps pay the {1}{B}{B}, and the phase is a main phase for
+-- transmuteBoard's reason.
+transfigureBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+transfigureBoard s registry = do
+  fleshwrither <- S.printingOf s registry "Fleshwrither"
+  swamp <- S.printingOf s registry "Swamp"
+  giant <- S.printingOf s registry "Hill Giant"
+  judgment <- S.printingOf s registry "Day of Judgment"
+  drift <- S.printingOf s registry "Drift of Phantasms"
+  let g0 = S.landsInPlay swamp 3
+      -- Pawl.Support.addLibraryCard puts each card on TOP, so this is the offer's
+      -- order reversed: the one match goes in first and the two rejects after it,
+      -- which puts a reject at the head of every offer a dropped conjunct would
+      -- widen the search to. Without that, findFirst would take the Hill Giant
+      -- again by luck of the order and the mutation would come back green.
+      (_, g1) = S.addLibraryCard giant S.alice g0
+      (_, g2) = S.addLibraryCard drift S.alice g1
+      (_, g3) = S.addLibraryCard judgment S.alice g2
+      (fleshwritherId, g4) = S.addPermanent fleshwrither S.alice g3
+  pure
+    ( fleshwritherId,
+      g4
+        { GameState.priority = Just S.alice,
+          GameState.activePlayer = S.alice,
+          GameState.phase = Phase.PostcombatMain
+        }
+    )
+
+transfigureSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+transfigureSpec s registry = Spec.describe s "Transfigure (CR 702.71)" $ do
+  Spec.it s "CR 702.71a transfigure sacrifices the permanent and finds a CREATURE card of THAT permanent's mana value" $ do
+    (fleshwritherId, gs) <- transfigureBoard s registry
+    case Activate.abilitiesFor fleshwritherId gs of
+      [ability] -> do
+        let after = S.runPure findFirst gs (Activate.activateAbility S.alice fleshwritherId ability >> Stack.resolveTop)
+        -- THE GAMEPLAY ASSERTION, first: CR 608.2h answers for the permanent the
+        -- cost already sacrificed, so the bound is the Fleshwrither's 4, and rule
+        -- 702.71a's "creature card" is what keeps the Day of Judgment beside it out.
+        Spec.assertEqWith
+          s
+          "CR 702.71a the mana value 4 creature Hill Giant arrived on the battlefield"
+          (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.alice after)
+          1
+        Spec.assertEqWith
+          s
+          "the mana value 4 noncreature and the mana value 3 creature are both still in the library"
+          (namesInZone Zone.Library S.alice after)
+          [CardName.MkCardName (Text.pack "Day of Judgment"), CardName.MkCardName (Text.pack "Drift of Phantasms")]
+        Spec.assertEqWith
+          s
+          "and the cost sacrificed the Fleshwrither"
+          (namesInZone Zone.Graveyard S.alice after)
+          [CardName.MkCardName (Text.pack "Fleshwrither")]
+      abilities -> Spec.assertFailure s ("expected one transfigure ability, got " <> show (length abilities))
+
+  -- Rule 702.71a's cost names THIS PERMANENT, so the ability is the battlefield's
+  -- alone: a second Fleshwrither in alice's hand is transmute's control inverted,
+  -- and the end-step board differs from the offering one only in the phase.
+  Spec.it s "CR 702.71a transfigure is offered from the battlefield, not from the hand, and not at instant speed" $ do
+    (fleshwritherId, gs) <- transfigureBoard s registry
+    fleshwrither <- S.printingOf s registry "Fleshwrither"
+    let (handId, withHand) = S.addHandCard fleshwrither S.alice gs
+    Spec.assertBool s (any (isActivationOf fleshwritherId) (Action.legalActions S.alice withHand)) "transfigure is offered from the battlefield"
+    Spec.assertBool s (not (any (isActivationOf handId) (Action.legalActions S.alice withHand))) "and not from the hand"
+    Spec.assertBool
+      s
+      (not (any (isActivationOf fleshwritherId) (Action.legalActions S.alice (gs {GameState.phase = Phase.Ending EndingStep.EndStep}))))
+      "CR 602.5d and not in the end step"
 
 encoreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 encoreSpec s registry = Spec.describe s "Encore (CR 702.141)" $ do

@@ -913,8 +913,9 @@ data Context = MkContext
     -- Nothing wherever the atom cannot appear, which `contextFor` below is the
     -- spelling of.
     sourcePower :: Maybe Integer,
-    -- CR 202.3: the SOURCE's mana value, for the one atom that compares a
-    -- candidate against it (ManaValueLessThanSource, CR 702.85a). sourcePower's
+    -- CR 202.3: the SOURCE's mana value, for the two atoms that compare a
+    -- candidate against it (ManaValueLessThanSource, CR 702.85a;
+    -- ManaValueEqualToSource, CR 702.53a and CR 702.71a). sourcePower's
     -- sibling one characteristic over, and undrivable from `source` here for that
     -- field's reason -- this module holds no game state -- so the caller that has
     -- the board supplies it: Pawl.Engine.Resolve.Slots.effectContext for a
@@ -1459,6 +1460,13 @@ matches context view predicate = case predicate of
   Filter.ManaValueLessThanSource -> case (manaValue view, sourceManaValue context) of
     (Just v, Just s) -> v < s
     _ -> False
+  -- CR 702.53a's "a card with the same mana value as the discarded card" and CR
+  -- 702.71a's "the same mana value as this permanent", the arm above's
+  -- comparison at equality, and False on an absent mana value at either end for
+  -- its reason.
+  Filter.ManaValueEqualToSource -> case (manaValue view, sourceManaValue context) of
+    (Just v, Just s) -> v == s
+    _ -> False
   -- CR 208.1 against a number an earlier clause of the resolution bound --
   -- Localized Destruction's "power equal to the amount of {E} paid this way".
   -- False unless both are readable, the two source-comparing arms above and for
@@ -1967,6 +1975,7 @@ rewrite pairs predicate = case predicate of
   -- Untouched for the source-power atoms' reason above: the atom names a
   -- comparison, and CR 612.1 finds no word in it to swap.
   Filter.ManaValueLessThanSource -> predicate
+  Filter.ManaValueEqualToSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
@@ -2456,6 +2465,8 @@ rewriteKeyword pairs keyword = case keyword of
   -- the same descent embalm's does.
   Keyword.Type.Scavenge cost -> Keyword.Type.Scavenge (rewriteCost pairs cost)
   Keyword.Type.Encore cost -> Keyword.Type.Encore (rewriteCost pairs cost)
+  Keyword.Type.Transmute cost -> Keyword.Type.Transmute (rewriteCost pairs cost)
+  Keyword.Type.Transfigure cost -> Keyword.Type.Transfigure (rewriteCost pairs cost)
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is
@@ -2592,6 +2603,7 @@ bakeBound players predicate = case predicate of
   -- and this atom names no slot at all -- the source's mana value rides the
   -- Context.
   Filter.ManaValueLessThanSource -> predicate
+  Filter.ManaValueEqualToSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
@@ -2725,6 +2737,9 @@ manaValueThresholds predicate = case predicate of
   -- is the one filler of Context's sourceManaValue), and
   -- Pawl.FilterPositionLintSpec is what keeps a card from writing it anywhere.
   Filter.ManaValueLessThanSource -> []
+  -- The arm above's comparison at equality (CR 702.53a, CR 702.71a), and empty
+  -- for its reason: it names no literal, and its position is the same one.
+  Filter.ManaValueEqualToSource -> []
   -- Reads the mana value and compares it against a bound this function cannot
   -- see -- the number is on the SLOT, and is a board reading rather than a
   -- literal -- so there is no threshold to report and reporting none is not the
@@ -2870,6 +2885,9 @@ statesAQuality predicate = case predicate of
   -- A quality like the literal bound's, the source-power atoms' answer: "a
   -- nonland card with mana value less than this spell's" describes the card.
   Filter.ManaValueLessThanSource -> True
+  -- A quality for the arm above's reason: "a card with the same mana value as
+  -- the discarded card" (CR 702.53a) describes the card.
+  Filter.ManaValueEqualToSource -> True
   Filter.ManaValueIsEven -> True
   -- A quality like the literal bound's, one atom over: "with mana value X or
   -- less" describes the card as much when X is computed as when it is printed.

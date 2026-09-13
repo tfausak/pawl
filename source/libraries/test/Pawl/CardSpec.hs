@@ -2978,6 +2978,10 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.97a's and CR 702.141a's payloads are whole Costs, embalm's shape.
   Keyword.Scavenge cost -> costFilters cost
   Keyword.Encore cost -> costFilters cost
+  -- CR 702.53a's and CR 702.71a's payloads are whole Costs too, the pair above's
+  -- shape.
+  Keyword.Transmute cost -> costFilters cost
+  Keyword.Transfigure cost -> costFilters cost
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
@@ -3866,6 +3870,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.PowerAtLeastAmountInSlot _ -> []
   Filter.Type.ManaValueAtMost _ -> []
   Filter.Type.ManaValueLessThanSource -> []
+  Filter.Type.ManaValueEqualToSource -> []
   Filter.Type.ManaValueIsEven -> []
   Filter.Type.ManaValueAtMostAmount -> []
   Filter.Type.ControlledBy _ -> []

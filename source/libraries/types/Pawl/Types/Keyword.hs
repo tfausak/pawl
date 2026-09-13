@@ -777,6 +777,14 @@ data Keyword
     -- Not implemented: a Natural, so Firebending Student's "firebending X, where
     -- X is this creature's power" has no transcription (gap #3697).
     Firebending Natural.Natural
+  | -- | 702.53a: transmute [cost] -- an ability functioning only in a hand,
+    -- discarding this card to search your library for a card with the same mana
+    -- value, at sorcery speed.
+    Transmute (Cost.Cost Keyword)
+  | -- | 702.71a: transfigure [cost] -- transmute's battlefield twin, sacrificing
+    -- this permanent to put a CREATURE card with the same mana value onto the
+    -- battlefield.
+    Transfigure (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one
