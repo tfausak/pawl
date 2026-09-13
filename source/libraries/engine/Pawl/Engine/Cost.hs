@@ -3090,12 +3090,12 @@ restoreKeepingLibraryActions before = do
 -- the keywords and every board with no eligible object: rule 702.51a's "you may"
 -- then has nothing to ask.
 --
--- Not implemented: taking this decision after CR 601.2g's mana window rather than
--- before it, which is the order the reminder text describes ("each artifact you
--- tap after you're done activating mana abilities"). The TAPS are in the right
--- place -- they are components, and `pay` pays the mana first -- but a payer
--- holding Birds of Paradise commits to how many creatures convoke a Siege Wurm
--- before choosing which colour the Birds make (#3584).
+-- RUN INSIDE THE PAYMENT, once CR 601.2g's window has closed and before a symbol
+-- is spent -- the order the reminder text describes ("each artifact you tap
+-- after you're done activating mana abilities"). Pawl.Engine.Cost.paySubstituting
+-- is what holds it there; Pawl.CostSpec's "CR 601.2g the mana window opens
+-- before the payer says how much of a Siege Wurm's cost is convoked" is the
+-- proof.
 --
 -- The answer is the residual cost and the SUBSTITUTION COMPONENTS APART, rather
 -- than one cost with the components folded in: CR 702.51c's record is of the
@@ -3200,20 +3200,32 @@ announceManaSubstitutions pid oid cost = case Cost.mana cost of
 -- `perform` is CR 405.6c's executor, carried down to the mana window for a mana
 -- ability that has an effect beyond its mana (Pawl.Types.ManaAbilityPerformer).
 pay :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-pay perform moment subject announced spending pid oid cost = fmap fst (paySubstituting perform moment subject announced spending pid oid [] cost)
+pay perform moment subject announced spending pid oid cost = fmap fst (paySubstituting perform moment subject announced spending pid oid (\c -> pure (c, [])) cost)
 
--- `pay` with CR 702.51a's, CR 702.66a's and CR 702.126a's substitution
--- components handed in APART from the cost's own, and their bindings handed back
--- apart as well -- which is what lets Pawl.Engine.Cast name the creatures that
--- CONVOKED the spell (CR 702.51c) rather than every permanent the payment
--- tapped. `announceManaSubstitutions` is where the split is made.
+-- `pay` with CR 702.51a's, CR 702.66a's and CR 702.126a's substitution offered
+-- INSIDE the mana window rather than ahead of it, and the components it adds
+-- kept APART from the cost's own.
+--
+-- WHERE THE OFFER SITS is CR 601.2g and the reminder text: the window comes
+-- after the total cost is determined and before the cost is paid, and convoke's
+-- and improvise's reminders put the taps after it ("each artifact you tap after
+-- you're done activating mana abilities pays for {1}"). So `announce` is run by
+-- `payManaWindow` once the window has CLOSED -- a payer holding Birds of
+-- Paradise sees what colour it made before saying how many creatures convoke the
+-- spell, and a creature tapped for mana in the window is no longer an untapped
+-- creature the offer can spend.
+--
+-- KEPT APART is the other half, and CR 702.51c's: the record is of the creatures
+-- tapped THIS way, where Binding.tappedPermanent names every permanent any tap
+-- component of the cost took. Pawl.Engine.Cast reads the second answer.
 --
 -- The two groups are paid in TWO passes, substitutes last, where CR 601.2h
--- leaves the whole payment's order to the payer. Unobservable in `data/cards/`:
--- no printing states convoke, delve or improvise beside a cost component of its
--- own, and Venerated Loxodon would be refuted by one that did.
-paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
-paySubstituting perform moment subject announced spending pid oid substitutes cost = do
+-- leaves the whole payment's order to the payer. Nothing in `data/cards/`
+-- observes it: none of the seven printings there that state convoke, delve or
+-- improvise carries a cost component of its own (checked 2026-09-13), and one
+-- that did would refute this.
+paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
+paySubstituting perform moment subject announced spending pid oid substituting cost = do
   before <- State.get
   let slots = announcedSlots announced before
   case Cost.mana cost of
@@ -3223,7 +3235,10 @@ paySubstituting perform moment subject announced spending pid oid substitutes co
     -- monadic, and it hands back how to reverse itself rather than reversing
     -- itself -- one question has to cover the components below too.
     Just manaCost -> do
-      (paidMana, undoWindow) <- payManaWindow perform Set.empty announced subject spending pid manaCost
+      let announceMana mc = do
+            (chosen, extra) <- substituting cost {Cost.mana = Just mc}
+            pure (Maybe.fromMaybe mc (Cost.mana chosen), extra)
+      (paidMana, substitutes, undoWindow) <- payManaWindow perform Set.empty announced subject spending pid announceMana manaCost
       paidOwn <-
         if paidMana
           then payComponents moment slots pid oid (Cost.components cost)
@@ -3709,7 +3724,9 @@ orderSensitive component = case component of
 payManaExcept :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payManaExcept perform inFlight record subject spending pid cost = do
   before <- State.get
-  (paid, _) <- payManaWindow perform inFlight record subject spending pid cost
+  -- No substitution: CR 702.51a, CR 702.66a and CR 702.126a all function while a
+  -- SPELL is on the stack, and every road into this one is something else.
+  (paid, _, _) <- payManaWindow perform inFlight record subject spending pid (\mc -> pure (mc, [])) cost
   -- `keepingLibraryActions`'s reason (Cost.pay): the window this call opened
   -- may have shuffled or revealed before its own mana came up short. Every
   -- caller of this function -- `payMana` inside `payToll` above,
@@ -3726,8 +3743,18 @@ payManaExcept perform inFlight record subject spending pid cost = do
 -- the whole reversal. `pay` holds it until the components have settled;
 -- payManaExcept itself, whose callers unwind more than the window, discards it
 -- and puts the whole state back (#3119).
-payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game (Bool, GameState -> Game ())
-payManaWindow perform inFlight record subject spending pid cost =
+--
+-- `substituting` is CR 702.51b's, CR 702.66b's and CR 702.126b's offer, run once the
+-- window has CLOSED and before a symbol is spent: it takes the total cost's mana
+-- and answers what is left of it after the substitutes the payer chose, beside
+-- the components that spending is written as. `settle` plans against that
+-- residual, and the caller pays those components (`paySubstituting`).
+--
+-- The window LOOP still reads the unsubstituted cost, which is what `covered`
+-- below asks about: nothing has been substituted yet while the window is open,
+-- so CR 118.3c's question is put against the whole of it.
+payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> (ManaCost.ManaCost -> Game (ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])) -> ManaCost.ManaCost -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game ())
+payManaWindow perform inFlight record subject spending pid substituting cost =
   let -- What the pool would leave if the cost were paid out of it right now.
       --
       -- CR 609.4b's clauses are resolved from the board on EVERY pass rather than
@@ -3774,8 +3801,12 @@ payManaWindow perform inFlight record subject spending pid cost =
       -- WHICH mana goes is the payer's (Mana.spendChosen), so this asks rather
       -- than reading `settlement`'s assignment: that one answers only whether the
       -- pool pays.
-      settle :: [ObjectId] -> Game (Bool, GameState -> Game ())
+      settle :: [ObjectId] -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game ())
       settle activated = do
+        -- CR 601.2g then the reminder text: the substitutes are offered HERE,
+        -- with the window shut and nothing spent, so the payer answers knowing
+        -- what their mana abilities produced.
+        (residual, extra) <- substituting cost
         -- The state the window CLOSED on, which is the one a payer who declines
         -- to reverse their mana abilities goes back to: this is after every
         -- activation and before a symbol of the cost has been paid out of the
@@ -3790,8 +3821,8 @@ payManaWindow perform inFlight record subject spending pid cost =
         -- unspent, it does not vanish because one cost could not use it).
         let undo = reverseIllegal pid (reverse activated) gs
             (available, withheld) = Mana.spendableFor subject pid gs
-        case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana available) of
-          Nothing -> pure (False, undo)
+        case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid residual gs)) residual (Mana.Type.MkMana available) of
+          Nothing -> pure (False, extra, undo)
           Just (steps, life) -> do
             (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
             -- Three writes in the order the one composed `State.modify'` they
@@ -3801,7 +3832,7 @@ payManaWindow perform inFlight record subject spending pid cost =
             State.modify' (Mana.setPool pid (Mana.Type.MkMana (withheld <> left)))
             Event.payLife pid life
             State.modify' (recordSpent spent)
-            pure (True, undo)
+            pure (True, extra, undo)
       -- CR 400.7d's cost record for the MANA, kept where CR 107.4h's third
       -- sentence can be asked about it afterwards -- "the {S} symbol can also be
       -- used to refer to mana of any type produced by a snow source spent to pay a

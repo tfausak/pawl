@@ -2544,11 +2544,11 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           paidCost = Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix}
                       -- CR 702.51b / 702.66b / 702.126b: convoke, delve and
                       -- improvise apply once the total cost is determined, so the
-                      -- payer is offered the substitutes HERE -- after `paidCost`
-                      -- and before CR 601.2h's payment, which is the same list the
-                      -- gate above measured.
-                      (substituted, substitutes) <- Cost.announceManaSubstitutions pid sid paidCost
-                      (payment, substitutedBindings) <- Cost.paySubstituting perform PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid substitutes substituted
+                      -- offer is handed to the payment rather than made here --
+                      -- CR 601.2g's mana window opens first, and the payer is
+                      -- asked once it closes (Cost.paySubstituting). The list is
+                      -- the same one the gate above measured.
+                      (payment, substitutedBindings) <- Cost.paySubstituting perform PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid (Cost.announceManaSubstitutions pid sid) paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed
