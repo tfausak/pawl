@@ -2110,6 +2110,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   shufflingReversalSpec s registry
   reversalRigSpec s registry
   siegeWurmSpec s registry
+  veneratedLoxodonSpec s registry
   foundryAssemblerSpec s registry
   treasureCruiseSpec s registry
   merrowSkyswimmerSpec s registry
@@ -4263,6 +4264,54 @@ siegeWurmSpec s registry = Spec.describe s "Siege Wurm" $ do
         (allRed, _, redBoard) = convokeBoard piker spider wurm 7 0
     Spec.assertBool s (S.castable S.alice withGreens greenBoard) "five Pikers and two Spiders pay {5}{G}{G}"
     Spec.assertBool s (not (S.castable S.alice allRed redBoard)) "seven Pikers and no green creature do not"
+
+-- Venerated Loxodon {4}{W} Creature -- Elephant Cleric 4/4: "Convoke. When this
+-- creature enters, put a +1/+1 counter on each creature that convoked it."
+--
+-- CR 702.51c's relation and the only printing that READS it, which is what makes
+-- the record observable at gameplay level: nothing else in the pool asks which
+-- creatures convoked a spell.
+--
+-- The board separates the two questions the record could be confused with. The
+-- Giant Spider is an untapped creature alice controls that convoked nothing, so
+-- an implementation counting "each creature you control" grows it; the Palace
+-- Guard pays the {W} where the Pikers pay the {4}, so the two substitution
+-- components have to land in the one relation rather than the last one winning.
+veneratedLoxodonSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+veneratedLoxodonSpec s registry = Spec.describe s "Venerated Loxodon" $ do
+  Spec.it s "CR 702.51c the entry trigger grows the creatures that convoked the Loxodon, and nothing else" $ do
+    loxodon <- S.printingOf s registry "Venerated Loxodon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (pikerIds, gs1) = addPermanents piker 4 (Setup.emptyGame S.bothPlayers)
+        (guardId, gs2) = S.addPermanent palaceGuard S.alice gs1
+        (spiderId, gs3) = S.addPermanent spider S.alice gs2
+        (spell, gs4) = S.addHandCard loxodon S.alice gs3
+        gs =
+          gs4
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- CR 702.51a's two clauses again, one prompt each: the colored clause
+        -- asks for ONE white creature and the generic clause for FOUR, so the
+        -- count is what tells the two structurally identical prompts apart.
+        -- Filtered against the offer rather than built, `convoking`'s posture.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter ((== Just (ManaCost.MkManaCost [])) . Cost.Type.mana) candidates)
+          Prompt.ChooseTaps _ _ _ candidates n -> Set.fromList (filter (`elem` (if n == 1 then [guardId] else pikerIds)) candidates)
+          _ -> S.identityAnswer p
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        entered = S.runPure answer cast (Stack.resolveTop >> Engine.settleForPriority)
+        grown = S.runPure answer entered Stack.resolveTop
+        counters oid g = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid g)
+    Spec.assertEqWith s "CR 702.51c each of the four Goblin Pikers that convoked it grew a +1/+1 counter" (fmap (`counters` grown) pikerIds) (replicate 4 (Just 1))
+    Spec.assertEqWith s "and so did the Palace Guard, which paid the colored half" (counters guardId grown) (Just 1)
+    Spec.assertEqWith s "the Giant Spider convoked nothing and grew none" (counters spiderId grown) (Just 0)
+    -- What the counters alone do not say: the Loxodon really was cast this way.
+    Spec.assertEqWith s "the Loxodon resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Venerated Loxodon")) S.alice grown) 1
 
 -- Foundry Assembler {5} Artifact Creature -- Assembly-Worker 3/3: "Improvise."
 --

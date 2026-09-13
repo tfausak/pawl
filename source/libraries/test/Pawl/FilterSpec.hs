@@ -81,6 +81,7 @@ blackCreature =
       Filter.milledThisTurn = False,
       Filter.dealtDamageThisTurn = False,
       Filter.crewedThisTurn = Set.empty,
+      Filter.convokedThisTurn = Set.empty,
       Filter.controlledSinceTurnBegan = False,
       Filter.controlGainedSinceLastUpkeep = False,
       Filter.attachedToView = Nothing,
@@ -152,6 +153,7 @@ devoidBigCreature =
       Filter.milledThisTurn = False,
       Filter.dealtDamageThisTurn = False,
       Filter.crewedThisTurn = Set.empty,
+      Filter.convokedThisTurn = Set.empty,
       Filter.controlledSinceTurnBegan = False,
       Filter.controlGainedSinceLastUpkeep = False,
       Filter.attachedToView = Nothing,
@@ -1491,6 +1493,39 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 702.122b crews with a CREATURE, and a player is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches (asked 11) aPlayer Filter.Type.CrewedSourceThisTurn)) "player"
+
+  -- CR 702.51c relates TWO objects, the sibling above's shape: object 21 is the
+  -- source on every case below and object 22 the one the candidate convoked
+  -- instead, so "convoked it" and "convoked a spell" answer differently here.
+  -- The set holds both a spell and the permanent it became, which is what
+  -- Pawl.Engine.Projection.View's convokedByIt puts in it.
+  Spec.describe s "ConvokedSourceThisTurn" $ do
+    let convokedBy ns = blackCreature {Filter.convokedThisTurn = Set.fromList (fmap ObjectId.MkObjectId ns)}
+        asked n = self {Filter.source = Just (ObjectId.MkObjectId n)}
+
+    Spec.it s "matches a creature that convoked the source this turn" $ do
+      Spec.assertBool s (Filter.matches (asked 21) (convokedBy [21]) Filter.Type.ConvokedSourceThisTurn) "convoked it"
+
+    Spec.it s "does not match a creature that convoked another spell" $ do
+      Spec.assertBool s (not (Filter.matches (asked 21) (convokedBy [22]) Filter.Type.ConvokedSourceThisTurn)) "convoked something else"
+
+    Spec.it s "does not match a creature that convoked nothing" $ do
+      Spec.assertBool s (not (Filter.matches (asked 21) blackCreature Filter.Type.ConvokedSourceThisTurn)) "convoked nothing"
+
+    -- Membership and not one convoking: rule 702.51c's relation admits a
+    -- creature that convoked two spells this turn, and each asks for itself.
+    Spec.it s "matches on any of several convokings" $ do
+      Spec.assertBool s (Filter.matches (asked 21) (convokedBy [21, 22]) Filter.Type.ConvokedSourceThisTurn) "the first spell"
+      Spec.assertBool s (Filter.matches (asked 22) (convokedBy [21, 22]) Filter.Type.ConvokedSourceThisTurn) "and the second"
+
+    -- The vacuous direction: with no source there is no "it" for the relation's
+    -- other end, whatever the candidate convoked.
+    Spec.it s "is vacuously false where the context has no source" $ do
+      Spec.assertBool s (not (Filter.matches self (convokedBy [21]) Filter.Type.ConvokedSourceThisTurn)) "no source"
+
+    -- CR 702.51a taps a CREATURE, and a player is not one.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (asked 21) aPlayer Filter.Type.ConvokedSourceThisTurn)) "player"
 
   Spec.describe s "DealtDamageThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do

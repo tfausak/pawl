@@ -122,6 +122,7 @@ import qualified Pawl.Codec.ControlDurationSpec
 import qualified Pawl.Codec.ControlPlayerSpec
 import qualified Pawl.Codec.ControllerBecomesTargetSpec
 import qualified Pawl.Codec.ControllerRelationSpec
+import qualified Pawl.Codec.ConvokingSpec
 import qualified Pawl.Codec.CopyExceptionSpec
 import qualified Pawl.Codec.CopyStackObjectSpec
 import qualified Pawl.Codec.CopyTargetsSpec
@@ -715,6 +716,7 @@ spec s registry = do
   Pawl.Codec.BlockPermissionSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
   Pawl.Codec.BecameBlockingSpec.spec s
+  Pawl.Codec.ConvokingSpec.spec s
   Pawl.Codec.CrewingSpec.spec s
   Pawl.Codec.BlocksDeclaredSpec.spec s
   Pawl.Codec.CandidateIdSpec.spec s

@@ -3494,6 +3494,10 @@ stubView table oid =
                 -- the pool filters by one, so CrewedSourceThisTurn is vacuously
                 -- False against this stub.
                 Filter.crewedThisTurn = Set.empty,
+                -- CR 702.51c: the table registers no convoking either, the
+                -- field above's reason, so ConvokedSourceThisTurn is vacuously
+                -- False against this stub.
+                Filter.convokedThisTurn = Set.empty,
                 -- CR 302.6: the table registers no sickness, and no Count in the
                 -- pool filters by one, so ControlledSinceTurnBegan is vacuously
                 -- False against this stub.

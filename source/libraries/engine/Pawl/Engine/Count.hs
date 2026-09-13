@@ -362,6 +362,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.CantCrewVehicles -> predicate
         Filter.Type.DealtDamageThisTurn -> predicate
         Filter.Type.CrewedSourceThisTurn -> predicate
+        Filter.Type.ConvokedSourceThisTurn -> predicate
         Filter.Type.ControlledSinceTurnBegan -> predicate
         Filter.Type.ControlGainedSinceLastUpkeep -> predicate
         -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
@@ -761,6 +762,7 @@ snapshotView gs shape event = case event of
   GameEvent.Exploited {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Convoked _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -965,6 +967,7 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- CR 702.122c relates two OBJECTS, and this view describes a snapshot
       -- rather than one -- `milledThisTurn` above's reason again.
       Filter.crewedThisTurn = Set.empty,
+      Filter.convokedThisTurn = Set.empty,
       -- CR 302.6 asks about an OBJECT under a player's control; this view
       -- describes a snapshot rather than one -- `milledThisTurn` above's reason.
       Filter.controlledSinceTurnBegan = False,

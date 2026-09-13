@@ -3940,6 +3940,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.CantCrewVehicles -> []
   Filter.Type.DealtDamageThisTurn -> []
   Filter.Type.CrewedSourceThisTurn -> []
+  Filter.Type.ConvokedSourceThisTurn -> []
   Filter.Type.ControlledSinceTurnBegan -> []
   Filter.Type.ControlGainedSinceLastUpkeep -> []
   -- DESCENT, for ControlsMoreThanYou's reason.

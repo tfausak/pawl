@@ -13,6 +13,7 @@ import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.Convoking as Convoking
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.Crewing as Crewing
@@ -318,6 +319,12 @@ data GameEvent
     -- the ability resolves and is not derivable from the exploiter. Recorded on
     -- the sacrifice itself, so declining rule 702.110a's "may" records nothing.
     Exploited Exploited.Exploited
+  | -- | CR 702.51c: creatures CONVOKED a spell, as they were tapped to pay for
+    -- mana in its total cost. Crewed below is the same relation one keyword
+    -- over; the end this one names is a spell, which CR 400.7 leaves behind the
+    -- moment it resolves -- Pawl.Engine.Projection.View's convokedByIt is what
+    -- follows it onto the permanent it became.
+    Convoked Convoking.Convoking
   | -- | CR 702.122b: creatures CREWED a Vehicle, as they were tapped to pay its
     -- crew ability's cost.
     Crewed Crewing.Crewing

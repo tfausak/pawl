@@ -350,6 +350,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.CrewedSourceThisTurn
       " {\"type\":\"CrewedSourceThisTurn\"} "
+  Spec.it s "ConvokedSourceThisTurn" $
+    Common.assertCodec
+      s
+      codec
+      Filter.ConvokedSourceThisTurn
+      " {\"type\":\"ConvokedSourceThisTurn\"} "
   Spec.it s "DeclaredAttackerThisCombat" $
     Common.assertCodec
       s

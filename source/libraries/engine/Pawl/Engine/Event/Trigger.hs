@@ -151,6 +151,7 @@ movedOf event = case event of
   GameEvent.Exploited {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Convoked _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -965,6 +966,7 @@ eventTriggers events gs =
         GameEvent.Exploited {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
+        GameEvent.Convoked _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1166,6 +1168,7 @@ eventTriggers events gs =
         GameEvent.Exploited {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
+        GameEvent.Convoked _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1403,6 +1406,7 @@ eventTriggers events gs =
         GameEvent.Exploited {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
+        GameEvent.Convoked _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1548,6 +1552,7 @@ eventTriggers events gs =
         GameEvent.Exploited {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
+        GameEvent.Convoked _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty

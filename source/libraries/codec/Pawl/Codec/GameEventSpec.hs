@@ -28,6 +28,7 @@ import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.Convoking as Convoking
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
@@ -370,6 +371,19 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Trained (ObjectId.MkObjectId 8))
       " {\"type\":\"Trained\",\"value\":8} "
+  -- CR 702.51c: the spell and the creatures tapped to pay for mana in its total
+  -- cost, two convokers so a codec that dropped all but one goes red.
+  Spec.it s "Convoked" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      ( GameEvent.Convoked
+          Convoking.MkConvoking
+            { Convoking.spell = ObjectId.MkObjectId 14,
+              Convoking.convokedBy = Set.fromList [ObjectId.MkObjectId 15, ObjectId.MkObjectId 16]
+            }
+      )
+      " {\"type\":\"Convoked\",\"value\":{\"convokedBy\":[15,16],\"spell\":14}} "
   -- CR 702.122b: the Vehicle and the creatures tapped to pay its crew cost, two
   -- crewers so a codec that dropped all but one goes red.
   Spec.it s "Crewed" $
