@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural
@@ -38,6 +39,7 @@ import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -46,11 +48,14 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
@@ -246,9 +251,9 @@ resolveOne answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
--- CR 701.47 amass, which is an opcode: Effect.Amass over a subtype and a Quantity,
--- whose Army token, candidate pool and counter kind are rule 701.47a's rather than
--- the card's.
+-- CR 701.47 amass, which is an opcode: Effect.Amass over a subtype, a Quantity and
+-- CR 701.47c's optional slot, whose Army token, candidate pool and counter kind are
+-- rule 701.47a's rather than the card's.
 --
 -- Relentless Advance {3}{U} Sorcery (data/cards/relentless-advance.json): "Amass
 -- Zombies 3.", and nothing else -- so every token and every counter on these boards
@@ -323,6 +328,28 @@ amassSpec s registry = Spec.describe s "Amass" $ do
     Spec.assertEqWith s "and became a Zombie as well as an Orc" (Projection.subtypesOf bobArmy after) (Set.fromList [Subtype.Orc, Subtype.Zombie, Subtype.Army])
     Spec.assertEqWith s "her own Army took none" (plusCountersOn aliceArmy after) (Just 3)
     Spec.assertEqWith s "and stayed a plain Zombie Army" (Projection.subtypesOf aliceArmy after) (Set.fromList [Subtype.Zombie, Subtype.Army])
+  -- CR 701.47c: "the amassed Army" is the creature the amasser CHOSE. The two
+  -- boards below are one board answered two ways, and the mill count is the whole
+  -- assertion: the Army she names is the one whose power the next clause reads.
+  --
+  -- Her own Army carries three counters and the borrowed one carries one, so after
+  -- this amass of three they stand at six and four -- distinct from each other, from
+  -- the amass's own 3, and from the untouched Army's power, so no reading but the
+  -- chosen Army's produces either number.
+  Spec.it s "CR 701.47c a later clause reads the amassed Army she named" $ do
+    (bobArmy, aliceArmy, gs, orcsId) <- surroundedBoard s registry
+    let after = resolveOne (amassingAtPlayer aliceArmy S.bob) gs orcsId
+    Spec.assertEqWith s "bob milled six, her own Army's power after its counters" (milledIslands after) 6
+    Spec.assertEqWith s "her own Army, whom she named, took three more" (plusCountersOn aliceArmy after) (Just 6)
+    Spec.assertEqWith s "the borrowed Army took none" (plusCountersOn bobArmy after) (Just 1)
+  -- The same board and the same spell, differing only in which Army she names --
+  -- so a mill of four can only have come from the OTHER Army's power.
+  Spec.it s "CR 701.47c the same board answered the other way mills the other Army's power" $ do
+    (bobArmy, aliceArmy, gs, orcsId) <- surroundedBoard s registry
+    let after = resolveOne (amassingAtPlayer bobArmy S.bob) gs orcsId
+    Spec.assertEqWith s "bob milled four, the borrowed Army's power after its counters" (milledIslands after) 4
+    Spec.assertEqWith s "the borrowed Army, whom she named, took three" (plusCountersOn bobArmy after) (Just 4)
+    Spec.assertEqWith s "her own Army took none" (plusCountersOn aliceArmy after) (Just 3)
   -- Where the rules leave nothing to ask, do not ask. The two boards differ in how
   -- many Armies their controller has, which is the whole of what makes rule
   -- 701.47a's choice a choice.
@@ -409,16 +436,54 @@ stolenArmyBoard s registry = do
     [bobArmy, aliceArmy] -> pure (bobArmy, aliceArmy, S.giveControl bobArmy S.alice amassed, secondId)
     other -> Spec.assertFailure s ("expected exactly two tokens, got " <> show (length other))
 
+-- The Islands in bob's graveyard, which on surroundedBoard is exactly what the mill
+-- put there: his library holds nothing else, and the Mordor Muster he cast is in
+-- that graveyard too -- so counting the zone whole would count the sorcery.
+milledIslands :: GameState.GameState -> Int
+milledIslands gs = length (filter (== Just (CardName.MkCardName (Text.pack "Island"))) (namesIn Zone.Graveyard S.bob gs))
+
+-- stolenArmyBoard's two Armies under one controller, with Surrounded by Orcs in
+-- alice's hand instead of a second Relentless Advance, and bob's library stocked
+-- deep enough that the mill below is bounded by the Army's power rather than by
+-- CR 701.17b's "as many as possible".
+--
+-- Surrounded by Orcs {3}{U} Sorcery (data/cards/surrounded-by-orcs.json): "Amass
+-- Orcs 3, then target player mills X cards, where X is the amassed Army's power."
+-- (Name, cost, type line and oracle text checked against Scryfall 2026-09-13.)
+--
+-- Returns bob's Army, alice's own, the board and the Surrounded by Orcs in her hand.
+surroundedBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+surroundedBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  advance <- S.printingOf s registry "Relentless Advance"
+  muster <- S.printingOf s registry "Mordor Muster"
+  orcs <- S.printingOf s registry "Surrounded by Orcs"
+  let g1 = S.landsFor swamp S.bob 6 (S.landsInPlay island 10)
+      (g2, firstId) = S.handOne advance g1
+      (orcsId, g3) = S.addHandCard orcs S.alice g2
+      (musterId, g4) = S.addHandCard muster S.bob g3
+      g5 = stockLibrary island S.bob 12 g4
+      amassed = resolveOne S.identityAnswer (resolveFor S.bob S.identityAnswer g5 musterId) firstId
+  case S.tokensOf amassed of
+    [bobArmy, aliceArmy] -> pure (bobArmy, aliceArmy, S.giveControl bobArmy S.alice amassed, orcsId)
+    other -> Spec.assertFailure s ("expected exactly two tokens, got " <> show (length other))
+
 -- resolveOne for a seat other than alice's: bob casts and the spell resolves.
 resolveFor :: PlayerId.PlayerId -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
 resolveFor pid answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast pid spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
--- CR 701.68 blight, which is an opcode: Effect.Blight over a PlayerRef and a
--- Quantity, whose candidate pool and counter kind are rule 701.68a's rather than
--- the card's. A bare printed "blight N" is CR 109.5's `Relative You`, which is
--- what every case here reads; blightPlayerSpec below is the other reading.
+-- CR 701.68 blight, which is an opcode: Effect.Blight over a PlayerRef, a Quantity
+-- and CR 701.68c's optional slot, whose candidate pool and counter kind are rule
+-- 701.68a's rather than the card's. A bare printed "blight N" is CR 109.5's
+-- `Relative You`, which is what every case here reads; blightPlayerSpec below is
+-- the other reading.
 --
 -- Sinister Gnarlbark {2}{B} 0/4 Creature -- Treefolk Warlock
 -- (data/cards/sinister-gnarlbark.json): "At the beginning of your end step, draw a
@@ -505,6 +570,78 @@ blightSpec s registry = Spec.describe s "Blight" $ do
     Spec.assertBool s (not (S.onBattlefield gnarlbarkId after)) "the Gnarlbark left the battlefield before its trigger resolved"
     Spec.assertEqWith s "the card was drawn all the same" (S.handSize S.alice after) 1
     Spec.assertEqWith s "and bob's creatures, who were never candidates, took nothing" (minusCountersOn pikerId after) (Just 0)
+  -- CR 701.68c: "the blighted creature" is the object the blighting player CHOSE
+  -- to put the counters on, read by the NEXT clause of the same resolution (CR
+  -- 608.2c). The two cases are one board answered two ways, and the token's name
+  -- is the whole assertion: the creature she names is the one that gets copied.
+  --
+  -- The two candidates are a 0/8 Wall of Stone and a 0/4 Sinister Gnarlbark --
+  -- different names and different toughnesses -- so no reading but the chosen
+  -- creature's produces either token, and both survive the counter (CR 704.5f) so
+  -- the counter itself stays readable. Grub is a third candidate and is named by
+  -- neither case, which is what keeps "the blighted creature" apart from "this
+  -- creature".
+  Spec.it s "CR 701.68c a later clause copies the creature she blighted" $ do
+    (wallId, gnarlbarkId, gs) <- grubBoard s registry
+    let after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (grubbing wallId) gs
+    Spec.assertEqWith s "the token is a copy of the Wall she blighted" (fmap (\oid -> PC.names (Projection.project oid after)) (S.tokensOf after)) [Set.singleton (CardName.MkCardName (Text.pack "Wall of Stone"))]
+    Spec.assertEqWith s "and the Wall is the creature that took the counter" (minusCountersOn wallId after) (Just 1)
+    Spec.assertEqWith s "the Gnarlbark took none" (minusCountersOn gnarlbarkId after) (Just 0)
+  -- The same board and the same trigger, differing only in the answer.
+  Spec.it s "CR 701.68c the same board answered the other way copies the other creature" $ do
+    (wallId, gnarlbarkId, gs) <- grubBoard s registry
+    let after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (grubbing gnarlbarkId) gs
+    Spec.assertEqWith s "the token is a copy of the Gnarlbark she blighted" (fmap (\oid -> PC.names (Projection.project oid after)) (S.tokensOf after)) [Set.singleton (CardName.MkCardName (Text.pack "Sinister Gnarlbark"))]
+    Spec.assertEqWith s "and the Gnarlbark is the creature that took the counter" (minusCountersOn gnarlbarkId after) (Just 1)
+    Spec.assertEqWith s "the Wall took none" (minusCountersOn wallId after) (Just 0)
+
+-- alice attacks with Grub, Notorious Auntie beside a Wall of Stone and a Sinister
+-- Gnarlbark, so rule 701.68a's choice is a real one and the creature copied can
+-- differ from the creature attacking -- the Wall, which CR 702.3b keeps out of the
+-- attack entirely, being a candidate all the same.
+--
+-- Grub, Storied Matriarch // Grub, Notorious Auntie {2}{B} 2/1 Legendary Creature
+-- -- Goblin Warlock // Goblin Warrior (Lorwyn Eclipsed,
+-- data/cards/grub-storied-matriarch-grub-notorious-auntie.json). The back face:
+-- "Menace / Whenever Grub attacks, you may blight 1. If you do, create a tapped
+-- and attacking token that's a copy of the blighted creature, except it has 'At
+-- the beginning of the end step, sacrifice this token.'" (Both faces' names, cost,
+-- type lines, P/T and oracle text checked against Scryfall 2026-09-13.)
+--
+-- Turned over by the opcode rather than by paying its printed {B}: the transform
+-- is not what these cases are about, and CR 701.27a's turn is the same turn either
+-- way. Returns the two candidates and the board.
+grubBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+grubBoard s registry = do
+  grub <- S.printingOf s registry "Grub, Storied Matriarch"
+  wall <- S.printingOf s registry "Wall of Stone"
+  gnarlbark <- S.printingOf s registry "Sinister Gnarlbark"
+  let (gs, ours, _) = S.combatBoardOf [grub, wall, gnarlbark] []
+  case ours of
+    [grubId, wallId, gnarlbarkId] -> pure (wallId, gnarlbarkId, transforming grubId gs)
+    other -> Spec.assertFailure s ("expected exactly three permanents, got " <> show (length other))
+
+-- CR 701.27a through the opcode a card's "transform target permanent" reaches, so
+-- the fixture above reaches Grub's back face without a turn passing.
+-- Pawl.MeldSpec keeps its own copy.
+transforming :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+transforming oid gs =
+  let slot = SlotName.MkSlotName (Text.pack "turning")
+      bound = Map.singleton slot (Set.singleton (Recipient.ToObject oid))
+   in S.runPure S.identityAnswer gs (Resolve.applyEffect S.noSource S.noSource S.alice bound Map.empty (Effect.Transform (ObjectRef.InSlot slot)))
+
+-- Attacks with everything, takes CR 603.5's printed "may", and names a creature
+-- for CR 701.68a. Both choices are PINNED rather than searched for a legal one: an
+-- answerer that searched would find the engine's own again after a mutation.
+grubbing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+grubbing oid p = case p of
+  Prompt.ChooseBlight {} -> oid
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.aggressiveAnswer p
 
 -- Sinister Gnarlbark on alice's battlefield and Goblin Piker, Typhoid Rats and Wall
 -- of Stone on `pid`'s, with a card in alice's library for the draw (CR 104.3c), her
@@ -1223,6 +1360,15 @@ paysBlighting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 paysBlighting oid p = case p of
   Prompt.ChooseBlight {} -> oid
   _ -> paysFor S.alice p
+
+-- `amassing` with CR 601.2c's target pinned to a named PLAYER, for a card that
+-- amasses and then aims its next clause. Both choices are pinned rather than
+-- searched for a legal one: a searching answerer finds the engine's own again after
+-- a mutation.
+amassingAtPlayer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+amassingAtPlayer oid pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
+  _ -> amassing oid p
 
 -- Answers Prompt.ChooseAmass with a named Army, deferring everything else to
 -- S.identityAnswer. PINNED BY ID rather than picked by searching the candidates, so

@@ -35,6 +35,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
+import qualified Pawl.Types.Blight as Blight.Type
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -801,7 +802,7 @@ effectPlayerRefs effect = case effect of
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref _) -> [ref]
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.Blight (Blight.Type.MkBlight ref _ _) -> [ref]
   -- Rule 701.66a reaches no player the card did not target.
   Effect.Earthbend {} -> []
   Effect.TemptWithTheRing -> []
@@ -886,8 +887,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.FromOutsideTheGame _ -> Map.empty
   Effect.ExileThisSpell -> Map.empty
   Effect.Bolster quantity -> quantitySlots quantity
-  Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  -- The COUNT only: the amass slot is a DEFINITION, not a read, Create's reason.
+  Effect.Amass (Amass.Type.MkAmass quantity _ _) -> quantitySlots quantity
+  -- The count and the blighters; the slot is a DEFINITION, Amass's reason above.
+  Effect.Blight (Blight.Type.MkBlight _ quantity _) -> quantitySlots quantity
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantitySlots quantity
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture {} -> Map.empty
@@ -1465,8 +1468,8 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.FromOutsideTheGame _ -> True
   Effect.ExileThisSpell -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
-  Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Amass (Amass.Type.MkAmass quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Blight (Blight.Type.MkBlight _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.TemptWithTheRing -> True
   Effect.Venture {} -> True
@@ -1682,8 +1685,8 @@ readsX =
         Effect.FromOutsideTheGame _ -> False
         Effect.ExileThisSpell -> False
         Effect.Bolster quantity -> Quantity.readsX quantity
-        Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
-        Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.Amass (Amass.Type.MkAmass quantity _ _) -> Quantity.readsX quantity
+        Effect.Blight (Blight.Type.MkBlight _ quantity _) -> Quantity.readsX quantity
         Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.readsX quantity
         Effect.TemptWithTheRing -> False
         Effect.Venture {} -> False
@@ -1880,8 +1883,10 @@ boundSlots effect = case effect of
   Effect.FromOutsideTheGame _ -> Set.empty
   Effect.ExileThisSpell -> Set.empty
   Effect.Bolster _ -> Set.empty
-  Effect.Amass _ -> Set.empty
-  Effect.Blight _ -> Set.empty
+  -- CR 701.47c's "the amassed Army": the creature the amasser chose.
+  Effect.Amass (Amass.Type.MkAmass _ _ mSlot) -> foldMap Set.singleton mSlot
+  -- CR 701.68c's "blighted creature", the rule one over and the same shape.
+  Effect.Blight (Blight.Type.MkBlight _ _ mSlot) -> foldMap Set.singleton mSlot
   -- Binding.earthbentLand is stamped by Pawl.Engine.Resolve.Effect, not defined
   -- here: it is a reserved slot the engine writes for its own delayed ability,
   -- and reporting it would make every earthbending card fail Pawl.CardSpec's

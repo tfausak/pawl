@@ -523,8 +523,8 @@ data GameEvent
     -- board, where that process never runs: rule 701.68d has no counterpart to
     -- rule 701.54d's "even if some or all of those actions were impossible".
     --
-    -- Not implemented: CR 701.68c's blighted creature, which is a
-    -- resolution-time binding of the instructing effect rather than a payload
-    -- here (#1492).
+    -- CR 701.68c's blighted creature is no payload here: it is a resolution-time
+    -- binding of the INSTRUCTING effect, under the name Pawl.Types.Blight's slot
+    -- gives it.
     Blighted PlayerId.PlayerId
   deriving (Eq, Ord, Show)

@@ -24,6 +24,7 @@ import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
@@ -1902,8 +1903,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Amass (Amass.MkAmass (Quantity.Literal 3) Subtype.Zombie))
+      (Effect.Amass (Amass.MkAmass (Quantity.Literal 3) Subtype.Zombie Nothing))
       " {\"type\":\"Amass\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":3},\"subtype\":{\"type\":\"Zombie\"}}} "
+  -- CR 701.47c: Surrounded by Orcs names the Army it amassed in its next clause.
+  Spec.it s "Amass, binding the amassed Army" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Amass (Amass.MkAmass (Quantity.Literal 3) Subtype.Orc (Just (SlotName.MkSlotName (Text.pack "army")))))
+      " {\"type\":\"Amass\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":3},\"subtype\":{\"type\":\"Orc\"},\"slot\":\"army\"}} "
   -- CR 701.68a: who and how many, Draw's shape -- rule 701.68a fixes the kind of
   -- counter and the candidate pool, leaving an author the blighter and N.
   Spec.it s "Blight" $
@@ -1911,8 +1920,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Blight (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))
+      (Effect.Blight (Blight.MkBlight (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing))
       " {\"type\":\"Blight\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "
+  -- CR 701.68c: Grub, Notorious Auntie copies the creature it blighted.
+  Spec.it s "Blight, binding the blighted creature" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Blight (Blight.MkBlight (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) (Just (SlotName.MkSlotName (Text.pack "blighted")))))
+      " {\"type\":\"Blight\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"slot\":\"blighted\"}} "
   -- CR 701.68a's "you" is whoever the instruction ADDRESSES: High Perfect Morcant's
   -- "each opponent blights 1" is the arm that needs the reference to be writable.
   Spec.it s "Blight for an opponent" $
@@ -1920,7 +1937,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Blight (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.Opponent) (Quantity.Literal 2)))
+      (Effect.Blight (Blight.MkBlight (PlayerRef.Relative PlayerRelation.Opponent) (Quantity.Literal 2) Nothing))
       " {\"type\":\"Blight\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"Opponent\"}},\"quantity\":{\"type\":\"Literal\",\"value\":2}}} "
   -- CR 701.54a: nullary, because rule 701.54 fixes the chooser, the count and the
   -- qualification, leaving an author nothing to write.

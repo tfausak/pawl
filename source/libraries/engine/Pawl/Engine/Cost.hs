@@ -4564,7 +4564,10 @@ payComponent moment slots pid oid component = case component of
   -- the second and not the first; Vorinclex, Monstrous Raider doubles both.
   CostComponent.Blight n -> do
     blighted <- Blight.blight (counterCause moment pid) oid n
-    pure (if blighted then bindsNothing else Payment.Unpaid)
+    -- The creature chosen is DISCARDED here, where the effect arm binds it: CR
+    -- 701.68c's "blighted creature" is read by a later clause of the same
+    -- resolution, and a cost is paid before there is one.
+    pure (if Maybe.isJust blighted then bindsNothing else Payment.Unpaid)
   -- Unpayable, `canPayComponent`'s answer and for its reason -- PayLifeX's arm
   -- above, verbatim.
   CostComponent.BlightX -> pure Payment.Unpaid

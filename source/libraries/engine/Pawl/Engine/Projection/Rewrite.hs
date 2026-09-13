@@ -26,6 +26,7 @@ import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
@@ -436,9 +437,12 @@ rewriteEffect pairs effect = case effect of
   Effect.Bolster quantity -> Effect.Bolster (rewriteQuantity pairs quantity)
   -- CR 612.1 / 612.2a: amass's subtype is a printed word of CR 205.3m's family,
   -- and the token's own name follows it.
-  Effect.Amass (Amass.MkAmass quantity subtype) ->
-    Effect.Amass (Amass.MkAmass (rewriteQuantity pairs quantity) (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
-  Effect.Blight x -> Effect.Blight (rewritePlayerQuantity pairs x)
+  Effect.Amass (Amass.MkAmass quantity subtype slot) ->
+    Effect.Amass (Amass.MkAmass (rewriteQuantity pairs quantity) (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs) slot)
+  -- The COUNT only: a slot name is this card's own namespace and not printed text
+  -- CR 612.1 can reach, which is why the Amass arm above carries its slot through
+  -- untouched too.
+  Effect.Blight (Blight.MkBlight ref quantity slot) -> Effect.Blight (Blight.MkBlight ref (rewriteQuantity pairs quantity) slot)
   -- CR 612 reaches the count and the ObjectRef's own filters; rule 701.66a
   -- names no subtype word.
   Effect.Earthbend (Earthbend.MkEarthbend quantity ref) -> Effect.Earthbend (Earthbend.MkEarthbend (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))

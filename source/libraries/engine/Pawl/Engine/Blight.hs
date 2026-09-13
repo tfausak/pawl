@@ -62,9 +62,13 @@ canBlight :: PlayerId -> GameState.GameState -> Bool
 canBlight pid gs = not (null (candidates pid gs))
 
 -- | CR 701.68a: put N -1\/-1 counters on a creature this player controls.
--- Answers whether a creature was found -- False is rule 701.68b's board, which
--- CR 101.3 makes a no-op for a mandatory effect and Pawl.Engine.Cost turns into
--- an unpaid cost.
+-- Answers the creature chosen, which is CR 701.68c's "blighted creature" --
+-- Nothing is rule 701.68b's board, which CR 101.3 makes a no-op for a mandatory
+-- effect and Pawl.Engine.Cost turns into an unpaid cost.
+--
+-- The caller binds the answer under the effect's slot for a later clause of the
+-- same resolution to read (Grub, Notorious Auntie). The COST callers bind
+-- nothing: no printing pays a blight and then names what it blighted.
 --
 -- The ObjectId is the object the prompt names -- the spell or ability resolving,
 -- or the one whose cost is being paid. The CounterCause is the caller's, and the
@@ -90,15 +94,15 @@ canBlight pid gs = not (null (candidates pid gs))
 -- N of zero still chooses, and CR 122.6 is why the choice is made anyway: rule
 -- 701.68a's process is "put N -1\/-1 counters on a creature you control", so the
 -- creature is chosen whatever N is, and CR 701.68c's "blighted creature" is that
--- creature. Nothing records it yet (gap #1492).
-blight :: CounterCause.CounterCause -> ObjectId -> Natural -> Game Bool
+-- creature.
+blight :: CounterCause.CounterCause -> ObjectId -> Natural -> Game (Maybe ObjectId)
 blight cause resolving n = do
   let pid = CounterCause.putter cause
   gs <- State.get
   case candidates pid gs of
     -- CR 701.68b for a cost, CR 101.3 for an effect: a player controlling no
     -- creature blights nothing.
-    [] -> pure False
+    [] -> pure Nothing
     first : rest -> do
       blighted <- case rest of
         [] -> pure first
@@ -121,4 +125,4 @@ blight cause resolving n = do
       -- provenances meet (the module haddock above): a blight paid as a cost and
       -- one an effect instructs are both a player blighting.
       State.modify' (Event.recordEvent (GameEvent.Blighted pid))
-      pure True
+      pure (Just blighted)

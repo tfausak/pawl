@@ -167,10 +167,11 @@ armiesOf pid gs =
 --    "if it isn't a [subtype]" and not an optimisation -- the projected types are
 --    what that reads.
 --
--- Not implemented: nothing records that an amass happened, so CR 701.47c's "the
--- amassed Army" cannot be named by a later effect and CR 701.47b's completion is
--- not observable (#1484).
-amass :: PlayerId -> ObjectId -> ObjectId -> Subtype.Type.Subtype -> Natural -> Game ()
+-- ANSWERS the creature chosen, which is CR 701.47c's "the amassed Army" -- the
+-- caller binds it under the effect's slot for a later clause of the same
+-- resolution to read (Surrounded by Orcs). Nothing is rule 701.47b's impossible
+-- choice, the empty pool below, and not a failed amass.
+amass :: PlayerId -> ObjectId -> ObjectId -> Subtype.Type.Subtype -> Natural -> Game (Maybe ObjectId)
 amass pid source resolving subtype n = do
   gs0 <- State.get
   -- CR 701.47a, first: the token, and only if they control no Army creature.
@@ -180,7 +181,7 @@ amass pid source resolving subtype n = do
   gs1 <- State.get
   case armiesOf pid gs1 of
     -- CR 701.47b: an impossible choice is not a failed amass.
-    [] -> pure ()
+    [] -> pure Nothing
     first : rest -> do
       chosen <- case rest of
         -- One Army is the whole of "an Army creature you control", and rule
@@ -209,3 +210,4 @@ amass pid source resolving subtype n = do
                   ContinuousEffect.affected = Affected.TheseObjects (Set.singleton chosen)
                 }
         State.put gs3 {GameState.continuousEffects = effect : GameState.continuousEffects gs3}
+      pure (Just chosen)

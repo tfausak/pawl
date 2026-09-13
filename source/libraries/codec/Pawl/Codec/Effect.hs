@@ -20,6 +20,7 @@ import qualified Pawl.Codec.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Codec.AttachBound as AttachBound
 import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
+import qualified Pawl.Codec.Blight as Blight
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.ChooseCardName as ChooseCardName
@@ -122,7 +123,7 @@ codec cardCodec abilityCodec =
           Arm.nullary "ExileThisSpell" Effect.ExileThisSpell,
           Arm.payload "Bolster" Quantity.codec Effect.Bolster (\x -> case x of Effect.Bolster y -> Just y; _ -> Nothing),
           Arm.payload "Amass" Amass.codec Effect.Amass (\x -> case x of Effect.Amass y -> Just y; _ -> Nothing),
-          Arm.payload "Blight" PlayerQuantity.codec Effect.Blight (\x -> case x of Effect.Blight y -> Just y; _ -> Nothing),
+          Arm.payload "Blight" Blight.codec Effect.Blight (\x -> case x of Effect.Blight y -> Just y; _ -> Nothing),
           Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
           Arm.optionalPayload "Venture" Subtype.codec Effect.Venture (\x -> case x of Effect.Venture y -> Just y; _ -> Nothing),
           Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,

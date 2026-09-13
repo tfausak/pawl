@@ -7,6 +7,7 @@ import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
@@ -580,7 +581,7 @@ data Effect card ability
   | -- | CR 701.68a: "blight N" -- the players the PlayerRef names each put N
     -- -1\/-1 counters on a creature they control, each asked separately. Choose,
     -- not target.
-    Blight PlayerQuantity.PlayerQuantity
+    Blight Blight.Blight
   | -- | CR 701.66a: "earthbend N" -- the land the payload names becomes a 0\/0
     -- land creature with haste in addition to its other types, takes N +1\/+1
     -- counters, and a CR 603.7 delayed ability returns it tapped when it dies or

@@ -5,7 +5,7 @@ import qualified Pawl.Types.Quantity as Quantity
 
 -- | "These players, this many" -- the payload of every Pawl.Types.Effect arm
 -- whose whole instruction is a PlayerRef and a Quantity: Scry, Surveil,
--- Fateseal, GainLife, SetLifeTotal, IncreaseSpeed and Blight.
+-- Fateseal, GainLife, SetLifeTotal and IncreaseSpeed.
 --
 -- SHARED FOR EXPEDIENCY, and not because those arms mean the same thing. The
 -- name says the shape rather than a concept precisely because there is no shared
@@ -23,8 +23,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- reader tells which arm it is looking at. Pawl.Types.Mill is what spinning out
 -- looks like -- a mill is "these players, this many" plus CR 728.1's tally, so
 -- it has its own record rather than a nullable field here. Pawl.Types.Draw left
--- the same way, over CR 121.1's "and reveal it" (#1899), and Pawl.Types.LifeLoss
--- over CR 728.1a's cause.
+-- the same way, over CR 121.1's "and reveal it" (#1899), Pawl.Types.LifeLoss over
+-- CR 728.1a's cause, and Pawl.Types.Blight over CR 701.68c's blighted creature.
 data PlayerQuantity = MkPlayerQuantity
   { player :: PlayerRef.PlayerRef,
     quantity :: Quantity.Quantity

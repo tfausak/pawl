@@ -1,6 +1,7 @@
 module Pawl.Types.Amass where
 
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 
 -- | The payload of Pawl.Types.Effect's Amass arm: CR 701.47a's two printed
@@ -16,6 +17,15 @@ import qualified Pawl.Types.Subtype as Subtype
 -- spell's mana value", so the count is an expression over game state.
 data Amass = MkAmass
   { quantity :: Quantity.Quantity,
-    subtype :: Subtype.Subtype
+    subtype :: Subtype.Subtype,
+    -- | CR 701.47c: the Army the amassing player chose, bound for a later effect
+    -- of the same resolution to name -- Surrounded by Orcs' "where X is the
+    -- amassed Army's power". Absent for every amass nothing looks back at.
+    --
+    -- Bound whether or not the Army received counters, which is rule 701.47c's
+    -- own sentence, and bound for the ONE amassing player: rule 701.47a's
+    -- instruction is the resolving controller's alone, so there is no group here
+    -- as there is on a Mill.
+    slot :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

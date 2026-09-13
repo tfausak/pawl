@@ -89,6 +89,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
+import qualified Pawl.Types.Blight as Blight.Type
 import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
@@ -7068,13 +7069,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Amass.amass's, and this arm evaluates only the printed N.
   --
   -- Targetless: no CR 608.2b legality to re-check.
-  Effect.Amass (Amass.Type.MkAmass quantity subtype) -> do
+  Effect.Amass (Amass.Type.MkAmass quantity subtype mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
-      Just n -> Amass.amass controller source resolving subtype (Integer.toNaturalSaturating n)
+      Just n -> do
+        chose <- Amass.amass controller source resolving subtype (Integer.toNaturalSaturating n)
+        -- CR 701.47c: "the amassed Army" is the creature chosen, whether or not it
+        -- received counters -- so this is bound off the choice and not off the
+        -- counters, and an amass whose pool was empty (CR 701.47b) binds nothing.
+        -- Onto `resolving`, which is bindSlot's contract: both resolution loops
+        -- re-read the stack object's bindings before each effect (CR 608.2c), so
+        -- the next clause sees it.
+        Monad.forM_ ((,) <$> mSlot <*> chose) $ \(slot, army) -> State.modify' (bindSlot resolving slot army)
   -- CR 701.68a: each player the PlayerRef names puts N -1/-1 counters on a
   -- creature they control; the keyword action is Pawl.Engine.Blight.blight's, and
   -- rule 701.68b's optional reading is a cost (CR 118.12). MANDATORY here, so an
@@ -7102,19 +7111,30 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Blight.blight, one per seat that actually blighted -- the
   -- bracket groups them, which changes nothing here, PlayerBlights not being a
   -- CR 603.2c batch condition (Pawl.Engine.Event.Trigger.batchScoped).
-  --
-  -- Not implemented: nothing records which creature was blighted, so CR 701.68c's
-  -- "blighted creature" has nothing to read (#1492).
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
+  Effect.Blight (Blight.Type.MkBlight ref quantity mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
         named = playerRefPlayers legal controller gs ref
         blighters = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    Event.simultaneously . Monad.forM_ blighters $ \pid ->
+    blightedCreatures <- Event.simultaneously . fmap Maybe.catMaybes . Monad.forM blighters $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
-        Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
-        Just n -> Monad.void (Blight.blight (CounterCause.ByEffect pid) resolving (Integer.toNaturalSaturating n))
+        Nothing -> pure Nothing -- unevaluable quantity: no-op (the powerOf posture)
+        Just n -> Blight.blight (CounterCause.ByEffect pid) resolving (Integer.toNaturalSaturating n)
+    -- CR 701.68c: "the blighted creature" is the object the blighting player chose
+    -- to put the counters on, bound for a later clause of this same resolution to
+    -- read (CR 608.2c) -- Grub, Notorious Auntie's token copy of it. Bound off the
+    -- CHOICE and not off the counters, which is rule 701.68c's own wording: a
+    -- blight of zero (CR 122.6), and one whose counters a replacement kept off,
+    -- name a creature just the same.
+    --
+    -- ACROSS blighters, the Effect.Mill slot's one/many split: one chosen creature
+    -- takes the single binding every singular reader can see, several take the
+    -- group. A seat that could not blight (rule 701.68b) contributes nothing.
+    Monad.forM_ mSlot $ \slot -> case blightedCreatures of
+      [] -> pure ()
+      [only] -> State.modify' (bindSlot resolving slot only)
+      several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   -- CR 701.54a: the Ring tempts the resolving controller; the keyword action is
   -- Pawl.Engine.Ring.tempt's.
   Effect.TemptWithTheRing -> Ring.tempt controller
