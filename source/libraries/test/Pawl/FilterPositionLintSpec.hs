@@ -227,6 +227,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.ControlledByRecipient -> 0
   Filter.Type.ManaValueAtMost _ -> 0
   Filter.Type.ManaValueLessThanSource -> 0
+  Filter.Type.ManaValueEqualToSource -> 0
   Filter.Type.ManaValueIsEven -> 0
   Filter.Type.ManaValueAtMostAmount -> 0
   Filter.Type.ControlledBy _ -> 0
@@ -1901,12 +1902,19 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- Pawl.Engine.Resolve.Slots.effectContext alone, so the atom is answerable only
   -- inside a resolution's own references and would be a silent False in a card's
   -- target slot, affected set, Count filter or search filter. Only
-  -- Pawl.Engine.Keyword's cascade writes it, and this is what keeps that true.
+  -- Pawl.Engine.Keyword writes it -- cascade, and the equality atom below that CR
+  -- 702.53a's transmute and CR 702.71a's transfigure search with -- and this is
+  -- what keeps that true.
   Spec.it s "CR 702.85a no card writes a source-mana-value comparison" $ do
     ps <- S.allPrintings s
     let atoms c = jsonAtoms (Text.pack "ManaValueLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c)
         offenders = filter (anyFace (\c -> atoms c /= 0) . Printing.card) ps
     Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- CR 702.53a and CR 702.71a's atom sits in the same position and is filled by
+    -- the same one caller, so the same sweep is owed it.
+    let equalAtoms c = jsonAtoms (Text.pack "ManaValueEqualToSource") (Codec.encode (Face.Codec.codec Card.codec) c)
+        equalOffenders = filter (anyFace (\c -> equalAtoms c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "the equality atom is the engine's alone" (fmap (S.nameOf . Printing.card) equalOffenders) []
     -- NOT vacuous, the sweep above's reason: the same counter over a hand-built
     -- face that DOES carry the atom finds it.
     piker <- S.printingOf s registry "Goblin Piker"

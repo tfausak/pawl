@@ -269,6 +269,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Mobilize n -> List.genericReplicate count (mobilize n)
   Keyword.Firebending n -> List.genericReplicate count (firebending n)
+  Keyword.Transmute _ -> []
+  Keyword.Transfigure _ -> []
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
   -- CR 603.2: none of the three rules states an "each instance" clause, so the
@@ -561,6 +563,11 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Annihilator _ -> []
   Keyword.Mobilize _ -> []
   Keyword.Firebending _ -> []
+  -- CR 702.53a's ability "functions only while the card with transmute is in a
+  -- player's hand", so this roster is the only one that offers it.
+  Keyword.Transmute cost -> [transmute cost]
+  -- CR 702.71a sacrifices THIS PERMANENT, so battlefieldAbilitiesFor mints it.
+  Keyword.Transfigure _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -766,6 +773,90 @@ reinforce n cost =
 reinforceTarget :: SlotName.SlotName
 reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 
+-- CR 702.53a's whole ability, cycling's shape with a library search in place of
+-- the draw and a self-comparison in place of a printed quality.
+--
+-- THE DISCARD is a COMPONENT of the activation cost for cycling's reasons (rule
+-- 702.53a puts it before the colon). Its cause is Ordinary and not
+-- ToPayCyclingCost: rule 702.53 never says transmute is a cycling ability, so CR
+-- 702.29c's "when you cycle this card" must not see it.
+--
+-- THE FILTER is the one thing neither cycling nor reinforce needed -- "a card
+-- with the same mana value as the discarded card". Filter.ManaValueEqualToSource
+-- reads Pawl.Engine.Filter.Context's sourceManaValue, which
+-- Pawl.Engine.Resolve.Slots.effectContext fills through CR 608.2h's last-known
+-- reader: the cost has already put the card in a graveyard as a new object (CR
+-- 400.7), so the live board answers nothing and the discarded card's own mana
+-- value is what rule 702.53a asks about. No card type conjunct -- rule 702.53a
+-- says "a card", where rule 702.71a says "a creature card".
+--
+-- THE DESTINATION is cycling's RevealThenHand: rule 702.53a states the reveal
+-- itself, which CR 701.23e is what makes load-bearing -- a search that does not
+-- say it does not do it. CR 113.8 makes the ability's controller the player who
+-- activated it, which is rule 702.53a's "your library" and "your hand" alike.
+transmute :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+transmute cost = searchForSameManaValue (cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]}) Filter.ManaValueEqualToSource SearchDestination.RevealThenHand
+
+-- CR 702.71a's whole ability, transmute's above one zone over: the cost
+-- sacrifices this permanent instead of discarding this card, the search is
+-- narrowed to a creature card, and the card found goes onto the battlefield
+-- rather than into a hand.
+--
+-- THE SACRIFICE is a cost component for the discard's reason, and reads back the
+-- same way: CR 701.21a has already put the permanent in a graveyard as a new
+-- object (CR 400.7), so "the same mana value as this permanent" is a CR 608.2h
+-- reading of the sacrificed permanent, which effectContext's sourceManaValue is.
+--
+-- NO REVEAL in the destination, unlike transmute's: rule 702.71a states none,
+-- and CR 701.23e's reveal is only what a rule's own sentence asks for.
+transfigure :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+transfigure cost = searchForSameManaValue (cost {Cost.components = Cost.components cost <> [CostComponent.SacrificeThis]}) (Filter.And [Filter.HasCardType CardType.Creature, Filter.ManaValueEqualToSource]) SearchDestination.Battlefield
+
+-- What CR 702.53a and CR 702.71a share once the cost, the quality and the
+-- destination are named: search your library for one card matching, then shuffle,
+-- at sorcery speed. Rule 702.53a's "Activate only as a sorcery" and rule 702.71a's
+-- are the same clause, so the two abilities differ in nothing else.
+searchForSameManaValue :: Cost Keyword -> Filter Keyword -> SearchDestination.SearchDestination -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+searchForSameManaValue cost filter_ destination =
+  let effect =
+        Effect.Search
+          Search.MkSearch
+            { Search.searcher = PlayerRef.Relative PlayerRelation.You,
+              Search.owner = PlayerRef.Relative PlayerRelation.You,
+              -- Both rules print "your library" and no other zone.
+              Search.zones = Set.singleton Zone.Library,
+              -- "Search your library for a card", so one card is the whole
+              -- instruction's count.
+              Search.quantity = Just (Quantity.Literal 1),
+              Search.filter = filter_,
+              -- Neither rule prints "up to", and both filters state a quality, so
+              -- the search is under CR 701.23b and this value is unobservable --
+              -- cycling's reading.
+              Search.upTo = False,
+              Search.destination = destination,
+              -- Neither destination attaches anything and neither filter asks a
+              -- CR 701.3a question, so no object is fixed for one to be about.
+              Search.subject = Nothing
+            }
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = cost,
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+          ActivatedAbility.activator = Activator.Controller,
+          -- Both rules give the ability outright, with no "as long as".
+          ActivatedAbility.condition = Nothing,
+          -- Nothing on every keyword-minted ability: no clause of a card refers to
+          -- one, CR 702's own text being what mints it.
+          ActivatedAbility.name = Nothing,
+          -- Nothing here and written by `mintedBy` at the roster, the one place that
+          -- knows the keyword by identity rather than by reconstructing it.
+          ActivatedAbility.keyword = Nothing
+        }
+
 -- CR 702.49a's whole ability: "[Cost], Reveal this card from your hand, Return an
 -- unblocked attacking creature you control to its owner's hand: Put this card
 -- onto the battlefield from your hand tapped and attacking."
@@ -949,6 +1040,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Annihilator _ -> []
   Keyword.Mobilize _ -> []
   Keyword.Firebending _ -> []
+  Keyword.Transmute _ -> []
+  Keyword.Transfigure _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -1543,6 +1636,11 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Annihilator _ -> []
   Keyword.Mobilize _ -> []
   Keyword.Firebending _ -> []
+  -- CR 702.53a's ability functions in a HAND; handAbilitiesFor is its roster.
+  Keyword.Transmute {} -> []
+  -- CR 702.71a states a whole self-contained ability, so one per instance,
+  -- crew's reading above.
+  Keyword.Transfigure cost -> List.genericReplicate count (transfigure cost)
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -2145,6 +2243,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.Mobilize _ -> []
   Keyword.Firebending _ -> []
+  Keyword.Transmute _ -> []
+  Keyword.Transfigure _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -3561,6 +3661,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.Mobilize _ -> []
   Keyword.Firebending _ -> []
+  Keyword.Transmute _ -> []
+  Keyword.Transfigure _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -3866,6 +3968,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.Mobilize _ -> []
   Keyword.Firebending _ -> []
+  Keyword.Transmute _ -> []
+  Keyword.Transfigure _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -4137,6 +4241,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.Mobilize _ -> []
   Keyword.Firebending _ -> []
+  Keyword.Transmute _ -> []
+  Keyword.Transfigure _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
@@ -4294,6 +4400,8 @@ familyOf keyword = case keyword of
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Mobilize _ -> Just KeywordFamily.Mobilize
   Keyword.Firebending _ -> Just KeywordFamily.Firebending
+  Keyword.Transmute {} -> Just KeywordFamily.Transmute
+  Keyword.Transfigure {} -> Just KeywordFamily.Transfigure
   Keyword.Crew _ -> Just KeywordFamily.Crew
   Keyword.Saddle _ -> Just KeywordFamily.Saddle
   Keyword.Fabricate _ -> Just KeywordFamily.Fabricate

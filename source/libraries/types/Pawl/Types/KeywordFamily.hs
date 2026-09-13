@@ -274,4 +274,10 @@ data KeywordFamily
   | -- | CR 702.119a: emerge [cost]. No card in the pool asks yet, and it is owed
     -- at the keyword rather than at the first asker.
     Emerge
+  | -- | CR 702.53a: transmute [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Transmute
+  | -- | CR 702.71a: transfigure [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Transfigure
   deriving (Bounded, Enum, Eq, Ord, Show)

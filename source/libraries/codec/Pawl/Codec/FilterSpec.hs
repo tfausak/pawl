@@ -108,6 +108,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.ManaValueLessThanSource
       " {\"type\":\"ManaValueLessThanSource\"} "
+  Spec.it s "ManaValueEqualToSource" $ do
+    Common.assertCodec
+      s
+      codec
+      Filter.ManaValueEqualToSource
+      " {\"type\":\"ManaValueEqualToSource\"} "
+    Spec.assertNeWith s "CR 702.53a's equality is not CR 702.85a's order" (Codec.encode codec Filter.ManaValueEqualToSource) (Codec.encode codec Filter.ManaValueLessThanSource)
   Spec.it s "SharesColorWithSource" $
     Common.assertCodec
       s

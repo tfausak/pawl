@@ -203,5 +203,7 @@ codec =
       Arm.payload "Madness" (Cost.codec codec) Keyword.Madness (\x -> case x of Keyword.Madness y -> Just y; _ -> Nothing),
       Arm.nullary "Rebound" Keyword.Rebound,
       Arm.payload "Scavenge" (Cost.codec codec) Keyword.Scavenge (\x -> case x of Keyword.Scavenge y -> Just y; _ -> Nothing),
+      Arm.payload "Transmute" (Cost.codec codec) Keyword.Transmute (\x -> case x of Keyword.Transmute y -> Just y; _ -> Nothing),
+      Arm.payload "Transfigure" (Cost.codec codec) Keyword.Transfigure (\x -> case x of Keyword.Transfigure y -> Just y; _ -> Nothing),
       Arm.payload "Encore" (Cost.codec codec) Keyword.Encore (\x -> case x of Keyword.Encore y -> Just y; _ -> Nothing)
     ]

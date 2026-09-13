@@ -2498,8 +2498,10 @@ effectContext gs controller source legal bindings =
           -- card its own reveal bound. CR 608.2h's last-known reader is inside
           -- chosenNamesOf, for the source that has already left (Conjurer's Ban).
           Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) gs,
-          -- CR 202.3 off the SOURCE, for the one atom that compares a candidate
-          -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade).
+          -- CR 202.3 off the SOURCE, for the two atoms that compare a candidate
+          -- against it (Filter.ManaValueLessThanSource, CR 702.85a's cascade;
+          -- Filter.ManaValueEqualToSource, CR 702.53a's transmute and CR 702.71a's
+          -- transfigure).
           -- The ONE filler of that field, which is what makes it a
           -- resolution-position atom: it is Nothing everywhere else, and
           -- Pawl.FilterPositionLintSpec is what keeps a card out of those

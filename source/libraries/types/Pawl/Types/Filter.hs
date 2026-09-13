@@ -103,6 +103,13 @@ data Filter keyword
     -- reading one characteristic over -- read off Pawl.Engine.Filter.Context's
     -- sourceManaValue, and vacuously False where either mana value is absent.
     ManaValueLessThanSource
+  | -- | CR 202.3 compared against the SOURCE for EQUALITY rather than order: the
+    -- object's mana value is the same as the mana value of the object the
+    -- evaluation comes from (CR 702.53a's transmute, CR 702.71a's transfigure).
+    -- ManaValueLessThanSource's comparison one operator over -- read off
+    -- Pawl.Engine.Filter.Context's sourceManaValue, and vacuously False where
+    -- either mana value is absent.
+    ManaValueEqualToSource
   | -- | CR 202.3 read for its PARITY rather than against a bound -- Void
     -- Winnower's "spells with even mana values", whose reminder text settles the
     -- boundary case: "(Zero is even.)" CR 202.3e is what makes it interesting off

@@ -563,6 +563,27 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "is False for a player" $
       Spec.assertBool s (not (Filter.matches (sourced 4) aPlayer Filter.Type.ManaValueLessThanSource)) "player"
 
+  -- CR 702.53a's and CR 702.71a's "the same mana value", the atom above's
+  -- comparison at equality and off the same Context field. blackCreature's mana
+  -- value is 3.
+  Spec.describe s "ManaValueEqualToSource" $ do
+    let sourced n = self {Filter.sourceManaValue = Just n}
+    -- The boundary the atom above excludes is the only one this one admits, which
+    -- is the whole difference between the two rules' searches.
+    Spec.it s "holds at equal mana value and nowhere else" $ do
+      Spec.assertBool s (Filter.matches (sourced 3) blackCreature Filter.Type.ManaValueEqualToSource) "3 == 3"
+      Spec.assertBool s (not (Filter.matches (sourced 4) blackCreature Filter.Type.ManaValueEqualToSource)) "3 is not 4"
+      Spec.assertBool s (not (Filter.matches (sourced 2) blackCreature Filter.Type.ManaValueEqualToSource)) "3 is not 2"
+
+    -- ManaValueLessThanSource's two vacuity postures, on the same two sides.
+    Spec.it s "is False when either mana value is absent" $ do
+      let noCost = blackCreature {Filter.manaValue = Nothing}
+      Spec.assertBool s (not (Filter.matches (sourced 3) noCost Filter.Type.ManaValueEqualToSource)) "no candidate mana value"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ManaValueEqualToSource)) "no source mana value"
+
+    Spec.it s "is False for a player" $
+      Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.ManaValueEqualToSource)) "player"
+
   -- CR 702.78a's comparison, the two arms above's shape over a SET: colour is a
   -- set (CR 105.2), so "shares a color" is a non-empty intersection rather than
   -- an ordering. blackCreature is mono-black.
