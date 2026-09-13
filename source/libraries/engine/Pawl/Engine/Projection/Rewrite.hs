@@ -727,6 +727,7 @@ rewriteEffect pairs effect = case effect of
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> effect
   Effect.Evolve _ -> effect
   Effect.Mentor _ -> effect
+  Effect.Exploit -> effect
   Effect.Train _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
@@ -1477,6 +1478,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentTappedForMana payload -> TriggerCondition.PermanentTappedForMana payload {PermanentTappedForMana.filter = Filter.rewrite pairs (PermanentTappedForMana.filter payload)}
   TriggerCondition.AbilityAddsMana payload -> TriggerCondition.AbilityAddsMana payload {AbilityAddsMana.source = Filter.rewrite pairs (AbilityAddsMana.source payload)}
   TriggerCondition.SelfTrains -> condition
+  TriggerCondition.SelfExploits -> condition
   TriggerCondition.SelfBecomesCrewed -> condition
   TriggerCondition.SelfCrewsVehicle -> condition
   TriggerCondition.PermanentSacrificed payload -> TriggerCondition.PermanentSacrificed payload {PermanentSacrificed.filter = Filter.rewrite pairs (PermanentSacrificed.filter payload)}

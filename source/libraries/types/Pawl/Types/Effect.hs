@@ -504,6 +504,15 @@ data Effect card ability
     -- creature, and record that it trained. Evolve's shape, over
     -- Binding.triggerSource rather than a chosen target.
     Train SlotName.SlotName
+  | -- | CR 702.110a's sacrifice and CR 702.110b's marker together: this effect's
+    -- controller sacrifices a creature they control, chosen as the effect is
+    -- applied (CR 608.2d), and that records the source as having exploited it.
+    -- Mentor's shape, one opcode because rule 702.110b's marker names the creature
+    -- the sacrifice picked and nothing else can say which that was.
+    --
+    -- NULLARY where the siblings take a slot: rule 702.110a states no parameter,
+    -- and the creature is chosen rather than targeted, so there is no slot to name.
+    Exploit
   | -- | CR 731.1: "it becomes day" / "it becomes night" -- the game gains that
     -- designation, which CR 702.145c and CR 702.145f make daybound and
     -- nightbound permanents transform for.

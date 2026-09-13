@@ -946,6 +946,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Evolve
       " {\"type\":\"Evolve\"} "
+  -- CR 702.110a's exploit is nullary: the rule states no parameter, the
+  -- sacrificed creature being chosen as the ability resolves.
+  Spec.it s "Exploit" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Exploit
+      " {\"type\":\"Exploit\"} "
   -- CR 702.105a's dethrone is nullary as well, CR 702.105b making the COUNT
   -- multiple rather than the value.
   Spec.it s "Dethrone" $

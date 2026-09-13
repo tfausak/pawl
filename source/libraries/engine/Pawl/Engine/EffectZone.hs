@@ -242,6 +242,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
+  Effect.Exploit -> Nothing
   Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing

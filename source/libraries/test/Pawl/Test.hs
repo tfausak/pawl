@@ -205,6 +205,7 @@ import qualified Pawl.Codec.ExileLookerSpec
 import qualified Pawl.Codec.ExilePlayPermissionSpec
 import qualified Pawl.Codec.ExpansionSpec
 import qualified Pawl.Codec.ExpirySpec
+import qualified Pawl.Codec.ExploitedSpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.ExtraTurnSpec
 import qualified Pawl.Codec.FaceDownCharacteristicsSpec
@@ -912,6 +913,7 @@ spec s registry = do
   Pawl.Codec.ManaUnitSpec.spec s
   Pawl.Codec.MeldSourceSpec.spec s
   Pawl.Codec.MeldSpec.spec s
+  Pawl.Codec.ExploitedSpec.spec s
   Pawl.Codec.MentoredSpec.spec s
   Pawl.Codec.MergeComponentSpec.spec s
   Pawl.Codec.MillSpec.spec s

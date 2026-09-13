@@ -459,6 +459,8 @@ library codec
     Pawl.Codec.ExpansionSpec
     Pawl.Codec.Expiry
     Pawl.Codec.ExpirySpec
+    Pawl.Codec.Exploited
+    Pawl.Codec.ExploitedSpec
     Pawl.Codec.ExtraPhase
     Pawl.Codec.ExtraPhaseSpec
     Pawl.Codec.ExtraTurn
@@ -1711,6 +1713,7 @@ library types
     Pawl.Types.ExilePlayPermission
     Pawl.Types.Expansion
     Pawl.Types.Expiry
+    Pawl.Types.Exploited
     Pawl.Types.ExtraPhase
     Pawl.Types.ExtraTurn
     Pawl.Types.Face

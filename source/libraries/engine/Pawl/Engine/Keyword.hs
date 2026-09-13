@@ -264,6 +264,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.ForMirrodin -> List.genericReplicate count (attachToOwnToken rebelToken)
   Keyword.JobSelect -> List.genericReplicate count (attachToOwnToken heroToken)
   Keyword.Evolve -> List.genericReplicate count evolve
+  -- Rule 702.110 prints no "each instance" clause, so CR 603.2's general reason
+  -- gives one ability per instance: two copies of exploit offer two sacrifices.
+  Keyword.Exploit -> List.genericReplicate count exploit
   -- CR 702.172a and 702.183a mint nothing: both are static abilities of a
   -- spell on the stack, read at CR 601.2b by Pawl.Engine.Cast.
   Keyword.Spree -> []
@@ -534,6 +537,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Exploit -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -911,6 +915,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Exploit -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -1492,6 +1497,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Exploit -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp cost -> List.genericReplicate count (levelUp cost)
@@ -2031,6 +2037,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Exploit -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -3380,6 +3387,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Exploit -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -3663,6 +3671,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Exploit -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -3923,6 +3932,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Exploit -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -4141,6 +4151,7 @@ familyOf keyword = case keyword of
   Keyword.Provoke -> Nothing
   Keyword.BattleCry -> Nothing
   Keyword.Evolve -> Nothing
+  Keyword.Exploit -> Nothing
   Keyword.Dethrone -> Nothing
   Keyword.Fuse -> Nothing
   Keyword.LevelUp _ -> Just KeywordFamily.LevelUp
@@ -5441,6 +5452,32 @@ fabricate n =
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
               Create.creator = PlayerRef.Relative PlayerRelation.You
             }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.110a in one clause: "When this creature enters, you may sacrifice a
+-- creature." The "may" is CR 603.5's printed one, so it rides
+-- Optionality.Optional on the clause rather than a PayGate -- nothing in rule
+-- 702.110 is conditional on the sacrifice, which is what CR 118.12's branches
+-- exist to express. Rule 702.110b's marker is the effect's other half; see
+-- Pawl.Engine.Resolve.Effect's Effect.Exploit arm for why the two are one opcode.
+exploit :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+exploit =
+  let clause =
+        Clause.MkClause
+          Nothing
+          Nothing
+          Nothing
+          (Optionality.Optional (PlayerRef.Relative PlayerRelation.You))
+          Nothing
+          (Seq.singleton Effect.Exploit)
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =

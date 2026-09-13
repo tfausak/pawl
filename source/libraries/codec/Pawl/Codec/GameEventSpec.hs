@@ -40,6 +40,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
@@ -353,6 +354,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Mentored (Mentored.MkMentored (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7)))
       " {\"type\":\"Mentored\",\"value\":{\"mentor\":6,\"mentored\":7}} "
+  -- CR 702.110b: the exploiter and the creature it exploited, Mentored's two ids
+  -- for its reason -- the second is chosen as rule 702.110a's ability resolves.
+  Spec.it s "Exploited" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Exploited (Exploited.MkExploited (ObjectId.MkObjectId 8) (ObjectId.MkObjectId 9)))
+      " {\"type\":\"Exploited\",\"value\":{\"exploiter\":8,\"exploited\":9}} "
   -- CR 702.149c: the creature that trained, and nothing else -- rule 702.149a puts
   -- its counter on that same creature, so there is no second id.
   Spec.it s "Trained" $

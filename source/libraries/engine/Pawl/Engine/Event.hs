@@ -534,6 +534,7 @@ damageOf event = case event of
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
+  GameEvent.Exploited {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Crewed _ -> Nothing
@@ -599,6 +600,7 @@ revealOf event = case event of
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
+  GameEvent.Exploited {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Crewed _ -> Nothing
@@ -7038,6 +7040,7 @@ reactsToAbilityTriggering cond = case cond of
   -- Rule 702.149c watches a training ability RESOLVING, which is the same
   -- first-pass event the arm above argues rule 702.134c's is.
   TriggerCondition.SelfTrains -> False
+  TriggerCondition.SelfExploits -> False
   -- Rule 702.122e names a crew ability RESOLVING, the same first-pass event.
   TriggerCondition.SelfBecomesCrewed -> False
   -- Rule 702.122b's crewer side rides the same event, so the same answer.
@@ -7184,6 +7187,7 @@ controllerTurnScoped cond = case cond of
   -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.
   TriggerCondition.SelfTrains -> False
+  TriggerCondition.SelfExploits -> False
   -- Rule 702.122e names no turn either: a Vehicle may be crewed at instant speed
   -- on any player's turn, CR 702.122a's cost carrying no timing clause.
   TriggerCondition.SelfBecomesCrewed -> False

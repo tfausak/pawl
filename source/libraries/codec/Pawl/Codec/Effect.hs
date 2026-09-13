@@ -207,6 +207,7 @@ codec cardCodec abilityCodec =
           Arm.payload "SetHalfLocked" SetHalfLocked.codec Effect.SetHalfLocked (\x -> case x of Effect.SetHalfLocked y -> Just y; _ -> Nothing),
           Arm.payload "Evolve" SlotName.codec Effect.Evolve (\x -> case x of Effect.Evolve y -> Just y; _ -> Nothing),
           Arm.payload "Mentor" SlotName.codec Effect.Mentor (\x -> case x of Effect.Mentor y -> Just y; _ -> Nothing),
+          Arm.nullary "Exploit" Effect.Exploit,
           Arm.payload "Train" SlotName.codec Effect.Train (\x -> case x of Effect.Train y -> Just y; _ -> Nothing),
           Arm.payload "ItBecomes" Daytime.codec Effect.ItBecomes (\x -> case x of Effect.ItBecomes y -> Just y; _ -> Nothing),
           Arm.payload "ExileUntilMonarch" SlotName.codec Effect.ExileUntilMonarch (\x -> case x of Effect.ExileUntilMonarch y -> Just y; _ -> Nothing),

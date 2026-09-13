@@ -155,6 +155,7 @@ import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExileLooker as ExileLooker
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
@@ -2306,6 +2307,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     Just target -> null (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
   Effect.Evolve {} -> False
   Effect.Mentor {} -> False
+  Effect.Exploit -> False
   Effect.Train {} -> False
   Effect.ItBecomes {} -> False
   Effect.ExileUntilMonarch {} -> False
@@ -6058,6 +6060,42 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
           Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.Trained target)))
       _ -> pure ()
+  -- CR 702.110a's sacrifice and CR 702.110b's marker. The creature is CHOSEN as
+  -- the effect is applied (CR 608.2d) rather than targeted (CR 115.1), so the
+  -- candidates are swept live off the battlefield and the ask follows
+  -- Pawl.Types.Prompt.ChoosePermanent's posture: skipped at none, where CR 101.3
+  -- ignores the instruction, and at one, where CR 608.2d leaves one legal
+  -- announcement; asked at two or more. FILTERED, not trusted (#222).
+  --
+  -- Rule 702.110a's own "you may" is NOT asked here -- it is the clause's
+  -- Optionality.Optional, which Pawl.Engine.Resolve has already answered by the
+  -- time this runs.
+  --
+  -- The marker is recorded on the sacrifice and names the pair rule 702.110b
+  -- does. Unconditional given a victim, Mentor's posture: a sacrifice is not a
+  -- destruction and CR 701.21a can refuse this one only for a permanent this
+  -- controller does not control, which the sweep's Filter.ControlledBy has just
+  -- excluded.
+  Effect.Exploit -> do
+    gs <- State.get
+    let candidates =
+          battlefieldMatching
+            legal
+            resolving
+            controller
+            source
+            gs
+            (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You])
+    victims <- case candidates of
+      [] -> pure []
+      [only] -> pure [only]
+      first : second : more -> do
+        let offered = first NonEmpty.:| (second : more)
+        answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
+        pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+    Monad.forM_ victims $ \victim -> do
+      Event.sacrifice controller victim
+      State.modify' (Event.recordEvent (GameEvent.Exploited (Exploited.MkExploited source victim)))
   -- CR 731.1: the GAME gains the designation; what that entails is
   -- Pawl.Engine.Daytime's. Nobody is named and nothing is prompted.
   Effect.ItBecomes designation -> do

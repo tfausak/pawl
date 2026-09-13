@@ -76,6 +76,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
@@ -2369,6 +2370,10 @@ representativeEvents cond =
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
         TriggerCondition.SelfTrains -> one (GameEvent.Trained departed)
+        -- CR 702.110b's own event, and the only one this condition admits, on
+        -- `departed` for SelfTrains' reason above. BOTH ids are `departed`, so the
+        -- exploiter side matches whichever way the arm reads the pair.
+        TriggerCondition.SelfExploits -> one (GameEvent.Exploited (Exploited.MkExploited departed departed))
         -- CR 702.122e's own event, and the only one this condition admits, on
         -- `departed` for SelfTrains' reason above.
         TriggerCondition.SelfBecomesCrewed -> one (GameEvent.BecameCrewed (Crewing.MkCrewing departed (Set.singleton departed)))
@@ -2645,6 +2650,7 @@ everyTriggerCondition =
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.Opponent (Filter.Type.And []) ManaSpecification.AnyMana),
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.AnyMana),
     TriggerCondition.SelfTrains,
+    TriggerCondition.SelfExploits,
     TriggerCondition.SelfBecomesCrewed,
     TriggerCondition.SelfCrewsVehicle,
     -- ALL THREE relations, on the PlayerAttacksWith rows' reasoning above: an
