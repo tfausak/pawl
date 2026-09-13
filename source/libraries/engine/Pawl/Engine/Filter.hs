@@ -632,7 +632,8 @@ data View = MkView
     -- ability it is -- read off Object.manaSpent, and empty where there is no
     -- object to read it off, both for the reasons `designations` above gives. Its
     -- one reader is Pawl.Engine.Quantity's TagWasSpent arm, answering Berg
-    -- Strider's and Forsworn Paladin's clause conditions.
+    -- Strider's and Forsworn Paladin's clause conditions. `manaSpentAmount`
+    -- below is the same record's other question.
     --
     -- The TAGS and not the units: Pawl.Types.ProductionTag is the closed half of
     -- what a unit carries (see its header), so this field is a classification the
@@ -643,6 +644,12 @@ data View = MkView
     -- Non-empty for a permanent a spell paid with tagged mana became, which is CR
     -- 400.7d's exception to the forgetting (see Pawl.Types.Object.manaSpent).
     manaSpentTags :: Set.Set ProductionTag.ProductionTag,
+    -- | CR 202.1a: how many mana were spent to pay for this candidate -- the
+    -- COUNT of the units `manaSpentTags` above classifies, read off the same
+    -- Object.manaSpent and 0 where there is no object to read it off. Its one
+    -- reader is Pawl.Engine.Quantity's ManaSpent arm, answering rule 702.191a's
+    -- "the amount of mana spent to cast that spell".
+    manaSpentAmount :: Natural.Natural,
     -- CR 602.1 / 605.1a: does the candidate have an activated ability that isn't
     -- a mana ability? A Bool and not the ability list, because that is the whole
     -- of what Filter.HasNonManaActivatedAbility asks and this module holds no
@@ -863,6 +870,9 @@ playerView pid =
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
       manaSpentTags = Set.empty,
+      -- A player is no object to have been paid for -- `manaSpentTags` above,
+      -- same sentence.
+      manaSpentAmount = 0,
       -- CR 602.1: an activated ability is an ability OF AN OBJECT, and CR 109.1's
       -- list of what an object is has no player in it -- `keywords` above, one
       -- rule over.
@@ -2299,6 +2309,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Eternalize cost -> Keyword.Type.Eternalize (rewriteCost pairs cost)
   Keyword.Type.Outlast cost -> Keyword.Type.Outlast (rewriteCost pairs cost)
   Keyword.Type.Prowess -> keyword
+  Keyword.Type.Extort -> keyword
+  Keyword.Type.Increment -> keyword
   Keyword.Type.Menace -> keyword
   -- CR 702.73a names no word either: "every creature type" is CR 205.3m's
   -- whole family, so a CR 612.2 swap inside it has nothing to rewrite.

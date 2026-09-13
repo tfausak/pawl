@@ -369,6 +369,10 @@ data Keyword
     -- power and/or toughness is greater than this creature's, put a +1/+1 counter
     -- on this creature; each instance triggers separately (CR 702.100d).
     Evolve
+  | -- | 702.101a: whenever you cast a spell, you may pay {W\/B}; if you do, each
+    -- opponent loses 1 life and you gain that much life. Each instance triggers
+    -- separately (CR 702.101b).
+    Extort
   | -- | 702.102a: a player casting this split card from their hand may cast both
     -- halves as one fused split spell (CR 702.102b-d).
     Fuse
@@ -703,6 +707,11 @@ data Keyword
     -- sneak cost was paid tapped and attacking whatever the returned creature was
     -- attacking (#3689).
     Sneak (Cost.Cost Keyword)
+  | -- | 702.191a: whenever you cast a spell, if this permanent is a creature and
+    -- the amount of mana spent to cast that spell is greater than this creature's
+    -- power or its toughness, put a +1\/+1 counter on it. Each instance triggers
+    -- separately (CR 702.191b).
+    Increment
   | -- | 702.195a: Ascend's shape at a different count and a different mark -- a
     -- static ability whose whole content is "any time you control three or more
     -- permanents that are artifacts, Sagas, and\/or legendary and you don't have

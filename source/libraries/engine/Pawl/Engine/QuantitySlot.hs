@@ -150,6 +150,7 @@ overSlots f quantity =
         Quantity.TimesPaid _ -> pure quantity
         Quantity.CastUsing _ -> pure quantity
         Quantity.TagWasSpent {} -> pure quantity
+        Quantity.ManaSpent -> pure quantity
         Quantity.WasToken -> pure quantity
         Quantity.WasAttacking -> pure quantity
         Quantity.WasBlocking -> pure quantity
@@ -302,6 +303,7 @@ nestedRefs quantity = case quantity of
   Quantity.TimesPaid _ -> Set.empty
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
+  Quantity.ManaSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasAttacking -> Set.empty
   Quantity.WasBlocking -> Set.empty
@@ -388,6 +390,7 @@ nestedCounts quantity = case quantity of
   Quantity.TimesPaid {} -> []
   Quantity.CastUsing {} -> []
   Quantity.TagWasSpent {} -> []
+  Quantity.ManaSpent -> []
   Quantity.WasToken -> []
   Quantity.WasAttacking -> []
   Quantity.WasBlocking -> []
@@ -573,6 +576,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.TimesPaid _ -> quantity
         Quantity.CastUsing _ -> quantity
         Quantity.TagWasSpent {} -> quantity
+        Quantity.ManaSpent -> quantity
         Quantity.WasToken -> quantity
         Quantity.WasAttacking -> quantity
         Quantity.WasBlocking -> quantity

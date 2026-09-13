@@ -585,7 +585,7 @@ battleCrySpec s registry =
 -- Boil, {3}{R} Instant "Destroy all Islands", is the noncreature spell, for
 -- youngPyromancerSpec's reasons: it targets nothing, so no answerer choice
 -- enters the fixture, and nobody here controls an Island, so its resolution
--- moves nothing an assertion reads. Goblin Piker, {2}{R}, is the creature spell.
+-- moves nothing an assertion reads. Goblin Piker, {1}{R}, is the creature spell.
 --
 -- The printed sentence narrows two things at once -- who cast it and what it was
 -- -- so each case below moves exactly one, and the negatives carry the positive
@@ -2428,6 +2428,124 @@ exploitSpec s registry =
           Spec.assertEqWith s "and alice gained nothing" (S.lifeOf S.alice after) (Just 20)
           Spec.assertBool s (S.onBattlefield giantId after) "CR 702.110a the Hill Giant stayed on the battlefield"
 
+-- CR 702.101a: "Extort is a triggered ability. 'Extort' means 'Whenever you cast
+-- a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you gain
+-- life equal to the total life lost this way.'"
+--
+-- Syndic of Tithes, {1}{W} Creature -- Human Cleric 2/2, whose whole text is
+-- extort, so nothing else on the card can move a life total.
+--
+-- THREE SEATS, which rule 702.101a's "each opponent" needs: at two players "each
+-- opponent loses 1" and "you gain 1" are the same number, and the gain could be
+-- a literal 1 rather than the total. Three makes the gain 2 where the loss is 1.
+--
+-- Luminesce, {W} Instant, is the spell cast: it targets nothing, prevents damage
+-- from colours nobody here is dealing, and above all touches no life total, so
+-- every life figure below is extort's.
+extortSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+extortSpec s registry =
+  let board = do
+        plains <- S.printingOf s registry "Plains"
+        syndic <- S.printingOf s registry "Syndic of Tithes"
+        luminesce <- S.printingOf s registry "Luminesce"
+        -- Three Plains: one for Luminesce and one for rule 702.101a's {W/B},
+        -- with a third spare so declining is never "could not pay".
+        let withLands = S.landsFor plains S.alice 3 S.threePlayerGame
+            (_, withSyndic) = S.addPermanent syndic S.alice withLands
+            (spellId, staged) = S.addHandCard luminesce S.alice withSyndic
+        pure
+          ( spellId,
+            staged
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice,
+                GameState.remaining = S.phasesAfter Phase.PrecombatMain
+              }
+          )
+      castAndResolve :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      castAndResolve answer oid gs = S.runPure answer (S.runPure answer gs (S.cast S.alice oid)) Engine.priorityLoop
+   in Spec.describe s "Extort" $ do
+        -- THE case: paying drains BOTH opponents a life each and gains alice the
+        -- two they lost between them, which is what "the total life lost this
+        -- way" says and what a literal 1 could not produce.
+        Spec.it s "CR 702.101a whole card: paying {W/B} drains each opponent and gains that much" $ do
+          (spellId, gs) <- board
+          let after = castAndResolve (paysFor S.alice) spellId gs
+          Spec.assertEqWith s "CR 702.101a alice gained the total the two of them lost" (S.lifeOf S.alice after) (Just 22)
+          Spec.assertEqWith s "bob lost 1" (S.lifeOf S.bob after) (Just 19)
+          Spec.assertEqWith s "and carol lost 1" (S.lifeOf S.carol after) (Just 19)
+        -- The same board differing in NOTHING but the answer to rule 702.101a's
+        -- "may", with the mana still up, so this separates declining from being
+        -- unable to pay.
+        Spec.it s "CR 702.101a declining the payment moves no life" $ do
+          (spellId, gs) <- board
+          let after = castAndResolve S.identityAnswer spellId gs
+          Spec.assertEqWith s "nobody's life moved" (fmap (\pid -> S.lifeOf pid after) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
+          Spec.assertEqWith s "though Luminesce really resolved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+          Spec.assertEqWith s "and no Plains was spent on the offer" (S.tappedCount S.alice after) 1
+        -- CR 702.101b: "If a permanent has multiple instances of extort, each
+        -- triggers separately." Asked of the mint, as prowess' 702.108b is: no
+        -- card here prints extort twice and nothing grants it.
+        Spec.it s "CR 702.101b each instance of extort is its own ability" $ do
+          Spec.assertEqWith s "extort held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Extort 2)) [Keyword.extort, Keyword.extort]
+          Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Extort 1)) [Keyword.extort]
+
+-- CR 702.191a: "Increment is a triggered ability. 'Increment' means 'Whenever you
+-- cast a spell, if this permanent is a creature and the amount of mana spent to
+-- cast that spell is greater than this creature's power or this creature's
+-- toughness, put a +1/+1 counter on this creature.'"
+--
+-- Hungry Graffalon, {3}{G} Creature -- Giraffe 3/4 with reach and increment. The
+-- 3/4 body is what makes the two spells below discriminating: FOUR mana clears
+-- the power and THREE clears neither, so a comparison that read ">=" rather than
+-- rule 702.191a's ">" fires on both.
+--
+-- Boil, {3}{R} Instant, is the four-mana spell and Trumpet Blast, {2}{R}, the
+-- three-mana one. Neither moves anything an assertion here reads: nobody here
+-- controls an Island and nobody is attacking.
+incrementSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+incrementSpec s registry =
+  let board spell = do
+        mountain <- S.printingOf s registry "Mountain"
+        graffalon <- S.printingOf s registry "Hungry Graffalon"
+        printing <- S.printingOf s registry spell
+        let withLands = S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers)
+            (giraffeId, withGiraffe) = S.addPermanent graffalon S.alice withLands
+            (spellId, staged) = S.addHandCard printing S.alice withGiraffe
+        pure
+          ( giraffeId,
+            spellId,
+            staged
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice,
+                GameState.remaining = S.phasesAfter Phase.PrecombatMain
+              }
+          )
+      castAndResolve oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice oid)) Engine.priorityLoop
+      sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
+   in Spec.describe s "Increment" $ do
+        -- THE case: four mana beats the 3 power, so the counter goes on and the
+        -- projection reads 4/5.
+        Spec.it s "CR 702.191a whole card: a four-mana spell grows Hungry Graffalon" $ do
+          (giraffeId, spellId, gs) <- board "Boil"
+          let after = castAndResolve spellId gs
+          Spec.assertEqWith s "CR 702.191a the +1/+1 counter made it 4/5" (sizeOf giraffeId after) (Just 4, Just 5)
+          Spec.assertEqWith s "3/4 before the cast" (sizeOf giraffeId gs) (Just 3, Just 4)
+        -- The strict inequality on its own: three mana equals neither 3 nor 4 and
+        -- exceeds neither, so nothing happens. Without this leg an AtLeast over
+        -- the bare power and rule 702.191a's "greater than" are the same test.
+        Spec.it s "CR 702.191a three mana is not GREATER than the 3 power" $ do
+          (giraffeId, spellId, gs) <- board "Trumpet Blast"
+          let after = castAndResolve spellId gs
+          Spec.assertEqWith s "CR 702.191a Hungry Graffalon is still 3/4" (sizeOf giraffeId after) (Just 3, Just 4)
+          Spec.assertEqWith s "though Trumpet Blast really resolved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+        -- CR 702.191b: "If a creature has multiple instances of increment, each
+        -- one triggers separately." Asked of the mint, as rule 702.101b's is.
+        Spec.it s "CR 702.191b each instance of increment is its own ability" $ do
+          Spec.assertEqWith s "increment held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Increment 2)) [Keyword.increment, Keyword.increment]
+          Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Increment 1)) [Keyword.increment]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cascadeSpec s registry
@@ -2441,6 +2559,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   annihilatorSpec s registry
   battleCrySpec s registry
   prowessSpec s registry
+  extortSpec s registry
+  incrementSpec s registry
   selfBlocksSpec s registry
   selfBlocksAtLeastSpec s registry
   selfBlocksOneOrMoreSpec s registry

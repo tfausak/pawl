@@ -638,7 +638,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.LoseLife (LifeLoss.MkLifeLoss (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2) LifeLossCause.ByEffect))
+      (Effect.LoseLife (LifeLoss.MkLifeLoss (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2) LifeLossCause.ByEffect Nothing))
       " {\"type\":\"LoseLife\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":2}}} "
   Spec.it s "GainLife" $
     Common.assertJsonCodec

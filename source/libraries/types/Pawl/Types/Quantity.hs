@@ -126,6 +126,14 @@ data Quantity
     -- spell's colors was spent to cast it" does ask that, which is a conjunction
     -- over one unit rather than a tag this atom could name (#2008).
     TagWasSpent ProductionTag.ProductionTag
+  | -- | CR 202.1a \/ 702.191a: how many mana were spent to pay for the object this
+    -- quantity is evaluated against -- rule 702.191a's "the amount of mana spent
+    -- to cast that spell".
+    --
+    -- The COUNT of units where TagWasSpent above asks after one unit's
+    -- classification; both read Pawl.Types.Object.manaSpent through
+    -- Pawl.Engine.Filter's view.
+    ManaSpent
   | -- | CR 111.6 / 608.2h: 1 if the object this quantity is evaluated against
     -- was a token, else 0.
     WasToken

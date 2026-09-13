@@ -56,6 +56,7 @@ substituteStar star quantity = case quantity of
   Quantity.TimesPaid _ -> quantity
   Quantity.CastUsing _ -> quantity
   Quantity.TagWasSpent {} -> quantity
+  Quantity.ManaSpent -> quantity
   Quantity.WasToken -> quantity
   Quantity.WasAttacking -> quantity
   Quantity.WasBlocking -> quantity

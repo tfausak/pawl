@@ -82,6 +82,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.InZone as InZone
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
@@ -115,6 +116,7 @@ import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
@@ -277,6 +279,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> List.genericReplicate count prowess
+  -- CR 702.101b and CR 702.191b: each instance triggers separately.
+  Keyword.Extort -> List.genericReplicate count extort
+  Keyword.Increment -> List.genericReplicate count increment
   Keyword.Flanking -> List.genericReplicate count flanking
   Keyword.Exalted -> List.genericReplicate count exalted
   Keyword.Unearth _ -> []
@@ -543,6 +548,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
+  Keyword.Extort -> []
+  Keyword.Increment -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
@@ -921,6 +928,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
+  Keyword.Extort -> []
+  Keyword.Increment -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
@@ -1503,6 +1512,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.LevelUp cost -> List.genericReplicate count (levelUp cost)
   Keyword.Outlast cost -> List.genericReplicate count (outlast cost)
   Keyword.Prowess -> []
+  Keyword.Extort -> []
+  Keyword.Increment -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
@@ -2043,6 +2054,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
+  Keyword.Extort -> []
+  Keyword.Increment -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
@@ -3393,6 +3406,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
+  Keyword.Extort -> []
+  Keyword.Increment -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   -- CR 702.82a's whole content: the SacrificeAnyNumber row a CARD writes
@@ -3677,6 +3692,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
+  Keyword.Extort -> []
+  Keyword.Increment -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
@@ -3938,6 +3955,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
+  Keyword.Extort -> []
+  Keyword.Increment -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
@@ -4157,6 +4176,8 @@ familyOf keyword = case keyword of
   Keyword.LevelUp _ -> Just KeywordFamily.LevelUp
   Keyword.Outlast _ -> Just KeywordFamily.Outlast
   Keyword.Prowess -> Nothing
+  Keyword.Extort -> Nothing
+  Keyword.Increment -> Nothing
   Keyword.Menace -> Nothing
   Keyword.Renown _ -> Just KeywordFamily.Renown
   Keyword.Changeling -> Nothing
@@ -4584,6 +4605,111 @@ prowess =
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
+-- CR 702.101a: whenever you cast a spell, you may pay {W/B}; if you do, each
+-- opponent loses 1 life and you gain that much life.
+--
+-- Prowess' SpellCast condition with no type filter -- rule 702.101a says "a
+-- spell", so a creature spell fires it too -- and ward's PayGate the other way
+-- round: PayBranch.IfPaid is rule 702.101a's "if you do", and the "may" IS the
+-- gate's offer (CR 118.12), which is why the clause is Optionality.Mandatory.
+--
+-- ONE CLAUSE for two instructions, which is CR 608.2d's single announcement: the
+-- loss and the gain hang off the one payment. The gain reads the loss's own
+-- tally rather than a count of opponents, because rule 702.101a says "the total
+-- life lost this way" and CR 614.1 may leave a seat losing nothing --
+-- Pawl.KeywordTriggerSpec's "CR 702.101a alice gained the total the two of them
+-- lost" is what proves it.
+extort :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+extort =
+  let drained = SlotName.MkSlotName (Text.pack "extorted")
+      gate =
+        PayGate.MkPayGate
+          { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+            PayGate.cost = extortCost,
+            PayGate.branch = PayBranch.IfPaid,
+            PayGate.obligation = PayObligation.Optional,
+            PayGate.perEach = Nothing,
+            PayGate.offeredAt = Nothing
+          }
+      loss = Effect.LoseLife (LifeLoss.MkLifeLoss (PlayerRef.Relative PlayerRelation.Opponent) (Quantity.Literal 1) LifeLossCause.ByEffect (Just drained))
+      gain = Effect.GainLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot drained))
+      clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just gate) (Seq.fromList [loss, gain])
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition =
+            TriggerCondition.SpellCast
+              SpellCast.MkSpellCast
+                { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
+                  SpellCast.scope = TurnScope.EachTurn,
+                  SpellCast.zone = Nothing,
+                  SpellCast.ordinal = Nothing
+                },
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.101a's {W/B}, fixed by the rule rather than printed on the card, which
+-- is why extort carries no cost payload where rule 702.21a's ward does.
+extortCost :: Cost Keyword
+extortCost =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.White) (ManaType.Colored Color.Black))]),
+      Cost.components = []
+    }
+
+-- CR 702.191a: whenever you cast a spell, if this permanent is a creature and the
+-- amount of mana spent to cast that spell is greater than this creature's power
+-- or its toughness, put a +1/+1 counter on it.
+--
+-- Extort's condition and dethrone's payload, joined by CR 603.4's intervening
+-- "if" -- checked as the trigger would go on the stack AND again as it resolves,
+-- which is what the rule's "is a creature" needs: a permanent that stops being
+-- one in response does nothing.
+--
+-- THE AMOUNT is read off the CAST SPELL through Binding.castSpell, which is why
+-- it is an AgainstSlot: Quantity.ManaSpent aimed at no slot would read the
+-- bearer's own payment. Comparison.AtLeast over (power + 1) is evolve's spelling
+-- of a strict ">" (Pawl.Types.Comparison).
+increment :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+increment =
+  let grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
+      spentExceeds quantity =
+        Condition.Compares
+          ( Compares.MkCompares
+              (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.castSpell Quantity.ManaSpent))
+              Comparison.AtLeast
+              (Quantity.Plus (Plus.MkPlus quantity (Quantity.Literal 1)))
+          )
+      -- "If this permanent is a creature", echo's spelling of a question about the
+      -- bearer: a count of one over the battlefield, which answers 0 for a
+      -- permanent that has left or stopped being a creature.
+      isCreature =
+        Condition.Compares
+          ( Compares.MkCompares
+              (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) (Filter.And [Filter.IsSource, Filter.HasCardType CardType.Creature]) Aggregation.Members))
+              Comparison.AtLeast
+              (Quantity.Literal 1)
+          )
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition =
+            TriggerCondition.SpellCast
+              SpellCast.MkSpellCast
+                { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
+                  SpellCast.scope = TurnScope.EachTurn,
+                  SpellCast.zone = Nothing,
+                  SpellCast.ordinal = Nothing
+                },
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Just (Condition.All [isCreature, Condition.Any [spentExceeds Quantity.Power, spentExceeds Quantity.Toughness]]),
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
 -- CR 702.121a, on battle cry's SelfAttacks condition with prowess' payload.
 -- Attacking a PLANESWALKER fires it just the same -- CR 508.1a chooses the
 -- attackers and CR 508.1b only then says what each attacks -- so what the
@@ -4801,6 +4927,7 @@ afflict n =
               (PlayerRef.InSlot Binding.triggerPlayer)
               (Quantity.Literal (toInteger n))
               LifeLossCause.ByEffect
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,

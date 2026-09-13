@@ -616,7 +616,7 @@ playerRefPositions =
         ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
         ("surveil", Effect.Surveil (playerQuantity "su"), [plantedPlayer "su"]),
         ("fateseal", Effect.Fateseal (playerQuantity "fs"), [plantedPlayer "fs"]),
-        ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect), [plantedPlayer "ll"]),
+        ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect Nothing), [plantedPlayer "ll"]),
         ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
         ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
         ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
@@ -1085,7 +1085,7 @@ ownCounts effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> quantityCounts quantity
     Discard.These {} -> []
-  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> quantityCounts quantity
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -1879,7 +1879,7 @@ effectReplacements effect = case effect of
   Effect.Explore {} -> []
   Effect.Connive {} -> []
   Effect.Discard {} -> []
-  Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause) -> []
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause _) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
@@ -2287,7 +2287,7 @@ effectMintedFaces effect = case effect of
   Effect.Explore {} -> []
   Effect.Connive {} -> []
   Effect.Discard {} -> []
-  Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause) -> []
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause _) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
@@ -2835,10 +2835,12 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Embalm cost -> costFilters cost
   Keyword.Eternalize cost -> costFilters cost
   Keyword.Outlast cost -> costFilters cost
-  -- CR 702.108a names no quality either: the "+1/+1" and the noncreature-spell
-  -- condition are written into the ability Pawl.Engine.Keyword mints, not into
-  -- the keyword.
+  -- CR 702.108a, CR 702.101a and CR 702.191a name no quality either: the payload
+  -- and the spell condition are written into the ability Pawl.Engine.Keyword
+  -- mints, not into the keyword.
   Keyword.Prowess -> []
+  Keyword.Extort -> []
+  Keyword.Increment -> []
   Keyword.Infect -> []
   -- CR 702.80a names no quality either: what it changes is where damage goes.
   Keyword.Wither -> []
@@ -3239,6 +3241,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.TimesPaid {} -> []
   Quantity.Type.CastUsing {} -> []
   Quantity.Type.TagWasSpent {} -> []
+  Quantity.Type.ManaSpent -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasAttacking -> []
   Quantity.Type.WasBlocking -> []
@@ -4850,7 +4853,7 @@ effectFilters effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> frame Unframed (quantityFilters quantity)
     Discard.These ref -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> frame Unframed (quantityFilters quantity)
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> frame Unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)

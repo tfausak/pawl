@@ -173,6 +173,7 @@ ability =
                               (PlayerRef.Relative PlayerRelation.You)
                               (Quantity.InSlot milledSlot)
                               LifeLossCause.ByRadiation
+                              Nothing
                           ),
                         -- "and removes one rad counter from themselves",
                         -- likewise once per card.

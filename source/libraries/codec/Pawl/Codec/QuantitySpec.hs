@@ -299,6 +299,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.TagWasSpent ProductionTag.Treasure)
       " {\"type\":\"TagWasSpent\",\"value\":{\"type\":\"Treasure\"}} "
+  -- CR 202.1a's amount, nothing on the wire for WasKicked's reason.
+  Spec.it s "ManaSpent" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.ManaSpent
+      " {\"type\":\"ManaSpent\"} "
   -- CR 111.6 and CR 509.1g, with nothing on the wire for WasKicked's reason: the
   -- object is whichever one the quantity is evaluated against.
   Spec.it s "WasToken" $

@@ -4548,7 +4548,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- for.
     Monad.forM_ mDiscarded $ \bound ->
       Monad.unless (null moved) (State.modify' (bindObjectsSlot resolving bound (Seq.fromList moved)))
-  Effect.LoseLife (LifeLoss.MkLifeLoss ref quantity cause) -> do
+  Effect.LoseLife (LifeLoss.MkLifeLoss ref quantity cause mTally) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -4568,7 +4568,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- only a life GAIN has a CR 603.2c batch condition watching it
     -- (Pawl.Types.TriggerCondition.PlayersGainLife), so dropping this bracket
     -- leaves the suite green. It is here because the rule says so.
-    Event.simultaneously . Monad.forM_ losers $ \pid ->
+    lost <- Event.simultaneously . fmap sum . Monad.forM losers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
           | n > 0 -> do
@@ -4588,7 +4588,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- Stronghold Discipline's 3.
               settled <- Event.resolveLifeLoss cause pid (Integer.toNaturalSaturating n)
               Event.changeLife pid (negate (toInteger settled))
-        _ -> pure ()
+              pure settled
+        _ -> pure 0
+    -- Rule 702.101a's "the total life lost this way", written where a later
+    -- effect of this resolution reads it as Quantity.InSlot. The SETTLED total,
+    -- summed after CR 614.1's replacements had their say, so an opponent whose
+    -- loss was stopped contributes nothing.
+    Monad.forM_ mTally $ \slot -> State.modify' (bindAmountSlot source slot lost)
   -- CR 119.3's other half, LoseLife's mirror but for the sign. The `n > 0` guard
   -- is CR 119.9: a gain of 0 is no life gain event to trigger on.
   --

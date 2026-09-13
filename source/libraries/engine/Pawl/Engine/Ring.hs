@@ -411,6 +411,7 @@ theRingDrainsOnCombatDamage =
               (PlayerRef.Relative PlayerRelation.Opponent)
               (Quantity.Literal 3)
               LifeLossCause.ByEffect
+              Nothing
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer yourRingBearer,

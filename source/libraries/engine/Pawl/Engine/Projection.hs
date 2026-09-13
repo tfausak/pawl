@@ -2884,6 +2884,7 @@ quantityReads q = case q of
   Quantity.Type.TimesPaid _ -> Set.empty
   Quantity.Type.CastUsing _ -> Set.empty
   Quantity.Type.TagWasSpent {} -> Set.empty
+  Quantity.Type.ManaSpent -> Set.empty
   Quantity.Type.WasToken -> Set.empty
   Quantity.Type.WasAttacking -> Set.empty
   Quantity.Type.WasBlocking -> Set.empty
