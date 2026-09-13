@@ -148,6 +148,7 @@ movedOf event = case event of
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
+  GameEvent.Exploited {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Crewed _ -> Nothing
@@ -341,6 +342,9 @@ looksBack condition = case condition of
   -- Nor here, and by the same sentence: rule 702.149a's counter goes on an
   -- attacking creature, which CR 506.4 has removed from combat if it left.
   TriggerCondition.SelfTrains -> False
+  -- Nor here: rule 702.110a's ability fires on an ENTRY, so its bearer arrived
+  -- rather than departed, and there is no departure to look back past.
+  TriggerCondition.SelfExploits -> False
   -- Nor here: rule 702.122e's Vehicle is on the battlefield when its own crew
   -- ability resolves, so there is no departure to look back past.
   TriggerCondition.SelfBecomesCrewed -> False
@@ -548,6 +552,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfMutates -> False
   TriggerCondition.AttachedCreatureMentors -> False
   TriggerCondition.SelfTrains -> False
+  TriggerCondition.SelfExploits -> False
   TriggerCondition.SelfBecomesCrewed -> False
   TriggerCondition.SelfCrewsVehicle -> False
   TriggerCondition.SelfEnters -> False
@@ -955,6 +960,7 @@ eventTriggers events gs =
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
+        GameEvent.Exploited {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
@@ -1155,6 +1161,7 @@ eventTriggers events gs =
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
+        GameEvent.Exploited {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
@@ -1391,6 +1398,7 @@ eventTriggers events gs =
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
+        GameEvent.Exploited {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
@@ -1535,6 +1543,7 @@ eventTriggers events gs =
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
+        GameEvent.Exploited {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
@@ -1998,6 +2007,9 @@ zonesTriggeredFrom cond =
         -- exception -- for a condition that cannot trigger from there at all -- does not
         -- apply.
         TriggerCondition.SelfTrains -> battlefield
+        -- The same default from the exploiting creature's own side: rule 702.110a's
+        -- ability fires on its bearer's entry, so the bearer is on the battlefield.
+        TriggerCondition.SelfExploits -> battlefield
         -- The same default: CR 702.122a's ability is a Vehicle permanent's, so its
         -- bearer is on the battlefield and CR 113.6k's exception does not apply.
         TriggerCondition.SelfBecomesCrewed -> battlefield
@@ -2453,6 +2465,10 @@ stateTriggers gs
               -- that resolution put is a counter like any other, so the board
               -- afterwards says nothing about which creature trained.
               TriggerCondition.SelfTrains -> False
+              -- CR 702.110b the same: it fires on a resolution, and a creature
+              -- missing from the battlefield afterwards could have left for any
+              -- reason, so the board says nothing about who exploited it.
+              TriggerCondition.SelfExploits -> False
               -- CR 702.122e likewise fires on a resolution, and the board
               -- afterwards -- an animated Vehicle -- is CR 702.122a's effect
               -- rather than a record of the crewing.

@@ -1727,6 +1727,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Mentor (SlotName.MkSlotName (Text.pack "mentored")))
       " {\"type\":\"Mentor\",\"value\":\"mentored\"} "
+  -- CR 702.110a's sacrifice and CR 702.110b's marker. Nullary where the two above
+  -- take a slot: rule 702.110a names no parameter and chooses rather than targets.
+  Spec.it s "Exploit" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Exploit
+      " {\"type\":\"Exploit\"} "
   -- CR 702.149a's counter and CR 702.149c's marker. Back to Evolve's "self": rule
   -- 702.149a puts its counter on the training creature itself.
   Spec.it s "Train" $

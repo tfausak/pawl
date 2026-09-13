@@ -759,6 +759,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
+  GameEvent.Exploited {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Crewed _ -> Nothing

@@ -2348,6 +2348,85 @@ echoSpec s registry =
           Spec.assertBool s (S.onBattlefield threeId enough) "three Forests could, so that Drake lived"
           Spec.assertEqWith s "spending all THREE, never the one its mana cost prints" (S.tappedCount S.alice enough) 3
 
+-- CR 702.110 exploit, whose rule is two things at once: rule 702.110a's entry
+-- trigger, "you may sacrifice a creature", and rule 702.110b's definition of the
+-- phrase every printing's SECOND ability keys on -- "when this creature exploits
+-- a creature".
+--
+-- Qarsi Sadist {1}{B} Creature -- Human Cleric 1/3 is the printing, "Exploit"
+-- plus "When this creature exploits a creature, target opponent loses 2 life and
+-- you gain 2 life". No exploit card prints the first half alone, so the pair is
+-- what a gameplay test can reach at all.
+--
+-- THREE SEATS, so "target opponent" and "you" cannot collapse onto one player.
+exploitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exploitSpec s registry =
+  let -- Declines rule 702.110a's "may" and answers nothing else, so the negative
+      -- leg differs from the positive one in exactly that answer.
+      declining :: Prompt.Prompt r -> r
+      declining p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Declines
+        _ -> S.identityAnswer p
+      -- Takes rule 702.110a's offer, sacrifices the LAST candidate offered -- the
+      -- Sadist is on the battlefield too, so a fixture taking the first would
+      -- prove nothing about which creature the choice reached -- and aims rule
+      -- 702.110b's trigger at bob.
+      exploiting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      exploiting victim p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChoosePermanent _ _ _ offered ->
+          Maybe.fromMaybe (NonEmpty.head offered) (List.find (== victim) (NonEmpty.toList offered))
+        Prompt.ChooseTargets _ _ _ slots ->
+          fmap (\(_, legal) -> Set.filter (== Recipient.ToPlayer S.bob) legal) slots
+        _ -> S.identityAnswer p
+      -- The Sadist on the stack over a board holding two other creatures of
+      -- alice's, distinctly named so the sacrifice is readable by name, and
+      -- carol seated so "target opponent" has two candidates.
+      sadistBoard = do
+        sadist <- S.printingOf s registry "Qarsi Sadist"
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Hill Giant"
+        let base = Setup.emptyGame S.threePlayers
+            (_, withPiker) = S.addPermanent piker S.alice base
+            (giantId, withGiant) = S.addPermanent giant S.alice withPiker
+            (spell, staged) = S.spellOnStack sadist S.alice withGiant
+        pure (spell, giantId, staged)
+      -- The Sadist resolves, its entry trigger goes on the stack and resolves,
+      -- and whatever rule 702.110b's event then triggers goes on and resolves
+      -- too. Engine.settleForPriority between them is what puts each trigger on
+      -- the stack (CR 603.3).
+      played :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      played answer staged =
+        S.runPure
+          answer
+          staged
+          ( Stack.resolveTop
+              >> Engine.settleForPriority
+              >> Stack.resolveTop
+              >> Engine.settleForPriority
+              >> Stack.resolveTop
+          )
+   in Spec.describe s "Exploit" $ do
+        -- The proving test: rule 702.110a's sacrifice happened, and rule
+        -- 702.110b's phrase fired the printed trigger off the back of it.
+        Spec.it s "CR 702.110b taking the sacrifice fires the printed exploits trigger" $ do
+          (_, giantId, staged) <- sadistBoard
+          let after = played (exploiting giantId) staged
+          Spec.assertEqWith s "CR 702.110b bob lost 2 life to the exploits trigger" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "and alice gained 2" (S.lifeOf S.alice after) (Just 22)
+          Spec.assertEqWith s "carol, the other opponent, was untouched" (S.lifeOf S.carol after) (Just 20)
+          Spec.assertBool s (not (S.onBattlefield giantId after)) "CR 702.110a the Hill Giant alice chose was the creature sacrificed"
+          Spec.assertEqWith s "and the Goblin Piker she did not choose stayed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+        -- The same board, differing in NOTHING but the answer to rule 702.110a's
+        -- "may": no sacrifice means no rule 702.110b event, so the printed
+        -- trigger never fires and nobody's life moves.
+        Spec.it s "CR 702.110a declining the sacrifice fires nothing" $ do
+          (_, giantId, staged) <- sadistBoard
+          let after = played declining staged
+          Spec.assertEqWith s "CR 702.110b bob lost nothing, the exploits trigger never firing" (S.lifeOf S.bob after) (Just 20)
+          Spec.assertEqWith s "and alice gained nothing" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertBool s (S.onBattlefield giantId after) "CR 702.110a the Hill Giant stayed on the battlefield"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cascadeSpec s registry
@@ -2355,6 +2434,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   replicateSpec s registry
   casualtySpec s registry
   echoSpec s registry
+  exploitSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry

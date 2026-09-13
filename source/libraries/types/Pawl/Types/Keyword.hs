@@ -388,9 +388,8 @@ data Keyword
   | -- | 702.110a: "When this creature enters, you may sacrifice a creature."
     --
     -- Not implemented: rule 702.110b's "exploits a creature" names the sacrificed
-    -- creature, which GameEvent.Exploited does not carry, so a trigger reading it
-    -- -- Skull Skaab's "a nontoken creature", Profaner of the Dead's "the
-    -- exploited creature's toughness" -- cannot be written (#NEW).
+    -- creature, and no trigger reads it -- Skull Skaab's "a nontoken creature",
+    -- Profaner of the Dead's "the exploited creature's toughness" (#3692).
     Exploit
   | -- | 702.111b: a creature with menace can't be blocked except by two or more
     -- creatures.

@@ -638,6 +638,7 @@ effectObjectRefs effect = case effect of
   Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
   Effect.Mentor {} -> []
+  Effect.Exploit -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
   Effect.ExileUntilMonarch {} -> []
@@ -784,6 +785,7 @@ effectPlayerRefs effect = case effect of
   Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
   Effect.Mentor {} -> []
+  Effect.Exploit -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
   Effect.ExileUntilMonarch {} -> []
@@ -1080,6 +1082,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- A READ, Designate's: the slot names where rule 702.100a's counter goes.
   Effect.Evolve slot -> oneSlot slot
   Effect.Mentor slot -> oneSlot slot
+  Effect.Exploit -> Map.empty
   Effect.Train slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
   Effect.ExileUntilMonarch slot -> oneSlot slot
@@ -1588,6 +1591,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> True
   Effect.Evolve _ -> True
   Effect.Mentor _ -> True
+  Effect.Exploit -> True
   Effect.Train _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
@@ -1764,6 +1768,7 @@ readsX =
         Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
         Effect.Evolve _ -> False
         Effect.Mentor _ -> False
+        Effect.Exploit -> False
         Effect.Train _ -> False
         Effect.ItBecomes _ -> False
         Effect.ExileUntilMonarch _ -> False
@@ -1962,6 +1967,7 @@ boundSlots effect = case effect of
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.Mentor _ -> Set.empty
+  Effect.Exploit -> Set.empty
   Effect.Train _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty

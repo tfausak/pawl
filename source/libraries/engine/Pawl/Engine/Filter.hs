@@ -2279,6 +2279,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Training -> keyword
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Evolve -> keyword
+  Keyword.Type.Exploit -> keyword
   Keyword.Type.Dethrone -> keyword
   Keyword.Type.Fuse -> keyword
   -- CR 702.6a's equip cost, level up's and outlast's shape, plus CR 702.6c's

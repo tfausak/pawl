@@ -1511,6 +1511,13 @@ eventBindingSlots cond = case cond of
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
   TriggerCondition.SelfTrains -> Set.empty
+  -- Empty for SelfTrains' reason and not for AttachedCreatureMentors': rule
+  -- 702.110b's event names the exploiter, which is already Binding.triggerSource.
+  --
+  -- Not implemented: a slot for the creature that was EXPLOITED, the event's
+  -- second id -- Profaner of the Dead's "the exploited creature's toughness" is
+  -- the printed payload that reads it (#3692).
+  TriggerCondition.SelfExploits -> Set.empty
   -- Empty for that arm's reason too: rule 702.122e's event names the Vehicle,
   -- which is already Binding.triggerSource, and the creatures it also carries are
   -- the OTHER side of the relation, which no rule 702.122e wording reads as a

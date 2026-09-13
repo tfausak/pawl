@@ -403,7 +403,7 @@ data TriggerCondition
     --
     -- Not implemented: binding the creature that was exploited, which rule
     -- 702.110b's "a creature" names and GameEvent.Exploited carries -- Profaner of
-    -- the Dead's "the exploited creature's toughness" needs it (#NEW).
+    -- the Dead's "the exploited creature's toughness" needs it (#3692).
     SelfExploits
   | -- | CR 702.122e: "whenever this Vehicle becomes crewed" (Mobilizer Mech),
     -- which that rule defines as a crew ability of the bearer RESOLVING.

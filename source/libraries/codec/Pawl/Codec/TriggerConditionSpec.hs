@@ -896,6 +896,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfTrains
       " {\"type\":\"SelfTrains\"} "
+  -- CR 702.110b's marker, self-scoped, so nullary for SelfTrains' reason above.
+  Spec.it s "SelfExploits" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfExploits
+      " {\"type\":\"SelfExploits\"} "
   -- CR 702.122e's marker, self-scoped, so nullary for SelfTrains' reason above.
   Spec.it s "SelfBecomesCrewed" $
     Common.assertCodec

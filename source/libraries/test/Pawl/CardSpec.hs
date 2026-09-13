@@ -854,6 +854,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.AbilityAddsMana {} -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
+  TriggerCondition.SelfExploits -> []
   -- Nor does CR 702.122e's, which is nullary.
   TriggerCondition.SelfBecomesCrewed -> []
   -- Nor does CR 702.122b's crewer side, nullary too.
@@ -1178,6 +1179,7 @@ ownCounts effect = case effect of
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
+  Effect.Exploit -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -1477,6 +1479,7 @@ effectNestedEffects effect = case effect of
   Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
   Effect.Mentor {} -> []
+  Effect.Exploit -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
   Effect.ExileUntilMonarch {} -> []
@@ -1939,6 +1942,7 @@ effectReplacements effect = case effect of
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
+  Effect.Exploit -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -2348,6 +2352,7 @@ effectMintedFaces effect = case effect of
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
+  Effect.Exploit -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -2886,6 +2891,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.100a is payload-free: the Filter its minted ability carries -- the
   -- entering creature's -- is the ENGINE's, never a card's.
   Keyword.Evolve -> []
+  Keyword.Exploit -> []
   -- CR 702.105a is payload-free too, and names no quality at all: what its minted
   -- ability compares is life totals, which no Filter reaches.
   Keyword.Dethrone -> []
@@ -3427,6 +3433,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []
+  TriggerCondition.SelfExploits -> []
   -- CR 702.122e's carries none either: it names "this Vehicle" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfBecomesCrewed -> []
@@ -3739,6 +3746,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfMutates -> []
   TriggerCondition.AttachedCreatureMentors -> []
   TriggerCondition.SelfTrains -> []
+  TriggerCondition.SelfExploits -> []
   TriggerCondition.SelfBecomesCrewed -> []
   TriggerCondition.SelfCrewsVehicle -> []
   TriggerCondition.PermanentSacrificed {} -> []
@@ -4975,6 +4983,7 @@ effectFilters effect = case effect of
   Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
+  Effect.Exploit -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []

@@ -372,6 +372,7 @@ manaProduced effect = case effect of
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
+  Effect.Exploit -> Nothing
   Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
@@ -583,6 +584,7 @@ movesLibraryCard effect = case effect of
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
   Effect.Evolve _ -> False
   Effect.Mentor _ -> False
+  Effect.Exploit -> False
   Effect.Train _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
