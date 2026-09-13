@@ -4666,6 +4666,59 @@ reboundSpec s registry = Spec.describe s "Rebound" $ do
     -- Rule 702.88a's "if this spell was cast from your HAND", from the excluded
     -- side: the rebound cast comes from exile, so it does not rebound again.
     Spec.assertEqWith s "and the card cast from exile does not rebound again" (length (GameState.exile after)) 0
+  -- CR 616.1e's first order on reboundRaceBoard: rule 702.88a's own row exiles the
+  -- card, so the delayed ability it creates in the same sentence is armed and
+  -- bob takes a second 2 at alice's next upkeep. The control for the pair below,
+  -- and what keeps its 18 from passing because Rest in Peace broke the board.
+  Spec.it s "CR 616.1e rebound taken before Rest in Peace still arms the upkeep cast" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    staggershock <- S.printingOf s registry "Staggershock"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (gs, spellId, restId) = reboundRaceBoard mountain staggershock restInPeace
+        after = reboundRaceTo (racingStaggershock False restId) gs spellId
+    Spec.assertEqWith s "bob takes the rebound cast's 2 as well" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "and it was free -- the three Mountains are untapped" (S.tappedCount S.alice after) 0
+  -- CR 614.6's half, and the one pawl could not reach while finishSpell read the
+  -- landing ZONE: Rest in Peace taken first exiles the card, rule 702.88a has no
+  -- graveyard move left to replace, and so it creates no delayed ability either.
+  -- The card is in exile on BOTH orders, which is why bob's life is the assertion.
+  Spec.it s "CR 616.1e Rest in Peace taken first exiles the rebound spell and arms nothing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    staggershock <- S.printingOf s registry "Staggershock"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (gs, spellId, restId) = reboundRaceBoard mountain staggershock restInPeace
+        after = reboundRaceTo (racingStaggershock True restId) gs spellId
+    Spec.assertEqWith s "bob took the spell's 2 and nothing more" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertBool s (elem (Just (S.printingName staggershock)) (buybackNamesIn Zone.Exile S.alice after)) "the card is in exile all the same, which is why the LIFE is the assertion"
+
+-- CR 616.1e: rule 702.88a's rewrite is a replacement effect (CR 614.1a), so Rest
+-- in Peace's row over the same CR 608.2n move races it, buybackRaceBoard's pairing
+-- one keyword over. BOTH orders send the card to exile, so the zone cannot tell
+-- them apart -- what can is the delayed ability rule 702.88a creates in the SAME
+-- sentence as the exile. Taken first, rebound exiles the card and arms the upkeep
+-- cast; taken second, CR 614.6 leaves rule 702.88a no graveyard move to replace,
+-- and the card sits in Rest in Peace's exile with nothing watching it.
+reboundRaceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+reboundRaceBoard mountain staggershock restInPeace =
+  let (gs, spellId) = reboundBoard mountain staggershock
+      (restId, board) = S.addPermanent restInPeace S.alice gs
+   in (board, spellId, restId)
+
+-- `reboundAnswer` plus CR 616.1e's order, `racingFuries`' pinning by source.
+racingStaggershock :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+racingStaggershock restFirst restId p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> (ReplacementEntry.source entry == restId) == restFirst) entries)
+  _ -> reboundAnswer p
+
+-- Resolve the Staggershock under `answer`, then run to alice's NEXT upkeep --
+-- past bob's whole turn in between, which rule 702.88a's "your" excludes.
+reboundRaceTo :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+reboundRaceTo answer gs spellId =
+  let resolved = S.runPure answer gs (S.cast S.alice spellId >> Stack.resolveTop)
+      startTurn = GameState.turnNumber resolved
+      atDrawOf n g = GameState.turnNumber g > startTurn + n && GameState.phase g == Phase.Beginning BeginningStep.DrawStep
+   in reboundRunUntil answer (atDrawOf 1) (reboundRunUntil answer (atDrawOf 0) resolved)
 
 -- CR 702.50's whole keyword, on Endless Swarm {5}{G}{G}{G} Sorcery -- "Create a
 -- 1/1 green Snake creature token for each card in your hand. / Epic" (Oracle text

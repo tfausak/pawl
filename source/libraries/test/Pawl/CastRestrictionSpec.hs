@@ -2234,6 +2234,41 @@ senTripletsSpec s registry =
               ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
           Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice ended)) "alice is no longer offered bob's card"
           Spec.assertEqWith s "and nothing is stored" (GameState.playerEffects ended) []
+        -- CR 702.88a's "your hand", the clause Sen Triplets is the pool's only
+        -- way to put a spell on the wrong side of. alice casts bob's
+        -- Staggershock, so the spell was cast from an OPPONENT's hand and rule
+        -- 702.88a does not apply: CR 608.2n's graveyard stands, and bob's is the
+        -- one CR 400.3 names.
+        Spec.it s "CR 702.88a a rebound spell alice casts out of bob's hand is not exiled" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          staggershock <- S.printingOf s registry "Staggershock"
+          triplets <- S.printingOf s registry "Sen Triplets"
+          let (_, bobSpell, open) = senReboundBoard mountain staggershock triplets
+              name = S.printingName staggershock
+              granted = senTripletsResolved open
+              resolved = S.runPure (senReboundAnswer (A.Cast bobSpell name Facing.FaceUp)) (granted {GameState.priority = Just S.alice}) Engine.priorityLoop
+          -- The GAMEPLAY assertion first. CR 608.2n: the card is in its owner's
+          -- graveyard, where rule 702.88a read for the ZONE alone exiles it.
+          Spec.assertEqWith s "CR 608.2n: the card is in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
+          Spec.assertEqWith s "and nothing was exiled" (length (GameState.exile resolved)) 0
+          -- What keeps the two readings above from agreeing for want of a
+          -- resolution: a fizzled spell (CR 608.2b) would reach the graveyard too.
+          Spec.assertEqWith s "the spell resolved: carol took its 2" (S.lifeOf S.carol resolved) (Just 18)
+        -- The same board and the same answerer for the one id: the copy in
+        -- ALICE's hand is cast from her own hand, so rule 702.88a applies and the
+        -- card is exiled. The pair differs in whose hand the card sat in and in
+        -- nothing else.
+        Spec.it s "CR 702.88a the identical card in alice's own hand is exiled" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          staggershock <- S.printingOf s registry "Staggershock"
+          triplets <- S.printingOf s registry "Sen Triplets"
+          let (aliceSpell, _, open) = senReboundBoard mountain staggershock triplets
+              name = S.printingName staggershock
+              granted = senTripletsResolved open
+              resolved = S.runPure (senReboundAnswer (A.Cast aliceSpell name Facing.FaceUp)) (granted {GameState.priority = Just S.alice}) Engine.priorityLoop
+          Spec.assertEqWith s "CR 702.88a: the card is in exile" (length (GameState.exile resolved)) 1
+          Spec.assertEqWith s "and alice's graveyard is empty" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
+          Spec.assertEqWith s "the spell resolved here too: carol took its 2" (S.lifeOf S.carol resolved) (Just 18)
         -- Drannith Magistrate's possessive, which nothing could observe until this
         -- card existed: BOB controls it, so alice is his opponent, and "from
         -- anywhere other than THEIR hands" refuses her cast out of his hand while
@@ -2250,6 +2285,36 @@ senTripletsSpec s registry =
           Spec.assertBool s (not (offered bobSpell policed)) "alice may not cast out of bob's hand under his Magistrate"
           Spec.assertBool s (offered aliceSpell policed) "while her own hand is untouched"
           Spec.assertBool s (offered bobSpell after) "and the one permanent is the whole difference"
+
+-- CR 702.88a's "if this spell was cast from YOUR hand", which only Sen Triplets'
+-- last sentence can put to the test: Staggershock {2}{R} Instant -- "Staggershock
+-- deals 2 damage to any target. / Rebound" (Oracle text fetched from Scryfall
+-- 2026-09-13, ROE) -- sits in BOTH alice's hand and bob's, so the two cases below
+-- differ in whose hand the card came out of and in nothing else.
+--
+-- THREE Mountains, exactly {2}{R}, so each case makes one cast. THREE seats, so
+-- carol is the damage's target and neither the caster nor the card's owner has a
+-- life total doing double duty. Libraries stocked against CR 104.3c.
+senReboundBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+senReboundBoard mountain staggershock triplets =
+  let gs1 = S.landsFor mountain S.alice 3 S.threePlayerGame
+      gs2 = snd (S.addPermanent triplets S.alice gs1)
+      (bobSpell, gs3) = S.addHandCard staggershock S.bob gs2
+      (aliceSpell, gs4) = S.addHandCard staggershock S.alice gs3
+      stocked = List.foldl' (\g pid -> snd (S.addLibraryCard mountain pid g)) gs4 [S.alice, S.bob, S.carol]
+   in (aliceSpell, bobSpell, aliceOnTurn stocked)
+
+-- `takeOnly` plus Staggershock's target, PICKED OUT OF THE OFFERED SET rather
+-- than built (CR 608.2b), so the spell resolves rather than fizzling and the card
+-- actually reaches finishSpell.
+senReboundAnswer :: A.Action -> Prompt.Prompt r -> r
+senReboundAnswer wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (Recipient.ToPlayer S.carol ==) sets
+  _ -> takeOnly wanted p
 
 -- What this player is offered with priority in hand, the shape
 -- Pawl.SpecialActionSpec's Damping Engine cases use: legalActions answers for the

@@ -15,6 +15,7 @@
 -- through S.soleFaceName and errors on a card with more than one castable half.
 module Pawl.AdventureSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
@@ -31,6 +32,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -44,8 +46,12 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -58,6 +64,45 @@ import qualified Pawl.Types.Zone as Zone
 shieldbreakerName, battleDisplayName :: CardName.CardName
 shieldbreakerName = CardName.MkCardName (Text.pack "Embereth Shieldbreaker")
 battleDisplayName = CardName.MkCardName (Text.pack "Battle Display")
+
+-- alice's board for CR 616.1e's race: three Mountains -- Battle Display's {R} plus
+-- the creature's {1}{R} from exile afterwards -- a Bonesplitter for the Adventure
+-- to destroy, and Rest in Peace already on the battlefield.
+adventureRaceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+adventureRaceBoard shieldbreaker mountain bonesplitter restInPeace =
+  let (_, withArtifact) = S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 3)
+      (restId, board) = S.addPermanent restInPeace S.alice withArtifact
+      (gs, oid) = S.handOne shieldbreaker board
+   in (gs, oid, restId)
+
+-- CR 616.1e's order: take the candidate Rest in Peace SOURCES when `restFirst`,
+-- and rule 715.3d's row -- whose source is the spell's own stack incarnation, an
+-- id no fixture holds -- when not. Pinned by source rather than by index, so
+-- neither answer can turn into the other under a change to the engine's canonical
+-- candidate order.
+racingDisplay :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+racingDisplay restFirst restId p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> (ReplacementEntry.source entry == restId) == restFirst) entries)
+  _ -> S.identityAnswer p
+
+-- Cast and resolve, keeping the seats asked to order CR 616.1's applicable
+-- effects along with the finished board.
+adventureRace ::
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ([PlayerId.PlayerId], GameState.GameState)
+adventureRace answer gs oid =
+  let step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      step p = case p of
+        Prompt.ChooseReplacement _ pid _ -> do
+          State.modify' (<> [pid])
+          pure (answer p)
+        _ -> pure (answer p)
+      cast = snd (fst (State.runState (Engine.runGame step gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp)) []))
+      ((_, after), asked) = State.runState (Engine.runGame step cast Stack.resolveTop) []
+   in (asked, after)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Adventure" $ do
@@ -169,6 +214,54 @@ spec s registry = Spec.describe s "Adventure" $ do
       "and the graveyard holds only its target"
       (fmap (\o -> Projection.namesOf o resolved) (Game.zoneMembers Zone.Graveyard S.alice resolved))
       [Set.singleton (CardName.MkCardName (Text.pack "Bonesplitter"))]
+  -- CR 616.1e: rule 715.3d's rewrite is a replacement effect (CR 614.1a), so a row
+  -- another OBJECT contributes to the same CR 608.2n move races it. Rest in Peace
+  -- ({1}{W} Enchantment, "When this enchantment enters, exile all graveyards. / If
+  -- a card or token would be put into a graveyard from anywhere, exile it instead"
+  -- -- Oracle text fetched from Scryfall 2026-09-13) is the racer, placed outright
+  -- so its entry trigger is never put on the stack.
+  --
+  -- Nothing in CR 616.1a-d buckets either row -- both are ordinary continuous
+  -- effects of static abilities (CR 604.2), so neither is CR 614.15's
+  -- self-replacement -- and CR 616.1e leaves the choice to the affected object's
+  -- controller. BOTH orders put the card in exile, so the zone is not what tells
+  -- them apart: rule 715.3d's own exile carries its second sentence's permission,
+  -- and Rest in Peace's does not -- CR 614.6 leaving rule 715.3d no graveyard move
+  -- to replace, which is the mechanic's own ruling that a card exiled any other
+  -- way permits nothing.
+  Spec.it s "CR 616.1e the Adventure taken before Rest in Peace leaves its own permission on the exiled card" $ do
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (gs, oid, restId) = adventureRaceBoard shieldbreaker mountain bonesplitter restInPeace
+        (asked, after) = adventureRace (racingDisplay False restId) gs oid
+        adventurer = List.find (\o -> Set.member shieldbreakerName (Projection.namesOf o after)) (Game.zoneMembers Zone.Exile S.alice after)
+    case adventurer of
+      Nothing -> Spec.assertFailure s "expected the adventurer card in exile"
+      Just exiledId -> do
+        Spec.assertBool s (Cast.castable S.alice exiledId shieldbreakerName Facing.FaceUp after) "CR 715.3d: the creature is castable from exile"
+        Spec.assertBool s (Maybe.isJust (Object.playableFromExile =<< Game.lookupObject exiledId after)) "the permission is on the card"
+    Spec.assertEqWith s "CR 616.1e: the spell's controller was asked, once" asked [S.alice]
+  -- The same board and the same answerer for the ONE answer: taking Rest in Peace
+  -- first exiles the card with no CR 715.3d permission on it -- the outcome pawl
+  -- could not reach while finishSpell named the exile itself. Three Mountains are
+  -- untapped for the creature's {1}{R}, so the refusal below is the permission and
+  -- not mana.
+  Spec.it s "CR 616.1e Rest in Peace taken first exiles the Adventure with no permission on it" $ do
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (gs, oid, restId) = adventureRaceBoard shieldbreaker mountain bonesplitter restInPeace
+        (asked, after) = adventureRace (racingDisplay True restId) gs oid
+        adventurer = List.find (\o -> Set.member shieldbreakerName (Projection.namesOf o after)) (Game.zoneMembers Zone.Exile S.alice after)
+    case adventurer of
+      Nothing -> Spec.assertFailure s "expected the adventurer card in exile"
+      Just exiledId -> do
+        Spec.assertBool s (not (Cast.castable S.alice exiledId shieldbreakerName Facing.FaceUp after)) "CR 614.6: the creature is not castable from this exile"
+        Spec.assertEqWith s "and no permission was written onto the card" (fmap Object.playableFromExile (Game.lookupObject exiledId after)) (Just Nothing)
+    Spec.assertEqWith s "CR 616.1e: alice was asked here as well" asked [S.alice]
   -- CR 715.3d's second and third sentences, which are one question asked of the
   -- same exiled card: "For as long as that card remains exiled, that player may
   -- play it. It can't be cast as an Adventure this way."

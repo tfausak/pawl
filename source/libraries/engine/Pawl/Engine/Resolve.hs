@@ -484,89 +484,61 @@ applyEpic oid controller = do
               (Just Expiry.Type.Never)
               g {GameState.stackArchive = Map.insert oid archived (GameState.stackArchive g)}
 
--- CR 608.2n / 702.27a / 715.3d / 720.3d: where the spell goes as the last part of
--- its resolution -- its owner's graveyard, unless its buyback cost was paid, when
--- it goes to its owner's hand instead, or it was cast as an Adventure, when its
--- controller exiles it and CR 715.3d's permission to play it goes onto the exiled
--- card, or as an Omen, when its controller shuffles it into its OWNER's library
--- instead.
+-- CR 608.2n / 702.27a / 702.88a / 715.3d / 720.3d: where the spell goes as the
+-- last part of its resolution -- its owner's graveyard, unless one of four riders
+-- replaces that move: buyback's owner's hand, rebound's exile, the Adventure's
+-- exile, or the Omen's shuffle into its owner's library.
 --
 -- Reached only from the RESOLVING path: a fizzled spell does not resolve (CR
--- 608.2b), so CR 715.3d's "as it resolves" never applies to it. Written onto the
--- id the move RETURNS, since CR 400.7 mints a fresh incarnation in exile.
+-- 608.2b), so CR 715.3d's "as it resolves" never applies to it. What a rider
+-- leaves BEHIND is written onto the id the move RETURNS, since CR 400.7 mints a
+-- fresh incarnation wherever the card lands.
 --
 -- The Adventure and Omen riders are keyed on the CHOSEN FACE's spell type (CR
 -- 205.3k) rather than on the card's layout, because the question is which set of
 -- characteristics is resolving rather than which card printed them -- a
 -- classification either way, never an effect's identity. Buyback's is keyed on the
 -- record CR 601.2b's announcement wrote (Pawl.Engine.Cast.stampBoughtBack), which
--- is rule 702.27a's own "if the buyback cost was paid".
+-- is rule 702.27a's own "if the buyback cost was paid", and rebound's on rule
+-- 702.88a's own two conditions, `reboundApplies`.
 --
--- Buyback's and rebound's rewrites are replacement effects (CR 614.1a) and are
--- INSTALLED here as rows rather than performed
--- (Replacement.installBuybackReturn, Replacement.installReboundExile), so CR
--- 616.1's loop orders them against every other row watching the same move.
--- Rebound's is keyed on CR 702.88a's own two conditions, `reboundApplies`.
---
--- Not implemented: the Adventure and Omen riders are performed outright, so a row
--- another object contributes to the same move is not ordered against them
--- (#3359). Nor are the four ordered against each other, and no printing carries
--- two -- buyback and rebound appear on instants and sorceries printed as such,
--- never together (Scryfall kw:buyback kw:rebound, 2026-09-12, no hit), where CR
--- 715.3d's and CR 720.3d's riders belong to a creature card's other half.
+-- All four rewrites are replacement effects (CR 614.1a) and are INSTALLED as rows
+-- rather than performed (Replacement.installSpellMoveRow), so CR 616.1's loop
+-- orders them against every other row watching the same move AND against each
+-- other. What no ZoneChangeR can carry -- rule 702.88a's delayed ability and rule
+-- 715.3d's play permission -- is armed after the move and only where
+-- Replacement.rowApplied says that row is what moved the card: a row the
+-- controller took ahead of it sends the spell somewhere else and CR 614.6 leaves
+-- the rider nothing to hang on.
 finishSpell :: ObjectId -> Face.Face Card.Type.Card -> PlayerId -> Game ()
-finishSpell oid face controller
-  -- CR 720.3d: "As an Omen spell resolves, its controller shuffles it into its
-  -- owner's library instead of putting it into its owner's graveyard as it
-  -- resolves." CR 108.3 makes the library the OWNER's, read BEFORE the move for
-  -- Effect.ShuffleIntoLibrary's reason -- CR 400.7 mints a fresh incarnation, so
-  -- the owner has to be in hand whether or not the move produced one. CR 701.24a
-  -- is the randomisation, through the same Event.shuffleLibrary that opcode uses.
-  | Card.isOmen face = do
-      owner <- State.gets (fmap Object.owner . Game.lookupObject oid)
-      Event.changeZone oid Zone.Library
-      Monad.forM_ owner Event.shuffleLibrary
-  | not (Card.isAdventure face) = do
-      -- CR 702.27a: "if the buyback cost was paid, put this spell into its owner's
-      -- hand instead of into that player's graveyard as it resolves". Reached only
-      -- here, which is the whole of "as it resolves": a countered or fizzled spell
-      -- never gets this far (CR 701.6a, CR 608.2b), and rule 702.27a leaves both of
-      -- those in the graveyard -- so the row installed here exists for exactly the
-      -- move proposed on the next line, and CR 616.1's loop settles where the
-      -- spell actually lands.
-      bought <- State.gets (maybe False Object.boughtBack . Game.lookupObject oid)
-      Monad.when bought (State.modify' (Replacement.installBuybackReturn oid controller))
-      -- CR 702.88a: "if this spell was cast from your hand, instead of putting it
-      -- into your graveyard as it resolves, exile it and, at the beginning of
-      -- your next upkeep, you may cast this card from exile without paying its
-      -- mana cost". Buyback's road exactly -- a row over the move on the next
-      -- line -- plus the delayed ability, which a ZoneChangeR cannot carry and
-      -- which is armed below against the incarnation CR 400.7 mints.
-      rebounds <- State.gets reboundApplies
-      Monad.when rebounds (State.modify' (Replacement.installReboundExile oid controller))
-      landed <- Event.changeZoneReturning oid Zone.Graveyard
-      Monad.forM_ landed $ \newId -> do
-        -- Rule 702.88a makes the delayed ability part of the SAME rewrite as the
-        -- exile, so it is armed only where that rewrite is what moved the card: a
-        -- row the controller took ahead of it under CR 616.1 sends the spell
-        -- somewhere else and leaves rebound nothing to do.
-        --
-        -- Not implemented: another row's exile is not told from rule 702.88a's
-        -- own. Rest in Peace taken first replaces the same move with an exile,
-        -- which CR 614.6 leaves rebound unapplied to, and pawl arms the upkeep
-        -- ability anyway (#3683).
-        inExile <- State.gets (fmap ((== Zone.Exile) . Object.zone) . Game.lookupObject newId)
-        Monad.when (rebounds && inExile == Just True) $
-          State.modify' (armDelayed Keyword.Engine.reboundUpkeep newId controller (Map.singleton Keyword.Engine.reboundSlot (Binding.toObject newId)) Onset.Immediately Nothing)
-  | otherwise = do
-      exiled <- Event.changeZoneReturning oid Zone.Exile
-      Monad.forM_ exiled $ \newId ->
-        State.modify' $ \gs ->
-          gs
-            { GameState.objects =
-                Map.adjust (\o -> o {Object.playableFromExile = Just (permission newId)}) newId (GameState.objects gs)
-            }
+finishSpell oid face controller = do
+  bought <- State.gets (maybe False Object.boughtBack . Game.lookupObject oid)
+  Monad.when bought (State.modify' (snd . Replacement.installBuybackReturn oid controller))
+  -- CR 701.24a's shuffle is the Omen row's own rider, so rule 720.3d leaves
+  -- nothing to do after the move and its timestamp is not kept.
+  Monad.when (Card.isOmen face) (State.modify' (snd . Replacement.installOmenShuffle oid controller))
+  rebounds <- State.gets reboundApplies
+  reboundRow <- rowWhen rebounds Replacement.installReboundExile
+  adventureRow <- rowWhen (Card.isAdventure face) Replacement.installAdventureExile
+  landed <- Event.changeZoneReturning oid Zone.Graveyard
+  moved <- State.get
+  let took = maybe False (\ts -> Replacement.rowApplied oid ts moved)
+  Monad.forM_ landed $ \newId -> do
+    -- Rule 702.88a makes the delayed ability part of the SAME rewrite as the
+    -- exile, so it is armed only where that rewrite is what moved the card.
+    Monad.when (took reboundRow) $
+      State.modify' (armDelayed Keyword.Engine.reboundUpkeep newId controller (Map.singleton Keyword.Engine.reboundSlot (Binding.toObject newId)) Onset.Immediately Nothing)
+    -- CR 715.3d's "for as long as that card remains exiled, that player may play
+    -- it", which is the same sentence as the exile it hangs off.
+    Monad.when (took adventureRow) . State.modify' $ \gs ->
+      gs
+        { GameState.objects =
+            Map.adjust (\o -> o {Object.playableFromExile = Just (permission newId)}) newId (GameState.objects gs)
+        }
   where
+    -- Mint one of CR 608.2n's riders when its rule's own condition holds, keeping
+    -- the timestamp that identifies the row to Replacement.rowApplied.
+    rowWhen holds install = if holds then fmap Just (State.state (install oid controller)) else pure Nothing
     -- CR 702.88a's two conditions. The keyword is read off the PROJECTION and
     -- not off `face`, so a spell granted rebound by a text-changing effect
     -- rebounds and one whose text was blanked does not (CR 613.1f); rule 702.88c
@@ -575,13 +547,16 @@ finishSpell oid face controller
     -- copy put on the stack rather than cast (CR 707.10), which rule 702.88a's
     -- "was cast" excludes.
     --
-    -- Not implemented: rule 702.88a's "YOUR hand". Object.castFrom records the
-    -- zone and not whose copy of it, so a spell cast out of an opponent's hand
-    -- (Sen Triplets) rebounds where the rule leaves it in the graveyard
-    -- (#3682).
+    -- "YOUR hand" is the owner test beside it: CR 400.3 makes every hand its
+    -- owner's, so the spell came out of its controller's own hand exactly when the
+    -- card's owner is the player resolving it (CR 109.5). Sen Triplets' "you may
+    -- play lands and cast spells from that player's hand" is the board that tells
+    -- the two apart, and Pawl.CastRestrictionSpec's "CR 702.88a a rebound spell
+    -- alice casts out of bob's hand is not exiled" is what proves it.
     reboundApplies gs =
       Keyword.Engine.hasRebound (Map.keysSet (Projection.keywordsOf oid gs))
-        && maybe False ((== Just Zone.Hand) . Object.castFrom) (Game.lookupObject oid gs)
+        && maybe False fromOwnHand (Game.lookupObject oid gs)
+    fromOwnHand obj = Object.castFrom obj == Just Zone.Hand && Object.owner obj == controller
     -- Never per CR 611.2a: CR 715.3d states no duration. What ends it is CR
     -- 400.7 -- leaving exile mints a new incarnation, and newIncarnation clears
     -- the field.
