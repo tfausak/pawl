@@ -294,6 +294,7 @@ ownQuantities effect = case effect of
   Effect.Goad _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
+  Effect.MakeWarped _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
@@ -1244,6 +1245,7 @@ effectObjectRefs effect =
         Effect.Goad ref -> read_ [ref]
         Effect.GrantLookAtExiled grant -> read_ [GrantLookAtExiled.cards grant]
         Effect.MakePlotted ref -> read_ [ref]
+        Effect.MakeWarped ref -> read_ [ref]
         Effect.DoesNotUntapNext ref -> read_ [ref]
         Effect.Transform ref -> [(AsksTransformGather, ref)]
         -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and

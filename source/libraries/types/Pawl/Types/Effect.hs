@@ -646,6 +646,19 @@ data Effect card ability
     -- (Kellan Joins Up). Not named Plot, CR 702.170e reserving that verb for CR
     -- 116.2k's special action; CR 702.170d fixes the beneficiary and the timing.
     MakePlotted ObjectRef.ObjectRef
+  | -- | CR 702.185b: the objects the ObjectRef names each become WARPED cards,
+    -- stamped with the current turn -- which is what rule 702.185a's "after the
+    -- current turn has ended" is compared against. MakePlotted's shape one
+    -- designation over, and separate for the reason Object.warped is separate
+    -- from Object.plotted: rule 702.185a's permission charges the printed cost
+    -- where rule 702.170d's charges nothing.
+    --
+    -- ONE PRODUCER, and it is the rulebook's: rule 702.185a's own delayed
+    -- triggered ability (Pawl.Engine.Keyword.warpExile), which exiles the
+    -- permanent and stamps the card the exile mints in the same clause. No card
+    -- states it, rule 702.185b defining a warped card as one "exiled by the
+    -- delayed triggered ability created by a warp ability" and nothing else.
+    MakeWarped ObjectRef.ObjectRef
   | -- | CR 608.2f: take the swept set one member at a time and run the body for
     -- each, with that member bound under the payload's slot for that iteration.
     -- The one arm that runs a sequence per member; every other set-naming opcode

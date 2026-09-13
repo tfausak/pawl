@@ -491,21 +491,23 @@ resolveCardBacked runSubgame oid rest printingId = do
     _ -> State.put gs {GameState.stack = rest}
 
 -- What a spell's Object.castUsing record buys the permanent it becomes: CR
--- 702.109a's and CR 702.152a's delayed ability, and CR 702.62a's haste.
+-- 702.109a's, CR 702.152a's and CR 702.185a's delayed ability, and CR 702.62a's
+-- haste.
 --
--- CR 702.109a's and CR 702.152a's second static ability: a spell cast for its
--- dash or blitz cost creates, as it resolves (CR 603.7a), a delayed triggered
--- ability naming "the permanent this spell becomes" -- the arrival, bound under
--- Keyword.becameSlot, so a later zone change leaves it naming nothing (CR 603.7c).
--- Not a trigger of the permanent's: nothing goes on the stack as it enters.
+-- CR 702.109a's, CR 702.152a's and CR 702.185a's second static ability: a spell
+-- cast for its dash, blitz or warp cost creates, as it resolves (CR 603.7a), a
+-- delayed triggered ability naming "the permanent this spell becomes" -- the
+-- arrival, bound under Keyword.becameSlot, so a later zone change leaves it
+-- naming nothing (CR 603.7c). Not a trigger of the permanent's: nothing goes on
+-- the stack as it enters.
 --
 -- CR 603.7d: the spell is the source and its controller as it resolved the
 -- controller. A copy of the spell carries the record too (CR 707.10,
 -- Keyword.copiedCastUsing), and so arms its own; Pawl.CastSpec's "Dash" group
 -- proves both. An arrival a replacement put anywhere but the battlefield is no
 -- permanent and arms nothing, and the Aura branch arms like the other: both are
--- rule 702.109a written out and unobserved, no dash or blitz card in data/cards/
--- being an Aura or entering elsewhere.
+-- rule 702.109a written out and unobserved, no dash, blitz or warp card in
+-- data/cards/ being an Aura or entering elsewhere.
 armBecame :: ObjectId -> Object.Object -> GameState.GameState -> Seq.Seq ObjectId -> Game ()
 armBecame oid obj gs1 arrivals = do
   gs <- State.get

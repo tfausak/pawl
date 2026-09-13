@@ -649,6 +649,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Goad ref -> Effect.Goad (rewriteObjectRef pairs ref)
   Effect.GrantLookAtExiled grant -> Effect.GrantLookAtExiled grant {GrantLookAtExiled.cards = rewriteObjectRef pairs (GrantLookAtExiled.cards grant)}
   Effect.MakePlotted ref -> Effect.MakePlotted (rewriteObjectRef pairs ref)
+  Effect.MakeWarped ref -> Effect.MakeWarped (rewriteObjectRef pairs ref)
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.Convert ref -> Effect.Convert (rewriteObjectRef pairs ref)

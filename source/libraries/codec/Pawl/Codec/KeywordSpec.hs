@@ -355,6 +355,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
     Common.assertCodec s Keyword.codec (Keyword.Dash cost) " {\"type\":\"Dash\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Common.assertCodec s Keyword.codec (Keyword.Blitz cost) " {\"type\":\"Blitz\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+  -- CR 702.185a's payload is a whole Cost too, Bygone Colossus's {3}, under a tag
+  -- of its own: rule 702.185a's cost is offered from the HAND alone where dash's
+  -- and blitz's name no zone, so a warp arriving under either tag would be
+  -- offered from every zone.
+  Spec.it s "Warp carries its cost" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Warp (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))
+      " {\"type\":\"Warp\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
   -- CR 702.148a's payload is a whole Cost, Path of Peril's {4}{W}{B}.
   Spec.it s "Cleave carries its cost" $
     Common.assertCodec

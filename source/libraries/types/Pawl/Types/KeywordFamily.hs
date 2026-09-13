@@ -280,4 +280,9 @@ data KeywordFamily
   | -- | CR 702.71a: transfigure [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Transfigure
+  | -- | CR 702.185a: warp [cost]. Sliver Weftwinder's "Sliver cards in your hand
+    -- have warp {3}" grants an instance rather than asking about one, so no card
+    -- in the pool asks yet; it is owed at the keyword rather than at the first
+    -- asker.
+    Warp
   deriving (Bounded, Enum, Eq, Ord, Show)

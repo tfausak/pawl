@@ -64,6 +64,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Engine.Warp as Warp
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
@@ -287,7 +288,7 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- CR 603.7a: create a delayed triggered ability, appended so it never fires on
 -- an event that already happened. Every entry is built here: by
 -- Effect.ArmDelayedTrigger's arm below, and by Pawl.Engine.Stack for CR
--- 702.109a's and CR 702.152a's spell.
+-- 702.109a's, CR 702.152a's and CR 702.185a's spell.
 armDelayed :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ObjectId -> PlayerId -> Map.Map SlotName Binding.Type.Binding -> Onset.Onset -> Maybe Expiry.Type.Expiry -> GameState -> GameState
 armDelayed ability source controller captured onset expiry gs =
   let -- CR 603.7a's creation moment, from the same counter every other moment
@@ -2337,6 +2338,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.GrantPlayFromExile {} -> False
   Effect.GrantLookAtExiled {} -> False
   Effect.MakePlotted {} -> False
+  Effect.MakeWarped {} -> False
   Effect.ForEach {} -> False
   where
     viewOf = effectViewOf source legal gs
@@ -4059,6 +4061,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MakePlotted ref ->
     State.modify' $ \gs ->
       foldr Plot.becomePlotted gs (objectRefObjects legal resolving controller source gs ref)
+  -- CR 702.185b's designation, MakePlotted's arm one rule over and every
+  -- argument of it unchanged, through Pawl.Engine.Warp.becomeWarped.
+  Effect.MakeWarped ref ->
+    State.modify' $ \gs ->
+      foldr Warp.becomeWarped gs (objectRefObjects legal resolving controller source gs ref)
   Effect.ForEach (ForEach.MkForEach ref slot body) -> do
     gs0 <- State.get
     -- CR 608.2f: WHICH members, swept ONCE from the pre-loop board and then fixed,

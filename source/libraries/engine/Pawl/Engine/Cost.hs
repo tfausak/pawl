@@ -414,6 +414,22 @@ candidateCostsGiven permitted pid name oid gs =
                 if Game.freerunningDamageThisTurn pid gs
                   then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Freerunning cost)) (withAdditional cost)) (Keyword.freerunningCosts (Map.keysSet (Projection.keywordsOf oid gs)))
                   else []
+              -- CR 702.185a: warp, evoked's offer with ONE ZONE. Rule 702.185a's
+              -- first static ability says "you may cast this card FROM YOUR
+              -- HAND", where evoke's, dash's and blitz's name none, so this is
+              -- joined at the hand arm below rather than into `ordinary`. That
+              -- is what keeps a warped card in exile priced at its printed cost:
+              -- rule 702.185a's second ability grants that cast a PERMISSION and
+              -- states no cost of its own.
+              --
+              -- Read off the projection and wrapped by `withAdditional` for
+              -- evoked's reasons, and tagged with the keyword itself, which is
+              -- what Keyword.resolutionDelayedAbility reads back off
+              -- Object.castUsing to arm rule 702.185a's exile.
+              warped =
+                fmap
+                  (\cost -> CandidateCost.plain (Just (Keyword.Type.Warp cost)) (withAdditional cost))
+                  (Keyword.warpCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
               -- which the spell may be cast".
@@ -580,6 +596,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- ManaCost, which has no variable to prompt for.
                 Zone.Hand ->
                   ordinary
+                    <> warped
                     <> (if PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs then [untagged (withoutPayingManaCost face)] else [])
                 _ -> ordinary
    in case Game.lookupObject oid gs of
