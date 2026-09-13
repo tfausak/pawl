@@ -65,6 +65,8 @@ import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Loyalty as Loyalty
+import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
@@ -3694,6 +3696,24 @@ announcedXOf oid gs = Maybe.fromMaybe 0 (Object.announcedX =<< Game.lookupObject
 -- paid with life (CR 601.2b). Rule 702.150a's compleated is the one reader.
 phyrexianLifePaidOf :: ObjectId -> GameState -> Natural
 phyrexianLifePaidOf oid gs = maybe 0 Object.phyrexianLifePaid (Game.lookupObject oid gs)
+
+-- CR 400.7d's third cost record, `phyrexianLifePaidOf` above's twin: which
+-- COLORS of mana were spent to cast the spell that became this permanent (CR
+-- 702.44b). Rule 702.44a's sunburst is the one reader, and it counts this set.
+--
+-- Read off the OBJECT for `announcedXOf`'s reason: a payment is not a
+-- characteristic, so no CR 613 layer writes it and CR 707.2 does not copy it.
+-- Object.manaSpent is the record, carried across the move onto the battlefield
+-- by Pawl.Engine.Event's arm; CR 106.1b's colorless is not one of CR 106.1a's
+-- five colors, so it is not in the set.
+--
+-- Empty for every object no such spell stands behind, which is CR 702.44b's own
+-- "only if the object ... is entering the battlefield from the stack as a
+-- resolving spell": nothing else arrives holding a payment.
+colorsSpentOf :: ObjectId -> GameState -> Set Color.Color
+colorsSpentOf oid gs = case Game.lookupObject oid gs of
+  Nothing -> Set.empty
+  Just obj -> Set.fromList (Maybe.mapMaybe (Quantity.colorOfManaType . ManaUnit.manaType) (Mana.unwrap (Object.manaSpent obj)))
 
 -- CR 122.1c: the pair of effects one or more shield counters create.
 --

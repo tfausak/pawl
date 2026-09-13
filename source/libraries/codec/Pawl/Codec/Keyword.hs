@@ -78,6 +78,7 @@ codec =
       Arm.payload "Morph" (Morph.codec codec) Keyword.Morph (\x -> case x of Keyword.Morph y -> Just y; _ -> Nothing),
       Arm.payload "Entwine" (Cost.codec codec) Keyword.Entwine (\x -> case x of Keyword.Entwine y -> Just y; _ -> Nothing),
       Arm.payload "Modular" Common.natural Keyword.Modular (\x -> case x of Keyword.Modular y -> Just y; _ -> Nothing),
+      Arm.nullary "Sunburst" Keyword.Sunburst,
       Arm.payload "Bushido" Common.natural Keyword.Bushido (\x -> case x of Keyword.Bushido y -> Just y; _ -> Nothing),
       Arm.payload "Soulshift" Common.natural Keyword.Soulshift (\x -> case x of Keyword.Soulshift y -> Just y; _ -> Nothing),
       -- Rule 702.54b's bloodthirst X is the ABSENT "value" key, vanishing's

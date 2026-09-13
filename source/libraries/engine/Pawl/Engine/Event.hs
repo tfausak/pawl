@@ -2542,6 +2542,36 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         addEnteringCounters oid CounterKind.PlusOnePlusOne count
         pure (Just event)
+      -- CR 702.44a via CR 614.1c: sunburst on Suntouched Myr and Clearwater
+      -- Goblet. Riot's arm with no prompt in it -- rule 702.44a states a choice
+      -- nowhere -- and through addEnteringCounters for bloodthirst's reason: the
+      -- pending map is what puts these in the entry's own CR 616.1 pool, so CR
+      -- 614.16's multipliers reach them.
+      --
+      -- The COUNT is CR 702.44b's "each color of mana spent to cast it", read
+      -- off the entering object's CR 400.7d record
+      -- (Pawl.Engine.Projection.colorsSpentOf). A SET, so two mana of one colour
+      -- are one colour, and CR 106.1b's colorless is not one of them.
+      --
+      -- NO CONDITION HERE. Rule 702.44b's two are one question and it is asked in
+      -- Pawl.Engine.Replacement.admitsEntry, so a row reaching this point already
+      -- means colours were spent.
+      --
+      -- The KIND is rule 702.44a's own fork, "if this object is entering as a
+      -- creature, IGNORING ANY TYPE-CHANGING EFFECTS that would affect it" --
+      -- which is what the COPIABLE characteristics answer, CR 613.1a's layer 1
+      -- being everything before CR 613.1d's layer 4. Projection.project would
+      -- read the live card types instead and let an opponent's March of the
+      -- Machines turn the Goblet's charge counters into +1/+1 counters.
+      EntryRewrite.Sunburst -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        let kind =
+              if Set.member CardType.Creature (PC.cardTypes (Projection.copiableCharacteristics oid gs))
+                then CounterKind.PlusOnePlusOne
+                else CounterKind.Named Keyword.chargeCounter
+        addEnteringCounters oid kind (Natural.length (Projection.colorsSpentOf oid gs))
+        pure (Just event)
       -- CR 702.150a via CR 614.1c: compleated on Tamiyo, Compleated Sage. "It
       -- instead enters the battlefield with that many loyalty counters MINUS TWO
       -- FOR EACH OF THOSE MANA SYMBOLS" -- the payload is the symbol count, so the

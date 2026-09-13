@@ -943,6 +943,24 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.ReadAhead -> True
   EntryRewrite.Riot -> True
   EntryRewrite.Unleash -> True
+  -- CR 702.44b's own condition, the ability's rather than the pattern's:
+  -- sunburst "adds counters only if the object with sunburst is entering the
+  -- battlefield from the stack as a resolving spell and only if one or more
+  -- colored mana was spent on its costs". Both halves are one read of
+  -- Pawl.Engine.Projection.colorsSpentOf: only a resolving spell arrives holding
+  -- a payment (see that function), so a non-empty set of colours is the whole
+  -- rule.
+  --
+  -- Asked here rather than in Event's arm for bloodthirst's reason above -- a
+  -- rewrite that applied and then placed nothing would still take a CR 616.1e
+  -- bucket, and could be handed the entry ahead of a rewrite with something to
+  -- do. The counters cannot tell the two readings apart; the bucket can.
+  --
+  -- A REGRESSION FENCE rather than proved behaviour: no board races sunburst
+  -- against a second CR 616.1e row, so answering True unconditionally leaves the
+  -- suite green (2026-09-13). Bloodthirst's Kismet case is the shape that would
+  -- observe it.
+  EntryRewrite.Sunburst -> not (Set.null (Projection.colorsSpentOf oid gs))
   -- CR 702.54a's own condition, the ability's rather than the pattern's: "IF AN
   -- OPPONENT WAS DEALT DAMAGE THIS TURN, this permanent enters with N +1/+1
   -- counters on it." Asked here rather than in Event's arm for rule 702.145b's
@@ -1570,6 +1588,9 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Riot) -> ReplacementBucket.Other
   -- CR 702.98a is none of CR 616.1a-d for riot's reason, one keyword over.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Unleash) -> ReplacementBucket.Other
+  -- CR 702.44a is none of CR 616.1a-d for riot's reason, one keyword over:
+  -- sunburst rewrites what the permanent enters WITH.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Sunburst) -> ReplacementBucket.Other
   -- CR 702.54a is none of CR 616.1a-d for riot's reason too: bloodthirst rewrites
   -- what the permanent enters WITH. Its condition does not change the bucket --
   -- `admitsEntry` has already kept an unsatisfied row out of the collection.
@@ -1722,6 +1743,11 @@ readsApplier re = case re of
   -- chooser is the entering object's controller and the rewrite carries no
   -- payload, so two unleash rows offer that player the same counter twice.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Unleash) -> False
+  -- CR 702.44a: no chooser at all, and no payload -- both the count and the
+  -- counter kind are read off the ENTERING object, which is the same object
+  -- whichever row is applying. Two sunburst rows place the same counters in
+  -- either order.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Sunburst) -> False
   -- CR 702.54a: no chooser at all, and the count rides the effect. The condition
   -- `admitsEntry` asks reads the ENTERING object's controller rather than the
   -- applier, so two bloodthirst rows on one permanent are admitted together and

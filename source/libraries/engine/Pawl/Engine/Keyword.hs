@@ -238,6 +238,10 @@ abilitiesFor keyword count = case keyword of
   Keyword.Frenzy n -> List.genericReplicate count (frenzy n)
   -- CR 702.43a's SECOND ability, one per instance (CR 702.43b).
   Keyword.Modular _ -> List.genericReplicate count modular
+  -- CR 702.44a mints no ability: sunburst is a static ability that functions as
+  -- the object enters, so its whole content is the CR 614.1c replacement
+  -- `mintedReplacementsFor` writes.
+  Keyword.Sunburst -> []
   -- Rule 702.85a's ability functions only while the spell is on the STACK, so
   -- stackTriggeredAbilitiesOf mints it and this roster stays empty -- suspend's
   -- shape one zone over.
@@ -609,6 +613,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Freerunning _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
+  Keyword.Sunburst -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -988,6 +993,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Freerunning _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
+  Keyword.Sunburst -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -1580,6 +1586,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Freerunning _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
+  Keyword.Sunburst -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -1773,6 +1780,9 @@ station =
 -- Pawl.Codec.CounterName, and deliberately so: CR 122.1 makes counters of the same
 -- name interchangeable, so `station`'s minted counters and the ones a striation
 -- counts through Quantity.ObjectCounters have to land on one Object.counters key.
+--
+-- TWO RULES MINT IT: CR 702.184a's station and CR 702.44a's sunburst, whose
+-- noncreature half Pawl.Engine.Event places through this same name.
 -- data/cards/lumen-class-frigate.json writes this same string.
 chargeCounter :: CounterName.CounterName
 chargeCounter = CounterName.UnsafeMkCounterName (Text.pack "charge")
@@ -2139,6 +2149,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Freerunning _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
+  Keyword.Sunburst -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -3325,6 +3336,14 @@ mintedReplacementsFor keyword count = case keyword of
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind. One
   -- row per instance, and CR 702.43b makes them add up.
   Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n))))))
+  -- CR 702.44a's one static ability, the arm above's row with both halves left
+  -- to the board: rule 702.44b's count is the colors of mana spent on the
+  -- entering object (Pawl.Engine.Projection.colorsSpentOf) and the kind turns
+  -- on whether it is entering as a creature, neither of them knowable from a
+  -- keyword and a count. Pawl.Engine.Event reads both where the row applies.
+  --
+  -- ONE ROW PER INSTANCE (CR 702.44d), riot's reason and riot's ordinal.
+  Keyword.Sunburst -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Sunburst))
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
@@ -3664,6 +3683,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
   Keyword.Modular _ -> []
+  Keyword.Sunburst -> []
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
@@ -3909,6 +3929,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
   Keyword.Modular _ -> []
+  Keyword.Sunburst -> []
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
@@ -4165,6 +4186,7 @@ familyOf keyword = case keyword of
   Keyword.Hideaway _ -> Just KeywordFamily.Hideaway
   Keyword.Reinforce {} -> Just KeywordFamily.Reinforce
   Keyword.Modular _ -> Just KeywordFamily.Modular
+  Keyword.Sunburst -> Nothing
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
   Keyword.Fading _ -> Just KeywordFamily.Fading
   Keyword.Frenzy _ -> Just KeywordFamily.Frenzy

@@ -2921,6 +2921,9 @@ keywordPayloadFilters keyword = case keyword of
   -- creature" are written into the replacement effect and the ability
   -- Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Modular _ -> []
+  -- CR 702.44a names no quality either: the counter kinds are the rule's own and
+  -- the count is the entering object's mana record, neither of them a Filter.
+  Keyword.Sunburst -> []
   -- CR 702.79a and CR 702.93a name no quality either: the counter kind and the
   -- "if" clause are written into the abilities Pawl.Engine.Keyword mints.
   Keyword.Persist -> []
@@ -4161,6 +4164,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []
+  EntryRewrite.Sunburst -> []
   EntryRewrite.Bloodthirst _ -> []
   EntryRewrite.Compleated _ -> []
   EntryRewrite.Tapped -> []

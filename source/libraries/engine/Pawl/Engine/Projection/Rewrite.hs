@@ -1252,6 +1252,10 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.Riot -> rewrite
   EntryRewrite.Unleash -> rewrite
   EntryRewrite.Bloodthirst _ -> rewrite
+  -- CR 702.44a states sunburst whole as well, and its count is the entering
+  -- object's CR 400.7d mana record rather than card text, so there is no word
+  -- here for CR 612.1 to reach either.
+  EntryRewrite.Sunburst -> rewrite
   -- CR 702.150a states compleated whole, the symbol count being CR 118.13a's
   -- announced payment rather than card text, so there is no word here for CR
   -- 612.1 either.

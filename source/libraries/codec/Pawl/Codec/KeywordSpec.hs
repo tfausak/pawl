@@ -655,6 +655,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Modular 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "modular 3 is not bushido 3"
+  -- CR 702.44a's sunburst is nullary: rule 702.44a fixes both counter kinds, and
+  -- CR 702.44b's count is the entering object's mana record rather than a printed
+  -- number.
+  Spec.it s "Sunburst" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Sunburst
+      " {\"type\":\"Sunburst\"} "
   -- CR 702.63a's N is a COUNT OF COUNTERS rather than a size or a threshold, and
   -- the wire cannot tell those apart -- so the tag is all that keeps vanishing 2
   -- from bushido 2.

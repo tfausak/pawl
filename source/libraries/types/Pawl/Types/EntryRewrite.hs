@@ -125,6 +125,15 @@ data EntryRewrite ability effect
   | -- | CR 702.98a via CR 614.1c: unleash's first static ability, minted from the
     -- projection -- riot's arm with the declining half deleted.
     Unleash
+  | -- | CR 702.44a via CR 614.1c: sunburst, minted from the projection -- riot's
+    -- position with no prompt in it.
+    --
+    -- Nullary where Bloodthirst carries a count: rule 702.44a's number and its
+    -- counter kind are both read off the ENTERING object -- the colors of mana
+    -- spent (CR 702.44b) and whether it is entering as a creature -- and the mint
+    -- is handed a keyword and a count, never a board. Pawl.Engine.Event reads
+    -- both where the row applies.
+    Sunburst
   | -- | CR 702.54a via CR 614.1c: bloodthirst N, minted from the projection, with
     -- Nothing standing for CR 702.54b's "bloodthirst X".
     Bloodthirst (Maybe Natural.Natural)
