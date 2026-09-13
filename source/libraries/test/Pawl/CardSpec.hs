@@ -916,6 +916,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerAttacksPlayer {} -> []
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
+  TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names the attacker without counting anything, and its Filter holds
   -- no Count for PermanentEnters' reason.
@@ -2888,6 +2889,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
   -- ability is built with lives in Pawl.Engine.Keyword and is not card data.
   Keyword.Crew _ -> []
+  Keyword.Saddle _ -> []
   -- CR 702.123a's payload is a count. Neither the counters its minted ability
   -- puts on nor the Servo token it creates carries a Filter.
   Keyword.Fabricate _ -> []
@@ -3544,6 +3546,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.105a names no quality of the attacker, only a fact about whom it
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
+  TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names a quality the attacker blocked must have, so this one DOES
   -- carry a Filter -- Netcaster Spider's "with flying".
@@ -3704,6 +3707,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerAttacksWith _ -> []
   TriggerCondition.PlayerAttacksPlayer _ -> []
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
+  TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfBlocks -> []
   TriggerCondition.SelfBlocksCreature _ -> []
   TriggerCondition.SelfBlocksAtLeast _ -> []

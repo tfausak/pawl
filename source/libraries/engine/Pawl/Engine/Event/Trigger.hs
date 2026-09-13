@@ -385,6 +385,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.PlayerAttacksPlayer {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
+  TriggerCondition.SelfAttacksWhileSaddled -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
@@ -597,6 +598,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.PlayerAttacksPlayer {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
+  TriggerCondition.SelfAttacksWhileSaddled -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
   -- FALSE despite naming batches in the RULES, which is the one group of answers
@@ -2055,6 +2057,7 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerAttacksWith {} -> battlefield
         TriggerCondition.PlayerAttacksPlayer {} -> battlefield
         TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
+        TriggerCondition.SelfAttacksWhileSaddled -> battlefield
         TriggerCondition.SelfBlocks -> battlefield
         TriggerCondition.SelfBlocksCreature _ -> battlefield
         TriggerCondition.SelfBlocksAtLeast _ -> battlefield
@@ -2352,6 +2355,7 @@ stateTriggers gs
               TriggerCondition.PlayerAttacksWith {} -> False
               TriggerCondition.PlayerAttacksPlayer {} -> False
               TriggerCondition.SelfAttacksPlayerWithMostLife -> False
+              TriggerCondition.SelfAttacksWhileSaddled -> False
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature _ -> False
               TriggerCondition.SelfBlocksAtLeast _ -> False

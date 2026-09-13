@@ -642,6 +642,14 @@ data Keyword
     -- Lost on the Range), which Pawl.Engine.Plot.canPlot's Zone.Hand test refuses
     -- (#2091).
     Plot (Cost.Cost Keyword)
+  | -- | 702.171a: "Tap any number of other untapped creatures you control with
+    -- total power N or greater: This permanent becomes saddled until end of
+    -- turn. Activate only as a sorcery." Crew's cost one rule over, with CR
+    -- 702.171b's designation where crew's arm sets card types.
+    --
+    -- Not implemented: CR 702.171c's "saddles" relation, which the cards saying
+    -- "a creature that saddled it this turn" need (#3705).
+    Saddle Natural.Natural
   | -- | 702.172a: "Choose one or more modes. As an additional cost to cast this
     -- spell, pay the costs associated with those modes." Payload-free: the
     -- selection is the card's Pawl.Types.ModeSelection and the per-mode costs are

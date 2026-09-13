@@ -80,6 +80,7 @@ mayGain designation oid gs = case designation of
   Designation.Monstrous -> True
   Designation.Suspected -> True
   Designation.Solved -> True
+  Designation.Saddled -> True
   Designation.Prepared -> hasPrepareSpell oid gs
 
 -- CR 722.3c, run immediately after the designation is written: "its controller

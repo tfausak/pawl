@@ -143,6 +143,13 @@ data TriggerCondition
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed to the player with the
     -- most life, or tied for most. Only AttackTarget.OfPlayer satisfies it.
     SelfAttacksPlayerWithMostLife
+  | -- | CR 702.171b: "whenever this creature attacks while saddled" (Bridled
+    -- Bighorn) -- SelfAttacks narrowed by the bearer carrying
+    -- Designation.Saddled as the declaration happens. The narrowing belongs to
+    -- the event and not to TriggeredAbility.intervening: CR 603.4 would re-check
+    -- an intervening "if" on resolution, where this clause asks only what was
+    -- true as the creature attacked.
+    SelfAttacksWhileSaddled
   | -- | CR 509.3a: "whenever [a creature] blocks" (Pride Guardian).
     -- Self-scoped, and once per blocking creature however many it blocked.
     SelfBlocks

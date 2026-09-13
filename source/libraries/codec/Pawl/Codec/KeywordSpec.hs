@@ -1096,6 +1096,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.Crew 6)
       " {\"type\":\"Crew\",\"value\":6} "
     Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Crew 1) /= Codec.encode Keyword.codec (Keyword.Crew 6)) "crew 1 and crew 6 encode differently"
+  -- CR 702.171a's N is crew's, one rule over, and is distinguishable for the
+  -- same reason.
+  Spec.it s "Saddle carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Saddle 2)
+      " {\"type\":\"Saddle\",\"value\":2} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Saddle 1) /= Codec.encode Keyword.codec (Keyword.Saddle 2)) "saddle 1 and saddle 2 encode differently"
   -- CR 702.123a's N is both the counters and the tokens, so fabricate 1 and
   -- fabricate 2 are distinct keywords, Crew's shape.
   Spec.it s "Fabricate carries its N" $ do

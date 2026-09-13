@@ -1,14 +1,20 @@
 module Pawl.Types.Designation where
 
 -- | A designation A PERMANENT can have and nothing else about it: CR 702.112b's
--- renowned, CR 701.37b's monstrous, CR 701.60b's suspected, CR 719.3b's solved
--- and CR 722.3b's prepared. Every one of those rules words the mark the same way
--- -- only a permanent can have it, it is "neither an ability nor part of the
--- permanent's copiable values", and it lasts until the permanent leaves the
--- battlefield -- so they are one payload rather than a field, an opcode and a
--- read atom apiece
+-- renowned, CR 701.37b's monstrous, CR 701.60b's suspected, CR 719.3b's solved,
+-- CR 722.3b's prepared and CR 702.171b's saddled. Every one of those rules words
+-- the mark the same way -- only a permanent can have it, and it is "neither an
+-- ability nor part of the permanent's copiable values" -- so they are one
+-- payload rather than a field, an opcode and a read atom apiece
 -- (Pawl.Types.Object's `designations`, Effect.Designate,
 -- Quantity.HasDesignation, Filter.HasDesignation).
+--
+-- WHERE THE MARK ENDS is the one axis they do not share, and it is a sweep
+-- rather than a field: five of the six last until the permanent leaves the
+-- battlefield, which CR 400.7's new object gives for free, and CR 702.171b adds
+-- "or the end of the turn" to saddled alone -- Pawl.Engine.Expiry.dropAtCleanup's
+-- clearedSaddles. That is not the objection that keeps goaded out below, which is
+-- per-PLAYER as well as expiring.
 --
 -- CR 701.37c's X rides alongside rather than inside: Object.designationValues
 -- keys a number by which mark set it, and Quantity.DesignationValue reads one
@@ -55,9 +61,10 @@ module Pawl.Types.Designation where
 -- itself carries. What READS one differs more: CR 701.60c hangs menace and
 -- "this creature can't block" off `Suspected` alone (Pawl.Engine.Projection and
 -- Pawl.Engine.CombatRestriction case on this constructor for it), and CR 701.60a
--- lets `Suspected` alone END before the permanent leaves the battlefield, which
--- is why Effect.Unsuspect is its own opcode rather than a designation-parameterised
--- inverse of Effect.Designate -- no rule takes renowned, monstrous or solved away.
+-- lets a SPELL OR ABILITY end `Suspected`, which is why Effect.Unsuspect is its
+-- own opcode rather than a designation-parameterised inverse of Effect.Designate
+-- -- no rule takes renowned, monstrous, solved or saddled away, the last of those
+-- ending on the clock instead.
 -- `Prepared` is `Suspected`'s shape in the second respect and not the first: CR
 -- 722.3c ends it too, at the moment the copy is cast, but no opcode takes it --
 -- Pawl.Engine.Cast does, at CR 601.2i. What it adds that no other mark has is a
@@ -76,6 +83,10 @@ data Designation
     -- CR 719.3c's "Solved --" ability is gated on. Renowned's shape: set by a
     -- trigger of the permanent's own, and with no remover.
     Solved
+  | -- | CR 702.171b: saddled, the marker CR 702.171a's saddle ability sets on
+    -- resolution. Renowned's shape in what sets it and the only mark here that
+    -- also ends at end of turn -- see the note above.
+    Saddled
   | -- | CR 722.3b: prepared, which CR 722.3a's "becomes prepared" instruction
     -- sets and which CR 722.3b takes away again -- Suspected's shape rather than
     -- Renowned's, and the only other mark here that a rule removes.

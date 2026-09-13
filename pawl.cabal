@@ -1467,6 +1467,7 @@ library test
     Pawl.RingSpec
     Pawl.RoomSpec
     Pawl.SacrificeRestrictionSpec
+    Pawl.SaddleSpec
     Pawl.SagaSpec
     Pawl.SetupSpec
     Pawl.ShieldCounterSpec

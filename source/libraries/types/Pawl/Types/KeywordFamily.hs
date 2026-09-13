@@ -205,6 +205,10 @@ data KeywordFamily
     Freerunning
   | -- | CR 702.170a: plot [cost].
     Plot
+  | -- | CR 702.171a: saddle N. The family a card writing "a creature with
+    -- saddle" names, as against saddle 2; no card in the pool asks yet, and it
+    -- is owed at the keyword rather than at the first asker.
+    Saddle
   | -- | CR 702.143a: foretell [cost].
     Foretell
   | -- | CR 702.139a: companion--[condition]. The family a card writing "a card

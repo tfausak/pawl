@@ -43,6 +43,7 @@ import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.Designation as Designation
 import Pawl.Types.Duration (Duration)
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -207,7 +208,10 @@ dropAtCleanup gs =
           GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-          GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
+          -- Two writers over one field, composed rather than merged: the
+          -- permission sweep reads the GameState and rule 702.171b's mark reads
+          -- only the objects.
+          GameState.objects = clearedSaddles (clearedPermissions (survives . ExilePlayPermission.expiry) gs)
         }
 
 -- CR 611.2b: drop every While whose condition has stopped holding. The effect
@@ -351,6 +355,17 @@ clearedGoads :: PlayerId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId O
 clearedGoads pid objects =
   if any (Set.member pid . Object.goadedBy) objects
     then Map.map (\o -> o {Object.goadedBy = Set.delete pid (Object.goadedBy o)}) objects
+    else objects
+
+-- CR 702.171b's second ending: saddled lasts "until the end of the turn or it
+-- leaves the battlefield", and this is the first of those -- the second is CR
+-- 400.7's new object, which needs no sweep. The only designation with a clock;
+-- see Pawl.Types.Designation. clearedGoads' shape, without its seat: rule
+-- 702.171b's mark names no player.
+clearedSaddles :: Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+clearedSaddles objects =
+  if any (Set.member Designation.Saddled . Object.designations) objects
+    then Map.map (\o -> o {Object.designations = Set.delete Designation.Saddled (Object.designations o)}) objects
     else objects
 
 -- CR 611.2a: a duration a spell or ability states lasts as long as it says, so

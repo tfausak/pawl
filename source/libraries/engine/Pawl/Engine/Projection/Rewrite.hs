@@ -1439,6 +1439,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- for CR 612.1 to rewrite -- the arm two above's answer.
   TriggerCondition.PlayerAttacksPlayer {} -> condition
   TriggerCondition.SelfAttacksPlayerWithMostLife -> condition
+  TriggerCondition.SelfAttacksWhileSaddled -> condition
   TriggerCondition.SelfBlocks -> condition
   TriggerCondition.SelfBlocksCreature f -> TriggerCondition.SelfBlocksCreature (Filter.rewrite pairs f)
   TriggerCondition.SelfBlocksAtLeast _ -> condition
