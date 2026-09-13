@@ -3435,9 +3435,9 @@ overCounting p = case p of
 --
 -- The count reads Quantity.ObjectCounters, which answers against whatever object
 -- the quantity is evaluated at -- so it is zero on the ability object, which
--- carries no counters, and two on the enchantment. Mogis's Marauder, the pool's
--- other computed count, reads devotion through Filter.perspective and reaches the
--- controller from either object, which is why this card and not that one.
+-- carries no counters, and two on the enchantment. Mogis's Marauder reads
+-- devotion through Filter.perspective, which reaches the controller from either
+-- object, so it is this card and not that one that tells the two apart.
 --
 -- FOUR lands against a count of two, so neither the offer nor the answer is
 -- forced by the board -- and the two the announcement names are bob's, so alice's

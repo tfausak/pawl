@@ -1453,10 +1453,10 @@ slotCapacities counting x slots sets gs =
 -- what a CR 115.1 chooser prompt hangs on. `source` is CR 113.7's source of the
 -- ability -- the object that generated it -- which is the object a computed
 -- count's Quantity is evaluated against, and the same id the caller's
--- selectionLegal or jointlyCoherent is handed, so the offer and the check cannot
--- disagree about one number (Pawl.TargetSpec's "CR 113.7 the verse counters on
--- the sacrificed enchantment, not on its ability, are what the count reads").
--- For a SPELL the two are one object (CR 113.7's first sentence).
+-- selectionLegal is handed, so the offer and the check cannot disagree about one
+-- number -- Pawl.TargetSpec's "CR 113.7 an activated ability's computed count
+-- reads the source's counters, not the ability's" is the proof. For a SPELL the
+-- two are one object (CR 113.7's first sentence).
 chooseTargets :: PlayerId -> ObjectId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
 chooseTargets pid oid source x slots sets = do
   let groups = Map.fromListWith Set.union [(TargetSlot.chooser slot, Set.singleton name) | (name, slot) <- Map.toList slots]
@@ -1707,7 +1707,8 @@ pileMembers perspective pile gs =
 -- against (legalSets) -- CR 601.2b's X for a cast and for an activation alike
 -- (CR 602.2b), and CR 603.2's event bindings for a trigger, whose placement
 -- reaches this whole check through CR 603.3d's import of rules 601.2c-d
--- (Pawl.Engine.Engine.placeBorne). The joint check joins it UNDER the chosen targets, exactly as
+-- (Pawl.Engine.Engine.placeBorne). The joint check joins it UNDER the chosen
+-- targets, exactly as
 -- legalSetsGiven's second pass does, so the re-derivation reads the same
 -- environment the offer did: a slot's CR 202.3
 -- computed bound reading Binding.variableX (Pawl.TargetSpec's "CR 601.2c the
@@ -1749,7 +1750,7 @@ selectionLegal perspective seed source x slots sets chosen gs =
         && jointlyCoherentGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots chosen gs
 
 -- CR 601.2c's JOINT CHECK on its own: every jointly judged slot re-derived
--- against what the whole announcement chose, under `seed`. Three callers, and
+-- against what the whole announcement chose, under `seed`. Two callers, and
 -- between them the moments an announcement over declared slots is accepted --
 -- selectionLegal above -- CR 601.2e's cast, CR 602.2's activation and CR
 -- 603.3d's trigger placement alike -- and
@@ -1977,8 +1978,10 @@ bakeSlot players slot =
       TargetSlot.amount = fmap (Quantity.bakeBound players) (TargetSlot.amount slot),
       -- CR 601.2c's count reads a Quantity of its own, so it is baked beside the
       -- bound for that field's reason. A REGRESSION FENCE rather than a proved
-      -- behaviour: Mogis's Marauder's devotion names PlayerRef.Relative, which
-      -- baking leaves alone, so no board today tells the two readings apart.
+      -- behaviour: no committed count holds a PlayerRef.InSlot -- Mogis's
+      -- Marauder's devotion names a PlayerRef.Relative, which baking leaves
+      -- alone, and Rumbling Crescendo's verse counters name no PlayerRef at all
+      -- -- so no board today tells the two readings apart.
       TargetSlot.count = SlotCount.mapQuantity (Quantity.bakeBound players) (TargetSlot.count slot)
     }
 
