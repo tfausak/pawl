@@ -930,6 +930,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.BattleCry
       " {\"type\":\"BattleCry\"} "
+  -- CR 702.101a fixes extort's {W/B} and CR 702.191a names no cost at all, so
+  -- both are nullary, and their 702.101b/702.191b are counts rather than values.
+  Spec.it s "Extort" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Extort
+      " {\"type\":\"Extort\"} "
+  Spec.it s "Increment" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Increment
+      " {\"type\":\"Increment\"} "
   -- CR 702.108a's prowess takes no parameter either, and CR 702.108b makes the
   -- COUNT multiple rather than the value.
   Spec.it s "Prowess" $

@@ -3677,7 +3677,7 @@ nonWinnersLose3 :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility 
 nonWinnersLose3 =
   let slot = SlotName.MkSlotName (Text.pack "winner")
    in [ Effect.PlaySubgame slot,
-        Effect.LoseLife (LifeLoss.MkLifeLoss (PlayerRef.EachPlayerExcept slot) (Quantity.Literal 3) LifeLossCause.ByEffect)
+        Effect.LoseLife (LifeLoss.MkLifeLoss (PlayerRef.EachPlayerExcept slot) (Quantity.Literal 3) LifeLossCause.ByEffect Nothing)
       ]
 
 -- A hand-built {0} sorcery of alice's on the stack, one chosen mode holding

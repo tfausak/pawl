@@ -7,6 +7,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -21,7 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.LifeLoss" $ do
       LifeLoss.MkLifeLoss
         { LifeLoss.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
           LifeLoss.quantity = Quantity.Literal 2,
-          LifeLoss.cause = LifeLossCause.ByEffect
+          LifeLoss.cause = LifeLossCause.ByEffect,
+          LifeLoss.tally = Nothing
         }
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":2}} "
   -- CR 728.1a, which only Pawl.Engine.Rad mints.
@@ -32,7 +34,21 @@ spec s = Spec.describe s "Pawl.Codec.LifeLoss" $ do
       LifeLoss.MkLifeLoss
         { LifeLoss.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
           LifeLoss.quantity = Quantity.Literal 1,
-          LifeLoss.cause = LifeLossCause.ByRadiation
+          LifeLoss.cause = LifeLossCause.ByRadiation,
+          LifeLoss.tally = Nothing
         }
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"cause\":{\"type\":\"ByRadiation\"}} "
+  -- CR 702.101a's "the total life lost this way", the one caller that names a
+  -- slot (Pawl.Engine.Keyword.extort).
+  Spec.it s "rule 702.101a's loss names a tally slot" $
+    Common.assertCodec
+      s
+      LifeLoss.codec
+      LifeLoss.MkLifeLoss
+        { LifeLoss.player = PlayerRef.Relative PlayerRelation.Opponent,
+          LifeLoss.quantity = Quantity.Literal 1,
+          LifeLoss.cause = LifeLossCause.ByEffect,
+          LifeLoss.tally = Just (SlotName.MkSlotName (Text.pack "extorted"))
+        }
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"Opponent\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"tally\":\"extorted\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LifeLoss.codec

@@ -544,6 +544,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- reports is Pawl.Types.ProductionTag, the closed half of what a unit carries,
         -- and this arm asks it for one member.
         Quantity.TagWasSpent tag -> fmap (\view -> if Set.member tag (Filter.manaSpentTags view) then 1 else 0) mView
+        -- CR 202.1a's amount, the arm above's read one field over and a COUNT
+        -- rather than a 0/1: rule 702.191a's "the amount of mana spent to cast that
+        -- spell". Zero for a spell cast for no mana, which is an ordinary answer.
+        Quantity.ManaSpent -> fmap (toInteger . Filter.manaSpentAmount) mView
         -- CR 111.6's status as a 0/1, WasKicked's arm in every respect. Filter.token
         -- rather than Game.isToken: reading the object directly answers False for an
         -- id naming nothing, which is the whole case this arm exists for; see #1102.
@@ -1062,6 +1066,7 @@ objectSlots quantity = case quantity of
   Quantity.TimesPaid _ -> Set.empty
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
+  Quantity.ManaSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasAttacking -> Set.empty
   Quantity.WasBlocking -> Set.empty
@@ -1296,6 +1301,7 @@ readsX quantity = case quantity of
   Quantity.TimesPaid _ -> False
   Quantity.CastUsing _ -> False
   Quantity.TagWasSpent {} -> False
+  Quantity.ManaSpent -> False
   Quantity.WasToken -> False
   Quantity.WasAttacking -> False
   Quantity.WasBlocking -> False

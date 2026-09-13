@@ -255,7 +255,7 @@ ownQuantities effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> [quantity]
     Discard.These {} -> []
-  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> [quantity]
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> [quantity]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
@@ -383,6 +383,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.TimesPaid {} -> False
   Quantity.Type.CastUsing {} -> False
   Quantity.Type.TagWasSpent {} -> False
+  Quantity.Type.ManaSpent -> False
   Quantity.Type.WasToken -> False
   Quantity.Type.WasAttacking -> False
   Quantity.Type.WasBlocking -> False

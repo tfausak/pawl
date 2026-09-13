@@ -29,6 +29,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Subtype as Subtype
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
@@ -259,6 +260,9 @@ viewOfCard face =
           -- CR 601.2h pays the cost of a SPELL, and this builder describes a
           -- printed face.
           Filter.manaSpentTags = Set.empty,
+          -- CR 202.1a's mana cost is paid for a SPELL -- `manaSpentTags` above,
+          -- same sentence.
+          Filter.manaSpentAmount = 0,
           -- CR 602.1 / 605.1a off the PRINTED face: the card's printed abilities
           -- plus rule 702's HAND ones (CR 702.29b, CR 702.77b) and GRAVEYARD ones
           -- (CR 702.84a, 702.128a, 702.129a), not the battlefield ones, which are
@@ -742,6 +746,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- object may be a CR 602.2a ability on the stack as well as a spell or the
       -- permanent one became; every one of them carries the field.
       Filter.manaSpentTags = foldMap (foldMap ManaUnit.tags . Mana.unwrap . Object.manaSpent) (Game.lookupObject oid gs),
+      -- CR 202.1a off the same record one field over: how many units were spent,
+      -- for rule 702.191a's increment.
+      Filter.manaSpentAmount = maybe 0 (Natural.length . Mana.unwrap . Object.manaSpent) (Game.lookupObject oid gs),
       -- CR 602.1 / 605.1a off the PROJECTION like `keywords`: abilities are
       -- characteristics (CR 109.3) written by layer 6. The whole list the object
       -- HAS, not the list it can activate here. LAZY -- see the field's own comment

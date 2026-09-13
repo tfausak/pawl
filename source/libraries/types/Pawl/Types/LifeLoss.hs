@@ -3,14 +3,15 @@ module Pawl.Types.LifeLoss where
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | The payload of Pawl.Types.Effect's LoseLife arm: "these players, this many",
 -- plus CR 119.3's classification of where the loss came from.
 --
--- Pawl.Types.PlayerQuantity's two fields with a third, SPUN OUT rather than
+-- Pawl.Types.PlayerQuantity's two fields with two more, SPUN OUT rather than
 -- bolted onto that record, which is the rule that record's own haddock states: a
--- life loss needs a field its fellow sharers do not. Pawl.Types.Mill left the
--- same way.
+-- life loss needs fields its fellow sharers do not. Pawl.Types.Mill left the
+-- same way, and carries a tally for the same reason this one does.
 --
 -- The cause is a CLASSIFICATION rather than an effect's identity, which is why
 -- the rules core may read it: Pawl.Engine.Replacement.applies narrows a row by
@@ -22,6 +23,16 @@ data LifeLoss = MkLifeLoss
   { player :: PlayerRef.PlayerRef,
     quantity :: Quantity.Quantity,
     -- | CR 119.3 for anything a card prints; CR 728.1a for rule 728.1's ability.
-    cause :: LifeLossCause.LifeLossCause
+    cause :: LifeLossCause.LifeLossCause,
+    -- | Where to record how much life was ACTUALLY lost, summed over every
+    -- player this instruction named, for a later effect of the same resolution
+    -- to read as Quantity.InSlot -- rule 702.101a's "you gain life equal to the
+    -- total life lost this way". Nothing for every other printing.
+    --
+    -- The SETTLED total and not the amount named: CR 614.1 lets a replacement
+    -- effect change or stop a loss, and rule 702.101a's "that much" is what the
+    -- opponents actually lost. Pawl.Engine.Resolve.Effect.bindAmountSlot writes
+    -- it, the way a Mill's tally is written (Pawl.Types.MillTally).
+    tally :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

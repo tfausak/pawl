@@ -5,7 +5,9 @@ module Pawl.Codec.LifeLoss where
 import qualified Pawl.Codec.LifeLossCause as LifeLossCause
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause.Type
@@ -18,9 +20,11 @@ codec = Fields.object $ do
   player <- Fields.required "player" PlayerRef.codec LifeLoss.player
   quantity <- Fields.required "quantity" Quantity.codec LifeLoss.quantity
   cause <- Fields.defaulted "cause" LifeLossCause.Type.ByEffect LifeLossCause.codec LifeLoss.cause
+  tally <- Fields.defaulted "tally" Nothing (Common.maybe SlotName.codec) LifeLoss.tally
   pure
     LifeLoss.MkLifeLoss
       { LifeLoss.player = player,
         LifeLoss.quantity = quantity,
-        LifeLoss.cause = cause
+        LifeLoss.cause = cause,
+        LifeLoss.tally = tally
       }
