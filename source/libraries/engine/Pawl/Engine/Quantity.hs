@@ -396,11 +396,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
           Nothing -> Nothing
           Just pids -> Just (if any (\pid -> GameState.monarch gs == Just pid) pids then 1 else 0)
         -- CR 702.131c / 702.195b: does that player have that rest-of-game mark?
-        -- IsMonarch's arm in shape and NOT in arity for the opposite reason: both
-        -- rules say "any number of players may have [it] at the same time", so a
-        -- disjunction over the named seats is what "an opponent has the city's
-        -- blessing" means, and summing them would count a table rather than answer
-        -- a question. Every printing in the pool asks about YOU, one seat.
+        -- IsMonarch's arm in shape and in arity, reaching that arity from the
+        -- opposite premise: rule 725.3 makes the monarch unique, so a disjunction
+        -- over the named seats and a sum over them agree there, while CR 702.131c
+        -- and CR 702.195b let every player hold the mark at once and the two come
+        -- apart. The disjunction is still what a card asks -- "you have the city's
+        -- blessing", "an opponent has an enduring story" -- where a sum would count
+        -- a table rather than answer a question.
         --
         -- A player who has never had the mark answers Just 0 and not Nothing,
         -- IsMonarch's posture: "you don't have the city's blessing" is a state the
@@ -1265,9 +1267,8 @@ readsX quantity = case quantity of
   -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
   -- The nine references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
   -- HasPlayerDesignation's, IsStartingPlayer's, IsActivePlayer's, PlayerCounters',
-  -- Devotion's) are
-  -- PlayerRefs, whose InSlot names a TARGET slot rather than an amount one, and X
-  -- is only ever an amount.
+  -- Devotion's) are PlayerRefs, whose InSlot names a TARGET slot rather than an
+  -- amount one, and X is only ever an amount.
   Quantity.Literal _ -> False
   Quantity.ManaValue -> False
   Quantity.Power -> False
