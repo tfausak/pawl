@@ -1268,14 +1268,14 @@ boundSiblings declared slot =
 --
 -- `declared` is the ANNOUNCEMENT's own slot names, and a filter naming anything
 -- else is deliberately not a sibling read: CR 603.2's trigger bindings reach
--- legalSetsGiven as `seed` and reach selectionLegal not at all, so re-deriving
--- such a slot against `chosen` alone would answer it off an empty binding rather
--- than off the trigger's, and reject an announcement the rule allows. Harness the
--- Storm's twin slot is the shape (its filter names `thatSpell`), and that half is
--- a REGRESSION FENCE rather than a proven behaviour: every card in the pool whose
--- slot filter names a seed is on a triggered ability, whose announcement reaches
--- jointlyCoherent alone (Pawl.Engine.Engine.placeBorne) and is re-derived there
--- under the trigger's own bindings, so dropping `declared` reddens nothing.
+-- legalSetsGiven and the joint check as `seed` and are never `declared`, so
+-- re-deriving such a slot against `chosen` alone would answer it off an empty
+-- binding rather than off the trigger's, and reject an announcement the rule
+-- allows. Harness the Storm's twin slot is the shape (its filter names
+-- `thatSpell`), and that half is a REGRESSION FENCE rather than a proven
+-- behaviour: every card in the pool whose slot filter names a seed is on a
+-- triggered ability, whose announcement is re-derived under the trigger's own
+-- bindings either way, so dropping `declared` reddens nothing.
 --
 -- The FILTER half is what only the JOINT CHECK reads, never legalSetsGiven's
 -- second pass. That pass is a WIDENING -- it offers the union over what a named
@@ -1447,8 +1447,18 @@ slotCapacities counting x slots sets gs =
 -- The controller's slots go first (Ord on Maybe), and the rest follow in the
 -- relation's own order. Rule 601.2c fixes no order between choosers; this one is
 -- deterministic, which a replay needs.
-chooseTargets :: PlayerId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
-chooseTargets pid oid x slots sets = do
+--
+-- TWO object ids, and they differ on the ability roads. `oid` is the STACK
+-- OBJECT this announcement is being made for, which is what a prompt names and
+-- what a CR 115.1 chooser prompt hangs on. `source` is CR 113.7's source of the
+-- ability -- the object that generated it -- which is the object a computed
+-- count's Quantity is evaluated against, and the same id the caller's
+-- selectionLegal is handed, so the offer and the check cannot disagree about one
+-- number -- Pawl.TargetSpec's "CR 113.7 an activated ability's computed count
+-- reads the source's counters, not the ability's" is the proof. For a SPELL the
+-- two are one object (CR 113.7's first sentence).
+chooseTargets :: PlayerId -> ObjectId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
+chooseTargets pid oid source x slots sets = do
   let groups = Map.fromListWith Set.union [(TargetSlot.chooser slot, Set.singleton name) | (name, slot) <- Map.toList slots]
   answers <-
     traverse
@@ -1460,7 +1470,7 @@ chooseTargets pid oid x slots sets = do
             -- which the callers' own gate then refuses (CR 601.2e, CR 602.2, CR
             -- 603.3d's removal).
             Nothing -> pure Map.empty
-            Just chooser -> askChooser pid chooser oid x slots sets mine
+            Just chooser -> askChooser pid chooser oid source x slots sets mine
       )
       (Map.toAscList groups)
   pure (Map.unions answers)
@@ -1516,14 +1526,17 @@ chooserOf controller oid relation = case relation of
 -- "you" for a computed count belongs to the ability, so countingByGiven takes the
 -- controller whoever hands in the answer.
 --
+-- The OBJECTS split the same way. `oid` names the stack object in every prompt;
+-- `source` is CR 113.7's, the object a computed count reads -- see chooseTargets.
+--
 -- The answer is NOT validated here -- `selectionLegal` below is that, asked by
 -- the callers that reverse an announcement (CR 601.2e, CR 602.2).
-askChooser :: PlayerId -> PlayerId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Set SlotName -> Game (Map SlotName (Set Recipient))
-askChooser controller chooser oid x slots sets mine = do
+askChooser :: PlayerId -> PlayerId -> ObjectId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Set SlotName -> Game (Map SlotName (Set Recipient))
+askChooser controller chooser oid source x slots sets mine = do
   gs <- State.get
   let decider = Decide.deciderFor chooser gs
       offered = fmap (piledOffer (Just chooser) gs) sets
-      counting = countingByGiven (Projection.projectAll gs) (Just controller) oid gs
+      counting = countingByGiven (Projection.projectAll gs) (Just controller) source gs
       ranges = Map.restrictKeys (Map.intersectionWith (announcedRange counting x) slots (slotCapacities counting x slots offered gs)) mine
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
       offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (SlotCount.at counting x (TargetSlot.count targetSlot), legal)) slots offered) variable
@@ -1608,12 +1621,12 @@ piledOffer perspective gs =
 -- selectionLegal at CR 601.2c (a cast, an activation) and by
 -- Pawl.Engine.Resolve's own gate at CR 707.10c's re-target.
 --
--- A TRIGGER's placement (Pawl.Engine.Engine.placeBorne) judges the announcement
--- for CR 601.2c's coherence and for nothing else, so a card the draw named that
--- the slot's own filter refuses stands as the target and CR 608.2b counters the
--- ability at resolution (gap #3091). Riftsweeper is the pool's one triggered
--- exile slot and its "face-up exiled card" is offered no pile, so no card reaches
--- it.
+-- A TRIGGER's placement (Pawl.Engine.Engine.placeBorne) judges it by
+-- selectionLegal too, so a card the draw named that the slot's own filter
+-- refuses is an illegal announcement there as well; what differs is the remedy,
+-- CR 603.3d importing rules 601.2c-d and not 601.2e's reversal, so that road
+-- re-asks. Riftsweeper is the pool's one triggered exile slot and its "face-up
+-- exiled card" is offered no pile, so no card reaches it.
 --
 -- Elided at one member and skipped at none, the posture the three randomness
 -- prompts over a candidate list take (Pawl.Engine.Resolve's RandomObject and
@@ -1691,8 +1704,11 @@ pileMembers perspective pile gs =
 -- WHICH recipients were named, not how many.
 --
 -- `seed` is the announcement's OWN bindings, the same map the offer was computed
--- against (legalSets) -- CR 601.2b's X, for a cast and for an activation alike
--- (CR 602.2b). The joint check joins it UNDER the chosen targets, exactly as
+-- against (legalSets) -- CR 601.2b's X for a cast and for an activation alike
+-- (CR 602.2b), and CR 603.2's event bindings for a trigger, whose placement
+-- reaches this whole check through CR 603.3d's import of rules 601.2c-d
+-- (Pawl.Engine.Engine.placeBorne). The joint check joins it UNDER the chosen
+-- targets, exactly as
 -- legalSetsGiven's second pass does, so the re-derivation reads the same
 -- environment the offer did: a slot's CR 202.3
 -- computed bound reading Binding.variableX (Pawl.TargetSpec's "CR 601.2c the
@@ -1734,20 +1750,17 @@ selectionLegal perspective seed source x slots sets chosen gs =
         && jointlyCoherentGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots chosen gs
 
 -- CR 601.2c's JOINT CHECK on its own: every jointly judged slot re-derived
--- against what the whole announcement chose, under `seed`. Three callers, and
+-- against what the whole announcement chose, under `seed`. Two callers, and
 -- between them the moments an announcement over declared slots is accepted --
--- selectionLegal above (CR 601.2e's cast and CR 602.2's activation),
--- Pawl.Engine.Engine.placeBorne (CR 603.3d's placement) and
+-- selectionLegal above -- CR 601.2e's cast, CR 602.2's activation and CR
+-- 603.3d's trigger placement alike -- and
 -- Pawl.Engine.Resolve.Effect.chooseNewTargetsFor (CR 707.10c's re-target). The
 -- re-derivation is exactly the one CR 608.2b will make at resolution, so a
 -- selection this admits cannot be one resolution then drops.
 --
 -- Only the WHICH question, never the how many: a count is measured against
--- slotCapacities by the caller that has one, and CR 707.10c's caller has no
--- count to judge at all.
---
--- Not implemented: CR 603.3d's caller measures none either, its announcement
--- being judged by this check alone (#3091).
+-- slotCapacities by selectionLegal, and CR 707.10c's caller has no count to
+-- judge at all, its re-target taking the recipients the original already has.
 jointlyCoherent :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyCoherent perspective seed source slots chosen gs =
   let pcs = Projection.projectAll gs
@@ -1965,8 +1978,10 @@ bakeSlot players slot =
       TargetSlot.amount = fmap (Quantity.bakeBound players) (TargetSlot.amount slot),
       -- CR 601.2c's count reads a Quantity of its own, so it is baked beside the
       -- bound for that field's reason. A REGRESSION FENCE rather than a proved
-      -- behaviour: Mogis's Marauder's devotion names PlayerRef.Relative, which
-      -- baking leaves alone, so no board today tells the two readings apart.
+      -- behaviour: no committed count holds a PlayerRef.InSlot -- Mogis's
+      -- Marauder's devotion names a PlayerRef.Relative, which baking leaves
+      -- alone, and Rumbling Crescendo's verse counters name no PlayerRef at all
+      -- -- so no board today tells the two readings apart.
       TargetSlot.count = SlotCount.mapQuantity (Quantity.bakeBound players) (TargetSlot.count slot)
     }
 

@@ -151,7 +151,10 @@ spec s registry = Spec.describe s "Teams" $ do
         recording p = case p of
           Prompt.ChooseTargets _ _ _ sets -> do
             State.modify' (<> fmap (Set.toAscList . snd) (Map.elems sets))
-            pure (fmap snd sets)
+            -- The slot's own announced number, not the whole offer: CR 603.3d
+            -- judges a trigger's announcement for its COUNT as well, and "target
+            -- opponent" answered with both would be re-asked rather than obeyed.
+            pure (S.preferring (const True) sets)
           _ -> pure (S.identityAnswer p)
         cast = S.runPure S.identityAnswer board (S.cast S.alice held)
         offered = State.execState (Engine.runGame recording cast Engine.priorityLoop) []

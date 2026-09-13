@@ -105,6 +105,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -132,6 +133,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -2679,6 +2681,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- The joint check on the road no spell takes: CR 603.3d's placement, where an
   -- announcement that fails it is asked again rather than reversed.
   itzquinthSpec s registry
+  -- And the conjunct beside it on that road: rule 601.2c's NUMBER, which only an
+  -- interpreter ignoring the offer can get wrong.
+  ravenousRatsSpec s registry
+  -- And the OBJECT a computed count is read against, on the two ability roads
+  -- where the stack object and CR 113.7's source are not the same thing.
+  crescendoSpec s registry
   -- And the one slot in the corpus its CONTROLLER does not announce.
   cuombajjSpec s registry
 
@@ -3356,3 +3364,130 @@ answeringItzquinthAfresh dealer p = case p of
             else Set.singleton fresh
     pure (Map.mapWithKey answer asked)
   _ -> pure (S.identityAnswer p)
+
+-- CR 603.3d imports rules 601.2c-d WHOLE, and rule 601.2c's first act is the
+-- NUMBER: "if the spell has a variable number of targets, the player announces
+-- how many targets they will choose before they announce those targets. In some
+-- cases, the number of targets will be defined by the spell's text." A count the
+-- slot's text refuses is therefore an illegal announcement on this road exactly
+-- as it is on a cast's, and Engine.placeBorne asks Target.selectionLegal whole
+-- rather than its joint conjunct alone.
+--
+-- Only an interpreter that ignores the offer can produce one: Target.chooseTargets
+-- clamps the count it OFFERS into the slot's own range, so a decider answering
+-- the prompt as posed never announces a number to refuse. That is what makes this
+-- assertion an engine-level one -- no card in data/cards/ can force the
+-- divergence, the announcement being the engine's own prompt in every printing.
+--
+-- Ravenous Rats {1}{B} Creature -- Rat 1/1 (data/cards/ravenous-rats.json): "When
+-- this creature enters, target opponent discards a card." (name, cost, type line,
+-- P/T and Oracle text checked against api.scryfall.com, 2026-09-13.) Nothing is
+-- omitted, so pawl's card is neither stricter nor weaker than printed.
+--
+-- THREE SEATS, which is what makes two opponents an over-count rather than the
+-- one answer the slot allows; each of them holds exactly one card, so the discard
+-- is visible as an empty hand and the two seats are told apart.
+ravenousRatsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+ravenousRatsSpec s registry = Spec.describe s "A trigger's announced count (CR 603.3d)" $ do
+  Spec.it s "CR 601.2c through CR 603.3d announcing two targets for a one-target slot is asked again" $ do
+    rats <- S.printingOf s registry "Ravenous Rats"
+    swamp <- S.printingOf s registry "Swamp"
+    let (_, bobHolds) = S.addHandCard swamp S.bob S.threePlayerGame
+        (_, held) = S.addHandCard swamp S.carol bobHolds
+        (_, entered) = S.entersWithTrigger rats S.alice held
+        ((_, after), asks) = State.runState (Engine.runGame overCounting entered (Engine.settleForPriority >> Stack.resolveTop)) 0
+    -- The gameplay-level assertions first. The re-asked announcement is the one
+    -- that stands, and it names bob alone; without the count conjunct the first
+    -- answer stands and CAROL discards too, both hands reading zero.
+    Spec.assertEqWith s "the re-asked announcement stands: bob, the one target it named, discarded" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "and carol, named only by the refused two-target answer, still holds her card" (S.handSize S.carol after) 1
+    -- The proxies last. The trigger really resolved, so the hands above are the
+    -- announcement and not an ability removed from the stack before it ran.
+    Spec.assertEqWith s "the ability resolved rather than being removed from the stack" (GameState.stack after) []
+    Spec.assertEqWith s "and alice was asked twice: the over-counted answer was refused and the announcement asked again" asks 2
+
+-- CR 603.3d's announcement for Ravenous Rats from an interpreter that ignores the
+-- offered count: the FIRST answer names every opponent the slot offers, which is
+-- two for a slot whose text fixes one, and every answer after it takes the
+-- announced number instead. Two answers rather than one, so what is proved is the
+-- re-ask and not the removal a decider that never answers legally degrades to.
+overCounting :: Prompt.Prompt r -> State.State Int r
+overCounting p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> do
+    asked_ <- State.get
+    State.modify' (+ 1)
+    pure (if asked_ == 0 then fmap snd asked else S.preferring (const True) asked)
+  _ -> pure (S.identityAnswer p)
+
+-- CR 113.7: "the source of an ability is the object that generated it. The source
+-- of an activated ability on the stack is the object whose ability was
+-- activated." A target count computed off the board is a number about that
+-- object, so Target.chooseTargets is handed the SOURCE and not the ability object
+-- on the stack -- the same id Target.selectionLegal beside it is handed, so the
+-- offer and CR 601.2c's judgement cannot disagree about one announcement.
+--
+-- Rumbling Crescendo {3}{R}{R} Enchantment (data/cards/rumbling-crescendo.json):
+-- "At the beginning of your upkeep, you may put a verse counter on this
+-- enchantment. {R}, Sacrifice this enchantment: Destroy up to X target lands,
+-- where X is the number of verse counters on this enchantment." (name, cost, type
+-- line and Oracle text checked against api.scryfall.com, 2026-09-13.) Nothing is
+-- omitted, so pawl's card is neither stricter nor weaker than printed.
+--
+-- The count reads Quantity.ObjectCounters, which answers against whatever object
+-- the quantity is evaluated at -- so it is zero on the ability object, which
+-- carries no counters, and two on the enchantment. Mogis's Marauder reads
+-- devotion through Filter.perspective, which reaches the controller from either
+-- object, so it is this card and not that one that tells the two apart.
+--
+-- FOUR lands against a count of two, so neither the offer nor the answer is
+-- forced by the board -- and the two the announcement names are bob's, so alice's
+-- own Mountain proves the count rather than the pool ran out.
+crescendoSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+crescendoSpec s registry = Spec.describe s "A computed target count's object (CR 113.7)" $ do
+  Spec.it s "CR 113.7 an activated ability's computed count reads the source's counters, not the ability's" $ do
+    crescendo <- S.printingOf s registry "Rumbling Crescendo"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    let (first_, oneForest) = S.addPermanent forest S.bob (Setup.emptyGame S.bothPlayers)
+        (second_, twoForests) = S.addPermanent forest S.bob oneForest
+        (_, threeForests) = S.addPermanent forest S.bob twoForests
+        (crescendoId, staged) = S.addPermanent crescendo S.alice (S.landsFor mountain S.alice 1 threeForests)
+        board = mainPhase (S.addCounter verseCounter 2 crescendoId staged)
+        abilities = Activate.abilitiesFor crescendoId board
+        after = case abilities of
+          [ability] -> S.runPure (aimingCrescendo [first_, second_]) board (Activate.activateAbility S.alice crescendoId ability >> Stack.resolveTop)
+          _ -> board
+    Spec.assertEqWith s "Rumbling Crescendo states exactly one activated ability" (length abilities) 1
+    -- The gameplay-level assertion first: two of bob's three Forests are gone,
+    -- which is the count the enchantment's own verse counters name. Read against
+    -- the ability object instead, the count is zero, the announcement is empty and
+    -- all three Forests survive.
+    Spec.assertEqWith s "CR 113.7 the two announced Forests were destroyed" (length (Game.zoneMembers Zone.Battlefield S.bob after)) 1
+    Spec.assertEqWith s "and they are in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
+    -- The proxies last. The cost was paid both ways, so the Forests above are the
+    -- announcement rather than an activation that never happened.
+    Spec.assertEqWith s "alice's Mountain paid the {R}" (S.tappedCount S.alice after) 1
+    Spec.assertEqWith s "and the enchantment was sacrificed for the cost" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "the ability resolved" (GameState.stack after) []
+
+-- CR 122.1's open arm, as Pawl.Codec.CounterName.make admits it from card data.
+verseCounter :: CounterKind.CounterKind Keyword.Keyword
+verseCounter = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "verse"))
+
+mainPhase :: GameState.GameState -> GameState.GameState
+mainPhase gs =
+  gs
+    { GameState.activePlayer = S.alice,
+      GameState.phase = Phase.PrecombatMain,
+      GameState.priority = Just S.alice
+    }
+
+-- CR 601.2c for Rumbling Crescendo: announce the largest number the slot's own
+-- count allows, then name exactly these permanents out of the offered set. PINNED
+-- by filtering rather than built (aimingDwell's reason), and by id rather than by
+-- a predicate an answerer could re-satisfy after a mutation.
+aimingCrescendo :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+aimingCrescendo oids p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (\(count, legal) -> TargetCount.ceilingOn (Natural.length legal) count) offers
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (maybe False (`elem` oids) . Recipient.objectOf) offered) asked
+  _ -> S.identityAnswer p
