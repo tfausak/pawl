@@ -129,6 +129,7 @@ import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
@@ -931,6 +932,9 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.WithKeywords _ -> True
   EntryRewrite.UnderSourceControl -> True
   EntryRewrite.SacrificeAnyNumber {} -> True
+  -- CR 702.38a states no condition of its own, the arm above's answer: an empty
+  -- hand is nothing to reveal rather than a row that does not apply.
+  EntryRewrite.Amplify _ -> True
   -- CR 614.1c states no condition of its own: "as this creature enters, exile an
   -- instant or sorcery card from your graveyard" is unconditional. An empty
   -- graveyard is nothing to exile rather than a row that does not apply, which CR
@@ -1575,6 +1579,9 @@ bucketOfEffect re = case re of
   -- enters WITH is neither whose it is, what it copies nor which face is up.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithKeywords _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> ReplacementBucket.Other
+  -- CR 616.1e for the arm above's reason: what the permanent enters WITH is
+  -- neither whose it is, what it copies nor which face is up.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Amplify _)) -> ReplacementBucket.Other
   -- CR 616.1e for the arm above's reason, one zone over: which card leaves a
   -- graveyard is neither whose the permanent is, what it copies nor which face is
   -- up.
@@ -1721,6 +1728,11 @@ readsApplier re = case re of
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
   -- the effect. Two such rows would offer the same player the same permanents.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> False
+  -- CR 702.38a: NO despite showing a card, for the arm above's reason. The hand
+  -- looked at is the ENTERING object's controller's, read live off the board at
+  -- CR 614.12a's moment, and the multiplier rides the effect. Two such rows would
+  -- offer the same player the same cards.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Amplify _)) -> False
   -- CR 614.1c: NO despite spending a card, for SacrificeAnyNumber's reason. The
   -- graveyard looked at is the ENTERING object's controller's -- "your graveyard"
   -- in an ability the permanent prints about itself -- read live off the board at
@@ -2344,6 +2356,29 @@ revealableFromHand pid filter_ gs =
   let viewOf = Projection.viewsOf gs
       matching oid = Filter.matches (Filter.contextFor (Game.teams gs) Nothing Nothing) (viewOf oid) filter_
    in filter matching (Game.zoneMembers Zone.Hand pid gs)
+
+-- CR 702.38a: the cards a player may reveal from their hand for an amplify
+-- ability -- the ones sharing a creature type with the entering object.
+-- revealableFromHand above with a set intersection where that one has a Filter,
+-- and for the reason Pawl.Types.EntryRewrite's Amplify arm gives: the criterion
+-- names the ENTERING object's creature types, which no Filter an entry
+-- replacement carries can say.
+--
+-- Matched through each card's own CR 613 projection, revealableFromHand's
+-- reading, so a continuous effect that made a card a Dragon card reaches it in a
+-- hand. The types on the other side are the caller's, read off the entering
+-- object's projection at CR 614.12a's moment.
+--
+-- Rule 702.38a's "you can't reveal this card or any other cards that are
+-- entering the battlefield at the same time" needs nothing written: this engine
+-- materializes every member of the batch on the battlefield before the entry
+-- loop runs (Pawl.Engine.Event.runEntry), so no card entering beside this one is
+-- in a hand for the walk below to find.
+amplifiableFromHand :: PlayerId -> Set Subtype.Subtype -> GameState -> [ObjectId]
+amplifiableFromHand pid types gs =
+  let viewOf = Projection.viewsOf gs
+      sharing oid = not (Set.disjoint types (Filter.subtypes (viewOf oid)))
+   in filter sharing (Game.zoneMembers Zone.Hand pid gs)
 
 -- CR 614.3: a floating replacement whose `uses` is Once is spent by being
 -- applied. A permanent's STATIC replacement ability has no use count at all --

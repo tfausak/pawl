@@ -173,6 +173,10 @@ data Keyword
     -- CR 702.37e's turn-up special action, and CR 702.37b's megamorph is a
     -- MorphVariant.
     Morph (Morph.Morph Keyword)
+  | -- | 702.38a: amplify N -- as this object enters, reveal any number of cards
+    -- from your hand that share a creature type with it, and it enters with N
+    -- +1/+1 counters for each card revealed this way.
+    Amplify Natural.Natural
   | -- | 702.39a: whenever this creature attacks, you may have target creature
     -- defending player controls block it if able; if you do, untap that creature.
     Provoke

@@ -2581,6 +2581,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseSacrifices decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExilesFromGraveyard decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseAnyNumberToSacrifice decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseAnyNumberToReveal decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseAnyNumberOfPermanents decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePermanent decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseTapsForTotalPower decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -2702,6 +2703,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseSacrifices {} -> "ChooseSacrifices"
   Prompt.ChooseExilesFromGraveyard {} -> "ChooseExilesFromGraveyard"
   Prompt.ChooseAnyNumberToSacrifice {} -> "ChooseAnyNumberToSacrifice"
+  Prompt.ChooseAnyNumberToReveal {} -> "ChooseAnyNumberToReveal"
   Prompt.ChooseAnyNumberOfPermanents {} -> "ChooseAnyNumberOfPermanents"
   Prompt.ChoosePermanent {} -> "ChoosePermanent"
   Prompt.ChooseTapsForTotalPower {} -> "ChooseTapsForTotalPower"

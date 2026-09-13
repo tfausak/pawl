@@ -2297,6 +2297,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.82a's payload is a count, not a Filter: the sacrifice's "creatures"
   -- is in the row Pawl.Engine.Keyword mints.
   Keyword.Type.Devour _ -> keyword
+  -- CR 702.38a's payload is a count too, and its "share a creature type with
+  -- it" names no word at all: the types are the entering object's own, which CR
+  -- 612.2a reaches by changing that object rather than this keyword.
+  Keyword.Type.Amplify _ -> keyword
   Keyword.Type.Exalted -> keyword
   -- CR 702.92a, 702.163a and 702.182a are nullary: their creature-type words
   -- (Germ, Rebel, Hero) are in the TOKEN Pawl.Engine.Keyword mints, which

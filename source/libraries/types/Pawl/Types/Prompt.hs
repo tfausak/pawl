@@ -430,6 +430,11 @@ data Prompt r where
   -- permanent enters, the empty set included; asked at one candidate, skipped
   -- at zero. Answers as Response.ChoseSacrifices.
   ChooseAnyNumberToSacrifice :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 702.38a with CR 701.20a: any number of the cards in the entering
+  -- object's controller's hand revealed as it enters, the empty set included;
+  -- the arm above one zone over, and asked at one candidate for its reason.
+  -- Answers as Response.ChoseReveals.
+  ChooseAnyNumberToReveal :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 608.2d: any number of the matching permanents a resolving effect acts
   -- on (Pawl.Types.ObjectRef's AnyNumberMatching); ChooseAnyNumberToSacrifice's
   -- shape. Not ChooseTargets (CR 115.1, CR 115.10a).

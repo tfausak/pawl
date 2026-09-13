@@ -83,6 +83,10 @@ data KeywordFamily
     -- Backslide's "target creature with a morph ability" is the card asking
     -- (#920).
     Morph
+  | -- | CR 702.38a: amplify N. The family a card writing "a creature with
+    -- amplify" names, as against amplify 2; no card in the pool asks yet, and it
+    -- is owed at the keyword rather than at the first asker.
+    Amplify
   | -- | CR 702.41a: affinity for [text]. The family a card writing "a spell with
     -- affinity" names, as against affinity for artifacts; no card in the pool
     -- asks yet, and it is owed at the keyword rather than at the first asker.

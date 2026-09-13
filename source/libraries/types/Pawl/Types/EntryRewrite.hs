@@ -137,6 +137,16 @@ data EntryRewrite ability effect
   | -- | CR 702.54a via CR 614.1c: bloodthirst N, minted from the projection, with
     -- Nothing standing for CR 702.54b's "bloodthirst X".
     Bloodthirst (Maybe Natural.Natural)
+  | -- | CR 702.38a via CR 614.1c: amplify N, minted from the projection --
+    -- SacrificeAnyNumber's shape one zone over, revealing rather than spending.
+    --
+    -- Nullary but for the multiplier: rule 702.38a's offer is "cards from your
+    -- hand that share a creature type with it", and the creature types are the
+    -- ENTERING object's, read off its projection where the row applies
+    -- (Pawl.Engine.Event) rather than baked into a Filter here --
+    -- Filter.SharesCreatureTypeWithBound names a resolution's slot, and an entry
+    -- replacement has none.
+    Amplify Natural.Natural
   | -- | CR 702.150a via CR 614.1c: compleated, minted from the projection. The
     -- payload is the number of Phyrexian mana symbols life was paid for (CR
     -- 118.13a), rule 702.150a's "two" being the rule's own.
