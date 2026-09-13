@@ -2954,6 +2954,7 @@ keywordPayloadFilters keyword = case keyword of
   -- into the keyword.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Delve -> []
   Keyword.Improvise -> []

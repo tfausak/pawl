@@ -127,6 +127,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.PutCounters as PutCounters
@@ -445,6 +446,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Station -> []
   -- CR 702.89a states a REPLACEMENT and nothing else; see mintedReplacementsFor.
   Keyword.UmbraArmor -> []
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -657,6 +659,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   -- battlefieldAbilitiesFor and not to this hand roster.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -1122,6 +1125,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Undying -> []
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -1729,6 +1733,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- crew's reading above.
   Keyword.Station -> List.genericReplicate count station
   Keyword.UmbraArmor -> []
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -2364,6 +2369,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- ability: each is a substitute for part of a total cost already determined,
   -- which is CR 601.2h and not CR 601.3. Pawl.Engine.Cost.manaSubstitutions is
   -- where the offer lives, Bestow's arm above and for its reason.
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -3795,6 +3801,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- apiece, and the two rows are equal values told apart by the instance ordinal
   -- Replacement.collect assigns.
   Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR DestructionRewrite.UmbraArmor)
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -4044,6 +4051,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- decides whether the permanent is a creature at all.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -4314,6 +4322,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- CR 702.89a says nothing about what the Aura may enchant; each printing
   -- states its own "enchant creature".
   Keyword.UmbraArmor -> []
+  Keyword.Epic -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -4534,6 +4543,7 @@ familyOf keyword = case keyword of
   Keyword.Station -> Nothing
   -- CR 702.89a carries no parameter, so there is no family to name it by.
   Keyword.UmbraArmor -> Nothing
+  Keyword.Epic -> Nothing
   Keyword.Convoke -> Nothing
   Keyword.Improvise -> Nothing
   Keyword.Delve -> Nothing
@@ -5498,7 +5508,7 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice), (mobilizeSacrificeName, mobilizeSacrifice)]
+mintedDelayedAbilities = Map.fromList [(epicCopyName, epicCopy), (decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice), (mobilizeSacrificeName, mobilizeSacrifice)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.
@@ -6926,6 +6936,77 @@ reboundSlot = SlotName.MkSlotName (Text.pack "rebounded")
 -- printed face.
 hasRebound :: Set Keyword -> Bool
 hasRebound = Set.member Keyword.Rebound
+
+-- CR 702.50a: does this object have epic? Membership, as rule 702.88c's
+-- redundancy makes hasRebound's. Read by Pawl.Engine.Resolve.finishSpell off
+-- Projection.keywordsOf and never off the printed face, so a spell GRANTED epic
+-- by a text-changing effect gets both abilities and one whose text was blanked
+-- gets neither (CR 613.1f).
+hasEpic :: Set Keyword -> Bool
+hasEpic = Set.member Keyword.Epic
+
+-- CR 702.50a's "except for its epic ability", written into the copiable snapshot
+-- that Pawl.Engine.Resolve.finishSpell archives: the copy rule 702.50a's delayed
+-- ability makes is a spell without epic, so it neither prohibits casting nor arms
+-- a second copier. Proved by Pawl.CastSpec's "the second upkeep copies once".
+--
+-- Written HERE rather than as an exception on Effect.CopyStackObject, because the
+-- exception is epic's own sentence and not CR 707.10's: a card that copies an
+-- epic spell (Fork) copies epic with it.
+withoutEpic :: PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
+withoutEpic pc = pc {PC.keywords = Map.delete Keyword.Epic (PC.keywords pc)}
+
+-- The slot rule 702.50a's "this spell" is bound into as the spell finishes
+-- resolving, reboundSlot's position: CR 603.7c's environment, captured at the
+-- arming.
+--
+-- The id it names has ceased before this ability ever triggers (CR 400.7), which
+-- is why Pawl.Engine.Resolve.applyEpic files the object in GameState.stackArchive
+-- for Effect.CopyStackObject to find. CR 603.7c bars a delayed ability from
+-- AFFECTING an object that has left the zone it was expected in; rule 702.50a
+-- COPIES the spell instead, and CR 707.10 copies it as CR 608.2h last knew it --
+-- without which no upkeep would copy anything at all, the spell having reached
+-- the graveyard before the first of them.
+epicSlot :: SlotName.SlotName
+epicSlot = SlotName.MkSlotName (Text.pack "epic spell")
+
+-- The name rule 702.50a's delayed ability is filed under. A card may not declare
+-- one under it (Pawl.AbilitySlotLintSpec).
+epicCopyName :: AbilityName
+epicCopyName = AbilityName.MkAbilityName (Text.pack "epic")
+
+-- CR 702.50a's delayed triggered ability: "at the beginning of each of your
+-- upkeeps for the rest of the game, copy this spell except for its epic ability.
+-- If the spell has any targets, you may choose new targets for the copy."
+--
+-- reboundUpkeep's condition exactly -- TurnScope.ControllersTurn is rule 702.50a's
+-- "YOUR", which CR 603.7d makes the spell's controller -- and TriggerLimit.Unlimited
+-- with it. What makes this one REPEAT where rebound's fires once is the expiry
+-- Pawl.Engine.Resolve.finishSpell arms it with: a delayed entry carrying one is
+-- never spent (Pawl.Engine.Event.Trigger), and Expiry.Never is "for the rest of
+-- the game".
+--
+-- CopyTargets.ChosenByController is rule 702.50a's last sentence, which is CR
+-- 707.10c: the offer is raised whether or not the spell had targets, and a spell
+-- with none has nothing to re-choose.
+epicCopy :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+epicCopy =
+  let effect =
+        Effect.CopyStackObject
+          CopyStackObject.MkCopyStackObject
+            { CopyStackObject.ref = ObjectRef.InSlot epicSlot,
+              CopyStackObject.targets = CopyTargets.ChosenByController,
+              CopyStackObject.quantity = CopyStackObject.defaultQuantity
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- CR 702.35a's SECOND ability: "when this card is exiled this way, its owner may
 -- cast it by paying [cost] rather than paying its mana cost. If that player

@@ -3187,6 +3187,7 @@ oneMountainState mountain ph =
           GameState.command = mempty,
           GameState.stack = [],
           GameState.players = Map.empty,
+          GameState.stackArchive = Map.empty,
           GameState.outsideObjects = Map.empty,
           GameState.broughtIn = Seq.empty,
           GameState.manaPool = Map.empty,

@@ -120,6 +120,7 @@ codec resolve = Fields.object $ do
   nextEventGroup <- Fields.required "nextEventGroup" EventGroup.codec GameState.nextEventGroup
   eventGroupDepth <- Fields.defaulted "eventGroupDepth" 0 Common.natural GameState.eventGroupDepth
   lastKnown <- Fields.defaulted "lastKnown" Map.empty (Common.naturalMap ObjectId.codec LastKnown.codec) GameState.lastKnown
+  stackArchive <- Fields.defaulted "stackArchive" Map.empty (Common.naturalMap ObjectId.codec Object.codec) GameState.stackArchive
   scannedThrough <- Fields.defaulted "scannedThrough" 0 Common.natural GameState.scannedThrough
   battlefieldWhenTriggered <- Fields.defaulted "battlefieldWhenTriggered" Map.empty (Common.naturalMap EventGroup.codec (Common.naturalMap ObjectId.codec (BattlefieldCandidate.codec ProjectedCharacteristics.codec))) GameState.battlefieldWhenTriggered
   controlSample <- Fields.defaulted "controlSample" Map.empty (Common.naturalMap ObjectId.codec PlayerId.codec) GameState.controlSample
@@ -198,6 +199,7 @@ codec resolve = Fields.object $ do
         GameState.nextEventGroup = nextEventGroup,
         GameState.eventGroupDepth = eventGroupDepth,
         GameState.lastKnown = lastKnown,
+        GameState.stackArchive = stackArchive,
         GameState.scannedThrough = scannedThrough,
         GameState.battlefieldWhenTriggered = battlefieldWhenTriggered,
         GameState.controlSample = controlSample,

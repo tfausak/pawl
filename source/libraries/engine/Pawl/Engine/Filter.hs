@@ -2434,6 +2434,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- own color, and CR 702.66a names no quality at all -- all the rules' own
   -- vocabulary, and the criteria they produce are written in Pawl.Engine.Keyword
   -- rather than on the card, so CR 612.2 has no printed word here to swap.
+  Keyword.Type.Epic -> keyword
   Keyword.Type.Convoke -> keyword
   Keyword.Type.Delve -> keyword
   Keyword.Type.Improvise -> keyword

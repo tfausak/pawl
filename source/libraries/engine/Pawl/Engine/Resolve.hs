@@ -36,6 +36,8 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as Card.Type
@@ -74,7 +76,9 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Recipient (Recipient)
@@ -420,7 +424,65 @@ resolveSpellWith runSubgame oid = do
                     )
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
+                applyEpic oid effectController
                 finishSpell oid face effectController
+
+-- CR 702.50a's two SPELL abilities, performed as the last part of the spell's
+-- resolution and ahead of finishSpell's move: "for the rest of the game, you
+-- can't cast spells", and "at the beginning of each of your upkeeps for the rest
+-- of the game, copy this spell except for its epic ability".
+--
+-- Here rather than in finishSpell, whose riders are all REPLACEMENTS over the
+-- move (CR 614.1a): rule 702.50a's are abilities of the SPELL, so they are part
+-- of CR 608.2's resolution. A countered or fizzled spell never reaches this line,
+-- which is rule 702.50b's "once a spell with epic they control resolves".
+--
+-- The keyword is read off the PROJECTION, reboundApplies' reading of CR 613.1f.
+--
+-- CR 702.50b's second sentence needs no code: "effects can still put copies of
+-- spells onto the stack" is what Effect.CopyStackObject does, a copy not being
+-- cast (CR 707.10).
+applyEpic :: ObjectId -> PlayerId -> Game ()
+applyEpic oid controller = do
+  gs <- State.get
+  Monad.when (Keyword.Engine.hasEpic (Map.keysSet (Projection.keywordsOf oid gs))) $ do
+    -- Rule 702.50a's FIRST ability, as the stored player effect Silence's opcode
+    -- stores (CR 611.1 / 613.11), with Expiry.Never for "for the rest of the
+    -- game" and CR 109.5's "you" -- the spell's controller as it resolved (CR
+    -- 603.7d) -- baked in as the seat. Scoped rather than Named: no slot was
+    -- targeted, so there is nothing of CR 601.2c's to bake.
+    State.modify' $ \g ->
+      let (ts, g1) = Game.freshTimestamp g
+          active =
+            ActivePlayerEffect.MkActivePlayerEffect
+              { ActivePlayerEffect.source = oid,
+                ActivePlayerEffect.controller = controller,
+                ActivePlayerEffect.timestamp = ts,
+                ActivePlayerEffect.expiry = Expiry.Type.Never,
+                ActivePlayerEffect.scope = AffectedPlayers.Scoped PlayerScope.You,
+                ActivePlayerEffect.effect = PlayerEffect.CantCastSpells
+              }
+       in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
+    -- Rule 702.50a's SECOND ability. The spell is still on the stack here, so the
+    -- object is filed in GameState.stackArchive for Effect.CopyStackObject to
+    -- find once CR 400.7 has deleted this id -- carrying rule 702.50a's "except
+    -- for its epic ability" in its copiable snapshot, so the copy is a spell
+    -- without epic and arms no second copier.
+    --
+    -- Expiry.Never is what makes the delayed entry repeat: one carrying an expiry
+    -- is never spent (Pawl.Engine.Event.Trigger), which is "each of your upkeeps
+    -- for the rest of the game".
+    Monad.forM_ (Game.lookupObject oid gs) $ \obj ->
+      let archived = obj {Object.bindings = Binding.setCopy (Keyword.Engine.withoutEpic (Event.copiedSnapshot oid gs)) (Object.bindings obj)}
+       in State.modify' $ \g ->
+            armDelayed
+              Keyword.Engine.epicCopy
+              oid
+              controller
+              (Map.singleton Keyword.Engine.epicSlot (Binding.toObject oid))
+              Onset.Immediately
+              (Just Expiry.Type.Never)
+              g {GameState.stackArchive = Map.insert oid archived (GameState.stackArchive g)}
 
 -- CR 608.2n / 702.27a / 715.3d / 720.3d: where the spell goes as the last part of
 -- its resolution -- its owner's graveyard, unless its buyback cost was paid, when
