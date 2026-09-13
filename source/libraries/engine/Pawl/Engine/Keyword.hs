@@ -6140,20 +6140,20 @@ exileTriggeredAbilitiesOf keywords =
 
 -- CR 702.85a's ability, "a triggered ability that functions only while the spell
 -- with cascade is on the stack", and CR 702.40a's storm and CR 702.69a's
--- gravestorm, which "function[] on the stack" -- the roster the cast scan in Pawl.Engine.Event.Trigger mints,
--- `exileTriggeredAbilitiesOf`'s sibling one zone over and ungated by CR 113.6
--- for that function's reason: both rules state the zone themselves, so asking
--- `functionsIn` would only re-derive it from a condition (a cast) that says
--- nothing about the stack.
+-- gravestorm, each of which "functions on the stack" -- the roster the cast scan
+-- in Pawl.Engine.Event.Trigger mints, `exileTriggeredAbilitiesOf`'s sibling one
+-- zone over and ungated by CR 113.6 for that function's reason: each rule states
+-- the zone itself, so asking `functionsIn` would only re-derive it from a
+-- condition (a cast) that says nothing about the stack.
 --
 -- A SET, `exileTriggeredAbilitiesOf`'s reading. The PARAMETERIZED members get
 -- one trigger per distinct payload all the same, which is CR 702.56b's and CR
 -- 702.153b's "each is paid separately and triggers based on the payments made
 -- for it": two replicate costs are two Set members and two instances of
 -- Quantity.TimesPaid, each reading its own payment. Not implemented: CR
--- 702.85c's, CR 702.40b's and those two rules' separate trigger for a card
--- printing the SAME keyword twice, which a printed keyword set cannot count
--- (#3577).
+-- 702.85c's, CR 702.40b's, CR 702.69b's, CR 702.78b's and those two rules'
+-- separate trigger for a card printing the SAME keyword twice, which a printed
+-- keyword set cannot count (#3577).
 stackTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 stackTriggeredAbilitiesOf keywords =
   [cascade | Set.member Keyword.Cascade keywords]
