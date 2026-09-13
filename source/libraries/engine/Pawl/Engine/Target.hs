@@ -306,6 +306,10 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- into a target slot, and Pawl.FilterPositionLintSpec is what keeps a
             -- card out of the positions this field is empty in.
             Filter.sourceManaValue = Nothing,
+            -- Empty for sourceManaValue's reason one field up: CR 702.78a's
+            -- comparison is written into a COST's criterion
+            -- (Pawl.Engine.Cost.tapCandidates fills it), never into a target slot.
+            Filter.sourceColors = Set.empty,
             -- Nothing HERE and filled below: CR 202.3's computed bound is the slot's
             -- own Quantity, and evaluating one takes a Filter.Context -- so this
             -- record is the context the evaluation runs in, and the answer is laid

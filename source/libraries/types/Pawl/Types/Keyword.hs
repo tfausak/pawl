@@ -276,6 +276,10 @@ data Keyword
     -- gets +N/+0 until end of turn; each instance triggers separately (CR
     -- 702.68b).
     Frenzy Natural.Natural
+  | -- | 702.69a: gravestorm -- a triggered ability that functions on the stack.
+    -- When you cast the spell, copy it for each permanent put into a graveyard
+    -- from the battlefield this turn; you may choose new targets for the copies.
+    Gravestorm
   | -- | 702.70a: whenever this creature deals combat damage to a player, that
     -- player gets N poison counters; the Ns are not summed, each instance
     -- triggering separately (CR 702.70b).
@@ -306,6 +310,11 @@ data Keyword
     -- 502.3/702.77b whole cards: under Tsabo's Web the Rustic Clachan does not
     -- untap" is what proves that half.
     Reinforce (Reinforce.Reinforce Keyword)
+  | -- | 702.78a: conspire -- an optional additional cost of tapping two untapped
+    -- creatures you control that each share a color with the spell, and a cast
+    -- trigger copying the spell once if it was paid, both minted by
+    -- Pawl.Engine.Keyword.
+    Conspire
   | -- | 702.79a: when this permanent dies, if it had no -1/-1 counters on it,
     -- return it to the battlefield under its owner's control with one.
     Persist

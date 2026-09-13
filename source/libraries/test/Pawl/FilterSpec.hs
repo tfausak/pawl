@@ -563,6 +563,22 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "is False for a player" $
       Spec.assertBool s (not (Filter.matches (sourced 4) aPlayer Filter.Type.ManaValueLessThanSource)) "player"
 
+  -- CR 702.78a's comparison, the two arms above's shape over a SET: colour is a
+  -- set (CR 105.2), so "shares a color" is a non-empty intersection rather than
+  -- an ordering. blackCreature is mono-black.
+  Spec.describe s "SharesColorWithSource" $ do
+    let sourced cs = self {Filter.sourceColors = Set.fromList cs}
+    Spec.it s "holds on any colour in common and fails on none" $ do
+      Spec.assertBool s (Filter.matches (sourced [Color.Black, Color.Red]) blackCreature Filter.Type.SharesColorWithSource) "black shares black"
+      Spec.assertBool s (not (Filter.matches (sourced [Color.Red]) blackCreature Filter.Type.SharesColorWithSource)) "black shares nothing with red"
+
+    -- CR 105.2's own reading rather than an absent-value convention: a colourless
+    -- object shares no colour with anything, on either side.
+    Spec.it s "is False when either side is colourless" $ do
+      let colorless = blackCreature {Filter.colors = Set.empty}
+      Spec.assertBool s (not (Filter.matches (sourced [Color.Black]) colorless Filter.Type.SharesColorWithSource)) "colourless candidate"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.SharesColorWithSource)) "no source colours"
+
   -- CR 202.3 read for parity: Void Winnower's "spells with even mana values",
   -- whose reminder text settles the boundary -- "(Zero is even.)"
   Spec.it s "ManaValueIsEven splits the mana values by parity" $ do

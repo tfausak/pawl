@@ -496,6 +496,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.SpellsCastBefore
       " {\"type\":\"SpellsCastBefore\"} "
+  -- CR 702.69a with nothing on the wire either: the count reads the whole of the
+  -- event log's extent and names no object at all.
+  Spec.it s "PermanentsDiedThisTurn is nullary" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.PermanentsDiedThisTurn
+      " {\"type\":\"PermanentsDiedThisTurn\"} "
   -- CR 309.7, on CardsDiscardedThisTurn's terms again: a PlayerRef and nothing
   -- else. Gloom Stalker writes the Relative You arm, which is the only spelling
   -- any printing uses -- "as long as YOU'VE completed a dungeon"; the InSlot arm

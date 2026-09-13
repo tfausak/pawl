@@ -928,6 +928,18 @@ data Context = MkContext
     -- spelling of, and the atom then matches nothing. What keeps a CARD out of
     -- those positions is Pawl.FilterPositionLintSpec's lint, sourcePower's pair.
     sourceManaValue :: Maybe Integer,
+    -- CR 105.2: the SOURCE's colours, for the one atom that intersects a
+    -- candidate's against them (SharesColorWithSource, CR 702.78a's conspire).
+    -- sourceManaValue's sibling one characteristic over, and undrivable from
+    -- `source` here for that field's reason -- this module holds no game state --
+    -- so the caller that has the board supplies it: Pawl.Engine.Cost.tapCandidates,
+    -- which is where rule 702.78a's cost pool is drawn.
+    --
+    -- A SET rather than a Maybe, which is why it needs no laziness argument:
+    -- filling it costs a projection of the source, but the empty set is the right
+    -- answer wherever the atom cannot appear AND the right answer for a colourless
+    -- source, CR 105.2's own reading -- nothing shares a colour with either.
+    sourceColors :: Set.Set Color.Color,
     -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
     -- as its mana-value bound, for the one atom that asks
     -- (ManaValueAtMostAmount) -- Celestine, the Living Saint's "where X is the
@@ -1331,7 +1343,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1369,7 +1381,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1379,6 +1391,12 @@ matches context view predicate = case predicate of
   Filter.HasCardType t -> Set.member t (cardTypes view)
   Filter.HasSupertype s -> Set.member s (supertypes view)
   Filter.HasColor c -> Set.member c (colors view)
+  -- CR 702.78a's "share a color with it", the arm above asked of two objects:
+  -- CR 105.2 makes colour a SET, so sharing is a non-empty intersection. False
+  -- where either side is colourless, which is that reading rather than an
+  -- absent-value convention -- a colourless object shares no colour with
+  -- anything, and a context that supplied no colours names none to share.
+  Filter.SharesColorWithSource -> not (Set.disjoint (colors view) (sourceColors context))
   Filter.HasSubtype s -> Set.member s (subtypes view)
   -- CR 709.4a's own test, said the way that rule says it: membership, so an
   -- object showing several names matches on any one of them.
@@ -1908,6 +1926,7 @@ rewrite pairs predicate = case predicate of
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
+  Filter.SharesColorWithSource -> predicate
   -- Untouched, and CR 612.2 says so outright: "an effect that changes a color
   -- word or a subtype can't change a card name, even if that name contains a
   -- word ... that is the same as a Magic color word, basic land type, or
@@ -2241,6 +2260,10 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Cascade -> keyword
   -- CR 702.40a is payload-free too.
   Keyword.Type.Storm -> keyword
+  -- CR 702.69a is payload-free as well, and CR 702.78a's creatures are in the
+  -- cost Pawl.Engine.Keyword.conspireCost mints.
+  Keyword.Type.Gravestorm -> keyword
+  Keyword.Type.Conspire -> keyword
   -- CR 702.153a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- the creature it names is in the cost Pawl.Engine.Keyword.casualtyCost mints.
   Keyword.Type.Casualty _ -> keyword
@@ -2533,6 +2556,7 @@ bakeBound players predicate = case predicate of
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
+  Filter.SharesColorWithSource -> predicate
   Filter.HasSubtype _ -> predicate
   Filter.HasName _ -> predicate
   Filter.HasNameOriginallyPrintedIn _ -> predicate
@@ -2699,6 +2723,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasCardType _ -> []
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
+  Filter.SharesColorWithSource -> []
   Filter.HasSubtype _ -> []
   Filter.HasName _ -> []
   Filter.HasNameOriginallyPrintedIn _ -> []
@@ -2837,6 +2862,7 @@ statesAQuality predicate = case predicate of
   Filter.HasCardType _ -> True
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True
+  Filter.SharesColorWithSource -> True
   Filter.HasSubtype _ -> True
   -- CR 701.23b's "stated quality" at its sharpest -- a named card is the most
   -- specific description a search can give -- so the searcher may decline to

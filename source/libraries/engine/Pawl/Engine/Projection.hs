@@ -2299,6 +2299,7 @@ filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
   Filter.Type.HasSupertype _ -> Set.singleton Supertypes
   Filter.Type.HasColor _ -> Set.singleton Colors
+  Filter.Type.SharesColorWithSource -> Set.singleton Colors
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
   -- Reads no aspect: no Modification writes CR 201.1's names.
   Filter.Type.HasName _ -> Set.empty
@@ -2597,6 +2598,7 @@ filterReadsPeers f = case f of
   Filter.Type.HasCardType _ -> False
   Filter.Type.HasSupertype _ -> False
   Filter.Type.HasColor _ -> False
+  Filter.Type.SharesColorWithSource -> False
   Filter.Type.HasSubtype _ -> False
   Filter.Type.HasName _ -> False
   Filter.Type.HasNameOriginallyPrintedIn _ -> False
@@ -2897,6 +2899,7 @@ quantityReads q = case q of
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.Type.SpellsCastLastTurn _ -> Set.empty
   Quantity.Type.SpellsCastBefore -> Set.empty
+  Quantity.Type.PermanentsDiedThisTurn -> Set.empty
   Quantity.Type.DungeonsCompleted _ -> Set.empty
   Quantity.Type.CompletedDungeon {} -> Set.empty
   Quantity.Type.EnteredThisTurn -> Set.empty

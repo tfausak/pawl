@@ -206,6 +206,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasCardType _ -> 0
   Filter.Type.HasSupertype _ -> 0
   Filter.Type.HasColor _ -> 0
+  Filter.Type.SharesColorWithSource -> 0
   Filter.Type.HasSubtype _ -> 0
   Filter.Type.HasName _ -> 0
   Filter.Type.HasNameOriginallyPrintedIn _ -> 0

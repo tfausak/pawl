@@ -1723,7 +1723,16 @@ tapCandidates slots pid oid criterion gs =
       -- printed outside a crew ability
       -- (data/cards/synthetic-crewed-battery.json) never asks and the set is
       -- never forced.
-      context = Filter.contextCrewing (Game.teams gs) (Just pid) (Just oid) slots (CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs)
+      -- CR 105.2, the half rule 702.78a's criterion reads off the SOURCE: the
+      -- spell being cast, whose colours the atom intersects each candidate's
+      -- against. Read with last known information for
+      -- Pawl.Engine.Resolve.Slots.effectContext's reason -- the same road it fills
+      -- sourceManaValue by -- and empty where the object is gone, which the atom
+      -- already answers False for.
+      context =
+        (Filter.contextCrewing (Game.teams gs) (Just pid) (Just oid) slots (CrewRestriction.cantCrew (Set.toList (GameState.battlefield gs)) gs))
+          { Filter.sourceColors = maybe Set.empty Filter.colors (Projection.viewWithLastKnownAnywhere gs oid)
+          }
       viewOf = Projection.viewsOf gs
       matches candidate =
         Filter.matches context (viewOf candidate) criterion

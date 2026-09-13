@@ -241,6 +241,10 @@ abilitiesFor keyword count = case keyword of
   Keyword.Cascade -> []
   -- CR 702.40a's, likewise.
   Keyword.Storm -> []
+  -- CR 702.69a's and CR 702.78a's, likewise -- both rules state the stack
+  -- themselves, as rule 702.40a does.
+  Keyword.Gravestorm -> []
+  Keyword.Conspire -> []
   -- CR 702.56a's and CR 702.153a's triggers function on the STACK too, so
   -- stackTriggeredAbilitiesOf mints them and this roster stays empty.
   Keyword.Replicate _ -> []
@@ -533,6 +537,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Gravestorm -> []
+  Keyword.Conspire -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -913,6 +919,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Gravestorm -> []
+  Keyword.Conspire -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -1497,6 +1505,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Gravestorm -> []
+  Keyword.Conspire -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -2039,6 +2049,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Gravestorm -> []
+  Keyword.Conspire -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -2753,6 +2765,9 @@ optionalCost keyword = case keyword of
   -- teamwork with its N alone.
   Keyword.Bargain -> Just (bargainCost, Just 1)
   Keyword.Teamwork n -> Just (teamworkCost n, Just 1)
+  -- Minted rather than printed, the two arms above's reason: rule 702.78a writes
+  -- out what is tapped and the card prints conspire bare.
+  Keyword.Conspire -> Just (conspireCost, Just 1)
   _ -> Nothing
 
 -- CR 702.153a's additional cost: "you may sacrifice a creature with power N or
@@ -2817,6 +2832,37 @@ teamworkCost n =
                     [ Filter.HasCardType CardType.Creature,
                       Filter.Not Filter.IsTapped,
                       Filter.ControlledBy PlayerRelation.You
+                    ]
+                )
+            )
+        ]
+    }
+
+-- CR 702.78a's additional cost: "you may tap two untapped creatures you control
+-- that each share a color with it". A FIXED COUNT with no aggregate threshold, so
+-- CostComponent.TapPermanents and not teamworkCost's TapForTotalPower -- rule
+-- 702.78a counts creatures where rule 702.194a counts power.
+--
+-- "It" is the SPELL, which is the object the cost is being paid for, so the
+-- colour comparison is Filter.SharesColorWithSource rather than an atom naming a
+-- slot; Pawl.Engine.Cost.tapCandidates is what supplies the source's colours.
+-- The untapped and control clauses are the rule's own, teamworkCost's reading
+-- exactly, and CR 302.6 does not reach the cost for that function's reason.
+--
+-- An EMPTY mana part, casualtyCost's reason.
+conspireCost :: Cost Keyword
+conspireCost =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost []),
+      Cost.components =
+        [ CostComponent.TapPermanents
+            ( TapPermanents.MkTapPermanents
+                2
+                ( Filter.And
+                    [ Filter.HasCardType CardType.Creature,
+                      Filter.Not Filter.IsTapped,
+                      Filter.ControlledBy PlayerRelation.You,
+                      Filter.SharesColorWithSource
                     ]
                 )
             )
@@ -3391,6 +3437,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Gravestorm -> []
+  Keyword.Conspire -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -3677,6 +3725,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Gravestorm -> []
+  Keyword.Conspire -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -3940,6 +3990,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
+  Keyword.Gravestorm -> []
+  Keyword.Conspire -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -4128,6 +4180,8 @@ familyOf keyword = case keyword of
   Keyword.Protection _ -> Just KeywordFamily.Protection
   Keyword.Cascade -> Nothing
   Keyword.Storm -> Nothing
+  Keyword.Gravestorm -> Nothing
+  Keyword.Conspire -> Nothing
   Keyword.Deathtouch -> Nothing
   Keyword.Defender -> Nothing
   Keyword.DoubleStrike -> Nothing
@@ -6085,8 +6139,8 @@ exileTriggeredAbilitiesOf keywords =
     <> fmap madnessCast (madnessCosts keywords)
 
 -- CR 702.85a's ability, "a triggered ability that functions only while the spell
--- with cascade is on the stack", and CR 702.40a's storm, which "functions on the
--- stack" -- the roster the cast scan in Pawl.Engine.Event.Trigger mints,
+-- with cascade is on the stack", and CR 702.40a's storm and CR 702.69a's
+-- gravestorm, which "function[] on the stack" -- the roster the cast scan in Pawl.Engine.Event.Trigger mints,
 -- `exileTriggeredAbilitiesOf`'s sibling one zone over and ungated by CR 113.6
 -- for that function's reason: both rules state the zone themselves, so asking
 -- `functionsIn` would only re-derive it from a condition (a cast) that says
@@ -6104,28 +6158,72 @@ stackTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbili
 stackTriggeredAbilitiesOf keywords =
   [cascade | Set.member Keyword.Cascade keywords]
     <> [storm | Set.member Keyword.Storm keywords]
+    <> [gravestorm | Set.member Keyword.Gravestorm keywords]
     <> Maybe.mapMaybe stackCopyTrigger (Set.toAscList keywords)
 
 -- The arm of `stackTriggeredAbilitiesOf` above that reads a keyword's PAYLOAD,
 -- so it cannot be a membership test: rule 702.56a counts the payments made for
--- this very replicate cost, and rule 702.153a asks whether this very casualty
--- cost was paid.
+-- this very replicate cost, and rules 702.153a and 702.78a ask whether this very
+-- casualty or conspire cost was paid. Conspire is payload-free and could have
+-- been a membership test in `stackTriggeredAbilitiesOf`; it is here because what
+-- it needs is the KEYWORD, which Quantity.TimesPaid names to find the payment.
 --
 -- A wildcard rather than an exhaustive case, entwineCosts' reason.
 stackCopyTrigger :: Keyword -> Maybe (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
 stackCopyTrigger keyword = case keyword of
   Keyword.Replicate _ -> Just (paidSpellCopies keyword (Quantity.TimesPaid keyword))
   Keyword.Casualty _ -> Just (paidSpellCopies keyword (Quantity.Literal 1))
+  -- CR 702.78a's second ability, casualty's above in shape: one copy, gated on
+  -- this very conspire cost having been paid.
+  Keyword.Conspire -> Just (paidSpellCopies keyword (Quantity.Literal 1))
   _ -> Nothing
+
+-- CR 707.10's copy instruction as the one mode the cast triggers of rules
+-- 702.40a, 702.56a, 702.69a, 702.78a and 702.153a all state: copy the spell this
+-- ability's source is (CR 113.7, named by Filter.IsSource) `quantity` times, with
+-- CR 707.10c's offer of new targets, asked per copy and never raised for a spell
+-- with no targets.
+--
+-- Shared rather than written out per keyword because the rules state one
+-- instruction and differ only in the COUNT and in the intervening "if" -- both of
+-- which are the caller's.
+copiesOf :: Quantity.Quantity -> Modal.Modal Card (GrantedAbility.GrantedAbility Card)
+copiesOf quantity =
+  Modal.MkModal
+    ( Seq.singleton
+        ( Mode.MkMode
+            ( Seq.singleton
+                ( Clause.MkClause
+                    Nothing
+                    Nothing
+                    Nothing
+                    Optionality.Mandatory
+                    Nothing
+                    ( Seq.singleton
+                        ( Effect.CopyStackObject
+                            CopyStackObject.MkCopyStackObject
+                              { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
+                                CopyStackObject.targets = CopyTargets.ChosenByController,
+                                CopyStackObject.quantity = quantity
+                              }
+                        )
+                    )
+                )
+            )
+            Map.empty
+        )
+    )
+    (ModeSelection.ChooseExactly 1)
 
 -- CR 702.56a's and CR 702.153a's SECOND ability: "When you cast this spell, if a
 -- [replicate/casualty] cost was paid for it, copy it [for each time its replicate
 -- cost was paid]. If the spell has any targets, you may choose new targets for
 -- [any of] the cop[ies]."
 --
--- `storm` below is the same trigger with no intervening "if" and a different
--- count; what differs is only which question CR 707.10 is handed, which is why
--- the two keywords share this builder and rule 702.40a does not.
+-- `storm` and `gravestorm` below are the same trigger with no intervening "if";
+-- what differs across all of them is only which question CR 707.10 is handed,
+-- which is why they share `copiesOf` and only the intervening "if" is written
+-- here.
 --
 -- The intervening "if" is CR 603.4's, evoke's reading: Quantity.TimesPaid reads
 -- Object.paidCosts off the SPELL, which CR 601.2b stamped as it was announced,
@@ -6137,32 +6235,7 @@ paidSpellCopies :: Keyword -> Quantity.Quantity -> TriggeredAbility Card (Grante
 paidSpellCopies keyword quantity =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfCast,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          ( Seq.singleton
-              ( Mode.MkMode
-                  ( Seq.singleton
-                      ( Clause.MkClause
-                          Nothing
-                          Nothing
-                          Nothing
-                          Optionality.Mandatory
-                          Nothing
-                          ( Seq.singleton
-                              ( Effect.CopyStackObject
-                                  CopyStackObject.MkCopyStackObject
-                                    { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
-                                      CopyStackObject.targets = CopyTargets.ChosenByController,
-                                      CopyStackObject.quantity = quantity
-                                    }
-                              )
-                          )
-                      )
-                  )
-                  Map.empty
-              )
-          )
-          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.modal = copiesOf quantity,
       TriggeredAbility.intervening =
         Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid keyword) Comparison.AtLeast (Quantity.Literal 1))),
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -6172,10 +6245,8 @@ paidSpellCopies keyword quantity =
 -- cast before it this turn. If the spell has any targets, you may choose new
 -- targets for any of the copies."
 --
--- "It" is the spell itself, which is this ability's source (CR 113.7), named as
--- the stack object Filter.IsSource matches. CopyTargets.ChosenByController is
--- CR 707.10c's offer, asked per copy and never raised for a spell with no
--- targets.
+-- The instruction is `copiesOf`'s, which carries its reasons; what rule 702.40a
+-- states of its own is the count and the absence of an intervening "if".
 --
 -- Not implemented: copying a spell that has left the stack before the trigger
 -- resolves (CR 608.2h); the trigger then copies nothing (#3618).
@@ -6183,32 +6254,27 @@ storm :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 storm =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfCast,
-      TriggeredAbility.modal =
-        Modal.MkModal
-          ( Seq.singleton
-              ( Mode.MkMode
-                  ( Seq.singleton
-                      ( Clause.MkClause
-                          Nothing
-                          Nothing
-                          Nothing
-                          Optionality.Mandatory
-                          Nothing
-                          ( Seq.singleton
-                              ( Effect.CopyStackObject
-                                  CopyStackObject.MkCopyStackObject
-                                    { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
-                                      CopyStackObject.targets = CopyTargets.ChosenByController,
-                                      CopyStackObject.quantity = Quantity.SpellsCastBefore
-                                    }
-                              )
-                          )
-                      )
-                  )
-                  Map.empty
-              )
-          )
-          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.modal = copiesOf Quantity.SpellsCastBefore,
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
+
+-- CR 702.69a: "When you cast this spell, copy it for each permanent that was put
+-- into a graveyard from the battlefield this turn. If the spell has any targets,
+-- you may choose new targets for any of the copies."
+--
+-- `storm` above with ONE thing changed, which is the whole of what rule 702.69a
+-- states differently from rule 702.40a: the count. A count of the WHOLE turn
+-- where rule 702.40a counts what came before the spell, so nothing here reads the
+-- spell's own place in the log.
+--
+-- Not implemented: copying a spell that has left the stack before the trigger
+-- resolves (CR 608.2h); the trigger then copies nothing (#3618).
+gravestorm :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+gravestorm =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfCast,
+      TriggeredAbility.modal = copiesOf Quantity.PermanentsDiedThisTurn,
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }

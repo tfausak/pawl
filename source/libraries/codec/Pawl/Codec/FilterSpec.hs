@@ -108,6 +108,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.ManaValueLessThanSource
       " {\"type\":\"ManaValueLessThanSource\"} "
+  Spec.it s "SharesColorWithSource" $
+    Common.assertCodec
+      s
+      codec
+      Filter.SharesColorWithSource
+      " {\"type\":\"SharesColorWithSource\"} "
   Spec.it s "PowerLessThanSource" $
     Common.assertCodec
       s

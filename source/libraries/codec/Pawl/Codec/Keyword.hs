@@ -101,6 +101,8 @@ codec =
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator (\x -> case x of Keyword.Annihilator y -> Just y; _ -> Nothing),
       Arm.nullary "Cascade" Keyword.Cascade,
       Arm.nullary "Storm" Keyword.Storm,
+      Arm.nullary "Gravestorm" Keyword.Gravestorm,
+      Arm.nullary "Conspire" Keyword.Conspire,
       Arm.payload "Affinity" (Filter.codec codec) Keyword.Affinity (\x -> case x of Keyword.Affinity y -> Just y; _ -> Nothing),
       Arm.payload "Cleave" (Cost.codec codec) Keyword.Cleave (\x -> case x of Keyword.Cleave y -> Just y; _ -> Nothing),
       Arm.payload "Evoke" (Cost.codec codec) Keyword.Evoke (\x -> case x of Keyword.Evoke y -> Just y; _ -> Nothing),

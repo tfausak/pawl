@@ -142,6 +142,7 @@ codec =
       -- "a player cast two or more" are the Comparison's, not this arm's.
       Arm.payload "SpellsCastLastTurn" PlayerRef.codec Quantity.SpellsCastLastTurn (\x -> case x of Quantity.SpellsCastLastTurn y -> Just y; _ -> Nothing),
       Arm.nullary "SpellsCastBefore" Quantity.SpellsCastBefore,
+      Arm.nullary "PermanentsDiedThisTurn" Quantity.PermanentsDiedThisTurn,
       -- CR 309.7's tally, with only a PlayerRef on the wire for
       -- CardsDiscardedThisTurn's reason above -- read off the player rather than
       -- the log, since a completion outlives the turn it happened in. The
