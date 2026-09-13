@@ -2987,7 +2987,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- swept BEFORE the rebuild, the only state in which the exemption can be read;
   -- putting them back is a separate effect of the same ability.
   --
-  -- Not implemented: CR 727.6's restarted SUBGAME (#1628).
+  -- CR 727.6 needs no code of its own: a subgame runs in its own frame
+  -- (Pawl.Engine.Engine.playSubgame), which a restart inside it cannot reach
+  -- out of, and the game loop exits the instant GameState.result is Just, so a
+  -- main-game effect can only ever read the restarted subgame's winner.
   Effect.RestartGame exempt -> do
     gs <- State.get
     let exempted = case exempt of

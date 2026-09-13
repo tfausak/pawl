@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers CR 720 end to end: Pawl.Types.Layout's Omen arm, the Pawl.Engine.Card
 -- arms that read it (CR 720.4's normal-characteristics view and CR 720.3's
@@ -14,6 +15,7 @@
 module Pawl.OmenSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -26,6 +28,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -35,8 +38,11 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Zone as Zone
 
 -- The two names the card prints (CR 720.2). The first is the card's own name
@@ -49,6 +55,44 @@ roarName = CardName.MkCardName (Text.pack "Signaling Roar")
 
 soldierName :: CardName.CardName
 soldierName = CardName.MkCardName (Text.pack "Soldier Token")
+
+-- alice's board for CR 616.1e's race: two Plains for Signaling Roar's {1}{W} and
+-- Rest in Peace already on the battlefield. Her library starts EMPTY
+-- (S.landsInPlay), so the library reading is the omen card or nothing.
+omenRaceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+omenRaceBoard dawnbreaker plains restInPeace =
+  let (restId, board) = S.addPermanent restInPeace S.alice (S.landsInPlay plains 2)
+      (gs, oid) = S.handOne dawnbreaker board
+   in (gs, oid, restId)
+
+-- CR 616.1e's order: take the candidate Rest in Peace SOURCES when `restFirst`,
+-- and rule 720.3d's row -- whose source is the spell's own stack incarnation, an
+-- id no fixture holds -- when not. Pinned by source rather than by index, so
+-- neither answer can turn into the other under a change to the engine's canonical
+-- candidate order.
+racingRoar :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+racingRoar restFirst restId p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> (ReplacementEntry.source entry == restId) == restFirst) entries)
+  _ -> S.identityAnswer p
+
+-- Cast and resolve, keeping the seats asked to order CR 616.1's applicable
+-- effects along with the finished board.
+omenRace ::
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ([PlayerId.PlayerId], GameState.GameState)
+omenRace answer gs oid =
+  let step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      step p = case p of
+        Prompt.ChooseReplacement _ pid _ -> do
+          State.modify' (<> [pid])
+          pure (answer p)
+        _ -> pure (answer p)
+      cast = snd (fst (State.runState (Engine.runGame step gs (Cast.castSpell S.manaPerformer S.alice oid roarName Facing.FaceUp)) []))
+      ((_, after), asked) = State.runState (Engine.runGame step cast Stack.resolveTop) []
+   in (asked, after)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Omen" $ do
@@ -119,6 +163,47 @@ spec s registry = Spec.describe s "Omen" $ do
     -- would pass the two assertions above by being still on the stack.
     Spec.assertEqWith s "the Soldier token is on the battlefield" (length (filter (\o -> Set.member soldierName (Projection.namesOf o resolved)) (Set.toList (GameState.battlefield resolved)))) 1
     Spec.assertEqWith s "and the stack is empty" (length (GameState.stack resolved)) 0
+  -- CR 616.1e: rule 720.3d's rewrite is a replacement effect (CR 614.1a), so a row
+  -- another OBJECT contributes to the same CR 608.2n move races it. Rest in Peace
+  -- ({1}{W} Enchantment, "When this enchantment enters, exile all graveyards. / If
+  -- a card or token would be put into a graveyard from anywhere, exile it instead"
+  -- -- Oracle text fetched from Scryfall 2026-09-13) is the racer, placed outright
+  -- so its entry trigger is never put on the stack.
+  --
+  -- Nothing in CR 616.1a-d buckets either row -- both are ordinary continuous
+  -- effects of static abilities (CR 604.2), so neither is CR 614.15's
+  -- self-replacement -- and CR 616.1e leaves the choice to the affected object's
+  -- controller. The two orders reach DIFFERENT zones: rule 720.3d first shuffles
+  -- the card into its owner's library, and Rest in Peace first exiles it, which CR
+  -- 614.6 leaves rule 720.3d no graveyard move to replace.
+  --
+  -- Pawl.CastSpec's buyback pair is the shape; `omenRace` keeps the seats CR
+  -- 616.1e asked, which castAndResolve's replay does not reach.
+  Spec.it s "CR 616.1e the Omen taken before Rest in Peace shuffles the card into its owner's library" $ do
+    dawnbreaker <- S.printingOf s registry "Riling Dawnbreaker"
+    plains <- S.printingOf s registry "Plains"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (gs, oid, restId) = omenRaceBoard dawnbreaker plains restInPeace
+        (asked, after) = omenRace (racingRoar False restId) gs oid
+        namesIn zone = fmap (\o -> Projection.namesOf o after) (Game.zoneMembers zone S.alice after)
+    Spec.assertEqWith s "CR 720.3d: the omen card is in its owner's library" (namesIn Zone.Library) [Set.singleton dawnbreakerName]
+    Spec.assertEqWith s "CR 614.6: so Rest in Peace exiled nothing" (namesIn Zone.Exile) []
+    Spec.assertEqWith s "and CR 608.2n's graveyard is empty" (namesIn Zone.Graveyard) []
+    Spec.assertEqWith s "CR 616.1e: the spell's controller was asked, once" asked [S.alice]
+  -- The same board and the same answerer for the ONE answer: taking Rest in Peace
+  -- first exiles the card, and CR 614.6 leaves rule 720.3d nothing to replace --
+  -- the outcome pawl could not reach while finishSpell named the library itself.
+  Spec.it s "CR 616.1e Rest in Peace taken first exiles the Omen instead of shuffling it back" $ do
+    dawnbreaker <- S.printingOf s registry "Riling Dawnbreaker"
+    plains <- S.printingOf s registry "Plains"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (gs, oid, restId) = omenRaceBoard dawnbreaker plains restInPeace
+        (asked, after) = omenRace (racingRoar True restId) gs oid
+        namesIn zone = fmap (\o -> Projection.namesOf o after) (Game.zoneMembers zone S.alice after)
+    Spec.assertEqWith s "CR 614.6: the resolved Omen is in exile" (namesIn Zone.Exile) [Set.singleton dawnbreakerName]
+    Spec.assertEqWith s "and the library rule 720.3d would have shuffled it into is empty" (namesIn Zone.Library) []
+    Spec.assertEqWith s "the graveyard is empty on this order too" (namesIn Zone.Graveyard) []
+    Spec.assertEqWith s "CR 616.1e: alice was asked here as well" asked [S.alice]
   -- CR 701.24a is the other half of rule 720.3d's "shuffles": the move alone
   -- would put the card back in a known position. Counted through the prompt,
   -- since Pawl.Engine.Event.shuffleLibrary raises exactly one Prompt.Shuffle per

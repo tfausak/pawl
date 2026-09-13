@@ -130,6 +130,7 @@ import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
+import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
@@ -3487,36 +3488,36 @@ installTurnSkips entry gs =
          in g1 {GameState.replacements = active : GameState.replacements g1}
    in List.foldl' install gs (Set.toAscList (ExtraTurn.skipped entry))
 
--- CR 702.27a's second static ability, as a row over CR 608.2n's own move:
--- "if the buyback cost was paid, put this spell into its owner's hand instead of
--- into that player's graveyard as it resolves". Installed by
--- Pawl.Engine.Resolve.finishSpell immediately before it proposes the graveyard
--- move, so this rewrite and every other row watching that move reach CR 616.1's
--- loop together and the spell's controller orders them (CR 616.1e). Rest in Peace
--- over a bought-back Elvish Fury is the board that observes it: buyback first
--- puts the card in its owner's hand, Rest in Peace first exiles it and CR 614.6
--- leaves buyback nothing to replace. Pawl.CastSpec's "CR 616.1e buyback taken
--- before Rest in Peace puts the spell into its owner's hand" and "CR 616.1e Rest
--- in Peace taken first exiles the bought-back spell instead" drive both orders.
+-- CR 608.2n's move is what all four of these rows watch, and
+-- Pawl.Engine.Resolve.finishSpell mints them immediately before it proposes that
+-- move, so each rewrite and every other row watching the same move reach CR
+-- 616.1's loop together and the spell's controller orders them (CR 616.1e). Rest
+-- in Peace over a bought-back Elvish Fury is the board that observes it: buyback
+-- first puts the card in its owner's hand, Rest in Peace first exiles it and CR
+-- 614.6 leaves buyback nothing to replace. Pawl.CastSpec's "CR 616.1e buyback
+-- taken before Rest in Peace puts the spell into its owner's hand" and "CR 616.1e
+-- Rest in Peace taken first exiles the bought-back spell instead" drive both
+-- orders.
 --
--- MINTED AT THE MOVE rather than gathered off the stack as a printed row, which
--- is how rule 702.27a's "as it resolves" is scoped: the rule leaves a countered
--- (CR 701.6a) or a fizzled (CR 608.2b) spell in the graveyard, and neither road
+-- MINTED AT THE MOVE rather than gathered off the stack as printed rows, which is
+-- how each rule's "as it resolves" is scoped: all four leave a countered (CR
+-- 701.6a) or a fizzled (CR 608.2b) spell in the graveyard, and neither road
 -- reaches finishSpell, so a standing row keyed on a graveyard destination would
 -- over-apply to both.
 --
 -- installTurnSkips' shape in every other respect. Uses.Once and Expiry.Never are
 -- flashback's pair (Pawl.Engine.Cast.armCastFromGraveyard): the move happens
--- once, and rule 702.27a states no duration. A row Rest in Peace outraces is left
--- unspent and is inert, CR 400.7 giving the exiled card a new id that
--- Filter.IsSource cannot match.
+-- once, and none of the four rules states a duration. A row another is taken
+-- ahead of is left unspent and is inert, CR 400.7 giving the moved card a new id
+-- that Filter.IsSource cannot match -- and `rowApplied` reads that leftover back
+-- out.
 --
 -- ReplacementOrigin.Other, not SelfReplacement: CR 604.2 has a static ability
 -- create the continuous effect, and CR 614.15 scopes a self-replacement to an
 -- effect of a RESOLVING spell replacing that spell's own effect. So CR 616.1a
--- buckets neither this nor Rest in Peace, and CR 616.1e is the step that applies.
-installBuybackReturn :: ObjectId -> PlayerId -> GameState -> GameState
-installBuybackReturn spellId caster gs =
+-- buckets neither these nor Rest in Peace, and CR 616.1e is the step that applies.
+installSpellMoveRow :: Zone.Zone -> Bool -> ObjectId -> PlayerId -> GameState -> (Timestamp, GameState)
+installSpellMoveRow destination shuffling spellId caster gs =
   let (ts, gs1) = Game.freshTimestamp gs
       active =
         ActiveReplacement.MkActiveReplacement
@@ -3524,87 +3525,82 @@ installBuybackReturn spellId caster gs =
               ReplacementEffect.ZoneChangeR
                 ( ZoneChangeR.MkZoneChangeR
                     ZoneChangePattern.MkZoneChangePattern
-                      { -- Rule 702.27a names the destination it replaces, so the
-                        -- pattern does too -- and a row that named none would
-                        -- re-fire on its own output.
+                      { -- Each of the four rules names the destination it
+                        -- replaces, so the pattern does too -- and a row that
+                        -- named none would re-fire on its own output.
                         ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                         ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-                        -- Rule 702.27a says "this spell", so the row is scoped
-                        -- to the object it was minted for -- castFromGraveyardExile's
+                        -- Each says "this spell", so the row is scoped to the
+                        -- object it was minted for -- castFromGraveyardExile's
                         -- Filter.IsSource, and for its reason.
                         ZoneChangePattern.whatObject = Filter.Type.IsSource
                       }
-                    Zone.Hand
+                    destination
                     False
-                    False
+                    shuffling
                 ),
             -- CR 113.7: the spell itself, which the pattern's IsSource is
             -- compared against.
             ActiveReplacement.source = spellId,
-            -- CR 109.5's "you". Nothing in rule 702.27a's rewrite reads it --
-            -- the destination is the OWNER's hand, which Event.changeZone
-            -- decides off the moving object (CR 400.3) -- but the row carries it
-            -- as every other row does, armCastFromGraveyard's posture.
+            -- CR 109.5's "you". Nothing in these rewrites reads it -- each
+            -- destination is the OWNER's zone, which Event.changeZone decides off
+            -- the moving object (CR 400.3) -- but the row carries it as every
+            -- other row does, armCastFromGraveyard's posture.
             ActiveReplacement.controller = caster,
             ActiveReplacement.timestamp = ts,
             ActiveReplacement.expiry = Expiry.Never,
             ActiveReplacement.uses = Uses.Once,
             ActiveReplacement.origin = ReplacementOrigin.Other,
-            -- No clause: rule 702.27a's own "if the buyback cost was paid" is the
-            -- designation Pawl.Engine.Cast.stampBoughtBack wrote, and finishSpell
-            -- has already read it (see Pawl.Types.ActiveReplacement).
+            -- No clause: each rule's own condition is a fact finishSpell has
+            -- already read before minting the row (see
+            -- Pawl.Types.ActiveReplacement).
             ActiveReplacement.condition = Nothing,
             ActiveReplacement.rider = Nothing,
             ActiveReplacement.slots = Map.empty
           }
-   in gs1 {GameState.replacements = active : GameState.replacements gs1}
+   in (ts, gs1 {GameState.replacements = active : GameState.replacements gs1})
 
--- CR 702.88a's static ability as a row over CR 608.2n's own move: "if this spell
--- was cast from your hand, instead of putting it into your graveyard as it
--- resolves, exile it". installBuybackReturn's twin with exile for the hand, and
--- installed by Pawl.Engine.Resolve.finishSpell the same way, so rule 702.88a's
--- rewrite and every other row watching that move reach CR 616.1's loop together.
---
--- MINTED AT THE MOVE for installBuybackReturn's reason: rule 702.88a scopes the
--- rewrite to "as it resolves", and a standing row keyed on a graveyard
--- destination would over-apply to a countered (CR 701.6a) or a fizzled (CR
--- 608.2b) spell, both of which rule 702.88a leaves in the graveyard.
+-- CR 702.27a's second static ability: "if the buyback cost was paid, put this
+-- spell into its owner's hand instead of into that player's graveyard as it
+-- resolves". Its condition is the designation Pawl.Engine.Cast.stampBoughtBack
+-- wrote.
+installBuybackReturn :: ObjectId -> PlayerId -> GameState -> (Timestamp, GameState)
+installBuybackReturn = installSpellMoveRow Zone.Hand False
+
+-- CR 702.88a's static ability: "if this spell was cast from your hand, instead of
+-- putting it into your graveyard as it resolves, exile it".
 --
 -- The DELAYED ABILITY rule 702.88a creates is not this row's: a ZoneChangeR
 -- rewrites a destination and nothing else, so finishSpell arms it after the move
--- lands, against the incarnation CR 400.7 minted.
-installReboundExile :: ObjectId -> PlayerId -> GameState -> GameState
-installReboundExile spellId caster gs =
-  let (ts, gs1) = Game.freshTimestamp gs
-      active =
-        ActiveReplacement.MkActiveReplacement
-          { ActiveReplacement.effect =
-              ReplacementEffect.ZoneChangeR
-                ( ZoneChangeR.MkZoneChangeR
-                    ZoneChangePattern.MkZoneChangePattern
-                      { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
-                        ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-                        -- Rule 702.88a says "this spell", installBuybackReturn's
-                        -- scoping.
-                        ZoneChangePattern.whatObject = Filter.Type.IsSource
-                      }
-                    Zone.Exile
-                    False
-                    False
-                ),
-            ActiveReplacement.source = spellId,
-            ActiveReplacement.controller = caster,
-            ActiveReplacement.timestamp = ts,
-            ActiveReplacement.expiry = Expiry.Never,
-            ActiveReplacement.uses = Uses.Once,
-            ActiveReplacement.origin = ReplacementOrigin.Other,
-            -- No clause: rule 702.88a's own "if this spell was cast from your
-            -- hand" is Object.castFrom, and finishSpell has already read it.
-            ActiveReplacement.condition = Nothing,
-            ActiveReplacement.rider = Nothing,
-            ActiveReplacement.slots = Map.empty
-          }
-   in gs1 {GameState.replacements = active : GameState.replacements gs1}
+-- lands, against the incarnation CR 400.7 minted -- and only where `rowApplied`
+-- says THIS row is what moved the card, CR 614.6 leaving an outraced rule 702.88a
+-- nothing to apply.
+installReboundExile :: ObjectId -> PlayerId -> GameState -> (Timestamp, GameState)
+installReboundExile = installSpellMoveRow Zone.Exile False
+
+-- CR 715.3d's first sentence: "Instead of putting a spell that was cast as an
+-- Adventure into its owner's graveyard as it resolves, its controller exiles it."
+-- Its second sentence -- the permission on the exiled card -- is finishSpell's,
+-- armed off `rowApplied` the way rule 702.88a's delayed ability is.
+installAdventureExile :: ObjectId -> PlayerId -> GameState -> (Timestamp, GameState)
+installAdventureExile = installSpellMoveRow Zone.Exile False
+
+-- CR 720.3d: "As an Omen spell resolves, its controller shuffles it into its
+-- owner's library instead of putting it into its owner's graveyard as it
+-- resolves." CR 701.24a's randomisation is the row's own `shuffling` rider --
+-- Nexus of Fate's -- which is what keeps the shuffle from happening on an order
+-- that sent the card somewhere other than a library.
+installOmenShuffle :: ObjectId -> PlayerId -> GameState -> (Timestamp, GameState)
+installOmenShuffle = installSpellMoveRow Zone.Library True
+
+-- CR 614.3 / 614.6: is the row installSpellMoveRow minted at `ts` what moved the
+-- card? `consume` deletes a spent Uses.Once row, so a row still standing is one
+-- CR 616.1's loop never chose -- which is how finishSpell tells rule 702.88a's own
+-- exile from Rest in Peace's, the two being the same destination.
+rowApplied :: ObjectId -> Timestamp -> GameState -> Bool
+rowApplied spellId ts gs =
+  let standing active = ActiveReplacement.source active == spellId && ActiveReplacement.timestamp active == ts
+   in not (any standing (GameState.replacements gs))
 
 asPhaseBegin :: ProposedEvent -> Maybe (PhaseSelector, PlayerId)
 asPhaseBegin event = case event of
