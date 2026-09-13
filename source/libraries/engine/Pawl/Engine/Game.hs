@@ -1850,9 +1850,31 @@ enteredBattlefield = fmap ZoneChange.object . enteredBattlefieldChange
 -- the callers; enteredBattlefield above is this with the extra fields dropped, so
 -- the two cannot disagree about what entered.
 enteredBattlefieldChange :: GameEvent -> Maybe ZoneChange.ZoneChange
-enteredBattlefieldChange event = case event of
-  GameEvent.Moved (Moved.MkMoved change _ _) ->
-    if ZoneChange.to change == Zone.Battlefield then Just change else Nothing
+enteredBattlefieldChange event = do
+  change <- movedChange event
+  if ZoneChange.to change == Zone.Battlefield then Just change else Nothing
+
+-- CR 700.4's "is put into a graveyard from the battlefield", the reader
+-- `enteredBattlefieldChange` above is the other direction of: rule 702.69a's
+-- gravestorm counts these, through Pawl.Engine.Quantity's PermanentsDiedThisTurn
+-- arm.
+--
+-- ONE per departure even where CR 712.21 put two cards into the graveyard: the
+-- rule counts PERMANENTS put there, and a melded permanent leaving is one
+-- departure -- which is exactly what GameEvent.Moved carries and
+-- GameEvent.CardArrived does not, so reading this event and not that one is the
+-- rule rather than an omission.
+diedChange :: GameEvent -> Maybe ZoneChange.ZoneChange
+diedChange event = do
+  change <- movedChange event
+  if ZoneChange.from change == Zone.Battlefield && ZoneChange.to change == Zone.Graveyard then Just change else Nothing
+
+-- CR 400.7's zone change itself, whatever its ends -- the exhaustive case the two
+-- readers above share, so a new GameEvent constructor is classified once rather
+-- than in each of them.
+movedChange :: GameEvent -> Maybe ZoneChange.ZoneChange
+movedChange event = case event of
+  GameEvent.Moved (Moved.MkMoved change _ _) -> Just change
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing
   GameEvent.SpellCast {} -> Nothing

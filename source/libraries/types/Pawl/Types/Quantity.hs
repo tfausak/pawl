@@ -188,6 +188,10 @@ data Quantity
   | -- | CR 702.40a: how many spells, by any player, were cast this turn before the
     -- object this quantity is evaluated against -- storm's count.
     SpellsCastBefore
+  | -- | CR 700.4 \/ 608.2i: how many permanents, of any player, were put into a
+    -- graveyard from the battlefield this turn -- gravestorm's count (CR
+    -- 702.69a).
+    PermanentsDiedThisTurn
   | -- | CR 309.7: how many dungeons that player has completed
     -- (Player.completedDungeons).
     DungeonsCompleted PlayerRef.PlayerRef

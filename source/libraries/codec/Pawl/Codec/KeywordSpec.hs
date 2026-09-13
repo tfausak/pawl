@@ -1158,6 +1158,21 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Storm
       " {\"type\":\"Storm\"} "
+  -- CR 702.69a. Nullary for Storm's reason: its count is the log's too.
+  Spec.it s "Gravestorm" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Gravestorm
+      " {\"type\":\"Gravestorm\"} "
+  -- CR 702.78a. Nullary: the creatures it taps are written in the cost
+  -- Pawl.Engine.Keyword.conspireCost mints, not onto the card.
+  Spec.it s "Conspire" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Conspire
+      " {\"type\":\"Conspire\"} "
   Spec.it s "Persist" $
     Common.assertCodec
       s

@@ -722,6 +722,20 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
           case break ((== oid) . SpellWasCast.spell) casts of
             (_, []) -> Nothing
             (before, _) -> Just (toInteger (length before))
+        -- CR 700.4 / 702.69a: how many permanents, of any controller, were put into
+        -- a graveyard from the battlefield this turn. The arm above's log fold with
+        -- no keying on the evaluation's own object: rule 702.69a counts the whole
+        -- turn, where rule 702.40a counts only what came before the spell -- and
+        -- GameState.events is cleared at turn handoff, which is the whole of "this
+        -- turn".
+        --
+        -- A TOKEN counts: CR 111.7 puts it into the graveyard before CR 704.5d
+        -- removes it, so the move is logged like any other.
+        --
+        -- Always a number, never Nothing: the fold answers for an evaluation aimed
+        -- at no object at all, nothing here being read off one.
+        Quantity.PermanentsDiedThisTurn ->
+          Just (toInteger (length (Maybe.mapMaybe (Game.diedChange . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
         -- CR 309.7: how many dungeons that player has completed. LifeTotal's arm in
         -- ARITY -- one player's tally, so a reference naming several answers "whose?"
         -- rather than a sum -- and in SOURCE: read straight off the player, because
@@ -1079,6 +1093,7 @@ objectSlots quantity = case quantity of
   Quantity.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.SpellsCastLastTurn _ -> Set.empty
   Quantity.SpellsCastBefore -> Set.empty
+  Quantity.PermanentsDiedThisTurn -> Set.empty
   Quantity.DungeonsCompleted _ -> Set.empty
   Quantity.CompletedDungeon {} -> Set.empty
   Quantity.EnteredThisTurn -> Set.empty
@@ -1314,6 +1329,7 @@ readsX quantity = case quantity of
   Quantity.DamageDealtToPlayersThisTurn _ -> False
   Quantity.SpellsCastLastTurn _ -> False
   Quantity.SpellsCastBefore -> False
+  Quantity.PermanentsDiedThisTurn -> False
   Quantity.DungeonsCompleted _ -> False
   Quantity.CompletedDungeon {} -> False
   Quantity.EnteredThisTurn -> False

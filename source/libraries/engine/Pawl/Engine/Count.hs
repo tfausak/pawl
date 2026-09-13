@@ -303,6 +303,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.HasCardType _ -> predicate
         Filter.Type.HasSupertype _ -> predicate
         Filter.Type.HasColor _ -> predicate
+        Filter.Type.SharesColorWithSource -> predicate
         Filter.Type.HasSubtype _ -> predicate
         Filter.Type.HasName _ -> predicate
         Filter.Type.HasNameOriginallyPrintedIn _ -> predicate

@@ -48,6 +48,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
@@ -58,6 +59,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -2095,6 +2097,138 @@ casualtySpec s registry = Spec.describe s "Casualty" $ do
       (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob after, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dryad Arbor")) S.alice after)
       (1, 1)
 
+-- CR 702.69a's gravestorm: "When you cast this spell, copy it for each permanent
+-- that was put into a graveyard from the battlefield this turn."
+--
+-- Ominous Harvest {2}{B} Sorcery -- "Gravestorm / Target player draws a card and
+-- loses 1 life." (Oracle text checked on Scryfall, 2026-09-13) -- is the
+-- producer.
+--
+-- THE BOARD distinguishes rule 702.69a's count from the two counts it is not.
+-- Alice Bolts two of bob's Hill Giants before casting: two PERMANENTS reached a
+-- graveyard FROM THE BATTLEFIELD, while the two Bolts reached one from the STACK
+-- and rule 702.69a does not count those. Two copies, so bob draws three cards
+-- and loses three life; a count of every card put into a graveyard makes it five
+-- and no trigger at all makes it one.
+gravestormSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gravestormSpec s registry = Spec.describe s "Gravestorm" $ do
+  Spec.it s "CR 702.69a gravestorm is minted for a spell on the stack and nowhere else" $ do
+    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Set.singleton Keyword.Type.Gravestorm)) [Keyword.gravestorm]
+    Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Gravestorm 1)) []
+
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.69a Ominous Harvest copies itself once per permanent that died, and not for the Bolts in the graveyard" $ do
+    harvest <- S.printingOf s registry "Ominous Harvest"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    giant <- S.printingOf s registry "Hill Giant"
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    let lands = S.landsFor swamp S.alice 3 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (firstGiant, g1) = S.addPermanent giant S.bob lands
+        (secondGiant, g2) = S.addPermanent giant S.bob g1
+        (firstBolt, g3) = S.addHandCard bolt S.alice g2
+        (secondBolt, g4) = S.addHandCard bolt S.alice g3
+        (harvestId, g5) = S.addHandCard harvest S.alice g4
+        -- CR 104.3c: bob draws three, so his library must hold more than three.
+        stocked = foldr (\_ gs -> snd (S.addLibraryCard giant S.bob gs)) g5 [1 :: Int .. 5]
+        board =
+          stocked
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain
+            }
+        step recipient gs action = snd (Engine.runGamePure (pinTarget recipient) gs (action >> Engine.settleForPriority))
+        castAndResolve recipient gs oid = step recipient (step recipient gs {GameState.priority = Just S.alice} (S.cast S.alice oid)) Stack.resolveTop
+        -- Each Bolt aimed by its own answerer, so the two structurally identical
+        -- target prompts cannot be answered the same way.
+        killed = castAndResolve (Recipient.ToCreature secondGiant) (castAndResolve (Recipient.ToCreature firstGiant) board firstBolt) secondBolt
+        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step (Recipient.ToPlayer S.bob) gs Stack.resolveTop)
+        after = resolveAll (step (Recipient.ToPlayer S.bob) killed {GameState.priority = Just S.alice} (S.cast S.alice harvestId))
+    Spec.assertEqWith s "CR 700.4 bob lost 1 life to the original and 1 to each of TWO copies" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "and drew three cards, the two Giants having left his battlefield" (S.handSize S.bob after) 3
+
+-- CR 702.78a's conspire: "As an additional cost to cast this spell, you may tap
+-- two untapped creatures you control that each share a color with it" and "When
+-- you cast this spell, if its conspire cost was paid, copy it."
+--
+-- Burn Trail {3}{R} Sorcery -- "Burn Trail deals 3 damage to any target. /
+-- Conspire" (Oracle text checked on Scryfall, 2026-09-13) -- is the producer.
+--
+-- THE BOARD: alice holds THREE untapped red Hill Giants, so rule 702.78a's
+-- choice of two is a real one rather than a set the prompt would elide, and one
+-- untapped GREEN Giant Spider, which the cost's colour clause must keep out of
+-- the offer. Burn Trail is red, so "share a color with it" is a question the
+-- board can answer both ways.
+conspireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+conspireSpec s registry = Spec.describe s "Conspire" $ do
+  Spec.it s "CR 702.78a conspire's trigger is minted for a spell on the stack and nowhere else" $ do
+    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Set.singleton Keyword.Type.Conspire))) 1
+    Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Conspire 1)) []
+
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.78a Burn Trail with its conspire paid deals its damage twice; unpaid, once" $ do
+    burnTrail <- S.printingOf s registry "Burn Trail"
+    giant <- S.printingOf s registry "Hill Giant"
+    spider <- S.printingOf s registry "Giant Spider"
+    mountain <- S.printingOf s registry "Mountain"
+    let lands = S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers)
+        (firstGiant, g1) = S.addPermanent giant S.alice lands
+        (secondGiant, g2) = S.addPermanent giant S.alice g1
+        (thirdGiant, g3) = S.addPermanent giant S.alice g2
+        (spiderId, g4) = S.addPermanent spider S.alice g3
+        (spellId, g5) = S.addHandCard burnTrail S.alice g4
+        board =
+          g5
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        step times gs action = snd (Engine.runGamePure (conspiringWith [firstGiant, secondGiant] times (Recipient.ToPlayer S.bob)) gs (action >> Engine.settleForPriority))
+        resolveAll times gs = if null (GameState.stack gs) then gs else resolveAll times (step times gs Stack.resolveTop)
+        after :: Natural.Natural -> GameState.GameState
+        after times = resolveAll times (step times board (S.cast S.alice spellId))
+        tappedOf oid gs = fmap ((== TapState.Tapped) . Object.tapped) (Game.lookupObject oid gs)
+    Spec.assertEqWith s "bob took the original's 3 and the copy's 3" (S.lifeOf S.bob (after 1)) (Just 14)
+    Spec.assertEqWith s "CR 603.4 unpaid, the original's 3 alone" (S.lifeOf S.bob (after 0)) (Just 17)
+    Spec.assertEqWith
+      s
+      "CR 702.78a the two red creatures alice chose paid, the third red one and the green one did not; unpaid, none of them is tapped"
+      (fmap (`tappedOf` after 1) [firstGiant, secondGiant, thirdGiant, spiderId], fmap (`tappedOf` after 0) [firstGiant, secondGiant, thirdGiant, spiderId])
+      ([Just True, Just True, Just False, Just False], [Just False, Just False, Just False, Just False])
+
+  -- The colour clause, on the same board with alice's red creatures swapped for
+  -- green ones: CR 105.2 leaves nothing sharing Burn Trail's red, so CR 601.2f
+  -- leaves the cost unpayable however she answers.
+  Spec.it s "CR 702.78a creatures sharing none of the spell's colours cannot pay conspire" $ do
+    burnTrail <- S.printingOf s registry "Burn Trail"
+    spider <- S.printingOf s registry "Giant Spider"
+    mountain <- S.printingOf s registry "Mountain"
+    let lands = S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers)
+        (firstSpider, g1) = S.addPermanent spider S.alice lands
+        (secondSpider, g2) = S.addPermanent spider S.alice g1
+        (thirdSpider, g3) = S.addPermanent spider S.alice g2
+        (spellId, g4) = S.addHandCard burnTrail S.alice g3
+        board =
+          g4
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        step gs action = snd (Engine.runGamePure (conspiringWith [firstSpider, secondSpider] 1 (Recipient.ToPlayer S.bob)) gs (action >> Engine.settleForPriority))
+        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step gs Stack.resolveTop)
+        after = resolveAll (step board (S.cast S.alice spellId))
+        tappedOf oid gs = fmap ((== TapState.Tapped) . Object.tapped) (Game.lookupObject oid gs)
+    Spec.assertEqWith s "bob took the original's 3 and no copy's" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "and no green creature was tapped" (fmap (`tappedOf` after) [firstSpider, secondSpider, thirdSpider]) [Just False, Just False, Just False]
+
+-- CR 601.2b's conspire announcement answered `times` times, CR 702.78a's tap
+-- pinned to the named creatures by FILTERING the offered set, and every target
+-- prompt aimed at one recipient.
+conspiringWith :: [ObjectId.ObjectId] -> Natural.Natural -> Recipient.Recipient -> Prompt.Prompt r -> r
+conspiringWith fodder times recipient p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
+  Prompt.ChooseTaps _ _ _ offered _ -> Set.fromList (filter (`elem` fodder) offered)
+  _ -> pinTarget recipient p
+
 -- CR 601.2b's optional additional cost answered `times` times, with every target
 -- prompt -- the spell's own and CR 707.10c's per-copy offer -- pinned to one
 -- recipient: Pawl.CastSpec's paidTimes crossed with `pinTarget` below.
@@ -2552,6 +2686,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   stormSpec s registry
   replicateSpec s registry
   casualtySpec s registry
+  gravestormSpec s registry
+  conspireSpec s registry
   echoSpec s registry
   exploitSpec s registry
   poisonousSpec s registry

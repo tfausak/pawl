@@ -32,6 +32,13 @@ data Filter keyword
   = HasCardType CardType.CardType -- CR 205 / 300: the object's card types include this one.
   | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
   | HasColor Color.Color -- CR 105.2: the object's colours include this one.
+  | -- | CR 105.2 asked of TWO objects: the candidate's colours intersect the
+    -- colours of the object the evaluation comes from (CR 702.78a's conspire).
+    -- PowerLessThanSource's shape one characteristic over -- read off
+    -- Pawl.Engine.Filter.Context's sourceColors -- and vacuously False where
+    -- either side is colourless, which CR 105.2's set reading already makes the
+    -- answer for a colourless source.
+    SharesColorWithSource
   | HasSubtype Subtype.Subtype -- CR 205.3: the object's subtypes include this one.
   | -- | CR 201.2: the object's names include this LITERAL one. Membership, as CR
     -- 709.4a states the test -- a split card off the stack and a Room with both

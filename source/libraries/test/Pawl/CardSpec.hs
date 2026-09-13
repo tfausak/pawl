@@ -2814,6 +2814,11 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Cascade -> []
   -- CR 702.40a names no quality: its count is written into the minted ability.
   Keyword.Storm -> []
+  -- CR 702.69a names none either, for the arm above's reason.
+  Keyword.Gravestorm -> []
+  -- CR 702.78a names its creatures in the rulebook rather than on the card, so
+  -- the Filter is in the cost Pawl.Engine.Keyword.conspireCost mints.
+  Keyword.Conspire -> []
   -- CR 702.153a names its creature in the rulebook rather than on the card, so
   -- the Filter is in the cost Pawl.Engine.Keyword.casualtyCost mints.
   Keyword.Casualty _ -> []
@@ -3268,6 +3273,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> []
   Quantity.Type.SpellsCastLastTurn _ -> []
   Quantity.Type.SpellsCastBefore -> []
+  Quantity.Type.PermanentsDiedThisTurn -> []
   Quantity.Type.DungeonsCompleted _ -> []
   Quantity.Type.CompletedDungeon {} -> []
   Quantity.Type.EnteredThisTurn -> []
@@ -3825,6 +3831,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasCardType _ -> []
   Filter.Type.HasSupertype _ -> []
   Filter.Type.HasColor _ -> []
+  Filter.Type.SharesColorWithSource -> []
   Filter.Type.HasSubtype _ -> []
   Filter.Type.HasName _ -> []
   Filter.Type.HasNameOriginallyPrintedIn _ -> []
