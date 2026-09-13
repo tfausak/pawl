@@ -370,6 +370,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
+  Keyword.Amplify _ -> []
   Keyword.Changeling -> []
   -- CR 603.2: rule 702.75a states no "each instance" clause, so the general
   -- reason gives one ability per instance.
@@ -571,6 +572,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
+  Keyword.Amplify _ -> []
   Keyword.Exalted -> []
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
@@ -957,6 +959,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
+  Keyword.Amplify _ -> []
   Keyword.Exalted -> []
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
@@ -1547,6 +1550,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
+  Keyword.Amplify _ -> []
   Keyword.Exalted -> []
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
@@ -2098,6 +2102,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
+  Keyword.Amplify _ -> []
   Keyword.Exalted -> []
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
@@ -3524,6 +3529,18 @@ mintedReplacementsFor keyword count = case keyword of
   -- application records the count at Binding.sacrificedCount, which a card reads
   -- back as a quantity (Marrow Chomper).
   Keyword.Devour n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber {SacrificeAnyNumber.filter = Filter.HasCardType CardType.Creature, SacrificeAnyNumber.kind = Just CounterKind.PlusOnePlusOne, SacrificeAnyNumber.each = n}))))
+  -- CR 702.38a's whole content, the arm above's position one zone over: what it
+  -- offers is cards in a hand rather than permanents on the battlefield, and
+  -- revealing them spends nothing. Filter.IsSource for riot's reason, CR 614.1c's
+  -- "as this object enters" being the entering object's own ability.
+  --
+  -- ONE ROW PER INSTANCE, riot's reading and rule 702.38b's own words: each
+  -- instance works separately, so two amplifies are two separate reveals.
+  --
+  -- Rule 702.38a's "share a creature type with it" is left to the row's
+  -- application (Pawl.Engine.Event): the types are the ENTERING object's, which
+  -- nothing knowable from a keyword and a count can answer.
+  Keyword.Amplify n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.Amplify n)))
   Keyword.Exalted -> []
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
@@ -3804,6 +3821,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
+  Keyword.Amplify _ -> []
   Keyword.Exalted -> []
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
@@ -4073,6 +4091,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Devour _ -> []
+  Keyword.Amplify _ -> []
   Keyword.Exalted -> []
   Keyword.LivingWeapon -> []
   Keyword.ForMirrodin -> []
@@ -4275,6 +4294,7 @@ familyOf keyword = case keyword of
   Keyword.Infect -> Nothing
   Keyword.Wither -> Nothing
   Keyword.Devour _ -> Just KeywordFamily.Devour
+  Keyword.Amplify _ -> Just KeywordFamily.Amplify
   Keyword.Exalted -> Nothing
   Keyword.LivingWeapon -> Nothing
   Keyword.ForMirrodin -> Nothing

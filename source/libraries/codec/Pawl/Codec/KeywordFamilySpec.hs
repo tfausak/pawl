@@ -79,6 +79,13 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Morph
       " {\"type\":\"Morph\"} "
 
+  Spec.it s "Amplify" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Amplify
+      " {\"type\":\"Amplify\"} "
+
   Spec.it s "Kicker" $
     Common.assertCodec
       s

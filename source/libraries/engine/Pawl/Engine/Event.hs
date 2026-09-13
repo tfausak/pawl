@@ -56,6 +56,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -2220,8 +2221,9 @@ apply batch candidate event =
       -- is left for the card's characteristic-defining ability (CR 208.2a) to read
       -- back out of Binding.sacrificedCount.
       --
-      -- The only entry arm that PERFORMS a game action rather than stamping a
-      -- value, which is why this module and not Pawl.Engine.Replacement holds
+      -- An entry arm that PERFORMS a game action rather than stamping a value --
+      -- the amplify and exile arms below are the others -- which is why this
+      -- module and not Pawl.Engine.Replacement holds
       -- `apply`: the sacrifice is `sacrifice` below, CR 701.21a's one funnel, and
       -- the counters go through addEnteringCounters into the pending map, so CR
       -- 614.16 applies to them in this same loop. Both are the ordinary doors, so
@@ -2312,6 +2314,65 @@ apply batch candidate event =
             -- which rule 702.82b keeps as the number of permanents. Shimatsu the
             -- Bloodcloaked's "that many" is this with `each` at 1.
             Monad.mapM_ (\k -> addEnteringCounters oid k (each * many)) kind
+            pure (Just event)
+      -- CR 702.38a: amplify N (Feral Throwback). "As this object enters, reveal
+      -- any number of cards from your hand that share a creature type with it.
+      -- This permanent enters with N +1/+1 counters on it for each card revealed
+      -- this way."
+      --
+      -- The SacrificeAnyNumber arm above one zone over, and the difference is
+      -- that revealing SPENDS nothing (CR 701.20b): no card moves, so CR 614.12b's
+      -- combined budget across a batch has nothing to divide and the same card may
+      -- be revealed again by the next member of the batch, which is the rules
+      -- answer rather than an omission.
+      --
+      -- WHICH CARDS is Replacement.amplifiableFromHand, read HERE at CR 614.12a's
+      -- moment for RevealOrTapped's reason: an entry replacement applied before
+      -- this one can have moved a card (CR 614.13). Rule 702.38a's exclusion of
+      -- cards entering beside this one falls out of that read; the helper says
+      -- why.
+      --
+      -- THE CREATURE TYPES are the ENTERING object's own, off its CR 613
+      -- projection (Projection.subtypesOf) rather than off the printed face, which
+      -- is what rule 702.38a's "with it" asks for. Not proven on a board: no test
+      -- here enters a copy of an amplify creature or one a continuous effect
+      -- retyped, so this is the right door rather than a demonstrated behaviour.
+      --
+      -- Through `reveal`, CR 701.20a's own funnel, so every shown card reaches the
+      -- public log -- the RevealOrTapped arm's road, and a reveal is not a cost
+      -- here either.
+      --
+      -- The counters go through addEnteringCounters, so CR 614.16 reaches them in
+      -- the entry's own CR 616.1 pool exactly as it reaches devour's.
+      EntryRewrite.Amplify n -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arms above's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner. Reveals nothing rather than
+          -- guessing whose hand "your hand" means, and so places no counters.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            let types = Set.filter Subtype.Engine.isCreatureType (Projection.subtypesOf oid gs)
+                offered = Replacement.amplifiableFromHand controller types gs
+            chosen <-
+              -- Where the rules leave nothing to ask, don't prompt: with no
+              -- candidate the empty set is the only answer. ONE candidate is
+              -- still asked, ChooseAnyNumberToSacrifice's posture -- "any number"
+              -- leaves two distinguishable answers there.
+              if null offered
+                then pure Set.empty
+                else do
+                  answer <- Game.choose (Prompt.ChooseAnyNumberToReveal (Decide.deciderFor controller gs) controller oid offered)
+                  -- FILTERED, NOT TRUSTED (#222): an answer naming a card that
+                  -- was never offered would otherwise buy counters with a card
+                  -- sharing no creature type, or with a card in another hand.
+                  pure (Set.intersection answer (Set.fromList offered))
+            Monad.mapM_ (reveal RevealCause.Ordinary controller) (Set.toAscList chosen)
+            -- "N +1/+1 counters for each card revealed this way": the multiplier
+            -- scales the counters, devour's arithmetic above.
+            addEnteringCounters oid CounterKind.PlusOnePlusOne (n * Natural.length chosen)
             pure (Just event)
       -- CR 614.1c: "as this creature enters, exile an instant or sorcery card from
       -- your graveyard" (Living Lore). The arm above one zone over -- what it

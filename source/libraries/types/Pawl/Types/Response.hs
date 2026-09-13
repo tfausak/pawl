@@ -488,6 +488,12 @@ data Response
     -- ChoseTaps' reason: replaying a transcript against the wrong one would
     -- sacrifice what it should have transformed.
     ChoseAnyNumberOfPermanents (Set.Set ObjectId.ObjectId)
+  | -- | CR 701.20a: the cards a player chose to reveal from their hand as a
+    -- permanent entered (CR 702.38a). A separate constructor from
+    -- ChoseAnyNumberOfPermanents above, though the payload has the same shape,
+    -- for ChoseTaps' reason: replaying a transcript against the wrong one would
+    -- act on permanents where it should have revealed cards in a hand.
+    ChoseReveals (Set.Set ObjectId.ObjectId)
   | -- | CR 608.2d: the ONE permanent a player chose out of the ones an effect
     -- offered, where the effect named exactly one. A separate constructor from
     -- ChoseAttachment below, though the payload has the same shape, for

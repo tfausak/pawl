@@ -1114,6 +1114,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.Devour 3)
       " {\"type\":\"Devour\",\"value\":3} "
     Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Devour 1) /= Codec.encode Keyword.codec (Keyword.Devour 3)) "devour 1 and devour 3 encode differently"
+  -- CR 702.38a's N multiplies the counters each revealed card buys, Devour's
+  -- shape one zone over.
+  Spec.it s "Amplify carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Amplify 2)
+      " {\"type\":\"Amplify\",\"value\":2} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Amplify 1) /= Codec.encode Keyword.codec (Keyword.Amplify 2)) "amplify 1 and amplify 2 encode differently"
   Spec.it s "Riot" $
     Common.assertCodec
       s

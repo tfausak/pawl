@@ -1260,6 +1260,9 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.WithKeywords _ -> ([], [])
   EntryRewrite.UnderSourceControl -> ([], [])
   EntryRewrite.SacrificeAnyNumber sacrifice -> ([SacrificeAnyNumber.filter sacrifice], [])
+  -- CR 702.38a names no slot: its offer is a set of creature types read off the
+  -- entering object's projection, never a Filter a resolution could bind.
+  EntryRewrite.Amplify _ -> ([], [])
   EntryRewrite.ExileFromGraveyard filter_ -> ([filter_], [])
   EntryRewrite.Riot -> ([], [])
   EntryRewrite.ReadAhead -> ([], [])
@@ -1360,6 +1363,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.WithKeywords _ -> []
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.SacrificeAnyNumber _ -> []
+  EntryRewrite.Amplify _ -> []
   EntryRewrite.ExileFromGraveyard _ -> []
   EntryRewrite.Riot -> []
   EntryRewrite.ReadAhead -> []

@@ -257,6 +257,14 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
   -- criterion the chosen permanents must match -- Shimatsu the Bloodcloaked's is
   -- "any number of permanents", the empty conjunction -- and the counter kind the
   -- count buys.
+  -- CR 702.38a's minted row: the multiplier alone, the criterion being the
+  -- entering object's own creature types rather than anything the row carries.
+  Spec.it s "Amplify (Feral Throwback)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryRewrite.Amplify 2)
+      " {\"type\":\"Amplify\",\"value\":2} "
   Spec.it s "SacrificeAnyNumber (Shimatsu the Bloodcloaked)" $
     Common.assertCodec
       s

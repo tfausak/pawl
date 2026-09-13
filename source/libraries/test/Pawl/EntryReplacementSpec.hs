@@ -49,6 +49,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -65,10 +66,12 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
+import qualified Pawl.Types.Zone as Zone
 
 riotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
@@ -429,6 +432,43 @@ bloodthirstXBoard forest woodKin sentry =
       (bobsSentry, withSentry) = S.addPermanent sentry S.bob lands
       (held, gs) = S.addHandCard woodKin S.alice withSentry
    in (readyForAlice gs, held, bobsSentry)
+
+-- alice controls six untapped Forests on a two-seat board and holds one Feral
+-- Throwback ({4}{G}{G} 3/3 Beast, "Amplify 2" and provoke) beside three Beast
+-- cards and one Ogre Sentry, in her precombat main phase with priority. Returns
+-- the state, the Throwback in hand, and the three Beast cards in the order they
+-- were added.
+--
+-- THREE Beasts and a reveal of two: rule 702.38a's "any number" is only a real
+-- choice where the offer is bigger than the answer, and the two numbers must not
+-- coincide with the multiplier either.
+--
+-- The Ogre Sentry is the card that makes "share a creature type WITH IT" mean
+-- something. It is a CREATURE card in the same hand, so a reading that offered
+-- every card, or every creature card, is told apart from rule 702.38a's by the
+-- counters alone.
+amplifyBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId])
+amplifyBoard forest throwback beasts sentry =
+  let lands = S.landsFor forest S.alice 6 (Setup.emptyGame S.bothPlayers)
+      (beastIds, withBeasts) = List.foldl' (\(ids, gs) beast -> let (oid, gs2) = S.addHandCard beast S.alice gs in (ids <> [oid], gs2)) ([], lands) beasts
+      (_, withSentry) = S.addHandCard sentry S.alice withBeasts
+      (held, gs3) = S.addHandCard throwback S.alice withSentry
+   in (readyForAlice gs3, held, beastIds)
+
+-- Reveals exactly `wanted`, filtered to what rule 702.38a's offer actually held.
+-- FILTERED rather than trusted, and pinned by identity rather than by index: an
+-- answerer that searched for a legal card would find one again after a mutation.
+revealing :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+revealing wanted p = case p of
+  Prompt.ChooseAnyNumberToReveal _ _ _ offered -> Set.fromList (filter (`List.elem` offered) wanted)
+  _ -> S.identityAnswer p
+
+-- Reveals every card the engine offered, which is what makes the offer itself
+-- observable on the board: one wrongly offered card is two more counters.
+revealingEverything :: Prompt.Prompt r -> r
+revealingEverything p = case p of
+  Prompt.ChooseAnyNumberToReveal _ _ _ offered -> Set.fromList offered
+  _ -> S.identityAnswer p
 
 -- alice, in her precombat main phase, with priority. Applied by the fixture above
 -- and again after a turn handoff, which leaves the game in CR 502's untap step.
@@ -2465,11 +2505,103 @@ zameckGuildmageSpec s registry = Spec.describe s "Zameck Guildmage (CR 614.3)" $
         Spec.assertEqWith s "setup: it is alice's own later turn, so the same cast was legal" (GameState.activePlayer after, GameState.turnNumber after > GameState.turnNumber armed) (S.alice, True)
       _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
 
+-- CR 702.38: amplify, on Feral Throwback ({4}{G}{G} 3/3 Beast, "Amplify 2" and
+-- provoke). A minted CR 614.1c row whose count is the answer to a question asked
+-- as the permanent enters -- devour's shape one zone over, and unlike devour the
+-- choice spends nothing (CR 701.20b).
+--
+-- ONE BOARD FOR EVERY CASE, differing in nothing but which cards the reveal
+-- names. What the assertions tell apart is how many counters the permanent
+-- entered with.
+--
+-- Distinct numbers everywhere: three Beasts offered, two revealed, a multiplier
+-- of two and four counters on a printed 3/3, so a reading that dropped the
+-- multiplier (2), counted the offer rather than the answer (6) or took the Ogre
+-- Sentry as a candidate (8) produces a different board from rule 702.38a's.
+amplifySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+amplifySpec s registry =
+  let throwbackIn = newestNamed (CardName.MkCardName $ Text.pack "Feral Throwback")
+      -- Which objects a CR 701.20a reveal has shown, off the event log.
+      revealedIn gs =
+        Maybe.mapMaybe
+          ( \event -> case event of
+              GameEvent.Revealed (Revealed.MkRevealed _ oid _ _) -> Just oid
+              _ -> Nothing
+          )
+          (S.eventsOf gs)
+   in Spec.describe s "Amplify (CR 702.38)" $ do
+        Spec.it s "CR 702.38a two Beast cards revealed are four +1/+1 counters" $ do
+          forest <- S.printingOf s registry "Forest"
+          throwback <- S.printingOf s registry "Feral Throwback"
+          baloth <- S.printingOf s registry "Durkwood Baloth"
+          thragtusk <- S.printingOf s registry "Thragtusk"
+          pack <- S.printingOf s registry "Gnarlid Pack"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs, held, beasts) = amplifyBoard forest throwback [baloth, thragtusk, pack] sentry
+              after = castAndResolve (revealing (take 2 beasts)) gs held
+          case throwbackIn after of
+            Nothing -> Spec.assertFailure s "Feral Throwback did not reach the battlefield"
+            Just oid -> do
+              Spec.assertEqWith s "four +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 4
+              -- Printed 3/3, so the counters show in the projection (CR 613.4c,
+              -- layer 7c).
+              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 7)
+              -- CR 701.20b: revealing changes no zone, so both cards are still in
+              -- the hand they were shown from. This is what separates amplify
+              -- from devour, whose choice is paid for.
+              Spec.assertBool s (all (`List.elem` Game.zoneMembers Zone.Hand S.alice after) (take 2 beasts)) "and both revealed cards are still in alice's hand"
+              -- CR 701.20a: through `reveal`, the funnel that files the event, so
+              -- a card watching for a reveal sees these two.
+              Spec.assertEqWith s "and both were shown" (List.sort (revealedIn after)) (List.sort (take 2 beasts))
+        -- THE PAIR THAT MAKES IT "SHARE A CREATURE TYPE WITH IT". The board
+        -- above, revealing everything the engine offered instead of two named
+        -- cards: three Beasts are six counters, and the Ogre Sentry in the same
+        -- hand would have been two more.
+        Spec.it s "CR 702.38a the Ogre Sentry in the same hand is not offered" $ do
+          forest <- S.printingOf s registry "Forest"
+          throwback <- S.printingOf s registry "Feral Throwback"
+          baloth <- S.printingOf s registry "Durkwood Baloth"
+          thragtusk <- S.printingOf s registry "Thragtusk"
+          pack <- S.printingOf s registry "Gnarlid Pack"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs, held, _) = amplifyBoard forest throwback [baloth, thragtusk, pack] sentry
+              after = castAndResolve revealingEverything gs held
+          case throwbackIn after of
+            Nothing -> Spec.assertFailure s "Feral Throwback did not reach the battlefield"
+            Just oid -> Spec.assertEqWith s "six +1/+1 counters, not eight" (countersOn CounterKind.PlusOnePlusOne oid after) 6
+        -- CR 702.38a's "any number" includes none, and the permanent still
+        -- enters: the same board with the reveal declined.
+        Spec.it s "CR 702.38a revealing nothing enters a plain 3/3" $ do
+          forest <- S.printingOf s registry "Forest"
+          throwback <- S.printingOf s registry "Feral Throwback"
+          baloth <- S.printingOf s registry "Durkwood Baloth"
+          thragtusk <- S.printingOf s registry "Thragtusk"
+          pack <- S.printingOf s registry "Gnarlid Pack"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs, held, _) = amplifyBoard forest throwback [baloth, thragtusk, pack] sentry
+              after = castAndResolve (revealing []) gs held
+          case throwbackIn after of
+            Nothing -> Spec.assertFailure s "Feral Throwback did not reach the battlefield"
+            Just oid -> do
+              Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 3)
+        -- CR 702.38b: "if a creature has multiple instances of amplify, each one
+        -- works separately." Asserted at the mint rather than at gameplay level,
+        -- because nothing in the pool prints or grants a second instance -- the
+        -- footing the bloodthirst group's rule 702.54c case states.
+        Spec.it s "CR 702.38b each instance is its own row" $
+          Spec.assertEqWith
+            s
+            "amplify 2 held twice mints two rows"
+            (Keyword.Engine.mintedReplacementsFor (Keyword.Amplify 2) 2)
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.Amplify 2))))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   riotSpec s registry
   unleashSpec s registry
   bloodthirstSpec s registry
+  amplifySpec s registry
   sunburstSpec s registry
   brineElementalSpec s registry
   coldsteelHeartSpec s registry

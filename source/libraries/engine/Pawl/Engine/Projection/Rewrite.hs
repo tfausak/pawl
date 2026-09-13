@@ -1247,6 +1247,11 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- reason -- that EntryR matches Filter.IsSource, and CR 400.7 forbids carrying a
   -- text change onto the permanent before it entered.
   EntryRewrite.ExileFromGraveyard f -> EntryRewrite.ExileFromGraveyard (Filter.rewrite pairs f)
+  -- CR 702.38a carries no Filter and no subtype of its own, so there is nothing
+  -- here for CR 612.1 to change. A text change to the entering object's own
+  -- creature types still reaches the offer, which Pawl.Engine.Event reads off
+  -- that object's CR 613 projection as the row applies.
+  EntryRewrite.Amplify _ -> rewrite
   -- Rules 702.136a, 702.98a and 702.54a state these three whole, bloodthirst's
   -- number included, so the card prints no word for CR 612.1 to reach.
   EntryRewrite.Riot -> rewrite
