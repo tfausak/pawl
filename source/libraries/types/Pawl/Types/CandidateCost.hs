@@ -2,6 +2,7 @@ module Pawl.Types.CandidateCost where
 
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
 
 -- | CR 601.2b: one of the costs a spell may be cast for, together with WHAT
 -- OFFERED IT.
@@ -27,6 +28,25 @@ import qualified Pawl.Types.Keyword as Keyword
 -- list: a granted flashback tags its candidate exactly as a printed one does.
 data CandidateCost = MkCandidateCost
   { keyword :: Maybe Keyword.Keyword,
-    cost :: Cost.Cost Keyword.Keyword
+    cost :: Cost.Cost Keyword.Keyword,
+    -- | CR 601.2f's reductions this candidate BRINGS WITH IT, on top of the ones
+    -- the board states -- CR 702.119a's "if you chose to pay this spell's emerge
+    -- cost, its total cost is reduced by an amount of generic mana equal to the
+    -- sacrificed creature's mana value".
+    --
+    -- Here rather than folded into `cost`, because CR 601.2f applies every
+    -- increase BEFORE any reduction: a candidate whose mana had the amount
+    -- subtracted out would floor at {0} before a tax was added, and pay the tax in
+    -- full. Pawl.Engine.Cast.payableCostAt and Pawl.Engine.Cast.castProposed both
+    -- hand them to Pawl.Engine.Cost.plusReductions, so the gate that offers the
+    -- cast and the total that prices it cannot disagree.
+    --
+    -- Empty for every other candidate: no other rule 702 alternative cost states
+    -- an amount that depends on a choice made at CR 601.2b.
+    reductions :: [ManaCost.ManaCost]
   }
   deriving (Eq, Ord, Show)
+
+-- | A candidate bringing no reduction of its own -- every offer but CR 702.119a's.
+plain :: Maybe Keyword.Keyword -> Cost.Cost Keyword.Keyword -> CandidateCost
+plain k c = MkCandidateCost k c []

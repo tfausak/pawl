@@ -9,7 +9,8 @@ import qualified Pawl.Types.Keyword as Keyword
 -- | CR 601.2f's adjustments to one cost: the increases that apply to it, the
 -- reductions that apply to it -- each with the restrictions its own effect
 -- states -- and the non-mana components other effects add to it. Gathered by
--- Pawl.Engine.Cost (spellAdjustments, activationAdjustments) and consumed by
+-- Pawl.Engine.Cost (spellAdjustments, activationAdjustments, and plusReductions
+-- for the amount a CR 601.2b announcement brings with it) and consumed by
 -- Pawl.Engine.Cost.applyAdjustments and Pawl.Engine.Cost.plusComponents;
 -- nothing else builds one.
 --

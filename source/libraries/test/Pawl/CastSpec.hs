@@ -44,6 +44,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BuybackDecision as BuybackDecision
+import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
@@ -1261,9 +1262,9 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     Spec.assertEqWith
       s
       "two Islands: the additional cost is {1}"
-      (Cast.entwineOffer ManaSpending.AsProduced S.alice richSpell (Cost.costsFor S.alice (S.printingName dreamsGrip) richSpell rich) rich)
+      (Cast.entwineOffer ManaSpending.AsProduced S.alice richSpell (candidatePairs (Cost.candidateCostsFor S.alice (S.printingName dreamsGrip) richSpell rich)) rich)
       (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.Type.components = []}))
-    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer ManaSpending.AsProduced S.alice poorSpell (Cost.costsFor S.alice (S.printingName dreamsGrip) poorSpell poor) poor) Nothing
+    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer ManaSpending.AsProduced S.alice poorSpell (candidatePairs (Cost.candidateCostsFor S.alice (S.printingName dreamsGrip) poorSpell poor)) poor) Nothing
   -- CR 702.42 states no limit on how many entwine abilities an object has --
   -- contrast CR 702.41b for affinity and CR 702.43b for modular, which each say
   -- what multiple instances do -- and CR 118.8a's "any number of additional
@@ -1318,7 +1319,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     Spec.assertEqWith
       s
       "five Forests: the additional cost is {1}{G} plus {2}"
-      (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor S.alice (S.printingName braid) spellId gs) gs)
+      (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (candidatePairs (Cost.candidateCostsFor S.alice (S.printingName braid) spellId gs)) gs)
       ( Just
           ( Cost.Type.MkCost
               { Cost.Type.mana =
@@ -1341,7 +1342,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
         (_, gs) = S.addPermanent piker S.bob gs0
-    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor S.alice (S.printingName chaosCharm) spellId gs) gs) Nothing
+    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (candidatePairs (Cost.candidateCostsFor S.alice (S.printingName chaosCharm) spellId gs)) gs) Nothing
 
 -- Burst Lightning's one mode is "Burst Lightning deals 2 damage to any target",
 -- slot "target" (CR 702.33 / data/cards/burst-lightning.json), plus "Kicker {4}"
@@ -3355,6 +3356,12 @@ escapeSpec s registry = Spec.describe s "Escape" $ do
 chimerasOn :: GameState.GameState -> [ObjectId.ObjectId]
 chimerasOn = namedOnBattlefield "Loathsome Chimera"
 
+-- namedOnBattlefield one zone over, for alice's own graveyard (CR 404.1, which
+-- files a card by OWNER). A sacrificed permanent arrives as a new object (CR
+-- 400.7), so the name is the only handle on it.
+namedInGraveyard :: String -> GameState.GameState -> [ObjectId.ObjectId]
+namedInGraveyard name gs = filter (\o -> Projection.hasName (CardName.MkCardName (Text.pack name)) o gs) (Game.zoneMembers Zone.Graveyard S.alice gs)
+
 namedOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
 namedOnBattlefield name gs = filter (\o -> Projection.hasName (CardName.MkCardName (Text.pack name)) o gs) (Set.toList (GameState.battlefield gs))
 
@@ -3374,6 +3381,37 @@ escapeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> In
 escapeBoard land printing fodder n =
   let (oid, gs) = inGraveyardWith land printing 5
    in (oid, List.foldl' (\acc _ -> snd (S.addGraveyardCard fodder S.alice acc)) gs [1 .. n])
+
+-- CR 702.119a on Drownyard Behemoth {9} 5/7 Creature -- Eldrazi Crab, "Flash /
+-- Emerge {7}{U} / This creature has hexproof as long as it entered this turn."
+-- (Oracle text checked on Scryfall, 2026-09-13).
+--
+-- ONE BOARD: alice holds the Behemoth over FOUR Islands, with a Hill Giant (mana
+-- value 4) and a Dwarven Mauler (mana value 1) on the battlefield. Four mana pays
+-- rule 702.119a's {7}{U} reduced by four and nothing else this board offers --
+-- the printed {9} and the emerge cost reduced by the Mauler's one both want more
+-- -- so a Behemoth that resolved at all proves WHICH creature's mana value rule
+-- 702.119a's reduction read, and the graveyard proves WHICH creature rule
+-- 702.119c then sacrificed for it.
+--
+-- The Mauler is not decoration: it is the second mana value, so the offer is a
+-- real CR 601.2b choice rather than a single candidate, and it is the control
+-- that a sacrifice pinned to the wrong creature would take instead.
+emergeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+emergeSpec s registry = Spec.describe s "Emerge" $ do
+  Spec.it s "CR 702.119a the emerge cost is reduced by the sacrificed creature's mana value" $ do
+    island <- S.printingOf s registry "Island"
+    giant <- S.printingOf s registry "Hill Giant"
+    mauler <- S.printingOf s registry "Dwarven Mauler"
+    behemoth <- S.printingOf s registry "Drownyard Behemoth"
+    let (_, gs1) = S.addPermanent giant S.alice (S.landsInPlay island 4)
+        (_, gs2) = S.addPermanent mauler S.alice gs1
+        (spellId, board) = S.addHandCard behemoth S.alice gs2
+        start = aliceOnTurn board
+        after = S.runPure S.identityAnswer (S.runPure S.identityAnswer start (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "CR 702.119a four Islands paid {7}{U} less the Hill Giant's four, so the Behemoth resolved" (length (namedOnBattlefield "Drownyard Behemoth" after)) 1
+    Spec.assertEqWith s "CR 702.119c and the Hill Giant whose mana value paid for that reduction is the creature that was sacrificed" (length (namedInGraveyard "Hill Giant" after)) 1
+    Spec.assertEqWith s "while the Dwarven Mauler, whose one would not have paid for it, stayed" (length (namedOnBattlefield "Dwarven Mauler" after)) 1
 
 -- CR 702.74a on Mulldrifter {4}{U} 2/2 Creature -- Elemental, "Flying / When
 -- this creature enters, draw two cards. / Evoke {2}{U}" (oracle checked on
@@ -4118,6 +4156,12 @@ evokeCost = [ManaSymbol.Generic 2, theBlue]
 theBlue :: ManaSymbol.ManaSymbol
 theBlue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
 
+-- Cast.entwineOffer's and Cast.announceOptionalCosts' candidate list: each
+-- candidate cost beside the CR 601.2f reductions it brings, which is empty for
+-- every candidate but CR 702.119a's emerge.
+candidatePairs :: [CandidateCost.CandidateCost] -> [([ManaCost.ManaCost], Cost.Type.Cost Keyword.Keyword)]
+candidatePairs = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate))
+
 -- CR 601.2b's announcement answered by naming a cost's mana, graveRecitalSpec's
 -- `paying`.
 payingFor :: [ManaSymbol.ManaSymbol] -> Prompt.Prompt r -> r
@@ -4718,6 +4762,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   flashbackCardTypeSpec s registry
   escapeSpec s registry
   evokeSpec s registry
+  emergeSpec s registry
   dashSpec s registry
   blitzSpec s registry
   cleaveSpec s registry

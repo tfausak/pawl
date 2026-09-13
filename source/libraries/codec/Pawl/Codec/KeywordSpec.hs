@@ -360,6 +360,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (Keyword.Cleave (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []))
       " {\"type\":\"Cleave\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
+  -- CR 702.119a's payload is a whole Cost, cleave's shape -- Drownyard
+  -- Behemoth's {7}{U}. The SACRIFICE rule 702.119a states is not in the payload:
+  -- it is appended at the offer, by Pawl.Engine.Cost.candidateCostsGiven.
+  Spec.it s "Emerge carries its cost" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Emerge (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 7])) []))
+      " {\"type\":\"Emerge\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":7}]}} "
   -- CR 702.188a and CR 702.190a carry a whole Cost each, cleave's shape. The
   -- return each rule states is NOT in the payload: it is appended at the offer, by
   -- Pawl.Engine.Keyword.plainAlternativeCosts, off the rule rather than the card.

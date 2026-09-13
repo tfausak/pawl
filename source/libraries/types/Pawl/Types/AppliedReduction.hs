@@ -11,8 +11,9 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- reductions applying to one cost can disagree about either.
 -- Pawl.Engine.Cost.applyAdjustments folds them one at a time for that reason.
 --
--- Built only by Pawl.Engine.PlayerEffect's gatherers and by
--- Pawl.Engine.Cost.spellAdjustments; it is the element type of
+-- Built only by Pawl.Engine.PlayerEffect's gatherers, by
+-- Pawl.Engine.Cost.spellAdjustments and by Pawl.Engine.Cost.plusReductions, which
+-- is where CR 702.119a's amount joins them; it is the element type of
 -- Pawl.Types.CostAdjustments.reductions and has no wire form of its own, the
 -- card-facing shapes being Pawl.Types.ReduceSpellCost,
 -- Pawl.Types.ReduceActivationCost and Pawl.Types.CostReduction.

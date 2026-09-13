@@ -149,7 +149,7 @@ withoutPayingManaCost face =
 -- A candidate no keyword ability offered: the printed cost, a printed
 -- alternative, or a cost an effect applied (CR 118.9).
 untagged :: Cost Keyword.Type.Keyword -> CandidateCost.CandidateCost
-untagged = CandidateCost.MkCandidateCost Nothing
+untagged = CandidateCost.plain Nothing
 
 -- The first offered candidate, or `unpayable` when none was offered.
 firstOffered :: [Cost Keyword.Type.Keyword] -> Cost Keyword.Type.Keyword
@@ -264,7 +264,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- hand arm below does not take for its own printed alternatives.
               bestowed =
                 fmap
-                  (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Bestow cost)) (withAdditional cost))
+                  (\cost -> CandidateCost.plain (Just (Keyword.Type.Bestow cost)) (withAdditional cost))
                   (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.160a / CR 718.3: prototype, offered from EVERY zone for
               -- bestow's reason -- CR 113.6e classes an ability that modifies how
@@ -283,7 +283,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- rule 613.1's reason.
               prototyped =
                 fmap
-                  (\prototype -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Prototype prototype)) (withAdditional Cost.MkCost {Cost.mana = Just (Prototype.cost prototype), Cost.components = []}))
+                  (\prototype -> CandidateCost.plain (Just (Keyword.Type.Prototype prototype)) (withAdditional Cost.MkCost {Cost.mana = Just (Prototype.cost prototype), Cost.components = []}))
                   (Keyword.prototypes (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.140a: mutate, offered from EVERY zone for bestow's reason
               -- -- rule 702.140a's static ability "functions while the spell with
@@ -301,7 +301,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- rule 613.1's reason.
               mutated =
                 fmap
-                  (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
+                  (\cost -> CandidateCost.plain (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
                   (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.74a, 702.109a, 702.148a and 702.152a: evoke, dash, blitz
               -- and cleave, offered from EVERY zone for bestow's reason -- "a
@@ -311,8 +311,62 @@ candidateCostsGiven permitted pid name oid gs =
               -- itself.
               evoked =
                 fmap
-                  (\(keyword, cost) -> CandidateCost.MkCandidateCost (Just keyword) (withAdditional cost))
+                  (\(keyword, cost) -> CandidateCost.plain (Just keyword) (withAdditional cost))
                   (Keyword.plainAlternativeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+              -- CR 702.119a: emerge, evoked's offer with rule 702.119a's two
+              -- clauses attached -- the sacrifice in the candidate's components,
+              -- the generic reduction in `CandidateCost.reductions`. Offered from
+              -- every zone for bestow's reason, rule 702.119a's abilities
+              -- functioning "while the spell with emerge is on the stack", which
+              -- CR 113.6e reaches from wherever the cast begins; read off the
+              -- projection for bestow's reason and wrapped in `withAdditional` for
+              -- flashback's, rule 702.119a sending the cast through CR 601.2f-h in
+              -- its own words.
+              --
+              -- ONE CANDIDATE PER MANA VALUE a sacrificeable creature has, which
+              -- is how CR 702.119c's timing is kept: the victim is chosen "as you
+              -- choose to pay a spell's emerge cost (see rule 601.2b)" and CR
+              -- 601.2f needs its mana value before CR 601.2h sacrifices it, so the
+              -- amount has to be settled at the announcement. Picking the
+              -- candidate IS rule 702.119c's choice; picking which creature of
+              -- that mana value to sacrifice is left to CR 601.2h, where two
+              -- creatures sharing a mana value are still told apart (a dies
+              -- trigger, a toughness) and still prompted for.
+              --
+              -- Not implemented: a creature that stops being sacrificeable between
+              -- CR 601.2b and CR 601.2h -- one spent to a mana ability at CR
+              -- 601.2g -- leaves the payment to fail on the whole mana value
+              -- rather than on the one creature rule 702.119c locked (#3702).
+              --
+              -- The pool is Replacement.sacrificeCandidates, so CR 701.21a's
+              -- restrictions are asked once, here, rather than left to surprise
+              -- CR 601.2h. Rule 701.21a is also why neither criterion states a
+              -- control clause -- "a player can't sacrifice ... something that's a
+              -- permanent they don't control", which that pool is already the
+              -- caster's -- and Filter.ControlledBy would be vacuously False here
+              -- anyway, a card in a hand having no controller (CR 108.4).
+              emerged =
+                let criterion n =
+                      Filter.Type.And
+                        [ Filter.Type.HasCardType CardType.Creature,
+                          Filter.Type.ManaValueAtMost n,
+                          Filter.Type.Not (Filter.Type.ManaValueAtMost (n - 1))
+                        ]
+                    anyCreature = Filter.Type.HasCardType CardType.Creature
+                    values =
+                      Set.fromList
+                        ( Maybe.mapMaybe
+                            (\vid -> Filter.manaValue (Projection.viewOfObject vid gs))
+                            (Replacement.sacrificeCandidates Map.empty pid (Just oid) anyCreature gs)
+                        )
+                    offer cost n =
+                      CandidateCost.MkCandidateCost
+                        (Just (Keyword.Type.Emerge cost))
+                        (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (criterion n))]})
+                        [ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]]
+                 in concatMap
+                      (\cost -> fmap (offer cost) (Set.toAscList values))
+                      (Keyword.emergeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.117a and CR 702.137a: surge and spectacle, evoked's offer
               -- with a GATE -- read off the projection, wrapped by
               -- `withAdditional` and tagged with the keyword for that list's
@@ -331,11 +385,11 @@ candidateCostsGiven permitted pid name oid gs =
               -- and rule 702.137a's "you".
               surged =
                 if Game.yourTeamCastASpellThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Surge cost)) (withAdditional cost)) (Keyword.surgeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Surge cost)) (withAdditional cost)) (Keyword.surgeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
                   else []
               spectacled =
                 if Game.opponentLostLifeThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Spectacle cost)) (withAdditional cost)) (Keyword.spectacleCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Spectacle cost)) (withAdditional cost)) (Keyword.spectacleCosts (Map.keysSet (Projection.keywordsOf oid gs)))
                   else []
               -- CR 702.76a and CR 702.173a: prowl and freerunning, surged's shape
               -- with a clause of their own -- a player dealt combat damage this
@@ -352,11 +406,11 @@ candidateCostsGiven permitted pid name oid gs =
               -- to the comparison.
               prowled =
                 if Game.prowlDamageThisTurn pid (Set.filter Subtype.isCreatureType (Projection.subtypesOf oid gs)) gs
-                  then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Prowl cost)) (withAdditional cost)) (Keyword.prowlCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Prowl cost)) (withAdditional cost)) (Keyword.prowlCosts (Map.keysSet (Projection.keywordsOf oid gs)))
                   else []
               freerun =
                 if Game.freerunningDamageThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Freerunning cost)) (withAdditional cost)) (Keyword.freerunningCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Freerunning cost)) (withAdditional cost)) (Keyword.freerunningCosts (Map.keysSet (Projection.keywordsOf oid gs)))
                   else []
               -- CR 702.162a: more than meets the eye, read from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone from
@@ -378,7 +432,7 @@ candidateCostsGiven permitted pid name oid gs =
                 if fmap Face.name (Card.backFace card) == Just (Face.name face)
                   then
                     fmap
-                      (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
+                      (\cost -> CandidateCost.plain (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
                       (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (Card.frontFace card)))
                   else []
               -- `converted` REPLACES the zone's own list rather than joining it:
@@ -405,7 +459,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- cost, or rule 702.162a's converted cast. Pawl.CastSpec's "CR
               -- 702.170d a Mulldrifter Aven Interrupter plotted is offered no evoke
               -- cost" proves it.
-              ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> surged <> spectacled <> prowled <> freerun
+              ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> emerged <> surged <> spectacled <> prowled <> freerun
            in orConverted $ case Object.zone obj of
                 -- Three shapes, differing in what they do to the printed cost, plus
                 -- an effect's permission. Flashback (CR 702.34a) REPLACES the mana
@@ -430,7 +484,7 @@ candidateCostsGiven permitted pid name oid gs =
                       -- The flashback keyword AS IT WAS READ: rule 702.34a's ability
                       -- and its cost are one sentence, so the cost is what
                       -- distinguishes one instance from another.
-                      flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
+                      flashback cost = CandidateCost.plain (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
                       -- CR 702.138a's cost, read as flashback's is and wrapped by
                       -- `withAdditional` for the same reason -- rule 702.138a replaces
                       -- the mana cost and CR 601.2f-h still adds the card's additional
@@ -438,7 +492,7 @@ candidateCostsGiven permitted pid name oid gs =
                       -- rides in the Cost's own components, which is why no arm here
                       -- spells it; the "other" needs no exclusion, exileCandidates'
                       -- CR 601.2a note below.
-                      escape cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Escape cost)) (withAdditional cost)
+                      escape cost = CandidateCost.plain (Just (Keyword.Type.Escape cost)) (withAdditional cost)
                       -- CR 702.187b's cost, read as flashback's is and wrapped by
                       -- `withAdditional` for the same reason, rule 702.187b sending
                       -- the cast through CR 601.2f-h in its own words. Offered only
@@ -447,13 +501,13 @@ candidateCostsGiven permitted pid name oid gs =
                       -- cost's condition above: a clause that does not hold is not an
                       -- offer withheld, it is no offer at all. The discarder asked
                       -- about is the CASTER, rule 702.187b's "you".
-                      mayhem cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Mayhem cost)) (withAdditional cost)
+                      mayhem cost = CandidateCost.plain (Just (Keyword.Type.Mayhem cost)) (withAdditional cost)
                    in fmap flashback (Keyword.flashbackCosts keywords)
                         <> fmap escape (Keyword.escapeCosts keywords)
                         <> (if Game.discardedThisTurnBy pid oid gs then fmap mayhem (Keyword.mayhemCosts keywords) else [])
                         <> ( if Keyword.hasRetrace keywords
                                then
-                                 [ CandidateCost.MkCandidateCost
+                                 [ CandidateCost.plain
                                      (Just Keyword.Type.Retrace)
                                      -- CR 702.81a ADDS to the printed cost rather than
                                      -- replacing it, jump-start's shape below, and
@@ -462,10 +516,10 @@ candidateCostsGiven permitted pid name oid gs =
                                  ]
                                else []
                            )
-                        <> (if Keyword.hasAftermath keywords then [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed] else [])
+                        <> (if Keyword.hasAftermath keywords then [CandidateCost.plain (Just Keyword.Type.Aftermath) printed] else [])
                         <> ( if Keyword.hasJumpStart keywords
                                then
-                                 [ CandidateCost.MkCandidateCost
+                                 [ CandidateCost.plain
                                      (Just Keyword.Type.JumpStart)
                                      -- CR 702.133a's cost names no quality -- "discard a
                                      -- card" -- so the criterion admits everything.
@@ -564,6 +618,21 @@ candidateCostsGiven permitted pid name oid gs =
 -- costs a mana more.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
 total pid oid cost gs = totalWith (spellAdjustments pid oid gs) cost
+
+-- CR 601.2f: the reductions a CANDIDATE COST brings with it
+-- (Pawl.Types.CandidateCost's @reductions@) folded into the adjustments the board
+-- states -- rule 702.119a's, the only ones in the pool.
+--
+-- Unfloored and unconfined, `spellAdjustments`' reading of Thrasta's sentence:
+-- rule 702.119a states neither restriction, so CR 601.2f's own {0} and CR
+-- 118.7b-d's spill both stand.
+plusReductions :: [ManaCost.ManaCost] -> CostAdjustments.CostAdjustments -> CostAdjustments.CostAdjustments
+plusReductions amounts adjustments =
+  adjustments
+    { CostAdjustments.reductions =
+        CostAdjustments.reductions adjustments
+          <> fmap (\amount -> AppliedReduction.MkAppliedReduction amount 0 False) amounts
+    }
 
 -- CR 601.2f's increases and reductions for a SPELL being cast: the ones CARDS
 -- generate (Pawl.Engine.PlayerEffect, plus the spell's own text through
