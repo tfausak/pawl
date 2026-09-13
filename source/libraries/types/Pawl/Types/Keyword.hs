@@ -463,6 +463,15 @@ data Keyword
   | -- | 702.130a: whenever this creature becomes blocked, defending player loses
     -- N life; each instance triggers separately (CR 702.130b).
     Afflict Natural.Natural
+  | -- | 702.131b: a static ability whose whole content is "any time you control
+    -- ten or more permanents and you don't have the city's blessing, you get the
+    -- city's blessing for the rest of the game", read off the projection by
+    -- Pawl.Engine.PlayerDesignation rather than minted.
+    --
+    -- Not implemented: CR 702.131a, the same word on an INSTANT OR SORCERY, where
+    -- it is a spell ability checked once on resolution rather than continuously
+    -- (#3508).
+    Ascend
   | -- | 702.133a: cast this card from your graveyard by discarding a card as an
     -- ADDITIONAL cost, and exile it as it leaves the stack.
     JumpStart
@@ -688,6 +697,13 @@ data Keyword
     -- sneak cost was paid tapped and attacking whatever the returned creature was
     -- attacking (#3689).
     Sneak (Cost.Cost Keyword)
+  | -- | 702.195a: Ascend's shape at a different count and a different mark -- a
+    -- static ability whose whole content is "any time you control three or more
+    -- permanents that are artifacts, Sagas, and\/or legendary and you don't have
+    -- an enduring story, you have an enduring story for the rest of the game",
+    -- read off the projection by Pawl.Engine.PlayerDesignation rather than
+    -- minted.
+    Storied
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

@@ -2892,6 +2892,10 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.102a is payload-free: the permission names no quality, and the halves
   -- it fuses are the CARD's own faces rather than anything this value carries.
   Keyword.Fuse -> []
+  -- CR 702.131b and CR 702.195a are payload-free: what each names is a count of
+  -- permanents the rules state, which no Filter this value carries reaches.
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
   -- TriggeredAbility, so any Filter in it is swept there rather than here.
@@ -3219,6 +3223,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.LifeTotal _ -> []
   Quantity.Type.Speed _ -> []
   Quantity.Type.IsMonarch _ -> []
+  Quantity.Type.HasPlayerDesignation {} -> []
   Quantity.Type.IsStartingPlayer _ -> []
   Quantity.Type.IsActivePlayer _ -> []
   Quantity.Type.HasDesignation _ -> []

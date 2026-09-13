@@ -713,6 +713,10 @@ library codec
     Pawl.Codec.PlayerCountersSpec
     Pawl.Codec.PlayerCounterTally
     Pawl.Codec.PlayerCounterTallySpec
+    Pawl.Codec.PlayerDesignation
+    Pawl.Codec.PlayerDesignationSpec
+    Pawl.Codec.PlayerDesignationTally
+    Pawl.Codec.PlayerDesignationTallySpec
     Pawl.Codec.PlayerDrawsNthCard
     Pawl.Codec.PlayerDrawsNthCardSpec
     Pawl.Codec.PlayerEffect
@@ -1071,6 +1075,7 @@ library engine
     Pawl.Engine.MoveDuration
     Pawl.Engine.Mulligan
     Pawl.Engine.Phasing
+    Pawl.Engine.PlayerDesignation
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Plot
     Pawl.Engine.Prepare
@@ -1443,6 +1448,7 @@ library test
     Pawl.PhasingSpec
     Pawl.PlaneswalkerCombatSpec
     Pawl.PlaneswalkerSpec
+    Pawl.PlayerDesignationSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
     Pawl.PreparationSpec
@@ -1855,6 +1861,8 @@ library types
     Pawl.Types.PlayerCounterKind
     Pawl.Types.PlayerCounters
     Pawl.Types.PlayerCounterTally
+    Pawl.Types.PlayerDesignation
+    Pawl.Types.PlayerDesignationTally
     Pawl.Types.PlayerDrawsNthCard
     Pawl.Types.PlayerEffect
     Pawl.Types.PlayerId

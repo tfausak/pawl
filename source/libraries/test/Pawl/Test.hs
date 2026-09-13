@@ -331,6 +331,8 @@ import qualified Pawl.Codec.PlayerControlSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerCounterTallySpec
 import qualified Pawl.Codec.PlayerCountersSpec
+import qualified Pawl.Codec.PlayerDesignationSpec
+import qualified Pawl.Codec.PlayerDesignationTallySpec
 import qualified Pawl.Codec.PlayerDrawsNthCardSpec
 import qualified Pawl.Codec.PlayerEffectSpec
 import qualified Pawl.Codec.PlayerIdSpec
@@ -556,6 +558,7 @@ import qualified Pawl.OutsideTheGameSpec
 import qualified Pawl.PhasingSpec
 import qualified Pawl.PlaneswalkerCombatSpec
 import qualified Pawl.PlaneswalkerSpec
+import qualified Pawl.PlayerDesignationSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
 import qualified Pawl.PreparationSpec
@@ -963,6 +966,8 @@ spec s registry = do
   Pawl.Codec.PlayerAttacksWithSpec.spec s
   Pawl.Codec.PlayerCounterTallySpec.spec s
   Pawl.Codec.PlayerCountersSpec.spec s
+  Pawl.Codec.PlayerDesignationSpec.spec s
+  Pawl.Codec.PlayerDesignationTallySpec.spec s
   Pawl.Codec.PlayerDrawsNthCardSpec.spec s
   Pawl.Codec.PlayerControlSpec.spec s
   Pawl.Codec.PlayerEffectSpec.spec s
@@ -1203,6 +1208,7 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.ashiokLoyaltySpec s registry
+  Pawl.PlayerDesignationSpec.spec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.CastProhibitionSpec.spec s registry
   Pawl.CastPermissionSpec.spec s registry

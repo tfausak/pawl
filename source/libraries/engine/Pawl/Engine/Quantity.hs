@@ -41,6 +41,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
+import qualified Pawl.Types.PlayerDesignationTally as PlayerDesignationTally
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Plus as Plus
@@ -394,6 +395,23 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.IsMonarch ref -> case playersOf ref of
           Nothing -> Nothing
           Just pids -> Just (if any (\pid -> GameState.monarch gs == Just pid) pids then 1 else 0)
+        -- CR 702.131c / 702.195b: does that player have that rest-of-game mark?
+        -- IsMonarch's arm in shape and in arity, reaching that arity from the
+        -- opposite premise: rule 725.3 makes the monarch unique, so a disjunction
+        -- over the named seats and a sum over them agree there, while CR 702.131c
+        -- and CR 702.195b let every player hold the mark at once and the two come
+        -- apart. The disjunction is still what a card asks -- "you have the city's
+        -- blessing", "an opponent has an enduring story" -- where a sum would count
+        -- a table rather than answer a question.
+        --
+        -- A player who has never had the mark answers Just 0 and not Nothing,
+        -- IsMonarch's posture: "you don't have the city's blessing" is a state the
+        -- rule names, so a 0 on the measured side of a static ability's "as long
+        -- as" clause is the right reading. Nothing stays reserved for a reference
+        -- that could not be resolved at all.
+        Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally ref mark) -> case playersOf ref of
+          Nothing -> Nothing
+          Just pids -> Just (if any (\pid -> maybe False (Set.member mark . Player.designations) (Map.lookup pid (GameState.players gs))) pids then 1 else 0)
         -- CR 103.1: is that player the starting player? IsMonarch's arm down to the
         -- arity argument -- there is exactly one starting player, so a disjunction over
         -- the named seats and a sum over them agree on every board.
@@ -1026,6 +1044,7 @@ objectSlots quantity = case quantity of
   Quantity.LifeTotal _ -> Set.empty
   Quantity.Speed _ -> Set.empty
   Quantity.IsMonarch _ -> Set.empty
+  Quantity.HasPlayerDesignation {} -> Set.empty
   Quantity.IsStartingPlayer _ -> Set.empty
   Quantity.IsActivePlayer _ -> Set.empty
   Quantity.PlayerCounters {} -> Set.empty
@@ -1246,10 +1265,10 @@ readsX quantity = case quantity of
   -- strictly smaller subterm.
   Quantity.Count c -> QuantitySlot.anyCount readsX c
   -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
-  -- The eight references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
-  -- IsStartingPlayer's, IsActivePlayer's, PlayerCounters', Devotion's) are
-  -- PlayerRefs, whose InSlot names a TARGET slot rather than an amount one, and X
-  -- is only ever an amount.
+  -- The nine references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
+  -- HasPlayerDesignation's, IsStartingPlayer's, IsActivePlayer's, PlayerCounters',
+  -- Devotion's) are PlayerRefs, whose InSlot names a TARGET slot rather than an
+  -- amount one, and X is only ever an amount.
   Quantity.Literal _ -> False
   Quantity.ManaValue -> False
   Quantity.Power -> False
@@ -1259,6 +1278,7 @@ readsX quantity = case quantity of
   Quantity.LifeTotal _ -> False
   Quantity.Speed _ -> False
   Quantity.IsMonarch _ -> False
+  Quantity.HasPlayerDesignation {} -> False
   Quantity.IsStartingPlayer _ -> False
   Quantity.IsActivePlayer _ -> False
   Quantity.PlayerCounters {} -> False

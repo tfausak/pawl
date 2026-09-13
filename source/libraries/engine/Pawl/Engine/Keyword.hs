@@ -409,6 +409,8 @@ abilitiesFor keyword count = case keyword of
   -- functions is CR 113.6k's question, answered in Event.zonesTriggeredFrom.
   Keyword.Miracle cost -> List.genericReplicate count (miracle cost)
   Keyword.StartYourEngines -> []
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
@@ -604,6 +606,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   -- minted by `abilitiesFor` above and reached from a hand by CR 113.6k.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -972,6 +976,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1555,6 +1561,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
   -- rather than the stack.
   Keyword.Exert -> []
@@ -2122,6 +2130,8 @@ permissionsFor cardTypes keyword = case keyword of
   -- own timing.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -3465,6 +3475,8 @@ mintedReplacementsFor keyword count = case keyword of
   -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCost directly.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
   -- writes Object.exertedBy directly.
   Keyword.Exert -> []
@@ -3704,6 +3716,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
   -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
@@ -3960,6 +3974,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Ascend -> []
+  Keyword.Storied -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -4170,6 +4186,8 @@ familyOf keyword = case keyword of
   Keyword.ReadAhead -> Nothing
   Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing
+  Keyword.Ascend -> Nothing
+  Keyword.Storied -> Nothing
   Keyword.Exert -> Nothing
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing

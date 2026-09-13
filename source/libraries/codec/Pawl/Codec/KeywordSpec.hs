@@ -1151,6 +1151,22 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Undying
       " {\"type\":\"Undying\"} "
     Spec.assertBool s (Codec.encode Keyword.codec Keyword.Undying /= Codec.encode Keyword.codec Keyword.Persist) "undying and persist encode differently"
+  -- CR 702.131b. Nullary: the ten and the mark are the rule's, not the card's.
+  Spec.it s "Ascend" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Ascend
+      " {\"type\":\"Ascend\"} "
+  -- CR 702.195a. Ascend's mirror at a different count and a different mark, and
+  -- told apart from it by the tag alone.
+  Spec.it s "Storied" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Storied
+      " {\"type\":\"Storied\"} "
+    Spec.assertBool s (Codec.encode Keyword.codec Keyword.Storied /= Codec.encode Keyword.codec Keyword.Ascend) "storied and ascend encode differently"
   -- CR 702.179a. Nullary, and the tag is the whole encoding.
   Spec.it s "StartYourEngines" $
     Common.assertCodec

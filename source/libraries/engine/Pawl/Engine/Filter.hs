@@ -2357,6 +2357,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Companion condition -> Keyword.Type.Companion (rewrite pairs condition)
   -- CR 702.94a states a cost too, so it is reached the same way.
   Keyword.Type.Miracle cost -> Keyword.Type.Miracle (rewriteCost pairs cost)
+  Keyword.Type.Ascend -> keyword
+  Keyword.Type.Storied -> keyword
   Keyword.Type.StartYourEngines -> keyword
   -- CR 701.43d names no quality and carries no cost, so CR 612.2 has nothing here
   -- to swap.

@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Codec.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Codec.PrintingId as PrintingId
 import qualified Pawl.Codec.Status as Status
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -35,6 +36,7 @@ codec = Fields.object $ do
   counters <- Fields.defaulted "counters" Map.empty (Common.multiset PlayerCounterKind.codec) Player.counters
   ringTemptations <- Fields.defaulted "ringTemptations" 0 Common.natural Player.ringTemptations
   speed <- Fields.required "speed" (Common.maybe Common.natural) Player.speed
+  designations <- Fields.defaulted "designations" Set.empty (Common.set PlayerDesignation.codec) Player.designations
   commander <- Fields.defaulted "commander" Set.empty (Common.set PrintingId.codec) Player.commander
   commanderCasts <- Fields.defaulted "commanderCasts" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.commanderCasts
   commanderDamage <- Fields.defaulted "commanderDamage" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.commanderDamage
@@ -52,6 +54,7 @@ codec = Fields.object $ do
         Player.counters = counters,
         Player.ringTemptations = ringTemptations,
         Player.speed = speed,
+        Player.designations = designations,
         Player.commander = commander,
         Player.commanderCasts = commanderCasts,
         Player.commanderDamage = commanderDamage,

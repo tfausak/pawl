@@ -27,6 +27,12 @@ module Pawl.Types.Designation where
 --
 -- * CR 725.1's monarch designates a PLAYER, so it lives on GameState.
 --
+-- * CR 702.131c's city's blessing and CR 702.195b's enduring story designate a
+--   PLAYER too, and are each other's twin rather than the monarch's: both rules
+--   let any number of players hold the mark at once, where CR 725.3 makes the
+--   monarch unique, so they ride Player.designations as a set per seat
+--   (Pawl.Types.PlayerDesignation).
+--
 -- * CR 731.1's day and night designate the GAME (Pawl.Types.Daytime).
 --
 -- * CR 701.15b's goaded is per-player AND expiring, the Ring-bearer's two

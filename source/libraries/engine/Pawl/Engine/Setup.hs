@@ -145,6 +145,10 @@ emptyGame order =
               -- your engines!, which is a state-based action and so cannot have
               -- happened before the game began.
               Player.speed = Nothing,
+              -- CR 702.131c / 702.195b: nobody has either mark in a game that has
+              -- not started. Both are granted by a static ability of a permanent
+              -- on the battlefield, and this function leaves none there.
+              Player.designations = Set.empty,
               Player.commander = Set.empty,
               Player.commanderCasts = Map.empty,
               -- CR 903.10a counts "over the course of the game", and no
@@ -636,6 +640,9 @@ resetPlayers settings seats lifeModifier players =
               -- CR 727.1 again: a new game starts with nobody having speed (CR
               -- 702.179b), whatever the restarted one reached.
               Player.speed = Nothing,
+              -- CR 727.1 once more: a new game, so neither CR 702.131c's nor CR
+              -- 702.195b's mark carries over, whatever the restarted one reached.
+              Player.designations = Set.empty,
               -- CR 903.8 counts casts "this game", and CR 727.1 makes the
               -- restarted one a new game, so the tax starts over. Player.commander
               -- is deliberately NOT reset beside it: rule 903.3's designation is

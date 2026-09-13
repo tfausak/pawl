@@ -1584,6 +1584,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.LifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.IsMonarch _ -> quantity
+  Quantity.Type.HasPlayerDesignation {} -> quantity
   Quantity.Type.IsStartingPlayer _ -> quantity
   Quantity.Type.IsActivePlayer _ -> quantity
   Quantity.Type.HasDesignation _ -> quantity

@@ -10,6 +10,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Status as Status
 
@@ -32,6 +33,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.counters = Map.empty,
           Player.ringTemptations = 0,
           Player.speed = Nothing,
+          Player.designations = Set.empty,
           Player.commander = Set.empty,
           Player.commanderCasts = Map.empty,
           Player.commanderDamage = Map.empty,
@@ -66,6 +68,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
               ],
           Player.ringTemptations = 3,
           Player.speed = Just 4,
+          Player.designations = Set.fromList [PlayerDesignation.CitysBlessing, PlayerDesignation.EnduringStory],
           Player.commander = Set.fromList [PrintingId.MkPrintingId 5, PrintingId.MkPrintingId 17],
           Player.commanderCasts = Map.fromList [(PrintingId.MkPrintingId 5, 6), (PrintingId.MkPrintingId 17, 19)],
           Player.commanderDamage = Map.singleton (PrintingId.MkPrintingId 7) 8,
@@ -80,7 +83,9 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
       ( " {\"life\":-1,\"status\":{\"type\":\"Departed\",\"value\":{\"type\":\"Conceded\"}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":2}"
           <> ",{\"key\":{\"type\":\"Poison\"},\"value\":0}]"
-          <> ",\"ringTemptations\":3,\"speed\":4,\"commander\":[5,17],\"commanderCasts\":{\"5\":6,\"17\":19}"
+          <> ",\"ringTemptations\":3,\"speed\":4"
+          <> ",\"designations\":[{\"type\":\"CitysBlessing\"},{\"type\":\"EnduringStory\"}]"
+          <> ",\"commander\":[5,17],\"commanderCasts\":{\"5\":6,\"17\":19}"
           <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]"
           <> ",\"startingDeck\":{\"14\":15},\"companion\":16,\"companionTaken\":true} "
       )
