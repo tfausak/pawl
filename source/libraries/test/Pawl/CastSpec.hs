@@ -3769,6 +3769,105 @@ squadSpec s registry = Spec.describe s "Squad" $ do
     Spec.assertEqWith s "CR 707.10 four Brigades, each pumped by the other three" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Galadhrim Brigade" after)) (replicate 4 (Just (5, 5)))
     Spec.assertEqWith s "and three of the four are tokens, with the stack empty" (length (S.tokensOf after), length (GameState.stack after)) (3, 0)
 
+-- CR 601.2b's optional additional cost answered `times` times, with CR 701.21a's
+-- sacrifice pinned to `fodder` by FILTERING the offered set and every target
+-- pinned to `victim`: an answerer that built its own set could name a permanent
+-- the cost never offered, and one that searched for a legal option would find
+-- another after a mutation.
+bargainingWith :: ObjectId.ObjectId -> Natural.Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+bargainingWith fodder times victim p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
+  Prompt.ChooseSacrifices _ _ _ offered _ -> Set.fromList (filter (== fodder) offered)
+  _ -> aimedAt victim p
+
+-- bargainingWith's twin over CR 702.194a's tap, pinned the same way.
+teamworkingWith :: ObjectId.ObjectId -> Natural.Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+teamworkingWith fodder times victim p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
+  Prompt.ChooseTapsForTotalPower _ _ _ offered _ -> Set.fromList (filter (== fodder) offered)
+  _ -> aimedAt victim p
+
+-- CR 702.166a on Archon's Glory {W} Instant, whole text: "Bargain (You may
+-- sacrifice an artifact, enchantment, or token as you cast this spell.) / Target
+-- creature gets +2/+2 until end of turn. If this spell was bargained, that
+-- creature also gains flying and lifelink until end of turn." (Oracle text
+-- checked on Scryfall, 2026-09-13).
+--
+-- THE BOARD: alice on turn with one Plains, a Hill Giant to aim at, and two
+-- permanents rule 702.166a's list DOES reach -- Braidwood Sextant, an artifact,
+-- and Bad Moon, an enchantment -- so CR 701.21a's choice is a real one rather
+-- than a forced set the prompt would elide, and each disjunct of the cost is
+-- paid by one case. The Giant is a third permanent the list does not reach, so a
+-- cost that offered every permanent would offer it too. One board throughout,
+-- the printed {W} being all the mana any of these castings needs.
+bargainSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+bargainSpec s registry = Spec.describe s "Bargain" $ do
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.166a Archon's Glory bargained also grants flying and lifelink; unbargained, the +2/+2 alone" $ do
+    plains <- S.printingOf s registry "Plains"
+    glory <- S.printingOf s registry "Archon's Glory"
+    giant <- S.printingOf s registry "Hill Giant"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    sextant <- S.printingOf s registry "Braidwood Sextant"
+    let (giantId, withGiant) = S.addPermanent giant S.alice (S.landsInPlay plains 1)
+        (moonId, withMoon) = S.addPermanent badMoon S.alice withGiant
+        (sextantId, withSextant) = S.addPermanent sextant S.alice withMoon
+        (gloryId, withGlory) = S.addHandCard glory S.alice withSextant
+        board = aliceOnTurn withGlory
+        after fodder times = castResolved (bargainingWith fodder times giantId) gloryId board
+        reading gs = (S.powerToughnessOf giantId gs, Projection.hasKeyword Keyword.Flying giantId gs, Projection.hasKeyword Keyword.Lifelink giantId gs)
+        standing gs = (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Braidwood Sextant")) S.alice gs, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Bad Moon")) S.alice gs)
+    Spec.assertEqWith s "CR 702.166c bargained, the 3/3 is a 5/5 with flying and lifelink" (reading (after sextantId 1)) (Just (5, 5), True, True)
+    Spec.assertEqWith s "CR 608.2c unbargained, the same 5/5 has neither" (reading (after sextantId 0)) (Just (5, 5), False, False)
+    Spec.assertEqWith s "CR 702.166a either disjunct pays: the artifact alice chose, or the enchantment; unbargained, both stand" (standing (after sextantId 1), standing (after moonId 1), standing (after sextantId 0)) ((0, 1), (1, 0), (1, 1))
+
+-- CR 702.194a on Team Tactics {1}{R} Instant, whole text: "Teamwork 1 (As an
+-- additional cost to cast this spell, you may tap any number of creatures you
+-- control with total power 1 or more.) / Target creature gains double strike
+-- until end of turn. If this spell was cast using teamwork, that creature also
+-- gains trample until end of turn." (Oracle text checked on Scryfall,
+-- 2026-09-13).
+--
+-- THE BOARD: alice on turn with two Mountains, a Hill Giant to aim at and a Jedit
+-- Ojanen, both untapped and both over rule 702.194a's threshold of 1 on their
+-- own, so the choice of whom to tap is a real one. Alice taps JEDIT and not the
+-- Giant, which is what makes the tap readable: the spell's own target is
+-- untouched either way.
+teamworkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+teamworkSpec s registry = Spec.describe s "Teamwork" $ do
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.194a Team Tactics cast using teamwork also grants trample; without it, double strike alone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    tactics <- S.printingOf s registry "Team Tactics"
+    giant <- S.printingOf s registry "Hill Giant"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    let (giantId, withGiant) = S.addPermanent giant S.alice (S.landsInPlay mountain 2)
+        (jeditId, withJedit) = S.addPermanent jedit S.alice withGiant
+        (tacticsId, withTactics) = S.addHandCard tactics S.alice withJedit
+        board = aliceOnTurn withTactics
+        after times = castResolved (teamworkingWith jeditId times giantId) tacticsId board
+        reading gs = (Projection.hasKeyword Keyword.DoubleStrike giantId gs, Projection.hasKeyword Keyword.Trample giantId gs)
+        tappedOf oid gs = fmap ((== TapState.Tapped) . Object.tapped) (Game.lookupObject oid gs)
+    Spec.assertEqWith s "CR 702.194b cast using teamwork, the Giant has double strike and trample" (reading (after 1)) (True, True)
+    Spec.assertEqWith s "CR 608.2c without it, double strike alone" (reading (after 0)) (True, False)
+    Spec.assertEqWith s "CR 702.194a Jedit paid the cost and the Giant did not; without teamwork, neither is tapped" ((tappedOf jeditId (after 1), tappedOf giantId (after 1)), (tappedOf jeditId (after 0), tappedOf giantId (after 0))) ((Just True, Just False), (Just False, Just False))
+
+  -- The floor rule 702.194a states, on the same board with both creatures tapped
+  -- before the cast: CR 601.2f then has no untapped creature to reach, the total
+  -- power available is 0, and the cost is unpayable however alice answers. The
+  -- mana is the same two Mountains that pay for the successful casting above.
+  Spec.it s "CR 702.194a with no untapped creature, teamwork cannot be paid" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    tactics <- S.printingOf s registry "Team Tactics"
+    giant <- S.printingOf s registry "Hill Giant"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    let (giantId, withGiant) = S.addPermanent giant S.alice (S.landsInPlay mountain 2)
+        (jeditId, withJedit) = S.addPermanent jedit S.alice withGiant
+        (tacticsId, withTactics) = S.addHandCard tactics S.alice withJedit
+        board = S.tapObject jeditId (S.tapObject giantId (aliceOnTurn withTactics))
+        after = castResolved (teamworkingWith jeditId 1 giantId) tacticsId board
+    Spec.assertEqWith s "CR 608.2c the Giant has double strike and no trample" (Projection.hasKeyword Keyword.DoubleStrike giantId after, Projection.hasKeyword Keyword.Trample giantId after) (True, False)
+
 -- CR 702.175a on Coruscation Mage {1}{R} 2/2 Creature -- Otter Wizard, "Offspring
 -- {2} / Whenever you cast a noncreature spell, this creature deals 1 damage to
 -- each opponent." (Oracle text checked on Scryfall, 2026-09-11).
@@ -4516,6 +4615,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   freerunningSpec s registry
   squadSpec s registry
   offspringSpec s registry
+  bargainSpec s registry
+  teamworkSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry

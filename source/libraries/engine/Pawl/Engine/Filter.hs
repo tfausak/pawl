@@ -2234,6 +2234,11 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.153a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- the creature it names is in the cost Pawl.Engine.Keyword.casualtyCost mints.
   Keyword.Type.Casualty _ -> keyword
+  -- CR 702.166a is payload-free and CR 702.194a's N is a number, so CR 612.2 has
+  -- nothing to swap in either; the permanents they name are in the costs
+  -- Pawl.Engine.Keyword.bargainCost and .teamworkCost mint.
+  Keyword.Type.Bargain -> keyword
+  Keyword.Type.Teamwork _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
   -- CR 702.75a's N is a number and not a word, so CR 612.2 has nothing to swap;

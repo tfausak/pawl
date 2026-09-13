@@ -2807,6 +2807,11 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.153a names its creature in the rulebook rather than on the card, so
   -- the Filter is in the cost Pawl.Engine.Keyword.casualtyCost mints.
   Keyword.Casualty _ -> []
+  -- CR 702.166a and CR 702.194a: neither payload is a Filter -- bargain has none
+  -- and teamwork's is an N -- the permanents they name living in the costs
+  -- Pawl.Engine.Keyword mints.
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []
