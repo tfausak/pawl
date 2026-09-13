@@ -7111,7 +7111,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Blight.blight, one per seat that actually blighted -- the
   -- bracket groups them, which changes nothing here, PlayerBlights not being a
   -- CR 603.2c batch condition (Pawl.Engine.Event.Trigger.batchScoped).
-  --
   Effect.Blight (Blight.Type.MkBlight ref quantity mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -7125,8 +7124,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 701.68c: "the blighted creature" is the object the blighting player chose
     -- to put the counters on, bound for a later clause of this same resolution to
     -- read (CR 608.2c) -- Grub, Notorious Auntie's token copy of it. Bound off the
-    -- CHOICE and not off the counters, rule 701.68d's posture: a blight of zero,
-    -- and one whose counters a replacement kept off, name a creature just the same.
+    -- CHOICE and not off the counters, which is rule 701.68c's own wording: a
+    -- blight of zero (CR 122.6), and one whose counters a replacement kept off,
+    -- name a creature just the same.
     --
     -- ACROSS blighters, the Effect.Mill slot's one/many split: one chosen creature
     -- takes the single binding every singular reader can see, several take the
