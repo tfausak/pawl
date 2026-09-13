@@ -184,6 +184,20 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Annihilator
       " {\"type\":\"Annihilator\"} "
 
+  Spec.it s "Mobilize" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Mobilize
+      " {\"type\":\"Mobilize\"} "
+
+  Spec.it s "Firebending" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Firebending
+      " {\"type\":\"Firebending\"} "
+
   Spec.it s "Unearth" $
     Common.assertCodec
       s

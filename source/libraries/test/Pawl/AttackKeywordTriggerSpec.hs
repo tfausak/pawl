@@ -34,6 +34,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -1731,6 +1733,82 @@ myriadSpec s registry =
           Spec.assertEqWith s "CR 603.5 and the may is asked once" askedThree 1
           Spec.assertEqWith s "CR 702.116a and one token was minted" (length (S.tokensOf afterThree)) 1
 
+-- CR 702.181a's mobilize: an attack trigger minting N tapped-and-attacking 1/1
+-- red Warrior tokens and one CR 603.7 delayed ability sacrificing the batch at
+-- the beginning of the next end step (CR 513.2).
+--
+-- Dalkovan Packbeasts {2}{W} Creature -- Ox 0/4, whole text "Vigilance /
+-- Mobilize 3", is the producer, and nothing else on it makes a token. A 0/4
+-- keeps every number on the board distinct from the tokens' 1/1 and from the
+-- Piker's 2/1, and mobilize 3 keeps the batch size distinct from the one
+-- attacker that carries the keyword.
+--
+-- THE PIKER is the control: another creature alice attacked with, so "everything
+-- that attacked is gone" cannot pass the end-step case, and a sacrifice scoped
+-- to attackers rather than to the bound batch reddens.
+--
+-- THE TWO MOMENTS are what separate rule 702.181a's timing from decayed's and
+-- myriad's, which both fire at CR 511.2's end of combat: the batch is read once
+-- in the postcombat main phase, where it is still there, and again once the end
+-- step has run.
+mobilizeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mobilizeSpec s registry =
+  let warriorName = CardName.MkCardName (Text.pack "Warrior Token")
+      plan :: Prompt.Prompt r -> r
+      plan p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      attackedBy oid gs = Map.lookup oid (Combat.Type.attackers (GameState.combat gs))
+      runSteps n gs = List.foldl' (\g _ -> S.runPure plan g Engine.runStep) gs [1 .. (n :: Int)]
+      board = do
+        packbeasts <- S.printingOf s registry "Dalkovan Packbeasts"
+        piker <- S.printingOf s registry "Goblin Piker"
+        case S.combatBoardOf [packbeasts, piker] [] of
+          (gs, [packId, pikerId], _) -> pure (Just (packId, pikerId, gs))
+          _ -> pure Nothing
+   in Spec.describe s "Mobilize (CR 702.181)" $ do
+        Spec.it s "CR 702.181a three 1/1 red Warrior tokens enter tapped and attacking" $ do
+          built <- board
+          case built of
+            Just (packId, pikerId, gs) -> do
+              let after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) plan gs
+                  tokens = S.tokensOf after
+              -- THE gameplay assertion, ahead of every proxy: it says both how
+              -- many tokens rule 702.181a minted and whom each of them attacks,
+              -- so a count read off anything but the keyword's N reddens here.
+              Spec.assertEqWith
+                s
+                "CR 702.181a three tokens, each attacking the player the Packbeasts did"
+                (fmap (`attackedBy` after) tokens)
+                (replicate 3 (Just (AttackTarget.OfPlayer S.bob)))
+              Spec.assertBool s (all (`Game.isTapped` after) tokens) "CR 702.181a and each entered tapped"
+              Spec.assertEqWith s "CR 111.3 each is a 1/1" (fmap (`S.powerToughnessOf` after) tokens) (replicate 3 (Just (1, 1)))
+              Spec.assertBool s (all (\oid -> Projection.hasName warriorName oid after && Set.member Subtype.Warrior (Projection.subtypesOf oid after) && Projection.colorsOf oid after == Set.singleton Color.Red) tokens) "CR 111.3 red Warrior, by name"
+              Spec.assertEqWith s "while the Packbeasts itself attacks bob" (attackedBy packId after) (Just (AttackTarget.OfPlayer S.bob))
+              Spec.assertEqWith s "as does the Piker beside it" (attackedBy pikerId after) (Just (AttackTarget.OfPlayer S.bob))
+            Nothing -> Spec.assertFailure s "fixture should give alice a Packbeasts and a Piker"
+        Spec.it s "CR 702.181a the batch outlives the combat phase and goes at the next end step" $ do
+          built <- board
+          case built of
+            Just (packId, pikerId, gs) -> do
+              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) plan gs
+                  tokens = S.tokensOf blockers
+                  -- Damage, end of combat, postcombat main: three steps, and
+                  -- none of them rule 702.181a's moment.
+                  postcombat = runSteps 3 blockers
+                  -- The end step itself, where CR 513.2 puts the delayed ability
+                  -- on the stack, and the priority round that resolves it.
+                  ended = runSteps 2 postcombat
+              -- Each moment says which phase it is before anything is read off
+              -- it; neither reading depends on the sacrifice, so neither can
+              -- absorb a mutation to it.
+              Spec.assertEqWith s "the first moment is the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
+              Spec.assertBool s (all (`S.onBattlefield` postcombat) tokens) "CR 702.181a the batch is still there once the combat phase has ended"
+              Spec.assertBool s (not (any (`S.onBattlefield` ended) tokens)) "CR 702.181a and gone once the end step has run"
+              Spec.assertBool s (S.onBattlefield packId ended) "while the Packbeasts that made them is still there"
+              Spec.assertBool s (S.onBattlefield pikerId ended) "and so is the Piker that attacked beside them"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Packbeasts and a Piker"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   frenzySpec s registry
@@ -1741,6 +1819,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   saviorOfOllenbockSpec s registry
   decayedSpec s registry
   myriadSpec s registry
+  mobilizeSpec s registry
   provokeSpec s registry
   trygonPredatorSpec s registry
   questingBeastSpec s registry

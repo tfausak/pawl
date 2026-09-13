@@ -257,4 +257,10 @@ data KeywordFamily
   | -- | CR 702.190a: sneak [cost]. No card in the pool asks yet, and it is owed at
     -- the keyword rather than at the first asker.
     Sneak
+  | -- | CR 702.181a: mobilize N. No card in the pool asks yet, and it is owed at
+    -- the keyword rather than at the first asker.
+    Mobilize
+  | -- | CR 702.189a: firebending N. No card in the pool asks yet, and it is owed
+    -- at the keyword rather than at the first asker.
+    Firebending
   deriving (Bounded, Enum, Eq, Ord, Show)

@@ -178,6 +178,8 @@ codec =
       Arm.payload "Companion" (Filter.codec codec) Keyword.Companion (\x -> case x of Keyword.Companion y -> Just y; _ -> Nothing),
       Arm.nullary "Ascend" Keyword.Ascend,
       Arm.nullary "Storied" Keyword.Storied,
+      Arm.payload "Mobilize" Common.natural Keyword.Mobilize (\x -> case x of Keyword.Mobilize y -> Just y; _ -> Nothing),
+      Arm.payload "Firebending" Common.natural Keyword.Firebending (\x -> case x of Keyword.Firebending y -> Just y; _ -> Nothing),
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines,
       Arm.nullary "Bargain" Keyword.Bargain,
       Arm.nullary "Spree" Keyword.Spree,

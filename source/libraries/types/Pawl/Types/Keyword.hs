@@ -728,6 +728,21 @@ data Keyword
     -- read off the projection by Pawl.Engine.PlayerDesignation rather than
     -- minted.
     Storied
+  | -- | 702.181a: mobilize N -- whenever this creature attacks, create N tapped
+    -- and attacking 1\/1 red Warrior tokens, sacrificed at the beginning of the
+    -- next end step.
+    --
+    -- Not implemented: a Natural, so a characteristic-defined N -- Avenger of
+    -- the Fallen's "mobilize X, where X is the number of creature cards in your
+    -- graveyard" -- has no transcription (gap #3697).
+    Mobilize Natural.Natural
+  | -- | 702.189a: firebending N -- whenever this creature attacks, add N {R}
+    -- that its controller does not lose as steps and phases end until end of
+    -- combat.
+    --
+    -- Not implemented: a Natural, so Firebending Student's "firebending X, where
+    -- X is this creature's power" has no transcription (gap #3697).
+    Firebending Natural.Natural
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

@@ -2830,6 +2830,10 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []
+  -- CR 702.181a and CR 702.189a name no quality either: the Warrior token and
+  -- the {R} are written into the abilities Pawl.Engine.Keyword mints.
+  Keyword.Mobilize _ -> []
+  Keyword.Firebending _ -> []
   -- CR 702.91a: battle cry names no quality either -- the "each other attacking
   -- creature" set is written into the ability Pawl.Engine.Keyword mints, not
   -- into the keyword.

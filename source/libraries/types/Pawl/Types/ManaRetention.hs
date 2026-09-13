@@ -3,11 +3,13 @@ module Pawl.Types.ManaRetention where
 -- | CR 106.4: whether the player LOSES this mana as a step or phase ends. Rides
 -- one unit of mana (Pawl.Types.ManaUnit) and the instruction that added it
 -- (Pawl.Types.ManaAddition). Shizuko, Caller of Autumn's "until end of turn,
--- they don't lose this mana as steps and phases end" and Avatar Roku,
--- Firebender's "until end of combat, you don't lose this mana as steps end" are
--- the printings, one per non-@Ordinary@ arm. Both resolve off the stack;
--- Synthetic Lasting Spring is the unprinted third, since no printing puts the
--- clause on an ACTIVATED mana ability (Pawl.ManaSpec's group has the census).
+-- they don't lose this mana as steps and phases end" writes the first
+-- non-@Ordinary@ arm, and Avatar Roku, Firebender's "until end of combat, you
+-- don't lose this mana as steps end" the second -- which is also what CR 702.189a
+-- means, so Pawl.Engine.Keyword.firebending mints it from the keyword instead.
+-- All of those resolve off the stack; Synthetic Lasting Spring is the unprinted
+-- case, since no printing puts the clause on an ACTIVATED mana ability
+-- (Pawl.ManaSpec's group has the census).
 --
 -- Not a Bool, for Pawl.Types.Optionality's reason: each arm says which rule is
 -- in play -- CR 514.2's, CR 500.5a's -- where @True@ would say only that

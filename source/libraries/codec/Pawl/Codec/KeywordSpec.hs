@@ -828,6 +828,23 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Annihilator 3) /= Codec.encode Keyword.codec (Keyword.Poisonous 3))
       "annihilator 3 is not poisonous 3"
+  -- CR 702.181a's and CR 702.189a's Ns ride their constructors the same way, and
+  -- the two must not share a tag with each other.
+  Spec.it s "Mobilize and Firebending carry their Ns" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Mobilize 3)
+      " {\"type\":\"Mobilize\",\"value\":3} "
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Firebending 2)
+      " {\"type\":\"Firebending\",\"value\":2} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Mobilize 2) /= Codec.encode Keyword.codec (Keyword.Firebending 2))
+      "mobilize 2 is not firebending 2"
   -- CR 702.23a's N rides the constructor the same way.
   Spec.it s "Rampage carries its N" $ do
     Common.assertCodec

@@ -1112,9 +1112,52 @@ castingOnly spell p = case p of
     [] -> Action.Type.Pass
   _ -> S.aggressiveAnswer p
 
--- Roku's {R}, which the trigger's ManaAddition stamps UntilEndOfCombat onto.
+-- A {R} whose ManaAddition stamped UntilEndOfCombat onto it -- Roku's, and
+-- rule 702.189a's.
 retainedRed :: ManaUnit.ManaUnit
 retainedRed = plainRed {ManaUnit.retention = ManaRetention.UntilEndOfCombat}
+
+-- CR 702.189a's firebending, the keyword that reaches the retention Avatar Roku
+-- writes out longhand: "'Firebending N' means 'Whenever this creature attacks,
+-- add N {R}. Until end of combat, you don't lose this mana as steps and phases
+-- end.'"
+--
+-- Zhao, Ruthless Admiral {2}{B/R}{B/R} Legendary Creature -- Human Soldier 3/4
+-- is the producer. Its other sentence, "Whenever you sacrifice another
+-- permanent, creatures you control get +1/+0 until end of turn", never fires
+-- here: nothing on this board sacrifices anything. Nothing is omitted from
+-- pawl's transcription, so it is neither stricter nor weaker than printed.
+--
+-- THE PIKER attacks beside Zhao with no firebending of its own, so a pool of
+-- exactly two says the count came off the keyword's payload and off one
+-- instance of it -- neither a per-attacker addition nor a fixed one.
+--
+-- TWO MOMENTS, Roku's first and third: the declare blockers step separates the
+-- retention from ManaRetention.Ordinary, which CR 500.5 would have emptied as
+-- the declare attackers step ended, and the postcombat main phase separates it
+-- from UntilEndOfTurn. Roku's group above proves the machinery at all three;
+-- what this group adds is that rule 702.189a's keyword mints it.
+zhaoSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+zhaoSpec s registry =
+  let passing :: Prompt.Prompt r -> r
+      passing = S.aggressiveAnswer
+   in Spec.describe s "Zhao, Ruthless Admiral" $ do
+        Spec.it s "CR 702.189a firebending 2 adds two retained {R} as Zhao attacks" $ do
+          zhao <- S.printingOf s registry "Zhao, Ruthless Admiral"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case S.combatBoardOf [zhao, piker] [] of
+            (gs, [_, _], _) -> do
+              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs
+                  postcombat = S.runPure passing (S.runToStep (Phase.Combat CombatStep.EndOfCombat) passing blockers) Engine.runStep
+              Spec.assertEqWith s "the first moment is the declare blockers step" (GameState.phase blockers) (Phase.Combat CombatStep.DeclareBlockers)
+              Spec.assertEqWith s "and the second is the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
+              -- THE gameplay assertion, ahead of the expiry one: it says how many
+              -- units the keyword added and that each carries rule 702.189a's
+              -- retention, so a payload read as anything but Zhao's 2 reddens
+              -- here rather than at the sweep.
+              Spec.assertEqWith s "CR 702.189a exactly the two the keyword added, retained" (poolOf S.alice blockers) (replicate 2 retainedRed)
+              Spec.assertEqWith s "CR 500.5a and none once the combat phase has ended" (poolOf S.alice postcombat) []
+            _ -> Spec.assertFailure s "fixture should give alice a Zhao and a Piker"
 
 -- CR 106.6: mana that carries a restriction on what it may be spent on. Geosurge
 -- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast
@@ -2106,6 +2149,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   stadiumVendorsSpec s registry
   shizukoSpec s registry
   avatarRokuSpec s registry
+  zhaoSpec s registry
   geosurgeSpec s registry
   workshopSpec s registry
   lastingSpringSpec s registry
