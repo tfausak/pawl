@@ -2355,8 +2355,9 @@ echoSpec s registry =
 --
 -- Qarsi Sadist {1}{B} Creature -- Human Cleric 1/3 is the printing, "Exploit"
 -- plus "When this creature exploits a creature, target opponent loses 2 life and
--- you gain 2 life". No exploit card prints the first half alone, so the pair is
--- what a gameplay test can reach at all.
+-- you gain 2 life". Every exploit printing pairs the keyword with its own
+-- "exploits" trigger -- MTGJSON 2026-08-23, keywords containing Exploit, 25
+-- names, no exception -- so the pair is what a gameplay test can reach at all.
 --
 -- THREE SEATS, so "target opponent" and "you" cannot collapse onto one player.
 exploitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
