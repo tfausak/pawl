@@ -170,6 +170,12 @@ data Response
     -- arbitrary sweep of the battlefield, which can coincide with any of the
     -- object choices above.
     ChoseVote ObjectId.ObjectId
+  | -- | CR 701.38b: the word one player voted for, named by the slot its tally
+    -- is bound at.
+    --
+    -- Its own constructor for ChoseBolster's reason, and it could not reuse
+    -- ChoseVote in any case: a word vote's choices are not objects.
+    ChoseVoteWord SlotName.SlotName
   | -- | CR 107.14: how much {E} a player chose to pay to an
     -- Effect.PayAnyEnergy.
     --

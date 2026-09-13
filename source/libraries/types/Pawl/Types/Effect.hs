@@ -601,8 +601,9 @@ data Effect card ability
     -- Edict) in APNAP order (CR 101.4b) before anything leaves the battlefield.
     PlayerSacrifices PlayerSacrifices.PlayerSacrifices
   | -- | CR 701.38a: each player, starting with the seat the payload names and
-    -- proceeding in turn order, votes for one of the objects its Filter matches;
-    -- the objects tied for most votes are bound at its slot (Council's Judgment).
+    -- proceeding in turn order, votes for one of the choices it lists;
+    -- Pawl.Types.VoteChoices says what the tally then decides (Council's
+    -- Judgment, Plea for Power).
     Vote Vote.Vote
   | -- | CR 500.7: the players the PlayerRef names each get the payload's count
     -- of extra turns (Ral Zarek's "for each coin that comes up heads"), added

@@ -186,4 +186,8 @@ data PlayerEffect
   | -- | CR 705.3 / Edgar, King of Figaro: an effect stating that a coin flip this
     -- player flips has a certain result and\/or that this player wins it.
     StateCoinFlip StatedFlip.StatedFlip
+  | -- | CR 701.38d / Brago's Representative: this player gets this many votes
+    -- beyond the one CR 701.38a gives every seat, cast at the same time they
+    -- would otherwise have voted.
+    AdditionalVotes Natural.Natural
   deriving (Eq, Ord, Show)

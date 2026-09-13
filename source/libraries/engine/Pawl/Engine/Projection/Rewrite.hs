@@ -164,6 +164,8 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Vote as Vote
+import qualified Pawl.Types.VoteChoices as VoteChoices
+import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
@@ -394,6 +396,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantGetCounters _ -> effect
   -- Nor is a coin's face, or the two flags beside it.
   PlayerEffect.StateCoinFlip _ -> effect
+  PlayerEffect.AdditionalVotes _ -> effect
 
 -- CR 612's subtype word swap over an effect's AST. Cases on an effect's
 -- STRUCTURE -- does this arm carry a word a swap could reach -- never on which
@@ -456,7 +459,12 @@ rewriteEffect pairs effect = case effect of
   Effect.Venture {} -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) (rewriteQuantity pairs quantity))
-  Effect.Vote (Vote.MkVote starter filter_ slot) -> Effect.Vote (Vote.MkVote starter (Filter.rewrite pairs filter_) slot)
+  Effect.Vote (Vote.MkVote starter choices) ->
+    Effect.Vote . Vote.MkVote starter $ case choices of
+      VoteChoices.Objects objects -> VoteChoices.Objects objects {VoteObjects.filter = Filter.rewrite pairs (VoteObjects.filter objects)}
+      -- The Blight arm's answer: rule 701.38b's words are slot names, this
+      -- card's own namespace rather than printed text CR 612.1 can reach.
+      VoteChoices.Words _ -> choices
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.ControlPlayerThisResolution _ -> effect

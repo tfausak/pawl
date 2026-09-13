@@ -468,4 +468,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
             }
       )
       " {\"type\":\"StateCoinFlip\",\"value\":{\"face\":{\"type\":\"Heads\"},\"wins\":true,\"firstEachTurn\":true}} "
+  -- CR 701.38d as Brago's Representative prints it, and the wire form
+  -- data/cards/bragos-representative.json writes.
+  Spec.it s "AdditionalVotes, Brago's Representative's one" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.AdditionalVotes 1)
+      " {\"type\":\"AdditionalVotes\",\"value\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerEffect.codec

@@ -35,30 +35,35 @@
                   {
                     "type": "Vote",
                     "value": {
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "Not",
-                            "value": {
-                              "type": "HasCardType",
-                              "value": {
-                                "type": "Land"
+                      "choices": {
+                        "type": "Objects",
+                        "value": {
+                          "filter": {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "Not",
+                                "value": {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Land"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "Not",
+                                "value": {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                }
                               }
-                            }
+                            ]
                           },
-                          {
-                            "type": "Not",
-                            "value": {
-                              "type": "ControlledBy",
-                              "value": {
-                                "type": "You"
-                              }
-                            }
-                          }
-                        ]
+                          "slot": "elected"
+                        }
                       },
-                      "slot": "elected",
                       "starter": {
                         "type": "Relative",
                         "value": {

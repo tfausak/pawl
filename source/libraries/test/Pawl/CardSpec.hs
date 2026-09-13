@@ -291,6 +291,8 @@ import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
 import qualified Pawl.Types.Vote as Vote
+import qualified Pawl.Types.VoteChoices as VoteChoices
+import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -4102,6 +4104,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 705.3's statement narrows by nothing at all: it names a face, a win and
   -- a once-per-turn flag, and no Filter over objects.
   PlayerEffect.StateCoinFlip _ -> []
+  PlayerEffect.AdditionalVotes _ -> []
 
 -- CR 707.9's "except ..." clauses. Only the GainKeywords arm reaches a Filter,
 -- and only through the keyword it names; CR 707.9b's other arms name a pair of
@@ -4856,7 +4859,10 @@ effectFilters effect = case effect of
   -- Unframed, PlayerSacrifices' answer and for its reason: rule 701.38b's
   -- listed choices are judged against each candidate on the battlefield, which
   -- is neither an attach destination nor a target slot.
-  Effect.Vote (Vote.MkVote _ f _) -> unframed [f]
+  Effect.Vote (Vote.MkVote _ choices) -> case choices of
+    VoteChoices.Objects objects -> unframed [VoteObjects.filter objects]
+    -- Rule 701.38b's words carry no filter to frame.
+    VoteChoices.Words _ -> []
   -- Unframed, PlayerSacrifices' answer and for its reason: the filter names
   -- permanents on the battlefield, judged by the ordinary projection.
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities _ f) -> unframed [f]

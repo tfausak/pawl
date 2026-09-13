@@ -7,6 +7,7 @@ module Pawl.Engine.Resolve.Slots where
 
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -165,6 +166,8 @@ import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Vote as Vote
+import qualified Pawl.Types.VoteChoices as VoteChoices
+import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -809,7 +812,7 @@ effectPlayerRefs effect = case effect of
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
   -- CR 701.38a's specified player, the seat the vote starts with.
-  Effect.Vote (Vote.MkVote starter _ _) -> [starter]
+  Effect.Vote (Vote.MkVote starter _) -> [starter]
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Shuffle ref -> [ref]
@@ -898,10 +901,13 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- CR 101.4's "each player sacrifices": the arm takes every player recipient
   -- the slot holds, so the read is Many.
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot _ quantity) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
-  -- The listed choices are a Filter and nothing else: the starter is
-  -- effectPlayerRefs' half, joined at the head above, and the slot this WRITES
-  -- is boundSlots' half.
-  Effect.Vote (Vote.MkVote _ filter_ _) -> filterSlotsOf filter_
+  -- The object vote's listed choices are a Filter and nothing else: the starter
+  -- is effectPlayerRefs' half, joined at the head above, and the slot this
+  -- WRITES is boundSlots' half. A word vote reads no slot at all -- its words
+  -- are the slots it writes.
+  Effect.Vote (Vote.MkVote _ choices) -> case choices of
+    VoteChoices.Objects objects -> filterSlotsOf (VoteObjects.filter objects)
+    VoteChoices.Words _ -> Map.empty
   Effect.RestartGame _ -> Map.empty
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
   Effect.ControlPlayerThisResolution (ControlPlayer.MkControlPlayer slot _) -> oneSlot slot
@@ -1897,8 +1903,12 @@ boundSlots effect = case effect of
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty
   -- CR 701.38a: the objects tied for most votes, for the later effect that
-  -- acts on them (Council's Judgment's exile).
-  Effect.Vote (Vote.MkVote _ _ slot) -> Set.singleton slot
+  -- acts on them (Council's Judgment's exile). For a word vote it is one slot
+  -- per word, each holding that word's tally for the clause connected to it
+  -- (CR 701.38b, Plea for Power).
+  Effect.Vote (Vote.MkVote _ choices) -> case choices of
+    VoteChoices.Objects objects -> Set.singleton (VoteObjects.slot objects)
+    VoteChoices.Words voteWords -> Set.fromList (NonEmpty.toList voteWords)
   Effect.RestartGame _ -> Set.empty
   Effect.ControlPlayerNextTurn _ -> Set.empty
   Effect.ControlPlayerThisResolution _ -> Set.empty

@@ -635,6 +635,7 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 602.5 / 101.2 / Sen Triplets: does an effect stop this player activating
@@ -758,6 +759,7 @@ prohibitsPlayingLand pid names oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 701.23: does any effect prohibit `pid` from searching `owner`'s library,
@@ -824,6 +826,7 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 101.2 with CR 122.1: does an effect in force right now say that `pid` CAN'T
@@ -883,6 +886,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 725 / 101.2: is `pid` forbidden from becoming the monarch? CR 725.4 asks the
@@ -947,6 +951,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 201.4: the card names chosen for this effect's source, as it entered (CR
@@ -1193,6 +1198,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
       reductionOf (source, effect) = case effect of
         PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion amount coloredOnly) ->
           fmap (\a -> (a, coloredOnly)) (matching source criterion amount)
@@ -1235,6 +1241,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
       -- CR 601.2f's "plus all additional costs", the non-mana half, reaching a
       -- SPELL: CR 118.8's "or applied to a spell or ability from another effect"
       -- (Drought's "Spells cost an additional \"Sacrifice a Swamp\" to cast").
@@ -1280,6 +1287,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
       effects = applying pid gs
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
@@ -1429,6 +1437,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
       reductionOf (source, effect) = case effect of
         PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted wantedKind aimedAt amount floor_) ->
           -- Never confined to coloured mana: no printed activation-cost reducer
@@ -1484,6 +1493,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
       -- CR 601.2f's "plus all additional costs", the non-mana half: Brutal
       -- Suppression's "Sacrifice a land". Gathered against the SAME criterion
       -- reading the reductions use -- the ability's source permanent -- and
@@ -1537,6 +1547,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
           CostAdjustments.reductions = Maybe.mapMaybe reductionOf effects,
@@ -1645,6 +1656,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
   PlayerEffect.CantGetCounters _ -> Nothing
   PlayerEffect.StateCoinFlip _ -> Nothing
+  PlayerEffect.AdditionalVotes _ -> Nothing
 
 -- The same axis for a CAST: the cast-scoped grant, and -- CR 601.1a, casting
 -- being one way to play a card -- every grant landPlayFlashGrant admits. The
@@ -1835,6 +1847,7 @@ mayCastFrom pid zone oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any allows (applying pid gs)
 
 -- CR 118.9 / Omniscience: may `pid` cast `oid` from their hand without paying
@@ -1872,6 +1885,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost criterion -> matchesObjectFrom source criterion oid gs
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
         -- The CR 601.3 permissions, which say WHERE a spell may be cast from and
         -- WHEN. Neither states a cost, which is the whole reason this arm is its
         -- own: Yawgmoth's Will's cast pays the card's printed cost.
@@ -1987,6 +2001,7 @@ playLandPiles pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> []
         PlayerEffect.CantGetCounters _ -> []
         PlayerEffect.StateCoinFlip _ -> []
+        PlayerEffect.AdditionalVotes _ -> []
    in concatMap (piles . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -2070,6 +2085,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any (stops . snd) rows
 
 -- CR 702.16b / 702.16c: does `pid` have protection from the object `oid` -- is
@@ -2153,6 +2169,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any stops rows
 
 -- CR 702.16e's damage half, as the (protected player, carrier, quality) rows
@@ -2227,6 +2244,7 @@ protectionCarriers gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
    in concatMap (\pid -> Maybe.mapMaybe (carrier pid) (applying pid gs)) (Game.stillPlaying gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -2297,7 +2315,66 @@ landPlaysAllowed pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
+
+-- CR 701.38a: the one vote every seat casts, before rule 701.38d's extras.
+defaultVotes :: Natural
+defaultVotes = 1
+
+-- CR 701.38d: how many ballots `pid` casts in one vote -- rule 701.38a's own
+-- one, plus every vote an effect gives them (Brago's Representative). Rule
+-- 701.38d puts them all "at the same time the player would otherwise have
+-- voted", which is Resolve.Effect's business; this answers only how many.
+--
+-- A SUM over every applicable grant, landPlaysAllowed's posture and for its
+-- reason: rule 701.38d says an effect gives "multiple votes" and states no rule
+-- making two such effects redundant, so two Representatives are three votes.
+--
+-- Read LIVE through `applying`, like every other question in this module. The
+-- vote itself reads it ONCE, off the board the vote begins on, since nothing
+-- happens between two seats' ballots that could change it.
+votesAllowed :: PlayerId -> GameState -> Natural
+votesAllowed pid gs =
+  let grantOf effect = case effect of
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantCastMoreThan {} -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost {} -> Nothing
+        PlayerEffect.IncreaseActivationCost {} -> Nothing
+        PlayerEffect.ReduceSpellCost {} -> Nothing
+        PlayerEffect.ReduceActivationCost {} -> Nothing
+        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AddSpellCost {} -> Nothing
+        PlayerEffect.PlayAdditionalLands {} -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize {} -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize {} -> Nothing
+        PlayerEffect.ReduceMaximumHandSize {} -> Nothing
+        PlayerEffect.DontLoseUnspentMana {} -> Nothing
+        PlayerEffect.SpendManaAsThough {} -> Nothing
+        PlayerEffect.CantBeTargetedBy {} -> Nothing
+        PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom {} -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash {} -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash {} -> Nothing
+        PlayerEffect.CantBeCountered {} -> Nothing
+        PlayerEffect.DamageCantBePrevented {} -> Nothing
+        PlayerEffect.DamageCantBeRedirected {} -> Nothing
+        PlayerEffect.CantSearchLibraries {} -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching {} -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
+        PlayerEffect.CantPlayLands {} -> Nothing
+        PlayerEffect.CastFrom {} -> Nothing
+        PlayerEffect.PlayLandsFrom {} -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost {} -> Nothing
+        PlayerEffect.CantGetCounters {} -> Nothing
+        PlayerEffect.StateCoinFlip {} -> Nothing
+        PlayerEffect.AdditionalVotes extra -> Just extra
+   in defaultVotes + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
 -- starting hand size, which is a different seven (Mulligan.openingHand) that
@@ -2379,6 +2456,7 @@ maximumHandSize pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> current
         PlayerEffect.CantGetCounters _ -> current
         PlayerEffect.StateCoinFlip _ -> current
+        PlayerEffect.AdditionalVotes _ -> current
    in List.foldl' (\current row -> apply current (snd row)) (Just (Vanguard.handSize defaultMaximumHandSize pid gs)) (applying pid gs)
 
 -- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
@@ -2446,6 +2524,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
@@ -2504,6 +2583,7 @@ spendManaAsThough pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
    in Maybe.mapMaybe (spends . snd) (applying pid gs)
 
 -- CR 701.6a / 613.11: can this spell or ability on the stack be countered
@@ -2579,6 +2659,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
    in any stops (applying pid gs)
 
 -- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
@@ -2640,6 +2721,7 @@ unpreventable gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities -> Nothing
@@ -2705,6 +2787,7 @@ unredirectable gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities -> Nothing
@@ -2748,6 +2831,7 @@ statedFlips :: PlayerId -> GameState -> [StatedFlip.StatedFlip]
 statedFlips pid gs =
   let says effect = case effect of
         PlayerEffect.StateCoinFlip statement -> Just statement
+        PlayerEffect.AdditionalVotes _ -> Nothing
         -- Every other arm is about casting, playing, targeting, countering,
         -- searching, paying, keeping mana or rule 702 protection. CR 705.1's flip is
         -- none of those --
@@ -2876,6 +2960,7 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> pure effect
   PlayerEffect.CantGetCounters _ -> pure effect
   PlayerEffect.StateCoinFlip _ -> pure effect
+  PlayerEffect.AdditionalVotes _ -> pure effect
 
 -- overPlayerRefs read, for a caller that only wants the references.
 playerRefsIn :: PlayerEffect -> [PlayerRef.PlayerRef]
@@ -2936,6 +3021,7 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> pure effect
   PlayerEffect.CantGetCounters _ -> pure effect
   PlayerEffect.StateCoinFlip _ -> pure effect
+  PlayerEffect.AdditionalVotes _ -> pure effect
 
 -- overDamagePatterns read: the SLOTS this effect's patterns name as their
 -- recipient (DamagePattern.boundRecipient), for the dataflow report

@@ -2,10 +2,8 @@
 
 module Pawl.Codec.Vote where
 
-import qualified Pawl.Codec.Filter as Filter
-import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerRef as PlayerRef
-import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Codec.VoteChoices as VoteChoices
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Vote as Vote
@@ -15,11 +13,9 @@ import qualified Pawl.Types.Vote as Vote
 codec :: Codec.Codec Vote.Vote
 codec = Fields.object $ do
   starter <- Fields.required "starter" PlayerRef.codec Vote.starter
-  filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) Vote.filter
-  slot <- Fields.required "slot" SlotName.codec Vote.slot
+  choices <- Fields.required "choices" VoteChoices.codec Vote.choices
   pure
     Vote.MkVote
       { Vote.starter = starter,
-        Vote.filter = filter_,
-        Vote.slot = slot
+        Vote.choices = choices
       }
