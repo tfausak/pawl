@@ -441,6 +441,14 @@ data GameEvent
     -- CountersPut entries the explore's own steps record, none of which says an
     -- explore completed.
     Explored ObjectId.ObjectId
+  | -- | CR 701.50f: this permanent completed CR 701.50a's or CR 701.50d's
+    -- connive, recorded after the whole process and "even if some or all of
+    -- those actions were impossible". Explored's shape and reasoning: the
+    -- conniver's id alone, CR 701.50b making last known information answer who
+    -- controlled it, and distinct from the Drew, Discarded and CountersPut
+    -- entries the connive's own steps record. CR 701.50e is why a connive 0
+    -- records nothing at all.
+    Connived ObjectId.ObjectId
   | -- | CR 701.43a: this permanent was EXERTED, recorded by
     -- Pawl.Engine.Combat.declareAttackers at CR 508.1g and watched by CR 701.43d's
     -- linked "when you do" trigger. The permanent's id alone; the PROHIBITION

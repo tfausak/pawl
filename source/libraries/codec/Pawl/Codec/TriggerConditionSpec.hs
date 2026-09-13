@@ -1058,6 +1058,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentExplores (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]))
       " {\"type\":\"PermanentExplores\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
+  -- CR 701.50f. PermanentExplores' payload exactly -- Iron Monger, Sadistic
+  -- Tycoon's "a creature you control" describes the CONNIVER -- so the tag is the
+  -- whole difference between the two.
+  Spec.it s "PermanentConnives round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentConnives (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]))
+      " {\"type\":\"PermanentConnives\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
   -- CR 701.43d. Nullary, SelfEvolves' shape: rule 701.43d links the trigger to
   -- the static ability printed beside it, so its subject is always the bearer.
   Spec.it s "SelfExerted round-trips" $

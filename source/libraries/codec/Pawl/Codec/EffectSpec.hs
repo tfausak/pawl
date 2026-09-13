@@ -39,6 +39,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
@@ -153,6 +154,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.Zone as Zone
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout (and at
@@ -595,8 +597,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Connive (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
-      " {\"type\":\"Connive\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}} "
+      (Effect.Connive (Connive.MkConnive (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self")))))
+      " {\"type\":\"Connive\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"ref\":{\"type\":\"InSlot\",\"value\":\"self\"}}} "
   Spec.it s "Mill" $
     Common.assertJsonCodec
       s
@@ -1921,6 +1923,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1)))
       " {\"type\":\"PlayerSacrifices\",\"value\":{\"slot\":\"t\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "
+  Spec.it s "Vote" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Vote (Vote.MkVote (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature) (SlotName.MkSlotName (Text.pack "elected"))))
+      " {\"type\":\"Vote\",\"value\":{\"starter\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"slot\":\"elected\"}} "
   -- CR 500.7: a slot read with an empty skip set, a self-scoped arm carrying
   -- CR 500.11's skip of one step, and a two-member set.
   Spec.it s "TakeExtraTurn" $ do

@@ -287,6 +287,7 @@ manaProduced effect = case effect of
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
+  Effect.Vote {} -> Nothing
   Effect.RestartGame _ -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.ControlPlayerThisResolution _ -> Nothing
@@ -421,7 +422,7 @@ movesLibraryCard effect = case effect of
   -- CR 701.44a's explore reveals the top card and may put it into a hand or a
   -- graveyard.
   Effect.Explore {} -> True
-  -- CR 701.50a's connive draws a card, CR 121.1's move out of a library.
+  -- CR 701.50d's connive draws cards, CR 121.1's move out of a library.
   Effect.Connive {} -> True
   -- CR 701.23a searches a zone -- Pawl.Types.Search names which zones and whose,
   -- and its SearchDestination is where the found card goes. Every zone it can
@@ -475,6 +476,7 @@ movesLibraryCard effect = case effect of
   Effect.TemptWithTheRing -> False
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
+  Effect.Vote {} -> False
   Effect.ControlPlayerNextTurn _ -> False
   Effect.ControlPlayerThisResolution _ -> False
   Effect.Destroy {} -> False

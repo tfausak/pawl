@@ -106,6 +106,7 @@ codec =
       Arm.payload "ClassLevelSet" ClassLevelChange.codec GameEvent.ClassLevelSet (\x -> case x of GameEvent.ClassLevelSet y -> Just y; _ -> Nothing),
       Arm.payload "Plotted" ObjectId.codec GameEvent.Plotted (\x -> case x of GameEvent.Plotted y -> Just y; _ -> Nothing),
       Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing),
+      Arm.payload "Connived" ObjectId.codec GameEvent.Connived (\x -> case x of GameEvent.Connived y -> Just y; _ -> Nothing),
       Arm.payload "Exerted" ObjectId.codec GameEvent.Exerted (\x -> case x of GameEvent.Exerted y -> Just y; _ -> Nothing),
       Arm.payload "BecameTapped" ObjectId.codec GameEvent.BecameTapped (\x -> case x of GameEvent.BecameTapped y -> Just y; _ -> Nothing),
       Arm.payload "BecameUntapped" ObjectId.codec GameEvent.BecameUntapped (\x -> case x of GameEvent.BecameUntapped y -> Just y; _ -> Nothing),

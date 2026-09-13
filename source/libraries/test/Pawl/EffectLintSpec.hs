@@ -59,6 +59,7 @@ import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -233,6 +234,7 @@ ownQuantities effect = case effect of
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> [quantity]
+  Effect.Vote {} -> []
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
   Effect.ControlPlayerThisResolution _ -> []
@@ -249,7 +251,7 @@ ownQuantities effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.Explore {} -> []
-  Effect.Connive {} -> []
+  Effect.Connive (Connive.MkConnive quantity _) -> [quantity]
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> [quantity]
     Discard.These {} -> []
@@ -1167,6 +1169,7 @@ effectObjectRefs effect =
         Effect.Venture {} -> []
         Effect.ExileHandThenDraw -> []
         Effect.PlayerSacrifices {} -> []
+        Effect.Vote {} -> []
         -- CR 727.5's exemption, optional: a card saying nothing about it exempts
         -- nothing.
         Effect.RestartGame mRef -> read_ (Maybe.maybeToList mRef)
@@ -1185,7 +1188,7 @@ effectObjectRefs effect =
         Effect.Surveil {} -> []
         Effect.Fateseal {} -> []
         Effect.Explore ref -> read_ [ref]
-        Effect.Connive ref -> read_ [ref]
+        Effect.Connive (Connive.MkConnive _ ref) -> read_ [ref]
         Effect.Discard subject -> case subject of
           Discard.Counted {} -> []
           Discard.These ref -> [(AsksDiscardArm, ref)]

@@ -984,6 +984,7 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerSurveils _ -> Set.empty
   TriggerCondition.SelfBecomesPlotted -> Set.empty
   TriggerCondition.PermanentExplores _ -> Set.empty
+  TriggerCondition.PermanentConnives _ -> Set.empty
   -- Nothing here either, and for the group above's reason: CR 701.68d's event
   -- names the blighting player, and Synthetic Blight Chronicler's payload points
   -- at no one -- it draws and drains its own controller. CR 701.68c's "blighted

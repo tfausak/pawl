@@ -1640,10 +1640,20 @@ opponentsOf you gs = filter (areOpponents gs you) (stillPlaying gs)
 -- filters with stillPlaying. An active player somehow absent from the roster
 -- degrades to the roster itself rather than to nobody.
 apnapOrder :: GameState -> [PlayerId]
-apnapOrder gs =
+apnapOrder gs = turnOrderFrom (GameState.activePlayer gs) gs
+
+-- apnapOrder's generalisation: the seating roster rotated to start with the
+-- player NAMED rather than with the active player. CR 701.38a's vote is the
+-- reader -- "starting with a specified player and proceeding in turn order" --
+-- and rule 101.4 is this with the active player, so the two share one rotation.
+--
+-- SEATING, not survival, apnapOrder's own posture: a caller that must not name a
+-- departed seat filters with stillPlaying. A player absent from the roster
+-- degrades to the roster itself rather than to nobody.
+turnOrderFrom :: PlayerId -> GameState -> [PlayerId]
+turnOrderFrom start gs =
   let order = GameState.turnOrder gs
-      active = GameState.activePlayer gs
-   in dropWhile (/= active) order <> takeWhile (/= active) order
+   in dropWhile (/= start) order <> takeWhile (/= start) order
 
 -- CR 701.24a: shuffling randomises an ORDER, so it is a permutation -- the
 -- cards that were there are the cards that are there.
@@ -1725,6 +1735,7 @@ castOf event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
@@ -1803,6 +1814,7 @@ discardOf event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
@@ -1887,6 +1899,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
@@ -1984,6 +1997,7 @@ damageDealt event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
@@ -2245,6 +2259,7 @@ lifeGainOf event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing

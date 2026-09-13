@@ -112,6 +112,7 @@ import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.Connive as Connive.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
@@ -278,6 +279,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
@@ -2323,6 +2325,9 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.TemptWithTheRing {} -> False
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
+  -- CR 701.38b lists the choices, and an empty list is the naming-nobody case:
+  -- nobody votes and nothing is bound, which CR 609.3 carries out vacuously.
+  Effect.Vote {} -> False
   Effect.TakeExtraTurn {} -> False
   Effect.ShuffleIntoLibrary {} -> False
   Effect.Shuffle {} -> False
@@ -4418,12 +4423,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- permanent that has left (CR 701.44c).
     ordered <- forEachOrder resolving id (objectRefRecipients legal resolving controller source gs ref)
     Monad.mapM_ exploreOne (Maybe.mapMaybe Recipient.objectOf ordered)
-  Effect.Connive ref -> do
+  Effect.Connive (Connive.Type.MkConnive quantity ref) -> do
     gs <- State.get
+    let viewOf = effectViewOf source legal gs
+        context = effectContext gs controller source legal (slotBindings resolving gs)
     -- Explore's sweep and order, CR 701.50c stating CR 701.44d's rule over again,
     -- its seats read through last known information by CR 701.50b.
     ordered <- forEachOrder resolving id (objectRefRecipients legal resolving controller source gs ref)
-    Monad.mapM_ conniveOne (Maybe.mapMaybe Recipient.objectOf ordered)
+    -- CR 701.50d's N, read ONCE as this instruction is reached (CR 608.2c):
+    -- Raffine, Scheming Seer's "the number of attacking creatures" cannot move
+    -- because an earlier conniver in the same instruction drew and discarded.
+    -- Amass's arm for the unevaluable case.
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Nothing -> pure ()
+      Just n -> Monad.mapM_ (conniveOne (Integer.toNaturalSaturating n)) (Maybe.mapMaybe Recipient.objectOf ordered)
   -- The card names the set, so CR 701.9b's default choice -- the discarding
   -- player's -- does not arise and the discarding player is not prompted. Named
   -- ONCE as this instruction is reached (CR 608.2c) and then fixed (CR 608.2f),
@@ -4794,6 +4807,54 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- One at a time rather than as one event, Effect.Sacrifice's fold above
     -- (#757). The reachable caller of the two: All Is Dust lands here.
     Monad.forM_ doomed (\(victim, oids) -> Monad.mapM_ (Event.sacrifice victim) oids)
+  -- CR 701.38a: each player, starting with the seat the payload specifies and
+  -- proceeding in turn order, votes for one of the listed choices; the objects
+  -- tied for most votes are bound at `slot` for a later effect of this
+  -- resolution to act on (Council's Judgment's exile).
+  --
+  -- The listed choices are swept ONCE, off the board as the vote begins, so
+  -- every voter chooses from the same list -- rule 701.38a votes "for one choice
+  -- from a list", singular. Through battlefieldMatching, so the sweep reads the
+  -- projection and a permanent that is a copy of something is judged by the
+  -- characteristics it copied.
+  --
+  -- Nothing on the board changes while the seats vote, so the decider and the
+  -- candidate list are both read off this one `gs`.
+  Effect.Vote (Vote.MkVote starter filter_ slot) -> do
+    gs <- State.get
+    let candidates = battlefieldMatching legal resolving controller source gs filter_
+        -- Rule 701.38a's "specified player". A reference naming several names the
+        -- first in PlayerId order, and one naming nobody falls back to CR 109.5's
+        -- "you" -- which is the starter every printing in the pool states anyway.
+        begin = case playerRefPlayers legal controller gs starter of
+          pid : _ -> pid
+          [] -> controller
+        -- turnOrderFrom answers the SEATING roster (CR 800.5), so stillPlaying
+        -- is what keeps a departed seat from being asked to vote.
+        voters = filter (\pid -> List.elem pid (Game.stillPlaying gs)) (Game.turnOrderFrom begin gs)
+    case candidates of
+      -- CR 101.3: an empty list of choices, so nobody votes and nothing is bound.
+      [] -> pure ()
+      first : rest -> do
+        ballots <- Monad.forM voters $ \voter -> case rest of
+          -- One choice is the whole of rule 701.38a's list, so voting decides
+          -- nothing and the prompt is elided -- where the rules leave nothing to
+          -- ask, don't prompt.
+          [] -> pure first
+          second : more -> do
+            let offered = first NonEmpty.:| (second : more)
+            answer <- Game.choose (Prompt.ChooseVote (Decide.deciderFor voter gs) voter resolving offered)
+            -- FILTERED, NOT TRUSTED, the ChooseBolster posture: an answer naming
+            -- something never offered falls back to the first choice, rule
+            -- 701.38a stating no way to abstain.
+            pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
+        let tallyOf oid = List.length (filter (== oid) ballots)
+            best = List.maximum (0 : fmap tallyOf candidates)
+            -- Every candidate on the winning tally, and none at all where nobody
+            -- voted. Rule 701.38a's vote determines "some aspect of the effect",
+            -- and the aspect this arm determines is which objects the slot names.
+            winners = if best <= 0 then [] else filter (\oid -> tallyOf oid == best) candidates
+        State.modify' (bindObjectsSlot resolving slot (Seq.fromList winners))
   Effect.Create (Create.MkCreate quantity card entry mSlot creator) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -7993,36 +8054,61 @@ exploreOne oid = do
       -- case, that rule firing even when the actions were impossible.
       State.modify' (Event.recordEvent (GameEvent.Explored oid))
 
--- CR 701.50a: one permanent's connive.
+-- CR 701.50d: one permanent's connive N. Rule 701.50a's bare connive is this
+-- with N of one, so there is no second road.
 --
 -- The controller comes from last known information (CR 701.50b), so a permanent
 -- gone before the instruction resolves still connives: its controller draws and
--- discards, and the counter lands on nothing -- the id is gone (CR 400.7), so
+-- discards, and the counters land on nothing -- the id is gone (CR 400.7), so
 -- putCounters places none.
+--
+-- CR 701.50e: connive 0 is not a connive. No draw, no discard, no counter, and
+-- none of CR 701.50f's event below. No printing in the pool counts something
+-- that can be zero when its connive resolves, so the guard is a regression
+-- fence rather than a proven behaviour (gap #3677).
 --
 -- "Nonland" is asked of each card the discard funnel MINTED, through its CR 613
 -- projection, exploreOne's reading: the hand incarnation is gone by then, and a
 -- double-faced card in a graveyard has only its front face's characteristics
 -- (CR 712.8a).
-conniveOne :: ObjectId -> Game ()
-conniveOne oid = do
+conniveOne :: Natural -> ObjectId -> Game ()
+conniveOne n oid = Monad.when (n > 0) $ do
   gs <- State.get
   Monad.forM_ (Projection.controllerWithLastKnown oid gs) $ \pid -> do
-    Event.drawCard pid
+    -- CR 121.2a: the N-card draw is one replaceable instruction, settled before
+    -- any of CR 121.2's individual draws -- Effect.Draw's arm, line for line.
+    outcome <- Event.applyReplacements (ProposedEvent.WouldDrawCards pid n)
+    Monad.forM_ (outcome >>= Replacement.asDrawCount) $ \(drawer, settled) ->
+      Monad.replicateM_ (Natural.toIntSaturating settled) (Event.drawCard drawer)
     drawn <- State.get
     let held = Game.zoneMembers Zone.Hand pid drawn
-    chosen <- case held of
-      -- An empty hand discards nothing, and one card leaves nothing to choose.
-      [] -> pure []
-      [sole] -> pure [sole]
-      first : _ -> do
-        -- CR 701.9b: the discarding player chooses. Filtered, and completed with
-        -- the first card, Effect.Discard's posture.
-        answer <- Game.choose (Prompt.ChooseDiscard (Decide.deciderFor pid drawn) pid held 1)
-        pure (take 1 (filter (\c -> List.elem c held) answer <> [first]))
+    -- The discard is N however many cards the draw actually delivered (CR
+    -- 701.50d), and CR 609.3 clamps it to the hand.
+    chosen <-
+      if n >= Natural.length held
+        -- CR 609.3: discarding the whole hand is "as much as possible," so it is
+        -- forced -- no choice, so no prompt.
+        then pure held
+        else do
+          -- CR 701.9b: the discarding player chooses which cards. Filtered,
+          -- completed and deduplicated, Effect.Discard's posture; this branch is
+          -- reached only when the hand is LARGER than N, so every omitted card is
+          -- one the player could have discarded.
+          answer <- Game.choose (Prompt.ChooseDiscard (Decide.deciderFor pid drawn) pid held n)
+          let valid = ListUtils.nubOrd (filter (\c -> List.elem c held) answer)
+              filler = filter (\c -> List.notElem c valid) held
+          pure (List.genericTake n (valid <> filler))
     moved <- fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary pid) chosen)
     after <- State.get
     let nonland c = not (Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject c after)))
-    -- CR 122.6 through the one counter funnel, as exploreOne's grow.
-    Monad.when (any nonland moved) $
-      Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne 1)
+        grown = Natural.length (filter nonland moved)
+    -- CR 701.50d: one counter per nonland card discarded, CR 122.6 through the
+    -- one counter funnel, as exploreOne's grow.
+    Monad.when (grown > 0) $
+      Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne grown)
+    -- CR 701.50f: the permanent connives once the whole of rule 701.50d is done,
+    -- so this comes after every step above and fires even where they were
+    -- impossible -- exploreOne's CR 701.44b line. Inside the Just, since an id
+    -- nobody ever controlled connives nothing; CR 701.50e's zero never reaches
+    -- here, the guard above having returned.
+    State.modify' (Event.recordEvent (GameEvent.Connived oid))

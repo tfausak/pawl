@@ -39,8 +39,14 @@
                       {
                         "type": "Connive",
                         "value": {
-                          "type": "InSlot",
-                          "value": "self"
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         }
                       }
                     ]

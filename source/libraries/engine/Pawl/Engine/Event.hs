@@ -558,6 +558,7 @@ damageOf event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
@@ -622,6 +623,7 @@ revealOf event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
@@ -6891,6 +6893,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  TriggerCondition.PermanentConnives _ -> False
   -- A fifth keyword action, and the same answer: CR 701.68a is something a
   -- player DOES, so it takes CR 603.3b's first pass too.
   TriggerCondition.PlayerBlights _ -> False
@@ -7083,6 +7086,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  TriggerCondition.PermanentConnives _ -> False
   -- CR 701.68 names no turn either.
   TriggerCondition.PlayerBlights _ -> False
   -- CR 706.1 names no turn either.

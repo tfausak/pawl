@@ -277,6 +277,7 @@ library codec
     Pawl.Codec.ConjureDestination
     Pawl.Codec.ConjureDestinationSpec
     Pawl.Codec.ConjureSpec
+    Pawl.Codec.Connive
     Pawl.Codec.ContinuousEffect
     Pawl.Codec.ContinuousEffectSpec
     Pawl.Codec.ControlChanged
@@ -961,6 +962,8 @@ library codec
     Pawl.Codec.VanguardSpec
     Pawl.Codec.VentureMarkerEntered
     Pawl.Codec.VentureMarkerEnteredSpec
+    Pawl.Codec.Vote
+    Pawl.Codec.VoteSpec
     Pawl.Codec.While
     Pawl.Codec.WhileSpec
     Pawl.Codec.WithCounters
@@ -1474,6 +1477,7 @@ library test
     Pawl.UntapRestrictionSpec
     Pawl.VanguardSpec
     Pawl.VariableEffectSpec
+    Pawl.VoteSpec
     Pawl.ZoneChangeSpec
     Pawl.ZoneReplacementSpec
     Pawl.ZoneTriggerSpec
@@ -1601,6 +1605,7 @@ library types
     Pawl.Types.Condition
     Pawl.Types.Conjure
     Pawl.Types.ConjureDestination
+    Pawl.Types.Connive
     Pawl.Types.ContinuousEffect
     Pawl.Types.ControlChanged
     Pawl.Types.ControlClock
@@ -1986,6 +1991,7 @@ library types
     Pawl.Types.Vanguard
     Pawl.Types.VariableChoice
     Pawl.Types.VentureMarkerEntered
+    Pawl.Types.Vote
     Pawl.Types.While
     Pawl.Types.WithCounters
     Pawl.Types.Zone

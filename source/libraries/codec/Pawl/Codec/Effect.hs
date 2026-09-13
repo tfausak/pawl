@@ -25,6 +25,7 @@ import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Codec.Conjure as Conjure
+import qualified Pawl.Codec.Connive as Connive
 import qualified Pawl.Codec.ControlPlayer as ControlPlayer
 import qualified Pawl.Codec.CopyStackObject as CopyStackObject
 import qualified Pawl.Codec.Counter as Counter
@@ -91,6 +92,7 @@ import qualified Pawl.Codec.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Codec.TurnFaceDown as TurnFaceDown
+import qualified Pawl.Codec.Vote as Vote
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -125,6 +127,7 @@ codec cardCodec abilityCodec =
           Arm.optionalPayload "Venture" Subtype.codec Effect.Venture (\x -> case x of Effect.Venture y -> Just y; _ -> Nothing),
           Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,
           Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices (\x -> case x of Effect.PlayerSacrifices y -> Just y; _ -> Nothing),
+          Arm.payload "Vote" Vote.codec Effect.Vote (\x -> case x of Effect.Vote y -> Just y; _ -> Nothing),
           Arm.optionalPayload "RestartGame" ObjectRef.codec Effect.RestartGame (\x -> case x of Effect.RestartGame y -> Just y; _ -> Nothing),
           Arm.payload "ControlPlayerNextTurn" SlotName.codec Effect.ControlPlayerNextTurn (\x -> case x of Effect.ControlPlayerNextTurn y -> Just y; _ -> Nothing),
           Arm.payload "ControlPlayerThisResolution" ControlPlayer.codec Effect.ControlPlayerThisResolution (\x -> case x of Effect.ControlPlayerThisResolution y -> Just y; _ -> Nothing),
@@ -144,7 +147,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Surveil" PlayerQuantity.codec Effect.Surveil (\x -> case x of Effect.Surveil y -> Just y; _ -> Nothing),
           Arm.payload "Fateseal" PlayerQuantity.codec Effect.Fateseal (\x -> case x of Effect.Fateseal y -> Just y; _ -> Nothing),
           Arm.payload "Explore" ObjectRef.codec Effect.Explore (\x -> case x of Effect.Explore y -> Just y; _ -> Nothing),
-          Arm.payload "Connive" ObjectRef.codec Effect.Connive (\x -> case x of Effect.Connive y -> Just y; _ -> Nothing),
+          Arm.payload "Connive" Connive.codec Effect.Connive (\x -> case x of Effect.Connive y -> Just y; _ -> Nothing),
           Arm.payload "Mill" Mill.codec Effect.Mill (\x -> case x of Effect.Mill y -> Just y; _ -> Nothing),
           Arm.payload "Discard" Discard.codec Effect.Discard (\x -> case x of Effect.Discard y -> Just y; _ -> Nothing),
           Arm.payload "LoseLife" LifeLoss.codec Effect.LoseLife (\x -> case x of Effect.LoseLife y -> Just y; _ -> Nothing),

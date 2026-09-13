@@ -797,6 +797,7 @@ abilityTriggeredOf event = case event of
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
