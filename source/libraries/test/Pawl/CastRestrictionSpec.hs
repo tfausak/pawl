@@ -2289,8 +2289,8 @@ senTripletsSpec s registry =
 -- CR 702.88a's "if this spell was cast from YOUR hand", which only Sen Triplets'
 -- last sentence can put to the test: Staggershock {2}{R} Instant -- "Staggershock
 -- deals 2 damage to any target. / Rebound" (Oracle text fetched from Scryfall
--- 2026-09-13, ROE) -- sits in BOTH alice's hand and bob's, so the two cases below
--- differ in whose hand the card came out of and in nothing else.
+-- 2026-09-13, ROE) -- sits in BOTH alice's hand and bob's, so senTripletsSpec's
+-- pair differs in whose hand the card came out of and in nothing else.
 --
 -- THREE Mountains, exactly {2}{R}, so each case makes one cast. THREE seats, so
 -- carol is the damage's target and neither the caster nor the card's owner has a
