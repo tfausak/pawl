@@ -89,6 +89,22 @@ isMainPhase phase = case phase of
   Phase.PostcombatMain -> True
   _ -> False
 
+-- CR 702.190a's "any time you could cast an instant during YOUR declare blockers
+-- step": sorcerySpeedWindow's two seats one phase over, and one conjunct short of
+-- it. The step is CR 509's, and "your" is CR 102.1's -- the turn is this player's
+-- -- which is why the active player is asked here as well.
+--
+-- NO EMPTY-STACK conjunct, where rule 307.1's window has one: rule 702.190a's own
+-- words are "any time you could cast an INSTANT", which CR 117.1a gives its
+-- controller at every priority, stack or no stack. The readers are
+-- Pawl.Engine.Cast's cardTimingOk, which disjoins it to widen WHEN the cast may
+-- begin, and candidateTimingOk, which substitutes it to narrow WHICH cost may
+-- begin it; priority is implicit in both for sorcerySpeedWindow's reason.
+declareBlockersWindow :: PlayerId -> GameState -> Bool
+declareBlockersWindow pid gs =
+  GameState.phase gs == Phase.Combat CombatStep.DeclareBlockers
+    && GameState.activePlayer gs == pid
+
 -- CR 500: the final step of the phase this one belongs to -- the step whose end
 -- ends the phase. CR 511.3 names combat's; CR 501.1 and CR 512.1 list the
 -- beginning and ending phases' steps. A main phase has no steps at all (CR

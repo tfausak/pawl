@@ -360,6 +360,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (Keyword.Cleave (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []))
       " {\"type\":\"Cleave\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
+  -- CR 702.188a and CR 702.190a carry a whole Cost each, cleave's shape. The
+  -- return each rule states is NOT in the payload: it is appended at the offer, by
+  -- Pawl.Engine.Keyword.plainAlternativeCosts, off the rule rather than the card.
+  Spec.it s "WebSlinging and Sneak carry their costs" $ do
+    let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
+    Common.assertCodec s Keyword.codec (Keyword.WebSlinging cost) " {\"type\":\"WebSlinging\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Common.assertCodec s Keyword.codec (Keyword.Sneak cost) " {\"type\":\"Sneak\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
   -- CR 702.117a and CR 702.137a carry a whole Cost each, under tags of their own.
   Spec.it s "Surge and Spectacle carry their costs" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []

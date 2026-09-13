@@ -119,6 +119,67 @@ timingOk pid oid name gs = case proposedFace oid name gs of
       || PlayerEffect.mayCastAsThoughItHadFlash pid oid gs
       || sorcerySpeed pid gs
 
+-- CR 117.1a and CR 702.190a: the window a cast of this CARD may begin in, which
+-- is timingOk widened once more. Rule 702.190a's "any time you could cast an
+-- instant during your declare blockers step" is a third axis beside the two
+-- timingOk already disjoins -- the card type's, which CR 702.8a's flash is a
+-- keyword on, and the player's -- and it is the only one of the three that names
+-- a STEP rather than a class of moment.
+--
+-- A DISJUNCT here, where the same rule NARROWS at candidateTimingOk below, and
+-- the two are not in tension: this answers whether a cast may begin at all, and a
+-- sorcery with sneak may begin one in that step; which COST may then be announced
+-- is the per-candidate question, and rule 702.190a's window admits only its own.
+--
+-- The keyword is read flashOn's two ways and for its reasons -- the proposed
+-- half's printed keywords and the object's post-layer ones -- so a granted sneak
+-- widens the window as a printed one does.
+cardTimingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+cardTimingOk pid oid name gs = case proposedFace oid name gs of
+  Nothing -> False
+  Just face ->
+    timingOk pid oid name gs
+      -- The WINDOW first and the keyword second, which is the cheap conjunct
+      -- first: the window is False at all but one step of one player's turn, and
+      -- the projection fold behind the second limb then never runs.
+      || ( Turn.declareBlockersWindow pid gs
+             && (Keyword.hasSneak (Face.keywords face) || Keyword.hasSneak (Map.keysSet (Projection.keywordsOf oid gs)))
+         )
+
+-- CR 702.190a: the window ONE CANDIDATE COST may be announced in. Ordinarily the
+-- card's own, which is every candidate's; sneak's is its own instead -- "any time
+-- you could cast an instant during your declare blockers step".
+--
+-- REPLACES timingOk rather than joining it, and the rule needs both halves of
+-- that. It WIDENS -- Donatello's Technique is a sorcery, so timingOk is False in
+-- the declare blockers step and the sneak cost must still be announceable. And it
+-- NARROWS -- the printed {2}{U} of that same sorcery must NOT be announceable
+-- there, and an instant with sneak (Kitsune's Technique) must not have its sneak
+-- cost announceable in an upkeep. A disjunction could only do the first, which is
+-- why the non-sneak arm asks timingOk and never cardTimingOk above.
+candidateTimingOk :: PlayerId -> ObjectId -> CardName.CardName -> Maybe Keyword.Type.Keyword -> GameState -> Bool
+candidateTimingOk pid oid name castUsing gs =
+  if Keyword.sneakWindowed castUsing
+    then Turn.declareBlockersWindow pid gs
+    else timingOk pid oid name gs
+
+-- CR 601.2b's candidates less the ones CR 702.190a's window shuts out. The ONE
+-- writer both roads to an announcement go through -- `castable`'s gate and the
+-- list Prompt.ChooseCost is built from -- so a cost the gate would have refused
+-- can never be offered and paid.
+--
+-- IDENTITY unless some candidate brings a window of its own, which today means
+-- sneak and nothing else. Where none does, every candidate shares the card's
+-- window, cardTimingOk has answered for all of them at once, and re-asking it
+-- per candidate would be exactly the near-copy cardGatesOk's haddock exists to
+-- prevent. Where one does, the two windows differ and each candidate has to be
+-- asked its own.
+windowedCandidates :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> [CandidateCost.CandidateCost] -> [CandidateCost.CandidateCost]
+windowedCandidates pid oid name gs candidates =
+  if any (Keyword.sneakWindowed . CandidateCost.keyword) candidates
+    then filter (\candidate -> candidateTimingOk pid oid name (CandidateCost.keyword candidate) gs) candidates
+    else candidates
+
 -- The half whose cast is being proposed (CR 709.3a: "Only the chosen half is
 -- evaluated to see if it can be cast"). Nothing when the id is unknown or no
 -- card stands behind it.
@@ -1328,7 +1389,7 @@ castable pid oid name facing gs =
    in cardGatesOk pid oid name proposed
         -- Gated HERE, upstream of Action.legalActions, because the engine never
         -- offers an illegal action and then rejects it.
-        && any candidateOk (Cost.candidateCostsFor pid name oid proposed)
+        && any candidateOk (windowedCandidates pid oid name proposed (Cost.candidateCostsFor pid name oid proposed))
 
 -- `castable`'s conjuncts that are about the CARD and the board rather than about
 -- one candidate cost -- the timing window, the zone's permission, and the three
@@ -1336,11 +1397,15 @@ castable pid oid name facing gs =
 -- could-begin-to-cast test below asks exactly the same questions `castable` does
 -- rather than a near-copy that can drift.
 --
+-- The window is cardTimingOk's rather than timingOk's, which is rule 702.190a
+-- widening WHEN a cast may begin; WHICH cost it may then begin with is
+-- windowedCandidates' narrowing, applied to the list in both callers.
+--
 -- Takes the board `asProposed` already stamped, since every conjunct reads the
 -- half being proposed off it.
 cardGatesOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 cardGatesOk pid oid name proposed =
-  timingOk pid oid name proposed
+  cardTimingOk pid oid name proposed
     && inCastableZone pid oid name proposed
     -- CR 601.3's prohibit half from a different CARRIER: a spell on the stack
     -- (CR 702.61a) rather than a continuous effect on a player. It names
@@ -1361,7 +1426,8 @@ cardGatesOk pid oid name proposed =
 -- payment are both later steps of that same rule -- so a card whose targets
 -- cannot be filled or whose mana cannot be found could still be BEGUN. The
 -- prohibition half is still asked per candidate, `castable`'s reason: CR 702.103d
--- judges a prohibition against the spell the announcement would produce.
+-- judges a prohibition against the spell the announcement would produce, over the
+-- list windowedCandidates has already narrowed to rule 702.190a's window.
 --
 -- FACE UP and from the card's own zone, since rule 116.2f's subject is a card in
 -- a hand.
@@ -1370,7 +1436,7 @@ couldBeginToCast pid oid name gs =
   let proposed = asProposed oid name Facing.FaceUp gs
       proposedName = maybe name Face.name (proposedFace oid name proposed)
       allowed = candidateAllowed pid oid proposedName proposed
-      candidates = Cost.candidateCostsFor pid name oid proposed
+      candidates = windowedCandidates pid oid name proposed (Cost.candidateCostsFor pid name oid proposed)
    in cardGatesOk pid oid name proposed && any allowed candidates
 
 -- Every cast this player may propose right now, in castZones' order, as the
@@ -1790,6 +1856,13 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- on the characteristics its own choice gives the spell, so a
           -- prohibition or an unfillable enchant slot that reaches only some of
           -- them must narrow what CR 601.2b offers rather than refuse the cast.
+          --
+          -- And by CR 702.190a's window before them, through the same
+          -- windowedCandidates the gate used. ONE WRITER, EVERY ROAD: a gate that
+          -- kept the cast and a list that offered every cost would let the player
+          -- pay in a window the gate itself would have refused, which is what
+          -- Pawl.CastSpec's sneak case "asked for the printed {2}{U} the answerer
+          -- gets rule 702.190a's cost anyway" reddens.
           -- This is the narrowing the player SEES -- Prompt.ChooseCost is built
           -- from this list -- and it is what keeps a bestow cast on a board with
           -- no creature from being offered and then rejected; see #2911.
@@ -1808,7 +1881,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
               (\candidate -> candidateAllowed pid oid (Face.name face) proposed candidate && candidateFillable pid oid name proposed candidate)
               ( fmap
                   (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
-                  (maybe (Cost.candidateCostsGiven offered pid name oid proposed) pure applied)
+                  (windowedCandidates pid oid name proposed (maybe (Cost.candidateCostsGiven offered pid name oid proposed) pure applied))
               )
           -- CR 400.7g / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move

@@ -251,4 +251,10 @@ data KeywordFamily
   | -- | CR 702.194a: teamwork N. No card in the pool asks yet, and it is owed at
     -- the keyword rather than at the first asker.
     Teamwork
+  | -- | CR 702.188a: web-slinging [cost]; the family Quantity.CastUsing names for
+    -- Spiders-Man, Heroic Horde's "if they were cast using web-slinging".
+    WebSlinging
+  | -- | CR 702.190a: sneak [cost]. No card in the pool asks yet, and it is owed at
+    -- the keyword rather than at the first asker.
+    Sneak
   deriving (Bounded, Enum, Eq, Ord, Show)

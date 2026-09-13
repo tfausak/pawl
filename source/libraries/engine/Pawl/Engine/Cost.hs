@@ -3402,8 +3402,10 @@ orderSensitive component = case component of
   -- `orderObservable` is False whichever way this answers.
   CostComponent.ReturnThis -> True
   -- A FENCE rather than proven behaviour, ReturnThis' above and for its reason:
-  -- Meloku the Clouded Mirror is the one card that prints this component and its
-  -- cost has no second order-sensitive part.
+  -- Meloku the Clouded Mirror is the one card that PRINTS this component, and its
+  -- cost has no second order-sensitive part. Nor has any cost that MINTS one --
+  -- CR 702.49a's ninjutsu, CR 702.188a's web-slinging and CR 702.190a's sneak,
+  -- which each append exactly this component to a mana cost and nothing else.
   CostComponent.ReturnPermanents {} -> True
   CostComponent.DiscardCards {} -> True
   CostComponent.DiscardThis _ -> True
