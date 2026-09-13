@@ -30,7 +30,9 @@ defaultPlayer = PlayerRef.Relative PlayerRelation.You
 -- @retention@ is DEFAULTED the same way and for the same reason: CR 106.4's
 -- default is that the player loses the mana as the step ends, so a card that
 -- says nothing means Ordinary. Shizuko, Caller of Autumn's "until end of turn,
--- they don't lose this mana" is the one printing in the pool that writes it.
+-- they don't lose this mana" and Avatar Roku, Firebender's "until end of combat"
+-- are the printings in the pool that write the key; CR 702.189a's firebending
+-- means the same thing and writes no key at all, being minted from the keyword.
 --
 -- @count@ is DEFAULTED to 1: an instruction adds one mana unless the card says
 -- otherwise, and Stadium Vendors' "two mana of any one color they choose" is the

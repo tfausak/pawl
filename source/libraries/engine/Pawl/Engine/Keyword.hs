@@ -4562,8 +4562,8 @@ mobilizeSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeE
 -- cry's SelfAttacks EveryTime.
 --
 -- EntryAttack.Chosen and not myriad's UnderPlayer: rule 702.181a narrows the
--- tokens' subject not at all, so CR 508.4's choice is offered whole -- and
--- elided at one candidate, which a two-seat board always is.
+-- tokens' subject not at all, so CR 508.4's choice is offered whole, and elided
+-- only where it has one candidate.
 --
 -- The batch is BOUND so the delayed ability can name "them" (CR 603.7c reads the
 -- environment captured as it was armed), and the arm shares a clause with the

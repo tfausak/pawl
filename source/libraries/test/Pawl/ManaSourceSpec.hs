@@ -1105,6 +1105,18 @@ avatarRokuSpec s registry =
 -- leaving every combat decision to S.aggressiveAnswer. Pinned to the OBJECT
 -- rather than to "the first cast on offer", so a mutation cannot be repaired by
 -- the answerer finding some other legal spell.
+castingOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+castingOnly spell p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
+    h : _ -> h
+    [] -> Action.Type.Pass
+  _ -> S.aggressiveAnswer p
+
+-- A {R} whose ManaAddition stamped UntilEndOfCombat onto it -- Roku's, and
+-- rule 702.189a's.
+retainedRed :: ManaUnit.ManaUnit
+retainedRed = plainRed {ManaUnit.retention = ManaRetention.UntilEndOfCombat}
+
 -- CR 702.189a's firebending, the keyword that reaches the retention Avatar Roku
 -- writes out longhand: "'Firebending N' means 'Whenever this creature attacks,
 -- add N {R}. Until end of combat, you don't lose this mana as steps and phases
@@ -1146,18 +1158,6 @@ zhaoSpec s registry =
               Spec.assertEqWith s "CR 702.189a exactly the two the keyword added, retained" (poolOf S.alice blockers) (replicate 2 retainedRed)
               Spec.assertEqWith s "CR 500.5a and none once the combat phase has ended" (poolOf S.alice postcombat) []
             _ -> Spec.assertFailure s "fixture should give alice a Zhao and a Piker"
-
-castingOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-castingOnly spell p = case p of
-  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
-    h : _ -> h
-    [] -> Action.Type.Pass
-  _ -> S.aggressiveAnswer p
-
--- A {R} whose ManaAddition stamped UntilEndOfCombat onto it -- Roku's, and
--- rule 702.189a's.
-retainedRed :: ManaUnit.ManaUnit
-retainedRed = plainRed {ManaUnit.retention = ManaRetention.UntilEndOfCombat}
 
 -- CR 106.6: mana that carries a restriction on what it may be spent on. Geosurge
 -- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast

@@ -1812,7 +1812,6 @@ mobilizeSpec s registry =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   frenzySpec s registry
-  mobilizeSpec s registry
   exaltedSpec s registry
   mentorSpec s registry
   mentorsTriggerSpec s registry
@@ -1820,6 +1819,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   saviorOfOllenbockSpec s registry
   decayedSpec s registry
   myriadSpec s registry
+  mobilizeSpec s registry
   provokeSpec s registry
   trygonPredatorSpec s registry
   questingBeastSpec s registry
