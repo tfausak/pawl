@@ -38,6 +38,7 @@ substituteStar star quantity = case quantity of
   Quantity.LifeTotal _ -> quantity
   Quantity.Speed _ -> quantity
   Quantity.IsMonarch _ -> quantity
+  Quantity.HasPlayerDesignation {} -> quantity
   Quantity.IsStartingPlayer _ -> quantity
   Quantity.IsActivePlayer _ -> quantity
   Quantity.PlayerCounters {} -> quantity

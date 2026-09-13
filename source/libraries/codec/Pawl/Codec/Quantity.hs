@@ -13,6 +13,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.ManaCount as ManaCount
 import qualified Pawl.Codec.PlayerCounterTally as PlayerCounterTally
+import qualified Pawl.Codec.PlayerDesignationTally as PlayerDesignationTally
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Plus as Plus
 import qualified Pawl.Codec.ProductionTag as ProductionTag
@@ -61,6 +62,9 @@ codec =
       -- a 0/1 rather than a stored number, so there is nothing beside the
       -- reference.
       Arm.payload "IsMonarch" PlayerRef.codec Quantity.IsMonarch (\x -> case x of Quantity.IsMonarch y -> Just y; _ -> Nothing),
+      -- CR 702.131c / 702.195b's marks, IsMonarch's 0/1 answer with the mark
+      -- beside the reference, since a player may hold either or both.
+      Arm.payload "HasPlayerDesignation" PlayerDesignationTally.codec Quantity.HasPlayerDesignation (\x -> case x of Quantity.HasPlayerDesignation y -> Just y; _ -> Nothing),
       Arm.payload "IsStartingPlayer" PlayerRef.codec Quantity.IsStartingPlayer (\x -> case x of Quantity.IsStartingPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsActivePlayer" PlayerRef.codec Quantity.IsActivePlayer (\x -> case x of Quantity.IsActivePlayer y -> Just y; _ -> Nothing),
       Arm.payload "PlayerCounters" PlayerCounterTally.codec Quantity.PlayerCounters (\x -> case x of Quantity.PlayerCounters y -> Just y; _ -> Nothing),

@@ -25,6 +25,8 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
+import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
+import qualified Pawl.Types.PlayerDesignationTally as PlayerDesignationTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Plus as Plus
@@ -172,6 +174,20 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.IsMonarch (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"IsMonarch\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 702.131c / 702.195b, IsMonarch's 0/1 answer with the mark beside the
+  -- reference. Both marks are round-tripped, since the tag that separates them
+  -- rides the payload rather than the arm.
+  Spec.it s "HasPlayerDesignation, both marks" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally (PlayerRef.Relative PlayerRelation.You) PlayerDesignation.CitysBlessing))
+      " {\"type\":\"HasPlayerDesignation\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"designation\":{\"type\":\"CitysBlessing\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally (PlayerRef.Relative PlayerRelation.You) PlayerDesignation.EnduringStory))
+      " {\"type\":\"HasPlayerDesignation\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"designation\":{\"type\":\"EnduringStory\"}}} "
   -- CR 103.1, IsMonarch's shape and round-tripped the same two ways: Gemstone
   -- Caverns' gate is the Relative arm, and the InSlot arm beside it is the one a
   -- recursive decoder could lose a payload through.

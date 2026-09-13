@@ -2865,6 +2865,9 @@ quantityReads q = case q of
   Quantity.Type.LifeTotal _ -> Set.empty
   Quantity.Type.Speed _ -> Set.empty
   Quantity.Type.IsMonarch _ -> Set.empty
+  -- Reads Player.designations, which no Modification writes, so CR 613.8a's
+  -- dependency cannot turn on it.
+  Quantity.Type.HasPlayerDesignation {} -> Set.empty
   Quantity.Type.IsStartingPlayer _ -> Set.empty
   Quantity.Type.IsActivePlayer _ -> Set.empty
   Quantity.Type.PlayerCounters {} -> Set.empty

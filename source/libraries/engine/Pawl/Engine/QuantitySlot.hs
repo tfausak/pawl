@@ -30,6 +30,7 @@ import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.ManaCount as ManaCount.Type
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
+import qualified Pawl.Types.PlayerDesignationTally as PlayerDesignationTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Plus as Plus
 import Pawl.Types.Quantity (Quantity)
@@ -120,6 +121,7 @@ overSlots f quantity =
         Quantity.Speed _ -> pure quantity
         -- And a fifth, CR 725.1's designation -- a PlayerRef and nothing else.
         Quantity.IsMonarch _ -> pure quantity
+        Quantity.HasPlayerDesignation {} -> pure quantity
         -- And a sixth, CR 103.1's -- the same position again.
         Quantity.IsStartingPlayer _ -> pure quantity
         -- And a seventh, CR 102.1's -- the same position once more.
@@ -282,6 +284,7 @@ nestedRefs quantity = case quantity of
   Quantity.LifeTotal ref -> Set.singleton (Left ref)
   Quantity.Speed ref -> Set.singleton (Left ref)
   Quantity.IsMonarch ref -> Set.singleton (Left ref)
+  Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally ref _) -> Set.singleton (Left ref)
   Quantity.IsStartingPlayer ref -> Set.singleton (Left ref)
   Quantity.IsActivePlayer ref -> Set.singleton (Left ref)
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> Set.singleton (Left ref)
@@ -371,6 +374,7 @@ nestedCounts quantity = case quantity of
   Quantity.LifeTotal _ -> []
   Quantity.Speed _ -> []
   Quantity.IsMonarch _ -> []
+  Quantity.HasPlayerDesignation {} -> []
   Quantity.IsStartingPlayer _ -> []
   Quantity.IsActivePlayer _ -> []
   Quantity.HasDesignation _ -> []
@@ -518,6 +522,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.LifeTotal ref -> Quantity.LifeTotal (f ref)
         Quantity.Speed ref -> Quantity.Speed (f ref)
         Quantity.IsMonarch ref -> Quantity.IsMonarch (f ref)
+        Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally ref mark) -> Quantity.HasPlayerDesignation (PlayerDesignationTally.MkPlayerDesignationTally (f ref) mark)
         Quantity.IsStartingPlayer ref -> Quantity.IsStartingPlayer (f ref)
         Quantity.IsActivePlayer ref -> Quantity.IsActivePlayer (f ref)
         Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (f ref) kind)

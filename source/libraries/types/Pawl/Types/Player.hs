@@ -5,6 +5,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Status as Status
 
@@ -57,6 +58,16 @@ data Player = MkPlayer
     -- speed only "if your speed is less than 4", and CR 702.179e reads 4 as max
     -- speed. Nothing in rule 702.179 lowers it.
     speed :: Maybe Natural.Natural,
+    -- | CR 702.131c \/ 702.195b: the rest-of-game marks this player has, empty
+    -- for a player with none. Written only by Pawl.Engine.PlayerDesignation and
+    -- read back by Pawl.Engine.Quantity's HasPlayerDesignation arm.
+    --
+    -- A SET per player rather than a seat per mark on GameState, which is where
+    -- the monarch lives: CR 702.131c and CR 702.195b both say "any number of
+    -- players may have [it] at the same time", where CR 725.3 makes the monarch
+    -- unique. An absent member means the player does not have that mark, and
+    -- nothing in either rule takes one back.
+    designations :: Set.Set PlayerDesignation.PlayerDesignation,
     -- | CR 903.3: the cards this player designated as their commanders, empty
     -- outside a Commander game. The designation is made before the game begins
     -- and never changes.

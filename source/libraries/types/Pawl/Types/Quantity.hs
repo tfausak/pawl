@@ -13,6 +13,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
+import qualified Pawl.Types.PlayerDesignationTally as PlayerDesignationTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -69,6 +70,9 @@ data Quantity
   | -- | CR 725.1: 1 if that player is the monarch, else 0; no monarch reads 0
     -- (CR 725.5).
     IsMonarch PlayerRef.PlayerRef
+  | -- | CR 702.131c \/ 702.195b: 1 if that player has that rest-of-game mark, else
+    -- 0; a player who has never had it reads 0.
+    HasPlayerDesignation PlayerDesignationTally.PlayerDesignationTally
   | -- | CR 103.1: 1 if that player is the starting player -- the head of
     -- GameState.turnOrder -- else 0.
     --

@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Phasing as Phasing
+import qualified Pawl.Engine.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
@@ -1161,6 +1162,12 @@ performSettle = do
   -- state-based actions -- both rules say they are not. Before the SBA pass, since
   -- turning a permanent over changes its power and toughness.
   dayNight <- Daytime.settle Event.recordTransformed
+  -- CR 702.131b / 702.195a, checked here for CR 704.3's reason and not because
+  -- they are state-based actions -- rule 704.5 lists neither. Before the SBA pass,
+  -- since a mark granted here turns on the "as long as you have" clauses that read
+  -- it and CR 702.131d / 702.195c want continuous effects reapplied before the
+  -- trigger check.
+  designated <- PlayerDesignation.settle
   -- Also before the SBA pass: a permanent that just became world must be stamped
   -- before CR 704.5k reads the clock. No reason to loop.
   sampleWorldSince
@@ -1189,7 +1196,7 @@ performSettle = do
   State.modify' Combat.removeChanged
   checkControlContinuity
   Ring.endOnControlChange
-  more <- if swept || returned || movedBack || dayNight || sampledControl || acted || placed then performSettle else pure False
+  more <- if swept || returned || movedBack || dayNight || designated || sampledControl || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
 -- CR 104.4b: how many events may happen with no player able to decide anything
