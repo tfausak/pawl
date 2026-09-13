@@ -1223,6 +1223,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Retrace
       " {\"type\":\"Retrace\"} "
+  -- CR 702.88a: nullary. The exile, the delayed ability and its free cast are
+  -- all the rule's, so a card printing rebound states nothing else.
+  Spec.it s "Rebound" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Rebound
+      " {\"type\":\"Rebound\"} "
   -- CR 702.187b's payload is a whole Cost, Electro's Bolt's {1}{R}, and it must
   -- not share Flashback's tag: rule 702.187b gates its permission on the discard
   -- this turn and rule 702.34a on the card type, so the two answer differently.

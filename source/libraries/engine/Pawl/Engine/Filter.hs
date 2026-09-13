@@ -2382,6 +2382,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.35a's cost is printed, so its components take the same descent
   -- mayhem's do.
   Keyword.Type.Madness cost -> Keyword.Type.Madness (rewriteCost pairs cost)
+  -- CR 702.88a takes no parameter and prints no cost, retrace's position: rule
+  -- 702.88a's exile, upkeep and free cast are all the rule's, so CR 612.2 has no
+  -- printed word here to swap.
+  Keyword.Type.Rebound -> keyword
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is

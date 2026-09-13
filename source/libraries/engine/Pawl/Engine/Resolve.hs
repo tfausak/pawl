@@ -23,13 +23,14 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, clauseIsImpossible, noSubgame, performManaAbility, targetSlotsOf)
+import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, armDelayed, clauseIsImpossible, noSubgame, performManaAbility, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, oneSlot, playerRefSlots, quantitySlots, slotBindings, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
@@ -439,14 +440,17 @@ resolveSpellWith runSubgame oid = do
 -- record CR 601.2b's announcement wrote (Pawl.Engine.Cast.stampBoughtBack), which
 -- is rule 702.27a's own "if the buyback cost was paid".
 --
--- Buyback's rewrite is a replacement effect (CR 614.1a) and is INSTALLED here as
--- a row rather than performed (Replacement.installBuybackReturn), so CR 616.1's
--- loop orders it against every other row watching the same move.
+-- Buyback's and rebound's rewrites are replacement effects (CR 614.1a) and are
+-- INSTALLED here as rows rather than performed
+-- (Replacement.installBuybackReturn, Replacement.installReboundExile), so CR
+-- 616.1's loop orders them against every other row watching the same move.
+-- Rebound's is keyed on CR 702.88a's own two conditions, `reboundApplies`.
 --
 -- Not implemented: the Adventure and Omen riders are performed outright, so a row
 -- another object contributes to the same move is not ordered against them
--- (#3359). Nor are the three ordered against each other, and no printing carries
--- two -- buyback appears on instants and sorceries printed as such, where CR
+-- (#3359). Nor are the four ordered against each other, and no printing carries
+-- two -- buyback and rebound appear on instants and sorceries printed as such,
+-- never together (Scryfall kw:buyback kw:rebound, 2026-09-12, no hit), where CR
 -- 715.3d's and CR 720.3d's riders belong to a creature card's other half.
 finishSpell :: ObjectId -> Face.Face Card.Type.Card -> PlayerId -> Game ()
 finishSpell oid face controller
@@ -470,7 +474,28 @@ finishSpell oid face controller
       -- spell actually lands.
       bought <- State.gets (maybe False Object.boughtBack . Game.lookupObject oid)
       Monad.when bought (State.modify' (Replacement.installBuybackReturn oid controller))
-      Event.changeZone oid Zone.Graveyard
+      -- CR 702.88a: "if this spell was cast from your hand, instead of putting it
+      -- into your graveyard as it resolves, exile it and, at the beginning of
+      -- your next upkeep, you may cast this card from exile without paying its
+      -- mana cost". Buyback's road exactly -- a row over the move on the next
+      -- line -- plus the delayed ability, which a ZoneChangeR cannot carry and
+      -- which is armed below against the incarnation CR 400.7 mints.
+      rebounds <- State.gets reboundApplies
+      Monad.when rebounds (State.modify' (Replacement.installReboundExile oid controller))
+      landed <- Event.changeZoneReturning oid Zone.Graveyard
+      Monad.forM_ landed $ \newId -> do
+        -- Rule 702.88a makes the delayed ability part of the SAME rewrite as the
+        -- exile, so it is armed only where that rewrite is what moved the card: a
+        -- row the controller took ahead of it under CR 616.1 sends the spell
+        -- somewhere else and leaves rebound nothing to do.
+        --
+        -- Not implemented: another row's exile is not told from rule 702.88a's
+        -- own. Rest in Peace taken first replaces the same move with an exile,
+        -- which CR 614.6 leaves rebound unapplied to, and pawl arms the upkeep
+        -- ability anyway (#3683).
+        inExile <- State.gets (fmap ((== Zone.Exile) . Object.zone) . Game.lookupObject newId)
+        Monad.when (rebounds && inExile == Just True) $
+          State.modify' (armDelayed Keyword.Engine.reboundUpkeep newId controller (Map.singleton Keyword.Engine.reboundSlot (Binding.toObject newId)) Onset.Immediately Nothing)
   | otherwise = do
       exiled <- Event.changeZoneReturning oid Zone.Exile
       Monad.forM_ exiled $ \newId ->
@@ -480,6 +505,21 @@ finishSpell oid face controller
                 Map.adjust (\o -> o {Object.playableFromExile = Just (permission newId)}) newId (GameState.objects gs)
             }
   where
+    -- CR 702.88a's two conditions. The keyword is read off the PROJECTION and
+    -- not off `face`, so a spell granted rebound by a text-changing effect
+    -- rebounds and one whose text was blanked does not (CR 613.1f); rule 702.88c
+    -- makes a second instance redundant, which membership is. The zone is CR
+    -- 601.2a's, which Object.castFrom stored as the cast began -- Nothing for a
+    -- copy put on the stack rather than cast (CR 707.10), which rule 702.88a's
+    -- "was cast" excludes.
+    --
+    -- Not implemented: rule 702.88a's "YOUR hand". Object.castFrom records the
+    -- zone and not whose copy of it, so a spell cast out of an opponent's hand
+    -- (Sen Triplets) rebounds where the rule leaves it in the graveyard
+    -- (#3682).
+    reboundApplies gs =
+      Keyword.Engine.hasRebound (Map.keysSet (Projection.keywordsOf oid gs))
+        && maybe False ((== Just Zone.Hand) . Object.castFrom) (Game.lookupObject oid gs)
     -- Never per CR 611.2a: CR 715.3d states no duration. What ends it is CR
     -- 400.7 -- leaving exile mints a new incarnation, and newIncarnation clears
     -- the field.

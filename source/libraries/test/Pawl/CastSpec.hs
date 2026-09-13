@@ -4196,6 +4196,83 @@ madnessBoard mountain forest wurm reunion =
       (reunionId, ready) = S.addHandCard reunion S.alice handed
    in S.runPure S.identityAnswer ready (S.cast S.alice reunionId)
 
+-- CR 702.88's whole ability, on Staggershock {2}{R} Instant -- "Staggershock
+-- deals 2 damage to any target. / Rebound" (Oracle text fetched from Scryfall
+-- 2026-09-12, ROE). The payoff is an Effect.DealDamage pawl already builds, so
+-- rule 702.88a's exile, its delayed ability and its free cast are the only things
+-- under test.
+--
+-- BOB'S LIFE is the observer, and 2 at a time: the first two as the spell
+-- resolves, the second two as rule 702.88a's cast does. Three Mountains is
+-- exactly {2}{R}, so a rebound cast that was PRICED would tap them again and one
+-- that is free leaves them untapped after the untap step -- which is what
+-- separates CR 118.9's waiver from an ordinary recast here.
+reboundBoard :: Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+reboundBoard mountain staggershock =
+  let stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard mountain pid h)) g [1 :: Int .. 8]
+      stocked = List.foldl' stock (S.landsInPlay mountain 3) [S.alice, S.bob]
+      (gs, spellId) = S.handOne staggershock stocked
+   in -- The SCHEDULE has to agree with the phase, or the upkeep this turn's
+      -- beginning phase still has queued arrives AFTER the main phase and rule
+      -- 702.88a's "next upkeep" lands on the turn the spell resolved on.
+      ((aliceOnTurn gs) {GameState.remaining = S.phasesAfter Phase.PrecombatMain}, spellId)
+
+-- Aims the Staggershock at bob and takes CR 608.2g's offered cast. The recipient
+-- is PICKED OUT OF THE OFFERED SET rather than built, `furies`' reason (CR
+-- 608.2b).
+reboundAnswer :: Prompt.Prompt r -> r
+reboundAnswer p = case p of
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  Prompt.ChooseTargets _ _ _ slots ->
+    Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (== Recipient.ToPlayer S.bob) (Set.toList recipients))) slots
+  _ -> S.identityAnswer p
+
+-- Run whole steps until the board reaches `stop`, or the game ends. Bounded so a
+-- bug cannot loop forever; Pawl.SpecialActionSpec's runUntil is the same shape.
+reboundRunUntil :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState -> Bool) -> GameState.GameState -> GameState.GameState
+reboundRunUntil answer stop gs0 =
+  let go n g =
+        if n <= (0 :: Int) || stop g || Maybe.isJust (GameState.result g)
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 64 gs0
+
+reboundSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+reboundSpec s registry = Spec.describe s "Rebound" $ do
+  -- Rule 702.88a's first half: the CR 608.2n move is replaced, and the card the
+  -- rule names is the one that would have gone to the graveyard.
+  Spec.it s "CR 702.88a a spell cast from hand is exiled as it resolves instead of going to its owner's graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    staggershock <- S.printingOf s registry "Staggershock"
+    let (gs, spellId) = reboundBoard mountain staggershock
+        resolved = S.runPure reboundAnswer gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertBool s (elem (Just (S.printingName staggershock)) (buybackNamesIn Zone.Exile S.alice resolved)) "the Staggershock is in exile"
+    Spec.assertBool s (notElem (Just (S.printingName staggershock)) (buybackNamesIn Zone.Graveyard S.alice resolved)) "and not in the graveyard CR 608.2n would have put it in"
+    Spec.assertEqWith s "the spell still resolved: bob took its 2" (S.lifeOf S.bob resolved) (Just 18)
+  -- Rule 702.88a's second half, driven to the upkeep it names. bob's life is the
+  -- gameplay assertion and comes first; the untapped Mountains and the empty
+  -- exile are read after it.
+  Spec.it s "CR 702.88a the delayed ability offers the cast from exile for nothing at its controller's next upkeep" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    staggershock <- S.printingOf s registry "Staggershock"
+    let (gs, spellId) = reboundBoard mountain staggershock
+        resolved = S.runPure reboundAnswer gs (S.cast S.alice spellId >> Stack.resolveTop)
+        startTurn = GameState.turnNumber resolved
+        atDrawOf n g = GameState.turnNumber g > startTurn + n && GameState.phase g == Phase.Beginning BeginningStep.DrawStep
+        -- bob's upkeep is the turn between, and rule 702.88a's "YOUR" excludes
+        -- it: a delayed ability watching EACH upkeep would have fired here.
+        betweenTurns = reboundRunUntil reboundAnswer (atDrawOf 0) resolved
+        after = reboundRunUntil reboundAnswer (atDrawOf 1) betweenTurns
+    Spec.assertEqWith s "bob takes the rebound cast's 2 as well" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "and nothing at bob's own upkeep one turn earlier" (S.lifeOf S.bob betweenTurns) (Just 18)
+    -- "For free" read off the board: the untap step gave the Mountains back and
+    -- the rebound cast left them untapped, where {2}{R} would have taken all
+    -- three.
+    Spec.assertEqWith s "no mana paid for it -- the three Mountains are untapped" (S.tappedCount S.alice after) 0
+    -- Rule 702.88a's "if this spell was cast from your HAND", from the excluded
+    -- side: the rebound cast comes from exile, so it does not rebound again.
+    Spec.assertEqWith s "and the card cast from exile does not rebound again" (length (GameState.exile after)) 0
+
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
@@ -4411,6 +4488,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   retraceSpec s registry
   mayhemSpec s registry
   madnessSpec s registry
+  reboundSpec s registry
   legendarySpellSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).

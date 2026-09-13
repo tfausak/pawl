@@ -3498,6 +3498,53 @@ installBuybackReturn spellId caster gs =
           }
    in gs1 {GameState.replacements = active : GameState.replacements gs1}
 
+-- CR 702.88a's static ability as a row over CR 608.2n's own move: "if this spell
+-- was cast from your hand, instead of putting it into your graveyard as it
+-- resolves, exile it". installBuybackReturn's twin with exile for the hand, and
+-- installed by Pawl.Engine.Resolve.finishSpell the same way, so rule 702.88a's
+-- rewrite and every other row watching that move reach CR 616.1's loop together.
+--
+-- MINTED AT THE MOVE for installBuybackReturn's reason: rule 702.88a scopes the
+-- rewrite to "as it resolves", and a standing row keyed on a graveyard
+-- destination would over-apply to a countered (CR 701.6a) or a fizzled (CR
+-- 608.2b) spell, both of which rule 702.88a leaves in the graveyard.
+--
+-- The DELAYED ABILITY rule 702.88a creates is not this row's: a ZoneChangeR
+-- rewrites a destination and nothing else, so finishSpell arms it after the move
+-- lands, against the incarnation CR 400.7 minted.
+installReboundExile :: ObjectId -> PlayerId -> GameState -> GameState
+installReboundExile spellId caster gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      active =
+        ActiveReplacement.MkActiveReplacement
+          { ActiveReplacement.effect =
+              ReplacementEffect.ZoneChangeR
+                ( ZoneChangeR.MkZoneChangeR
+                    ZoneChangePattern.MkZoneChangePattern
+                      { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
+                        ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                        -- Rule 702.88a says "this spell", installBuybackReturn's
+                        -- scoping.
+                        ZoneChangePattern.whatObject = Filter.Type.IsSource
+                      }
+                    Zone.Exile
+                    False
+                    False
+                ),
+            ActiveReplacement.source = spellId,
+            ActiveReplacement.controller = caster,
+            ActiveReplacement.timestamp = ts,
+            ActiveReplacement.expiry = Expiry.Never,
+            ActiveReplacement.uses = Uses.Once,
+            ActiveReplacement.origin = ReplacementOrigin.Other,
+            -- No clause: rule 702.88a's own "if this spell was cast from your
+            -- hand" is Object.castFrom, and finishSpell has already read it.
+            ActiveReplacement.condition = Nothing,
+            ActiveReplacement.rider = Nothing,
+            ActiveReplacement.slots = Map.empty
+          }
+   in gs1 {GameState.replacements = active : GameState.replacements gs1}
+
 asPhaseBegin :: ProposedEvent -> Maybe (PhaseSelector, PlayerId)
 asPhaseBegin event = case event of
   ProposedEvent.WouldBeginPhase selector pid -> Just (selector, pid)

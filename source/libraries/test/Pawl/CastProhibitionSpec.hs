@@ -396,10 +396,8 @@ blossomingCalmHandoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
 -- Pawl.Engine.Resolve stamps Expiry.AtTurnOf off the resolution's controller
 -- (CR 109.5) and Expiry.dropAtTurnOf ends it at alice's seat, two handoffs later.
 --
--- Not implemented: the card's third line is rebound (CR 702.88), which pawl has
--- no representation for (#3489). The omission runs against the controller -- pawl's
--- Blossoming Calm is cast once where the printed one is cast twice -- so nothing
--- here is weaker than printed.
+-- The card's third line is rebound (CR 702.88), which Pawl.CastSpec's Rebound
+-- group proves on Staggershock; nothing below reaches it.
 blossomingCalmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blossomingCalmSpec s registry =
   Spec.describe s "Blossoming Calm" $ do
