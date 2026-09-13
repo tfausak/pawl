@@ -323,6 +323,28 @@ amassSpec s registry = Spec.describe s "Amass" $ do
     Spec.assertEqWith s "and became a Zombie as well as an Orc" (Projection.subtypesOf bobArmy after) (Set.fromList [Subtype.Orc, Subtype.Zombie, Subtype.Army])
     Spec.assertEqWith s "her own Army took none" (plusCountersOn aliceArmy after) (Just 3)
     Spec.assertEqWith s "and stayed a plain Zombie Army" (Projection.subtypesOf aliceArmy after) (Set.fromList [Subtype.Zombie, Subtype.Army])
+  -- CR 701.47c: "the amassed Army" is the creature the amasser CHOSE. The two
+  -- boards below are one board answered two ways, and the mill count is the whole
+  -- assertion: the Army she names is the one whose power the next clause reads.
+  --
+  -- Her own Army carries three counters and the borrowed one carries one, so after
+  -- this amass of three they stand at six and four -- distinct from each other, from
+  -- the amass's own 3, and from the untouched Army's power, so no reading but the
+  -- chosen Army's produces either number.
+  Spec.it s "CR 701.47c a later clause reads the amassed Army she named" $ do
+    (bobArmy, aliceArmy, gs, orcsId) <- surroundedBoard s registry
+    let after = resolveOne (amassingAtPlayer aliceArmy S.bob) gs orcsId
+    Spec.assertEqWith s "bob milled six, her own Army's power after its counters" (milledIslands after) 6
+    Spec.assertEqWith s "her own Army, whom she named, took three more" (plusCountersOn aliceArmy after) (Just 6)
+    Spec.assertEqWith s "the borrowed Army took none" (plusCountersOn bobArmy after) (Just 1)
+  -- The same board and the same spell, differing only in which Army she names --
+  -- so a mill of four can only have come from the OTHER Army's power.
+  Spec.it s "CR 701.47c the same board answered the other way mills the other Army's power" $ do
+    (bobArmy, aliceArmy, gs, orcsId) <- surroundedBoard s registry
+    let after = resolveOne (amassingAtPlayer bobArmy S.bob) gs orcsId
+    Spec.assertEqWith s "bob milled four, the borrowed Army's power after its counters" (milledIslands after) 4
+    Spec.assertEqWith s "the borrowed Army, whom she named, took three" (plusCountersOn bobArmy after) (Just 4)
+    Spec.assertEqWith s "her own Army took none" (plusCountersOn aliceArmy after) (Just 3)
   -- Where the rules leave nothing to ask, do not ask. The two boards differ in how
   -- many Armies their controller has, which is the whole of what makes rule
   -- 701.47a's choice a choice.
@@ -407,6 +429,43 @@ stolenArmyBoard s registry = do
       amassed = resolveOne S.identityAnswer (resolveFor S.bob S.identityAnswer g5 musterId) firstId
   case S.tokensOf amassed of
     [bobArmy, aliceArmy] -> pure (bobArmy, aliceArmy, S.giveControl bobArmy S.alice amassed, secondId)
+    other -> Spec.assertFailure s ("expected exactly two tokens, got " <> show (length other))
+
+-- The Islands in bob's graveyard, which on surroundedBoard is exactly what the mill
+-- put there: his library holds nothing else, and the Mordor Muster he cast is in
+-- that graveyard too -- so counting the zone whole would count the sorcery.
+milledIslands :: GameState.GameState -> Int
+milledIslands gs = length (filter (== Just (CardName.MkCardName (Text.pack "Island"))) (namesIn Zone.Graveyard S.bob gs))
+
+-- stolenArmyBoard's two Armies under one controller, with Surrounded by Orcs in
+-- alice's hand instead of a second Relentless Advance, and bob's library stocked
+-- deep enough that the mill below is bounded by the Army's power rather than by
+-- CR 701.17a's "fewer cards".
+--
+-- Surrounded by Orcs {3}{U} Sorcery (data/cards/surrounded-by-orcs.json): "Amass
+-- Orcs 3, then target player mills X cards, where X is the amassed Army's power."
+-- (Name, cost, type line and oracle text checked against Scryfall 2026-09-13.)
+--
+-- Returns bob's Army, alice's own, the board and the Surrounded by Orcs in her hand.
+surroundedBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+surroundedBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  advance <- S.printingOf s registry "Relentless Advance"
+  muster <- S.printingOf s registry "Mordor Muster"
+  orcs <- S.printingOf s registry "Surrounded by Orcs"
+  let g1 = S.landsFor swamp S.bob 6 (S.landsInPlay island 10)
+      (g2, firstId) = S.handOne advance g1
+      (orcsId, g3) = S.addHandCard orcs S.alice g2
+      (musterId, g4) = S.addHandCard muster S.bob g3
+      g5 = stockLibrary island S.bob 12 g4
+      amassed = resolveOne S.identityAnswer (resolveFor S.bob S.identityAnswer g5 musterId) firstId
+  case S.tokensOf amassed of
+    [bobArmy, aliceArmy] -> pure (bobArmy, aliceArmy, S.giveControl bobArmy S.alice amassed, orcsId)
     other -> Spec.assertFailure s ("expected exactly two tokens, got " <> show (length other))
 
 -- resolveOne for a seat other than alice's: bob casts and the spell resolves.
@@ -1223,6 +1282,15 @@ paysBlighting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 paysBlighting oid p = case p of
   Prompt.ChooseBlight {} -> oid
   _ -> paysFor S.alice p
+
+-- `amassing` with CR 601.2c's target pinned to a named PLAYER, for a card that
+-- amasses and then aims its next clause. Both choices are pinned rather than
+-- searched for a legal one: a searching answerer finds the engine's own again after
+-- a mutation.
+amassingAtPlayer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+amassingAtPlayer oid pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
+  _ -> amassing oid p
 
 -- Answers Prompt.ChooseAmass with a named Army, deferring everything else to
 -- S.identityAnswer. PINNED BY ID rather than picked by searching the candidates, so

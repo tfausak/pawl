@@ -49,6 +49,7 @@ import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -227,8 +228,8 @@ ownQuantities effect = case effect of
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
   Effect.Bolster quantity -> [quantity]
-  Effect.Amass (Amass.MkAmass quantity _) -> [quantity]
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.Amass (Amass.MkAmass quantity _ _) -> [quantity]
+  Effect.Blight (Blight.MkBlight _ quantity _) -> [quantity]
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> [quantity]
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []

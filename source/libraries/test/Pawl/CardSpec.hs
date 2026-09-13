@@ -73,6 +73,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
@@ -628,7 +629,7 @@ playerRefPositions =
         ("gain-player-counters", Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "gp") PlayerCounterKind.Rad one), [plantedPlayer "gp"]),
         ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
         ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (plantedPlayer "ra-defender")), [plantedPlayer "ra-defender"]),
-        ("blight", Effect.Blight (playerQuantity "bl"), [plantedPlayer "bl"]),
+        ("blight", Effect.Blight (Blight.MkBlight (plantedPlayer "bl") one Nothing), [plantedPlayer "bl"]),
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
@@ -1055,10 +1056,10 @@ ownCounts effect = case effect of
   Effect.Bolster quantity -> quantityCounts quantity
   -- Amass's N is a Quantity like the Search's above, so its Counts are reachable
   -- from here.
-  Effect.Amass (Amass.MkAmass quantity _) -> quantityCounts quantity
+  Effect.Amass (Amass.MkAmass quantity _ _) -> quantityCounts quantity
   -- Blight's N is a Quantity like bolster's above, so its Counts are reachable
   -- from here.
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.Blight (Blight.MkBlight _ quantity _) -> quantityCounts quantity
   -- Earthbend's N likewise.
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
@@ -4840,11 +4841,11 @@ effectFilters effect = case effect of
   Effect.Bolster quantity -> frame Unframed (quantityFilters quantity)
   -- Only the count's Filters: rule 701.47a describes the candidate pool, so no
   -- Filter on the card names it.
-  Effect.Amass (Amass.MkAmass quantity _) -> frame Unframed (quantityFilters quantity)
+  Effect.Amass (Amass.MkAmass quantity _ _) -> frame Unframed (quantityFilters quantity)
   -- Only the count's Filters: rule 701.68a describes the candidate pool, so no
   -- Filter on the card names it, and a PlayerRef carries none either -- Draw's
   -- arm below answers the same way.
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.Blight (Blight.MkBlight _ quantity _) -> frame Unframed (quantityFilters quantity)
   -- PutCounters' shape above: rule 701.66a's count and the target land's own
   -- Filters, the latter framed by the source's host as every ObjectRef is.
   Effect.Earthbend (Earthbend.MkEarthbend quantity ref) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
