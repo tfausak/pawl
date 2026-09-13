@@ -93,7 +93,10 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -4537,6 +4540,114 @@ myriad =
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
+-- The slot rule 702.181a's sacrifice needs, myriadTokenSlot's position: a
+-- DEFINITION and never a target (CR 115.10a), holding the whole batch so ONE
+-- delayed ability sacrifices them all.
+mobilizeTokenSlot :: SlotName.SlotName
+mobilizeTokenSlot = SlotName.MkSlotName (Text.pack "mobilize token")
+
+-- The name rule 702.181a's delayed ability is filed under, decayedSacrificeName's
+-- position. A card may not declare one under this name (Pawl.AbilitySlotLintSpec).
+mobilizeSacrificeName :: AbilityName
+mobilizeSacrificeName = AbilityName.MkAbilityName (Text.pack "mobilize")
+
+-- CR 702.181a's "sacrifice them at the beginning of the next end step",
+-- encoreSacrifice's shape over the whole batch: CR 513.2's timing, once (CR
+-- 603.7b), on any player's turn. CR 701.21a keeps it a sacrifice, so an
+-- indestructible token still goes.
+mobilizeSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+mobilizeSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot mobilizeTokenSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController})
+
+-- CR 702.181a. CR 508.3a is what "attacks" means, so the condition is battle
+-- cry's SelfAttacks EveryTime.
+--
+-- EntryAttack.Chosen and not myriad's UnderPlayer: rule 702.181a narrows the
+-- tokens' subject not at all, so CR 508.4's choice is offered whole -- and
+-- elided at one candidate, which a two-seat board always is.
+--
+-- The batch is BOUND so the delayed ability can name "them" (CR 603.7c reads the
+-- environment captured as it was armed), and the arm shares a clause with the
+-- create, myriad's arrangement.
+mobilize :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+mobilize n =
+  let spawn =
+        Effect.Create
+          Create.MkCreate
+            { Create.quantity = Quantity.Literal (toInteger n),
+              Create.card = warriorToken,
+              Create.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Tapped,
+                    EntryRiders.attacking = Just EntryAttack.Chosen,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              Create.slot = Just mobilizeTokenSlot,
+              -- CR 111.2 under CR 109.5: the keyword ability's own controller.
+              Create.creator = PlayerRef.Relative PlayerRelation.You
+            }
+      arm =
+        Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = mobilizeSacrificeName,
+              ArmDelayedTrigger.onset = Onset.Immediately,
+              ArmDelayedTrigger.duration = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [spawn, arm]))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- | CR 702.181a's token: 1\/1 red Warrior creature. Rule 702.181a names no name,
+-- so CR 111.4 supplies one -- rebelToken's shape one rule over.
+warriorToken :: Card
+warriorToken = creatureToken (Text.pack "Warrior Token") (Set.singleton Subtype.Warrior) (Set.singleton Color.Red) 1 1
+
+-- CR 702.189a, battle cry's condition again (CR 508.3a).
+--
+-- ONE AddMana of count N rather than N of them, which is what
+-- Pawl.Types.ManaAddition's haddock asks for: rule 702.189a fixes the type, so
+-- there is no CR 105.4 choice for separate instructions to answer differently.
+--
+-- ManaRetention.UntilEndOfCombat is rule 702.189a's second sentence in as many
+-- words, and Pawl.Engine.Mana.endRetentionAtEndOf is what ends it.
+--
+-- NOT a mana ability: CR 605.1b asks what the trigger fired from as well as what
+-- it watches, and an attack is neither an activated mana ability resolving nor
+-- mana being added (Pawl.Engine.ManaAbility.firedFromManaAbility), so this uses
+-- the stack.
+firebending :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+firebending n =
+  let added =
+        Effect.AddMana
+          ManaAddition.MkManaAddition
+            { -- CR 109.5: rule 702.189a's "you" is the ability's controller.
+              ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+              ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Red),
+              ManaAddition.count = n,
+              ManaAddition.retention = ManaRetention.UntilEndOfCombat,
+              ManaAddition.restriction = Nothing,
+              ManaAddition.rider = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton added))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
 -- CR 702.86a. CR 508.3a is what "attacks" means -- being declared as an attacker
 -- -- so the condition is battle cry's SelfAttacks EveryTime.
 --
@@ -5154,7 +5265,7 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice)]
+mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice), (mobilizeSacrificeName, mobilizeSacrifice)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.
@@ -5826,8 +5937,8 @@ rebelToken = creatureToken (Text.pack "Rebel Token") (Set.singleton Subtype.Rebe
 heroToken :: Card
 heroToken = creatureToken (Text.pack "Hero Token") (Set.singleton Subtype.Hero) Set.empty 1 1
 
--- A vanilla creature token: CR 111.3's characteristics and nothing else, since
--- none of the three rules gives its token an ability.
+-- A vanilla creature token: CR 111.3's characteristics and nothing else, for the
+-- rules whose token has no ability of its own.
 creatureToken :: Text.Text -> Set.Set Subtype.Subtype -> Set.Set Color.Color -> Integer -> Integer -> Card
 creatureToken name subtypes colors power toughness =
   Card.MkCard
