@@ -330,6 +330,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfAttacksPlayerWithMostLife
       " {\"type\":\"SelfAttacksPlayerWithMostLife\"} "
+  Spec.it s "SelfAttacksWhileSaddled" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfAttacksWhileSaddled
+      " {\"type\":\"SelfAttacksWhileSaddled\"} "
   -- CR 509.3a, and nullary where its mirror is not: rule 509.3a's
   -- once-each-combat is not a frequency a card chooses.
   Spec.it s "SelfBlocks" $

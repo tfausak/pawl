@@ -1874,9 +1874,10 @@ matches context view predicate = case predicate of
     (Just designated, Just you) -> designated == you
     _ -> False
   -- The designation, asked of the CANDIDATE. A live read of Object.designations,
-  -- never a stamp on the candidate: each rule ends its designation when the
+  -- never a stamp on the candidate: every rule here ends its designation when the
   -- permanent leaves the battlefield, and CR 400.7's new incarnation simply arrives
-  -- without it. Asks nothing of the perspective, unlike the arm above -- none of
+  -- without it -- and where a rule states a second ending (CR 702.171b's clock on
+  -- saddled) a live read picks that up too, where a stamp would not. Asks nothing of the perspective, unlike the arm above -- none of
   -- these designations belongs to a player. NOT the menace or the can't-block CR
   -- 701.60c hangs off `Suspected` -- a permanent can have either from somewhere
   -- else.
@@ -2359,6 +2360,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Myriad -> keyword
   -- CR 702.122a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Crew _ -> keyword
+  Keyword.Type.Saddle _ -> keyword
   Keyword.Type.Fabricate _ -> keyword
   Keyword.Type.Riot -> keyword
   Keyword.Type.Escape cost -> Keyword.Type.Escape (rewriteCost pairs cost)

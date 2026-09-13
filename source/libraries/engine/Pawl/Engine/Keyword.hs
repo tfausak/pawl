@@ -323,6 +323,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Ingest -> List.genericReplicate count ingest
   Keyword.Myriad -> List.genericReplicate count myriad
   Keyword.Crew _ -> []
+  Keyword.Saddle _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -494,6 +495,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ninjutsu cost -> [ninjutsu cost]
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
+  Keyword.Saddle _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Hideaway _ -> []
   Keyword.Deathtouch -> []
@@ -883,6 +885,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ninjutsu _ -> []
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
+  Keyword.Saddle _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Hideaway _ -> []
   Keyword.Deathtouch -> []
@@ -1459,6 +1462,9 @@ battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map
 battlefieldAbilitiesFor :: Keyword -> Natural -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword of
   Keyword.Crew n -> List.genericReplicate count (crew n)
+  -- CR 702.171a states a whole self-contained ability, so one per instance and
+  -- one threshold each, crew's reading above.
+  Keyword.Saddle n -> List.genericReplicate count (saddle n)
   Keyword.Fabricate _ -> []
   Keyword.Cycling {} -> []
   Keyword.Deathtouch -> []
@@ -1707,6 +1713,55 @@ crew n =
           ActivatedAbility.name = Nothing,
           -- Nothing here and written by `mintedBy` at the roster, the one place that
           -- knows the keyword by identity rather than by reconstructing it.
+          ActivatedAbility.keyword = Nothing
+        }
+
+-- CR 702.171a's whole ability, crew's shape one rule over.
+--
+-- THE COST is crew's TapForTotalPower on the same words -- "any number of other
+-- untapped creatures you control with total power N or greater" -- so `Not
+-- IsSource` is rule 702.171a's own "other" and CR 302.6 reaches it no more than
+-- it reaches crew's. WITHOUT crew's `Not CantCrewVehicles`: rule 702.122d
+-- forbids paying a CREW cost and nothing else, teamworkCost's reading below.
+--
+-- THE RESTRICTION is rule 702.171a's own "Activate only as a sorcery", which
+-- crew does not print.
+--
+-- THE EFFECT is Effect.Designate, where crew's arm adds card types: CR 702.171b
+-- makes saddled a designation, "neither an ability nor part of the permanent's
+-- copiable values", which is exactly what Object.designations holds. Aimed at
+-- Binding.triggerSource, so the permanent is named and never TARGETED (CR
+-- 115.10a), crew's posture and renown's. No value rides with the mark -- CR
+-- 701.37c's X is monstrosity's alone.
+--
+-- The mark's END is not stated here: CR 400.7's new object drops it on a zone
+-- change, and rule 702.171b's "until the end of the turn" is
+-- Pawl.Engine.Expiry.dropAtCleanup's clearedSaddles.
+saddle :: Natural -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+saddle n =
+  let criterion =
+        Filter.And
+          [ Filter.HasCardType CardType.Creature,
+            Filter.Not Filter.IsTapped,
+            Filter.ControlledBy PlayerRelation.You,
+            Filter.Not Filter.IsSource
+          ]
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost =
+            Cost.MkCost
+              { -- CR 118.5, crew's note above.
+                Cost.mana = Just (ManaCost.MkManaCost []),
+                Cost.components = [CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion)]
+              },
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Designate (Designate.MkDesignate Designation.Saddled Binding.triggerSource Nothing))))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          ActivatedAbility.name = Nothing,
           ActivatedAbility.keyword = Nothing
         }
 
@@ -2006,6 +2061,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- the card, it never casts it. Rule 702.122a is one too, one zone over.
   Keyword.Cycling {} -> []
   Keyword.Crew _ -> []
+  Keyword.Saddle _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -3369,6 +3425,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- ONE ROW PER INSTANCE (CR 702.44d), riot's reason and riot's ordinal.
   Keyword.Sunburst -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Sunburst))
   Keyword.Crew _ -> []
+  Keyword.Saddle _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -3722,6 +3779,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Modular _ -> []
   Keyword.Sunburst -> []
   Keyword.Crew _ -> []
+  Keyword.Saddle _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -3970,6 +4028,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Modular _ -> []
   Keyword.Sunburst -> []
   Keyword.Crew _ -> []
+  Keyword.Saddle _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -4236,6 +4295,7 @@ familyOf keyword = case keyword of
   Keyword.Mobilize _ -> Just KeywordFamily.Mobilize
   Keyword.Firebending _ -> Just KeywordFamily.Firebending
   Keyword.Crew _ -> Just KeywordFamily.Crew
+  Keyword.Saddle _ -> Just KeywordFamily.Saddle
   Keyword.Fabricate _ -> Just KeywordFamily.Fabricate
   Keyword.Rampage _ -> Just KeywordFamily.Rampage
   Keyword.CumulativeUpkeep _ -> Just KeywordFamily.CumulativeUpkeep

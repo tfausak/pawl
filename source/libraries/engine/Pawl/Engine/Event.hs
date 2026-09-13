@@ -7051,6 +7051,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.PlayerAttacksPlayer {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
+  TriggerCondition.SelfAttacksWhileSaddled -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
@@ -7335,6 +7336,7 @@ controllerTurnScoped cond = case cond of
   -- about whose turn it is.
   TriggerCondition.PlayerAttacksPlayer subjects -> PlayerAttacksPlayer.attacker subjects == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
+  TriggerCondition.SelfAttacksWhileSaddled -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False

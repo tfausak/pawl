@@ -577,6 +577,7 @@ import qualified Pawl.RestampSpec
 import qualified Pawl.RingSpec
 import qualified Pawl.RoomSpec
 import qualified Pawl.SacrificeRestrictionSpec
+import qualified Pawl.SaddleSpec
 import qualified Pawl.SagaSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.ShieldCounterSpec
@@ -1242,6 +1243,7 @@ spec s registry = do
   Pawl.EntryRestrictionSpec.spec s registry
   Pawl.SacrificeRestrictionSpec.spec s registry
   Pawl.SagaSpec.spec s registry
+  Pawl.SaddleSpec.spec s registry
   Pawl.SpecialActionSpec.spec s registry
   Pawl.SpeedSpec.spec s registry
   Pawl.SplitSecondSpec.spec s registry
