@@ -132,6 +132,7 @@ import qualified Pawl.Types.Replace as Replace
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -413,6 +414,8 @@ abilitiesFor keyword count = case keyword of
   -- `exileTriggeredAbilitiesOf`, so this roster stays empty.
   Keyword.Madness _ -> []
   Keyword.Rebound -> []
+  Keyword.Scavenge _ -> []
+  Keyword.Encore _ -> []
 
 -- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
 -- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
@@ -524,9 +527,9 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.JobSelect -> []
   Keyword.Spree -> []
   Keyword.Tiered -> []
-  -- CR 702.84a, 702.128a and 702.129a function in a GRAVEYARD, so
-  -- graveyardAbilitiesFor below is the roster that mints them and this hand one
-  -- grants nothing.
+  -- CR 702.84a, 702.97a, 702.128a, 702.129a and 702.141a function in a
+  -- GRAVEYARD, so graveyardAbilitiesFor below is the roster that mints them and
+  -- this hand one grants nothing.
   Keyword.Unearth _ -> []
   Keyword.Embalm _ -> []
   Keyword.Eternalize _ -> []
@@ -597,6 +600,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
   Keyword.Rebound -> []
+  Keyword.Scavenge _ -> []
+  Keyword.Encore _ -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
@@ -798,8 +803,9 @@ ninjutsu cost =
         }
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card in a GRAVEYARD,
--- handAbilitiesOf's sibling one zone over: CR 702.84a's unearth, CR 702.128a's
--- embalm and CR 702.129a's eternalize.
+-- handAbilitiesOf's sibling one zone over: CR 702.84a's unearth, CR 702.97a's
+-- scavenge, CR 702.128a's embalm, CR 702.129a's eternalize and CR 702.141a's
+-- encore.
 --
 -- PRINTED keywords, as handAbilitiesOf takes them and for the same reason: the
 -- projection does not reach a graveyard card (#1859; see
@@ -812,8 +818,7 @@ graveyardAbilitiesOf :: Set Keyword -> [ActivatedAbility Card (GrantedAbility.Gr
 graveyardAbilitiesOf = concatMap graveyardAbilitiesFor . Set.toAscList
 
 -- Exhaustive for the reason handAbilitiesFor is: the next keyword that functions
--- from a graveyard -- CR 702.97a's scavenge is the one the pool will reach
--- first -- must break this build rather than silently produce nothing.
+-- from a graveyard must break this build rather than silently produce nothing.
 graveyardAbilitiesFor :: Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Cycling _ -> []
@@ -959,6 +964,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
   Keyword.Rebound -> []
+  Keyword.Scavenge cost -> [scavenge cost]
+  Keyword.Encore cost -> [encore cost]
 
 -- CR 702.84a's whole ability, minted from the one cost the keyword carries, as
 -- four effects in one clause -- the return, the haste, the delayed exile and the
@@ -1191,6 +1198,177 @@ graveyardTokenCopy exceptions cost =
           ActivatedAbility.keyword = Nothing
         }
 
+-- CR 702.97a's whole ability: "[Cost], Exile this card from your graveyard: Put
+-- a number of +1/+1 counters equal to the power of the card you exiled on target
+-- creature. Activate only as a sorcery."
+--
+-- THE EXILE is a cost component appended to the keyword's own cost,
+-- graveyardTokenCopy's reason in full: CR 602.2b / 601.2h pay it on activation,
+-- and CR 113.6m is what then confines the ability to a graveyard.
+--
+-- THE TARGET is reinforce's, the other rule 702 ability that puts +1/+1 counters
+-- on one creature: chosen at CR 601.2c, before CR 601.2h pays, so the ability
+-- outlives the card its own cost exiled (CR 113.7a).
+--
+-- THE COUNT reads Quantity.Power off Binding.triggerSource, the card the cost
+-- exiled. Rule 702.97a says "the card you exiled" where the printed reminder
+-- says "this card's power"; they name one object, and CR 608.2h's last known
+-- information is what answers for it -- an AgainstSlot read goes through the
+-- injected view, so a card whose power a continuous effect changed in the
+-- graveyard is read as it last existed there.
+scavenge :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+scavenge cost =
+  let slot = TargetSlot.required Pool.Creatures Nothing
+      effect =
+        Effect.PutCounters
+          ( PutCounters.MkPutCounters
+              CounterKind.PlusOnePlusOne
+              (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.triggerSource Quantity.Power))
+              (ObjectRef.InSlot scavengeTarget)
+          )
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ExileThisFromGraveyard]},
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton scavengeTarget slot)))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          -- CR 602.5d, rule 702.97a's "Activate only as a sorcery".
+          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          -- Nothing on every keyword-minted ability, unearth's reason.
+          ActivatedAbility.name = Nothing,
+          -- Written by `mintedBy` at the roster, unearth's reason.
+          ActivatedAbility.keyword = Nothing
+        }
+
+-- The slot rule 702.97a's one target is chosen into, reinforceTarget's position.
+scavengeTarget :: SlotName.SlotName
+scavengeTarget = SlotName.MkSlotName (Text.pack "scavenged onto")
+
+-- CR 702.141a's whole ability: "[Cost], Exile this card from your graveyard: For
+-- each opponent, create a token that's a copy of this card that attacks that
+-- opponent this turn if able. The tokens gain haste. Sacrifice them at the
+-- beginning of the next end step. Activate only as a sorcery."
+--
+-- THE EXILE and the sorcery-speed restriction are scavenge's, one rule over.
+--
+-- THE LOOP is myriad's, over ObjectRef.EachOpponent rather than rule 702.116a's
+-- PlayerRef.EachOpponentExcept: rule 702.141a names every opponent outright,
+-- where myriad's excludes the defending player its trigger bound -- so this is
+-- the printed NOUN where myriad needs the indirection.
+--
+-- THE COPY names Binding.triggerSource, graveyardTokenCopy's reason: the card the
+-- cost exiled is gone by resolution (CR 400.7), so CreateCopy reads CR 707.2's
+-- copiable values through CR 608.2h's last known information. No exception rides
+-- it -- rule 702.141a states none, where embalm and eternalize each state theirs.
+--
+-- THE REQUIREMENT is rule 702.141a's "attacks that opponent this turn if able",
+-- CR 508.1d's object axis (Alluring Siren's shape). It sits INSIDE the loop
+-- body, which is what pairs each token with its own opponent: a body-defined
+-- name is rescoped per member and only accumulates into the union once the loop
+-- is over (Pawl.Engine.Resolve.Effect's ForEach arm), so the ref reads this
+-- iteration's token alone.
+--
+-- THE HASTE and THE SACRIFICE sit AFTER the loop and read that union, myriadExile's
+-- reason: one grant and one delayed ability over the whole batch rather than one
+-- per opponent. Duration.Indefinite for the haste is unearth's reason -- rule
+-- 702.141a states no "until", and the tokens are sacrificed before any end of
+-- turn could end the effect anyway.
+--
+-- Rule 702.141a states no "if one or more tokens are created this way", so no
+-- clause condition guards the arming the way myriad's does: a solitaire game has
+-- no opponent, the loop mints nothing, and the delayed ability then sacrifices an
+-- empty batch.
+encore :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+encore cost =
+  let copied =
+        Effect.CreateCopy
+          CreateCopy.MkCreateCopy
+            { CreateCopy.quantity = CreateCopy.defaultQuantity,
+              CreateCopy.ref = ObjectRef.InSlot Binding.triggerSource,
+              CreateCopy.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    -- NOT EntryAttack: rule 702.141a's token is created during a
+                    -- main phase (CR 602.5d above) and REQUIRED to attack later,
+                    -- where myriad's arrives already attacking mid-combat.
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              CreateCopy.slot = Just encoreTokenSlot,
+              CreateCopy.exceptions = []
+            }
+      required =
+        Effect.RequireAttack
+          RequireAttack.MkRequireAttack
+            { RequireAttack.duration = Duration.UntilEndOfTurn,
+              RequireAttack.attacker = ObjectRef.InSlot encoreTokenSlot,
+              RequireAttack.defender = PlayerRef.InSlot encoreOpponentSlot
+            }
+      loop =
+        Effect.ForEach
+          ForEach.MkForEach
+            { ForEach.ref = ObjectRef.EachOpponent,
+              ForEach.slot = encoreOpponentSlot,
+              ForEach.body = Seq.fromList [copied, required]
+            }
+      hasted =
+        Effect.ModifyTarget
+          ModifyTarget.MkModifyTarget
+            { ModifyTarget.duration = Duration.Indefinite,
+              ModifyTarget.modification = Modification.GainKeyword Keyword.Haste,
+              ModifyTarget.ref = ObjectRef.InSlot encoreTokenSlot
+            }
+      armed =
+        Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = encoreSacrificeName,
+              ArmDelayedTrigger.onset = Onset.Immediately,
+              ArmDelayedTrigger.duration = Nothing
+            }
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.ExileThisFromGraveyard]},
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [loop, hasted, armed]))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          -- CR 602.5d, rule 702.141a's "Activate only as a sorcery".
+          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          -- Nothing on every keyword-minted ability, unearth's reason.
+          ActivatedAbility.name = Nothing,
+          -- Written by `mintedBy` at the roster, unearth's reason.
+          ActivatedAbility.keyword = Nothing
+        }
+
+-- The slots rule 702.141a's loop needs, myriadOpponentSlot's and
+-- myriadTokenSlot's position: the opponent this iteration is aimed at, and the
+-- tokens the loop minted. Both DEFINITIONS and never targets (CR 115.10a).
+encoreOpponentSlot, encoreTokenSlot :: SlotName.SlotName
+encoreOpponentSlot = SlotName.MkSlotName (Text.pack "encore opponent")
+encoreTokenSlot = SlotName.MkSlotName (Text.pack "encore token")
+
+-- The name rule 702.141a's delayed ability is filed under, decayedSacrificeName's
+-- position. A card may not declare one under this name (Pawl.AbilitySlotLintSpec).
+encoreSacrificeName :: AbilityName
+encoreSacrificeName = AbilityName.MkAbilityName (Text.pack "encore")
+
+-- CR 702.141a's "sacrifice them at the beginning of the next end step",
+-- blitzSacrifice's shape over the whole batch: CR 513.2's timing, once (CR
+-- 603.7b), on any player's turn. CR 701.21a keeps it a sacrifice, so an
+-- indestructible token still goes.
+encoreSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+encoreSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot encoreTokenSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController})
+
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
 -- sibling one zone over.
 --
@@ -1367,6 +1545,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
   Keyword.Rebound -> []
+  Keyword.Scavenge _ -> []
+  Keyword.Encore _ -> []
 
 -- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
@@ -1945,6 +2125,8 @@ permissionsFor cardTypes keyword = case keyword of
   -- CR 702.88a grants no standing permission: the free cast from exile is the
   -- delayed ability's own Effect.OfferCast (reboundUpkeep), offered once.
   Keyword.Rebound -> []
+  Keyword.Scavenge _ -> []
+  Keyword.Encore _ -> []
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
@@ -3143,6 +3325,8 @@ mintedReplacementsFor keyword count = case keyword of
   -- row keyed on a graveyard destination would over-apply to a countered or a
   -- fizzled spell.
   Keyword.Rebound -> []
+  Keyword.Scavenge _ -> []
+  Keyword.Encore _ -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
@@ -3358,6 +3542,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
   Keyword.Rebound -> []
+  Keyword.Scavenge _ -> []
+  Keyword.Encore _ -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
@@ -3606,6 +3792,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
   Keyword.Rebound -> []
+  Keyword.Scavenge _ -> []
+  Keyword.Encore _ -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
 -- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
@@ -3805,6 +3993,8 @@ familyOf keyword = case keyword of
   Keyword.Madness _ -> Just KeywordFamily.Madness
   -- CR 702.88a carries no parameter, so there is no family to name it by.
   Keyword.Rebound -> Nothing
+  Keyword.Scavenge _ -> Just KeywordFamily.Scavenge
+  Keyword.Encore _ -> Just KeywordFamily.Encore
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.
@@ -4542,7 +4732,7 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile)]
+mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.

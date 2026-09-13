@@ -2386,6 +2386,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- 702.88a's exile, upkeep and free cast are all the rule's, so CR 612.2 has no
   -- printed word here to swap.
   Keyword.Type.Rebound -> keyword
+  -- CR 702.97a's and CR 702.141a's costs are printed, so their components take
+  -- the same descent embalm's does.
+  Keyword.Type.Scavenge cost -> Keyword.Type.Scavenge (rewriteCost pairs cost)
+  Keyword.Type.Encore cost -> Keyword.Type.Encore (rewriteCost pairs cost)
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is

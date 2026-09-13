@@ -647,6 +647,13 @@ data Keyword
     -- constructor (Pawl.Engine.Resolve.finishSpell,
     -- Pawl.Engine.Keyword.reboundUpkeep) rather than printed.
     Rebound
+  | -- | 702.97a: a graveyard ability exiling this card to put +1\/+1 counters
+    -- equal to its power on target creature, at sorcery speed.
+    Scavenge (Cost.Cost Keyword)
+  | -- | 702.141a: scavenge's neighbour, exiling this card for one hasty token
+    -- copy per opponent, each required to attack that opponent and sacrificed
+    -- at the beginning of the next end step.
+    Encore (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

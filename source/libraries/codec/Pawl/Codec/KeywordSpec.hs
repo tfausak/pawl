@@ -1290,6 +1290,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Tiered
       " {\"type\":\"Tiered\"} "
     Spec.assertNeWith s "CR 702.183a is not CR 702.172a: two payload-free arms must not share one tag" (Codec.encode Keyword.codec Keyword.Tiered) (Codec.encode Keyword.codec Keyword.Spree)
+  Spec.it s "Scavenge carries its cost" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Scavenge (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []))
+      " {\"type\":\"Scavenge\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
+  Spec.it s "Encore carries its cost, and the tag tells it from scavenge" $ do
+    let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Encore cost)
+      " {\"type\":\"Encore\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Encore cost) /= Codec.encode Keyword.codec (Keyword.Scavenge cost)) "CR 702.141a is not CR 702.97a"
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 
