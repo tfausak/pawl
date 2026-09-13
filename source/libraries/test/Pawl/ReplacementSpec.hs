@@ -2417,8 +2417,8 @@ thromokBoard mountain forest piker thromok =
 --
 -- Rule 702.82b's restated N: the multiplier is the sacrifice's own count, so the
 -- counters are that count SQUARED. FOUR Pikers rather than three, so 16 is
--- neither the count nor a product with either literal the pool's other devours
--- carry -- Caprichrome's 1 would give 4 and the Elder's 3 would give 12.
+-- neither the count itself nor its product with a small literal N: a 1 would
+-- give 4 and a 3 would give 12.
 thromokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 thromokSpec s registry =
   Spec.describe s "Thromok the Insatiable (CR 702.82b)" $ do
