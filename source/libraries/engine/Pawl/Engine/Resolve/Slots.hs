@@ -163,6 +163,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -657,6 +658,7 @@ effectObjectRefs effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
+  Effect.Vote {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> [ref]
   Effect.Shuffle {} -> []
@@ -802,6 +804,8 @@ effectPlayerRefs effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
+  -- CR 701.38a's specified player, the seat the vote starts with.
+  Effect.Vote (Vote.MkVote starter _ _) -> [starter]
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Shuffle ref -> [ref]
@@ -887,6 +891,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- CR 101.4's "each player sacrifices": the arm takes every player recipient
   -- the slot holds, so the read is Many.
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot _ quantity) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
+  -- The listed choices are a Filter and nothing else: the starter is
+  -- effectPlayerRefs' half, joined at the head above, and the slot this WRITES
+  -- is boundSlots' half.
+  Effect.Vote (Vote.MkVote _ filter_ _) -> filterSlotsOf filter_
   Effect.RestartGame _ -> Map.empty
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
   Effect.ControlPlayerThisResolution (ControlPlayer.MkControlPlayer slot _) -> oneSlot slot
@@ -1449,6 +1457,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Venture {} -> True
   Effect.ExileHandThenDraw -> True
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Vote {} -> True
   Effect.RestartGame _ -> True
   Effect.ControlPlayerNextTurn _ -> True
   Effect.ControlPlayerThisResolution _ -> True
@@ -1663,6 +1672,7 @@ readsX =
         Effect.Venture {} -> False
         Effect.ExileHandThenDraw -> False
         Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
+        Effect.Vote {} -> False
         Effect.RestartGame _ -> False
         Effect.ControlPlayerNextTurn _ -> False
         Effect.ControlPlayerThisResolution _ -> False
@@ -1862,6 +1872,9 @@ boundSlots effect = case effect of
   Effect.Venture {} -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty
+  -- CR 701.38a: the objects tied for most votes, for the later effect that
+  -- acts on them (Council's Judgment's exile).
+  Effect.Vote (Vote.MkVote _ _ slot) -> Set.singleton slot
   Effect.RestartGame _ -> Set.empty
   Effect.ControlPlayerNextTurn _ -> Set.empty
   Effect.ControlPlayerThisResolution _ -> Set.empty

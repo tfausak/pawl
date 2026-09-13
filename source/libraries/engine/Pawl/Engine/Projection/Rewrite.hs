@@ -162,6 +162,7 @@ import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
@@ -451,6 +452,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Venture {} -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) (rewriteQuantity pairs quantity))
+  Effect.Vote (Vote.MkVote starter filter_ slot) -> Effect.Vote (Vote.MkVote starter (Filter.rewrite pairs filter_) slot)
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.ControlPlayerThisResolution _ -> effect

@@ -154,6 +154,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.Zone as Zone
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout (and at
@@ -1922,6 +1923,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1)))
       " {\"type\":\"PlayerSacrifices\",\"value\":{\"slot\":\"t\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "
+  Spec.it s "Vote" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Vote (Vote.MkVote (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature) (SlotName.MkSlotName (Text.pack "elected"))))
+      " {\"type\":\"Vote\",\"value\":{\"starter\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"slot\":\"elected\"}} "
   -- CR 500.7: a slot read with an empty skip set, a self-scoped arm carrying
   -- CR 500.11's skip of one step, and a two-member set.
   Spec.it s "TakeExtraTurn" $ do

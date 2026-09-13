@@ -131,6 +131,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
+  Effect.Vote {} -> Nothing
   Effect.RestartGame _ -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.ControlPlayerThisResolution _ -> Nothing

@@ -164,6 +164,12 @@ data Response
     -- (every creature its chooser controls), so nothing but a distinct
     -- constructor keeps a transcript of one from replaying as the other.
     ChoseBlight ObjectId.ObjectId
+  | -- | CR 701.38a: the choice one player voted for.
+    --
+    -- Its own constructor for ChoseBolster's reason: a vote's candidates are an
+    -- arbitrary sweep of the battlefield, which can coincide with any of the
+    -- object choices above.
+    ChoseVote ObjectId.ObjectId
   | -- | CR 107.14: how much {E} a player chose to pay to an
     -- Effect.PayAnyEnergy.
     --
