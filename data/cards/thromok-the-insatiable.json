@@ -6,8 +6,7 @@
           "type": "Devour",
           "value": {
             "count": {
-              "type": "Fixed",
-              "value": 3
+              "type": "Devoured"
             }
           }
         }
@@ -15,7 +14,7 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 2
+          "value": 3
         },
         {
           "type": "OfType",
@@ -25,24 +24,35 @@
               "type": "Red"
             }
           }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
       ],
-      "name": "Thunder-Thrash Elder",
+      "name": "Thromok the Insatiable",
       "power": {
         "type": "Literal",
-        "value": 1
+        "value": 0
       },
       "toughness": {
         "type": "Literal",
-        "value": 1
+        "value": 0
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Lizard"
-          },
+            "type": "Hellion"
+          }
+        ],
+        "supertypes": [
           {
-            "type": "Warrior"
+            "type": "Legendary"
           }
         ],
         "types": [

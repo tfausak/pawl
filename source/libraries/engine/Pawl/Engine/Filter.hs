@@ -16,6 +16,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
@@ -2304,9 +2305,11 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Hideaway _ -> keyword
   Keyword.Type.Infect -> keyword
   Keyword.Type.Wither -> keyword
-  -- CR 702.82a's payload is a count, not a Filter: the sacrifice's "creatures"
-  -- is in the row Pawl.Engine.Keyword mints.
-  Keyword.Type.Devour _ -> keyword
+  -- CR 702.82c's [quality] is a Filter the CARD writes (Caprichrome's artifacts),
+  -- so CR 612.2 swaps whatever word it names. Rule 702.82a's bare "creatures" is
+  -- Nothing here and in the row Pawl.Engine.Keyword mints instead, and the count
+  -- beside it is a number rather than a word.
+  Keyword.Type.Devour devour -> Keyword.Type.Devour devour {Devour.quality = fmap (rewrite pairs) (Devour.quality devour)}
   -- CR 702.38a's payload is a count too, and its "share a creature type with
   -- it" names no word at all: the types are the entering object's own, which CR
   -- 612.2a reaches by changing that object rather than this keyword.

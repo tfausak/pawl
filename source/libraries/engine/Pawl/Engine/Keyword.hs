@@ -64,6 +64,8 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Devour as Devour
+import qualified Pawl.Types.DevourCount as DevourCount
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
@@ -3681,10 +3683,12 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Increment -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
-  -- CR 702.82a's whole content: the SacrificeAnyNumber row a CARD writes
-  -- (Shimatsu the Bloodcloaked), with rule 702.82a's "creatures" as the filter
-  -- and its N as the per-sacrifice multiplier. Filter.IsSource for riot's reason,
-  -- CR 614.1c's "as this object enters" being the entering object's own ability.
+  -- CR 702.82a's and CR 702.82c's whole content: the SacrificeAnyNumber row a
+  -- CARD writes (Shimatsu the Bloodcloaked), with the payload's N as the
+  -- per-sacrifice multiplier and the filter rule 702.82a's "creatures" or rule
+  -- 702.82c's quality (Caprichrome's artifacts). Filter.IsSource for riot's
+  -- reason, CR 614.1c's "as this object enters" being the entering object's own
+  -- ability.
   --
   -- ONE ROW PER INSTANCE, riot's reading: rule 702.82 states no multiplicity
   -- clause, so two devours are two independent sacrifices each buying its own
@@ -3692,8 +3696,15 @@ mintedReplacementsFor keyword count = case keyword of
   --
   -- Rule 702.82b's "it devoured" needs nothing minted here: the row's own
   -- application records the count at Binding.sacrificedCount, which a card reads
-  -- back as a quantity (Marrow Chomper).
-  Keyword.Devour n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber {SacrificeAnyNumber.filter = Filter.HasCardType CardType.Creature, SacrificeAnyNumber.kind = Just CounterKind.PlusOnePlusOne, SacrificeAnyNumber.each = n}))))
+  -- back as a quantity (Marrow Chomper). That is also where rule 702.82b's
+  -- RESTATED N reads from -- Thromok the Insatiable's "devour X, where X is the
+  -- number of creatures devoured this way" -- the multiplier being evaluated
+  -- against the entering permanent after the choice is made.
+  Keyword.Devour devour ->
+    let each = case Devour.count devour of
+          DevourCount.Fixed n -> Quantity.Literal (toInteger n)
+          DevourCount.Devoured -> Quantity.InSlot Binding.sacrificedCount
+     in List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber {SacrificeAnyNumber.filter = Maybe.fromMaybe (Filter.HasCardType CardType.Creature) (Devour.quality devour), SacrificeAnyNumber.kind = Just CounterKind.PlusOnePlusOne, SacrificeAnyNumber.each = each}))))
   -- CR 702.38a's whole content, the arm above's position one zone over: what it
   -- offers is cards in a hand rather than permanents on the battlefield, and
   -- revealing them spends nothing. Filter.IsSource for riot's reason, CR 614.1c's

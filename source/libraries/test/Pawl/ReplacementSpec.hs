@@ -1231,6 +1231,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   kismetSpec s registry
   shimatsuSpec s registry
   thunderThrashElderSpec s registry
+  caprichromeSpec s registry
+  thromokSpec s registry
   undergrowthScavengerSpec s registry
   entryBudgetSpec s registry
   warLeechSpec s registry
@@ -2325,6 +2327,128 @@ thunderThrashElderSpec s registry =
           Spec.assertEqWith s "no +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne elderId after) 0
           Spec.assertEqWith s "power" (Projection.powerOf elderId after) (Just 1)
           Spec.assertEqWith s "toughness" (Projection.toughnessOf elderId after) (Just 1)
+
+-- alice controls four untapped Plains, two Goblin Pikers and three Soldevi
+-- Diggers, and holds the card under test. The two kinds of bystander are what
+-- tells rule 702.82c's quality from rule 702.82a's "creatures": the Pikers are
+-- creatures that are not artifacts and the Diggers artifacts that are not
+-- creatures, so a row built with the wrong filter sacrifices the wrong pile.
+-- Returns the state, the card's hand id, the Pikers and the Diggers.
+caprichromeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId])
+caprichromeBoard plains piker digger subject =
+  let addOne printing (ids, g) _ = let (oid, g1) = S.addPermanent printing S.alice g in (ids <> [oid], g1)
+      (pikers, withPikers) = List.foldl' (addOne piker) ([], S.landsInPlay plains 4) (replicate 2 ())
+      (diggers, withDiggers) = List.foldl' (addOne digger) ([], withPikers) (replicate 3 ())
+      (gs, held) = S.handOne subject withDiggers
+   in ( gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held,
+        pikers,
+        diggers
+      )
+
+-- Caprichrome {3}{W} Artifact Creature -- Goat 2/2, whole text: "Flash",
+-- "Vigilance", "Devour artifact 1". Oracle text verified against Scryfall.
+--
+-- Every number distinct: 2/2 printed, two Pikers left alone, three Diggers
+-- devoured, three counters, a 5/5 body.
+caprichromeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+caprichromeSpec s registry =
+  Spec.describe s "Caprichrome (CR 702.82c)" $ do
+    Spec.it s "CR 702.82c devour artifact 1 offers the artifacts and not the creatures" $ do
+      plains <- S.printingOf s registry "Plains"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      digger <- S.printingOf s registry "Soldevi Digger"
+      caprichrome <- S.printingOf s registry "Caprichrome"
+      let (gs, held, pikers, diggers) = caprichromeBoard plains pikerPrinting digger caprichrome
+          after = S.runPure sacrificesAll gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      case newestNamed (CardName.MkCardName $ Text.pack "Caprichrome") after of
+        Nothing -> Spec.assertFailure s "Caprichrome did not reach the battlefield"
+        Just caprichromeId -> do
+          -- WHAT was offered, before what it bought: the greedy answer takes every
+          -- candidate, so the quality is observable as the pile that moved.
+          Spec.assertEqWith s "CR 702.82c all three artifacts were devoured" (filter (\oid -> Set.member oid (GameState.battlefield after)) diggers) []
+          Spec.assertEqWith s "CR 702.82c neither creature was offered" (filter (\oid -> Set.member oid (GameState.battlefield after)) pikers) pikers
+          -- Printed 2/2, so three counters make a 5/5.
+          Spec.assertEqWith s "CR 702.82c three +1/+1 counters, one per artifact" (countersOn CounterKind.PlusOnePlusOne caprichromeId after) 3
+          Spec.assertEqWith s "power" (Projection.powerOf caprichromeId after) (Just 5)
+    -- Rule 702.82c's "you may", the Elder's declining case one quality over: no
+    -- sacrifice buys no counters, so the Goat is its printed 2/2 and the
+    -- artifacts are still there.
+    Spec.it s "CR 702.82c declining the sacrifice enters the printed 2/2" $ do
+      plains <- S.printingOf s registry "Plains"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      digger <- S.printingOf s registry "Soldevi Digger"
+      caprichrome <- S.printingOf s registry "Caprichrome"
+      let (gs, held, _, diggers) = caprichromeBoard plains pikerPrinting digger caprichrome
+          -- S.identityAnswer answers the empty set: sacrifice nothing.
+          after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      case newestNamed (CardName.MkCardName $ Text.pack "Caprichrome") after of
+        Nothing -> Spec.assertFailure s "Caprichrome did not reach the battlefield"
+        Just caprichromeId -> do
+          Spec.assertEqWith s "every artifact is still there" (filter (\oid -> Set.member oid (GameState.battlefield after)) diggers) diggers
+          Spec.assertEqWith s "no +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne caprichromeId after) 0
+          Spec.assertEqWith s "power" (Projection.powerOf caprichromeId after) (Just 2)
+
+-- alice controls four untapped Mountains, a Forest and four Goblin Pikers, and
+-- holds a Thromok. The fifth land is a Forest because {3}{R}{G} needs a green
+-- source; the Pikers are what the devour takes. Returns the state, Thromok's
+-- hand id and the Pikers.
+thromokBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId])
+thromokBoard mountain forest piker thromok =
+  let addOne (ids, g) _ = let (oid, g1) = S.addPermanent piker S.alice g in (ids <> [oid], g1)
+      (pikers, withPikers) = List.foldl' addOne ([], S.landsFor forest S.alice 1 (S.landsInPlay mountain 4)) (replicate 4 ())
+      (gs, held) = S.handOne thromok withPikers
+   in ( gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held,
+        pikers
+      )
+
+-- Thromok the Insatiable {3}{R}{G} Legendary Creature -- Hellion 0/0, whole
+-- text: "Devour X, where X is the number of creatures devoured this way". Oracle
+-- text verified against Scryfall.
+--
+-- Rule 702.82b's restated N: the multiplier is the sacrifice's own count, so the
+-- counters are that count SQUARED. FOUR Pikers rather than three, so 16 is
+-- neither the count nor a product with either literal the pool's other devours
+-- carry -- Caprichrome's 1 would give 4 and the Elder's 3 would give 12.
+thromokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+thromokSpec s registry =
+  Spec.describe s "Thromok the Insatiable (CR 702.82b)" $ do
+    Spec.it s "CR 702.82b devour X puts the devoured count on itself for each devoured creature" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      forest <- S.printingOf s registry "Forest"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      thromok <- S.printingOf s registry "Thromok the Insatiable"
+      let (gs, held, pikers) = thromokBoard mountain forest pikerPrinting thromok
+          after = S.runPure sacrificesAll gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      case newestNamed (CardName.MkCardName $ Text.pack "Thromok the Insatiable") after of
+        Nothing -> Spec.assertFailure s "Thromok did not survive its own entry"
+        Just thromokId -> do
+          -- The behaviour this case exists for, ahead of every proxy: four
+          -- creatures devoured, so X is four and the counters are sixteen.
+          Spec.assertEqWith s "CR 702.82b sixteen +1/+1 counters, the devoured count for each devoured creature" (countersOn CounterKind.PlusOnePlusOne thromokId after) 16
+          -- Printed 0/0, so the counters are the whole body.
+          Spec.assertEqWith s "power" (Projection.powerOf thromokId after) (Just 16)
+          Spec.assertEqWith s "CR 702.82a all four creatures were devoured" (filter (\oid -> Set.member oid (GameState.battlefield after)) pikers) []
+    -- Rule 702.82a's "you may" with rule 702.82b's N: declining leaves X at zero,
+    -- so zero times zero is zero and CR 704.5f takes the printed 0/0.
+    Spec.it s "CR 702.82b declining the sacrifice enters a 0/0 that dies" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      forest <- S.printingOf s registry "Forest"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      thromok <- S.printingOf s registry "Thromok the Insatiable"
+      let (gs, held, _) = thromokBoard mountain forest pikerPrinting thromok
+          -- S.identityAnswer answers the empty set: sacrifice nothing.
+          after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      Spec.assertEqWith s "the 0/0 Thromok is gone" (newestNamed (CardName.MkCardName $ Text.pack "Thromok the Insatiable") after) Nothing
 
 -- alice controls four untapped Forests and holds an Undergrowth Scavenger. Her
 -- graveyard holds `aliceCreatures` Goblin Pikers and `aliceLands` Mountains;

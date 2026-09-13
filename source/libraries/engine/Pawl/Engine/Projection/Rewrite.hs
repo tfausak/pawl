@@ -1238,7 +1238,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.SacrificeAnyNumber s ->
     EntryRewrite.SacrificeAnyNumber
       s
-        { SacrificeAnyNumber.each = SacrificeAnyNumber.each s,
+        { SacrificeAnyNumber.each = rewriteQuantity pairs (SacrificeAnyNumber.each s),
           SacrificeAnyNumber.filter = Filter.rewrite pairs (SacrificeAnyNumber.filter s),
           SacrificeAnyNumber.kind = fmap (Filter.rewriteCounterKind pairs) (SacrificeAnyNumber.kind s)
         }

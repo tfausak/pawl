@@ -2313,7 +2313,19 @@ apply batch candidate event =
             -- way": the multiplier scales the COUNTERS, never the recorded count,
             -- which rule 702.82b keeps as the number of permanents. Shimatsu the
             -- Bloodcloaked's "that many" is this with `each` at 1.
-            Monad.mapM_ (\k -> addEnteringCounters oid k (each * many)) kind
+            --
+            -- Evaluated HERE rather than where the row was read, and after the
+            -- binding above: rule 702.82b's restated N is the sacrifice's own
+            -- count (Thromok the Insatiable), so a multiplier naming
+            -- Binding.sacrificedCount must see what this application just wrote.
+            -- The board is Projection.boardAsEntering and the view the live one,
+            -- for the WithCounters arm's reasons. An unevaluable multiplier
+            -- places nothing, that arm's posture too.
+            gs3 <- State.get
+            let viewOf = Projection.viewWithLastKnown oid gs3
+                context = Replacement.candidateContext gs3 candidate
+                scale = maybe 0 Integer.toNaturalSaturating (Quantity.evaluate viewOf context (Projection.boardAsEntering gs3) oid each)
+            Monad.mapM_ (\k -> addEnteringCounters oid k (scale * many)) kind
             pure (Just event)
       -- CR 702.38a: amplify N (Feral Throwback). "As this object enters, reveal
       -- any number of cards from your hand that share a creature type with it.

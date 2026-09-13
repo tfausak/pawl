@@ -2,6 +2,7 @@ module Pawl.Codec.Keyword where
 
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Cycling as Cycling
+import qualified Pawl.Codec.Devour as Devour
 import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Morph as Morph
@@ -127,7 +128,7 @@ codec =
       Arm.nullary "Persist" Keyword.Persist,
       Arm.nullary "Infect" Keyword.Infect,
       Arm.nullary "Wither" Keyword.Wither,
-      Arm.payload "Devour" Common.natural Keyword.Devour (\x -> case x of Keyword.Devour y -> Just y; _ -> Nothing),
+      Arm.payload "Devour" (Devour.codec codec) Keyword.Devour (\x -> case x of Keyword.Devour y -> Just y; _ -> Nothing),
       Arm.nullary "Exalted" Keyword.Exalted,
       Arm.payload "Unearth" (Cost.codec codec) Keyword.Unearth (\x -> case x of Keyword.Unearth y -> Just y; _ -> Nothing),
       Arm.payload "Embalm" (Cost.codec codec) Keyword.Embalm (\x -> case x of Keyword.Embalm y -> Just y; _ -> Nothing),
