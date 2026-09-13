@@ -2239,6 +2239,13 @@ rewriteKeyword pairs keyword = case keyword of
   -- Pawl.Engine.Keyword.bargainCost and .teamworkCost mint.
   Keyword.Type.Bargain -> keyword
   Keyword.Type.Teamwork _ -> keyword
+  -- CR 702.188a's and CR 702.190a's costs, flashback's shape: CR 612.2 swaps
+  -- whatever a component of the PRINTED cost names. The creature each rule's own
+  -- return names is not there to swap -- Pawl.Engine.Keyword.plainAlternativeCosts
+  -- appends that component when the cost is offered, off the rule rather than off
+  -- the card.
+  Keyword.Type.WebSlinging cost -> Keyword.Type.WebSlinging (rewriteCost pairs cost)
+  Keyword.Type.Sneak cost -> Keyword.Type.Sneak (rewriteCost pairs cost)
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
   -- CR 702.75a's N is a number and not a word, so CR 612.2 has nothing to swap;

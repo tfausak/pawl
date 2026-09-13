@@ -248,6 +248,11 @@ abilitiesFor keyword count = case keyword of
   -- payment buys is a clause of the card (CR 702.166c, CR 702.194b).
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  -- CR 702.188a and CR 702.190a state one static ability each, and it is an
+  -- alternative cost (Pawl.Engine.Cost.candidateCostsGiven) rather than an
+  -- ability this roster mints -- evoke's shape.
+  Keyword.WebSlinging _ -> []
+  Keyword.Sneak _ -> []
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
@@ -522,6 +527,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  Keyword.WebSlinging _ -> []
+  Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -895,6 +902,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  Keyword.WebSlinging _ -> []
+  Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1472,6 +1481,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  Keyword.WebSlinging _ -> []
+  Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2007,6 +2018,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  Keyword.WebSlinging _ -> []
+  Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2297,27 +2310,102 @@ copiedCastUsing castUsing = case castUsing of
   Just (Keyword.Suspend _) -> Nothing
   _ -> castUsing
 
--- CR 702.74a, 702.109a, 702.148a and 702.152a: every evoke, dash, blitz and
--- cleave cost this card may be cast for, each beside the keyword that offers it
--- -- the tag CR 601.2b records as Object.castUsing -- in ascending Set order.
+-- CR 702.74a, 702.109a, 702.148a, 702.152a, 702.188a and 702.190a: every evoke,
+-- dash, blitz, cleave, web-slinging and sneak cost this card may be cast for,
+-- each beside the keyword that offers it -- the tag CR 601.2b records as
+-- Object.castUsing -- in ascending Set order.
 -- Read by Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is
 -- offered, bestowCosts' reading: evoke's static ability functions "in any zone
 -- from which the card with evoke can be cast", dash and blitz name no zone, and
--- cleave's functions "while a spell with cleave is on the stack", which CR
--- 113.6e reaches from wherever the cast begins.
+-- cleave's, web-slinging's and sneak's function "while a spell with [the
+-- keyword] is on the stack", which CR 113.6e reaches from wherever the cast
+-- begins.
+--
+-- THE TAG IS THE BARE KEYWORD and the cost is not always the bare payload: rule
+-- 702.188a and rule 702.190a each spell an alternative cost of "[cost] AND
+-- returning a creature you control to its owner's hand", so the return rides in
+-- the SECOND component while the first stays the keyword as printed -- which is
+-- what Quantity.CastUsing compares against (Spiders-Man, Heroic Horde) and what
+-- Pawl.Engine.Cast.candidateTimingOk reads rule 702.190a's window off.
 --
 -- UNGATED, where surgeCosts' and spectacleCosts' callers gate: rule 702.148a
--- states no clause of its own. A list and a wildcard for flashbackCosts'
--- reasons.
+-- states no clause of its own, and rule 702.188a states none either. Rule
+-- 702.190a's clause is a WINDOW rather than a condition on the board, so it
+-- gates in Pawl.Engine.Cast beside the card's own timing and not here -- an offer
+-- withheld here would still leave the printed cost castable in that window, which
+-- is the opposite of what that rule says. A list and a wildcard for
+-- flashbackCosts' reasons.
 plainAlternativeCosts :: Set Keyword -> [(Keyword, Cost Keyword)]
 plainAlternativeCosts keywords =
-  let costOf keyword = case keyword of
+  let withReturn criterion cost =
+        cost {Cost.components = Cost.components cost <> [CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents 1 criterion)]}
+      costOf keyword = case keyword of
         Keyword.Evoke cost -> Just (keyword, cost)
         Keyword.Dash cost -> Just (keyword, cost)
         Keyword.Blitz cost -> Just (keyword, cost)
         Keyword.Cleave cost -> Just (keyword, cost)
+        -- CR 702.188a's "a tapped creature you control", three conjuncts and CR
+        -- 400.3 for the destination -- ninjutsu's component one rule over, whose
+        -- haddock has the argument for asking the creature conjunct at all.
+        Keyword.WebSlinging cost ->
+          Just
+            ( keyword,
+              withReturn
+                ( Filter.And
+                    [ Filter.HasCardType CardType.Creature,
+                      Filter.ControlledBy PlayerRelation.You,
+                      Filter.IsTapped
+                    ]
+                )
+                cost
+            )
+        -- CR 702.190a's "an unblocked creature you control", which is ninjutsu's
+        -- four conjuncts exactly: the CR's glossary entry for "unblocked creature"
+        -- makes it an ATTACKING creature no blocker was declared for, so
+        -- IsAttacking is not an extra reading but the definition, and CR 509.1h is
+        -- why Not IsBlocked has to be asked beside it.
+        Keyword.Sneak cost ->
+          Just
+            ( keyword,
+              withReturn
+                ( Filter.And
+                    [ Filter.HasCardType CardType.Creature,
+                      Filter.ControlledBy PlayerRelation.You,
+                      Filter.IsAttacking,
+                      Filter.Not Filter.IsBlocked
+                    ]
+                )
+                cost
+            )
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.190a: does this CR 601.2b tag name the one alternative cost that brings
+-- a casting window of its own -- "any time you could cast an instant during your
+-- declare blockers step"? Pawl.Engine.Cast.candidateTimingOk asks it of one
+-- candidate, in place of the card's own window rather than beside it, and
+-- windowedCandidates asks it of the whole list to decide whether the two windows
+-- differ at all; hasSneak below asks it of a keyword set.
+--
+-- A question about the keyword's IDENTITY rather than a classification, which is
+-- what rule 702.190a is: the window is the rulebook's, stated nowhere but on this
+-- keyword.
+sneakWindowed :: Maybe Keyword -> Bool
+sneakWindowed castUsing = case castUsing of
+  Just (Keyword.Sneak _) -> True
+  _ -> False
+
+-- CR 702.190a: does this card hold a sneak at all? hasFlash's membership question
+-- for the one other keyword that widens WHEN a card may be cast rather than from
+-- where, and read the same way -- Pawl.Engine.Cast.cardTimingOk asks it of the
+-- proposed face's printed keywords and of the object's post-layer ones, so a
+-- granted sneak widens the window its grantee's cast is offered in.
+--
+-- MEMBERSHIP, not a cost, because the widening is the same whatever the cost is;
+-- which cost may then be paid in that window is sneakWindowed's question, asked
+-- per candidate.
+hasSneak :: Set Keyword -> Bool
+hasSneak = any (sneakWindowed . Just) . Set.toList
 
 -- CR 702.117a: every cost this card may be cast for by surging, in ascending Set
 -- order, and empty when it has no surge. Read by
@@ -3277,6 +3365,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  Keyword.WebSlinging _ -> []
+  Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3556,6 +3646,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  Keyword.WebSlinging _ -> []
+  Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3812,6 +3904,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  Keyword.WebSlinging _ -> []
+  Keyword.Sneak _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3979,6 +4073,8 @@ familyOf keyword = case keyword of
   -- CR 702.166a carries no parameter, so there is no family to name it by.
   Keyword.Bargain -> Nothing
   Keyword.Teamwork _ -> Just KeywordFamily.Teamwork
+  Keyword.WebSlinging _ -> Just KeywordFamily.WebSlinging
+  Keyword.Sneak _ -> Just KeywordFamily.Sneak
   Keyword.Foretell _ -> Just KeywordFamily.Foretell
   -- CR 702.94a's parameterized keyword: "a card with miracle" drops the cost.
   Keyword.Miracle _ -> Just KeywordFamily.Miracle

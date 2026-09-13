@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -47,6 +48,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DiscardCards as DiscardCards
@@ -3549,6 +3551,116 @@ cleaveCost = [ManaSymbol.Generic 4, theWhite, theBlack]
 theWhite :: ManaSymbol.ManaSymbol
 theWhite = ManaSymbol.OfType (ManaType.Colored Color.White)
 
+-- CR 702.188a on Spider-Man, Web-Slinger {2}{W} Legendary Creature -- Spider
+-- Human Hero 3/3, "Web-slinging {W}", and nothing else printed on it (Oracle
+-- text checked on Scryfall, 2026-09-13). Chosen over Spider-Sense, the issue's
+-- card: that one counters "target instant spell, sorcery spell, or triggered
+-- ability", which is Pool.Spells and Pool.Abilities in ONE slot, and CR 113.9 is
+-- why pawl holds those two pools apart (see Pawl.Types.Pool).
+--
+-- ONE PLAINS on every board, which is what makes the negative a rule and not a
+-- shortage: {W} is exactly the web-slinging cost and one short of the printed
+-- {2}{W}, so the only cast available is the one rule 702.188a offers, and it is
+-- available only while something can pay its return.
+--
+-- The two boards differ in ONE THING, the Piker's tap state. CR 702.188a's "a
+-- TAPPED creature you control" is the whole of the difference.
+webSlingingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+webSlingingSpec s registry = Spec.describe s "WebSlinging" $ do
+  Spec.it s "CR 702.188a with a tapped Piker the Spider-Man is cast for {W} and the Piker goes home; untapped, no cast is offered" $ do
+    plains <- S.printingOf s registry "Plains"
+    spiderMan <- S.printingOf s registry "Spider-Man, Web-Slinger"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, gs0) = S.addPermanent piker S.alice (S.landsInPlay plains 1)
+        (spiderId, gs1) = S.addHandCard spiderMan S.alice gs0
+        untappedBoard = aliceOnTurn gs1
+        tappedBoard = S.tapObject pikerId untappedBoard
+        slung = castResolved (payingFor webSlingingCost) spiderId tappedBoard
+    Spec.assertEqWith
+      s
+      "CR 702.188a / CR 400.3 the Spider-Man is on the battlefield and the tapped Piker is in its owner's hand"
+      (length (namedOnBattlefield "Spider-Man, Web-Slinger" slung), S.onBattlefield pikerId slung, length (Game.zoneMembers Zone.Hand S.alice slung))
+      (1, False, 1)
+    Spec.assertBool
+      s
+      (not (any (S.isCastOf spiderId) (Action.legalActions S.alice untappedBoard)))
+      "CR 702.188a with the Piker untapped there is nothing to return, so no cast is offered at all"
+    Spec.assertBool
+      s
+      (any (S.isCastOf spiderId) (Action.legalActions S.alice tappedBoard))
+      "the control: the same one Plains DOES offer the cast once the Piker is tapped"
+
+-- Spider-Man, Web-Slinger's web-slinging {W}. His printed {2}{W} is unpayable on
+-- every board above, deliberately.
+webSlingingCost :: [ManaSymbol.ManaSymbol]
+webSlingingCost = [theWhite]
+
+-- CR 702.190a on Donatello's Technique {2}{U} Sorcery, "Sneak {U} / Draw two
+-- cards." (Oracle text checked on Scryfall, 2026-09-13). Chosen over Splinter's
+-- Technique, the issue's card, for its effect alone: both are sorceries with
+-- sneak, and a draw is one reading where a library search is several.
+--
+-- A SORCERY is the point. CR 702.190a's window -- "any time you could cast an
+-- instant during your declare blockers step" -- has to WIDEN for this card to be
+-- castable at all in that step, and has to NARROW so that the cost paid there is
+-- rule 702.190a's and never the printed one.
+--
+-- THREE ISLANDS on every board, enough for either cost, so no case below turns on
+-- mana. What the boards differ in is whether alice has an unblocked attacker.
+--
+-- Not implemented: CR 702.190b, which enters a PERMANENT spell whose sneak cost
+-- was paid tapped and attacking what the returned creature was attacking (#3689).
+-- Every sneak permanent in the pool is a creature, and this card is a sorcery.
+sneakSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+sneakSpec s registry = Spec.describe s "Sneak" $ do
+  Spec.it s "CR 702.190a in her declare blockers step alice casts the sorcery for {U}, returning the unblocked Piker; the printed {2}{U} is not on offer" $ do
+    island <- S.printingOf s registry "Island"
+    technique <- S.printingOf s registry "Donatello's Technique"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (g0, ours, _) = S.combatBoardOf [piker] []
+        pikerId = case ours of
+          oid : _ -> oid
+          -- combatBoardOf returns one id per printing given, so this is
+          -- unreachable; a bogus id fails the assertions rather than the suite.
+          [] -> S.noSource
+        withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) g0 [1 :: Int .. 3]
+        (techniqueId, withCard) = S.addHandCard technique S.alice withLands
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) withCard [1 :: Int .. 4]
+        -- CR 509.1h: no blocker was declared for the Piker, so it is an unblocked
+        -- creature. The step is set after the declaration rather than run into, so
+        -- the board states rule 702.190a's window outright.
+        blockersStep gs = gs {GameState.phase = Phase.Combat CombatStep.DeclareBlockers, GameState.priority = Just S.alice}
+        attacking = blockersStep (S.runPure S.aggressiveAnswer stocked (Combat.declareAttackers S.manaPerformer S.alice))
+        -- The same seats, the same three Islands and the same card in hand, one
+        -- turn-based action earlier: nothing is attacking, so rule 702.190a's
+        -- return has no payer. ninjutsuBeforeAttack's paired control.
+        noAttack = blockersStep stocked
+        held gs = length (Game.zoneMembers Zone.Hand S.alice gs)
+        cast wanted = castResolved (payingFor wanted) techniqueId attacking
+    Spec.assertEqWith
+      s
+      "CR 702.190a the sorcery resolved in the declare blockers step: alice drew two and the Piker is home, leaving two drawn cards and the Piker in a hand that held only the Technique"
+      (S.onBattlefield pikerId (cast sneakCost), held (cast sneakCost))
+      (False, 3)
+    Spec.assertEqWith
+      s
+      "CR 702.190a asked for the printed {2}{U} the answerer gets rule 702.190a's cost anyway, because that window offers no other: the Piker still went home"
+      (S.onBattlefield pikerId (cast techniqueCost))
+      False
+    Spec.assertBool
+      s
+      (any (S.isCastOf techniqueId) (Action.legalActions S.alice attacking))
+      "CR 702.190a a SORCERY is offered in the declare blockers step, which CR 117.1a alone would never allow"
+    Spec.assertBool
+      s
+      (not (any (S.isCastOf techniqueId) (Action.legalActions S.alice noAttack)))
+      "the control: the same step and the same mana with nothing attacking offer no cast, so the window alone is not what carried the case above"
+
+-- Donatello's Technique's printed {2}{U} and its sneak {U}.
+techniqueCost, sneakCost :: [ManaSymbol.ManaSymbol]
+techniqueCost = [ManaSymbol.Generic 2, theBlue]
+sneakCost = [theBlue]
+
 -- CR 702.117a on Boulder Salvo {4}{R} Sorcery, "Surge {1}{R} / Boulder Salvo
 -- deals 4 damage to target creature." (Oracle text checked on Scryfall,
 -- 2026-09-11).
@@ -4609,6 +4721,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   dashSpec s registry
   blitzSpec s registry
   cleaveSpec s registry
+  webSlingingSpec s registry
+  sneakSpec s registry
   surgeSpec s registry
   spectacleSpec s registry
   prowlSpec s registry

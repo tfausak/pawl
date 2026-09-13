@@ -115,6 +115,8 @@ codec =
       Arm.payload "Replicate" (Cost.codec codec) Keyword.Replicate (\x -> case x of Keyword.Replicate y -> Just y; _ -> Nothing),
       Arm.payload "Casualty" Common.natural Keyword.Casualty (\x -> case x of Keyword.Casualty y -> Just y; _ -> Nothing),
       Arm.payload "Teamwork" Common.natural Keyword.Teamwork (\x -> case x of Keyword.Teamwork y -> Just y; _ -> Nothing),
+      Arm.payload "WebSlinging" (Cost.codec codec) Keyword.WebSlinging (\x -> case x of Keyword.WebSlinging y -> Just y; _ -> Nothing),
+      Arm.payload "Sneak" (Cost.codec codec) Keyword.Sneak (\x -> case x of Keyword.Sneak y -> Just y; _ -> Nothing),
       Arm.payload "Hideaway" Common.natural Keyword.Hideaway (\x -> case x of Keyword.Hideaway y -> Just y; _ -> Nothing),
       Arm.payload "Reinforce" (Reinforce.codec codec) Keyword.Reinforce (\x -> case x of Keyword.Reinforce y -> Just y; _ -> Nothing),
       Arm.nullary "Persist" Keyword.Persist,

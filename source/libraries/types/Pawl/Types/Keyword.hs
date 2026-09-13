@@ -676,6 +676,18 @@ data Keyword
     -- Pawl.Engine.Keyword.teamworkCost. CR 702.194b's "cast using teamwork"
     -- clauses are the card's own, gated on Quantity.TimesPaid (Team Tactics).
     Teamwork Natural.Natural
+  | -- | 702.188a: web-slinging [cost] -- an alternative cost of [cost] plus
+    -- returning a tapped creature you control to its owner's hand, minted by
+    -- Pawl.Engine.Keyword.plainAlternativeCosts.
+    WebSlinging (Cost.Cost Keyword)
+  | -- | 702.190a: sneak [cost] -- web-slinging's alternative cost two rules over,
+    -- returning an unblocked creature instead of a tapped one and carrying a
+    -- casting window of its own (Pawl.Engine.Cast.candidateTimingOk).
+    --
+    -- Not implemented: CR 702.190b's rider, which enters a PERMANENT spell whose
+    -- sneak cost was paid tapped and attacking whatever the returned creature was
+    -- attacking (#3689).
+    Sneak (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one
