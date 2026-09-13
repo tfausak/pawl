@@ -22,6 +22,12 @@
 -- Pawl.Engine.Cost.candidateCostsFor. See moreThanMeetsTheEyeSpec, which shares
 -- convertSpec's Ratchet.
 --
+-- Also CR 702.146a's disturb, which reaches that same back face through that same
+-- CR 712.11d exception and adds rule 702.146a's own zone: the CR 601.3 permission
+-- is Pawl.Engine.Cast.permitsDisturb's and the price is the graveyard half of
+-- Pawl.Engine.Cost.candidateCostsGiven's converted offer. See disturbSpec, whose
+-- fixture is Baithook Angler // Hook-Haunt Drifter.
+--
 -- Also CR 701.28's convert and CR 702.161a's living metal, which land together
 -- because no printed card carries one without the other: the Effect.Convert arm
 -- of Pawl.Engine.Resolve (the same turnPermanentsOver the transform arm calls),
@@ -250,6 +256,7 @@ spec s registry = Spec.describe s "Transform" $ do
   convertSpec s registry
   gainLifeConvertSpec s registry
   moreThanMeetsTheEyeSpec s registry
+  disturbSpec s registry
   spellsCastLastTurnSpec s registry
   restampSpec s registry
   -- CR 712.8d: "While a double-faced permanent has its front face up, it has
@@ -1404,6 +1411,63 @@ convertSpec s registry = Spec.describe s "Convert" $ do
 ratchetFrontReadings, ratchetBackReadings :: (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Set.Set CardType.CardType)
 ratchetFrontReadings = (Set.singleton ratchetFront, Just (2, 4), Set.singleton Subtype.Robot, Set.fromList [CardType.Artifact, CardType.Creature])
 ratchetBackReadings = (Set.singleton ratchetBack, Just (1, 4), Set.singleton Subtype.Vehicle, Set.fromList [CardType.Artifact, CardType.Creature])
+
+-- The two names Baithook Angler // Hook-Haunt Drifter prints. CR 702.146's group
+-- reads both.
+anglerFront, anglerBack :: CardName.CardName
+anglerFront = CardName.MkCardName (Text.pack "Baithook Angler")
+anglerBack = CardName.MkCardName (Text.pack "Hook-Haunt Drifter")
+
+-- CR 702.146a: disturb, on Baithook Angler // Hook-Haunt Drifter -- a {1}{U} 2/1
+-- Creature -- Human Peasant whose entire front-face text is "Disturb {1}{U}",
+-- against a 1/2 Creature -- Spirit back face with flying and "If Hook-Haunt
+-- Drifter would be put into a graveyard from anywhere, exile it instead" (Oracle
+-- text checked on Scryfall, 2026-09-13). Chosen for that emptiness: of the
+-- disturb printings it is the one whose front face prints nothing else, so every
+-- reading below is rule 702.146a alone.
+--
+-- More than meets the eye's near twin, one clause apart, and the clause is the
+-- ZONE. Both rules put the BACK face on the stack (CR 712.11a) through the same
+-- CR 712.11d exception, and CR 712.13 carries it onto the battlefield, which rule
+-- 702.146b states again in its own words. Where rule 702.162a names no zone, rule
+-- 702.146a names the graveyard -- so the disturb cast is a CR 601.3 permission as
+-- well as a cost, and neither half reaches the front face.
+--
+-- TWO ISLANDS, which pay the disturb {1}{U} and the printed {1}{U} alike: the two
+-- costs are equal on this printing, deliberately, so mana cannot be what tells
+-- the graveyard cast from the hand cast and the FACE has to be.
+disturbSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+disturbSpec s registry = Spec.describe s "Disturb" $ do
+  Spec.it s "CR 702.146a from her graveyard alice may cast only the transformed half, and it arrives with its back face up" $ do
+    angler <- S.printingOf s registry "Baithook Angler"
+    island <- S.printingOf s registry "Island"
+    let -- alice active in her own precombat main phase, holding priority. What
+        -- S.handOne bakes in for a hand and what a graveyard board has to say
+        -- for itself; without it CR 117.1a's sorcery window is shut and every
+        -- reading below is about the phase rather than about rule 702.146a.
+        onTurn gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        lands = S.landsInPlay island 2
+        (buried, graveyardBoard) = fmap onTurn (S.addGraveyardCard angler S.alice lands)
+        (held, handBoard) = fmap onTurn (S.addHandCard angler S.alice lands)
+        -- Which halves of that object the player is actually offered, CR
+        -- 712.11d's own reading: an assertion on Cost.costsFor alone would pass
+        -- on a face nobody could propose.
+        offeredNames oid gs =
+          List.sort
+            ( Maybe.mapMaybe
+                ( \action -> case action of
+                    A.Cast o n _ | o == oid -> Just n
+                    _ -> Nothing
+                )
+                (Action.legalActions S.alice gs)
+            )
+        resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer graveyardBoard (Cast.castSpell S.manaPerformer S.alice buried anglerBack Facing.FaceUp)) Stack.resolveTop
+        -- The permanent found by the CARD behind it rather than by a name, since
+        -- which name it answers to is the thing under test.
+        anglerIn gs = filter (\o -> fmap S.nameOf (Game.cardOf o gs) == Just (S.printingName angler)) (Game.zoneMembers Zone.Battlefield S.alice gs)
+    Spec.assertEqWith s "CR 712.11a / 702.146b the disturbed spell arrives with its back face up: the 1/2 Spirit, not the 2/1 Human" (fmap (\o -> (Projection.namesOf o resolved, S.powerToughnessOf o resolved)) (anglerIn resolved)) [(Set.singleton anglerBack, Just (1, 2))]
+    Spec.assertEqWith s "CR 702.146a / 712.11d the graveyard offers the back face and only it" (offeredNames buried graveyardBoard) [anglerBack]
+    Spec.assertEqWith s "CR 712.11 her hand offers the front face and only it, the same two Islands paying either cost" (offeredNames held handBoard) [anglerFront]
 
 -- CR 702.162a: more than meets the eye, on the same Ratchet, Field Medic //
 -- Ratchet, Rescue Racer the convert group runs on -- "More Than Meets the Eye

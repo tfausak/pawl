@@ -3414,6 +3414,53 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
     Spec.assertEqWith s "CR 702.119c and the Hill Giant whose mana value paid for that reduction is the creature that was sacrificed" (length (namedInGraveyard "Hill Giant" after)) 1
     Spec.assertEqWith s "while the Dwarven Mauler, whose one would not have paid for it, stayed" (length (namedOnBattlefield "Dwarven Mauler" after)) 1
 
+-- CR 702.180a on Unending Whisper {U} Sorcery, "Draw a card." with "Harmonize
+-- {5}{U}" (Oracle text checked on Scryfall, 2026-09-13). Chosen over Nature's
+-- Rhythm, the issue's card, for its effect and its cost alike: both are
+-- sorceries with harmonize, but a draw is one reading where a library search is
+-- several, and rule 702.180a's reduction meets a printed X in the Rhythm's own
+-- costs.
+--
+-- Rule 702.180a states THREE abilities and each gets a reading. The first is a
+-- permission out of a GRAVEYARD (CR 601.3) at a stated cost; the second is a
+-- reduction "equal to the tapped creature's power"; the third exiles the card
+-- rather than letting it go anywhere else from the stack, which is CR 702.34a's
+-- second ability in different words.
+--
+-- ONE BOARD: three untapped Islands, the Whisper in alice's graveyard, and a
+-- Hill Giant (power 3) and a Goblin Piker (power 2) untapped beside them. Three
+-- mana pays {5}{U} reduced by three and nothing else this board offers -- the
+-- unreduced cost and the cost reduced by the Piker's two both want more -- so a
+-- Whisper that resolved at all proves WHICH creature's power rule 702.180a's
+-- reduction read, and the tap states prove WHICH creature rule 702.180b then
+-- tapped for it.
+--
+-- The Piker is not decoration: it is the second power, so the offer is a real CR
+-- 601.2b choice rather than a single candidate, and it is the control a tap
+-- pinned to the wrong creature would take instead. The `noGiant` board below is
+-- the Piker alone, one permanent from the first, and it is not castable at all.
+harmonizeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+harmonizeSpec s registry = Spec.describe s "Harmonize" $ do
+  Spec.it s "CR 702.180a the harmonize cost is reduced by the tapped creature's power, and the spell is exiled from the stack" $ do
+    island <- S.printingOf s registry "Island"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    whisper <- S.printingOf s registry "Unending Whisper"
+    let (giantId, gs1) = S.addPermanent giant S.alice (S.landsInPlay island 3)
+        (pikerId, gs2) = S.addPermanent piker S.alice gs1
+        (spellId, gs3) = S.addGraveyardCard whisper S.alice gs2
+        start = aliceOnTurn (List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) gs3 [1 :: Int .. 3])
+        after = S.runPure S.identityAnswer (S.runPure S.identityAnswer start (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
+        -- The same board without the Hill Giant, which is the only thing that
+        -- differs: same three Islands, same graveyard, same Piker.
+        (_, noGiant1) = S.addPermanent piker S.alice (S.landsInPlay island 3)
+        (noGiantSpell, noGiant2) = S.addGraveyardCard whisper S.alice noGiant1
+        noGiant = aliceOnTurn (List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) noGiant2 [1 :: Int .. 3])
+    Spec.assertEqWith s "CR 702.180a three Islands paid {5}{U} less the Hill Giant's power of three, so the Whisper resolved and drew a card" (handSize S.alice after) 1
+    Spec.assertEqWith s "CR 702.180b the Hill Giant whose power paid for that reduction is the creature that was tapped, and the Piker's two, which would not have paid for it, left it untapped" (tapStateOf giantId after, tapStateOf pikerId after) (Just TapState.Tapped, Just TapState.Untapped)
+    Spec.assertEqWith s "CR 702.180a the harmonize cost was paid, so the Whisper is exiled rather than put back into her graveyard" (length (Game.zoneMembers Zone.Exile S.alice after), length (namedInGraveyard "Unending Whisper" after)) (1, 0)
+    Spec.assertBool s (not (S.castable S.alice noGiantSpell noGiant)) "CR 702.180a with only the Piker on the board no reduction reaches three, so the same three Islands cannot pay the harmonize cost at all"
+
 -- CR 702.74a on Mulldrifter {4}{U} 2/2 Creature -- Elemental, "Flying / When
 -- this creature enters, draw two cards. / Evoke {2}{U}" (oracle checked on
 -- Scryfall).
@@ -4880,6 +4927,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   escapeSpec s registry
   evokeSpec s registry
   emergeSpec s registry
+  harmonizeSpec s registry
   dashSpec s registry
   blitzSpec s registry
   cleaveSpec s registry

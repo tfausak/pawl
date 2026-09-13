@@ -705,31 +705,33 @@ castableFaces card = case Card.layout card of
   Layout.Preparation -> [NonEmpty.head (Card.faces card)]
   -- CR 712.11: "A double-faced spell is cast with its front face up by default.
   -- The front face always, and the BACK face as a second option exactly when the
-  -- front prints CR 702.162a's more than meets the eye -- "you may cast this card
-  -- converted by paying [cost]". CR 712.11d is the rule that puts it in this list
-  -- rather than leaving it to an effect: "if an ability of a double-faced card's
-  -- FRONT FACE allows it to be cast 'transformed' or 'converted', that ability is
-  -- also considered when evaluating that spell to determine if it can be cast.
-  -- This is an exception to 712.11c." So the ability is the card's own and the
-  -- offer is the card's own, which is what makes it a second entry here beside
-  -- the front rather than a rider some opcode carries.
+  -- front prints an ability allowing the card to be cast transformed or converted
+  -- -- CR 702.162a's more than meets the eye, or CR 702.146a's disturb. CR
+  -- 712.11d is the rule that puts it in this list rather than leaving it to an
+  -- effect: "if an ability of a double-faced card's FRONT FACE allows it to be
+  -- cast 'transformed' or 'converted', that ability is also considered when
+  -- evaluating that spell to determine if it can be cast. This is an exception to
+  -- 712.11c." So the ability is the card's own and the offer is the card's own,
+  -- which is what makes it a second entry here beside the front rather than a
+  -- rider some opcode carries.
   --
   -- Two entries and never a choice the engine makes, Split's reason: casting for
-  -- the printed cost and casting converted are two different casts of one card,
+  -- the printed cost and casting transformed are two different casts of one card,
   -- so they are two actions and the player picks (Pawl.Engine.Cast.castableSpells
   -- gates each on its own, CR 712.11c). Pawl.Engine.Cost.candidateCostsFor is
-  -- where the second one is priced at rule 702.162a's cost, and `enteringFace`
-  -- below carries the chosen face onto the battlefield (CR 712.13).
+  -- where the second one is priced at rule 702.162a's or rule 702.146a's cost,
+  -- and `enteringFace` below carries the chosen face onto the battlefield (CR
+  -- 712.13), which is CR 702.146b.
   --
   -- That second entry is `convertedFace` below, named because a reader who
-  -- cannot pay rule 702.162a's cost cannot have it: CR 118.9a gives a spell one
-  -- alternative cost, so Pawl.Engine.Resolve.Effect.offerCast drops it from an offer
-  -- that states an alternative of its own.
+  -- cannot pay that cost cannot have it: CR 118.9a gives a spell one alternative
+  -- cost, so Pawl.Engine.Resolve.Effect.offerCast drops it from an offer that
+  -- states an alternative of its own.
   --
   -- Read off the front face's PRINTED keywords, which is CR 712.11d's own scope
   -- and the posture Pawl.Engine.Cast.castableSpells takes for rule 702.37a's morph
-  -- ability. A more than meets the eye ability GRANTED to a card in a zone is not
-  -- expanded here (gap #1859).
+  -- ability. A more than meets the eye or disturb ability GRANTED to a card in a
+  -- zone is not expanded here (gap #1859).
   --
   -- The other roads to a back face still do not come through this list. An effect
   -- allowing the card to be cast "transformed" names the face itself --
@@ -861,26 +863,36 @@ mergeDisjointModes l r =
           }
     else Nothing
 
--- The face `castableFaces` above offers only because CR 702.162a's more than
--- meets the eye put it there: the back face of a nonmodal transforming card
--- whose FRONT face prints the keyword (CR 712.11d). Nothing for every other
--- card and every other layout.
+-- The face `castableFaces` above offers only because CR 712.11d's kind of
+-- ability put it there: the back face of a nonmodal transforming card whose
+-- FRONT face prints one that "allows it to be cast 'transformed' or
+-- 'converted'". Nothing for every other card and every other layout.
 --
--- Named separately because reaching it is not free. CR 702.162a states the
--- permission and its price in one breath -- "you may cast this card converted by
--- paying [cost] rather than its mana cost" -- so the only route to this face is
--- paying that alternative cost, which is why Pawl.Engine.Cost.candidateCostsFor
--- REPLACES the zone's candidates with it. CR 118.9a allows a spell one
--- alternative cost, so an effect offering a cast under an alternative of its own
--- cannot reach this face at all; Pawl.Engine.Resolve.Effect.offerCast drops it, and
--- Pawl.InvestigateSpec's "CR 118.9a a free offer does not also offer the
--- converted face" is the proof.
+-- TWO rules print such an ability. CR 702.162a's more than meets the eye says
+-- "converted" and names no zone; CR 702.146a's disturb says "transformed" and
+-- names the graveyard. The ZONE half is not asked here, because rule 712.11d is
+-- about which face may be evaluated at all -- Pawl.Engine.Cost.candidateCostsGiven
+-- offers disturb's cost in a graveyard and nowhere else, and
+-- Pawl.Engine.Cast.permitsCastFromGraveyard is what turns rule 702.146a into the
+-- CR 601.3 permission.
+--
+-- Named separately because reaching it is not free. Each rule states its
+-- permission and its price in one breath -- "you may cast this card
+-- [converted|transformed] by paying [cost] rather than its mana cost" -- so the
+-- only route to this face is paying that alternative cost, which is why
+-- Pawl.Engine.Cost.candidateCostsFor REPLACES the zone's candidates with it. CR
+-- 118.9a allows a spell one alternative cost, so an effect offering a cast under
+-- an alternative of its own cannot reach this face at all;
+-- Pawl.Engine.Resolve.Effect.offerCast drops it, and Pawl.InvestigateSpec's "CR
+-- 118.9a a free offer does not also offer the converted face" is the proof.
 convertedFace :: Card.Card -> Maybe (Face.Face Card.Card)
-convertedFace card = case Card.layout card of
-  Layout.Transforming
-    | not (null (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (NonEmpty.head (Card.faces card))))) ->
-        backFace card
-  _ -> Nothing
+convertedFace card =
+  let printed = Face.keywords (frontFace card)
+   in case Card.layout card of
+        Layout.Transforming
+          | not (null (Keyword.moreThanMeetsTheEyeCosts printed)) || not (null (Keyword.disturbCosts printed)) ->
+              backFace card
+        _ -> Nothing
 
 -- CR 305.1 / 712.12: the faces of this card a player may PLAY as a land, each
 -- paired with the name the play carries -- the castableFaces of the special

@@ -1479,6 +1479,24 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.Transfigure cost)
       " {\"type\":\"Transfigure\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Transmute cost) /= Codec.encode Keyword.codec (Keyword.Transfigure cost)) "CR 702.53a is not CR 702.71a"
+  -- CR 702.146a's and CR 702.180a's payloads are whole Costs, and neither may
+  -- share Flashback's tag: all three permit a cast from a graveyard, but rule
+  -- 702.146a casts the card TRANSFORMED and rule 702.180a adds a tap and a
+  -- reduction, so the three answer differently everywhere it matters.
+  Spec.it s "Disturb and Harmonize carry their costs, and neither is Flashback" $ do
+    let cost n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Disturb (cost 2))
+      " {\"type\":\"Disturb\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Harmonize (cost 6))
+      " {\"type\":\"Harmonize\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":6}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Disturb (cost 2)) /= Codec.encode Keyword.codec (Keyword.Flashback (cost 2))) "CR 702.146a is not CR 702.34a"
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Harmonize (cost 2)) /= Codec.encode Keyword.codec (Keyword.Disturb (cost 2))) "CR 702.180a is not CR 702.146a"
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 

@@ -128,9 +128,9 @@ data Layout
     -- here: CR 712.11b lets a player choose which face of a MODAL card they cast,
     -- where CR 712.11 casts this one with its front face up by DEFAULT. Not
     -- always -- CR 712.11a's cast "transformed" or "converted" puts a back face
-    -- on the stack, and CR 702.162a's more than meets the eye is the ability a
-    -- card prints to reach it -- but the default is what CR 712.11b displaces and
-    -- so is what separates the two layouts.
+    -- on the stack, and CR 702.162a's more than meets the eye and CR 702.146a's
+    -- disturb are the abilities a card prints to reach it -- but the default is
+    -- what CR 712.11b displaces and so is what separates the two layouts.
     --
     -- FIRST face front, the rest back -- the positional reading Adventure above
     -- already takes. CR 712.2a/712.2b give the two faces printed SYMBOLS rather
