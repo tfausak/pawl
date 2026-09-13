@@ -1142,8 +1142,10 @@ permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
 --
 -- The rule fixes no window beyond that, foretell's reading rather than CR
 -- 702.170d's main phase: a warped INSTANT would be castable whenever its owner
--- has priority, and every printing carrying warp today is a permanent, for which
--- CR 307.5 covers the timing anyway.
+-- has priority (CR 117.1a's first sentence), and every printing carrying warp
+-- today is a permanent, for which that rule's second sentence -- the main phase
+-- and the empty stack, which instantSpeed above reads -- covers the timing
+-- anyway.
 --
 -- "For as long as it remains exiled" needs no conjunct here: the stamp is
 -- per-incarnation, so CR 400.7 takes it off the moment the card leaves exile.
