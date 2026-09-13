@@ -304,6 +304,21 @@ data Object = MkObject
     -- face down, but CR 702.143d makes a card foretold that was already in exile
     -- face up, so neither field implies the other.
     foretold :: Maybe Natural.Natural,
+    -- | CR 702.185b: this exiled card is a WARPED card, stamped with the turn the
+    -- warp ability's delayed trigger exiled it on -- which is what rule 702.185a's
+    -- "after the current turn has ended" is compared against.
+    --
+    -- `plotted` and `foretold` above with every argument unchanged, and a field of
+    -- its own for the reason those two are separate: rule 702.185a's permission
+    -- names the OWNER and states no cost, where rule 702.170d's makes the cast
+    -- free and rule 702.143a's charges a foretell cost, and a card cannot be two
+    -- of the three. Per-incarnation: cleared by newIncarnation (CR 400.7), which
+    -- IS rule 702.185a's "for as long as it remains exiled".
+    --
+    -- ONE WRITER, Effect.MakeWarped, which is the only thing rule 702.185a's own
+    -- delayed ability (Pawl.Engine.Keyword.warpExile) uses it for; read by
+    -- Pawl.Engine.Cast.permitsCastWarped.
+    warped :: Maybe Natural.Natural,
     -- | CR 722.3c: this exiled object is the copy that rule minted, naming the
     -- PREPARED PERMANENT it was minted for. Nothing for everything else, which is
     -- every object in the game but one per prepared permanent.
@@ -762,6 +777,7 @@ newIncarnation object =
       playableFromExile = Nothing,
       plotted = Nothing,
       foretold = Nothing,
+      warped = Nothing,
       preparedCopyOf = Nothing,
       ringBearerFor = Nothing,
       protector = Nothing,

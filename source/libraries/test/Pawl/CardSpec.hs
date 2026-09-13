@@ -591,6 +591,7 @@ objectRefPositions =
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced False), [plantedRef "gp"]),
         ("grant-look-at-exiled", Effect.GrantLookAtExiled (GrantLookAtExiled.MkGrantLookAtExiled (plantedRef "gl") False), [plantedRef "gl"]),
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
+        ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])
       ]
 
@@ -1150,6 +1151,7 @@ ownCounts effect = case effect of
   Effect.Goad _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
+  Effect.MakeWarped _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
@@ -1465,6 +1467,7 @@ effectNestedEffects effect = case effect of
   Effect.Goad {} -> []
   Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
+  Effect.MakeWarped {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
   Effect.Convert {} -> []
@@ -1916,6 +1919,7 @@ effectReplacements effect = case effect of
   Effect.Goad _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
+  Effect.MakeWarped _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
@@ -2326,6 +2330,7 @@ effectMintedFaces effect = case effect of
   Effect.Goad _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
+  Effect.MakeWarped _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
@@ -2640,6 +2645,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.109a and CR 702.152a: the dash and blitz costs, flashback's shape.
   Keyword.Dash cost -> costFilters cost
   Keyword.Blitz cost -> costFilters cost
+  Keyword.Warp cost -> costFilters cost
   -- CR 702.148a: the cleave cost, flashback's shape.
   Keyword.Cleave cost -> costFilters cost
   -- CR 702.119a: the emerge cost, flashback's shape. The sacrifice the rule
@@ -4978,6 +4984,7 @@ effectFilters effect = case effect of
   Effect.Goad ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.GrantLookAtExiled grant -> frame SourceHostFramed (objectRefFilters (GrantLookAtExiled.cards grant))
   Effect.MakePlotted ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.MakeWarped ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Transform ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Convert ref -> frame SourceHostFramed (objectRefFilters ref)

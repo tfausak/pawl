@@ -191,6 +191,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.Goad _ -> Nothing
   Effect.GrantLookAtExiled _ -> Nothing
   Effect.MakePlotted _ -> Nothing
+  Effect.MakeWarped _ -> Nothing
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
   Effect.Convert _ -> Nothing

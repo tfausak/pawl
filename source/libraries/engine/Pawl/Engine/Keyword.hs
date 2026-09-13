@@ -402,6 +402,9 @@ abilitiesFor keyword count = case keyword of
   -- draw is granted by mintedStaticAbilitiesOf.
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  -- CR 702.185a prints none either, and for the first of those reasons: its
+  -- delayed ability is created by the spell as it resolves.
+  Keyword.Warp _ -> []
   -- CR 702.148a's two static abilities print no triggered ability either: one is
   -- an alternative cost (Pawl.Engine.Cost.candidateCostsGiven) and the other a CR
   -- 612.1 text change, which Pawl.Types.Keyword's Cleave says the card states for
@@ -623,6 +626,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Warp _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -1093,6 +1097,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Warp _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -1697,6 +1702,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Warp _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -2315,6 +2321,14 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  -- CR 702.185a states a permission of its own -- "its owner may cast this card
+  -- after the current turn has ended for as long as it remains exiled" -- and it
+  -- is not one of these: this type's arms are permissions a CARD grants about
+  -- itself in a zone, where rule 702.185a's is about one INCARNATION, names one
+  -- player and fixes a turn. It rides Object.warped instead, written by rule
+  -- 702.185a's own delayed ability and read by Cast.permitsCastWarped. The cost
+  -- half is Pawl.Engine.Cost.candidateCostsGiven's hand arm.
+  Keyword.Warp _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -2456,6 +2470,29 @@ mayhemCosts :: Set Keyword -> [Cost Keyword]
 mayhemCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Mayhem cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.185a: every cost this card may be cast from its owner's HAND for under
+-- its warp ability, in ascending Set order. mayhemCosts' shape above, read by
+-- Pawl.Engine.Cost.candidateCostsGiven at its HAND arm alone -- rule 702.185a's
+-- first static ability says "you may cast this card FROM YOUR HAND", where
+-- evoke's, dash's and blitz's name no zone. That clause is load-bearing rather
+-- than decorative: rule 702.185a's second ability then lets the owner cast the
+-- card from exile, and an offer made there would price that cast at the warp
+-- cost and warp it again, where the rule states only a permission and leaves the
+-- printed cost standing.
+--
+-- A LIST for flashbackCosts' reason: rule 702.185a states no limit on how many
+-- warp abilities an object has -- Sliver Weftwinder grants one to every Sliver
+-- card in its controller's hand, its own printed warp included -- and CR 601.2b
+-- makes two of them a CHOICE.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+warpCosts :: Set Keyword -> [Cost Keyword]
+warpCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Warp cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -3493,6 +3530,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Warp _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -3888,6 +3926,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Warp _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -4140,6 +4179,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
+  Keyword.Warp _ -> []
   Keyword.Cleave _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -4533,6 +4573,7 @@ familyOf keyword = case keyword of
   Keyword.Evoke _ -> Just KeywordFamily.Evoke
   Keyword.Dash _ -> Just KeywordFamily.Dash
   Keyword.Blitz _ -> Just KeywordFamily.Blitz
+  Keyword.Warp _ -> Just KeywordFamily.Warp
   Keyword.Cleave _ -> Just KeywordFamily.Cleave
   Keyword.Surge _ -> Just KeywordFamily.Surge
   Keyword.Spectacle _ -> Just KeywordFamily.Spectacle
@@ -5519,35 +5560,39 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.fromList [(epicCopyName, epicCopy), (decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice), (mobilizeSacrificeName, mobilizeSacrifice)]
+mintedDelayedAbilities = Map.fromList [(epicCopyName, epicCopy), (decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice), (mobilizeSacrificeName, mobilizeSacrifice), (warpExileName, warpExile)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.
 mintedDelayedAbility :: AbilityName -> Maybe (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
 mintedDelayedAbility name = Map.lookup name mintedDelayedAbilities
 
--- CR 702.109a's and CR 702.152a's second static ability: the delayed triggered
--- ability a spell cast for this keyword's cost creates as it becomes a permanent
--- (CR 603.7a), named for mintedDelayedAbility. Pawl.Engine.Stack arms it on
--- resolution with `becameSlot` bound to that permanent. Nothing for every other
--- keyword, and for a spell cast for no keyword's cost.
+-- CR 702.109a's, CR 702.152a's and CR 702.185a's second static ability: the
+-- delayed triggered ability a spell cast for this keyword's cost creates as it
+-- becomes a permanent (CR 603.7a), named for mintedDelayedAbility.
+-- Pawl.Engine.Stack arms it on resolution with `becameSlot` bound to that
+-- permanent. Nothing for every other keyword, and for a spell cast for no
+-- keyword's cost.
 resolutionDelayedAbility :: Maybe Keyword -> Maybe AbilityName
 resolutionDelayedAbility castUsing = case castUsing of
   Just (Keyword.Dash _) -> Just dashReturnName
   Just (Keyword.Blitz _) -> Just blitzSacrificeName
+  Just (Keyword.Warp _) -> Just warpExileName
   _ -> Nothing
 
--- The slot rule 702.109a's and rule 702.152a's "the permanent this spell becomes"
--- is bound into, unearthSlot's position: CR 603.7c's "it", which a flickered
--- permanent is not (CR 400.7).
+-- The slot rule 702.109a's, rule 702.152a's and rule 702.185a's "the permanent
+-- this spell becomes" is bound into, unearthSlot's position: CR 603.7c's "it",
+-- which a flickered permanent is not (CR 400.7).
 becameSlot :: SlotName.SlotName
 becameSlot = SlotName.MkSlotName (Text.pack "became permanent")
 
--- The names rule 702.109a's and rule 702.152a's delayed abilities are filed
--- under. A card may not declare one under either name (Pawl.AbilitySlotLintSpec).
-dashReturnName, blitzSacrificeName :: AbilityName
+-- The names rule 702.109a's, rule 702.152a's and rule 702.185a's delayed
+-- abilities are filed under. A card may not declare one under any of these names
+-- (Pawl.AbilitySlotLintSpec).
+dashReturnName, blitzSacrificeName, warpExileName :: AbilityName
 dashReturnName = AbilityName.MkAbilityName (Text.pack "dash")
 blitzSacrificeName = AbilityName.MkAbilityName (Text.pack "blitz")
+warpExileName = AbilityName.MkAbilityName (Text.pack "warp")
 
 -- CR 702.109a's "return the permanent this spell becomes to its owner's hand at
 -- the beginning of the next end step", unearthExile's shape with the hand for
@@ -5588,16 +5633,68 @@ blitzSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffe
 -- CR 513.2's "at the beginning of the next end step", once (CR 603.7b), on any
 -- player's turn.
 atNextEndStep :: Effect.Effect Card (GrantedAbility.GrantedAbility Card) -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-atNextEndStep effect =
+atNextEndStep = atNextEndStepAll . Seq.singleton
+
+-- atNextEndStep for a rule stating more than one instruction, as CR 702.185a
+-- does. ONE CLAUSE and not one per effect: CR 608.2c follows the instructions in
+-- the order written, and warpExile's second effect reads the slot its first one
+-- bound, which a second clause would not see.
+atNextEndStepAll :: Seq.Seq (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+atNextEndStepAll effects =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.EachTurn),
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing effects)) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
+
+-- CR 702.185a's second static ability: "if this spell's warp cost was paid, exile
+-- the permanent this spell becomes at the beginning of the next end step. Its
+-- owner may cast this card after the current turn has ended for as long as it
+-- remains exiled." dashReturn's timing with exile for the hand, plus the stamp
+-- rule 702.185b's designation is.
+--
+-- TWO EFFECTS in ONE clause: the move binds the card it mints in exile under
+-- `warpedSlot` and the stamp reads it there, so the designation lands on CR
+-- 400.7's new incarnation rather than on the permanent that left the battlefield
+-- -- which is also what ends it, since Object.newIncarnation clears the stamp on
+-- the next zone change and that IS rule 702.185a's "for as long as it remains
+-- exiled". A move a replacement sent elsewhere binds that zone's arrival and the
+-- stamp is inert there, Cast.permitsCastWarped being asked only of exile.
+--
+-- FACE UP: rule 702.185a says only "exile", so the default facing stands.
+warpExile :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+warpExile =
+  let exiled =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot becameSlot,
+              MoveToZone.zone = Zone.Exile,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Just warpedSlot,
+              MoveToZone.origin = Nothing,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+   in atNextEndStepAll (Seq.fromList [exiled, Effect.MakeWarped (ObjectRef.InSlot warpedSlot)])
+
+-- The slot rule 702.185a's exile binds the card it mints in exile into, so the
+-- stamp beside it names that incarnation and not `becameSlot`'s permanent.
+warpedSlot :: SlotName.SlotName
+warpedSlot = SlotName.MkSlotName (Text.pack "warped card")
 
 -- The name rule 702.147a's delayed ability is filed under. A card may not declare
 -- one under this name (Pawl.CardSpec), which is what makes the fallback order in

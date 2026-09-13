@@ -937,15 +937,16 @@ castableZones pid oid face gs =
         _ -> False
    in filter permitted castZones
 
--- CR 601.3: may this player cast this half of this exiled card? FOUR INDEPENDENT
--- PERMISSIONS, any of which suffices, because the rules state four.
+-- CR 601.3: may this player cast this half of this exiled card? FIVE INDEPENDENT
+-- PERMISSIONS, any of which suffices, because the rules state five.
 -- The first is Object.playableFromExile's, whose two conjuncts are below and
 -- whose second is why a card its own Adventure exiled offers only the creature
 -- half, while the same card in a hand -- or exiled by some other effect --
 -- offers both; the second is CR 702.170d's
 -- plotted card, which permitsCastPlotted answers; the third is CR 702.143a's
 -- foretold card, which permitsCastForetold answers; the fourth is CR 722.3c's
--- prepare copy, which permitsCastPrepared answers.
+-- prepare copy, which permitsCastPrepared answers; the fifth is CR 702.185a's
+-- warped card, which permitsCastWarped answers.
 --
 --   * Object.playableFromExile names a player -- which is what keeps a
 --     permission from being an offer to the table. Written either by CR 715.3d's
@@ -965,6 +966,7 @@ permitsCastFromExile pid oid face gs =
     || permitsCastPlotted pid oid gs
     || permitsCastForetold pid oid gs
     || permitsCastPrepared pid oid gs
+    || permitsCastWarped pid oid gs
 
 -- CR 722.3c's own permission, the FOURTH of permitsCastFromExile's disjuncts:
 -- "for as long as the copy remains in exile, the prepared permanent's controller
@@ -1000,17 +1002,16 @@ grantedByAdventureRule oid gs =
     == Just PlayPermissionOrigin.Adventure
 
 -- Object.playableFromExile's permission on its own -- whichever rule wrote it,
--- with neither of permitsCastFromExile's other two disjuncts and without its
--- Adventure conjunct: does the exiled object's stored permission name THIS
--- player?
+-- with none of permitsCastFromExile's other disjuncts and without its Adventure
+-- conjunct: does the exiled object's stored permission name THIS player?
 --
 -- The rule says PLAY, so this is the conjunct the land side shares --
 -- Pawl.Engine.Action.playableLands asks it of an exiled land, where playing is
--- CR 305.1's special action rather than a cast. Neither of the other two
--- disjuncts may be shared: CR 702.170d ("a plotted card's owner may cast it")
--- and CR 702.143a ("they may cast that card") each permit a CAST and nothing
--- else, so a land carrying either keyword would still get no land play out of
--- it.
+-- CR 305.1's special action rather than a cast. None of the other disjuncts may
+-- be shared: CR 702.170d ("a plotted card's owner may cast it"), CR 702.143a
+-- ("they may cast that card") and CR 702.185a ("its owner may cast this card")
+-- each permit a CAST and nothing else, so a land carrying any of those keywords
+-- would still get no land play out of it.
 --
 -- The Adventure conjunct stays with the cast side for the same reason: CR
 -- 715.3d's "it can't be cast as an Adventure this way" is about a cast, and CR
@@ -1034,9 +1035,10 @@ permitsPlayFromExile pid oid gs =
 -- step ahead of the move exactly as it captures `castFrom` and `keywordsBefore`.
 --
 -- The PLAYER is checked, for permitsCastFromExile's reason: a permission names
--- one player, and nobody else spends mana under it. CR 702.170d's plotted card
--- and CR 702.143a's foretold card each permit a cast and neither says anything
--- about mana, so both answer AsProduced by having no rider to read.
+-- one player, and nobody else spends mana under it. CR 702.170d's plotted card,
+-- CR 702.143a's foretold card and CR 702.185a's warped card each permit a cast
+-- and none says anything about mana, so all three answer AsProduced by having no
+-- rider to read.
 spendingFor :: PlayerId -> ObjectId -> GameState -> ManaSpending
 spendingFor pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromExile of
   Just permission | ExilePlayPermission.player permission == pid -> ExilePlayPermission.spending permission
@@ -1125,6 +1127,30 @@ permitsCastForetold :: PlayerId -> ObjectId -> GameState -> Bool
 permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
   turn <- Object.foretold obj
+  pure (Object.owner obj == pid && GameState.turnNumber gs > turn)
+
+-- CR 702.185a: may this player cast this WARPED card? permitsCastForetold's three
+-- conjuncts one rule over, and rule 702.185a states each of them:
+--
+--   * the card is warped, which is the Object.warped stamp Pawl.Engine.Warp
+--     wrote as rule 702.185a's delayed ability exiled it (CR 702.185b);
+--   * this player is its OWNER, "ITS OWNER may cast this card";
+--   * the turn is a LATER one, "after the current turn has ended" -- foretell's
+--     clause word for word, and a strict comparison on GameState.turnNumber for
+--     its reason: that counter takes in extra turns (CR 500.7), so the clause
+--     needs no bookkeeping of its own.
+--
+-- The rule fixes no window beyond that, foretell's reading rather than CR
+-- 702.170d's main phase: a warped INSTANT would be castable whenever its owner
+-- has priority, and every printing carrying warp today is a permanent, for which
+-- CR 307.5 covers the timing anyway.
+--
+-- "For as long as it remains exiled" needs no conjunct here: the stamp is
+-- per-incarnation, so CR 400.7 takes it off the moment the card leaves exile.
+permitsCastWarped :: PlayerId -> ObjectId -> GameState -> Bool
+permitsCastWarped pid oid gs = Maybe.fromMaybe False $ do
+  obj <- Game.lookupObject oid gs
+  turn <- Object.warped obj
   pure (Object.owner obj == pid && GameState.turnNumber gs > turn)
 
 -- The objects in a castable zone that this player might cast, BEFORE any

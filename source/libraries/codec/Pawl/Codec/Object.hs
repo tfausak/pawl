@@ -115,6 +115,7 @@ codec = Fields.object $ do
   playableFromExile <- Fields.defaulted "playableFromExile" Nothing (Common.maybe ExilePlayPermission.codec) Object.playableFromExile
   plotted <- Fields.defaulted "plotted" Nothing (Common.maybe Common.natural) Object.plotted
   foretold <- Fields.defaulted "foretold" Nothing (Common.maybe Common.natural) Object.foretold
+  warped <- Fields.defaulted "warped" Nothing (Common.maybe Common.natural) Object.warped
   preparedCopyOf <- Fields.defaulted "preparedCopyOf" Nothing (Common.maybe ObjectId.codec) Object.preparedCopyOf
   ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
   protector <- Fields.defaulted "protector" Nothing (Common.maybe PlayerId.codec) Object.protector
@@ -167,6 +168,7 @@ codec = Fields.object $ do
         Object.playableFromExile = playableFromExile,
         Object.plotted = plotted,
         Object.foretold = foretold,
+        Object.warped = warped,
         Object.preparedCopyOf = preparedCopyOf,
         Object.ringBearerFor = ringBearerFor,
         Object.protector = protector,

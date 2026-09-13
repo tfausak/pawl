@@ -1116,6 +1116,7 @@ library engine
     Pawl.Engine.Turn
     Pawl.Engine.UntapRestriction
     Pawl.Engine.Vanguard
+    Pawl.Engine.Warp
 
 -- The catalog of every exception Pawl can throw, and nothing else.
 library exceptions

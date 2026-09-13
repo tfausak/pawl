@@ -710,6 +710,7 @@ handInPlay printing board =
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
@@ -3633,6 +3634,57 @@ webSlingingSpec s registry = Spec.describe s "WebSlinging" $ do
 webSlingingCost :: [ManaSymbol.ManaSymbol]
 webSlingingCost = [theWhite]
 
+-- CR 702.185a on Bygone Colossus {9} Artifact Creature -- Robot Giant 9/9, "Warp
+-- {3}" and nothing else printed on it (Oracle text checked on Scryfall,
+-- 2026-09-13). Chosen for exactly that: of the warp printings it is the only one
+-- with no second ability, so every case below is rule 702.185a alone.
+--
+-- THREE MOUNTAINS on the warp board, which is what makes the first case rule
+-- 702.185a's and not a coincidence: {3} is exactly the warp cost and six short of
+-- the printed {9}, so the only cast that board can pay for is the one rule
+-- 702.185a offers. The hard-cast control gets NINE, the same card cast the
+-- ordinary way, and rule 702.185a's "if this spell's warp cost was paid" is the
+-- whole of the difference between the two.
+--
+-- The exile boards below are the board the end step left, with untapped Mountains
+-- added and the TURN NUMBER set, so each case turns on the rule rather than on
+-- what the warp cast spent. The turn they are set relative to is the one the
+-- Colossus was CAST on, read off the board before the end step rather than off
+-- the Object.warped stamp the case is about.
+--
+-- THREE Mountains on the middle board is the negative that says rule 702.185a's
+-- cost is not on offer in exile: its first ability names the HAND, so the only
+-- price there is the printed {9}.
+warpSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+warpSpec s registry = Spec.describe s "Warp" $ do
+  Spec.it s "CR 702.185a warped for {3} the Colossus enters, is exiled at the next end step, and is castable from exile only on a later turn" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    colossus <- S.printingOf s registry "Bygone Colossus"
+    let stocked n gs = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) gs [1 .. (n :: Int)]
+        (warpId, warpBoard) = S.addHandCard colossus S.alice (stocked 3 (S.landsInPlay mountain 3))
+        (hardId, hardBoard) = S.addHandCard colossus S.alice (stocked 3 (S.landsInPlay mountain 9))
+        entered = castResolved (payingFor warpCost) warpId (scheduled warpBoard)
+        warped = throughEndStep entered
+        hardCast = throughEndStep (castResolved (payingFor colossusCost) hardId (scheduled hardBoard))
+        standing gs = (length (namedOnBattlefield "Bygone Colossus" gs), length (GameState.exile gs))
+        castTurn = GameState.turnNumber entered
+        atTurn n lands = (aliceOnTurn (S.landsFor mountain S.alice lands warped)) {GameState.turnNumber = n}
+    Spec.assertEqWith s "CR 702.185a three Mountains paid the warp cost, so the Colossus is on the battlefield" (standing entered) (1, 0)
+    Spec.assertEqWith s "CR 702.185a the warped Colossus is exiled at the next end step; cast for its printed {9} it stays" (standing warped, standing hardCast) ((0, 1), (1, 0))
+    case Set.toList (GameState.exile warped) of
+      [exiledId] ->
+        Spec.assertEqWith
+          s
+          "CR 702.185a its owner may cast it from exile on a later turn, for the printed {9} and not the warp {3}"
+          (S.castable S.alice exiledId (atTurn castTurn 9), S.castable S.alice exiledId (atTurn (castTurn + 1) 3), S.castable S.alice exiledId (atTurn (castTurn + 1) 9))
+          (False, False, True)
+      other -> Spec.assertFailure s ("expected one exiled card, got " <> show (length other))
+
+-- Bygone Colossus's printed {9} and its warp {3}.
+colossusCost, warpCost :: [ManaSymbol.ManaSymbol]
+colossusCost = [ManaSymbol.Generic 9]
+warpCost = [ManaSymbol.Generic 3]
+
 -- CR 702.190a on Donatello's Technique {2}{U} Sorcery, "Sneak {U} / Draw two
 -- cards." (Oracle text checked on Scryfall, 2026-09-13). Chosen over Splinter's
 -- Technique, the issue's card, for its effect alone: both are sorceries with
@@ -4832,6 +4884,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   blitzSpec s registry
   cleaveSpec s registry
   webSlingingSpec s registry
+  warpSpec s registry
   sneakSpec s registry
   surgeSpec s registry
   spectacleSpec s registry

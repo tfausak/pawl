@@ -667,6 +667,7 @@ effectObjectRefs effect = case effect of
   Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ ref _ _) -> [ref]
   Effect.GrantLookAtExiled grant -> [GrantLookAtExiled.cards grant]
   Effect.MakePlotted ref -> [ref]
+  Effect.MakeWarped ref -> [ref]
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
   Effect.ForEach (ForEach.MkForEach ref _ _) -> [ref]
 
@@ -815,6 +816,7 @@ effectPlayerRefs effect = case effect of
   Effect.GrantPlayFromExile {} -> []
   Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
+  Effect.MakeWarped {} -> []
   Effect.ForEach {} -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
@@ -1035,6 +1037,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Goad _ -> Map.empty
   Effect.GrantLookAtExiled _ -> Map.empty
   Effect.MakePlotted _ -> Map.empty
+  Effect.MakeWarped _ -> Map.empty
   Effect.DoesNotUntapNext _ -> Map.empty
   Effect.Transform _ -> Map.empty
   Effect.Convert _ -> Map.empty
@@ -1550,6 +1553,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Goad _ -> True
   Effect.GrantLookAtExiled _ -> True
   Effect.MakePlotted _ -> True
+  Effect.MakeWarped _ -> True
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
   Effect.Convert _ -> True
@@ -1750,6 +1754,7 @@ readsX =
         Effect.Goad _ -> False
         Effect.GrantLookAtExiled _ -> False
         Effect.MakePlotted _ -> False
+        Effect.MakeWarped _ -> False
         Effect.DoesNotUntapNext _ -> False
         Effect.Transform _ -> False
         Effect.Convert _ -> False
@@ -1949,6 +1954,7 @@ boundSlots effect = case effect of
   Effect.Goad _ -> Set.empty
   Effect.GrantLookAtExiled _ -> Set.empty
   Effect.MakePlotted _ -> Set.empty
+  Effect.MakeWarped _ -> Set.empty
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
   Effect.Convert _ -> Set.empty

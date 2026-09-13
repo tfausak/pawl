@@ -112,6 +112,7 @@ codec =
       Arm.payload "Evoke" (Cost.codec codec) Keyword.Evoke (\x -> case x of Keyword.Evoke y -> Just y; _ -> Nothing),
       Arm.payload "Dash" (Cost.codec codec) Keyword.Dash (\x -> case x of Keyword.Dash y -> Just y; _ -> Nothing),
       Arm.payload "Blitz" (Cost.codec codec) Keyword.Blitz (\x -> case x of Keyword.Blitz y -> Just y; _ -> Nothing),
+      Arm.payload "Warp" (Cost.codec codec) Keyword.Warp (\x -> case x of Keyword.Warp y -> Just y; _ -> Nothing),
       Arm.payload "Surge" (Cost.codec codec) Keyword.Surge (\x -> case x of Keyword.Surge y -> Just y; _ -> Nothing),
       Arm.payload "Prowl" (Cost.codec codec) Keyword.Prowl (\x -> case x of Keyword.Prowl y -> Just y; _ -> Nothing),
       Arm.payload "Freerunning" (Cost.codec codec) Keyword.Freerunning (\x -> case x of Keyword.Freerunning y -> Just y; _ -> Nothing),

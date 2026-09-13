@@ -1524,6 +1524,31 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.Indefinite (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "plotted"))) ManaSpending.AsProduced False))
       )
       "MakePlotted and GrantPlayFromExile of the same slot encode differently"
+  -- CR 702.185b's designation, MakePlotted's sibling. The two write different
+  -- fields of the same exiled object -- one permits a free cast (CR 702.170d) and
+  -- the other a cast for the printed cost -- so a shared tag would make a warped
+  -- card free. No card in data/cards/ prints either arm of this opcode: rule
+  -- 702.185a's own delayed ability is the only producer, and it takes the slot
+  -- arm.
+  Spec.it s "MakeWarped round-trips both ObjectRef arms, and is not MakePlotted" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MakeWarped (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "warped card"))))
+      " {\"type\":\"MakeWarped\",\"value\":{\"type\":\"InSlot\",\"value\":\"warped card\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MakeWarped (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"MakeWarped\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+    Spec.assertBool
+      s
+      ( toJson (Effect.MakeWarped (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "warped card"))))
+          /= toJson (Effect.MakePlotted (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "warped card"))))
+      )
+      "MakeWarped and MakePlotted of the same slot encode differently"
   -- The shapes the encoder can emit, told apart by LENGTH: a bare ability name
   -- (CR 603.7a/b's defaults), a two-element form (a stated duration, onset
   -- still the default), and a three-element form (a stated onset, whose last
