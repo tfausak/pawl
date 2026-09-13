@@ -243,6 +243,11 @@ abilitiesFor keyword count = case keyword of
   -- stackTriggeredAbilitiesOf mints them and this roster stays empty.
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
+  -- CR 702.166a and CR 702.194a state one static ability each and no triggered
+  -- ability at all: their optional additional cost is optionalCost's, and what a
+  -- payment buys is a clause of the card (CR 702.166c, CR 702.194b).
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
@@ -515,6 +520,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Storm -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -886,6 +893,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Storm -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1461,6 +1470,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Storm -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -1994,6 +2005,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -2593,18 +2606,20 @@ disguiseCost keywords =
 
 -- CR 601.2b: the OPTIONAL additional cost this keyword ability lets its spell's
 -- controller pay as they cast it, paired with how many times its rule lets it be
--- paid -- Just 1 for kicker (CR 702.33a), offspring (CR 702.175a) and casualty
--- (CR 702.153a), Nothing for multikicker (CR 702.33c), squad (CR 702.157a) and
--- replicate (CR 702.56a), which their rules make payable "any number of times"
--- -- and Nothing for every other keyword.
+-- paid -- Just 1 for kicker (CR 702.33a), offspring (CR 702.175a), casualty (CR
+-- 702.153a), bargain (CR 702.166a) and teamwork (CR 702.194a), Nothing for
+-- multikicker (CR 702.33c), squad (CR 702.157a) and replicate (CR 702.56a),
+-- which their rules make payable "any number of times" -- and Nothing for every
+-- other keyword. Rule 702.194a's "any number" counts CREATURES within one
+-- payment, not payments, so teamwork is a Just 1 like the rest.
 --
--- One function for all six because their rules say one thing: each is an
+-- One function for all of them because their rules say one thing: each is an
 -- optional ADDITIONAL cost (CR 118.8b) announced at CR 601.2b and paid at CR
 -- 601.2f-h, so one announcement asks about them and Object.paidCosts records
 -- them. What each PAYS OFF differs, and is read back off that record by keyword.
 --
 -- A wildcard rather than an exhaustive case, entwineCosts' reason: this asks
--- about six named constructors rather than classifying every keyword.
+-- about named constructors rather than classifying every keyword.
 optionalCost :: Keyword -> Maybe (Cost Keyword, Maybe Natural)
 optionalCost keyword = case keyword of
   Keyword.Kicker cost -> Just (cost, Just 1)
@@ -2615,6 +2630,11 @@ optionalCost keyword = case keyword of
   -- The one arm whose cost is MINTED rather than printed: rule 702.153a writes
   -- the sacrifice out in the rulebook and the card prints only the N.
   Keyword.Casualty n -> Just (casualtyCost n, Just 1)
+  -- Minted rather than printed too: rules 702.166a and 702.194a write out what
+  -- is sacrificed and what is tapped, and the card prints bargain bare and
+  -- teamwork with its N alone.
+  Keyword.Bargain -> Just (bargainCost, Just 1)
+  Keyword.Teamwork n -> Just (teamworkCost n, Just 1)
   _ -> Nothing
 
 -- CR 702.153a's additional cost: "you may sacrifice a creature with power N or
@@ -2631,6 +2651,58 @@ casualtyCost n =
   Cost.MkCost
     { Cost.mana = Just (ManaCost.MkManaCost []),
       Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerAtLeast (toInteger n)]))]
+    }
+
+-- CR 702.166a's additional cost: "you may sacrifice an artifact, enchantment, or
+-- token". ONE permanent, and CR 701.21a leaves WHICH to the payer and requires
+-- they control it, casualtyCost's arrangement exactly -- the Filter states the
+-- three kinds and nothing about control.
+--
+-- Filter.IsToken beside the two card types rather than under them: CR 111.3
+-- gives a token only the card types its creating effect defined, so a Food token
+-- is already an artifact and a Saproling token is neither of the two -- the
+-- third disjunct is what rule 702.166a's own list adds.
+--
+-- An EMPTY mana part, casualtyCost's reason.
+bargainCost :: Cost Keyword
+bargainCost =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost []),
+      Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Enchantment, Filter.IsToken]))]
+    }
+
+-- CR 702.194a's additional cost: "you may tap any number of creatures you
+-- control with total power N or more". The aggregate threshold is what makes it
+-- CostComponent.TapForTotalPower and not TapPermanents, `crew` above's reading of
+-- the same words one rule over.
+--
+-- WITHOUT crew's `Not CantCrewVehicles`: rule 702.122d forbids paying a CREW
+-- cost and says nothing about any other cost that taps, and that atom in this
+-- criterion is what would make a Vehicle-barred creature unable to pay teamwork
+-- too. Without crew's `Not IsSource` either -- the source is a spell on the
+-- stack, so no battlefield creature is it.
+--
+-- CR 302.6 does not reach it: the cost carries no tap symbol
+-- (Pawl.Engine.Cost.requiresSicknessCheck), so a creature that arrived this turn
+-- may be tapped to pay.
+--
+-- An EMPTY mana part, casualtyCost's reason.
+teamworkCost :: Natural -> Cost Keyword
+teamworkCost n =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost []),
+      Cost.components =
+        [ CostComponent.TapForTotalPower
+            ( TapForTotalPower.MkTapForTotalPower
+                n
+                ( Filter.And
+                    [ Filter.HasCardType CardType.Creature,
+                      Filter.Not Filter.IsTapped,
+                      Filter.ControlledBy PlayerRelation.You
+                    ]
+                )
+            )
+        ]
     }
 
 -- Every keyword of this card offering optionalCost's kind of cost, in ascending
@@ -3203,6 +3275,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Storm -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3480,6 +3554,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3734,6 +3810,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
+  Keyword.Bargain -> []
+  Keyword.Teamwork _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
@@ -3898,6 +3976,9 @@ familyOf keyword = case keyword of
   Keyword.Offspring _ -> Just KeywordFamily.Offspring
   Keyword.Replicate _ -> Just KeywordFamily.Replicate
   Keyword.Casualty _ -> Just KeywordFamily.Casualty
+  -- CR 702.166a carries no parameter, so there is no family to name it by.
+  Keyword.Bargain -> Nothing
+  Keyword.Teamwork _ -> Just KeywordFamily.Teamwork
   Keyword.Foretell _ -> Just KeywordFamily.Foretell
   -- CR 702.94a's parameterized keyword: "a card with miracle" drops the cost.
   Keyword.Miracle _ -> Just KeywordFamily.Miracle

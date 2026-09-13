@@ -248,4 +248,7 @@ data KeywordFamily
   | -- | CR 702.148a: cleave [cost]; the family Quantity.CastUsing names for Path
     -- of Peril.
     Cleave
+  | -- | CR 702.194a: teamwork N. No card in the pool asks yet, and it is owed at
+    -- the keyword rather than at the first asker.
+    Teamwork
   deriving (Bounded, Enum, Eq, Ord, Show)

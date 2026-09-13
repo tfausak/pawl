@@ -568,6 +568,11 @@ data Keyword
   | -- | 702.164a: toxic N. CR 702.164b's total toxic value is the SUM over every
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic).
     Toxic Natural.Natural
+  | -- | 702.166a: bargain -- an optional additional cost of sacrificing an
+    -- artifact, enchantment or token, minted by Pawl.Engine.Keyword.bargainCost.
+    -- CR 702.166c's "if it was bargained" clauses are the card's own, gated on
+    -- Quantity.TimesPaid (Archon's Glory).
+    Bargain
   | -- | 702.168a: disguise [cost] -- Morph's twin, casting the card as a 2\/2
     -- face-down creature with ward {2} for {3}; the Cost is what CR 702.168d
     -- charges to turn the permanent face up.
@@ -666,6 +671,11 @@ data Keyword
     -- copy per opponent, each required to attack that opponent and sacrificed
     -- at the beginning of the next end step.
     Encore (Cost.Cost Keyword)
+  | -- | 702.194a: teamwork N -- an optional additional cost of tapping any number
+    -- of untapped creatures you control with total power N or more, minted by
+    -- Pawl.Engine.Keyword.teamworkCost. CR 702.194b's "cast using teamwork"
+    -- clauses are the card's own, gated on Quantity.TimesPaid (Team Tactics).
+    Teamwork Natural.Natural
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one
