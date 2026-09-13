@@ -182,5 +182,6 @@ codec =
       Arm.nullary "Improvise" Keyword.Improvise,
       Arm.nullary "Retrace" Keyword.Retrace,
       Arm.payload "Mayhem" (Cost.codec codec) Keyword.Mayhem (\x -> case x of Keyword.Mayhem y -> Just y; _ -> Nothing),
-      Arm.payload "Madness" (Cost.codec codec) Keyword.Madness (\x -> case x of Keyword.Madness y -> Just y; _ -> Nothing)
+      Arm.payload "Madness" (Cost.codec codec) Keyword.Madness (\x -> case x of Keyword.Madness y -> Just y; _ -> Nothing),
+      Arm.nullary "Rebound" Keyword.Rebound
     ]

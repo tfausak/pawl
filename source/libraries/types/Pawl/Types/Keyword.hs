@@ -640,6 +640,13 @@ data Keyword
     -- its owner the cast for [cost], or the graveyard
     -- (Pawl.Engine.Keyword.exileTriggeredAbilitiesOf).
     Madness (Cost.Cost Keyword)
+  | -- | 702.88a: a spell cast from its controller's hand is exiled as it
+    -- resolves instead of going to the graveyard, and a delayed triggered
+    -- ability offers its controller the cast from exile for nothing at the
+    -- beginning of their next upkeep. Both halves are minted from this
+    -- constructor (Pawl.Engine.Resolve.finishSpell,
+    -- Pawl.Engine.Keyword.reboundUpkeep) rather than printed.
+    Rebound
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

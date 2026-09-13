@@ -1,6 +1,11 @@
 {
   "faces": [
     {
+      "keywords": [
+        {
+          "type": "Rebound"
+        }
+      ],
       "manaCost": [
         {
           "type": "OfType",

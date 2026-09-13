@@ -412,6 +412,7 @@ abilitiesFor keyword count = case keyword of
   -- static half by `handReplacementsOf` and the triggered half by
   -- `exileTriggeredAbilitiesOf`, so this roster stays empty.
   Keyword.Madness _ -> []
+  Keyword.Rebound -> []
 
 -- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
 -- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
@@ -595,6 +596,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
+  Keyword.Rebound -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
@@ -956,6 +958,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
+  Keyword.Rebound -> []
 
 -- CR 702.84a's whole ability, minted from the one cost the keyword carries, as
 -- four effects in one clause -- the return, the haste, the delayed exile and the
@@ -1363,6 +1366,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
+  Keyword.Rebound -> []
 
 -- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
@@ -1938,6 +1942,9 @@ permissionsFor cardTypes keyword = case keyword of
   -- offer (Pawl.Engine.Resolve.Effect.offerCast) rather than as a zone this
   -- card may be cast from.
   Keyword.Madness _ -> []
+  -- CR 702.88a grants no standing permission: the free cast from exile is the
+  -- delayed ability's own Effect.OfferCast (reboundUpkeep), offered once.
+  Keyword.Rebound -> []
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
@@ -3130,6 +3137,12 @@ mintedReplacementsFor keyword count = case keyword of
   -- projection of a battlefield or command-zone object. `handReplacementsOf`
   -- above is where rule 702.35a's row is minted.
   Keyword.Madness _ -> []
+  -- CR 702.88a's exile is minted AT THE MOVE by
+  -- Pawl.Engine.Replacement.installReboundExile, buyback's road and for its
+  -- reason: the rule scopes the rewrite to "as it resolves", which a standing
+  -- row keyed on a graveyard destination would over-apply to a countered or a
+  -- fizzled spell.
+  Keyword.Rebound -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
@@ -3344,6 +3357,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
+  Keyword.Rebound -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
@@ -3591,6 +3605,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Retrace -> []
   Keyword.Mayhem _ -> []
   Keyword.Madness _ -> []
+  Keyword.Rebound -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
 -- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
@@ -3788,6 +3803,8 @@ familyOf keyword = case keyword of
   Keyword.Retrace -> Nothing
   Keyword.Mayhem _ -> Just KeywordFamily.Mayhem
   Keyword.Madness _ -> Just KeywordFamily.Madness
+  -- CR 702.88a carries no parameter, so there is no family to name it by.
+  Keyword.Rebound -> Nothing
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.
@@ -5852,6 +5869,69 @@ stillExiled =
         Comparison.AtLeast
         (Quantity.Literal 1)
     )
+
+-- CR 702.88a: "at the beginning of your next upkeep, you may cast this card from
+-- exile without paying its mana cost" -- the DELAYED triggered ability (CR
+-- 603.7a) rule 702.88a's static ability creates as the spell is exiled.
+-- Pawl.Engine.Resolve.finishSpell arms it with `reboundSlot` bound to the exiled
+-- card.
+--
+-- ARMED rather than gathered off the exiled card the way suspend's two abilities
+-- are: rule 702.88a says "your NEXT upkeep", once, where an exile-zone ability
+-- reading the same condition would fire at every upkeep the card sat through.
+-- Its once-ness is the delayed store's (CR 603.7b).
+--
+-- Onset.Immediately: rule 702.88a names no turn, and the upkeep the arming
+-- resolution is itself in has already begun, so the first upkeep this can see is
+-- the next one. TurnScope.ControllersTurn is rule 702.88a's "YOUR", which CR
+-- 603.7d makes the spell's controller.
+--
+-- ONE MANDATORY clause, suspendLastCounter's reading of the "may": the option
+-- governs the CAST alone, which is Prompt.OfferedCast's own question (CR 608.2g).
+--
+-- NO intervening "if": rule 702.88a states none. A card that has left exile by
+-- the time this resolves is not offered all the same, CR 400.7 having deleted the
+-- id the arming captured -- stillExiled's note above argues that from the other
+-- side.
+--
+-- CastOffer.offeredBy tags the candidate so the spell records
+-- Object.castUsing = rebound (CR 601.2b), suspendLastCounter's field. No clause
+-- of rule 702.88 reads it back; rule 702.88b routes the payment through rules
+-- 601.2b and 601.2f-h, which is what CastOffer.withoutPayingManaCost means.
+reboundUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+reboundUpkeep =
+  let effect =
+        Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.ref = ObjectRef.InSlot reboundSlot,
+              -- Rule 702.88a's "YOU may cast": the delayed ability's controller,
+              -- and a "may".
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = CastObligation.Optional,
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just Keyword.Rebound}
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slot rule 702.88a's "this card" is bound into as the spell is exiled,
+-- becameSlot's position: CR 603.7c's environment, captured at the arming rather
+-- than re-read.
+reboundSlot :: SlotName.SlotName
+reboundSlot = SlotName.MkSlotName (Text.pack "rebounded")
+
+-- CR 702.88a / 702.88c: does this object have rebound? Membership, rule 702.88c
+-- making multiple instances redundant. Read by
+-- Pawl.Engine.Resolve.finishSpell off Projection.keywordsOf, never off the
+-- printed face.
+hasRebound :: Set Keyword -> Bool
+hasRebound = Set.member Keyword.Rebound
 
 -- CR 702.35a's SECOND ability: "when this card is exiled this way, its owner may
 -- cast it by paying [cost] rather than paying its mana cost. If that player
