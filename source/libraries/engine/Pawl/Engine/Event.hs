@@ -2333,9 +2333,10 @@ apply batch candidate event =
       -- why.
       --
       -- THE CREATURE TYPES are the ENTERING object's own, off its CR 613
-      -- projection rather than its printed face, so a Clone of an amplify creature
-      -- and a permanent a continuous effect made a Dragon each offer what rule
-      -- 702.38a says they offer.
+      -- projection (Projection.subtypesOf) rather than off the printed face, which
+      -- is what rule 702.38a's "with it" asks for. Not proven on a board: no test
+      -- here enters a copy of an amplify creature or one a continuous effect
+      -- retyped, so this is the right door rather than a demonstrated behaviour.
       --
       -- Through `reveal`, CR 701.20a's own funnel, so every shown card reaches the
       -- public log -- the RevealOrTapped arm's road, and a reveal is not a cost
