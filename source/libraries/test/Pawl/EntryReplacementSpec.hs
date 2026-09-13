@@ -39,6 +39,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Effect as Effect
@@ -438,6 +439,100 @@ readyForAlice gs =
       GameState.activePlayer = S.alice,
       GameState.priority = Just S.alice
     }
+
+-- alice holds one card and controls exactly the lands named, untapped, in her
+-- precombat main phase with priority. Returns the state and the card in hand.
+--
+-- EXACTLY the lands the cast needs, which is what pins the payment without
+-- pinning an answer by index: a {3} or {5} generic cost against that many
+-- untapped sources leaves the payer no colour to choose, so what was spent is
+-- the board rather than the answerer.
+sunburstBoard :: [(Printing.Printing, Int)] -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+sunburstBoard lands card =
+  let base = List.foldl' (\acc (land, n) -> S.landsFor land S.alice n acc) (Setup.emptyGame S.bothPlayers) lands
+      (held, gs) = S.addHandCard card S.alice base
+   in (readyForAlice gs, held)
+
+-- CR 702.44: sunburst, on Suntouched Myr ({3} 0/0 artifact creature, "Sunburst"
+-- and nothing else) for rule 702.44a's creature half and on Clearwater Goblet
+-- ({5} artifact, sunburst plus an upkeep ability counting its charge counters)
+-- for the other. A minted CR 614.1c row whose count AND counter kind are both
+-- read off the entering object, which is what makes it neither bloodthirst's
+-- shape nor riot's.
+--
+-- ONE BOARD PER CASE, differing in nothing but which lands pay for the spell:
+-- the same seat, the same card, the same cast. What the assertions tell apart is
+-- how many counters of WHICH kind the permanent entered with.
+--
+-- Distinct numbers everywhere, so no two readings coincide: three lands of three
+-- colours are 3 counters where three Plains are 1 (mana spent is not colours
+-- spent), and the Goblet's five lands carry four colours (its charge counters
+-- are 4, not 5 and not 0).
+sunburstSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sunburstSpec s registry =
+  let enters = castAndResolve S.aggressiveAnswer
+      myrIn = newestNamed (CardName.MkCardName $ Text.pack "Suntouched Myr")
+      gobletIn = newestNamed (CardName.MkCardName $ Text.pack "Clearwater Goblet")
+      -- The name the CARD writes, not Pawl.Engine.Keyword.chargeCounter: CR
+      -- 122.1's last sentence makes counters interchangeable by name, so the
+      -- minted kind has to land on the key data/cards/clearwater-goblet.json
+      -- counts.
+      charge = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "charge"))
+   in Spec.describe s "Sunburst (CR 702.44)" $ do
+        Spec.it s "CR 702.44a three colours of mana are three +1/+1 counters" $ do
+          plains <- S.printingOf s registry "Plains"
+          island <- S.printingOf s registry "Island"
+          mountain <- S.printingOf s registry "Mountain"
+          myr <- S.printingOf s registry "Suntouched Myr"
+          let (gs, held) = sunburstBoard [(plains, 1), (island, 1), (mountain, 1)] myr
+              after = enters gs held
+          case myrIn after of
+            Nothing -> Spec.assertFailure s "Suntouched Myr did not reach the battlefield"
+            Just oid -> do
+              Spec.assertEqWith s "three +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 3
+              -- Printed 0/0, so the counters are the whole of its size (CR
+              -- 613.4c, layer 7c) and CR 704.5f does not reach it.
+              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 3)
+              Spec.assertEqWith s "no charge counters on a creature" (countersOn charge oid after) 0
+        -- THE PAIR THAT MAKES IT COLOURS. The board above with the same three
+        -- mana all of one colour.
+        Spec.it s "CR 702.44a three mana of one colour are one counter" $ do
+          plains <- S.printingOf s registry "Plains"
+          myr <- S.printingOf s registry "Suntouched Myr"
+          let (gs, held) = sunburstBoard [(plains, 3)] myr
+              after = enters gs held
+          case myrIn after of
+            Nothing -> Spec.assertFailure s "Suntouched Myr did not reach the battlefield"
+            Just oid -> do
+              Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 1
+              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 1)
+        -- CR 702.44b's "only if one or more colored mana was spent": the same
+        -- three mana again, none of them coloured.
+        Spec.it s "CR 702.44b colourless mana buys no counter at all" $ do
+          fountain <- S.printingOf s registry "Radiant Fountain"
+          myr <- S.printingOf s registry "Suntouched Myr"
+          let (gs, held) = sunburstBoard [(fountain, 3)] myr
+              after = enters gs held
+          case myrIn after of
+            Nothing -> Spec.assertFailure s "Suntouched Myr did not reach the battlefield"
+            Just oid -> do
+              Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 0)
+        -- CR 702.44a's OTHER half, and the only case that reaches it: an object
+        -- not entering as a creature takes charge counters instead.
+        Spec.it s "CR 702.44a a noncreature takes charge counters" $ do
+          plains <- S.printingOf s registry "Plains"
+          island <- S.printingOf s registry "Island"
+          mountain <- S.printingOf s registry "Mountain"
+          forest <- S.printingOf s registry "Forest"
+          goblet <- S.printingOf s registry "Clearwater Goblet"
+          let (gs, held) = sunburstBoard [(plains, 2), (island, 1), (mountain, 1), (forest, 1)] goblet
+              after = enters gs held
+          case gobletIn after of
+            Nothing -> Spec.assertFailure s "Clearwater Goblet did not reach the battlefield"
+            Just oid -> do
+              Spec.assertEqWith s "four charge counters off five mana" (countersOn charge oid after) 4
+              Spec.assertEqWith s "and no +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 0
 
 -- CR 702.54: bloodthirst, on Bloodrage Vampire ({2}{B} 3/1 Vampire, "Bloodthirst
 -- 1" and nothing else) for rule 702.54a's N, and on Petrified Wood-Kin ({6}{G}
@@ -2375,6 +2470,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   riotSpec s registry
   unleashSpec s registry
   bloodthirstSpec s registry
+  sunburstSpec s registry
   brineElementalSpec s registry
   coldsteelHeartSpec s registry
   stuffyDollSpec s registry

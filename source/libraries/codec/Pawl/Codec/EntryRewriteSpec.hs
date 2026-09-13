@@ -161,6 +161,17 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.Unleash
       " {\"type\":\"Unleash\"} "
     Spec.assertBool s (Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) EntryRewrite.Unleash /= Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) EntryRewrite.Riot) "unleash and riot encode differently"
+  -- CR 702.44a: sunburst's rewrite, payload-free for riot's reason -- rule
+  -- 702.44a fixes both the counter kinds and where the count comes from. Encoded
+  -- distinctly from Unleash, since a transcript of one must not decode as the
+  -- other.
+  Spec.it s "Sunburst (Suntouched Myr)" $ do
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      EntryRewrite.Sunburst
+      " {\"type\":\"Sunburst\"} "
+    Spec.assertBool s (Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) EntryRewrite.Sunburst /= Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) EntryRewrite.Unleash) "sunburst and unleash encode differently"
   -- CR 702.54a: bloodthirst's rewrite, which DOES carry its N -- the printed
   -- number varies by card, where rule 702.136a fixes riot's. Encoded distinctly
   -- from WithCounters, whose payload names a counter kind rule 702.54a fixes.

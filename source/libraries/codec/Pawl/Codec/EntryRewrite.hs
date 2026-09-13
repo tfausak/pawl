@@ -41,6 +41,7 @@ codec abilityCodec effectCodec =
       Arm.nullary "ReadAhead" EntryRewrite.ReadAhead,
       Arm.nullary "Riot" EntryRewrite.Riot,
       Arm.nullary "Unleash" EntryRewrite.Unleash,
+      Arm.nullary "Sunburst" EntryRewrite.Sunburst,
       -- Optional for Pawl.Codec.Keyword's reason: rule 702.54b's X is the absent
       -- "value" key, and the payload is that keyword's carried through.
       Arm.optionalPayload "Bloodthirst" Common.natural EntryRewrite.Bloodthirst (\x -> case x of EntryRewrite.Bloodthirst y -> Just y; _ -> Nothing),
