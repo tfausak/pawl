@@ -523,6 +523,18 @@ data Keyword
     -- sacrifice it at end of combat", the second arming a CR 603.7 delayed
     -- triggered ability.
     Decayed
+  | -- | 702.148a: cleave [cost] -- an alternative cost, plus a CR 612.1
+    -- text-changing effect that removes the card's bracketed words if it was
+    -- paid.
+    --
+    -- Not implemented: the text change as a text change (#3686). A card carries
+    -- its two readings instead as two clauses of one mode, each gated on
+    -- Quantity.CastUsing -- Morsel Theft's prowl shape -- which states a bracket
+    -- that is a whole clause or a whole ObjectRef.EachMatching filter (Path of
+    -- Peril) and cannot state one inside a TARGET (Wash Away). CR 601.2c lets a
+    -- spell's targets depend on which alternative cost was chosen; what pawl
+    -- lacks is a cast that reads them off anything but the printed face.
+    Cleave (Cost.Cost Keyword)
   | -- | 702.149a: whenever this creature and at least one other creature with
     -- greater power attack, put a +1/+1 counter on this creature. The counter
     -- goes on through Effect.Train, so CR 702.149c's "whenever this creature

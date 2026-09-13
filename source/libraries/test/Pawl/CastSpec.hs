@@ -3509,6 +3509,46 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
     Spec.assertEqWith s "CR 702.152a and drew a card as it died" (drew blitzed) 1
     Spec.assertEqWith s "cast for {1}{R} and bolted, it died and made its Treasure without drawing" (drew bolted, dead bolted) (0, (0, 1))
 
+-- CR 702.148a on Path of Peril {1}{B}{B} Sorcery, "Cleave {4}{W}{B} / Destroy
+-- all creatures [with mana value 2 or less]." (Oracle text checked on Scryfall,
+-- 2026-09-12).
+--
+-- ONE board for both cases, so the negative cannot be a shortage: alice on turn
+-- with five Swamps, a Plains and the Path in hand; bob with a Goblin Piker
+-- ({1}{R}, mana value 2) and a Blind-Spot Giant ({2}{R}, mana value 3) --
+-- CR 202.3's boundary pair, one on each side of rule 702.148a's bracketed
+-- "with mana value 2 or less". Six lands pay either cost, so the case that
+-- leaves the Giant alive had the cleave cost available and declined it.
+--
+-- The card states its two readings as two clauses of one mode, each gated on
+-- Quantity.CastUsing (Morsel Theft's prowl shape), rather than as CR 612.1's
+-- text change; Pawl.Types.Keyword's Cleave says why, see #3686.
+cleaveSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+cleaveSpec s registry = Spec.describe s "Cleave" $ do
+  Spec.it s "CR 702.148a cleaved, the Path destroys both creatures; cast for {1}{B}{B} the Blind-Spot Giant lives" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    plains <- S.printingOf s registry "Plains"
+    peril <- S.printingOf s registry "Path of Peril"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Blind-Spot Giant"
+    let (_, gs0) = S.addPermanent piker S.bob (S.landsFor plains S.alice 1 (S.landsInPlay swamp 5))
+        (_, gs1) = S.addPermanent giant S.bob gs0
+        (perilId, gs2) = S.addHandCard peril S.alice gs1
+        board = aliceOnTurn gs2
+        cast cost = castResolved (payingFor cost) perilId board
+        alive gs = (length (namedOnBattlefield "Goblin Piker" gs), length (namedOnBattlefield "Blind-Spot Giant" gs))
+    Spec.assertEqWith s "CR 702.148a the cleave cost was paid, so the bracketed mana value clause is gone and the Giant dies too" (alive (cast cleaveCost)) (0, 0)
+    Spec.assertEqWith s "CR 702.148a the printed cost was paid, so only the Piker is destroyed" (alive (cast perilCost)) (0, 1)
+    Spec.assertEqWith s "the control: both casts left the Path in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice (cast cleaveCost)), length (Game.zoneMembers Zone.Graveyard S.alice (cast perilCost))) (1, 1)
+
+-- Path of Peril's printed {1}{B}{B} and its cleave {4}{W}{B}.
+perilCost, cleaveCost :: [ManaSymbol.ManaSymbol]
+perilCost = [ManaSymbol.Generic 1, theBlack, theBlack]
+cleaveCost = [ManaSymbol.Generic 4, theWhite, theBlack]
+
+theWhite :: ManaSymbol.ManaSymbol
+theWhite = ManaSymbol.OfType (ManaType.Colored Color.White)
+
 -- CR 702.117a on Boulder Salvo {4}{R} Sorcery, "Surge {1}{R} / Boulder Salvo
 -- deals 4 damage to target creature." (Oracle text checked on Scryfall,
 -- 2026-09-11).
@@ -4469,6 +4509,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   evokeSpec s registry
   dashSpec s registry
   blitzSpec s registry
+  cleaveSpec s registry
   surgeSpec s registry
   spectacleSpec s registry
   prowlSpec s registry

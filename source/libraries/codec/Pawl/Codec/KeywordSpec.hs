@@ -353,6 +353,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
     Common.assertCodec s Keyword.codec (Keyword.Dash cost) " {\"type\":\"Dash\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Common.assertCodec s Keyword.codec (Keyword.Blitz cost) " {\"type\":\"Blitz\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+  -- CR 702.148a's payload is a whole Cost, Path of Peril's {4}{W}{B}.
+  Spec.it s "Cleave carries its cost" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Cleave (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []))
+      " {\"type\":\"Cleave\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
   -- CR 702.117a and CR 702.137a carry a whole Cost each, under tags of their own.
   Spec.it s "Surge and Spectacle carry their costs" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []

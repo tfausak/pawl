@@ -303,11 +303,12 @@ candidateCostsGiven permitted pid name oid gs =
                 fmap
                   (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
                   (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
-              -- CR 702.74a, 702.109a and 702.152a: evoke, dash and blitz, offered
-              -- from EVERY zone for bestow's reason -- "a static ability that
-              -- functions in any zone from which the card with evoke can be
-              -- cast" -- wrapped in `withAdditional` for flashback's, read off the
-              -- PROJECTION for bestow's, and tagged with the keyword itself.
+              -- CR 702.74a, 702.109a, 702.148a and 702.152a: evoke, dash, blitz
+              -- and cleave, offered from EVERY zone for bestow's reason -- "a
+              -- static ability that functions in any zone from which the card with
+              -- evoke can be cast" -- wrapped in `withAdditional` for flashback's,
+              -- read off the PROJECTION for bestow's, and tagged with the keyword
+              -- itself.
               evoked =
                 fmap
                   (\(keyword, cost) -> CandidateCost.MkCandidateCost (Just keyword) (withAdditional cost))
