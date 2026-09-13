@@ -117,6 +117,7 @@ import qualified Pawl.Codec.ConjureDestinationSpec
 import qualified Pawl.Codec.ConjureSpec
 import qualified Pawl.Codec.ContinuousEffectSpec
 import qualified Pawl.Codec.ControlChangedSpec
+import qualified Pawl.Codec.ControlClockSpec
 import qualified Pawl.Codec.ControlDurationSpec
 import qualified Pawl.Codec.ControlPlayerSpec
 import qualified Pawl.Codec.ControllerBecomesTargetSpec
@@ -752,6 +753,7 @@ spec s registry = do
   Pawl.Codec.ContinuousEffectSpec.spec s
   Pawl.Codec.ControlDurationSpec.spec s
   Pawl.Codec.ControlChangedSpec.spec s
+  Pawl.Codec.ControlClockSpec.spec s
   Pawl.Codec.ControlPlayerSpec.spec s
   Pawl.Codec.ControllerBecomesTargetSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s

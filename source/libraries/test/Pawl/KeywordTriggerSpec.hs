@@ -22,6 +22,8 @@ import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection.View
+import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -31,6 +33,7 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -38,6 +41,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -46,12 +50,14 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -2134,12 +2140,221 @@ isCast action = case action of
   A.Cast {} -> True
   _ -> False
 
+-- Rule 702.30a's "unless you pay" answered yes for one seat --
+-- Pawl.CounterKeywordTriggerSpec's helper of the same name, duplicated rather
+-- than hoisted. S.identityAnswer declines every CR 118.12 offer, and everything
+-- else falls through to it, including the mana window the payment opens.
+paysFor :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+paysFor who p = case p of
+  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+    | d == who && player == who ->
+        PaymentDecision.Pays
+  _ -> S.identityAnswer p
+
+-- The pay-or-not answers in a transcript, in order -- duplicated for `paysFor`'s
+-- reason. An EMPTY list is what says a choice was never put to the player, which
+-- is the assertion rule 702.30a's window needs.
+payResponses :: [Response.Response] -> [Response.Response]
+payResponses = filter isPayResponse
+
+isPayResponse :: Response.Response -> Bool
+isPayResponse response = case response of
+  Response.ChoseToPay _ -> True
+  _ -> False
+
+-- `paysFor` with CR 614.1c's as-enters copy choice PINNED to one named permanent
+-- -- Pawl.CopySpec's copyNamed posture and its reason, so a mutation cannot be
+-- repaired by the answerer finding some other legal source. The trigger order is
+-- pinned too: two echo triggers at one upkeep are CR 603.3b's choice.
+copyingPayingFor :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+copyingPayingFor wanted who p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  _ -> paysFor who p
+
+-- The battlefield object whose PRINTED card is a Clone -- Pawl.CopySpec's
+-- printedOnBattlefield narrowed to the one card this group copies with. Game.faceOf
+-- is right HERE and nowhere else in the group: the question is which printing the
+-- object is, not what it projects as.
+cloneOf :: GameState.GameState -> Maybe ObjectId.ObjectId
+cloneOf gs =
+  let isIt oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Clone"))
+   in List.find isIt (Set.toList (GameState.battlefield gs))
+
+-- CR 702.30 echo, whose whole rule is one upkeep trigger with a CLOCK: rule
+-- 702.30a's "if this permanent came under your control since the beginning of
+-- your last upkeep" is a window and not a one-shot, so it opens again for a
+-- player who takes control later. Pawl.Types.Object.controlClock holds the
+-- window and Pawl.Engine.Engine.advanceControlClock turns it, one seat per
+-- upkeep.
+--
+-- Two printings, so no number below reads two ways:
+--
+--   * Pouncing Jaguar {G} Creature -- Cat 2/2, whose whole printed text is
+--     "Echo {G}".
+--   * Uktabi Drake {G} Creature -- Drake 2/1, "Flying, haste" and "Echo
+--     {1}{G}{G}" -- an echo cost that is NOT its mana cost, which is what tells
+--     the keyword's payload apart from a re-read of the card. CR 702.30b's
+--     errata is why every echo cost is printed at all.
+--
+-- Driven through Engine.runStep and never a synthetic StepBegan: the clock turns
+-- in Engine.runStepThatBegan, so a fixture that only recorded CR 603.2b's event
+-- would leave every permanent at ControlClock.Gained and each leg below would
+-- pass for the wrong reason.
+echoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+echoSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- `pid`'s upkeep step, whole: CR 603.2b's event, the turn-based actions,
+      -- the trigger gather and the priority round that resolves it. No untap
+      -- step between two of them, deliberately -- alice's Forests stay tapped, so
+      -- a second payment is visible as a second Forest rather than as the same
+      -- one twice.
+      atStepOf step pid gs =
+        gs
+          { GameState.phase = step,
+            GameState.activePlayer = pid,
+            GameState.priority = Just pid,
+            GameState.remaining = S.phasesAfter step
+          }
+      atUpkeepOf = atStepOf upkeep
+      ranUpkeep :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> GameState.GameState -> (((), GameState.GameState), [Response.Response])
+      ranUpkeep answer pid gs = Replay.record answer (atUpkeepOf pid gs) Engine.runStep
+      afterUpkeep :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+      afterUpkeep answer pid gs = S.runPure answer (atUpkeepOf pid gs) Engine.runStep
+      afterStep :: (forall r. Prompt.Prompt r -> r) -> Phase.Phase -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+      afterStep answer step pid gs = S.runPure answer (atStepOf step pid gs) Engine.runStep
+      jaguarBoard forests = do
+        forest <- S.printingOf s registry "Forest"
+        jaguar <- S.printingOf s registry "Pouncing Jaguar"
+        pure (S.addPermanent jaguar S.alice (S.landsFor forest S.alice forests (Setup.emptyGame S.bothPlayers)))
+   in Spec.describe s "Echo" $ do
+        -- The proving test, and rule 702.30a's window in one board: the upkeep
+        -- after the Jaguar arrived asks, and the one after that does not.
+        Spec.it s "CR 702.30a the first of your upkeeps asks the cost and the next asks nothing" $ do
+          (oid, gs) <- jaguarBoard 3
+          let ((_, first), firstLog) = ranUpkeep (paysFor S.alice) S.alice gs
+              ((_, second), secondLog) = ranUpkeep (paysFor S.alice) S.alice first
+          Spec.assertEqWith s "CR 702.30a one Forest paid the echo cost" (S.tappedCount S.alice first) 1
+          Spec.assertBool s (S.onBattlefield oid first) "so the Jaguar survived its first upkeep"
+          Spec.assertEqWith s "and alice was offered it exactly once" (length (payResponses firstLog)) 1
+          -- The whole of rule 702.30a: by the next upkeep, control was gained
+          -- longer ago than the last upkeep began, so nothing triggers and no
+          -- choice is put to alice.
+          Spec.assertEqWith s "CR 702.30a no second Forest went to a second upkeep" (S.tappedCount S.alice second) 1
+          Spec.assertEqWith s "because nothing was offered at all" (payResponses secondLog) []
+          Spec.assertBool s (S.onBattlefield oid second) "and the Jaguar is still there"
+        -- The same board and the same upkeep, differing in NOTHING but the answer
+        -- to rule 702.30a's "unless": three untapped Forests can cover {G}, so
+        -- this leg separates declining from being unable to pay.
+        Spec.it s "CR 702.30a declining the payment sacrifices it with the mana still up" $ do
+          (oid, gs) <- jaguarBoard 3
+          let after = afterUpkeep S.identityAnswer S.alice gs
+          Spec.assertEqWith s "CR 702.30a no Forest was spent" (S.tappedCount S.alice after) 0
+          Spec.assertBool s (not (S.onBattlefield oid after)) "and the Jaguar went anyway"
+          Spec.assertEqWith s "CR 701.21a into its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+        -- Rule 702.30a says "YOUR upkeep" (CR 603.3a) and measures the window in
+        -- YOUR upkeeps. Both halves are here: bob's upkeep neither triggers the
+        -- Jaguar nor spends alice's window, which is what an
+        -- Engine.advanceControlClock turning every seat's entry would break.
+        Spec.it s "CR 603.3a bob's upkeep neither asks nor spends alice's window" $ do
+          (oid, gs) <- jaguarBoard 3
+          let ((_, bobs), bobLog) = ranUpkeep (paysFor S.alice) S.bob gs
+              ((_, alices), aliceLog) = ranUpkeep (paysFor S.alice) S.alice bobs
+          Spec.assertEqWith s "CR 603.3a bob's upkeep spent no mana of alice's" (S.tappedCount S.alice bobs) 0
+          Spec.assertBool s (S.onBattlefield oid bobs) "and left the Jaguar untouched"
+          Spec.assertEqWith s "CR 702.30a alice's own upkeep still asks, so bob's did not turn her clock" (S.tappedCount S.alice alices) 1
+          Spec.assertEqWith s "the transcripts agreeing: nothing offered on bob's upkeep, one offer on alice's" (length (payResponses bobLog), length (payResponses aliceLog)) (0, 1)
+        -- CR 702.30a's control-change clause, the subtle half: alice's window has
+        -- already closed when bob takes the Jaguar, and bob's own next upkeep
+        -- opens a fresh one. An implementation that spent the clock once per
+        -- OBJECT rather than once per player-and-object asks bob nothing.
+        Spec.it s "CR 702.30a a player who takes control owes echo at their own next upkeep" $ do
+          (oid, gs0) <- jaguarBoard 3
+          forest <- S.printingOf s registry "Forest"
+          island <- S.printingOf s registry "Island"
+          controlMagic <- S.printingOf s registry "Control Magic"
+          -- TWO of alice's upkeeps first, so her own window is shut before bob
+          -- takes the Jaguar: with it still open, a reader that asked the OWNER's
+          -- entry rather than the CONTROLLER's would answer bob's upkeep right by
+          -- accident.
+          let paid = afterUpkeep (paysFor S.alice) S.alice gs0
+              elapsed = afterUpkeep (paysFor S.alice) S.alice paid
+              (held, staged) = S.addHandCard controlMagic S.bob (S.landsFor forest S.bob 4 (S.landsFor island S.bob 4 elapsed))
+              stolen = S.runPure (paysFor S.bob) staged (S.cast S.bob held >> Stack.resolveTop)
+              ((_, bobs), bobLog) = ranUpkeep (paysFor S.bob) S.bob stolen
+          Spec.assertEqWith s "the Jaguar really is bob's now" (Projection.View.controllerOf oid stolen) (Just S.bob)
+          Spec.assertEqWith s "CR 702.30a a fifth land of bob's paid echo, on top of Control Magic's four" (S.tappedCount S.bob bobs) 5
+          Spec.assertBool s (S.onBattlefield oid bobs) "so the Jaguar survived under its new controller"
+          Spec.assertEqWith s "alice, who already paid once, spent nothing more" (S.tappedCount S.alice bobs) 1
+          Spec.assertEqWith s "and bob was the one offered it" (length (payResponses bobLog)) 1
+        -- CR 702.30a asks whether the permanent came under your control since
+        -- your last upkeep, NOT whether this is the first time you ever
+        -- controlled it. alice's window has already closed when bob borrows the
+        -- Jaguar for a turn, and CR 514.2 ending the Act of Treason gives it back
+        -- to her -- which is a fresh coming-under-her-control and opens hers
+        -- again. CR 400.7 is not involved: the permanent never left the
+        -- battlefield, so this is the same incarnation with the same clock.
+        --
+        -- The settle after the Act of Treason resolves is a REAL precondition and
+        -- not tidiness: Engine.sampleControl sees control move by diffing two
+        -- samples, so a theft and a hand-back that both fell between one sample
+        -- and the next would be invisible to it. A game gives bob priority there;
+        -- this script has to say so.
+        Spec.it s "CR 702.30a control coming back re-opens the window it closed" $ do
+          (oid, gs0) <- jaguarBoard 4
+          mountain <- S.printingOf s registry "Mountain"
+          treason <- S.printingOf s registry "Act of Treason"
+          let elapsed = afterUpkeep (paysFor S.alice) S.alice (afterUpkeep (paysFor S.alice) S.alice gs0)
+              (held, staged) = S.addHandCard treason S.bob (S.landsFor mountain S.bob 3 elapsed)
+              stolen = S.runPure (paysFor S.bob) (atStepOf S.precombatMain S.bob staged) (S.cast S.bob held >> Stack.resolveTop >> Engine.settleForPriority)
+              reverted = afterStep (paysFor S.bob) (Phase.Ending EndingStep.Cleanup) S.bob stolen
+              ((_, back), backLog) = ranUpkeep (paysFor S.alice) S.alice reverted
+          Spec.assertEqWith s "alice's two upkeeps spent one Forest and shut her window" (S.tappedCount S.alice elapsed) 1
+          Spec.assertEqWith s "the Jaguar really was bob's" (Projection.View.controllerOf oid stolen) (Just S.bob)
+          Spec.assertEqWith s "CR 514.2 and alice's again once bob's turn ended" (Projection.View.controllerOf oid reverted) (Just S.alice)
+          Spec.assertEqWith s "CR 702.30a a second Forest of alice's paid echo, so her window re-opened" (S.tappedCount S.alice back) 2
+          Spec.assertBool s (S.onBattlefield oid back) "and the Jaguar survived that upkeep too"
+          Spec.assertEqWith s "she being offered it once" (length (payResponses backLog)) 1
+        -- The copy tripwire. A Clone of the Jaguar HAS echo -- CR 707.2 copies the
+        -- printed keyword -- and CR 702.30a's clock starts for the copy as it
+        -- enters. An implementation reading the PRINTED card (Game.faceOf) rather
+        -- than the projection finds "Clone", which has no echo, and asks once.
+        Spec.it s "CR 707.2 a Clone of the Jaguar owes its own echo" $ do
+          (oid, gs0) <- jaguarBoard 4
+          clone <- S.printingOf s registry "Clone"
+          let (_, staged) = S.spellOnStack clone S.alice gs0
+              copied = S.runPure (copyingPayingFor oid S.alice) staged Stack.resolveTop
+              ((_, after), log') = ranUpkeep (copyingPayingFor oid S.alice) S.alice copied
+          Spec.assertEqWith s "the Clone entered as a 2/2, so it really copied the Jaguar" (fmap (\c -> Projection.powerOf c after) (cloneOf copied)) (Just (Just 2))
+          Spec.assertEqWith s "CR 707.2 two Forests went, one echo per permanent" (S.tappedCount S.alice after) 2
+          Spec.assertEqWith s "both of them offered" (length (payResponses log')) 2
+          Spec.assertEqWith s "with both still on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 6
+        -- The cost comes off the keyword's payload, not off the card: Uktabi
+        -- Drake's mana cost is {G} and its echo cost {1}{G}{G}. A pair of boards
+        -- differing in exactly one thing -- two Forests or three.
+        Spec.it s "CR 702.30a the echo cost is the keyword's and not the mana cost" $ do
+          forest <- S.printingOf s registry "Forest"
+          drake <- S.printingOf s registry "Uktabi Drake"
+          let boardOf n = S.addPermanent drake S.alice (S.landsFor forest S.alice n (Setup.emptyGame S.bothPlayers))
+              (twoId, two) = boardOf 2
+              (threeId, three) = boardOf 3
+              short = afterUpkeep (paysFor S.alice) S.alice two
+              enough = afterUpkeep (paysFor S.alice) S.alice three
+          -- CR 118.3: two lands cannot cover {1}{G}{G}, so the offer is never
+          -- made and rule 702.30a's "unless" runs. One land would cover the
+          -- printed {G}.
+          Spec.assertBool s (not (S.onBattlefield twoId short)) "CR 702.30a two Forests could not pay {1}{G}{G}, so the Drake was sacrificed"
+          Spec.assertEqWith s "and none of them was spent" (S.tappedCount S.alice short) 0
+          Spec.assertBool s (S.onBattlefield threeId enough) "three Forests could, so that Drake lived"
+          Spec.assertEqWith s "spending all THREE, never the one its mana cost prints" (S.tappedCount S.alice enough) 3
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cascadeSpec s registry
   stormSpec s registry
   replicateSpec s registry
   casualtySpec s registry
+  echoSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry

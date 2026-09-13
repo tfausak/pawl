@@ -67,6 +67,10 @@ data KeywordFamily
     Buyback
   | -- | CR 702.29a: cycling [cost], and CR 702.29e's typecycling.
     Cycling
+  | -- | CR 702.30a: echo [cost]. The family a card writing "a permanent with
+    -- echo" names, as against echo {1}{G}; no card in the pool asks yet, and it
+    -- is owed at the keyword rather than at the first asker.
+    Echo
   | -- | CR 702.32a: fading N.
     Fading
   | -- | CR 702.33a: kicker [cost], which CR 702.33c's multikicker is a variant of

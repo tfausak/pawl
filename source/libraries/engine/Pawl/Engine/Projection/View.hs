@@ -40,6 +40,7 @@ import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.Face as Face
@@ -188,6 +189,9 @@ viewOfCard face =
           -- describes a printed FACE, which is none -- `milledThisTurn` above's
           -- reason.
           Filter.controlledSinceTurnBegan = False,
+          -- CR 702.30a asks about a PERMANENT a player came to control, and
+          -- this builder describes a printed FACE -- the field above's reason.
+          Filter.controlGainedSinceLastUpkeep = False,
           Filter.attachedToView = Nothing,
           -- CR 303.4b's mirror, and Nothing for the same reason: a printed face
           -- is not an object, so no permanent's Object.attachedTo names it.
@@ -342,6 +346,15 @@ crewedByIt oid event = case event of
 settledUnder :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Bool
 settledUnder oid controller gs = case (Game.lookupObject oid gs, controller) of
   (Just object, Just pid) -> Object.sickness object == Sickness.Settled pid
+  _ -> False
+
+-- CR 702.30a: did `controller` come to control this object since the beginning
+-- of their last upkeep? Object.controlClock is the engine's record of that
+-- window, keyed by player because the rule's "you" is one; a seat with no entry
+-- gained control more than an upkeep ago, or never.
+gainedSinceLastUpkeep :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Bool
+gainedSinceLastUpkeep oid controller gs = case (Game.lookupObject oid gs, controller) of
+  (Just object, Just pid) -> Map.lookup pid (Object.controlClock object) == Just ControlClock.SinceLastUpkeep
   _ -> False
 
 -- Shared assembly: fill a View from a projection's characteristics, a supplied
@@ -574,6 +587,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- `Settled` names one, and Pawl.Engine.Engine.checkControlContinuity drops a
       -- settle whose player stopped controlling the object.
       Filter.controlledSinceTurnBegan = settledUnder oid controller gs,
+      -- CR 702.30a: Object.controlClock, compared against the PROJECTED
+      -- controller for the field above's reason -- rule 702.30a's "you" is the
+      -- ability's controller, which for a permanent's own echo is its own.
+      Filter.controlGainedSinceLastUpkeep = gainedSinceLastUpkeep oid controller gs,
       -- CR 701.3a: not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's characteristics are projected, so it
       -- arrives as a view of its own read through `peers` (CR 613.1). CR 303.4 /

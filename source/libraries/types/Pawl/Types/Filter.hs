@@ -327,6 +327,13 @@ data Filter keyword
     -- lets only the active player declare attackers, and Nettling Imp names the
     -- active player outright.
     ControlledSinceTurnBegan
+  | -- | CR 702.30a: the candidate came under its CURRENT controller's control
+    -- since the beginning of that player's last upkeep -- echo's intervening
+    -- "if", whose "you" is the ability's controller and so the permanent's.
+    -- Reads Object.controlClock, which Pawl.Engine.Engine samples and advances;
+    -- ControlledSinceTurnBegan above is the neighbouring question and a
+    -- different window, CR 302.6 asking about the turn rather than the upkeep.
+    ControlGainedSinceLastUpkeep
   | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to something the nested
     -- Filter admits -- Crown of the Ages' "target Aura attached to a creature".
     -- The nest asks about the HOST's characteristics against the OUTER context,

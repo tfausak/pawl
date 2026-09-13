@@ -258,6 +258,7 @@ enter pid quality = do
                 Object.exileLookers = Set.empty,
                 Object.damage = 0,
                 Object.sickness = Sickness.Settled pid,
+                Object.controlClock = Map.empty,
                 Object.bindings = Map.empty,
                 Object.counters = Map.empty,
                 Object.counterTimestamps = Map.empty,

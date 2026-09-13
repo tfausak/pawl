@@ -9,6 +9,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExileLooker as ExileLooker
@@ -137,6 +138,23 @@ data Object = MkObject
     -- newIncarnation. Not purely stored: Engine.checkControlContinuity drops the
     -- claim when the derived controller stops matching it.
     sickness :: Sickness.Sickness,
+    -- | CR 702.30a's window, per player: for a seat that has come to control
+    -- this permanent, how far the rule's "since the beginning of your last
+    -- upkeep" has run. A seat with no entry has no open window;
+    -- Pawl.Types.ControlClock says why two states are needed where a flag is not
+    -- enough, and why there is no third.
+    --
+    -- SAMPLED rather than hooked, for `sickness` above's reason -- control is
+    -- DERIVED (CR 613.1b) and nothing announces a change. Engine.sampleControl
+    -- opens a seat's window wherever it finds the permanent has arrived under
+    -- them, and Engine.advanceControlClock moves that seat's window on at the
+    -- beginning of their upkeep. Its one reader is
+    -- Filter.ControlGainedSinceLastUpkeep.
+    --
+    -- Per-incarnation: reset by newIncarnation (CR 400.7), which is rule 702.30a
+    -- read straight -- the permanent that comes back came under your control
+    -- then, and echo is owed again.
+    controlClock :: Map.Map PlayerId.PlayerId ControlClock.ControlClock,
     -- | CR 601.2: the choices bound while casting, by slot name. Empty for
     -- everything but a spell or ability on the stack. Per-incarnation: reset by
     -- newIncarnation, so CR 400.7 forgets them when the object moves. A
@@ -726,6 +744,9 @@ newIncarnation object =
       exileLookers = Set.empty,
       damage = 0,
       sickness = Sickness.Sick,
+      -- CR 702.30a read straight: the object that comes back came under its
+      -- controller's control on that move, so the clock starts over.
+      controlClock = Map.empty,
       bindings = Map.empty,
       counters = Map.empty,
       counterTimestamps = Map.empty,

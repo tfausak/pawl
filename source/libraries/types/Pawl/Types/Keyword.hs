@@ -144,6 +144,11 @@ data Keyword
     -- the card is in a player's hand; Just is CR 702.29e's typecycling search,
     -- riding this constructor so CR 702.29f holds for free.
     Cycling (Cycling.Cycling Keyword)
+  | -- | 702.30a: at the beginning of your upkeep, if this permanent came under
+    -- your control since the beginning of your last upkeep, sacrifice it unless
+    -- you pay [cost]. CR 702.30b's Urza-block errata is already in the Oracle
+    -- text, so the cost is always printed and never defaulted from the mana cost.
+    Echo (Cost.Cost Keyword)
   | -- | 702.31b: a creature with horsemanship can't be blocked by creatures
     -- without horsemanship.
     Horsemanship

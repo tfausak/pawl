@@ -282,6 +282,8 @@ library codec
     Pawl.Codec.ContinuousEffectSpec
     Pawl.Codec.ControlChanged
     Pawl.Codec.ControlChangedSpec
+    Pawl.Codec.ControlClock
+    Pawl.Codec.ControlClockSpec
     Pawl.Codec.ControlDuration
     Pawl.Codec.ControlDurationSpec
     Pawl.Codec.ControllerBecomesTarget
@@ -1606,6 +1608,7 @@ library types
     Pawl.Types.Connive
     Pawl.Types.ContinuousEffect
     Pawl.Types.ControlChanged
+    Pawl.Types.ControlClock
     Pawl.Types.ControlDuration
     Pawl.Types.ControllerBecomesTarget
     Pawl.Types.ControllerRelation
