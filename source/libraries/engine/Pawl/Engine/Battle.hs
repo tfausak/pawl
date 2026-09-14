@@ -56,6 +56,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CounterChange as CounterChange
@@ -322,7 +323,9 @@ siegeDefeat =
               -- is the resolving controller, and a "may".
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing}
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing},
+              -- rule 310.12b's "cast it": one card, the one the slot names.
+              OfferCast.repetition = CastRepetition.Once
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,

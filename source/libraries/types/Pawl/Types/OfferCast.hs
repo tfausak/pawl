@@ -2,6 +2,7 @@ module Pawl.Types.OfferCast where
 
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
@@ -14,9 +15,10 @@ data OfferCast = MkOfferCast
     -- Kappa" is ObjectRef.EachCardExiledWithSource, CR 607.2a's linked set,
     -- where Tinybones, the Pickpocket's one target is ObjectRef.InSlot.
     --
-    -- Several cards is a CHOICE, not several casts: Pawl.Engine.Resolve.Effect's
-    -- offerCast puts the whole set to the caster as one Prompt.ChooseOfferedCastSpell
-    -- and casts at most one.
+    -- Several cards is a CHOICE first: Pawl.Engine.Resolve.Effect's offerCast puts
+    -- the whole set to the caster as one Prompt.ChooseOfferedCastSpell, and the
+    -- `repetition` field below says whether that choice is asked once or over
+    -- again.
     ref :: ObjectRef.ObjectRef,
     -- | WHO casts. Rule 608.2g says "a player" rather than the resolving
     -- controller, and CR 601.2's announcements then belong to whoever that is --
@@ -40,6 +42,11 @@ data OfferCast = MkOfferCast
     optionality :: CastObligation.CastObligation,
     -- | Elided when the offer carries neither rider, which is an ordinary cast
     -- of the card.
-    offer :: CastOffer.CastOffer
+    offer :: CastOffer.CastOffer,
+    -- | Whether the offer admits ONE of the cards `ref` names or any number of
+    -- them -- the axis `optionality` above is not. Fevered Suspicion's "you may
+    -- cast any number of spells from among those nonland cards" writes both: a
+    -- may, repeated.
+    repetition :: CastRepetition.CastRepetition
   }
   deriving (Eq, Ord, Show)
