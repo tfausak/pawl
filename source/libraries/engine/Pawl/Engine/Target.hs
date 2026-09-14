@@ -428,7 +428,8 @@ slotContext pcs perspective unannounced bindings source amount gs =
           }
       evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated
-      -- against the context above and handed to Filter.ManaValueAtMostAmount.
+      -- against the context above and handed to Filter.ManaValueAtMostAmount and
+      -- Filter.ManaValueEqualToAmount.
       -- THIS is the one site that fills it, sourcePower's and slotNames' sibling
       -- in that respect and for the same reason: the atom lives in a target
       -- slot's Filter, and this is where one is matched -- at both of CR 115's
@@ -1223,7 +1224,8 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
 -- rather than for jointlyJudged's: against the seed alone a bound naming a
 -- sibling slot measures nothing at all -- CR 400.7j's fold over an unbound slot
 -- is 0, and a read that insists on one object (Binding.onlyOne) is unanswerable
--- -- so ManaValueAtMostAmount narrows to the mana value 0 candidates or to none,
+-- -- so ManaValueAtMostAmount and ManaValueEqualToAmount narrow to the mana value
+-- -- 0 candidates or to none,
 -- and the first pass would offer such a slot an empty set. Re-answering it
 -- against the union is the widening every other dependent slot gets, and
 -- jointlyJudged below is where the announcement is narrowed back.

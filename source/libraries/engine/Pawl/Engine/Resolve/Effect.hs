@@ -2169,11 +2169,11 @@ chooseNewTargetsFor controller copyId = do
 thisAbilitySource :: ObjectId -> GameState -> Maybe Source.Source
 thisAbilitySource resolving gs = fmap Object.source (Game.lookupObject resolving gs)
 
--- The name a conjure's candidate answers to, which is what
--- Prompt.RandomCard offers and what its answer is matched back against. The
--- FRONT face's (CR 712.8a): no printed spellbook holds a card with a second
--- face, and a conjure that named one outright would still be picked out of a
--- one-candidate list, which raises no prompt.
+-- The name a conjure's candidate answers to, which is what Prompt.RandomCard
+-- and Prompt.ChooseConjuredCard offer and what their answer is matched back
+-- against. The FRONT face's (CR 712.8a): no printed spellbook holds a card with
+-- a second face, and a conjure that named one outright would still be picked out
+-- of a one-candidate list, which raises no prompt.
 conjuredName :: Card.Type.Card -> CardName.CardName
 conjuredName card = Face.name (NonEmpty.head (Card.Type.faces card))
 
