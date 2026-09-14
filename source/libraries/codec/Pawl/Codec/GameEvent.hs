@@ -124,5 +124,8 @@ codec =
       Arm.payload "RingTempted" PlayerId.codec GameEvent.RingTempted (\x -> case x of GameEvent.RingTempted y -> Just y; _ -> Nothing),
       -- CR 701.68d. One player id, the arm above's shape: the rule names the
       -- blighting player and nothing else.
-      Arm.payload "Blighted" PlayerId.codec GameEvent.Blighted (\x -> case x of GameEvent.Blighted y -> Just y; _ -> Nothing)
+      Arm.payload "Blighted" PlayerId.codec GameEvent.Blighted (\x -> case x of GameEvent.Blighted y -> Just y; _ -> Nothing),
+      -- CR 701.61a. One player id, the arm above's shape: the rule's two halves
+      -- write their own Moved events, so the forager is all this carries.
+      Arm.payload "Foraged" PlayerId.codec GameEvent.Foraged (\x -> case x of GameEvent.Foraged y -> Just y; _ -> Nothing)
     ]

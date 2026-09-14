@@ -1165,6 +1165,17 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerBlights PlayerRelation.You)
       " {\"type\":\"PlayerBlights\",\"value\":{\"type\":\"You\"}} "
+  Spec.it s "PlayerForages round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerForages PlayerRelation.AnyPlayer)
+      " {\"type\":\"PlayerForages\",\"value\":{\"type\":\"AnyPlayer\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerForages PlayerRelation.You)
+      " {\"type\":\"PlayerForages\",\"value\":{\"type\":\"You\"}} "
   -- CR 509.3d's bystander form. A real Filter rather than the trivial `And []`:
   -- the payload is over the ATTACKER, and CR 701.54c's is a Ring-bearer test.
   Spec.it s "PermanentBecomesBlockedBy round-trips" $

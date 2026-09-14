@@ -893,9 +893,9 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- binds are eventBindingSlotsSometimes' AnyOf arm.
   (TriggerCondition.AnyOf conditions, _) ->
     Map.unions (fmap (\c -> eventBindings gs bearerBecame becameInGraveyard you c event) conditions)
-  -- The five CR 701/702 keyword-action conditions reach this fallthrough and
+  -- The CR 701/702 keyword-action conditions reach this fallthrough and
   -- stamp nothing, deliberately: no card in the pool reads the scrying player,
-  -- the plotted card or the explorer, and
+  -- the plotted card, the explorer or the forager, and
   -- SelfExerted's "it" is the bearer, which CR 113.7a's source slot already
   -- names. eventBindingSlots claims nothing for any of them; see that function's
   -- arms.
@@ -1017,6 +1017,11 @@ eventBindingSlots cond = case cond of
   -- creature" is not this condition's to bind: it is a later clause of the
   -- INSTRUCTING effect, which binds it at Pawl.Types.Blight's own slot.
   TriggerCondition.PlayerBlights _ -> Set.empty
+  -- Nothing here either, and for the arm above's reason: CR 701.61a's event names
+  -- the foraging player, and Corpseberry Cultivator's payload points at no one --
+  -- it puts a counter on itself. Which half of rule 701.61a the forager took is
+  -- no binding of this condition: nothing printed names it.
+  TriggerCondition.PlayerForages _ -> Set.empty
   -- Nothing here either. CR 706.1's event names the roller, but Feywild
   -- Trickster's payload points at no one -- it creates a token for its own
   -- controller -- and a card printing "that player" is what would earn a slot.

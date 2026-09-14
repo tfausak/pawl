@@ -1518,6 +1518,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerScries _ -> condition
   TriggerCondition.RingTemptsPlayer _ -> condition
   TriggerCondition.PlayerBlights _ -> condition
+  TriggerCondition.PlayerForages _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
