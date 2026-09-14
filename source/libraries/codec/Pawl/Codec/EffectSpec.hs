@@ -747,7 +747,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (Text.pack "Ornithopter" NonEmpty.:| []) ConjureDestination.Hand))
+      (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (Text.pack "Ornithopter" NonEmpty.:| []) Conjure.defaultSelection ConjureDestination.Hand))
       " {\"type\":\"Conjure\",\"value\":{\"cards\":[\"Ornithopter\"],\"destination\":{\"type\":\"Hand\"}}} "
   -- Toralf's Disciple's form: a stated count and a library.
   Spec.it s "Conjure with a stated count" $
@@ -755,7 +755,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Conjure (Conjure.MkConjure (Quantity.Literal 4) (Text.pack "Lightning Bolt" NonEmpty.:| []) ConjureDestination.Library))
+      (Effect.Conjure (Conjure.MkConjure (Quantity.Literal 4) (Text.pack "Lightning Bolt" NonEmpty.:| []) Conjure.defaultSelection ConjureDestination.Library))
       " {\"type\":\"Conjure\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":4},\"cards\":[\"Lightning Bolt\"],\"destination\":{\"type\":\"Library\"}}} "
   -- Both ObjectRef arms have to survive. A count of one is elided, so both of
   -- these write the ref alone.

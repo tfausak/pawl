@@ -81,6 +81,13 @@ data Prompt r where
   -- because a conjure's candidates are card data and no object exists yet; the
   -- caller filters the answer back to a candidate.
   RandomCard :: NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
+  -- | Which card its controller CHOSE out of a printed spellbook (Follow the
+  -- Tracks's "conjure a card of your choice from Follow the Tracks's
+  -- spellbook"). RandomCard's payload, and its own constructor rather than that
+  -- one reused: CR 701.9b's distinction, so it carries the Decider and the seat
+  -- RandomCard deliberately does not. Asked only for two or more candidates,
+  -- and the caller filters the answer back to one.
+  ChooseConjuredCard :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
   -- | Which of the resolving controller's opponents randomness named
   -- (Pawl.Types.Effect.ChooseOpponentAtRandom); RandomObject's shape, asked
   -- only for two or more.

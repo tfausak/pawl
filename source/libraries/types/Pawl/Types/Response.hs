@@ -83,6 +83,14 @@ data Response
     -- whole point -- a transcript of a player DECIDING must not satisfy a prompt
     -- that asked randomness, which is CR 701.9b's distinction.
     SelectedCardAtRandom CardName.CardName
+  | -- | The card a player chose out of a printed spellbook (Follow the Tracks's
+    -- "conjure a card of your choice from Follow the Tracks's spellbook").
+    --
+    -- Its own constructor rather than SelectedCardAtRandom reused: this type's
+    -- rule at the top, and CR 701.9b's distinction is the whole point here --
+    -- a transcript of a player DECIDING must not satisfy a prompt that asked
+    -- randomness.
+    ChoseConjuredCard CardName.CardName
   | -- | CR 706.1a: the face a die came up, for Pawl.Types.Effect's RollDie
     -- (Ancient Copper Dragon's "roll a d20").
     --

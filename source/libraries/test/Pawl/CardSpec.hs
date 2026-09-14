@@ -1104,7 +1104,7 @@ ownCounts effect = case effect of
   -- The floor beside it is a printed literal and holds no Count.
   Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
   Effect.Create (Create.MkCreate quantity card _ _ _) -> quantityCounts quantity <> overFaces cardCounts card
-  Effect.Conjure (Conjure.MkConjure quantity cards _) -> quantityCounts quantity <> foldMap (overFaces cardCounts) cards
+  Effect.Conjure (Conjure.MkConjure quantity cards _ _) -> quantityCounts quantity <> foldMap (overFaces cardCounts) cards
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's. The riders are skipped for the reason Create's
   -- arm above skips its own: a rider count is a Quantity, and effectFilters below
@@ -1851,7 +1851,7 @@ effectReplacements :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbilit
 effectReplacements effect = case effect of
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementPrintedEffects replacement) <> concatMap (overFaces cardReplacementEffects) (replacementMintedCards replacement)
   Effect.Create (Create.MkCreate _ token _ _ _) -> overFaces cardReplacementEffects token
-  Effect.Conjure (Conjure.MkConjure _ cards _) -> foldMap (overFaces cardReplacementEffects) cards
+  Effect.Conjure (Conjure.MkConjure _ cards _ _) -> foldMap (overFaces cardReplacementEffects) cards
   Effect.CreateCopy {} -> []
   Effect.BecomeCopy {} -> []
   Effect.CopyStackObject {} -> []
@@ -2256,7 +2256,7 @@ data MintedKind
 effectMintedFaces :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(MintedKind, Face.Face Card.Type.Card)]
 effectMintedFaces effect = case effect of
   Effect.Create (Create.MkCreate _ token _ _ _) -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
-  Effect.Conjure (Conjure.MkConjure _ cards _) -> fmap ((,) MintedCard) (concatMap (NonEmpty.toList . Card.Type.faces) cards)
+  Effect.Conjure (Conjure.MkConjure _ cards _ _) -> fmap ((,) MintedCard) (concatMap (NonEmpty.toList . Card.Type.faces) cards)
   -- Mints no face of its own: the token's text is the copied permanent's.
   Effect.CreateCopy {} -> []
   -- Mints nothing at all: it rewrites an existing permanent's copiable values.
@@ -4935,7 +4935,7 @@ effectFilters effect = case effect of
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
   Effect.Create (Create.MkCreate quantity card riders _ _) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> overFaces cardFilters card
-  Effect.Conjure (Conjure.MkConjure quantity cards _) -> frame Unframed (quantityFilters quantity) <> foldMap (overFaces cardFilters) cards
+  Effect.Conjure (Conjure.MkConjure quantity cards _ _) -> frame Unframed (quantityFilters quantity) <> foldMap (overFaces cardFilters) cards
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's and the riders' Filters are as much card text as Create's. The
   -- exceptions frame themselves, BecomeCopy's arm below.

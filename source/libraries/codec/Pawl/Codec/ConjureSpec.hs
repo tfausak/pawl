@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.ConjureSelection as ConjureSelection
 import qualified Pawl.Types.Quantity as Quantity
 
 -- | The @card@ parameter is instantiated at 'Text.Text': this codec reaches it
@@ -26,6 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
       ( Conjure.MkConjure
           { Conjure.quantity = Conjure.defaultQuantity,
             Conjure.cards = Text.pack "Ornithopter" NonEmpty.:| [],
+            Conjure.selection = Conjure.defaultSelection,
             Conjure.destination = ConjureDestination.Hand
           }
       )
@@ -39,6 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
       ( Conjure.MkConjure
           { Conjure.quantity = Quantity.Literal 4,
             Conjure.cards = Text.pack "Lightning Bolt" NonEmpty.:| [],
+            Conjure.selection = Conjure.defaultSelection,
             Conjure.destination = ConjureDestination.Library
           }
       )
@@ -52,8 +55,23 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
       ( Conjure.MkConjure
           { Conjure.quantity = Conjure.defaultQuantity,
             Conjure.cards = Text.pack "Ponder" NonEmpty.:| [Text.pack "Dark Ritual"],
+            Conjure.selection = Conjure.defaultSelection,
             Conjure.destination = ConjureDestination.Hand
           }
       )
       " {\"cards\":[\"Ponder\",\"Dark Ritual\"],\"destination\":{\"type\":\"Hand\"}} "
+  -- The chosen half of the spellbook shape, and the only value of the selection
+  -- key that survives the elision guard.
+  Spec.it s "MkConjure over a spellbook picked by choice" $
+    Common.assertCodec
+      s
+      codec
+      ( Conjure.MkConjure
+          { Conjure.quantity = Conjure.defaultQuantity,
+            Conjure.cards = Text.pack "Ponder" NonEmpty.:| [Text.pack "Dark Ritual"],
+            Conjure.selection = ConjureSelection.ByChoice,
+            Conjure.destination = ConjureDestination.Hand
+          }
+      )
+      " {\"cards\":[\"Ponder\",\"Dark Ritual\"],\"selection\":{\"type\":\"ByChoice\"},\"destination\":{\"type\":\"Hand\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
