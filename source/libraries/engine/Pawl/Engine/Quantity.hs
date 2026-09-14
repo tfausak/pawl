@@ -51,6 +51,7 @@ import qualified Pawl.Types.Rounding as Rounding
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -319,6 +320,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- propagates from the payload, Plus' posture: half of a number nobody could
         -- determine is not a number either.
         Quantity.Halved (Halved.MkHalved rounding inner) -> fmap (halve rounding) (recur inner)
+        -- CR 107.1: the product, integral on both sides so nothing rounds. Nothing
+        -- propagates from the payload, Plus' and Halved's posture: a multiple of a
+        -- number nobody could determine is not a number either.
+        Quantity.Times (Times.MkTimes factor inner) -> fmap (toInteger factor *) (recur inner)
         -- CR 107.1b: the negated value, with no floor here -- a creature's power may be
         -- less than zero, and the readers that need a nonnegative count apply that
         -- rule's "zero is used instead" themselves. Unanswerable stays unanswerable:
@@ -960,12 +965,14 @@ halve rounding n = case rounding of
 -- The recursion through Plus is what "inside a calculation" buys, and it is not
 -- the same answer as substituting at the top: Tarmogoyf's printed 1+* is 1 when
 -- its count cannot be determined, because it is the COUNT that becomes 0 and
--- not the sum. Plus, Halved and Negate are the calculations Pawl.Types.Quantity
--- has, and all three descend for that one reason -- but only Plus's descent
--- changes an answer. Half of CR 208.2a's substituted 0 is 0 whichever way it
--- rounds, so Malignus, whose whole CDA is a Halved, reads 0 with no opponents
--- either way; and no printed characteristic-defining P/T contains a Negate at
--- all. Both of those arms are consistency rather than a card's behaviour.
+-- not the sum. Plus, Halved, Times and Negate are the calculations
+-- Pawl.Types.Quantity has, and all four descend for that one reason -- but only
+-- Plus's descent changes an answer on its own. Half of CR 208.2a's substituted 0
+-- is 0 whichever way it rounds, so Malignus, whose whole CDA is a Halved, reads
+-- 0 with no opponents either way; a multiple of that 0 is 0 as well, and no
+-- printed characteristic-defining P/T contains a Negate at all. Those three arms
+-- are consistency rather than a card's behaviour -- a Times wrapping a Plus
+-- would differ, and no printed box holds one.
 --
 -- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is: the caller is
 -- Projection.applyCharacteristicPT, which layer 7a runs for an object in any
@@ -989,6 +996,7 @@ determineWith :: (Quantity -> Maybe Integer) -> Quantity -> Integer
 determineWith eval quantity = case quantity of
   Quantity.Plus (Plus.MkPlus a b) -> determineWith eval a + determineWith eval b
   Quantity.Halved (Halved.MkHalved rounding inner) -> halve rounding (determineWith eval inner)
+  Quantity.Times (Times.MkTimes factor inner) -> toInteger factor * determineWith eval inner
   Quantity.Negate a -> negate (determineWith eval a)
   _ -> Maybe.fromMaybe 0 (eval quantity)
 
@@ -1016,6 +1024,7 @@ substituteAnnouncedX n quantity = case quantity of
   Quantity.InSlot slot | slot == Binding.variableX -> Quantity.Literal (toInteger n)
   Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (substituteAnnouncedX n a) (substituteAnnouncedX n b))
   Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (substituteAnnouncedX n inner))
+  Quantity.Times (Times.MkTimes factor inner) -> Quantity.Times (Times.MkTimes factor (substituteAnnouncedX n inner))
   Quantity.Negate a -> Quantity.Negate (substituteAnnouncedX n a)
   _ -> quantity
 
@@ -1050,6 +1059,7 @@ objectSlots quantity = case quantity of
   -- QuantitySlot.slots descends into each of these three the same way.
   Quantity.Plus (Plus.MkPlus a b) -> Set.union (objectSlots a) (objectSlots b)
   Quantity.Halved (Halved.MkHalved _ inner) -> objectSlots inner
+  Quantity.Times (Times.MkTimes _ inner) -> objectSlots inner
   Quantity.Negate a -> objectSlots a
   -- DESCENT into a Greatest's or a Total's per-member number, which may aim at a
   -- slot of its own; the other aggregations carry no number to ask.
@@ -1276,6 +1286,11 @@ readsX quantity = case quantity of
   -- neither producer halves an announced value, so answering False here leaves
   -- the suite green.
   Quantity.Halved (Halved.MkHalved _ inner) -> readsX inner
+  -- Halved's descent, for its reason: "twice X" would be a Times over an X that
+  -- is not equal to one. A REGRESSION FENCE rather than proven behaviour --
+  -- Blessed Reversal multiplies a count and not an announced value, so answering
+  -- False here leaves the suite green.
+  Quantity.Times (Times.MkTimes _ inner) -> readsX inner
   -- Toxic Deluge's "-X" is Negate X, which reads X the same way. Without this
   -- arm the CR 107.3 lint would call the card an unannounced-X reader on one
   -- side and an unread announcement on the other.

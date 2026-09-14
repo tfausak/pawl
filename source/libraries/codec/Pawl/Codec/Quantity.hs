@@ -18,6 +18,7 @@ import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Plus as Plus
 import qualified Pawl.Codec.ProductionTag as ProductionTag
 import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Codec.Times as Times
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -51,6 +52,8 @@ codec =
       -- CR 107.1a's rounding first, then what is halved: the direction is the
       -- card's word and the payload is the value it applies to.
       Arm.payload "Halved" (Halved.codec codec) Quantity.Halved (\x -> case x of Quantity.Halved y -> Just y; _ -> Nothing),
+      -- CR 107.1: the factor first, then what it multiplies.
+      Arm.payload "Times" (Times.codec codec) Quantity.Times (\x -> case x of Quantity.Times y -> Just y; _ -> Nothing),
       -- CR 107.1b's negative game value: one whole Quantity on the wire, since a
       -- minus sign carries nothing of its own.
       Arm.payload "Negate" codec Quantity.Negate (\x -> case x of Quantity.Negate y -> Just y; _ -> Nothing),

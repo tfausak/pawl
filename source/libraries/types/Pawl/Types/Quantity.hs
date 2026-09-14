@@ -18,6 +18,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Times as Times
 
 -- | A number that may not be a literal number.
 --
@@ -53,6 +54,9 @@ data Quantity
   | -- | CR 107.1a: half the inner quantity, rounded the way the card prints
     -- (Pawl.Types.Rounding).
     Halved (Halved.Halved Quantity)
+  | -- | CR 107.1: the payload's factor times the inner quantity, which is the
+    -- "N for each" a card prints; see Pawl.Types.Times.
+    Times (Times.Times Quantity)
   | -- | The negation of the inner quantity -- the minus a card prints in front
     -- of a value, as in "-X/-X". CR 107.1b: a game value may go negative; a
     -- count reader saturates at 0.

@@ -1801,6 +1801,103 @@ battleGrantRemovalSpec s registry = Spec.describe s "BattleGrantRemoval" $ do
     Spec.assertEqWith s "CR 508.1k both Pikers really were declared, so this is the removal and not a failed declaration" (length (S.attackerDeclarationsOf after)) 2
     Spec.assertEqWith s "and the grantee is on the battlefield as a battle at defense five, so CR 704.5w did not bury it" (fmap (\oid -> (S.onBattlefield oid after, S.counterOf CounterKind.Defense oid after)) battles) [(True, 5)]
 
+-- Declare every creature as an attacker and announce CR 508.1b's target by
+-- attacker: `atJace` at the planeswalker, every other at the defending player.
+-- attackJaceAndBob's shape, widened past two attackers, which is what a COUNT
+-- needs. Passes priority, so the spell under test is cast by the test itself and
+-- not by the walk that reaches the step.
+attackJaceAndTheRest :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackJaceAndTheRest atJace p = case p of
+  Prompt.ChooseAttackTarget _ _ oid options ->
+    if oid == atJace
+      then attackThePlaneswalker p
+      else case filter (not . isPlaneswalkerTarget) (NonEmpty.toList options) of
+        target : _ -> target
+        [] -> NonEmpty.head options
+  Prompt.ChooseAction {} -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+-- The control's answerer: the same declaration with every attacker announced at
+-- the planeswalker instead, and priority passed for the reason above.
+attackOnlyJace :: Prompt.Prompt r -> r
+attackOnlyJace p = case p of
+  Prompt.ChooseAction {} -> A.Pass
+  _ -> attackThePlaneswalker p
+
+-- alice attacks with three Goblin Pikers; bob defends with his own Jace Beleren
+-- at five loyalty, the two Plains that pay Blessed Reversal's {1}{W}, and the
+-- spell in hand. Returns the state, the three attackers, Jace and the spell.
+--
+-- Every element is load-bearing. THREE attackers with ONE announced at Jace, so
+-- CR 508.1b's "attacking you" is 2 where CR 508.1k's "attacking" is 3 -- an atom
+-- that lost the PlayerRelation gains 9 instead of 6. TWO attackers at bob and not
+-- one, so the FACTOR is observable: at one attacker 3 and 1 differ by less than
+-- the board's other readings do, and at two the four candidate answers (26, 22,
+-- 20, 29) are all distinct. Jace is what separates the two atoms at all, since
+-- bob is the defending player either way (CR 508.5). FIVE loyalty counters so CR
+-- 704.5i is never reached. Nothing is ever drawn, so CR 104.3c cannot end the
+-- game before the assertion.
+blessedReversalBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (GameState.GameState, [ObjectId.ObjectId], ObjectId.ObjectId, ObjectId.ObjectId)
+blessedReversalBoard piker jace plains reversal =
+  let (gs0, mine, theirs) = S.combatBoardOf [piker, piker, piker] [jace]
+      landed = S.landsFor plains S.bob 2 gs0
+   in case (mine, theirs) of
+        (attackers@[_, _, _], [jaceId]) ->
+          let (spell, ready) = S.addHandCard reversal S.bob (S.addCounter CounterKind.Loyalty 5 jaceId landed)
+           in Just (ready, attackers, jaceId, spell)
+        _ -> Nothing
+
+-- CR 107.1 through Pawl.Types.Quantity's Times arm: a printed "N for each" is a
+-- factor times a count and not that count added to itself N times.
+attackerCountSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+attackerCountSpec s registry = Spec.describe s "AttackerCount" $ do
+  -- Blessed Reversal {1}{W} Instant, "You gain 3 life for each creature attacking
+  -- you." (8th Edition; oracle text checked against Scryfall.)
+  --
+  -- A PAIR off ONE board differing in exactly one thing: where the three attackers
+  -- are announced. Same spell, same two Plains, same cast, so a leg that failed
+  -- for want of mana or of a resolved spell would fail on both.
+  Spec.it s "CR 107.1 whole card: Blessed Reversal gains three life for each of the creatures attacking you" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    plains <- S.printingOf s registry "Plains"
+    reversal <- S.printingOf s registry "Blessed Reversal"
+    case blessedReversalBoard piker jace plains reversal of
+      Just (gs, [first, second, atJace], jaceId, spell) -> do
+        let resolve st = S.runPure S.aggressiveAnswer st (S.cast S.bob spell >> Stack.resolveTop)
+            declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackJaceAndTheRest atJace) gs
+            gained = resolve declared
+            -- The control: the same three attackers announced at Jace instead, so
+            -- every one of them is attacking and none of them is attacking bob.
+            atWalker = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackOnlyJace gs
+            nothing = resolve atWalker
+        -- GAMEPLAY FIRST, on the one quantity every candidate reading differs on:
+        -- 20 + 3 x 2. A factor dropped reads 22, a Times that never descended into
+        -- its count reads 20, and an atom that asked only whether the creature was
+        -- attacking reads 29.
+        Spec.assertEqWith s "CR 107.1: three life for each of the two creatures attacking bob" (S.lifeOf S.bob gained) (Just 26)
+        Spec.assertEqWith s "control: with all three announced at Jace, nothing is attacking bob and he gains nothing" (S.lifeOf S.bob nothing) (Just 20)
+        -- Anti-vacuity: the spell resolved on BOTH legs, so the control's 20 is a
+        -- count of zero and not a cast that never happened.
+        Spec.assertEqWith s "the spell left bob's hand and is in his graveyard on both legs" (fmap (\st -> (length (Game.zoneMembers Zone.Hand S.bob st), length (Game.zoneMembers Zone.Graveyard S.bob st))) [gained, nothing]) [(0, 1), (0, 1)]
+        -- And the declaration really is the pair's one difference.
+        Spec.assertEqWith
+          s
+          "CR 508.1b: two attackers were announced at bob and one at Jace"
+          (fmap (\oid -> Map.lookup oid (Combat.Type.attackers (GameState.combat declared))) [first, second, atJace])
+          [Just (AttackTarget.OfPlayer S.bob), Just (AttackTarget.OfPlayer S.bob), Just (AttackTarget.OfPlaneswalker jaceId)]
+        Spec.assertEqWith
+          s
+          "control: all three were announced at Jace"
+          (fmap (\oid -> Map.lookup oid (Combat.Type.attackers (GameState.combat atWalker))) [first, second, atJace])
+          [Just (AttackTarget.OfPlaneswalker jaceId), Just (AttackTarget.OfPlaneswalker jaceId), Just (AttackTarget.OfPlaneswalker jaceId)]
+      _ -> Spec.assertFailure s "fixture should have three attackers, a Jace and the spell"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -1816,3 +1913,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   battleGrantRemovalSpec s registry
   effectRemovalSpec s registry
   savePointSpec s registry
+  attackerCountSpec s registry

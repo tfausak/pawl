@@ -35,6 +35,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -612,10 +613,18 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Halved (Halved.MkHalved Rounding.Up (Quantity.LifeTotal PlayerRef.Candidate)))
       " {\"type\":\"Halved\",\"value\":{\"rounding\":{\"type\":\"Up\"},\"quantity\":{\"type\":\"LifeTotal\",\"value\":{\"type\":\"Candidate\"}}}} "
+  -- CR 107.1's factor and the value it multiplies, over the Count that Blessed
+  -- Reversal prints -- Halved's reason for nesting, one arm over.
+  Spec.it s "Times, over a count" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.Times (Times.MkTimes 3 (Quantity.LifeTotal PlayerRef.Candidate)))
+      " {\"type\":\"Times\",\"value\":{\"factor\":3,\"quantity\":{\"type\":\"LifeTotal\",\"value\":{\"type\":\"Candidate\"}}}} "
   -- Forcing the schema is what proves the RECURSIVE definition terminates, and
   -- it proves more of that now than it used to: Negate names `codec` itself
-  -- while Plus, Halved, AgainstSlot and Count each hand it to a payload codec in
-  -- another module, so the loop runs through four siblings. assertHasSchema
+  -- while Plus, Halved, Times, AgainstSlot and Count each hand it to a payload
+  -- codec in another module, so the loop runs through five siblings. assertHasSchema
   -- renders the whole tree rather than just its outer tag, so a definition that
   -- failed to emit a $ref on re-entry would hang here rather than pass.
   Spec.it s "has a schema" $ Common.assertHasSchema s Quantity.codec

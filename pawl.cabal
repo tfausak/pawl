@@ -931,6 +931,8 @@ library codec
     Pawl.Codec.TeamIdSpec
     Pawl.Codec.Teams
     Pawl.Codec.TeamsSpec
+    Pawl.Codec.Times
+    Pawl.Codec.TimesSpec
     Pawl.Codec.Timestamp
     Pawl.Codec.TimestampSpec
     Pawl.Codec.TokenPattern
@@ -2001,6 +2003,7 @@ library types
     Pawl.Types.TargetSlot
     Pawl.Types.TeamId
     Pawl.Types.Teams
+    Pawl.Types.Times
     Pawl.Types.Timestamp
     Pawl.Types.TokenLot
     Pawl.Types.TokenPattern

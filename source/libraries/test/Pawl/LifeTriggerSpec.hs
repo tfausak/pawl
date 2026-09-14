@@ -373,9 +373,9 @@ lifeGainAmountSpec s registry =
 --     because they arrive in batches of one. Centaur Peacemaker, on its own
 --     board below, puts every seat's gain in a single batch.
 --
--- The doubling is Quantity.Plus of the slot with itself, Pawl.Types.Quantity
--- having no multiply -- exact for "2 life for each 1 life", and what makes the
--- two amounts tell a bound amount from a constant.
+-- The doubling is Quantity.Plus of the slot with itself -- exact for "2 life for
+-- each 1 life", and what makes the two amounts tell a bound amount from a
+-- constant.
 falseCureSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 falseCureSpec s registry =
   let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)

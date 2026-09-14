@@ -85,6 +85,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Times as Times
 import Pawl.Types.Timestamp (Timestamp)
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -2865,6 +2866,7 @@ quantityReads q = case q of
   Quantity.Type.StationMeasure -> Set.singleton PowerA
   Quantity.Type.Plus (Plus.MkPlus a b) -> quantityReads a <> quantityReads b
   Quantity.Type.Halved (Halved.MkHalved _ a) -> quantityReads a
+  Quantity.Type.Times (Times.MkTimes _ a) -> quantityReads a
   Quantity.Type.Negate a -> quantityReads a
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ a) -> quantityReads a
   -- AgainstSlot's answer: the payload is what reads an aspect, off CR 607.2a's

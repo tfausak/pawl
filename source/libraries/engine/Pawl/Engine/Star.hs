@@ -14,6 +14,7 @@ import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.Plus as Plus
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Times as Times
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
 -- ability supplies, recursing through Plus so 1+* becomes 1+<the count>.
@@ -25,6 +26,9 @@ substituteStar star quantity = case quantity of
   -- halving is still the value the CDA supplies. No card prints one there --
   -- Malignus' star is the whole P/T box and its CDA carries the halving.
   Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (substituteStar star inner))
+  -- Halved's descent, for CR 208.2's reason: a printed star inside a product is
+  -- still the value the characteristic-defining ability supplies.
+  Quantity.Times (Times.MkTimes factor inner) -> Quantity.Times (Times.MkTimes factor (substituteStar star inner))
   -- Plus's descent, for Plus's reason: a star under a minus sign is still the
   -- star the characteristic-defining ability defines.
   Quantity.Negate a -> Quantity.Negate (substituteStar star a)
@@ -102,6 +106,7 @@ containsStar quantity = case quantity of
   Quantity.Star -> True
   Quantity.Plus (Plus.MkPlus a b) -> containsStar a || containsStar b
   Quantity.Halved (Halved.MkHalved _ inner) -> containsStar inner
+  Quantity.Times (Times.MkTimes _ inner) -> containsStar inner
   Quantity.Negate a -> containsStar a
   -- No descent into a Count, nor into AgainstSlot or AgainstCardsExiledWith:
   -- CR 208.2a's star is a printed box's own symbol, and each of those three
