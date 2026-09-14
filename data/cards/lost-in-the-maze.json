@@ -97,9 +97,12 @@
                             "type": "EachCardFromAmong",
                             "value": {
                               "filter": {
-                                "type": "ControlledBy",
+                                "type": "Not",
                                 "value": {
-                                  "type": "Opponent"
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
                                 }
                               },
                               "slot": "creatures"

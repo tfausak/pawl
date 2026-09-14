@@ -5952,8 +5952,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- spell that became that object -- and Pawl.Engine.Engine.placeBorne inherits it
   -- on exactly that condition. Every other trigger is placed with X as zero, so a
   -- slot counted by X there would silently take no targets. CR 107.3n's delayed
-  -- twin is the same shape one ability over and is NOT inherited; no printing
-  -- states a delayed ability's target COUNT in X, so the refusal costs nothing.
+  -- twin is the same shape one ability over and is NOT inherited: Scryfall
+  -- `m:{X} o:"at the beginning of the next end step" (t:instant or t:sorcery)`,
+  -- 2026-09-14, returns delayed clauses that name "them" and "those creatures"
+  -- and none that states a target COUNT in X, so the refusal costs a card
+  -- nothing. A delayed ability printing "return up to X target creature cards"
+  -- would refute it; Disorder in the Court's returns the cards it already exiled,
+  -- by name rather than by target, and is the closest the query found.
   --
   -- The exemption is keyed on the CONDITION and not on which channel printed the
   -- ability, which is what placeBorne cases on: a room's ability carries no

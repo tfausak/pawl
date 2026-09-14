@@ -1566,8 +1566,9 @@ pestName :: CardName.CardName
 pestName = CardName.MkCardName (Text.pack "Pest Token")
 
 -- CR 601.2c: a slot counted 0 to a number the BOARD supplies, on a triggered
--- ability -- where CR 601.2b's announced X is not available at all, a trigger
--- being neither cast nor activated (CR 603.3d).
+-- ability -- where CR 601.2b's own announcement is unavailable, a trigger being
+-- neither cast nor activated (CR 603.3d), and the Marauder's {2}{B} states no X
+-- for CR 107.3m to carry across the entry either (the InheritedX group below).
 --
 -- Mogis's Marauder {2}{B} 2/2 (data/cards/mogiss-marauder.json): "When this
 -- creature enters, up to X target creatures each gain intimidate and haste until
