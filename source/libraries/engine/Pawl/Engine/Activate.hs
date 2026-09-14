@@ -441,12 +441,12 @@ loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcI
 -- demands nothing at all (Mana.waysOf), so leaving it in place would answer the
 -- same as X=0 by accident rather than by rule -- the accident that made the {X}
 -- free (#544).
-payableCost :: [Map.Map SlotName (Set.Set ObjectId)] -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCost :: [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost aimable = payableCostAt aimable 0
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
-payableCostGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostGiven aimable sources pcs = payableCostAtGiven aimable sources pcs 0
 
 -- The same question asked at some OTHER value of X -- `payableCost` is this at
@@ -470,15 +470,15 @@ payableCostGiven aimable sources pcs = payableCostAtGiven aimable sources pcs 0
 -- offers: CR 601.2b's completion comes before CR 601.2f's totalling, so a {2/R}
 -- totalled while still spelled {2/R} would hide the generic reduction the
 -- announcement exposes.
-payableCostAt :: [Map.Map SlotName (Set.Set ObjectId)] -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt aimable x family pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) Cost.noManaSubstitutions (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+payableCostAt :: [Map.Map SlotName (Set.Set ObjectId)] -> Natural -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAt aimable x stamp pid srcId gs cost =
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) Cost.noManaSubstitutions (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
-payableCostAtGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAtGiven aimable sources pcs x family pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) Cost.noManaSubstitutions (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+payableCostAtGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAtGiven aimable sources pcs x stamp pid srcId gs cost =
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) Cost.noManaSubstitutions (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
 
 -- CR 601.2f's totalling asked where CR 601.2c's targets do not exist yet: the
 -- predicate holds if SOME aiming this activation could still take leaves the
@@ -526,8 +526,8 @@ payableCostAtGiven aimable sources pcs x family pid srcId gs cost =
 -- that arrives on a component CR 601.2f's adjustments add is not seen here and
 -- its cost takes the cheap search (#2959). No cost adjustment in `data/cards/`
 -- adds a component with a criterion naming a slot.
-aimingSomewhere :: Bool -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe KeywordFamily.KeywordFamily -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set ObjectId) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
-aimingSomewhere slotReading aimable family loyalty pid srcId gs payable =
+aimingSomewhere :: Bool -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set ObjectId) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
+aimingSomewhere slotReading aimable stamp loyalty pid srcId gs payable =
   -- CR 605.1a's kind is AbilityKind.NonManaAbility at all three sites in this
   -- module, and CR 605.3b is why: activatableGiven refuses a mana ability
   -- outright and the cost conjunct this gate serves sits after that refusal,
@@ -541,7 +541,7 @@ aimingSomewhere slotReading aimable family loyalty pid srcId gs payable =
   -- than an ability: Cost.loyaltyKindOf reads it off the same printed cost the
   -- caller is measuring, so Carth the Lion's addition is totalled in here only
   -- for an ability whose own cost carries a loyalty symbol.
-  let gather aimedAt = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility loyalty pid srcId gs
+  let gather aimedAt = Cost.activationAdjustments aimedAt stamp AbilityKind.NonManaAbility loyalty pid srcId gs
       candidates = Set.unions (concatMap Map.elems aimable)
       blind = gather Set.empty
    in if slotReading
@@ -594,8 +594,8 @@ candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
 -- Blighted Nightmare's blight route terminate -- CostComponent.BlightX's demand
 -- never grows (Cost.demandGrowsWithX), so the climb has no other ground to stop
 -- on. Cast.affordableX takes the same argument off Face.maximumX.
-affordableX :: Maybe Natural -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX mCeiling aimable family pid srcId gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt aimable x family pid srcId gs cost) cost
+affordableX :: Maybe Natural -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX mCeiling aimable stamp pid srcId gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt aimable x stamp pid srcId gs cost) cost
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability, the whole activation cost is payable
@@ -694,7 +694,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         && ActivationRestriction.restrictionsOk pid srcId (Just ability) (ActivatedAbility.restrictions ability) gs
         && loyaltyOk pid srcId ability gs
         && Modal.selectionPossible fillable (Modal.Type.selection modal)
-        && payableCostGiven aimable sources pcs (Keyword.familyGranting ability) pid srcId gs (ActivatedAbility.cost ability)
+        && payableCostGiven aimable sources pcs (ActivatedAbility.keyword ability) pid srcId gs (ActivatedAbility.cost ability)
 
 -- CR 602.2a: an ability activated from a hidden zone reveals the card that has
 -- it (CR 701.20a). Note what the rule does NOT say: there is no qualifier about
@@ -834,7 +834,7 @@ activateAbility pid srcId ability = do
       -- reduction the gate withheld could still be applied when the cost is
       -- paid. Read off the ability's own stamp, so the answer does not depend on
       -- the zone its source is in when this is asked.
-      family = Keyword.familyGranting ability
+      stamp = ActivatedAbility.keyword ability
   State.put onStack
   -- Sorted on the way in, for the reason Cast.castProposed gives: printed order
   -- (CR 608.2c), with a repeated mode's instances adjacent (CR 700.2d).
@@ -898,7 +898,7 @@ activateAbility pid srcId ability = do
           mCeiling = Cost.ceilingOf pid srcId (ActivatedAbility.maximumX ability) gs
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX mCeiling aimableUnannounced family pid srcId gs printedCost)))
+          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX mCeiling aimableUnannounced stamp pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
           -- CR 101.1, and CR 101.2 for its direction, exactly as Cast.castProposed
@@ -954,7 +954,7 @@ activateAbility pid srcId ability = do
       -- Asked unconditionally rather than only when there is an {X}, which buys
       -- one predicate over one cost instead of two spellings of when the gate
       -- applies.
-      if overCeiling || not (payableCost aimable family pid srcId gs announcedAtX)
+      if overCeiling || not (payableCost aimable stamp pid srcId gs announcedAtX)
         then State.put before -- reject: the whole activation is a no-op
         else do
           -- CR 118.13a's announcement, which names an activated ability's
@@ -989,7 +989,7 @@ activateAbility pid srcId ability = do
           -- target-aware reduction therefore cannot change which nonhybrid
           -- equivalent or Phyrexian half a player would announce. The reductions
           -- themselves are gathered again below, once the targets exist.
-          let gathered = Cost.activationAdjustments Set.empty family AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
+          let gathered = Cost.activationAdjustments Set.empty stamp AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of
           -- an activation cost.
@@ -1046,7 +1046,7 @@ activateAbility pid srcId ability = do
               -- -- so the increases and the CR 601.2f components the announcement
               -- above measured are the same ones charged below.
               let aimedAt = Set.unions (fmap recipientObjects (Map.elems chosen))
-                  targeted = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
+                  targeted = Cost.activationAdjustments aimedAt stamp AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
               let paidCost = Cost.totalWith adjustments announcedCost
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
@@ -1088,7 +1088,7 @@ activateAbility pid srcId ability = do
                   -- leaves it (CrewSpec's "a countered crew ability"). A case on
                   -- the rule-702 keyword stamp, never on an effect.
                   Monad.when
-                    (family == Just KeywordFamily.Crew)
+                    ((Keyword.familyOf =<< stamp) == Just KeywordFamily.Crew)
                     ( State.modify'
                         ( Event.recordEvent
                             ( GameEvent.Crewed

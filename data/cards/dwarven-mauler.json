@@ -20,7 +20,10 @@
             "value": {
               "floor": 0,
               "grantedBy": {
-                "type": "Equip"
+                "type": "OfFamily",
+                "value": {
+                  "type": "Equip"
+                }
               },
               "reduction": [
                 {

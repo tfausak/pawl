@@ -537,6 +537,8 @@ library codec
     Pawl.Codec.InZone
     Pawl.Codec.InZoneSpec
     Pawl.Codec.Keyword
+    Pawl.Codec.KeywordDesignator
+    Pawl.Codec.KeywordDesignatorSpec
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
     Pawl.Codec.KeywordSpec
@@ -1777,6 +1779,7 @@ library types
     Pawl.Types.InstanceOrdinal
     Pawl.Types.InZone
     Pawl.Types.Keyword
+    Pawl.Types.KeywordDesignator
     Pawl.Types.KeywordFamily
     Pawl.Types.KickerDecision
     Pawl.Types.LastKnown

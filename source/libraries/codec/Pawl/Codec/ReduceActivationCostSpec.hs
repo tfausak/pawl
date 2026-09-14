@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -41,14 +42,14 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
       ReduceActivationCost.codec
       ( ReduceActivationCost.MkReduceActivationCost
           { ReduceActivationCost.whichAbilities = Filter.And [],
-            ReduceActivationCost.grantedBy = Just KeywordFamily.Cycling,
+            ReduceActivationCost.grantedBy = Just (KeywordDesignator.OfFamily KeywordFamily.Cycling),
             ReduceActivationCost.whichKind = Nothing,
             ReduceActivationCost.whichTargets = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
             ReduceActivationCost.floor = 0
           }
       )
-      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"grantedBy\":{\"type\":\"Cycling\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
+      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"grantedBy\":{\"type\":\"OfFamily\",\"value\":{\"type\":\"Cycling\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
   -- CR 601.2c from the reducer's side: Dwarven Mauler's "equip abilities you
   -- activate THAT TARGET THIS CREATURE", the one shape in the pool that writes
   -- whichTargets. Its own case for the reason the grantedBy case above has one --
@@ -60,14 +61,14 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
       ReduceActivationCost.codec
       ( ReduceActivationCost.MkReduceActivationCost
           { ReduceActivationCost.whichAbilities = Filter.And [],
-            ReduceActivationCost.grantedBy = Just KeywordFamily.Equip,
+            ReduceActivationCost.grantedBy = Just (KeywordDesignator.OfFamily KeywordFamily.Equip),
             ReduceActivationCost.whichKind = Nothing,
             ReduceActivationCost.whichTargets = Just Filter.IsSource,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
             ReduceActivationCost.floor = 0
           }
       )
-      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"grantedBy\":{\"type\":\"Equip\"},\"whichTargets\":{\"type\":\"IsSource\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
+      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"grantedBy\":{\"type\":\"OfFamily\",\"value\":{\"type\":\"Equip\"}},\"whichTargets\":{\"type\":\"IsSource\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
   -- CR 605.1a's rider, which Zirda, the Dawnwaker prints and the three cases
   -- above do not: the key is written only where the sentence says it, and its
   -- own case for the reason theirs have one -- whichKind is DEFAULTED, so a

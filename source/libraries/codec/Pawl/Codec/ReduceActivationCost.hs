@@ -5,7 +5,7 @@ module Pawl.Codec.ReduceActivationCost where
 import qualified Pawl.Codec.AbilityKind as AbilityKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Codec.KeywordFamily as KeywordFamily
+import qualified Pawl.Codec.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -29,7 +29,7 @@ import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 codec :: Codec.Codec ReduceActivationCost.ReduceActivationCost
 codec = Fields.object $ do
   whichAbilities <- Fields.required "whichAbilities" (Filter.codec Keyword.codec) ReduceActivationCost.whichAbilities
-  grantedBy <- Fields.defaulted "grantedBy" Nothing (Common.maybe KeywordFamily.codec) ReduceActivationCost.grantedBy
+  grantedBy <- Fields.defaulted "grantedBy" Nothing (Common.maybe KeywordDesignator.codec) ReduceActivationCost.grantedBy
   whichKind <- Fields.defaulted "whichKind" Nothing (Common.maybe AbilityKind.codec) ReduceActivationCost.whichKind
   whichTargets <- Fields.defaulted "whichTargets" Nothing (Common.maybe (Filter.codec Keyword.codec)) ReduceActivationCost.whichTargets
   reduction <- Fields.required "reduction" ManaCost.codec ReduceActivationCost.reduction

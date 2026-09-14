@@ -15,7 +15,10 @@
             "value": {
               "floor": 0,
               "grantedBy": {
-                "type": "Cycling"
+                "type": "OfFamily",
+                "value": {
+                  "type": "Cycling"
+                }
               },
               "reduction": [
                 {
