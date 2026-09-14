@@ -242,6 +242,9 @@ rewriteModification pairs m =
         -- CR 702.14a's generic term, which has no land type in it. A Hack on
         -- Hammerheim changes what its removal reaches not at all.
         Modification.LoseKeywordFamily _ -> acc
+        -- CR 612.5's exchange names no word to swap: its two sides are object
+        -- ids in the effect's affected set, so there is nothing here to rewrite.
+        Modification.ExchangeTextBoxes -> acc
         Modification.SwitchPowerToughness -> acc
         -- Nothing to rewrite: two bare markers naming no subtype word.
         Modification.AssignCombatDamageWithToughness -> acc

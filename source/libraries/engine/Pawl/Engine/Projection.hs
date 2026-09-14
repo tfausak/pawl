@@ -142,6 +142,10 @@ layer m = case m of
   Modification.AddSupertype _ -> Layer.Type
   Modification.RemoveSupertype _ -> Layer.Type
   Modification.ChangeSubtypeWord {} -> Layer.Text
+  -- CR 613.1c: CR 612.5 is a text-changing effect, so it shares layer 3 with
+  -- the subtype-word swap above. Answering any other layer leaves the suite
+  -- green, since nothing else in this unit reads the layer directly.
+  Modification.ExchangeTextBoxes -> Layer.Text
   Modification.SetController _ -> Layer.Control
   Modification.SetControllerToSource -> Layer.Control
   Modification.SetColor _ -> Layer.Color
@@ -166,8 +170,11 @@ layer m = case m of
 -- computed by the caller over the whole unit before any of it is applied
 -- (cardTypesAfter). Every correspondence question below asks it rather than the
 -- fold's running value.
-applyModification :: Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Set CardType.CardType -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
-applyModification viewOf src gs oid unitTypes m pc =
+-- `affected` is CR 611.2c's frozen set for the effect this modification is a
+-- part of, which CR 612.5's exchange reads to find the object on the other
+-- side; every other arm ignores it.
+applyModification :: Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Set CardType.CardType -> Affected.Affected -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyModification viewOf src gs oid unitTypes affected m pc =
   let context = Filter.contextFor (Game.teams gs) (controllerOf src gs) (Just src)
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
@@ -378,6 +385,25 @@ applyModification viewOf src gs oid unitTypes m pc =
            in if Set.member from (PC.subtypes pc2)
                 then pc2 {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc2))}
                 else pc2
+        -- CR 612.5: the two objects in this effect's affected set exchange their
+        -- text boxes. Each side's incoming text is the OTHER side's copiable
+        -- characteristics (CR 613.2c), which is the state layer 3 begins from:
+        -- layer 1 has already stamped a copy effect's text into them and layer 2
+        -- writes no text at all. Reading them rather than re-projecting the
+        -- partner is also what keeps the mutual effect from re-entering the fold
+        -- it is running inside.
+        --
+        -- Not implemented: a text-changing effect with an EARLIER timestamp on
+        -- either creature (Magical Hack on one of them), whose output CR 613.7
+        -- puts ahead of this one within layer 3 and which the copiable read
+        -- misses (#3749).
+        --
+        -- CR 707.2 needs nothing here: the copiable values are untouched, so a
+        -- Clone of either creature copies the PRINTED text. Pawl.ProjectionSpec's
+        -- exchange group proves that board.
+        Modification.ExchangeTextBoxes -> case exchangePartner oid affected of
+          Nothing -> pc
+          Just other -> exchangeTextBoxFrom (copiableCharacteristics other gs) pc
         -- CR 613.1b layer 2: controllerOf reads GameState.continuousEffects
         -- directly. Identity here to keep gather/project's walk total.
         Modification.SetController _ -> pc
@@ -484,6 +510,8 @@ cardTypesAfter m types = case m of
   Modification.LoseEveryCreatureSubtype -> types
   Modification.AddSubtype _ -> types
   Modification.ChangeSubtypeWord {} -> types
+  -- CR 612.1 / 612.5: the text box moves and the type line does not.
+  Modification.ExchangeTextBoxes -> types
   Modification.AddSupertype _ -> types
   Modification.RemoveSupertype _ -> types
   Modification.SetColor _ -> types
@@ -495,6 +523,53 @@ cardTypesAfter m types = case m of
 -- CR 205.1a's named exception to its own set: instant and sorcery are retained.
 retainedThroughCardTypeSet :: CardType.CardType -> Bool
 retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
+
+-- CR 612.5 / 611.2c: the OTHER side of a two-object exchange, read out of the
+-- effect's own frozen affected set. Nothing when the set is not exactly the two
+-- objects the card named -- a side that has left the battlefield leaves the
+-- other with its own text, which is CR 612.5's "the other object" naming
+-- nothing rather than an exchange with a blank.
+--
+-- Only Affected.TheseObjects is answered, and that is the whole domain: the one
+-- producer stores its effect through Effect.ModifyTarget, whose affected set is
+-- always CR 611.2c's frozen id set. A matching set would be a card that
+-- exchanged text boxes with a described object, which nothing prints.
+exchangePartner :: ObjectId -> Affected.Affected -> Maybe ObjectId
+exchangePartner oid a = case a of
+  Affected.TheseObjects s -> case Set.toList (Set.delete oid s) of
+    [other] -> Just other
+    _ -> Nothing
+  _ -> Nothing
+
+-- CR 612.5: replace every text-box characteristic of `pc` with `from`'s. The
+-- name, mana cost, colour, type line and P/T box are untouched, which is what
+-- separates rule 612 from a copy effect (CR 706/707) and from CR 612.6's full
+-- text.
+--
+-- PC.textChangedKeywords takes the incoming keywords for ChangeSubtypeWord's
+-- reason: CR 612.3 makes rule 702's mint tell the instances layer 3 left behind
+-- from the ones layer 6 grants afterwards, and after this arm the ones layer 3
+-- left behind are exactly these.
+--
+-- Not implemented: PC.staticAbilities, PC.playerAbilities and PC.specialActions
+-- stay where they were printed. Each is gathered from the object's COPIABLE
+-- characteristics rather than from the projection (Pawl.Engine.Projection.View's
+-- staticAbilitiesOf and specialActionsOf), so a static ability moved here would
+-- appear in the list and still generate its effect on the old host (#3748).
+exchangeTextBoxFrom :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
+exchangeTextBoxFrom from pc =
+  pc
+    { PC.keywords = PC.keywords from,
+      PC.activatedAbilities = PC.activatedAbilities from,
+      PC.triggeredAbilities = PC.triggeredAbilities from,
+      PC.replacementEffects = PC.replacementEffects from,
+      PC.enchant = PC.enchant from,
+      -- CR 604.3: a characteristic-defining ability is printed in the text box,
+      -- so it moves with it. A regression fence rather than a proved behaviour:
+      -- the one producer's test board uses two literal power/toughness boxes.
+      PC.characteristicPT = PC.characteristicPT from,
+      PC.textChangedKeywords = PC.keywords from
+    }
 
 -- CR 305.7's strip, shared by both modifications that set a land's subtype. It
 -- does the subtype and ability clauses; the new basic type's mana ability rides
@@ -990,6 +1065,8 @@ freezeQuantities gs announcedOn source context m =
         Modification.AddColor _ -> Just m
         Modification.AddChosenColor -> Just m
         Modification.SwitchPowerToughness -> Just m
+        -- Payload-free: the two sides are object ids, not quantities.
+        Modification.ExchangeTextBoxes -> Just m
         -- No quantity to freeze: two bare markers.
         Modification.AssignCombatDamageWithToughness -> Just m
         Modification.GrantsStationToughness -> Just m
@@ -1032,6 +1109,7 @@ quantitiesOf m = case m of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
+  Modification.ExchangeTextBoxes -> []
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
 
@@ -1081,6 +1159,7 @@ setsLandSubtype m = case m of
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
+  Modification.ExchangeTextBoxes -> False
   Modification.AssignCombatDamageWithToughness -> False
   Modification.SetColor _ -> False
   Modification.AddColor _ -> False
@@ -1865,6 +1944,9 @@ removesAbilities m = case m of
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
+  -- CR 612.5 REPLACES a text box rather than removing abilities, and does it
+  -- at layer 3, so CR 613.1f's strip is not what it is.
+  Modification.ExchangeTextBoxes -> False
   -- CR 613.11 rules-modifying marker rather than a layer-6 ability change.
   Modification.AssignCombatDamageWithToughness -> False
   -- A grant, GainKeyword's answer above: not a removal.
@@ -2232,7 +2314,9 @@ bestowedView :: ObjectId -> GameState -> Filter.View
 bestowedView oid gs =
   let pc = project oid gs
       unitTypes = List.foldl' (flip cardTypesAfter) (PC.cardTypes pc) Keyword.bestowModifications
-      bestowed = List.foldl' (flip (applyModification (fullView gs) oid gs oid unitTypes)) pc Keyword.bestowModifications
+      -- CR 702.103a's bestow grants land on the permanent itself, so the set
+      -- they are applied under is that one object.
+      bestowed = List.foldl' (flip (applyModification (fullView gs) oid gs oid unitTypes (Affected.TheseObjects (Set.singleton oid)))) pc Keyword.bestowModifications
    in viewOfCharacteristics (fullView gs) oid bestowed (controllerOf oid gs) (countersOf oid gs) gs
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
@@ -2812,6 +2896,10 @@ modificationWrites m = case m of
   -- suite green too.
   Modification.AddSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord {} -> Set.fromList [Subtypes, Keywords]
+  -- CR 612.5 writes the ability lists and PC.keywords with them, which Aspect
+  -- has no finer grain for than Keywords. Not Subtypes: the type line stays
+  -- where it was (CR 612.1).
+  Modification.ExchangeTextBoxes -> Set.singleton Keywords
   Modification.AddCardType _ -> Set.singleton Types
   -- CR 205.1a's set writes BOTH: the card types it replaces, and the subtypes it
   -- strips along with the types that carried them.
@@ -2860,6 +2948,10 @@ modificationReads m = case m of
   -- Carries a payload-free family, so there is no Filter here to read anything.
   Modification.LoseKeywordFamily _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
+  -- Carries no Quantity. It reads the OTHER side's copiable characteristics,
+  -- which no layer writes, so no Aspect names them and CR 613.8a's dependency
+  -- cannot turn on them.
+  Modification.ExchangeTextBoxes -> Set.empty
   -- Carries no Quantity: two bare markers.
   Modification.AssignCombatDamageWithToughness -> Set.empty
   Modification.GrantsStationToughness -> Set.empty
@@ -3208,7 +3300,7 @@ projectDeciding admits cands =
                   applyUnit viewOf o pc cs =
                     let parts = NonEmpty.toList cs
                         unitTypes = List.foldl' (\ts c -> cardTypesAfter (gModification c) ts) (PC.cardTypes pc) parts
-                     in List.foldl' (\p c -> applyModification viewOf (gSource c) gs o unitTypes (gModification c) p) pc parts
+                     in List.foldl' (\p c -> applyModification viewOf (gSource c) gs o unitTypes (gAffected c) (gModification c) p) pc parts
                   -- A gathered effect's parts at this layer, as CR 613.8's ordering
                   -- asks about them. The head part answers for the unit's affected
                   -- set and its timestamp (CR 613.6, CR 613.7a).
@@ -4296,6 +4388,10 @@ grantsKeywordWhere p m = case m of
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
+  -- CR 612.5 MOVES whatever keywords the other text box printed rather than
+  -- handing out one this arm could name, so no predicate over a Keyword can
+  -- be answered here.
+  Modification.ExchangeTextBoxes -> False
   -- Neither marker hands out a Keyword, whatever the station one's name says.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
@@ -4356,6 +4452,8 @@ grantsMintingType m = case m of
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
+  -- CR 612.1: the exchange leaves the type line alone.
+  Modification.ExchangeTextBoxes -> False
   -- Neither marker writes a card type or subtype.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False

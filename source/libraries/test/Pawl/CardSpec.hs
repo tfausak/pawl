@@ -808,6 +808,7 @@ modificationCounts modification = case modification of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
+  Modification.ExchangeTextBoxes -> []
   -- Payload-free, both of them, so there is no Count to sweep.
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
@@ -3435,6 +3436,7 @@ modificationFilters modification = case modification of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
+  Modification.ExchangeTextBoxes -> []
   -- Payload-free, both of them, so there is no Filter to sweep.
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []

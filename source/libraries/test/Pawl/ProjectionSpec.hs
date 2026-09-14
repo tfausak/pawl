@@ -29,6 +29,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
@@ -4258,6 +4259,173 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   honeCounterSpec s registry
   levelerSpec s registry
   supertypeSpec s registry
+  exchangeTextBoxSpec s registry
+
+-- CR 612.5's two sides, pinned by id out of the offered set rather than
+-- hand-built, so CR 608.2b's re-read at resolution still finds what was named.
+-- bob's Goblin Piker is a third legal creature the slot could have taken, which
+-- is what keeps the announcement a real choice instead of a slot whose only
+-- candidates are the two this test wants.
+exchangeAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+exchangeAnswer one two p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 2) offers
+  Prompt.ChooseTargets _ _ _ offers -> S.preferring (isOneOf (Set.fromList [one, two])) offers
+  _ -> S.identityAnswer p
+
+isOneOf :: Set.Set ObjectId.ObjectId -> Recipient.Recipient -> Bool
+isOneOf wanted r = maybe False (`Set.member` wanted) (Recipient.objectOf r)
+
+-- Activates the ability of ONE named permanent at bob's face, once: after the
+-- activation its {T} is paid and the same action is no longer legal, so the
+-- priority loop terminates without a stateful answerer. Every other seat passes.
+pingFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+pingFrom oid p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (activatedBy oid) actions of
+    action : _ -> action
+    [] -> Action.Type.Pass
+  Prompt.ChooseTargets _ _ _ offers -> S.preferring (== Recipient.ToPlayer S.bob) offers
+  _ -> S.identityAnswer p
+
+activatedBy :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+activatedBy oid a = case a of
+  Action.Type.Activate o _ -> o == oid
+  _ -> False
+
+tapped :: ObjectId.ObjectId -> GameState.GameState -> Bool
+tapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
+
+-- alice's Ogre Sentry (3/3, defender, no other text) and Prodigal Sorcerer (1/1,
+-- "{T}: This creature deals 1 damage to any target"), bob's Goblin Piker as a
+-- third candidate, and Exchange of Words entering under alice with its CR 603.6a
+-- trigger pending. Returns the Sentry, the Sorcerer, the board BEFORE the
+-- trigger resolves and the board after -- a pair differing in exactly the
+-- exchange.
+exchangeOfWordsBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+exchangeOfWordsBoard sentry sorcerer piker exchange =
+  let (sentryId, b0) = S.addPermanent sentry S.alice (Setup.emptyGame S.bothPlayers)
+      (sorcererId, b1) = S.addPermanent sorcerer S.alice b0
+      (_, before) = S.addPermanent piker S.bob b1
+      (wordsId, entered) = S.entersWithTrigger exchange S.alice before
+      -- Inlined rather than bound: GADTs implies MonoLocalBinds, so a shared
+      -- local binding of the answerer would not generalise over the prompt's
+      -- result type.
+      staged = S.runPure (exchangeAnswer sentryId sorcererId) entered Engine.settleForPriority
+      after = S.runPure (exchangeAnswer sentryId sorcererId) staged Stack.resolveTop
+   in (sentryId, sorcererId, wordsId, before, after)
+
+exchangeTextBoxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
+  -- CR 612.5 whole card: Exchange of Words ({1}{U}{U}, "When this enchantment
+  -- enters, choose two target creatures. For as long as this enchantment remains
+  -- on the battlefield, exchange the text boxes of those creatures.").
+  --
+  -- The ping is the gameplay-level proof, and what it proves is the
+  -- SELF-REFERENCE re-binding: Prodigal Sorcerer's ability reads "this creature
+  -- deals 1 damage", so an implementation that moved the ability while leaving
+  -- its source behind would tap the Sorcerer, or deal the damage from it, and
+  -- the tap assertion below is what tells those apart.
+  --
+  -- The control board is the same three creatures with the trigger unresolved:
+  -- there the Sentry has no activated ability at all, so the same answerer pings
+  -- nothing and bob keeps his life. One difference between the boards, and it is
+  -- the exchange.
+  Spec.it s "CR 612.5 the exchanged text box pings from its NEW host" $ do
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (sentryId, sorcererId, _, before, after) = exchangeOfWordsBoard sentry sorcerer piker exchange
+        pingedBefore = S.runPure (pingFrom sentryId) before S.priorityGame
+        pingedAfter = S.runPure (pingFrom sentryId) after S.priorityGame
+    Spec.assertEqWith s "CR 612.5 the Ogre Sentry deals the Sorcerer's 1 damage to bob" (S.lifeOf S.bob pingedAfter) (fmap (subtract 1) (S.lifeOf S.bob after))
+    Spec.assertBool s (tapped sentryId pingedAfter) "CR 113.7 and it paid the {T} on ITSELF, so the ability's source re-bound to its new host"
+    Spec.assertBool s (not (tapped sorcererId pingedAfter)) "leaving the Sorcerer, which no longer has the ability, untapped"
+    -- The control, after the behaviour so neither can absorb a mutation aimed at
+    -- the other.
+    Spec.assertEqWith s "without the exchange the Sentry has nothing to activate and bob keeps his life" (S.lifeOf S.bob pingedBefore) (S.lifeOf S.bob before)
+    Spec.assertBool s (not (tapped sentryId pingedBefore)) "and stays untapped"
+
+  -- CR 612.1: a text-changing effect leaves the name, the type line and the P/T
+  -- box alone. That is the whole of what separates CR 612.5 from a copy effect
+  -- (CR 706/707) and from CR 612.6's full text, so a board where the 3/3 became
+  -- a 1/1 would be a copy and not an exchange.
+  Spec.it s "CR 612.1 both creatures keep their own name and power/toughness" $ do
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (sentryId, sorcererId, _, _, after) = exchangeOfWordsBoard sentry sorcerer piker exchange
+    Spec.assertEqWith s "the Ogre Sentry is still a 3/3" (S.powerToughnessOf sentryId after) (Just (3, 3))
+    Spec.assertEqWith s "and still named Ogre Sentry" (S.soleFaceName sentryId after) (CardName.MkCardName (Text.pack "Ogre Sentry"))
+    Spec.assertEqWith s "the Prodigal Sorcerer is still a 1/1" (S.powerToughnessOf sorcererId after) (Just (1, 1))
+    Spec.assertEqWith s "and still named Prodigal Sorcerer" (S.soleFaceName sorcererId after) (CardName.MkCardName (Text.pack "Prodigal Sorcerer"))
+
+  -- The other half of the exchange, and the half the ping cannot show: the
+  -- keywords in a text box move with it, so the Sentry's defender lands on the
+  -- Sorcerer. A one-way implementation -- the Sorcerer's ability copied onto the
+  -- Sentry with nothing going back -- satisfies every assertion above and fails
+  -- both of these.
+  Spec.it s "CR 612.5 the keywords move the other way too" $ do
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (sentryId, sorcererId, _, before, after) = exchangeOfWordsBoard sentry sorcerer piker exchange
+    Spec.assertBool s (Projection.hasKeyword Keyword.Defender sorcererId after) "CR 702.3 the Sorcerer has the Sentry's defender"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Defender sentryId after)) "and the Sentry has lost it"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Defender sentryId before) "which it had before the exchange"
+
+  -- CR 611.2b: the duration Exchange of Words states is "for as long as this
+  -- enchantment remains on the battlefield", so the effect ends when it leaves
+  -- and both text boxes go back where they were printed. The same board as
+  -- above, advanced by one zone change.
+  Spec.it s "CR 611.2b destroying the enchantment puts both text boxes back" $ do
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (sentryId, sorcererId, wordsId, _, after) = exchangeOfWordsBoard sentry sorcerer piker exchange
+        gone = S.runPure S.identityAnswer after (Event.changeZone wordsId Zone.Graveyard)
+        swept = S.runPure S.identityAnswer gone Engine.settleForPriority
+    Spec.assertBool s (null (Projection.abilitiesOf sentryId swept)) "the Sentry has given the ping back"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Defender sentryId swept) "and has its own defender again"
+    Spec.assertBool s (not (null (Projection.abilitiesOf sorcererId swept))) "and the Sorcerer has its ping back"
+    -- The precondition, after the behaviour: the exchange really was in force on
+    -- the board this one advanced from.
+    Spec.assertBool s (not (null (Projection.abilitiesOf sentryId after))) "which it did not have while the enchantment was on the battlefield"
+
+  -- CR 707.2 / 613.1c: the exchange is a layer-3 text change, so it never
+  -- reaches the copiable values. A Clone entering as a copy of the exchanged
+  -- Ogre Sentry therefore gets the PRINTED text box -- defender, and no ping --
+  -- rather than the Sorcerer's ability the Sentry is using.
+  Spec.it s "CR 707.2 a Clone of an exchanged creature copies the PRINTED text" $ do
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    clone <- S.printingOf s registry "Clone"
+    let (sentryId, _, _, _, after) = exchangeOfWordsBoard sentry sorcerer piker exchange
+        (_, staged) = S.spellOnStack clone S.alice after
+        copied = S.runPure (copyNamed sentryId) staged (Stack.resolveTop Monad.>> Engine.settleForPriority)
+    case Maybe.listToMaybe (S.namedObjects (CardName.MkCardName (Text.pack "Clone")) copied) of
+      Nothing -> Spec.assertFailure s "the Clone should be on the battlefield"
+      Just cloneId -> do
+        Spec.assertBool s (null (Projection.abilitiesOf cloneId copied)) "CR 707.2 the copy has no activated ability, the printed Ogre Sentry having none"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Defender cloneId copied) "and has the printed defender the exchange took off its source"
+        Spec.assertBool s (not (null (Projection.abilitiesOf sentryId copied))) "while the source it copied still has the exchanged ping"
+
+-- The as-enters copy choice, pinned to one named permanent so a mutation cannot
+-- be repaired by an answerer that finds another legal source. Pawl.CopySpec's
+-- copyNamed is the same shape, duplicated rather than hoisted.
+copyNamed :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+copyNamed wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  _ -> S.identityAnswer p
 
 -- Resourceful Defense's two target slots are both Pool.Permanents over the same
 -- board, so no predicate could tell them apart and the slot NAME settles which

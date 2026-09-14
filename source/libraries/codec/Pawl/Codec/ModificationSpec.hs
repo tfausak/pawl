@@ -246,6 +246,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.AddChosenColor
       " {\"type\":\"AddChosenColor\"} "
+  -- layer 3, CR 612.5: the two sides come from the effect's affected set, so
+  -- the arm itself is payload-free.
+  Spec.it s "ExchangeTextBoxes" $
+    Common.assertCodec
+      s
+      codec
+      Modification.ExchangeTextBoxes
+      " {\"type\":\"ExchangeTextBoxes\"} "
   -- layer 7d, CR 613.4d: switches power and toughness. Payload-free.
   Spec.it s "SwitchPowerToughness" $
     Common.assertCodec
