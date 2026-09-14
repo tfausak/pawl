@@ -105,9 +105,10 @@ data ObjectRef
   | -- | CR 608.2d / Port of Karfell: a card in a graveyard matching the Filter,
     -- chosen as the effect runs rather than targeted (CR 115.1).
     --
-    -- Not implemented: a count above one -- Fall of the Thran's "each player
-    -- returns TWO land cards from their graveyard to the battlefield" -- and with
-    -- it the exclusion "another" states (#1437).
+    -- The payload's count is what Fall of the Thran's "each player returns two
+    -- land cards from their graveyard" states, and the picks it names are
+    -- DISTINCT -- Pawl.MassEffectSpec's "CR 608.2d each player returns two
+    -- DISTINCT land cards from their own graveyard" is what proves it.
     --
     -- A QUESTION rather than a read, so only an opcode whose gather reaches the
     -- Game monad carries it out; Pawl.CardSpec's inertChoosers rejects the other

@@ -34,6 +34,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -43,6 +44,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -1218,6 +1220,163 @@ communeWithTheGodsSpec s registry =
           Spec.assertEqWith s "and only the spell is in her graveyard" (namesIn Zone.Graveyard S.alice after) [named "Commune with the Gods"]
           Spec.assertEqWith s "her library is empty" (namesIn Zone.Library S.alice after) []
 
+-- ObjectRef.ChosenCardInGraveyard's COUNT: one gather taking more than one card
+-- out of each named graveyard, where portOfKarfellSpec and graspingTentaclesSpec
+-- above take one. ancestralMemoriesSpec below is the same count over a bound
+-- group rather than a zone.
+--
+-- Fall of the Thran {5}{W} Enchantment - Saga, "I -- Destroy all lands. II, III
+-- -- Each player returns two land cards from their graveyard to the
+-- battlefield." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com, 2026-09-14). The whole card is transcribed; CR 714.2c's "II,
+-- III --" shorthand is written as the two abilities that rule says it means, and
+-- "to the battlefield" with no controller named goes to the player the effect
+-- instructed (CR 110.2a) -- here each player over their own graveyard, which is
+-- the card's owner (CR 400.3) and what the underOwner rider states.
+--
+-- THREE SEATS, each with THREE land cards and a creature card buried: the count
+-- is two, so every seat has a real choice (an offer equal to the count would
+-- elide the second ask and the case would pass whatever the engine did), and the
+-- creature card is the filter's witness in the very graveyard the choice reads.
+--
+-- Driven through the turn-based action rather than a cast, which is what
+-- advanceSpec in Pawl.SagaSpec does: the Saga enters with one lore counter
+-- already on it, CR 714.3c adds the second, and the chapter II trigger that
+-- crossing fires is what resolves. The asks are pinned by INDEX through a
+-- State-threaded answerer, since a pure one cannot tell a seat's second ask from
+-- its first.
+fallOfTheThranSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fallOfTheThranSpec s registry =
+  let -- Fall of the Thran on alice's battlefield with chapter I already behind
+      -- it, and `buried` into the named graveyards in the order given. The
+      -- precombat main phase is alice's, so CR 714.3c's action is hers to take.
+      board thran buried =
+        let (oid, base) = S.addPermanent thran S.alice S.threePlayerGame
+            withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) base buried
+         in ( oid,
+              (S.addCounter CounterKind.Lore 1 oid withGraves)
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      named = Just . CardName.MkCardName . Text.pack
+      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+      -- One index per ask, taken in order, and the SIZE of each offer recorded
+      -- beside it -- so a second ask that never happened and a second ask over
+      -- the wrong candidates are both visible.
+      taking :: Prompt.Prompt r -> State.State ([Int], [Int]) r
+      taking p = case p of
+        Prompt.ChooseCardInGraveyard _ _ _ offered -> do
+          (indices, sizes) <- State.get
+          State.put (drop 1 indices, sizes <> [length (NonEmpty.toList offered)])
+          pure (nth (Maybe.fromMaybe 0 (Maybe.listToMaybe indices)) offered)
+        _ -> pure (S.identityAnswer p)
+      -- CR 714.3c's counter, then the priority round that resolves the chapter
+      -- ability it fired.
+      advance :: [Int] -> (ObjectId.ObjectId, GameState.GameState) -> (GameState.GameState, [Int])
+      advance script (_, gs) =
+        let ((_, advanced), afterTba) = State.runState (Engine.runGame taking gs (Engine.runTurnBasedActions Phase.PrecombatMain)) (script, [])
+            ((_, after), afterLoop) = State.runState (Engine.runGame taking advanced Engine.priorityLoop) afterTba
+         in (after, snd afterLoop)
+      -- Every permanent on the battlefield by NAME and CONTROLLER (CR 110.2a),
+      -- which is what a return "to the battlefield" has to be read by: CR 400.7
+      -- mints a fresh id at the destination.
+      onBattlefield gs =
+        List.sort
+          ( fmap
+              (\oid -> (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs))
+              (Set.toList (GameState.battlefield gs))
+          )
+      setup = do
+        thran <- S.printingOf s registry "Fall of the Thran"
+        plains <- S.printingOf s registry "Plains"
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        mountain <- S.printingOf s registry "Mountain"
+        forest <- S.printingOf s registry "Forest"
+        hero <- S.printingOf s registry "Benalish Hero"
+        pure
+          ( board
+              thran
+              [ (plains, S.alice),
+                (island, S.alice),
+                (swamp, S.alice),
+                (hero, S.alice),
+                (forest, S.bob),
+                (mountain, S.bob),
+                (plains, S.bob),
+                (hero, S.bob),
+                (island, S.carol),
+                (swamp, S.carol),
+                (forest, S.carol),
+                (hero, S.carol)
+              ]
+          )
+   in Spec.describe s "FallOfTheThran" $ do
+        -- The headline: TWO cards come back per seat, and they are DIFFERENT
+        -- cards. Every ask takes index 0, so an implementation whose second ask
+        -- re-offered the card the first took would name one card twice and return
+        -- one land per seat (CR 400.7 retiring the id the first move minted).
+        Spec.it s "CR 608.2d each player returns two DISTINCT land cards from their own graveyard" $ do
+          gs <- setup
+          let (after, sizes) = advance [0, 0, 0, 0, 0, 0] gs
+          Spec.assertEqWith
+            s
+            "two lands each, under their own owners, beside the Saga"
+            (onBattlefield after)
+            ( List.sort
+                [ (named "Fall of the Thran", Just S.alice),
+                  (named "Plains", Just S.alice),
+                  (named "Island", Just S.alice),
+                  (named "Forest", Just S.bob),
+                  (named "Mountain", Just S.bob),
+                  (named "Island", Just S.carol),
+                  (named "Swamp", Just S.carol)
+                ]
+            )
+          Spec.assertEqWith
+            s
+            "each graveyard keeps its third land and its creature card"
+            (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after, namesIn Zone.Graveyard S.carol after)
+            ([named "Swamp", named "Benalish Hero"], [named "Plains", named "Benalish Hero"], [named "Forest", named "Benalish Hero"])
+          Spec.assertEqWith s "six asks in APNAP order, each seat's second over one fewer candidate" sizes [3, 2, 3, 2, 3, 2]
+        -- The paired control, on the same board: other answers take other cards,
+        -- so the engine is not picking. Index 2 of alice's untouched three is the
+        -- Swamp, and index 1 of what its removal leaves is the Island.
+        Spec.it s "CR 608.2d the engine does not pick: other answers return the other lands" $ do
+          gs <- setup
+          let (after, _) = advance [2, 1, 2, 1, 2, 1] gs
+          Spec.assertEqWith
+            s
+            "each seat's third and second land came back instead"
+            (onBattlefield after)
+            ( List.sort
+                [ (named "Fall of the Thran", Just S.alice),
+                  (named "Swamp", Just S.alice),
+                  (named "Island", Just S.alice),
+                  (named "Plains", Just S.bob),
+                  (named "Mountain", Just S.bob),
+                  (named "Forest", Just S.carol),
+                  (named "Swamp", Just S.carol)
+                ]
+            )
+        -- CR 609.3: a graveyard holding fewer matching cards than the count gives
+        -- what it has, and the rest of the instruction is performed on that (CR
+        -- 101.3). One candidate elides the ask entirely and none skips it, so
+        -- neither seat consumes an index.
+        Spec.it s "CR 609.3 one land card gives one, and an empty graveyard gives none" $ do
+          thran <- S.printingOf s registry "Fall of the Thran"
+          plains <- S.printingOf s registry "Plains"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let (after, sizes) = advance [] (board thran [(plains, S.alice), (hero, S.bob)])
+          Spec.assertEqWith
+            s
+            "alice's one land came back and bob's creature card stayed put"
+            (onBattlefield after)
+            (List.sort [(named "Fall of the Thran", Just S.alice), (named "Plains", Just S.alice)])
+          Spec.assertEqWith s "and nobody was asked anything" sizes []
+
 -- ObjectRef.ChosenCardFromAmong's COUNT: "from among them" taking more than one
 -- card out of one bound group, where communeWithTheGodsSpec above takes one.
 --
@@ -2075,6 +2234,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   enduranceSpec s registry
   portOfKarfellSpec s registry
   graspingTentaclesSpec s registry
+  fallOfTheThranSpec s registry
   midnightTillingSpec s registry
   communeWithTheGodsSpec s registry
   ancestralMemoriesSpec s registry

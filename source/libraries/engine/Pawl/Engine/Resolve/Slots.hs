@@ -380,7 +380,10 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- Both halves name a slot: WHO CHOOSES through the Chooser, and WHOSE
   -- graveyards through the scope -- reported for EachCardInGraveyard's reason,
   -- since Grasping Tentacles' scope is a read of the slot its own mill targets.
-  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope _) -> joinTwo (chooserSlots chooser) (zoneScopeSlots scope)
+  --
+  -- Joined with the COUNT's own slots, TopOfLibrary's arm above and for its
+  -- reason.
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope _ count) -> joinTwo (joinTwo (chooserSlots chooser) (zoneScopeSlots scope)) (quantitySlots count)
   -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read --
   -- reported by objectRefPlayerRefs rather than here.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ _) -> Map.empty
@@ -441,7 +444,10 @@ objectRefQuantities ref = case ref of
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ _ count) -> [count]
   -- CR 404.1's top card is ONE card, so the graveyard arm states no depth at all.
   ObjectRef.TopOfGraveyard _ -> []
-  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _) -> []
+  -- How many cards each chooser picks out of a graveyard -- Fall of the Thran's
+  -- printed two. A REGRESSION FENCE for the ChosenCardFromAmong arm below's
+  -- reason: every count in the pool is a Literal, which reads no slot.
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _ count) -> [count]
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ _) -> []
   -- How many cards are picked out of the group -- Ancestral Memories' printed
   -- two, the library walks' counts above being the only other ObjectRef numbers.
@@ -483,7 +489,7 @@ objectRefPlayerRefs ref = case ref of
   -- Whose graveyard, the two library walks' own read over CR 400.1's other
   -- per-player zone.
   ObjectRef.TopOfGraveyard player -> [player]
-  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _) -> []
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _ _) -> []
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> [player]
   -- The seat that picks out of the group -- Animal Magnetism's opponent, and by
   -- default CR 608.2c's resolving controller.

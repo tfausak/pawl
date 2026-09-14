@@ -824,8 +824,8 @@ swapWordIn family pairs word =
 -- CR 612.1 through an ObjectRef. An InSlot names an object chosen at cast time,
 -- and the player-naming arms hold no subtype word; only the Filters and the
 -- Quantities can carry one -- the Filter that says what ends a walk of a library
--- included, and ChosenCardFromAmong's and RandomCardInHand's counts beside the
--- two library walks'.
+-- included, and ChosenCardInGraveyard's, ChosenCardFromAmong's and
+-- RandomCardInHand's counts beside the two library walks'.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
@@ -850,7 +850,7 @@ rewriteObjectRef pairs ref = case ref of
   -- nothing to swap: the arms above reach one only through a Filter or a
   -- Quantity, and this one carries neither.
   ObjectRef.TopOfGraveyard _ -> ref
-  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f n) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f) (rewriteQuantity pairs n))
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p f) -> ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p (Filter.rewrite pairs f))
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n f c w) -> ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n (Filter.rewrite pairs f) (rewriteQuantity pairs c) w)
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong n f) -> ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong n (Filter.rewrite pairs f))
