@@ -669,6 +669,20 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- promise needs: every GameEvent.Crewed carries a vehicle.
   (TriggerCondition.SelfCrewsVehicle, GameEvent.Crewed ev) ->
     Binding.setCrewedVehicle (Crewing.vehicle ev) Map.empty
+  -- CR 702.122e's rider: the creatures that paid THAT activation's crew cost,
+  -- which Mighty Servant of Leuk-o's intervening "if" counts. The event the
+  -- rider is about is the one being matched, so taking the set off it is what
+  -- makes "only creatures that were tapped to pay the cost of the crew ability
+  -- that caused it to trigger" true of a Vehicle crewed twice in a turn. The
+  -- VEHICLE gets no slot: it is the bearer, and Binding.triggerSource already
+  -- names it.
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.BecameCrewed carries the set, empty where the
+  -- cost had no TapForTotalPower component. An empty set still binds, and the
+  -- count reads 0 -- which is the rider's own answer, not an absent slot.
+  (TriggerCondition.SelfBecomesCrewed _, GameEvent.BecameCrewed ev) ->
+    Binding.setCrewers (Crewing.crewedBy ev) Map.empty
   -- CR 400.7f, the sibling of CR 400.7e's `became` arms above: an ability that
   -- triggers when an enchanted permanent leaves the battlefield "can find the new
   -- object that each Aura enchanting that permanent became in its owner's
@@ -1534,16 +1548,12 @@ eventBindingSlots cond = case cond of
   -- second id -- Profaner of the Dead's "the exploited creature's toughness" is
   -- the printed payload that reads it (#3692).
   TriggerCondition.SelfExploits -> Set.empty
-  -- Empty for that arm's reason too: rule 702.122e's event names the Vehicle,
-  -- which is already Binding.triggerSource, and the creatures it also carries are
-  -- the OTHER side of the relation, which no rule 702.122e wording reads as a
-  -- subject.
-  --
-  -- Not implemented: rule 702.122e's rider, the intervening "if" that would ask a
-  -- condition of the creatures which paid that activation's crew cost. The event
-  -- carries them (GameEvent.BecameCrewed); what is missing is a condition that
-  -- reads them (#915).
-  TriggerCondition.SelfBecomesCrewed -> Set.empty
+  -- NOT empty, unlike SelfEvolves above: rule 702.122e's event names the Vehicle,
+  -- which Binding.triggerSource already answers, but its rider makes the CREWERS
+  -- a subject of their own -- Mighty Servant of Leuk-o's "if it was crewed by
+  -- exactly two creatures". Guaranteed given a match, every
+  -- GameEvent.BecameCrewed carrying the set.
+  TriggerCondition.SelfBecomesCrewed {} -> Set.singleton Binding.crewers
   -- CR 702.122b's crewer side, which DOES name somebody the bearer does not: the
   -- Vehicle it crewed, Gearshift Ace's "that Vehicle". Guaranteed given a match,
   -- every GameEvent.Crewed carrying a vehicle.

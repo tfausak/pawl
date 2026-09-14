@@ -37,7 +37,10 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfBecomesCrewed"
+            "type": "SelfBecomesCrewed",
+            "value": {
+              "type": "EveryTime"
+            }
           },
           "modal": {
             "modes": [

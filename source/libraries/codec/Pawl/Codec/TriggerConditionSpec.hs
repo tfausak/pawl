@@ -918,13 +918,20 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfExploits
       " {\"type\":\"SelfExploits\"} "
-  -- CR 702.122e's marker, self-scoped, so nullary for SelfTrains' reason above.
-  Spec.it s "SelfBecomesCrewed" $
+  -- CR 702.122e's marker, self-scoped but carrying a frequency for SelfAttacks'
+  -- reason above -- Mighty Servant of Leuk-o prints "for the first time each
+  -- turn". Both, since either could round-trip alone.
+  Spec.it s "SelfBecomesCrewed round-trips both frequencies" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      TriggerCondition.SelfBecomesCrewed
-      " {\"type\":\"SelfBecomesCrewed\"} "
+      (TriggerCondition.SelfBecomesCrewed TriggerFrequency.EveryTime)
+      " {\"type\":\"SelfBecomesCrewed\",\"value\":{\"type\":\"EveryTime\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfBecomesCrewed TriggerFrequency.FirstTimeEachTurn)
+      " {\"type\":\"SelfBecomesCrewed\",\"value\":{\"type\":\"FirstTimeEachTurn\"}} "
   -- CR 702.122b's crewer side, nullary for the arm above's reason.
   Spec.it s "SelfCrewsVehicle" $
     Common.assertCodec

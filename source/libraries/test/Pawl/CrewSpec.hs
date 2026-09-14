@@ -31,6 +31,11 @@
 -- ability reaches nothing that reads the crewing, so becomesCrewedSpec below adds
 -- a second Vehicle rather than another case on this one.
 --
+-- CR 702.122e's RIDER has a fixture of its own again, Mighty Servant of Leuk-o:
+-- the rider is an intervening "if" that counts the creatures which paid that
+-- activation's cost, and neither Vehicle above prints one, so crewedByRiderSpec
+-- below adds a third.
+--
 -- CR 702.122b has its own fixture too, Gearshift Ace: rule 702.122b is asked of
 -- the CREWER, which neither Vehicle above can be, so crewsVehicleSpec below adds
 -- a creature that reads the relation from that side.
@@ -78,6 +83,8 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- The crew ability, taken from the PROJECTION rather than from the card's face.
@@ -137,6 +144,7 @@ spec s registry = Spec.describe s "Crew" $ do
   crewCostSpec s registry
   crewedVehicleSpec s registry
   becomesCrewedSpec s registry
+  crewedByRiderSpec s registry
   crewsVehicleSpec s registry
   crewedThisTurnSpec s registry
   cantCrewSpec s registry
@@ -418,6 +426,80 @@ crewingAt tappers target p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter ((== Just target) . Recipient.objectOf) candidates) sets
   _ -> S.identityAnswer p
+
+-- CR 702.122e's rider: an intervening "if" that refers to the crewing creatures
+-- means only the ones that paid the cost of the activation that caused the
+-- trigger. Mighty Servant of Leuk-o is the fixture -- {3} Artifact -- Vehicle
+-- 6/6, crew 4, "whenever this Vehicle becomes crewed for the FIRST TIME EACH
+-- TURN, if it was crewed by EXACTLY TWO creatures, it gains 'whenever this
+-- creature deals combat damage to a player, draw two cards' until end of turn".
+--
+-- Crew 4 is what makes the pair of boards differ in ONE thing. Blind-Spot Giant
+-- is 4/3, so it pays the cost alone; adding Hill Giant's 3 pays the same cost
+-- with two creatures. So the positive and negative boards are the same board,
+-- the same Vehicle and the same cost, tapping one creature or two.
+--
+-- The arithmetic is non-degenerate for the module header's reason: the rider's
+-- threshold is 2 (a COUNT), the cost's is 4 (a total POWER), and the two boards
+-- total 4 and 7. No single number reaches the answer twice, so a condition that
+-- had counted power or summed the count would miss on both boards.
+--
+-- Four crewers, two of each printing, so the third case can crew twice in one
+-- turn with a fresh pair each time and never reuse a tapped creature.
+crewedByRiderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+crewedByRiderSpec s registry = Spec.describe s "CrewedByRider" $ do
+  Spec.it s "CR 702.122e crewed by exactly two creatures grants the ability" $ do
+    servant <- S.printingOf s registry "Mighty Servant of Leuk-o"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (servantId, _, crewIds, gs) = crewReaderBoard servant [] [hillGiant, blindSpot]
+    case crewIds of
+      [giantId, blindId] -> do
+        let (onStack, after) = crewAndSettle (crewingWith [giantId, blindId]) servantId gs
+        Spec.assertBool s (drawsOnCombatDamage servantId after) "the Vehicle gained the combat-damage trigger"
+        Spec.assertBool s (not (drawsOnCombatDamage servantId onStack)) "and had not gained it while the trigger waited"
+        Spec.assertBool s (isCreature servantId after) "with the crewing itself having animated it"
+      _ -> Spec.assertFailure s "fixture should have two crewers"
+  -- The negative, ONE thing away: the same Vehicle and the same crew 4, paid by
+  -- Blind-Spot Giant alone. The trigger still fires -- rule 702.122e's first
+  -- sentence is about the ability resolving -- and the rider is what removes it.
+  Spec.it s "CR 702.122e crewed by one creature does not" $ do
+    servant <- S.printingOf s registry "Mighty Servant of Leuk-o"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (servantId, _, crewIds, gs) = crewReaderBoard servant [] [hillGiant, blindSpot]
+    case crewIds of
+      [giantId, blindId] -> do
+        let (_, after) = crewAndSettle (crewingWith [blindId]) servantId gs
+        Spec.assertBool s (not (drawsOnCombatDamage servantId after)) "the Vehicle gained nothing"
+        Spec.assertBool s (isCreature servantId after) "though the crewing animated it all the same"
+        Spec.assertEqWith s "and Hill Giant was never tapped" (tapStateOf giantId after) (Just TapState.Untapped)
+      _ -> Spec.assertFailure s "fixture should have two crewers"
+  -- "For the first time each turn": a SECOND crewing on the same turn, by a
+  -- fresh pair that would satisfy the rider, triggers nothing at all. One board
+  -- away from the first case -- the same Vehicle, crewed twice.
+  Spec.it s "CR 702.122e a second crewing this turn does not trigger it again" $ do
+    servant <- S.printingOf s registry "Mighty Servant of Leuk-o"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (servantId, _, crewIds, gs) = crewReaderBoard servant [] [hillGiant, blindSpot, hillGiant, blindSpot]
+    case crewIds of
+      [giantId, blindId, giantId', blindId'] -> do
+        let (_, once) = crewAndSettle (crewingWith [giantId, blindId]) servantId gs
+            (twiceOnStack, _) = crewAndSettle (crewingWith [giantId', blindId']) servantId once
+        Spec.assertEqWith s "the second crewing gathered no trigger" (length (GameState.stack twiceOnStack)) 0
+        Spec.assertEqWith s "though it did tap its own pair" (tapStateOf giantId' twiceOnStack, tapStateOf blindId' twiceOnStack) (Just TapState.Tapped, Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should have four crewers"
+
+-- Does this permanent carry the triggered ability Mighty Servant of Leuk-o's
+-- rider grants -- "whenever this creature deals combat damage to a player, draw
+-- two cards"? Read off the PROJECTION, hasFirstStrike's shape one ability kind
+-- over, so a grant that never reached layer 6 answers False.
+drawsOnCombatDamage :: ObjectId.ObjectId -> GameState.GameState -> Bool
+drawsOnCombatDamage oid gs =
+  any
+    ((\condition -> case condition of TriggerCondition.SelfDealsCombatDamageToPlayer _ -> True; _ -> False) . TriggeredAbility.condition)
+    (Projection.triggeredAbilitiesOf oid gs)
 
 -- CR 702.122b: the crewer's side of rule 702.122c's relation, read by Gearshift
 -- Ace's "whenever this creature crews a Vehicle, that Vehicle gains first strike

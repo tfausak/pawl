@@ -498,6 +498,27 @@ revealedCard = SlotName.MkSlotName (Text.pack "thatRevealedCard")
 crewedVehicle :: SlotName
 crewedVehicle = SlotName.MkSlotName (Text.pack "thatCrewedVehicle")
 
+-- CR 702.122e's rider: the reserved slot under which the creatures that paid
+-- THAT crew activation's cost are bound -- Mighty Servant of Leuk-o's "if it was
+-- crewed by exactly two creatures", which is an intervening "if" and so must
+-- mean only the crewers of the activation that caused the trigger. Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings off GameEvent.BecameCrewed, which
+-- Pawl.Engine.Resolve carries the set on for exactly this reason.
+--
+-- Not `tappedForTotalPower` above, though the two hold the same ids: that slot
+-- is the PAYMENT's, folded onto the ability object and gone with it (CR 608.2n),
+-- while this one rides the trigger onto the stack. Rule 702.122e's rider is
+-- about which activation, so a Vehicle crewed twice in a turn has two triggers
+-- and each reads its own set here.
+--
+-- SET-VALUED for tappedForTotalPower's reason and bound as a GROUP
+-- (Binding.objects) rather than as recipients: rule 702.122a's "any number" is a
+-- set, and these are named, never targeted (CR 115.10a). The set carries no
+-- order the game gives it, so nothing may read it positionally; the only reader
+-- in the pool counts it.
+crewers :: SlotName
+crewers = SlotName.MkSlotName (Text.pack "thoseThatCrewedIt")
+
 -- CR 106.12a: the reserved slot under which the permanent that was TAPPED FOR
 -- MANA is bound -- the "its" in Wild Growth's "whenever enchanted land is tapped
 -- for mana, its controller adds an additional {G}", read through
@@ -986,6 +1007,10 @@ setMentoredCreature oid = Map.insert mentoredCreature (toObject oid)
 -- Bind an object under the reserved crewedVehicle slot (CR 702.122b).
 setCrewedVehicle :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setCrewedVehicle oid = Map.insert crewedVehicle (toObject oid)
+
+-- Bind the crewing creatures under the reserved crewers slot (CR 702.122e).
+setCrewers :: Set ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setCrewers oids = Map.insert crewers (toObjects (Seq.fromList (Set.toList oids)))
 
 -- Bind an object under the reserved attachedHost slot (CR 701.3a).
 setAttachedHost :: ObjectId -> Map SlotName Binding -> Map SlotName Binding

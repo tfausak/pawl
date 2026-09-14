@@ -862,7 +862,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
   -- Nor does CR 702.122e's, which is nullary.
-  TriggerCondition.SelfBecomesCrewed -> []
+  TriggerCondition.SelfBecomesCrewed {} -> []
   -- Nor does CR 702.122b's crewer side, nullary too.
   TriggerCondition.SelfCrewsVehicle -> []
   -- CR 701.21a's carries a PlayerRelation and a Filter, neither of which holds a
@@ -2170,6 +2170,7 @@ reservedSlots =
       Binding.tappedForTotalPower,
       Binding.revealedCard,
       Binding.crewedVehicle,
+      Binding.crewers,
       Binding.manaSource,
       Binding.castSpell,
       Binding.thisAbility,
@@ -3485,7 +3486,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfExploits -> []
   -- CR 702.122e's carries none either: it names "this Vehicle" and nothing about
   -- it to narrow by.
-  TriggerCondition.SelfBecomesCrewed -> []
+  TriggerCondition.SelfBecomesCrewed {} -> []
   -- Nor does CR 702.122b's: it names "this creature" and nothing about the
   -- Vehicle to narrow by.
   TriggerCondition.SelfCrewsVehicle -> []
@@ -3800,7 +3801,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.AttachedCreatureMentors -> []
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
-  TriggerCondition.SelfBecomesCrewed -> []
+  TriggerCondition.SelfBecomesCrewed {} -> []
   TriggerCondition.SelfCrewsVehicle -> []
   TriggerCondition.PermanentSacrificed {} -> []
   TriggerCondition.SagaFinalChapterTriggers _ -> []
