@@ -3535,6 +3535,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    -- Unreachable rather than elided: Pawl.Engine.Event records this event only
+    -- in CR 730.3's departure split, whose origin is the battlefield, so `from`
+    -- is never the library here.
     GameEvent.CardArrived _ -> False
   -- CR 603.6 with NO origin zone: the destination is the whole condition, so a
   -- discard, a mill, a countered spell and a death all match. `from` is
@@ -3614,10 +3617,15 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
-    -- Not implemented: CR 712.21's second card IS put into the graveyard, so a
-    -- component printing this condition should fire for it too; no meld pair in
-    -- data/cards/ prints one (#3106).
-    GameEvent.CardArrived _ -> False
+    -- CR 712.21 / CR 730.3: every component card after the leading one is put
+    -- into the graveyard too and announces itself here, so a component printing
+    -- this condition fires for its own card wherever CR 730.3a's arrangement put
+    -- it. Matched exactly as the Moved arm above, the two events differing only
+    -- in which arrival they name. Pawl.MutateSpec's "from either arrangement"
+    -- case proves it over both orders.
+    GameEvent.CardArrived zc ->
+      ZoneChange.object zc == bearer
+        && ZoneChange.to zc == Zone.Graveyard
   -- CR 603.6 read by a BYSTANDER: "whenever another card is put into a graveyard
   -- from anywhere" (Planar Void). The destination is the whole of the zone test,
   -- as it is for SelfPutIntoGraveyardFromAnywhere above; what differs is who is

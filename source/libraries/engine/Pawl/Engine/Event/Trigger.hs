@@ -111,11 +111,16 @@ battlefieldAt group gs = Map.findWithDefault (battlefieldCandidates gs) group (G
 movedOf :: GameEvent -> Maybe ZoneChange
 movedOf event = case event of
   GameEvent.Moved (Moved.MkMoved zc _ _) -> Just zc
-  -- Not implemented: CR 712.21's second card DID change zones, so this could
-  -- answer its ZoneChange too. Its two engine callers are the graveyard
-  -- candidate sources below, whose business is a card bearing an ability that
-  -- functions from a graveyard; no meld pair in data/cards/ prints one (#3106).
-  GameEvent.CardArrived _ -> Nothing
+  -- CR 712.21 / CR 730.3: each component card after the leading one DID change
+  -- zones, so the event that announces it answers with its zone change like any
+  -- other. That is what puts it in front of the two graveyard candidate sources
+  -- below -- CR 603.10's subtraction of a card that reached a graveyard later,
+  -- and the last-known read for one that has left the graveyard again.
+  --
+  -- A REGRESSION FENCE rather than a behaviour under test: no card in
+  -- data/cards/ reaches either source through this arm, and neutralising the line
+  -- leaves the suite green. It is CR 400.7 held to, not coverage.
+  GameEvent.CardArrived zc -> Just zc
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
