@@ -861,7 +861,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
-  -- Nor does CR 702.122e's, which is nullary.
+  -- Nor does CR 702.122e's: its payload is a TriggerFrequency, SelfAttacks' above.
   TriggerCondition.SelfBecomesCrewed {} -> []
   -- Nor does CR 702.122b's crewer side, nullary too.
   TriggerCondition.SelfCrewsVehicle -> []

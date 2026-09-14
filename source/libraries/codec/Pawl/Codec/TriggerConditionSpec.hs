@@ -932,7 +932,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesCrewed TriggerFrequency.FirstTimeEachTurn)
       " {\"type\":\"SelfBecomesCrewed\",\"value\":{\"type\":\"FirstTimeEachTurn\"}} "
-  -- CR 702.122b's crewer side, nullary for the arm above's reason.
+  -- CR 702.122b's crewer side, nullary for SelfExploits' reason above; the arm
+  -- before it is where a frequency would go if a card printed one.
   Spec.it s "SelfCrewsVehicle" $
     Common.assertCodec
       s
