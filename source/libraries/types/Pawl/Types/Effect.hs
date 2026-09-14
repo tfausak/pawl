@@ -305,7 +305,11 @@ data Effect card ability
     -- on the stack onto the stack (Twincast, Lithoform Engine), cloning the
     -- original stack object so CR 707.10's "all decisions made for it" carries
     -- over.
-    CopyStackObject CopyStackObject.CopyStackObject
+    --
+    -- The payload carries CR 707.9's exceptions, BecomeCopy's arm above (Double
+    -- Major), and CR 707.10's own answer to who puts the copy onto the stack
+    -- (Meletis Charlatan).
+    CopyStackObject (CopyStackObject.CopyStackObject ability)
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition asked as the event
     -- would happen (CR 614.1). Targetless.

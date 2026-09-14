@@ -31,6 +31,16 @@
                   {
                     "type": "CopyStackObject",
                     "value": {
+                      "exceptions": [
+                        {
+                          "type": "RemoveSupertypes",
+                          "value": [
+                            {
+                              "type": "Legendary"
+                            }
+                          ]
+                        }
+                      ],
                       "ref": {
                         "type": "InSlot",
                         "value": "spell"

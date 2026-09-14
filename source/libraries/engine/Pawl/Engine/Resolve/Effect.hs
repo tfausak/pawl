@@ -5160,7 +5160,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               subjects = objectRefObjects legal resolving controller source gs subjectRef
            in gs {GameState.objects = foldr write (GameState.objects gs) subjects}
         _ -> gs
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity) -> do
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity copierRef exceptions) -> do
     gs <- State.get
     -- CR 707.10: `quantity` copies of each named object, each put onto the stack.
     -- The named objects are enumerated ONCE off this `gs` (CR 608.2f), and the
@@ -5192,7 +5192,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- spell a trigger fired on, which resolves first). This branch is epic's
       -- alone today.
       Monad.forM_ (if Game.isSpell original gs || Game.isAbility original gs then Game.lookupObject original gs else Map.lookup original (GameState.stackArchive gs)) $ \obj ->
-        Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(copySource, kind) -> Monad.replicateM_ copies $ do
+        -- CR 707.10's "that player copies it": WHO puts the copy onto the stack,
+        -- which is the copy's owner and controller and CR 707.10c's chooser --
+        -- Meletis Charlatan's "the controller of target instant or sorcery spell".
+        -- Read off the same pre-effect `gs` as the objects (CR 608.2f), and
+        -- PLURAL, one copy per seat the reference names; every producer names one,
+        -- and the elided default names the resolving controller.
+        Monad.forM_ (playerRefPlayers legal controller gs copierRef) $ \copier -> Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(copySource, kind) -> Monad.replicateM_ copies $ do
           -- CR 707.10's answers, as the target maps to write: one EMPTY map
           -- where the copy keeps the decisions rule 707.10 copied (rule 707.10c
           -- included, its offer below being a separate act), CR 707.10d's one
@@ -5215,10 +5221,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- would be a list to keep in step with Pawl.Types.Object; this way
                 -- a new decision field is copied by construction.
                 --
-                -- Owner and controller are the COPYING effect's controller, both
-                -- stated outright by CR 707.10 and neither inherited: the copy is
+                -- Owner and controller are the seat `copier` named, both stated
+                -- outright by CR 707.10 and neither inherited: the copy is
                 -- "owned by the player under whose control it was put on the
-                -- stack". Rule 707.10 gives an OWNER only to a copy of a spell, and
+                -- stack", which is the copying effect's controller unless the
+                -- effect says who else (Meletis Charlatan).
+                -- Rule 707.10 gives an OWNER only to a copy of a spell, and
                 -- the same write is right for an ability: pawl's Object.owner on an
                 -- ability object is that ability's controller, which is what
                 -- Pawl.Engine.Activate stamps and what Pawl.Engine.Stack's two
@@ -5245,10 +5253,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- An ARCHIVED spell brings its own snapshot -- the one the
                 -- arming effect filed, rule 702.50a's "except for its epic
                 -- ability" written into it -- and there is no live object left
-                -- to take a fresh reading off, so the copied bindings stand.
+                -- to take a fresh reading off, so that snapshot is what the
+                -- arm below re-stamps rather than a fresh reading.
+                --
+                -- CR 707.9's exceptions are folded into the snapshot on the way
+                -- in, exactly as the BecomeCopy arm above folds them, so Double
+                -- Major's "except it isn't legendary" is part of the copy's own
+                -- copiable values (CR 707.9b) and survives CR 707.10f's token.
+                -- `own` is Nothing for CreateCopy's reason: a copy put onto the
+                -- stack has no previous copiable values for CR 707.9c to retain.
+                except = Replacement.applyCopyExceptions (thisAbilitySource resolving gs) Nothing exceptions
                 stampCopiable = case kind of
-                  StackObjectKind.Spell | Maybe.isJust (Game.lookupObject original gs) -> Binding.setCopy (Event.copiedSnapshot original gs)
-                  StackObjectKind.Spell -> id
+                  StackObjectKind.Spell | Maybe.isJust (Game.lookupObject original gs) -> Binding.setCopy (except (Event.copiedSnapshot original gs))
+                  -- An ARCHIVED spell's exceptions are re-folded over the snapshot
+                  -- the arming effect filed. A REGRESSION FENCE rather than a
+                  -- proved line: rule 702.50a's epic is the only arming effect,
+                  -- and it states no exception.
+                  StackObjectKind.Spell -> maybe id (Binding.setCopy . except) (Binding.copyOf (Object.bindings obj))
                   StackObjectKind.ActivatedAbility -> id
                   StackObjectKind.TriggeredAbility -> id
                 copy =
@@ -5258,8 +5279,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- opcode's own rather than the copied object's -- which the
                       -- guard above has already established was the stack.
                       Object.zone = Zone.Stack,
-                      Object.owner = controller,
-                      Object.enteredUnder = Just controller,
+                      Object.owner = copier,
+                      Object.enteredUnder = Just copier,
                       Object.timestamp = ts,
                       Object.damage = 0,
                       Object.counters = Map.empty,
@@ -5275,7 +5296,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- that must be: Pawl.Engine.Cast and Pawl.Engine.Activate
                       -- write the caster or activator into it as the original goes
                       -- on the stack, and CR 707.10 makes the copy's controller the
-                      -- copying effect's controller instead. Every other binding is
+                      -- seat `copier` named instead. Every other binding is
                       -- a DECISION, which CR 707.10 copies verbatim -- including an
                       -- ability's self slot, so CR 707.10b's "the copy refers to
                       -- that same object" needs no write of its own.
@@ -5283,10 +5304,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- chose them, over the decisions CR 707.10 copied. Empty
                       -- for the other two answers, which leave every one of them
                       -- standing.
-                      Object.bindings = Binding.setYou controller (stampCopiable (Map.union (fmap Binding.toRecipients retarget) (Object.bindings obj)))
+                      Object.bindings = Binding.setYou copier (stampCopiable (Map.union (fmap Binding.toRecipients retarget) (Object.bindings obj)))
                     }
-            State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue controller copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
-            Monad.when (targets == CopyTargets.ChosenByController) (chooseNewTargetsFor controller copyId)
+            State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue copier copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
+            -- CR 707.10c's chooser is the COPY's controller and not the copying
+            -- effect's: Meletis Charlatan's "that player may choose new targets
+            -- for the copy". Proved by Pawl.CopySpec's Charlatan group.
+            Monad.when (targets == CopyTargets.ChosenByController) (chooseNewTargetsFor copier copyId)
             -- CR 115.1: "these targets are declared as part of the process of
             -- putting the spell or ability on the stack", and CR 707.10c puts the
             -- copy on the stack once its controller has decided what its targets
@@ -5303,7 +5327,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- 707.10's "a copy of a spell is itself a spell" and "a copy of an
             -- ability is itself an ability".
             gsCopied <- State.get
-            Event.becameTarget copyId kind controller (targetsOnStack copyId gsCopied)
+            Event.becameTarget copyId kind copier (targetsOnStack copyId gsCopied)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and not belt and braces: the source can

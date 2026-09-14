@@ -54,6 +54,13 @@
 -- 704.5e state-based action in Pawl.Engine.Sba that removes the resolved copy,
 -- and Pawl.Engine.Stack's OfSpellCopy resolution arm.
 --
+-- And that arm's two answers to the rest of CR 707.10's sentence: who puts the
+-- copy onto the stack, where the effect names somebody other than its own
+-- controller (Meletis Charlatan, whose copy is the copied spell's controller's
+-- and who is therefore CR 707.10c's chooser), and CR 707.9's "except ..." clause
+-- riding it (Double Major's "except it isn't legendary", read by CR 704.5j over
+-- the token CR 707.10f mints).
+--
 -- And that same arm over CR 707.10's other two nouns -- an activated and a
 -- triggered ability on the stack, copied by Lithoform Engine
 -- (copyAbilityOnStackSpec), where CR 707.10b keeps the original's source.
@@ -2097,6 +2104,17 @@ pinTarget recipient p = case p of
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
   _ -> S.identityAnswer p
 
+-- CR 707.10c's prompt answered by the SEAT it asks, which is the only way a pure
+-- answerer can tell the copy's controller from the copying effect's: bob, the
+-- copied spell's controller, sends the copy at carol, and any other seat sends it
+-- at bob. Used where CR 707.10c's is the only ChooseTargets the run raises.
+retargetByAsker :: Prompt.Prompt r -> r
+retargetByAsker p = case p of
+  Prompt.ChooseTargets _ who _ _
+    | who == S.bob -> pinTarget (Recipient.ToPlayer S.carol) p
+    | otherwise -> pinTarget (Recipient.ToPlayer S.bob) p
+  _ -> S.identityAnswer p
+
 -- The stack's top object, which after a cast is the spell just cast.
 topOfStack :: GameState.GameState -> Maybe ObjectId
 topOfStack = Maybe.listToMaybe . GameState.stack
@@ -2246,8 +2264,10 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
 
   -- CR 707.10: "a copy of a spell is owned by the player under whose control it
   -- was put on the stack ... a copy of a spell or ability is controlled by the
-  -- player under whose control it was put on the stack". The copying effect's
-  -- controller, never the copied spell's.
+  -- player under whose control it was put on the stack". Twincast states nobody
+  -- else, so CopyStackObject.copier is its elided default and the seat is the
+  -- copying effect's controller rather than the copied spell's; Meletis
+  -- Charlatan is the case that names somebody else.
   --
   -- Renewed Faith ("You gain 6 life") rather than the Bolt above, because the
   -- Bolt cannot show this: its damage lands on a target either way, so a copy
@@ -2307,6 +2327,88 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "alice takes the COPY's 2, being the copy's you" (S.lifeOf S.alice after) (Just 18)
         Spec.assertEqWith s "bob takes only his own Char's 2" (S.lifeOf S.bob after) (Just 18)
         Spec.assertEqWith s "carol takes 4 from each, the target having been copied" (S.lifeOf S.carol after) (Just 12)
+  -- CR 707.10's "that player copies it", on Meletis Charlatan {2}{U} Creature --
+  -- Human Wizard 2/3, "{2}{U}, {T}: The controller of target instant or sorcery
+  -- spell copies it. That player may choose new targets for the copy" (Oracle
+  -- text verified 2026-09-14). The copy is put onto the stack by somebody other
+  -- than the ability's controller, which is the CopyStackObject.copier field.
+  --
+  -- THREE SEATS, one role each: alice activates, bob controls the copied spell
+  -- and so controls the copy, and carol is where CR 707.10c can send it. Two
+  -- would put the copy's controller and its new target on the same player and
+  -- the case would prove nothing.
+  --
+  -- The discriminator is retargetByAsker, which answers by the SEAT CR 707.10c
+  -- asks: a copy stamped under bob sends it at carol, and one stamped under
+  -- alice -- the reading before this field existed -- sends it at bob. The two
+  -- boards differ in carol's and bob's life totals, and in nothing else.
+  Spec.it s "CR 707.10 the Charlatan's copy is bob's, and bob chooses its new target" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    charlatan <- S.printingOf s registry "Meletis Charlatan"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let lands = S.landsFor mountain S.bob 1 (S.landsFor island S.alice 3 S.threePlayerGame)
+        (charlatanId, withCharlatan) = S.addPermanent charlatan S.alice lands
+        (boltId, withBolt) = handAppend bolt S.bob withCharlatan
+        -- CR 302.6: the Charlatan's {T} is not payable until it has settled.
+        board = S.runPure S.identityAnswer withBolt (Engine.settleAll S.alice)
+    case Maybe.listToMaybe (Projection.abilitiesOf charlatanId board) of
+      Nothing -> Spec.assertFailure s "Meletis Charlatan should declare one activated ability"
+      Just copier -> do
+        let cast1 = S.runPure (pinTarget (Recipient.ToPlayer S.alice)) board (S.cast S.bob boltId)
+        case topOfStack cast1 of
+          Nothing -> Spec.assertFailure s "the Bolt never reached the stack"
+          Just boltSpell -> do
+            let staged = S.runPure (pinTarget (Recipient.ToObject boltSpell)) cast1 {GameState.priority = Just S.alice} (Activate.activateAbility S.alice charlatanId copier)
+                -- The Charlatan's ability, then the copy it put on the stack,
+                -- then bob's own Bolt.
+                afterAbility = resolveOne retargetByAsker staged
+                afterCopy = resolveOne S.identityAnswer afterAbility
+                after = resolveOne S.identityAnswer afterCopy
+            Spec.assertEqWith s "CR 707.10 bob controlled the copy, so bob was asked and sent it at carol" (S.lifeOf S.carol after) (Just 17)
+            Spec.assertEqWith s "alice took only bob's original Bolt's 3" (S.lifeOf S.alice after) (Just 17)
+            Spec.assertEqWith s "and bob, whose copy it was, took none" (S.lifeOf S.bob after) (Just 20)
+            -- Supporting, after the behaviour so neither can absorb a mutation
+            -- aimed at it: the copy resolved before the original.
+            Spec.assertEqWith s "the copy resolved first: alice was untouched at that point" (S.lifeOf S.alice afterCopy) (Just 20)
+            Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+  -- CR 707.9's exception riding CR 707.10's opcode, on Double Major {G}{U}
+  -- Instant, "Copy target creature spell you control, except it isn't legendary
+  -- if the spell is legendary" (Oracle text verified 2026-09-14) --
+  -- CopyException.RemoveSupertypes, the same list BecomeCopy and CreateCopy
+  -- carry.
+  --
+  -- Rograkh, Son of Rohgahh is the copied spell: a {0} Legendary Creature whose
+  -- whole text box is keywords, so nothing but CR 704.5j reads the board. The
+  -- copy resolves into a token (CR 707.10f) with the same NAME, so the legend
+  -- rule is what the exception is visible through: without it alice controls two
+  -- legendary permanents named Rograkh and puts one into a graveyard, and the
+  -- token ceases to exist (CR 111.7).
+  Spec.it s "CR 707.9b Double Major's copy isn't legendary, so CR 704.5j leaves both" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    rograkh <- S.printingOf s registry "Rograkh, Son of Rohgahh"
+    doubleMajor <- S.printingOf s registry "Double Major"
+    let lands = S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 S.threePlayerGame)
+        (rograkhId, withRograkh) = handAppend rograkh S.alice lands
+        (majorId, board) = handAppend doubleMajor S.alice withRograkh
+        cast1 = S.runPure S.identityAnswer board (S.cast S.alice rograkhId)
+    case topOfStack cast1 of
+      Nothing -> Spec.assertFailure s "Rograkh never reached the stack"
+      Just rograkhSpell -> do
+        let castMajor = S.runPure (pinTarget (Recipient.ToObject rograkhSpell)) cast1 (S.cast S.alice majorId)
+            -- Double Major, then the copy it put on the stack, then Rograkh.
+            after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne S.identityAnswer castMajor))
+            -- By PROJECTED name (CR 707.2), which is the only read that sees both
+            -- the printed card and the token the copy became.
+            rograkhs gs = filter (\oid -> Set.member (cardNamed "Rograkh, Son of Rohgahh") (Projection.namesOf oid gs)) (Set.toList (GameState.battlefield gs))
+        Spec.assertEqWith s "CR 707.9b / 704.5j both Rograkhs are on the battlefield, the copy not being legendary" (length (rograkhs after)) 2
+        case S.tokensOf after of
+          [tokenId] -> do
+            Spec.assertBool s (not (Set.member Supertype.Legendary (Projection.supertypesOf tokenId after))) "CR 707.9b the token copy lost the supertype the exception named"
+            Spec.assertEqWith s "CR 707.2 and kept the copied name, which is what CR 704.5j reads" (Projection.namesOf tokenId after) (Set.singleton (cardNamed "Rograkh, Son of Rohgahh"))
+          other -> Spec.assertFailure s ("expected exactly one token copy, got " <> show (length other))
+        Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
 
 -- CR 702.21a's observer for a copy's targets: bob's Tomakul Honor Guard, {1}{G}
 -- 3/1 whose whole text box is "Ward {2}", against alice's Twincast.

@@ -268,7 +268,7 @@ ownQuantities effect = case effect of
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> [quantity]
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
   Effect.BecomeCopy {} -> []
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> [quantity]
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> [quantity]
   Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity _) -> quantity : durationQuantities duration
@@ -1216,7 +1216,7 @@ effectObjectRefs effect =
         Effect.Conjure {} -> []
         Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> read_ [ref]
         Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
-        Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _) -> read_ (ref : copyTargetsRefs targets)
+        Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _ _ _) -> read_ (ref : copyTargetsRefs targets)
         Effect.Replace {} -> []
         Effect.SkipNextPhase {} -> []
         Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
