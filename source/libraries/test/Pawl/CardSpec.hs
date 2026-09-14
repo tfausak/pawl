@@ -5862,12 +5862,24 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               _ -> []
             q <- Map.elems (WithCounters.counters wc)
             pure (Set.member Binding.variableX (QuantitySlot.slots q))
+        -- CR 107.3m's third reader, the enters-the-battlefield TRIGGER beside the
+        -- replacement effects above: Lost in the Maze's "tap X target creatures"
+        -- names its count at the announcement made for the spell that became the
+        -- enchantment, so the {X} that face declares is what makes the count
+        -- answerable. Only this condition, CR 107.3m's own, and only through the
+        -- slot -- an effect of the same ability reading X is already
+        -- Resolve.readsX's.
+        entersTriggerReadsX c =
+          any
+            (\ability -> TriggeredAbility.condition ability == TriggerCondition.SelfEnters && modalReadsAnnouncedX (TriggeredAbility.modal ability))
+            (Face.triggeredAbilities c)
         readsX c =
           Resolve.readsX (Card.allEffects c)
             || Face.loyalty c == Just Loyalty.Variable
             || entryCountersReadX c
             || any declaresVariable (payGateCostsOf (Face.spell c))
             || modalReadsAnnouncedX (Face.spell c)
+            || entersTriggerReadsX c
         offenders =
           filter
             (anyFace (\f -> readsX f /= any declaresVariable (spellCostsOf f)) . Printing.card)
@@ -5935,15 +5947,41 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (null abilities)) "the pool has activated abilities"
     Spec.assertBool s (any (declaresVariable . ActivatedAbility.cost . snd) abilities) "and one of them declares an X"
     Spec.assertEqWith s "X read iff X declared" (fmap fst (filter offends abilities)) []
-  -- Pawl.Engine.Engine.placeBorne counts a trigger's slots with X as zero, so a
-  -- slot counted by X there would silently take no targets (#3633).
-  Spec.it s "CR 603.3d no triggered ability's target count reads an announced X" $ do
+  -- CR 107.3m gives exactly one triggered ability a value of X to read -- an
+  -- object's enters-the-battlefield ability, whose X is the one announced for the
+  -- spell that became that object -- and Pawl.Engine.Engine.placeBorne inherits it
+  -- on exactly that condition. Every other trigger is placed with X as zero, so a
+  -- slot counted by X there would silently take no targets. CR 107.3n's delayed
+  -- twin is the same shape one ability over and is NOT inherited: Scryfall
+  -- `m:{X} o:"at the beginning of the next end step" (t:instant or t:sorcery)`,
+  -- 2026-09-14, returns delayed clauses that name "them" and "those creatures"
+  -- and none that states a target COUNT in X, so the refusal costs a card
+  -- nothing. A delayed ability printing "return up to X target creature cards"
+  -- would refute it; Disorder in the Court's returns the cards it already exiled,
+  -- by name rather than by target, and is the closest the query found.
+  --
+  -- The exemption is keyed on the CONDITION and not on which channel printed the
+  -- ability, which is what placeBorne cases on: a room's ability carries no
+  -- condition of its own, so it stays refused with the rest.
+  Spec.it s "CR 603.3d only an enters-the-battlefield triggered ability's target count reads an announced X" $ do
     ps <- S.allPrintings s
-    let triggerModals f =
-          fmap TriggeredAbility.modal (Face.triggeredAbilities f <> Map.elems (Face.delayedAbilities f) <> grantedTriggeredAbilities f)
-            <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms f))
-        offends = any (any (countReadsX . TargetSlot.count) . Modal.allTargetSlots) . triggerModals
+    let inheritsX ability = TriggeredAbility.condition ability == TriggerCondition.SelfEnters
+        triggers f = Face.triggeredAbilities f <> Map.elems (Face.delayedAbilities f) <> grantedTriggeredAbilities f
+        countsByX :: [Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Bool
+        countsByX = any (any (countReadsX . TargetSlot.count) . Modal.allTargetSlots)
+        offends f =
+          countsByX
+            ( fmap TriggeredAbility.modal (filter (not . inheritsX) (triggers f))
+                <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms f))
+            )
+        exercises f = countsByX (fmap TriggeredAbility.modal (filter inheritsX (triggers f)))
     Spec.assertEqWith s "no offenders" (fmap (S.nameOf . Printing.card) (filter (anyFace offends . Printing.card) ps)) []
+    -- Guards the sweep against passing vacuously on a pool where no trigger counts
+    -- by X at all, which is what it asserted before CR 107.3m's arm landed.
+    Spec.assertBool
+      s
+      (any (anyFace exercises . Printing.card) ps)
+      "the pool has an enters-the-battlefield trigger counting by the announced X"
   -- CR 702: Pawl.Types.ActivatedAbility.keyword is the stamp
   -- Pawl.Engine.Keyword.mintedBy puts on an ability rule 702 states, and the wire
   -- carries the key only so an ability already on the stack round-trips through
