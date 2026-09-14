@@ -705,9 +705,11 @@ snapshotView gs shape event = case event of
   GameEvent.StepBegan {} -> Nothing
   -- CR 601.2i's cast, read from the snapshot the event took as the spell became
   -- cast rather than off the stack: by the time a look-back count folds the log
-  -- that spell has resolved or been countered, so the live object is gone.
-  -- TriggerCondition.SpellCast is the other reader and does read it live, which
-  -- it can -- CR 601.2i's trigger is checked while the spell is still there.
+  -- that spell has usually resolved or been countered, so the live object is
+  -- gone. TriggerCondition.SpellCast is the other reader and does read it live,
+  -- which it can -- CR 601.2i's trigger is checked while the spell is still
+  -- there. The CHARACTERISTICS, that is: castOwner below reads the live object
+  -- for the one field a snapshot cannot carry, wherever there still is one.
   GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell snapshot _) -> case shape of
     -- CR 601.2a: "that player becomes its controller", so the caster the event
     -- recorded IS the view's controller and Filter.ControlledBy You answers "a
@@ -721,8 +723,9 @@ snapshotView gs shape event = case event of
     -- became this spell shed whatever it carried on its way to the stack, so a
     -- cast records none.
     --
-    -- CR 108.3's owner is castOwner's below, and is NOT `caster` again: Dire
-    -- Fleet Daredevil casts a card its owner never touched (Pawl.CountSpec).
+    -- CR 108.3's owner comes from castOwner below, and is NOT `caster` again:
+    -- Dire Fleet Daredevil casts a card its owner never touched
+    -- (Pawl.CountSpec).
     EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) (castOwner gs spell) False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
     -- CR 601.2a moves a card to the STACK, so a cast IS a card arriving there --
@@ -894,8 +897,9 @@ departedView gs zc snapshot =
 -- between, so the two roads agree wherever both answer. Both are driven by
 -- Pawl.CountSpec's Daredevil pair.
 --
--- Nothing only for a cast whose spell left no record, which is a hand-built log
--- rather than anything the funnel produces.
+-- Nothing where neither road answers -- the spell is gone and nothing was filed
+-- under its id -- which is the honest blank departedView gives for the same
+-- reason, and leaves Filter.OwnedBy False rather than guessing a seat.
 castOwner :: GameState -> ObjectId -> Maybe PlayerId
 castOwner gs spell = case Game.lookupObject spell gs of
   Just object -> Just (Object.owner object)

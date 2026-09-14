@@ -1572,8 +1572,8 @@ strandcatcherSpec s registry =
 -- clause were a count.
 --
 -- Both cases run on Pawl.CastRestrictionSpec's Dire Fleet Daredevil boards,
--- reused for the reason Pawl.DepartureSpec reuses them: they are the only ones in
--- the tree where a spell's caster and its owner are different players.
+-- reused for the reason Pawl.DepartureSpec reuses one: on them a spell's caster
+-- and its owner are different players, and three seats keep the two apart.
 --
 -- The first board logs two casts and alice made both -- the Daredevil out of her
 -- own hand, and bob's Renewed Faith out of bob's graveyard -- so the life the
