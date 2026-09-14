@@ -1,5 +1,6 @@
 module Pawl.Codec.Keyword where
 
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Cycling as Cycling
 import qualified Pawl.Codec.Devour as Devour
@@ -163,6 +164,7 @@ codec =
       Arm.payload "Fabricate" Common.natural Keyword.Fabricate (\x -> case x of Keyword.Fabricate y -> Just y; _ -> Nothing),
       Arm.nullary "Partner" Keyword.Partner,
       Arm.payload "PartnerText" PartnerText.codec Keyword.PartnerText (\x -> case x of Keyword.PartnerText y -> Just y; _ -> Nothing),
+      Arm.payload "PartnerWith" CardName.codec Keyword.PartnerWith (\x -> case x of Keyword.PartnerWith y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseABackground" Keyword.ChooseABackground,
       Arm.nullary "DoctorsCompanion" Keyword.DoctorsCompanion,
       Arm.nullary "Riot" Keyword.Riot,

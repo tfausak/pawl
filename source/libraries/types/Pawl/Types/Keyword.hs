@@ -1,6 +1,7 @@
 module Pawl.Types.Keyword where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Devour as Devour
@@ -484,13 +485,15 @@ data Keyword
     -- rather than one if each of them has partner." A deck-construction ability
     -- that functions before the game begins (CR 702.124a), read by
     -- Pawl.Engine.Commander.designations.
-    --
-    -- Not implemented: CR 702.124j's partner with [name], which CR 702.124f
-    -- keeps distinct from this one (#939).
     Partner
   | -- | 702.124i: partner—[text], pairing only with the same text; read by
     -- Pawl.Engine.Commander.designations.
     PartnerText PartnerText.PartnerText
+  | -- | 702.124j: partner with [name], TWO abilities -- the deck-construction
+    -- pairing Pawl.Engine.Commander.designations reads, and the entry trigger
+    -- Pawl.Engine.Keyword.partnerWith mints. The payload is the OTHER card's
+    -- name, which both halves read.
+    PartnerWith CardName.CardName
   | -- | 702.124k: "You may designate two cards as your commander rather than one
     -- if one of them is this card and the other is a legendary Background
     -- enchantment card." A deck-construction ability like Partner above, read by
