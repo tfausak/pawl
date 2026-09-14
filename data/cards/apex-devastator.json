@@ -1,0 +1,68 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Cascade"
+        },
+        {
+          "type": "Cascade"
+        },
+        {
+          "type": "Cascade"
+        },
+        {
+          "type": "Cascade"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 8
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Apex Devastator",
+      "power": {
+        "type": "Literal",
+        "value": 10
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 10
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Chimera"
+          },
+          {
+            "type": "Hydra"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

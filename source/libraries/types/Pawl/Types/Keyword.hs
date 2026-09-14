@@ -35,8 +35,8 @@ import qualified Pawl.Types.Suspend as Suspend
 --
 -- Multiplicity is NOT this type's problem: an object can have the same keyword
 -- ability twice, which Pawl.Types.ProjectedCharacteristics.keywords carries as a
--- count. This type says only WHICH ability, so a card's printed keywords stay a
--- Set -- see Pawl.Types.Face.keywords.
+-- count and Pawl.Types.Face.keywords carries the same way for the PRINTED ones
+-- (CR 702.85c). This type says only WHICH ability.
 --
 -- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
 -- Filter has a HasKeyword arm and this type carries a Filter (702.6c, 702.11d,

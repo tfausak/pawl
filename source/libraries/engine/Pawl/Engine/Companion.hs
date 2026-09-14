@@ -76,7 +76,7 @@ conditionOf printingId gs = do
   Maybe.listToMaybe
     ( Maybe.mapMaybe
         (\keyword -> case keyword of Keyword.Companion predicate -> Just predicate; _ -> Nothing)
-        (Foldable.toList (Face.keywords face))
+        (Foldable.toList (Face.keywordSet face))
     )
 
 -- CR 702.139a: does this player's STARTING DECK fulfill the condition? Every card

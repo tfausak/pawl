@@ -899,9 +899,10 @@ rewriteFace pairs face =
                       Face.name = rewriteTokenName from to (Face.name f)
                     }
          in renamed
-              { -- CR 702.14a's land-type word inside a landwalk. Set.map rather
-                -- than Map.mapKeysWith (+), since a face's keywords are a Set.
-                Face.keywords = Set.map (Filter.rewriteKeyword pair) (Face.keywords renamed),
+              { -- CR 702.14a's land-type word inside a landwalk. Map.mapKeysWith
+                -- (+), so two instances the rewrite collapses onto one keyword
+                -- stay two instances.
+                Face.keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pair) (Face.keywords renamed),
                 -- CR 208.2a's star, unevaluated as at layer 3.
                 Face.characteristicPT = fmap (rewriteCharacteristicPT pair) (Face.characteristicPT renamed),
                 -- CR 101.1's ceiling on X, whose Quantity can Count a criterion

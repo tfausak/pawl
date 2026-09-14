@@ -856,7 +856,7 @@ timesPaidKeywords value = case value of
 -- `keywords`, 2026-09-02.
 timesPaidOffends :: Face.Face Card.Type.Card -> Bool
 timesPaidOffends card =
-  let printed = fmap (Codec.encode Keyword.Codec.codec) (Keyword.Engine.optionalCosts (Face.keywords card))
+  let printed = fmap (Codec.encode Keyword.Codec.codec) (Keyword.Engine.optionalCosts (Face.keywordSet card))
    in any (`notElem` printed) (timesPaidKeywords (Codec.encode (Face.Codec.codec Card.codec) card))
 
 -- Two things a TriggerCondition.AnyOf may not contain, checked at every depth so
@@ -1078,8 +1078,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         -- Filter would miss it.
         buried = Filter.Type.And [Filter.Type.Or [creatures, Filter.Type.OfChosenPlayer]]
         equipping quality = Keyword.Equip (Equip.MkEquip (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) quality)
-        offending = base {Face.keywords = Set.singleton (equipping (Just buried))}
-        protecting = base {Face.keywords = Set.singleton (Keyword.Protection Protection.MkProtection {Protection.quality = buried, Protection.spares = Nothing})}
+        offending = base {Face.keywords = Map.singleton (equipping (Just buried)) 1}
+        protecting = base {Face.keywords = Map.singleton (Keyword.Protection Protection.MkProtection {Protection.quality = buried, Protection.spares = Nothing}) 1}
     -- Ordered FIRST, and the assertion this framing exists for.
     Spec.assertBool s (ofChosenPlayerOffends offending) "OfChosenPlayer in an equip quality offends"
     Spec.assertEqWith s "counted outside the keyword bucket" (ofChosenPlayerCounts offending) (0, 1)
@@ -1101,7 +1101,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- the framing in its offending list for that.
     let slot = SlotName.MkSlotName (Text.pack "target")
         bound = Filter.Type.And [Filter.Type.Or [creatures, Filter.Type.IsBound slot]]
-    Spec.assertBool s (isBoundOffends (base {Face.keywords = Set.singleton (equipping (Just bound))})) "IsBound in an equip quality offends too"
+    Spec.assertBool s (isBoundOffends (base {Face.keywords = Map.singleton (equipping (Just bound)) 1})) "IsBound in an equip quality offends too"
     Spec.assertBool s (not (isBoundOffends (base {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching bound) Nothing]}))) "and the same atom at an unframed position does not"
   -- CR 701.23a: a search looks through a zone, so one naming none can find
   -- nothing. Nothing else catches an empty set. Search.zones is defaulted-absent
@@ -1461,8 +1461,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           Keyword.Multikicker cost -> Keyword.Multikicker (reverseMana cost)
           _ -> keyword
     Spec.assertBool s (not (timesPaidOffends face)) "the control: Gnarlid Pack as printed is accepted"
-    Spec.assertBool s (timesPaidOffends (face {Face.keywords = Set.map respell (Face.keywords face)})) "a reordered multikicker cost is rejected"
-    Spec.assertBool s (timesPaidOffends (face {Face.keywords = Set.empty})) "and so is a face that counts a kicker it prints none of"
+    Spec.assertBool s (timesPaidOffends (face {Face.keywords = Map.mapKeys respell (Face.keywords face)})) "a reordered multikicker cost is rejected"
+    Spec.assertBool s (timesPaidOffends (face {Face.keywords = Map.empty})) "and so is a face that counts a kicker it prints none of"
   -- CR 702.122d's Filter.CantCrewVehicles is the one atom here that no card may
   -- write ANYWHERE, rather than one admitted at some positions: it is answerable
   -- only where Pawl.Engine.Cost.tapCandidates gathers the prohibition, and it is
@@ -1667,7 +1667,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- Filter is reached from. A site that lost the tag reddens under its own
     -- label rather than under a total.
     let sited =
-          [ ("CR 702.11d's printed keyword", isBoundCounts (base {Face.keywords = Set.singleton (keywordOf boundAtom)})),
+          [ ("CR 702.11d's printed keyword", isBoundCounts (base {Face.keywords = Map.singleton (keywordOf boundAtom) 1})),
             ("CR 613's granted keyword", isBoundCounts (base {Face.staticAbilities = granting (keywordOf boundAtom)})),
             ("CR 122.1b's keyword counter", isBoundCounts (base {Face.counterRestrictions = prohibiting (kindOf boundAtom)})),
             -- CR 208.2b's as-enters options and CR 614.1c's outright grant, the
@@ -2183,7 +2183,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 702.29e's typecycling predicate",
-              base {Face.keywords = Set.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried)))}
+              base {Face.keywords = Map.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried))) 1}
             ),
             ( "CR 613.11's spell-cost modifier",
               base
@@ -2412,7 +2412,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 702.29e's typecycling predicate",
-              base {Face.keywords = Set.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried)))}
+              base {Face.keywords = Map.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried))) 1}
             ),
             ( "a created token's own static ability",
               base
@@ -2591,7 +2591,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 702.29e's typecycling predicate",
-              base {Face.keywords = Set.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried)))}
+              base {Face.keywords = Map.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried))) 1}
             )
           ]
         report (label, card) = (label, hasChosenNameOffends card, hasChosenNameCounts card)

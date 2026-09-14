@@ -1745,7 +1745,7 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     Spec.assertEqWith
       s
       "one cost, {4}, and rule 702.33a's limit of one payment"
-      (fmap (fmap Keyword.Engine.optionalCost . Keyword.Engine.optionalCosts . Face.keywords) (Game.faceOf spellId gs))
+      (fmap (fmap Keyword.Engine.optionalCost . Keyword.Engine.optionalCosts . Face.keywordSet) (Game.faceOf spellId gs))
       (Just [Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]), Cost.Type.components = []}, Just 1)])
   -- A card with no kicker is never asked, which is the other half of "where the
   -- rules leave nothing to ask, don't prompt".
@@ -1755,7 +1755,7 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     hillGiant <- S.printingOf s registry "Hill Giant"
     let (gs, spellId, giantId) = kickerBoard mountain lightningBolt hillGiant 5
         (asked, _) = castAndResolve (bursts (KickerDecision.MkKickerDecision 1) giantId) gs spellId
-    Spec.assertEqWith s "no kicker cost to offer" (fmap (Keyword.Engine.optionalCosts . Face.keywords) (Game.faceOf spellId gs)) (Just [])
+    Spec.assertEqWith s "no kicker cost to offer" (fmap (Keyword.Engine.optionalCosts . Face.keywordSet) (Game.faceOf spellId gs)) (Just [])
     Spec.assertEqWith s "so no kicker question was put, on a board that could pay one" (kickerAnnouncements asked) []
   -- CR 702.33a's "an additional cost", singular: kicker is payable once, so an
   -- answer of two is text Burst Lightning does not have. Nine Mountains, which is

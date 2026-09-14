@@ -152,7 +152,7 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- Face.activatedAbilities -- so nothing is offered twice.
   Just Zone.Hand -> case Game.faceOf oid gs of
     Nothing -> []
-    Just face -> Keyword.handAbilitiesOf (Face.keywords face) <> zoneAbilitiesOf Zone.Hand oid gs
+    Just face -> Keyword.handAbilitiesOf (Face.keywordSet face) <> zoneAbilitiesOf Zone.Hand oid gs
   -- The hand arm's shape one zone over, on TWO rules rather than one: rule 702's
   -- MINTED graveyard abilities (Pawl.Engine.Keyword.graveyardAbilitiesOf) plus
   -- the card's own AUTHORED ones that name the graveyard, disjoint by the same
@@ -167,7 +167,7 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- 702.129a's COSTS exile the card from a graveyard, CR 113.6m's other reading,
   -- which the cost's own payability gate enforces
   -- (Pawl.Engine.Keyword.graveyardTokenCopy).
-  Just Zone.Graveyard -> Keyword.graveyardAbilitiesOf (maybe Set.empty Face.keywords (Game.faceOf oid gs)) <> zoneAbilitiesOf Zone.Graveyard oid gs
+  Just Zone.Graveyard -> Keyword.graveyardAbilitiesOf (maybe Set.empty Face.keywordSet (Game.faceOf oid gs)) <> zoneAbilitiesOf Zone.Graveyard oid gs
   -- CR 114.4 and CR 902.7's third limb, "its activated abilities may be
   -- activated". The narrowing to the objects rule 113.6p names is inside
   -- zoneAbilitiesOf, so a commander or a dungeon card sharing this zone offers

@@ -50,7 +50,7 @@ import qualified Pawl.Types.Zone as Zone
 suspendOf :: ObjectId -> GameState -> Maybe (Suspend.Suspend Keyword)
 suspendOf oid gs = do
   card <- Game.cardOfHandMember oid gs
-  Keyword.suspend (Face.keywords (Card.combined card))
+  Keyword.suspend (Face.keywordSet (Card.combined card))
 
 -- CR 702.62a / 116.2f: may this player suspend this card right now? Three
 -- conjuncts, each a clause of the rule:

@@ -140,7 +140,7 @@ sharesPartnerText a b = not (Set.null (Set.intersection (partnerTexts a) (partne
 -- reason `designations` gives.
 partnerTexts :: Printing.Printing -> Set.Set PartnerText.PartnerText
 partnerTexts printing =
-  Set.fromList [text | Keyword.PartnerText text <- Set.toList (Face.keywords (Card.frontFace (Printing.card printing)))]
+  Set.fromList [text | Keyword.PartnerText text <- Set.toList (Face.keywordSet (Card.frontFace (Printing.card printing)))]
 
 -- | CR 702.124j's requirement of the pair: "two legendary cards ... if each has
 -- a 'partner with [name]' ability with the other's name". Both memberships,
@@ -164,7 +164,7 @@ namesEachOther a b =
 -- more than one partner ability.
 partnerWithNames :: Printing.Printing -> Set.Set CardName.CardName
 partnerWithNames printing =
-  Set.fromList [name | Keyword.PartnerWith name <- Set.toList (Face.keywords (Card.frontFace (Printing.card printing)))]
+  Set.fromList [name | Keyword.PartnerWith name <- Set.toList (Face.keywordSet (Card.frontFace (Printing.card printing)))]
 
 -- | CR 702.124j's "[name]", matched against the printed front face's name -- CR
 -- 201.2a's identity, and the same face every other limb here reads.
@@ -227,7 +227,7 @@ legendaryCreature printing =
 -- reason `designations` gives.
 printedKeyword :: Keyword.Keyword -> Printing.Printing -> Bool
 printedKeyword keyword printing =
-  Set.member keyword (Face.keywords (Card.frontFace (Printing.card printing)))
+  Set.member keyword (Face.keywordSet (Card.frontFace (Printing.card printing)))
 
 -- | CR 903.3: record which cards this player designated as their commanders.
 -- Called once per designation by Pawl.Engine.Setup.createDeck, from the Deck.

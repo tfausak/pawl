@@ -864,7 +864,7 @@ copiableReplacementsOf oid gs = case copiableSnapshotOf oid gs of
 anyCopiableKeyword :: (Keyword -> Bool) -> ObjectId -> GameState -> Bool
 anyCopiableKeyword p oid gs = case copiableSnapshotOf oid gs of
   Just snapshot -> any p (Map.keys (PC.keywords snapshot))
-  Nothing -> any (any p . Face.keywords) (Game.faceOf oid gs)
+  Nothing -> any (any p . Face.keywordSet) (Game.faceOf oid gs)
 
 -- CR 707.2: does this object's copiable rules text give it a card type or subtype
 -- that intrinsicReplacementsOf mints a CR 614.1c entry row from -- CR 306.5b's
@@ -4163,7 +4163,7 @@ replacementsAffecting gs =
       -- rule writes onto an object rather than a face printing it.
       mintedInHand oid = case Game.faceOf oid gs of
         Nothing -> []
-        Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (Face.keywords face))
+        Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (Face.keywordSet face))
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
