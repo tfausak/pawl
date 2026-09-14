@@ -87,6 +87,7 @@ import qualified Pawl.Codec.CastFromSpec
 import qualified Pawl.Codec.CastFromZoneSpec
 import qualified Pawl.Codec.CastObligationSpec
 import qualified Pawl.Codec.CastOfferSpec
+import qualified Pawl.Codec.CastRepetitionSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
 import qualified Pawl.Codec.ChangeSubtypeWordSpec
@@ -738,6 +739,7 @@ spec s registry = do
   Pawl.Codec.CastFromZoneSpec.spec s
   Pawl.Codec.CastObligationSpec.spec s
   Pawl.Codec.CastOfferSpec.spec s
+  Pawl.Codec.CastRepetitionSpec.spec s
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s
   Pawl.Codec.ChangeSubtypeWordSpec.spec s

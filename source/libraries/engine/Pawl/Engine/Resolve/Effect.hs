@@ -99,6 +99,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CarryOver as CarryOver
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
@@ -912,7 +913,43 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
     fmap Combat.Specified (Game.attackTargetWithLastKnown named gs)
   Just (EntryAttack.UnderPlayer slot) -> fmap Combat.Under (onePlayerNamed legal slot resolving gs)
 
--- CR 608.2g: make the offer Effect.OfferCast carries, and cast if it is taken.
+-- CR 608.2g: make the offer Effect.OfferCast carries, once or over again.
+--
+-- CR 601.3's choice among the named cards is `offerCastOnce` below; this is the
+-- repetition Pawl.Types.CastRepetition names -- Fevered Suspicion's "you may cast
+-- ANY NUMBER of spells from among those nonland cards", where Shell of the Last
+-- Kappa's "cast A SPELL from among cards exiled with Shell of the Last Kappa"
+-- stops after one. CR 608.2g's own "which may include casting other spells this
+-- way" is what admits the repeat.
+--
+-- The card a round took is dropped from the next round's candidates rather than
+-- the round re-reading the whole set: CR 400.7 has already made the cast card a
+-- new object, so it would be dropped anyway, and dropping it HERE is what bounds
+-- the recursion -- a round that somehow left its card where it was cannot offer
+-- it for ever.
+--
+-- A DECLINE ENDS IT, and no reachable board can tell that from a decline that
+-- skipped one card and went on: the caster names which card they are declining by
+-- picking it at Prompt.ChooseOfferedCastSpell, so every card they wanted was
+-- reachable before they said no.
+--
+-- Mandatory repeats too, and terminates for the same reason: each round casts a
+-- different card, and a card the rules will not let them cast never reaches the
+-- offer (question 4 below).
+offerCast :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastRepetition.CastRepetition -> CastOffer.CastOffer -> Game ()
+offerCast context named caster optionality repetition offer = case repetition of
+  CastRepetition.Once -> Monad.void (offerCastOnce context named caster optionality offer)
+  CastRepetition.AnyNumber -> again named
+  where
+    again remaining = do
+      taken <- offerCastOnce context remaining caster optionality offer
+      case taken of
+        Nothing -> pure ()
+        Just oid -> again (filter (/= oid) remaining)
+
+-- One round of the offer above: CR 601.3's choice among the cards `named` still
+-- holds, and the cast if it is taken. Answers the id of the card that was cast,
+-- which is what tells the caller whether to go round again.
 --
 -- The four questions, in the order the rules ask them:
 --
@@ -943,8 +980,8 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 -- The caster is a parameter and not the resolving controller: CR 608.2g says "a
 -- player". Everything above is a CLASSIFICATION carried by the opcode's
 -- CastOffer and its CastObligation; nothing here asks which card is offered.
-offerCast :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
-offerCast context named caster optionality offer = do
+offerCastOnce :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game (Maybe ObjectId)
+offerCastOnce context named caster optionality offer = do
   gs <- State.get
   let -- Whether this offer states CR 118.9's alternative cost, in either of the
       -- two wordings `applied` below reads. NOT `transformed`, which is CR
@@ -1064,15 +1101,17 @@ offerCast context named caster optionality offer = do
       -- card's half must not answer another card's.
       pure (List.find ((== picked) . keyOf) offers)
   case chosen of
-    Nothing -> pure ()
+    Nothing -> pure Nothing
     Just (oid, name, applied, excused) -> do
-      let cast = Cast.castSpellWith performManaAbility True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
+      let cast = do
+            Cast.castSpellWith performManaAbility True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
+            pure (Just oid)
           -- The SAME prompt on both paths: CR 118.8c creates no new decision.
           mayCast = do
             let decider = Decide.deciderFor caster gs
             decision <- Game.choose (Prompt.OfferedCast decider caster oid name)
             case decision of
-              OptionalDecision.Declines -> pure ()
+              OptionalDecision.Declines -> pure Nothing
               OptionalDecision.Exercises -> cast
       case optionality of
         CastObligation.Mandatory | not excused -> cast
@@ -4041,7 +4080,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let named = Set.fromList (playerRefPlayers legal controller gs ref)
     Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) Event.shuffleLibrary
-  Effect.OfferCast (OfferCast.MkOfferCast ref caster optionality offer) -> do
+  Effect.OfferCast (OfferCast.MkOfferCast ref caster optionality offer repetition) -> do
     gs <- State.get
     -- The sweep every ObjectRef-taking opcode shares, read HERE rather than
     -- inside offerCast so that one function takes the objects and never the
@@ -4055,7 +4094,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
     -- cast to nobody.
     Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
-      offerCast context named pid optionality offer
+      offerCast context named pid optionality repetition offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
   -- as CR 109.5's "you" and the stated duration.
   --

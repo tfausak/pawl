@@ -225,6 +225,8 @@ library codec
     Pawl.Codec.CastObligationSpec
     Pawl.Codec.CastOffer
     Pawl.Codec.CastOfferSpec
+    Pawl.Codec.CastRepetition
+    Pawl.Codec.CastRepetitionSpec
     Pawl.Codec.ChangeSubtypeWord
     Pawl.Codec.ChangeSubtypeWordSpec
     Pawl.Codec.ChangeText
@@ -1604,6 +1606,7 @@ library types
     Pawl.Types.CastingRestriction
     Pawl.Types.CastObligation
     Pawl.Types.CastOffer
+    Pawl.Types.CastRepetition
     Pawl.Types.ChangeSubtypeWord
     Pawl.Types.ChangeText
     Pawl.Types.CharacteristicPT

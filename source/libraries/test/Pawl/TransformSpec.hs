@@ -92,6 +92,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Designation as Designation
@@ -1570,7 +1571,7 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
         offered = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing}
         -- No restriction on either offer, so the context's source is immaterial
         -- here: what this group is about is which FACE a free offer reaches.
-        under o = S.runPure wantingBack board (Resolve.offerCast (Filter.contextFor (Game.teams board) (Just S.alice) Nothing) [oid] S.alice CastObligation.Optional o)
+        under o = S.runPure wantingBack board (Resolve.offerCast (Filter.contextFor (Game.teams board) (Just S.alice) Nothing) [oid] S.alice CastObligation.Optional CastRepetition.Once o)
         resolvedUnder o = S.runPure wantingBack (under o) Stack.resolveTop
         free = offered {CastOffer.withoutPayingManaCost = True}
         ratchetIn gs = filter (\o -> fmap S.nameOf (Game.cardOf o gs) == Just (S.printingName ratchet)) (Game.zoneMembers Zone.Battlefield S.alice gs)

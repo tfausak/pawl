@@ -2,8 +2,8 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Pawl.Engine.Resolve over investigate (CR 701.16a), suspect (CR 701.60), the
--- token-making effects around them, and the effects that reveal or cast at
--- random. The machinery is Pawl.ResolveSpec.
+-- token-making effects around them, the effects that reveal or cast at random,
+-- and CR 608.2g's offers to cast. The machinery is Pawl.ResolveSpec.
 module Pawl.InvestigateSpec where
 
 import qualified Control.Monad as Monad
@@ -1367,6 +1367,121 @@ trumpetingCarnosaurSpec s registry = Spec.describe s "TrumpetingCarnosaur" $ do
       (Set.fromList [named "Trumpeting Carnosaur", named "Mountain"])
     Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) []
 
+-- CR 608.2g's offer over a set, taken MORE THAN ONCE: Pawl.Types.CastRepetition's
+-- AnyNumber, the printed "you may cast any number of" that one
+-- Prompt.ChooseOfferedCastSpell cannot say on its own (see #3595).
+--
+-- Fevered Suspicion {6}{B}{R} Sorcery -- "Each opponent exiles cards from the top
+-- of their library until they exile a nonland card. You may cast any number of
+-- spells from among those nonland cards without paying their mana costs. /
+-- Rebound" (Oracle text checked 2026-09-14) -- is the producer.
+--
+-- CARD DATA AND NO OPCODE beyond the repetition rider: the walk into exile is
+-- ObjectRef.TopOfLibraryUntil over PlayerRelation.Opponent, and the offer is
+-- ObjectRef.EachCardFromAmong over what it bound, which is Trumpeting Carnosaur's
+-- pair one group up with the offer told to repeat.
+--
+-- THREE SEATS, because "each opponent" is what makes the set bigger than one: a
+-- two-player board exiles one nonland card and could not tell a repeated offer
+-- from a single one. Each opponent's library is stocked with a Mountain over the
+-- creature the walk stops at, so the walk's stopping is visible, and a Think
+-- Twice under it that is never reached.
+--
+-- The two creatures cost {1}{R} and {4}{U} where alice's eight lands are seven
+-- Mountains and a Swamp: she cannot pay for either, so a tapped count of eight
+-- is the whole of "without paying their mana costs".
+feveredSuspicionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+feveredSuspicionSpec s registry = Spec.describe s "FeveredSuspicion" $ do
+  let named = CardName.MkCardName . Text.pack
+      piker = named "Goblin Piker"
+      galleon = named "Armored Galleon"
+      play :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
+      play answer (oid, gs) =
+        let step g action = snd (Engine.runGamePure answer g (action >> Engine.settleForPriority))
+            drain g = if null (GameState.stack g) then g else drain (step g Stack.resolveTop)
+         in drain (step gs (S.cast S.alice oid))
+      -- What alice CONTROLS, which is not what `namesIn` would answer: CR 108.3
+      -- indexes the battlefield by OWNER, and the two creatures cast off this
+      -- offer are owned by bob and carol.
+      onBattlefield gs =
+        Set.fromList
+          [ S.nameOf card
+          | pid <- [S.alice, S.bob, S.carol],
+            oid <- Game.zoneMembers Zone.Battlefield pid gs,
+            Projection.controllerOf oid gs == Just S.alice,
+            card <- Maybe.maybeToList (Game.cardOf oid gs)
+          ]
+      exiled gs = Set.fromList (Maybe.catMaybes (namesIn Zone.Exile S.bob gs <> namesIn Zone.Exile S.carol gs))
+      stock creature mountain think pid gs =
+        -- S.addLibraryCard puts each card ON TOP, so this stocks bottom first.
+        let (_, g1) = S.addLibraryCard think pid gs
+            (_, g2) = S.addLibraryCard creature pid g1
+            (_, g3) = S.addLibraryCard mountain pid g2
+         in g3
+      setUp suspicion pikerCard galleonCard mountain swamp think =
+        let base = S.landsFor swamp S.alice 1 (S.landsFor mountain S.alice 7 S.threePlayerGame)
+            g1 = stock pikerCard mountain think S.bob base
+            g2 = stock galleonCard mountain think S.carol g1
+            (suspicionId, g3) = S.addHandCard suspicion S.alice g2
+         in ( suspicionId,
+              g3
+                { GameState.activePlayer = S.alice,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.priority = Just S.alice
+                }
+            )
+      board = do
+        suspicion <- S.printingOf s registry "Fevered Suspicion"
+        pikerCard <- S.printingOf s registry "Goblin Piker"
+        galleonCard <- S.printingOf s registry "Armored Galleon"
+        mountain <- S.printingOf s registry "Mountain"
+        swamp <- S.printingOf s registry "Swamp"
+        think <- S.printingOf s registry "Think Twice"
+        pure (setUp suspicion pikerCard galleonCard mountain swamp think)
+  -- THE PROVING TEST.
+  Spec.it s "CR 608.2g an any-number offer casts both of the cards it named" $ do
+    after <- fmap (play castingBoth) board
+    Spec.assertEqWith
+      s
+      "both opponents' nonland cards were cast off one offer"
+      (onBattlefield after)
+      (Set.fromList [piker, galleon, named "Mountain", named "Swamp"])
+    -- Proxies, AFTER the behaviour: the lands the walk passed over stay exiled,
+    -- and eight lands paid the {6}{B}{R} and nothing else.
+    Spec.assertEqWith s "the lands the walk passed over stay in exile" (exiled after) (Set.singleton (named "Mountain"))
+    Spec.assertEqWith s "eight lands paid the Suspicion's {6}{B}{R} and nothing paid the two creatures" (S.tappedCount S.alice after) 8
+  -- The "any" half of "any number": the same board, with the second offer refused.
+  Spec.it s "CR 608.2g a refused offer leaves the card it named where the walk put it" $ do
+    after <- fmap (play castingOnlyThePiker) board
+    Spec.assertEqWith
+      s
+      "the Piker was cast and the Galleon was not"
+      (onBattlefield after)
+      (Set.fromList [piker, named "Mountain", named "Swamp"])
+    Spec.assertEqWith
+      s
+      "the refused Galleon is still in carol's exile"
+      (Set.fromList (Maybe.catMaybes (namesIn Zone.Exile S.carol after)))
+      (Set.fromList [galleon, named "Mountain"])
+
+-- Takes CR 608.2g's offer however often it is made, and picks the Goblin Piker
+-- FIRST when both are on offer -- filtered out of the offered set rather than
+-- built, so a pick the engine did not offer cannot pass.
+castingBoth :: Prompt.Prompt r -> r
+castingBoth p = case p of
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  Prompt.ChooseOfferedCastSpell _ _ offers ->
+    Maybe.fromMaybe (NonEmpty.head offers) (List.find ((== CardName.MkCardName (Text.pack "Goblin Piker")) . snd) (NonEmpty.toList offers))
+  _ -> S.identityAnswer p
+
+-- `castingBoth` with the Armored Galleon's offer refused, which is the pair's one
+-- difference: the prompt names the card, so the two structurally identical
+-- OfferedCast questions are told apart by their payload rather than by a count.
+castingOnlyThePiker :: Prompt.Prompt r -> r
+castingOnlyThePiker p = case p of
+  Prompt.OfferedCast _ _ _ name | name == CardName.MkCardName (Text.pack "Armored Galleon") -> OptionalDecision.Declines
+  _ -> castingBoth p
+
 -- Takes CR 608.2g's offer and rotates the batch rule 701.57a's last sentence
 -- hands the random-order channel; `declining` refuses the offer and answers
 -- everything else the same way, so a pair of legs differs in that answer alone.
@@ -1395,3 +1510,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   randomRevealSpec s registry
   wildEvocationSpec s registry
   trumpetingCarnosaurSpec s registry
+  feveredSuspicionSpec s registry
