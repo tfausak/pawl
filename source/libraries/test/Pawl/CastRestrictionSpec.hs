@@ -970,10 +970,10 @@ boundedFuseXSpec s registry = Spec.describe s "BoundedFuseX" $ do
 
 -- Victor Mancha, Runaway {5} Legendary Artifact Creature -- Human Hero 4/4:
 -- "When Victor Mancha enters, exile target card from your graveyard. You may
--- play it for as long as you control Victor Mancha." The pool's only
--- Effect-granted permission to play a card from exile (CR 601.3), and the only
--- one of either kind with a STATED duration -- CR 715.3d's states none, so
--- Pawl.AdventureSpec cannot reach the sweep this group exercises.
+-- play it for as long as you control Victor Mancha." An Effect-granted
+-- permission to play a card from exile (CR 601.3) with a STATED duration -- CR
+-- 715.3d's states none, so Pawl.AdventureSpec cannot reach the sweep this group
+-- exercises. Hostage Taker below is the other stated duration.
 --
 -- Its target slot names CardsInGraveyard with no filter, so the permitted card
 -- may be a LAND -- which is played and never cast (CR 305.1), and is the last
@@ -1232,9 +1232,11 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
 
 -- Dire Fleet Daredevil {1}{R} Creature -- Human Pirate 2/1: "First strike. When
 -- this creature enters, exile target instant or sorcery card from an opponent's
--- graveyard. You may cast it this turn ..." The pool's only card that lets a
--- player cast a card somebody else OWNS, which is the one board where CR 405.4's
--- controller and CR 108.3's owner name different players (#83).
+-- graveyard. You may cast it this turn ..." One of the cards that let a player
+-- cast a card somebody else OWNS, which is the board where CR 405.4's controller
+-- and CR 108.3's owner name different players (#83). Sen Triplets below reaches
+-- the same board from an opponent's hand, and Hostage Taker reaches it with a
+-- PERMANENT card (CR 110.2b).
 --
 -- Both riders are expressed. "If that spell would be put into a graveyard, exile
 -- it instead" is a floating CR 614.1a redirect whose pattern names the object
@@ -1284,7 +1286,7 @@ exiledNamed name gs = filter (\o -> Projection.hasName name o gs) (Set.toList (G
 -- daredevilExiled with the Faith cast and still on the stack: alice's SPELL off
 -- bob's CARD. Exported because Pawl.DepartureSpec wants the same board -- CR
 -- 800.4a's fourth clause is about an object whose controller is not its owner,
--- and this is the only one in the pool that is on the stack.
+-- and this one is on the stack.
 daredevilFaithCast :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
 daredevilFaithCast mountain plains daredevil faith =
   let exiled = daredevilExiled mountain plains daredevil faith
@@ -1464,6 +1466,96 @@ direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
         -- Mountains, so the mana that paid the {W} was red and stayed red.
         Spec.assertEqWith s "all five Mountains are tapped" (S.tappedCount S.alice after) 5
         Spec.assertEqWith s "and nothing is left floating" (Game.poolOf S.alice after) (Mana.Type.MkMana [])
+
+-- Hostage Taker {2}{U}{B} Creature -- Human Pirate 2/3 (Scryfall, 2026-09-14):
+-- "When this creature enters, exile another target creature or artifact until
+-- this creature leaves the battlefield. You may cast that card for as long as it
+-- remains exiled, and mana of any type can be spent to cast that spell." It
+-- reaches a PERMANENT somebody else owns, which is the board CR 110.2b's default
+-- controller is observable on -- Dire Fleet Daredevil above reaches only
+-- instants and sorceries, and Sen Triplets below is never driven with a
+-- permanent card in bob's hand.
+--
+-- TRANSCRIBED, with one clause restated rather than dropped: "for as long as it
+-- remains exiled" is written as "for as long as the source is on the
+-- battlefield" (Duration.ForAsLongAs over a Count of Filter.IsSource), because
+-- Pawl.Engine.Expiry.arm bakes only the SEATS a duration names and an
+-- Filter.IsBound left standing there would answer Nothing. The two are
+-- coextensive on this card: the exile's own duration is
+-- MoveDuration.UntilSourceLeavesTheBattlefield, so the card stops being exiled
+-- exactly when the source stops being on the battlefield, and the other way out
+-- of exile is the cast the permission is granting.
+hostageTakerName, goblinPikerName :: CardName.CardName
+hostageTakerName = CardName.MkCardName (Text.pack "Hostage Taker")
+goblinPikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+
+-- Three seats, because the caster, the owner and "some other player" collapse
+-- onto the two seats of a duel: alice casts, bob owns, and carol holds nothing,
+-- so an engine that entered the permanent under any player but alice is visible
+-- whichever wrong player it picked.
+--
+-- alice holds the Taker and six lands, three Islands and three Swamps. Six is
+-- the whole answer to the cast-gate vacuity trap: the Taker's {2}{U}{B} takes
+-- four however the generic half is paid, and the two that survive pay the
+-- Piker's {1}{R} under CR 118.14's rider whichever two they are.
+--
+-- bob's Goblin Piker is the only creature or artifact on the board other than
+-- the Taker itself, which its "another" excludes, so CR 603.3d's target choice
+-- is forced and S.identityAnswer cannot re-find a different one after a
+-- mutation.
+--
+-- Returns the board with the Taker's enters trigger already resolved: the Piker
+-- exiled, and alice permitted to cast it.
+hostageExiled :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+hostageExiled island swamp taker piker =
+  let lands = S.landsFor swamp S.alice 3 (S.landsFor island S.alice 3 S.threePlayerGame)
+      (_, withPiker) = S.addPermanent piker S.bob lands
+      (handId, board) = S.addHandCard taker S.alice withPiker
+      cast = S.runPure S.identityAnswer (inHerMainPhase board) (Cast.castSpell S.manaPerformer S.alice handId hostageTakerName Facing.FaceUp)
+      entered = S.runPure S.identityAnswer cast Stack.resolveTop
+      -- CR 603.3b/603.3d: the enters trigger goes onto the stack the next time a
+      -- player would receive priority, and its target is chosen there.
+      placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+   in inHerMainPhase (S.runPure S.identityAnswer placed Stack.resolveTop)
+
+-- The battlefield objects this player CONTROLS. Not S.countOnBattlefieldByName
+-- or Game.zoneMembers, which index the battlefield by OWNER (CR 108.3) and so
+-- cannot answer the question this group is about.
+controlledOnBattlefield :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
+controlledOnBattlefield pid gs =
+  filter (\o -> Projection.controllerOf o gs == Just pid) (Set.toList (GameState.battlefield gs))
+
+hostageTakerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+hostageTakerSpec s registry = Spec.describe s "HostageTaker" $ do
+  -- CR 110.2b: "the permanent's controller by default is the player who put that
+  -- spell onto the stack". alice cast it, bob owns it, and carol is the seat
+  -- that shows the answer is not a default.
+  Spec.it s "CR 110.2b a permanent cast off an opponent's card enters under its caster" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    taker <- S.printingOf s registry "Hostage Taker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let board = hostageExiled island swamp taker piker
+    case exiledNamed goblinPikerName board of
+      [exiledId] -> do
+        Spec.assertEqWith s "CR 108.3: bob still owns the exiled card" (fmap Object.owner (Game.lookupObject exiledId board)) (Just S.bob)
+        -- The ACTION LIST, not the permission field: a field read would pass
+        -- against an engine that never let alice reach the card.
+        Spec.assertBool s (offeredCast exiledId goblinPikerName board) "alice is offered the cast"
+        let cast = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice exiledId goblinPikerName Facing.FaceUp)
+            after = S.runPure S.identityAnswer cast Stack.resolveTop
+        Spec.assertBool s (not (null (GameState.stack cast))) "the Piker really was cast"
+        case namedOnBattlefield goblinPikerName after of
+          [pikerId] -> do
+            -- THE GAMEPLAY ASSERTION, ahead of every proxy: the permanent the
+            -- spell became answers to alice and not to the player whose card it
+            -- is.
+            Spec.assertEqWith s "CR 110.2b: the permanent entered under alice, who cast it" (Projection.controllerOf pikerId after) (Just S.alice)
+            Spec.assertEqWith s "CR 108.3: and bob still owns it, so the two readings differ" (fmap Object.owner (Game.lookupObject pikerId after)) (Just S.bob)
+            Spec.assertEqWith s "bob controls nothing on the battlefield" (controlledOnBattlefield S.bob after) []
+            Spec.assertEqWith s "and neither does carol, the third seat" (controlledOnBattlefield S.carol after) []
+          other -> Spec.assertFailure s ("expected exactly one Goblin Piker on the battlefield, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected exactly one exiled Piker, got " <> show (length other))
 
 -- alice with `n` untapped Swamps and one spell in hand, a Goblin Piker under BOB
 -- for the spells that target a creature, and Drought under bob when one is
@@ -2870,6 +2962,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   flashSpec s registry
   victorManchaSpec s registry
   direFleetDaredevilSpec s registry
+  hostageTakerSpec s registry
   upToOneTargetSpec s registry
   multiTargetCastSpec s registry
   soulImmolationSpec s registry

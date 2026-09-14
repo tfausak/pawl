@@ -381,12 +381,9 @@ resolveCardBacked runSubgame oid rest printingId = do
           -- Nothing in the pool changes a spell's control, so the two
           -- coincide today.
           --
-          -- UNOBSERVED, and said plainly rather than left to look tested: the
-          -- pool's one card that casts somebody else's card (Dire Fleet
-          -- Daredevil) reaches only instants and sorceries, so no permanent
-          -- spell in the suite has a caster its owner disagrees with, and
-          -- replacing this with Object.owner leaves the suite green. It is
-          -- CR 110.2b written out, not a passing test.
+          -- PROVED by Pawl.CastRestrictionSpec's HostageTaker group: alice casts
+          -- bob's Goblin Piker out of the Taker's exile and the permanent
+          -- answers to alice, so Object.owner here goes red.
           controller = Projection.defaultControllerOf obj
           -- CR 702.140c: is this still a mutating creature spell with a legal
           -- target? Read off `gs1` and not `obj`, since the CR 702.140b clear
