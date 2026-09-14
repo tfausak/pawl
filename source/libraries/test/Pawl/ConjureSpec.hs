@@ -390,6 +390,83 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "asked once, offering every card of the printed spellbook"
       offers
       [tomeSpellbook]
+  -- Follow the Tracks ({2}{G} Sorcery, "Conjure a card of your choice from
+  -- Follow the Tracks's spellbook onto the battlefield."), Oracle text verified
+  -- on Scryfall 2026-09-14. The Tome's case one group above with the other
+  -- question asked: the same printed spellbook shape, picked BY CHOICE.
+  --
+  -- Not implemented: each of the five Gates prints "{3}{C}, {T}: Seek a nonland
+  -- card. Activate only once." No effect seeks, so pawl's Gates are stricter
+  -- than the printing, never weaker (#3734).
+  --
+  -- The answerer pins the pick to Gate to Seatower, which the offered list's
+  -- head is not: Pawl.Engine.Replay.defaultAnswer takes the head, so an engine
+  -- that picked for alice -- or asked for randomness here, whose default answer
+  -- is also the head -- lands on Gate of the Black Dragon instead.
+  Spec.it s "a printed spellbook picked by choice is offered whole, and the card its controller named is the one conjured" $ do
+    forest <- S.printingOf s registry "Forest"
+    tracks <- S.printingOf s registry "Follow the Tracks"
+    let (spell, board0) = S.addHandCard tracks S.alice (S.landsInPlay forest 3)
+        board = board0 {GameState.phase = Phase.PrecombatMain}
+        logging :: Prompt.Prompt r -> State.State [[CardName.CardName]] r
+        logging p = case p of
+          Prompt.ChooseConjuredCard _ _ offered -> do
+            State.modify' (NonEmpty.toList offered :)
+            pure (tracksAnswer gateToSeatower p)
+          _ -> pure (tracksAnswer gateToSeatower p)
+        (offers, final) = case State.runState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) [] of
+          ((_, gs), asked) -> (reverse asked, gs)
+        gates = filter (/= forestName) (namesIn Zone.Battlefield final)
+    -- THE GAMEPLAY ASSERTION: the Gate on the battlefield is the one alice's
+    -- answer named, and no other member of the spellbook came with it.
+    Spec.assertEqWith
+      s
+      "the conjured Gate on the battlefield is the one alice chose"
+      gates
+      [gateToSeatower]
+    -- The conjured card carries its own printed text rather than just its name:
+    -- CR 616.1's entry loop ran over the arrival and the Gate's own replacement
+    -- effect had it enter tapped.
+    Spec.assertEqWith
+      s
+      "and it entered tapped, as its own printed replacement effect says"
+      (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid final)) (namedIn gateToSeatower Zone.Battlefield final))
+      [Just TapState.Tapped]
+    -- Supporting, and LAST so it cannot absorb a mutation the assertions above
+    -- should catch: the whole spellbook was offered, once, in the card file's
+    -- order.
+    Spec.assertEqWith
+      s
+      "asked once, offering every card of the printed spellbook"
+      offers
+      [tracksSpellbook]
+
+-- The five Gates data/cards/follow-the-tracks.json prints as the spellbook, in
+-- the order the card file writes them.
+tracksSpellbook :: [CardName.CardName]
+tracksSpellbook =
+  fmap
+    (CardName.MkCardName . Text.pack)
+    [ "Gate of the Black Dragon",
+      "Gate to Manorborn",
+      "Gate to Seatower",
+      "Gate to the Citadel",
+      "Gate to Tumbledown"
+    ]
+
+gateToSeatower :: CardName.CardName
+gateToSeatower = CardName.MkCardName (Text.pack "Gate to Seatower")
+
+forestName :: CardName.CardName
+forestName = CardName.MkCardName (Text.pack "Forest")
+
+-- Pins the chosen pick to `who`, FILTERED out of the offered candidates rather
+-- than built, tomeAnswer's reason: a name the engine never offered cannot slip
+-- through, and the fallback is the head.
+tracksAnswer :: CardName.CardName -> Prompt.Prompt r -> r
+tracksAnswer who p = case p of
+  Prompt.ChooseConjuredCard _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
+  _ -> S.identityAnswer p
 
 -- The ten cards data/cards/tome-of-the-infinite.json prints as the Tome's
 -- spellbook, in the order the card file writes them.

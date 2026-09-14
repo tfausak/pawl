@@ -52,6 +52,7 @@ encode p answer = case p of
   Prompt.RandomFirstPlayer _ -> Response.DeterminedFirstPlayer answer
   Prompt.RandomObject _ -> Response.SelectedAtRandom answer
   Prompt.RandomCard _ -> Response.SelectedCardAtRandom answer
+  Prompt.ChooseConjuredCard {} -> Response.ChoseConjuredCard answer
   Prompt.RandomOpponent _ -> Response.SelectedOpponentAtRandom answer
   Prompt.RollDie _ -> Response.RolledDie answer
   Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
@@ -189,6 +190,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RandomCard _ -> case response of
     Response.SelectedCardAtRandom name -> Just name
+    _ -> Nothing
+  Prompt.ChooseConjuredCard {} -> case response of
+    Response.ChoseConjuredCard name -> Just name
     _ -> Nothing
   Prompt.RandomOpponent _ -> case response of
     Response.SelectedOpponentAtRandom pid -> Just pid
@@ -562,6 +566,9 @@ defaultAnswer p = case p of
   -- The head of the offer is always one of the offered cards, and FIXED for the
   -- reason RandomObject gives just above.
   Prompt.RandomCard candidates -> NonEmpty.head candidates
+  -- Every candidate is a card of the spellbook the conjuring card printed, and
+  -- the prompt is raised only when there are two or more.
+  Prompt.ChooseConjuredCard _ _ candidates -> NonEmpty.head candidates
   -- CR 706.1a's FLOOR: every die has a 1, whatever its size, so this is the one
   -- answer that is in range for any N -- including the degenerate N of a
   -- malformed card. FIXED for the reason RandomObject gives above.

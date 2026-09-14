@@ -115,6 +115,7 @@ import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.ConjureSelection as ConjureSelection
 import qualified Pawl.Types.Connive as Connive.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
@@ -5017,7 +5018,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- The conjurer is the resolving CONTROLLER (CR 109.5's "you"). Not implemented:
   -- a printing that states one instead, which is a shape rather than one card --
   -- Pawl.Types.Conjure lists the two forms (#2638).
-  Effect.Conjure (Conjure.MkConjure quantity cards destination) -> do
+  Effect.Conjure (Conjure.MkConjure quantity cards selection destination) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -5052,15 +5053,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- matches none takes the head. Two candidates sharing a name would be
         -- indistinguishable to the answer, and the first is what is conjured.
         --
+        -- WHICH question is asked is the opcode's own field, and the two are not
+        -- interchangeable (CR 701.9b): a random pick goes through Game.ask,
+        -- since randomness is not CR 104.4b's optional action, and a chosen pick
+        -- through Game.choose, carrying the Decider and the seat that a choice
+        -- owes. Pawl.ConjureSpec's Follow the Tracks case proves the chosen half
+        -- reaches the answer rather than the head of the offer.
+        --
         -- Not implemented: "X random cards" picking X DISTINCT cards (Giant
         -- Secrets' "conjure X random cards from Giant Secrets's spellbook into
         -- your hand"). Each pick here is independent, so one card can come up
         -- twice (#3648).
+        offered = fmap conjuredName cards
+        answered answer = Maybe.fromMaybe (NonEmpty.head cards) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList cards))
         pick = case cards of
           one NonEmpty.:| [] -> pure one
-          _ -> do
-            answer <- Game.ask (Prompt.RandomCard (fmap conjuredName cards))
-            pure (Maybe.fromMaybe (NonEmpty.head cards) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList cards)))
+          _ -> case selection of
+            ConjureSelection.AtRandom -> fmap answered (Game.ask (Prompt.RandomCard offered))
+            ConjureSelection.ByChoice -> do
+              g <- State.get
+              fmap answered (Game.choose (Prompt.ChooseConjuredCard (Decide.deciderFor controller g) controller offered))
         intoZone zone n = Monad.replicateM_ (Integer.toIntSaturating n) (pick >>= \card -> Monad.void (Event.conjure controller card zone LibraryPosition.defaultValue))
     case evaluateForRecipient viewOf context gs resolving source controller quantity of
       Just n

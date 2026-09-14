@@ -265,7 +265,7 @@ ownQuantities effect = case effect of
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.DecreaseSpeed d -> [SpeedDecrease.quantity d]
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
-  Effect.Conjure (Conjure.MkConjure quantity _ _) -> [quantity]
+  Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> [quantity]
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
   Effect.BecomeCopy {} -> []
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> [quantity]

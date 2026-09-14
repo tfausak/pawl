@@ -963,7 +963,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Create (Create.MkCreate quantity card riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders <> tokenBoxQuantities card)), riderSlots riders]
   -- The COUNT only: the conjure's candidates are literal card data, its
   -- destination is a constructor, and the conjurer is the resolving controller.
-  Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
+  Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> quantitySlots quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   Effect.BecomeCopy {} -> Map.empty
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> quantitySlots quantity
@@ -1526,7 +1526,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- nothing bakes a conjured card's printed box, so Pawl.Engine.Resolve.Effect
   -- hands the one it picks to Event.conjure exactly as written. The COUNT is
   -- the effect speaking, read in the resolution's own slots.
-  Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
@@ -1738,7 +1738,7 @@ readsX =
         -- The token's printed P/T box reaches CR 601.2b's X too: it is the
         -- creating effect's number (tokenBoxQuantities).
         Effect.Create (Create.MkCreate quantity card riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders <> tokenBoxQuantities card)
-        Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
+        Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> Quantity.readsX quantity
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> Quantity.readsX quantity
         Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
         Effect.BecomeCopy {} -> False
