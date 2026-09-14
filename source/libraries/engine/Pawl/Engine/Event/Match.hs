@@ -7492,7 +7492,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
-  -- CR 603.10a's sacrifice family: the log entry Event.sacrifice writes is the
+  -- CR 603.10a's sacrifice family: the log entry Event.sacrificeIn writes is the
   -- whole of the answer, which is exactly what makes the condition worth having.
   -- CR 700.4 makes every sacrifice a death, so the Moved event the same sacrifice
   -- records is indistinguishable from a destruction's or a mill's -- an arm that

@@ -10,16 +10,20 @@
 -- where a card reaches them: CounterKind.Lore, GameEvent.CountersPut (the CR
 -- 122.6 record) and TriggerCondition.SelfCountersReached.
 --
--- Two cards. History of Benalia carries every group but the last: chapters I and
--- II create a 2/2 white Knight token with vigilance -- CR 714.2c's "I, II --"
--- shorthand, written as the two abilities that rule says it means -- and chapter
--- III gives Knights its controller controls +2/+1 until end of turn. Love Song of
--- Night and Day carries the Read ahead group, and rule 702.155 is the whole
--- reason it is here.
+-- History of Benalia carries every group but the last: chapters I and II create a
+-- 2/2 white Knight token with vigilance -- CR 714.2c's "I, II --" shorthand,
+-- written as the two abilities that rule says it means -- and chapter III gives
+-- Knights its controller controls +2/+1 until end of turn. Love Song of Night and
+-- Day carries the Read ahead group, and rule 702.155 is the whole reason it is
+-- here. Synthetic Saga Reliquary joins Benalia for rule 704.3's batch. It is
+-- synthetic because the one printed Saga carrying a graveyard replacement is The
+-- Great Work, whose replacement is aimed at SPELLS cast from a graveyard and whose
+-- chapter III exiles the Saga itself, so CR 704.5s never names it (Scryfall
+-- t:saga o:"would be put into a graveyard", 2026-09-14, that one hit).
 --
--- `data/cards` holds a third Saga, Old Fat Spider Can't See Me, whose four
--- chapters run under Pawl.ExpirySpec's OldFatSpiderCantSeeMe group: rule 714 is
--- read here, and that group reads what its chapters' CR 611.2b durations do.
+-- Old Fat Spider Can't See Me's four chapters run under Pawl.ExpirySpec's
+-- OldFatSpiderCantSeeMe group: rule 714 is read here, and that group reads what
+-- its chapters' CR 611.2b durations do.
 module Pawl.SagaSpec where
 
 import qualified Data.List as List
@@ -256,6 +260,28 @@ sacrificeSpec s registry = Spec.describe s "The final chapter" $ do
         after = S.settleSba gs
     Spec.assertBool s (not (S.onBattlefield oid after)) "the Saga left the battlefield"
     Spec.assertEqWith s "and is in its owner's graveyard, a sacrifice being a move to it (CR 701.21a)" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+  -- CR 704.3 / 714.4: two Sagas finishing on the same check are sacrificed as ONE
+  -- event, so each member's CR 616.1 loop reads the board the pass began on. The
+  -- Reliquary is the only producer of a Saga-borne graveyard replacement -- no
+  -- printing carries one, which is why it is synthetic -- and it goes FIRST, so
+  -- under a per-Saga fold it has already left by the time History of Benalia's
+  -- move is replaced and Benalia reaches a graveyard the rule says is closed.
+  --
+  -- "Another permanent", so the Reliquary's own move is NOT replaced: alice's
+  -- graveyard then holds exactly it, which is what parts the two readings.
+  Spec.it s "CR 704.3 / 714.4 two Sagas finishing together are sacrificed as one event" $ do
+    reliquary <- S.printingOf s registry "Synthetic Saga Reliquary"
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (reliquaryId, g0) = S.addPermanent reliquary S.alice (Setup.emptyGame S.bothPlayers)
+        (benaliaId, g1) = S.addPermanent benalia S.alice g0
+        -- Counters placed directly, so no CR 714.2b chapter ability has triggered
+        -- and rule 704.5s's third conjunct is satisfied for both.
+        gs = S.addCounter CounterKind.Lore 3 benaliaId (S.addCounter CounterKind.Lore 3 reliquaryId g1)
+        after = S.settleSba gs
+    Spec.assertEqWith s "alice's graveyard holds the Reliquary alone, Benalia having been exiled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "and one card is in exile" (Set.size (GameState.exile after)) 1
+    Spec.assertBool s (not (S.onBattlefield reliquaryId after)) "the Reliquary was sacrificed"
+    Spec.assertBool s (not (S.onBattlefield benaliaId after)) "and so was History of Benalia"
   Spec.it s "CR 704.5s but NOT while a chapter ability of its own is still on the stack" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
