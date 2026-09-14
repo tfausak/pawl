@@ -4858,9 +4858,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   pure (victim, List.genericTake wanted (valid <> filler))
             _ -> pure (victim, [])
     doomed <- traverse pickFor victims
-    -- CR 101.4's last sentence -- "then all creatures chosen this way are
-    -- sacrificed simultaneously" -- so the picks from every seat go to the funnel
-    -- as ONE batch against one board.
+    -- CR 101.4's "then the actions happen simultaneously", which its own Example
+    -- writes out for this very instruction, so the picks from every seat go to the
+    -- funnel as ONE batch against one board.
     Event.sacrificeAll (concatMap (\(victim, oids) -> fmap (\oid -> (victim, oid)) oids) doomed)
   -- CR 701.38a: each player, starting with the seat the payload specifies and
   -- proceeding in turn order, votes for one of the listed choices. What the
