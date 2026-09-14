@@ -1566,8 +1566,9 @@ pestName :: CardName.CardName
 pestName = CardName.MkCardName (Text.pack "Pest Token")
 
 -- CR 601.2c: a slot counted 0 to a number the BOARD supplies, on a triggered
--- ability -- where CR 601.2b's announced X is not available at all, a trigger
--- being neither cast nor activated (CR 603.3d).
+-- ability -- where CR 601.2b's own announcement is unavailable, a trigger being
+-- neither cast nor activated (CR 603.3d), and the Marauder's {2}{B} states no X
+-- for CR 107.3m to carry across the entry either (the InheritedX group below).
 --
 -- Mogis's Marauder {2}{B} 2/2 (data/cards/mogiss-marauder.json): "When this
 -- creature enters, up to X target creatures each gain intimidate and haste until
@@ -1642,6 +1643,87 @@ intimidating gs oid = Projection.hasKeyword Keyword.Intimidate oid gs
 -- CR 702.10, the other half.
 hasty :: GameState.GameState -> ObjectId.ObjectId -> Bool
 hasty gs oid = Projection.hasKeyword Keyword.Haste oid gs
+
+-- CR 107.3m: a slot counted by an X the TRIGGER inherits -- the value announced
+-- for the spell that became the permanent, "although the value of X for that
+-- permanent is 0". CR 601.2b's own announcement is unavailable here, a triggered
+-- ability being neither cast nor activated (CR 603.3d).
+--
+-- Lost in the Maze {X}{U}{U} Enchantment (data/cards/lost-in-the-maze.json):
+-- "Flash. When this enchantment enters, tap X target creatures. Put a stun
+-- counter on each of those creatures you don't control. Tapped creatures you
+-- control have hexproof."
+--
+-- FOUR creatures stand against an X of two, so the announcement is a real choice
+-- rather than a prompt short-circuited by having exactly as many candidates as it
+-- needs, and the pair nobody named is asserted untapped -- which is what
+-- separates "X of them" from "all of them". The two boards differ in the
+-- announced X alone.
+--
+-- The count is AnnouncedX rather than "up to", so a wrong X shows as the wrong
+-- NUMBER of creatures tapped rather than as a permissive range: at X = 0 the slot
+-- takes no targets and the whole board stands untapped.
+--
+-- One of the two named is alice's own, which is what makes the second sentence
+-- legible: the stun counter goes to the one she does not control and to nothing
+-- else.
+inheritedXSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+inheritedXSpec s registry = Spec.describe s "InheritedX" $ do
+  Spec.it s "CR 107.3m a trigger's target count reads the X announced for the spell that became the permanent" $ do
+    (hers, his, spared, gs, spellId) <- mazeBoard s registry
+    let after = mazeTrigger 2 [hers, his] gs spellId
+    Spec.assertEqWith s "the two creatures alice named are tapped" (fmap (tappedIn after) [hers, his]) [True, True]
+    Spec.assertEqWith s "the two she had no target left for are untapped" (fmap (tappedIn after) spared) [False, False]
+    Spec.assertEqWith s "only the one she does not control took a stun counter" (fmap (stunCountersOn after) [hers, his]) [Just 0, Just 1]
+  -- One fewer announced, and nothing else different.
+  Spec.it s "CR 107.3m an announced X of one counts one target" $ do
+    (hers, his, spared, gs, spellId) <- mazeBoard s registry
+    let after = mazeTrigger 1 [his] gs spellId
+    Spec.assertEqWith s "one creature of the four is tapped" (length (filter (tappedIn after) (hers : his : spared))) 1
+
+-- alice holds Lost in the Maze with five Islands, enough for {X}{U}{U} at X = 2,
+-- and controls one Typhoid Rats; bob controls a Goblin Piker, a Wall of Stone and
+-- Typhoid Rats of his own. Answers alice's creature, one of bob's, and the two
+-- the trigger should not reach.
+mazeBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState, ObjectId.ObjectId)
+mazeBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  maze <- S.printingOf s registry "Lost in the Maze"
+  let (hersId, g1) = S.addPermanent rats S.alice (S.landsInPlay island 5)
+      (pikerId, g2) = S.addPermanent piker S.bob g1
+      (ratsId, g3) = S.addPermanent rats S.bob g2
+      (wallId, g4) = S.addPermanent wall S.bob g3
+      (gs, spellId) = S.handOne maze g4
+  pure (hersId, pikerId, [ratsId, wallId], gs, spellId)
+
+-- Cast the enchantment for the stated X and resolve it, let the CR 603.3d
+-- placement choose the trigger's targets -- which is where the inherited count is
+-- read -- and resolve the trigger.
+mazeTrigger :: Natural -> [ObjectId.ObjectId] -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+mazeTrigger x wanted gs spellId =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseX {} -> x
+        _ -> takingTargets x wanted p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+      entered = snd (Engine.runGamePure answer cast Stack.resolveTop)
+      placed = snd (Engine.runGamePure answer entered Engine.settleForPriority)
+   in snd (Engine.runGamePure answer placed Stack.resolveTop)
+
+-- CR 110.5: is this permanent tapped?
+tappedIn :: GameState.GameState -> ObjectId.ObjectId -> Bool
+tappedIn gs oid = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
+
+-- CR 122.1d's stun counters on one permanent.
+stunCountersOn :: GameState.GameState -> ObjectId.ObjectId -> Maybe Natural
+stunCountersOn gs oid = fmap (Map.findWithDefault 0 CounterKind.Stun . Object.counters) (Game.lookupObject oid gs)
 
 -- CR 701.39 bolster, which is an opcode: Effect.Bolster over a Quantity, whose
 -- candidate pool and counter kind are rule 701.39a's rather than the card's.
@@ -2274,6 +2356,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   supportSpec s registry
   upToXSpec s registry
   computedCountSpec s registry
+  inheritedXSpec s registry
   bolsterSpec s registry
   amassSpec s registry
   blightSpec s registry

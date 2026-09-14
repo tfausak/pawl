@@ -114,6 +114,7 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -886,6 +887,33 @@ placeBorne srcId pending = do
       -- matcher instead, and to the mode gate as well as the target prompt, both
       -- of which would otherwise see an empty map and admit nothing.
       bound = PendingTrigger.bindings pending
+      -- CR 601.2c's number of targets, at the value of X this ability reads.
+      -- Zero for almost every trigger: CR 601.2b's announcement is made while
+      -- casting a spell or activating an ability, and a triggered ability is
+      -- neither.
+      --
+      -- CR 107.3m is the exception, and the only one: an object's
+      -- enters-the-battlefield triggered ability reads the X announced for the
+      -- spell that became that object, "although the value of X for that
+      -- permanent is 0" -- so the same permanent's other abilities keep reading
+      -- zero, which is what makes the case on the CONDITION the rule's own
+      -- boundary rather than a convenience. Object.announcedX carries the
+      -- number across the move (Pawl.Engine.Event.changeZoneAttaching), and is
+      -- Nothing for a permanent no cast X stands behind -- a token copy, or a
+      -- permanent put onto the battlefield by an effect.
+      --
+      -- Pawl.TargetSpec's "CR 107.3m a trigger's target count reads the X
+      -- announced for the spell that became the permanent" is the proof, and
+      -- Pawl.CardSpec's CR 603.3d lint admits an announced-X count on exactly
+      -- this shape of ability.
+      --
+      -- A slot counted by a COMPUTED number needs none of this: its Quantity is
+      -- read off the board against `srcId`, CR 113.7's source of this ability,
+      -- which is what lets Mogis's Marauder's devotion count a trigger's
+      -- targets.
+      inheritedX = case TriggeredAbility.condition ability of
+        TriggerCondition.SelfEnters -> Projection.announcedXOf srcId gs
+        _ -> 0
       legal = Target.fillableModes (Just controller) bound srcId Map.empty modal gs
       selection = Modal.Type.selection modal
       obj =
@@ -1015,20 +1043,8 @@ placeBorne srcId pending = do
           -- The cast road (Cast.castProposed) and the activation road
           -- (Activate.activateAbility) ask the same three.
           attempt rejected = do
-            -- Zero, there being no announcement to read: CR 601.2b's is made
-            -- while casting a spell or activating an ability, and a triggered
-            -- ability is neither.
-            --
-            -- A slot counted by a COMPUTED number needs none of this: its
-            -- Quantity is read off the board against `srcId`, CR 113.7's source
-            -- of this ability, which is what lets Mogis's Marauder's devotion
-            -- count a trigger's targets.
-            --
-            -- Not implemented: a slot counting by an X the trigger INHERITS (CR
-            -- 107.3m, CR 701.37c); Pawl.CardSpec refuses a triggered ability
-            -- whose slot counts by X (#3633).
-            chosen <- Target.chooseTargets controller abilId srcId 0 slots sets
-            if Target.selectionLegal (Just controller) bound srcId 0 slots sets chosen gs
+            chosen <- Target.chooseTargets controller abilId srcId inheritedX slots sets
+            if Target.selectionLegal (Just controller) bound srcId inheritedX slots sets chosen gs
               then pure (Just chosen)
               else
                 let key = Map.intersectionWith Set.intersection chosen sets

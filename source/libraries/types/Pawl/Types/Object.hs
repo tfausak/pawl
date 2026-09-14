@@ -591,16 +591,20 @@ data Object = MkObject
     manaSpent :: Mana.Mana,
     -- | CR 107.3m: the value of X chosen for the SPELL that became this
     -- permanent, which is the value of X for the permanent's
-    -- enters-the-battlefield replacement effects. Two readers: CR 306.5b's
-    -- intrinsic loyalty ability (Nissa, Steward of Elements) and a CR 614.1c row
-    -- a CARD writes (Protean Hydra), through
-    -- Pawl.Engine.Quantity.substituteAnnouncedX.
+    -- enters-the-battlefield replacement effects and for its
+    -- enters-the-battlefield triggered abilities. The replacement readers are CR
+    -- 306.5b's intrinsic loyalty ability (Nissa, Steward of Elements) and a CR
+    -- 614.1c row a CARD writes (Protean Hydra), both through
+    -- Pawl.Engine.Quantity.substituteAnnouncedX; the trigger's is CR 601.2c's
+    -- target count (Lost in the Maze), through Pawl.Engine.Engine.placeBorne.
     --
     -- A SNAPSHOT copied across the move by Pawl.Engine.Event.changeZoneAttaching
     -- off the departing spell's own `bindings`, never a live read, CR 601.2b
     -- having fixed the number as the spell was cast. NOT the permanent's own X,
-    -- which rule 107.3m puts at 0, which is why substituteAnnouncedX puts it into
-    -- an entry row's quantity and nowhere else.
+    -- which rule 107.3m puts at 0 -- which is why substituteAnnouncedX puts it
+    -- into an entry row's quantity rather than into the permanent's text, and why
+    -- placeBorne reads it on CR 107.3m's own condition rather than for every
+    -- ability the permanent triggers.
     announcedX :: Maybe Natural.Natural,
     -- | CR 601.2a: the zone this spell was moved to the stack FROM, which is what
     -- Aven Interrupter's "spells your opponents cast from graveyards or from
