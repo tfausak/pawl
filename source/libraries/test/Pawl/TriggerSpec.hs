@@ -428,7 +428,10 @@ sacrificeSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (card, gs) = S.addLibraryCard piker S.bob (Setup.emptyGame S.bothPlayers)
           after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob card)
-      Spec.assertEqWith s "the library card is untouched" after gs
+      -- Against the bracket rather than against `gs`: the funnel is CR
+      -- 608.2f-bracketed (Event.sacrificeIn), so a refused sacrifice still spends
+      -- an event group. Every other field is still compared.
+      Spec.assertEqWith s "the library card is untouched" after (S.runPure S.identityAnswer gs (Event.simultaneously (pure ())))
     -- CR 701.21a's second clause, which had no enforcement before #44: "A player
     -- can't sacrifice ... a permanent they don't control." Bob controls it;
     -- alice asking is refused outright rather than quietly honoured.
@@ -437,7 +440,8 @@ sacrificeSpec s registry =
       let (piker, gs) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           byAlice = S.runPure S.identityAnswer gs (Event.sacrifice S.alice piker)
           byBob = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
-      Spec.assertEqWith s "alice's attempt changes nothing at all" byAlice gs
+      -- Against the bracket, for the reason the library case above states.
+      Spec.assertEqWith s "alice's attempt changes nothing at all" byAlice (S.runPure S.identityAnswer gs (Event.simultaneously (pure ())))
       -- The discriminating half: the same call from the controller works, so the
       -- refusal above is the guard and not an unrelated no-op.
       Spec.assertEqWith s "bob's own sacrifice goes through" (S.creaturesInPlay S.bob byBob) 0

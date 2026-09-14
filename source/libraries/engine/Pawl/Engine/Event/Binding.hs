@@ -798,7 +798,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- CR 400.7e's new object BESIDE it -- the graveyard card Prowling
   -- Geistcatcher's "exile it" has to move -- and it is the reason this arm is
   -- handed the batch's arrival table at all: CR 603.10a records the sacrifice
-  -- BEFORE the move (Event.sacrifice), so the id the event carries is the
+  -- BEFORE the move (Event.sacrificeIn), so the id the event carries is the
   -- battlefield permanent CR 400.7 went on to delete and nothing on the event
   -- names what it became. `becameInGraveyard` is keyed by exactly that departed
   -- id.
