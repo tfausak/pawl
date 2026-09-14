@@ -537,7 +537,9 @@ rewriteEffect pairs effect = case effect of
   -- BOTH refs, CreateCopy's reason: CR 707.2 keeps a text change out of the
   -- copiable values, so what the copy becomes is not rewritten, but CR 707.10d's
   -- description of the candidates ("each other creature you control") is card
-  -- text like any other ref's. CR 707.10c's offer is no land type at all.
+  -- text like any other ref's. CR 707.10c's offer is no land type at all. The
+  -- exceptions take BecomeCopy's walk above, and the copier is a PlayerRef, which
+  -- names no card text for CR 612.1 to change.
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity copier exceptions) ->
     Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (rewriteObjectRef pairs ref) (rewriteCopyTargets pairs targets) (rewriteQuantity pairs quantity) copier (fmap (rewriteCopyException pairs) exceptions))
   -- CR 612.1 through the SHIELD a resolution installs: the row's duration, its

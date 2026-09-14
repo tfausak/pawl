@@ -5253,7 +5253,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- An ARCHIVED spell brings its own snapshot -- the one the
                 -- arming effect filed, rule 702.50a's "except for its epic
                 -- ability" written into it -- and there is no live object left
-                -- to take a fresh reading off, so the copied bindings stand.
+                -- to take a fresh reading off, so that snapshot is what the
+                -- arm below re-stamps rather than a fresh reading.
+                --
                 -- CR 707.9's exceptions are folded into the snapshot on the way
                 -- in, exactly as the BecomeCopy arm above folds them, so Double
                 -- Major's "except it isn't legendary" is part of the copy's own
