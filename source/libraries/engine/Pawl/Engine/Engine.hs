@@ -1384,6 +1384,13 @@ priorityLoop = do
                                 -- one below -- and consumed only once the land has
                                 -- moved, a CR 616.1 loop that cancels the move
                                 -- having played nothing.
+                                -- CR 406.3a, the land half of the turn
+                                -- Pawl.Engine.Cast.turnedUpForPlay states: a
+                                -- land played out of face-down exile is turned
+                                -- face up just before it is played, so the
+                                -- reads below see the card rather than that
+                                -- rule's characteristicless object.
+                                State.modify' (Cast.turnedUpForPlay oid Facing.FaceUp)
                                 spent <- State.gets (PlayerEffect.spentByLandPlay p oid)
                                 -- CR 110.2 / 305.1: the permanent enters under
                                 -- the player who PLAYED it, which is not the

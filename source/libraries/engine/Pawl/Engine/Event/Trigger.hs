@@ -1347,9 +1347,14 @@ eventTriggers events gs =
       -- 108.4a), also for `inGraveyards`' reasons: CR 108.4 gives a card in exile
       -- no controller at all, so Blind Hunter's "you gain 2 life" pays the player
       -- who owns the haunting card.
-      -- Not implemented: a card exiled FACE DOWN is scanned here like any other,
-      -- so its printed abilities are offered where CR 406.3a leaves it none
-      -- (#1479).
+      -- A card exiled FACE DOWN is skipped: CR 406.3a leaves it no
+      -- characteristics, so it bears no ability to function from anywhere. The
+      -- sibling gates are Pawl.Engine.Projection's, which drop the same card's
+      -- static abilities and replacement rows. A REGRESSION FENCE rather than a
+      -- proof: no card in data/cards both reaches exile face down and prints a
+      -- triggered ability that functions there -- pawl's face-down exilers are
+      -- foretell (CR 702.143a), Ignorant Bliss and Extract Power -- so removing
+      -- this guard leaves the suite green.
       --
       -- The KEYWORD-MINTED abilities join the printed ones and are NOT filtered
       -- by `functionsIn`, which is the whole difference between the two halves
@@ -1361,7 +1366,7 @@ eventTriggers events gs =
       -- is what decides which keywords reach this: suspend and CR 702.35a's
       -- madness, whose own first ability is what put its card here.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-        (Just obj, Just face) ->
+        (Just obj, Just face) | not (Object.exiledFaceDown obj) ->
           case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> Keyword.exileTriggeredAbilitiesOf (Face.keywords face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))

@@ -1356,9 +1356,29 @@ restrictionMet pid gs restriction = case restriction of
 -- half, and every gate below reads it through `proposedFace` and `Game.faceOf`
 -- without knowing morph exists. FaceUp is CR 110.5b's default and what every
 -- ordinary proposal passes.
+--
+-- CR 406.3a's turn rides it too, through `turnedUpForPlay`: the same stamp is
+-- what the gate and the announcement both read, so the card's characteristics
+-- come back for both at once.
 asProposed :: ObjectId -> CardName.CardName -> Facing.Facing -> GameState -> GameState
 asProposed oid name facing gs =
-  gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name, Object.facing = facing, Object.castFrom = Just (Object.zone o)}) oid (GameState.objects gs)}
+  turnedUpForPlay oid facing gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name, Object.facing = facing, Object.castFrom = Just (Object.zone o)}) oid (GameState.objects gs)}
+
+-- CR 406.3a: a card exiled face down is turned face up just before the player
+-- announces they are playing it (CR 601.2), which is what gives the
+-- announcement a card to read -- Projection.View.baseCharacteristics answers
+-- CR 406.3a's characteristicless object for every other reader.
+--
+-- The rule's own "unless that card is being cast face down": a morph cast
+-- (CR 708.4) turns nothing up, so the flag survives a FaceDown proposal.
+--
+-- Written as STATE rather than as an argument, `asProposed`'s posture and for
+-- its reason: the gate, the cost and the announcement are one board apart, and
+-- a turn only one of them saw would price a cast the other refuses.
+turnedUpForPlay :: ObjectId -> Facing.Facing -> GameState -> GameState
+turnedUpForPlay oid facing gs = case facing of
+  Facing.FaceDown _ -> gs
+  Facing.FaceUp -> gs {GameState.objects = Map.adjust (\o -> o {Object.exiledFaceDown = False}) oid (GameState.objects gs)}
 
 -- Affordable and correctly timed, actually in a zone this player may cast it
 -- from, fillable, and prohibited by nothing. CR 601.2b: affordable means at least
@@ -1871,6 +1891,10 @@ castSpell perform = castSpellWith perform False Nothing ManaSpending.AsProduced
 -- `spendingFor`'s reason.
 castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Maybe CandidateCost.CandidateCost -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
 castSpellWith perform offered applied widened pid oid name facing = do
+  -- CR 406.3a, run BEFORE `before` is read and so before CR 601.2e's rewind
+  -- captures it: the turn happens just before the announcement rather than
+  -- inside it, so a cast the player backs out of leaves the card face up.
+  State.modify' (turnedUpForPlay oid facing)
   before <- State.get
   -- The state the GATE measured, which is `before` with CR 709.3's half and CR
   -- 708.4's facing stamped on. Read from rather than written to the game: the

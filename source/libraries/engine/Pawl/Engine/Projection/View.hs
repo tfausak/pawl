@@ -1118,59 +1118,70 @@ seedCharacteristicPT face =
           }
     _ -> Nothing
 
+-- CR 406.3a / 613.1: an object with no characteristics at all. Two kinds have
+-- none -- an ability on the stack, which has no card behind it, and a card
+-- exiled face down, whose card is there but says nothing.
+noCharacteristics :: ProjectedCharacteristics
+noCharacteristics =
+  PC.MkProjectedCharacteristics
+    { PC.names = Set.empty,
+      PC.supertypes = Set.empty,
+      PC.keywords = Map.empty,
+      PC.colors = Set.empty,
+      -- CR 202.1 reads a mana cost off a card, and there is none to read.
+      PC.manaCost = Nothing,
+      -- CR 202.3a all the same: CR 109.1 makes an ability on the stack an
+      -- OBJECT, and an object with no mana cost has mana value 0 -- neither of
+      -- that rule's two exceptions (a nonmodal double-faced back face, a melded
+      -- permanent) is such an object. CR 603.3's "no other
+      -- characteristics" does not take it back: CR 109.3 lists mana COST as a
+      -- characteristic and not mana value, which rule 202.3 derives from it.
+      -- Pawl.CounterspellSpec's Synthetic Weigh the Trigger group is what
+      -- proves the number.
+      PC.manaValue = Just 0,
+      PC.power = Nothing,
+      PC.toughness = Nothing,
+      PC.loyalty = Nothing,
+      PC.defense = Nothing,
+      PC.characteristicPT = Nothing,
+      PC.cardTypes = Set.empty,
+      PC.subtypes = Set.empty,
+      PC.staticAbilities = [],
+      PC.playerAbilities = [],
+      -- CR 116.2: no characteristics, so no printed permission either.
+      PC.specialActions = [],
+      PC.activatedAbilities = [],
+      PC.replacementEffects = [],
+      PC.triggeredAbilities = [],
+      PC.enchant = [],
+      -- CR 613.11: no characteristics, so none of the twelve families either.
+      PC.ruleAbilities = mempty,
+      PC.lostAllAbilities = False,
+      PC.subtypeWordChanges = [],
+      PC.textChangedKeywords = Map.empty,
+      PC.assignsCombatDamageWithToughness = False,
+      -- CR 702.184c: an ability on the stack grants nothing to its
+      -- controller's station abilities of its own.
+      PC.grantsStationToughness = False,
+      -- CR 709.5: no characteristics, so no halves either.
+      PC.halves = Nothing,
+      -- CR 722.2b, for the same reason one line up.
+      PC.prepare = Nothing,
+      -- CR 710.1b, for the same reason again.
+      PC.flipped = Nothing
+    }
+
 -- Printed characteristics before any effect: CR 613.1's starting point.
 baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 baseCharacteristics oid gs = case Game.faceOf oid gs of
-  Nothing ->
-    PC.MkProjectedCharacteristics
-      { -- No card behind this object (an ability on the stack).
-        PC.names = Set.empty,
-        PC.supertypes = Set.empty,
-        PC.keywords = Map.empty,
-        PC.colors = Set.empty,
-        -- CR 202.1 reads a mana cost off a card, and there is none to read.
-        PC.manaCost = Nothing,
-        -- CR 202.3a all the same: CR 109.1 makes an ability on the stack an
-        -- OBJECT, and an object with no mana cost has mana value 0 -- neither of
-        -- that rule's two exceptions (a nonmodal double-faced back face, a melded
-        -- permanent) is an object with no card behind it. CR 603.3's "no other
-        -- characteristics" does not take it back: CR 109.3 lists mana COST as a
-        -- characteristic and not mana value, which rule 202.3 derives from it.
-        -- Pawl.CounterspellSpec's Synthetic Weigh the Trigger group is what
-        -- proves the number.
-        PC.manaValue = Just 0,
-        PC.power = Nothing,
-        PC.toughness = Nothing,
-        PC.loyalty = Nothing,
-        PC.defense = Nothing,
-        PC.characteristicPT = Nothing,
-        PC.cardTypes = Set.empty,
-        PC.subtypes = Set.empty,
-        PC.staticAbilities = [],
-        PC.playerAbilities = [],
-        -- CR 116.2: no card behind the object, so no printed permission either.
-        PC.specialActions = [],
-        PC.activatedAbilities = [],
-        PC.replacementEffects = [],
-        PC.triggeredAbilities = [],
-        PC.enchant = [],
-        -- CR 613.11: no card behind the object, so none of the twelve families
-        -- either.
-        PC.ruleAbilities = mempty,
-        PC.lostAllAbilities = False,
-        PC.subtypeWordChanges = [],
-        PC.textChangedKeywords = Map.empty,
-        PC.assignsCombatDamageWithToughness = False,
-        -- CR 702.184c: an ability on the stack grants nothing to its
-        -- controller's station abilities of its own.
-        PC.grantsStationToughness = False,
-        -- CR 709.5: no card behind the object, so no halves either.
-        PC.halves = Nothing,
-        -- CR 722.2b, for the same reason one line up.
-        PC.prepare = Nothing,
-        -- CR 710.1b, for the same reason again.
-        PC.flipped = Nothing
-      }
+  Nothing -> noCharacteristics
+  -- CR 406.3a: a card exiled face down has no characteristics, so the seed CR
+  -- 613.1 starts the layers from holds none either -- the card behind it is
+  -- read only by the one reader the rules entitle, which is Pawl.Engine.Cast's
+  -- offer of a play the exiling effect permitted (CR 406.3b) and never this
+  -- projection. CR 110.5d keeps this apart from Object.facing, which is CR
+  -- 708's face-down PERMANENT and reaches the projection through Game.faceOf.
+  Just _ | any Object.exiledFaceDown (Game.lookupObject oid gs) -> noCharacteristics
   Just face ->
     -- CR 718.3b's swap sits OUTSIDE the record rather than in four of its fields,
     -- so that CR 718.5's "remain the same" is visible as the default: everything
