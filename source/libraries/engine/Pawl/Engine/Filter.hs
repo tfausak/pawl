@@ -304,7 +304,7 @@ data View = MkView
     -- `crewedThisTurn` above splits rule 702.122c's: this half is the
     -- candidate's, and the "it" the card names is the source on the Context. The
     -- PERMANENTS are in the set beside the spells because a spell is gone by the
-    -- time its own entry trigger resolves (CR 400.7a).
+    -- time its own entry trigger resolves (CR 400.7d).
     convokedThisTurn :: Set.Set ObjectId.ObjectId,
     -- CR 302.6: has this candidate's CONTROLLER controlled it continuously since
     -- their most recent turn began? Read from Object.sickness, the field CR

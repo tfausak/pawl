@@ -3112,10 +3112,12 @@ announceManaSubstitutions pid oid cost = case Cost.mana cost of
         whole (candidate, extra) = candidate {Cost.components = Cost.components candidate <> extra}
         offered = filter (\candidate -> componentsPayable slots pid oid (Cost.components (whole candidate)) gs) (fmap variant (manaSubstitutions slots pid oid gs manaCost))
     case offered of
-      -- Unreachable: the substitute-nothing entry carries the cost's own
-      -- components, which the gate that offered this cast already measured. Left
-      -- as the cost rather than as an error, the payment being what reports a
-      -- cost that cannot be paid.
+      -- REACHABLE, and not by the gate's measurement: this runs after CR 601.2g's
+      -- window, so a mana ability may have tapped the very permanent the cost's
+      -- own component needed and left even the substitute-nothing entry
+      -- unpayable. Answered with the cost unchanged rather than with an error,
+      -- because the offer is not the place that reports an unpayable cost -- CR
+      -- 601.2h's payment is, and it reverses the cast.
       [] -> pure (cost, [])
       [only] -> pure only
       first : rest -> do
@@ -3219,11 +3221,14 @@ pay perform moment subject announced spending pid oid cost = fmap fst (paySubsti
 -- tapped THIS way, where Binding.tappedPermanent names every permanent any tap
 -- component of the cost took. Pawl.Engine.Cast reads the second answer.
 --
--- The two groups are paid in TWO passes, substitutes last, where CR 601.2h
--- leaves the whole payment's order to the payer. Nothing in `data/cards/`
--- observes it: none of the seven printings there that state convoke, delve or
--- improvise carries a cost component of its own (checked 2026-09-13), and one
--- that did would refute this.
+-- The two groups go through payComponents SEPARATELY, so each makes CR 601.2h's
+-- two passes of its own. That is not the rule: CR 601.2h wants ONE first pass
+-- over everything that moves no card out of a library, then one second pass over
+-- the rest -- so a cost carrying a MillCards component of its own would have it
+-- paid before the substitutes' first pass, which inverts the rule's order.
+-- Nothing in `data/cards/` observes it, which is why no issue is filed: no
+-- printing there that states convoke, delve or improvise carries a cost
+-- component at all (checked 2026-09-13), and one that did would refute this.
 paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
 paySubstituting perform moment subject announced spending pid oid substituting cost = do
   before <- State.get

@@ -322,8 +322,9 @@ data GameEvent
   | -- | CR 702.51c: creatures CONVOKED a spell, as they were tapped to pay for
     -- mana in its total cost. Crewed below is the same relation one keyword
     -- over; the end this one names is a spell, which CR 400.7 leaves behind the
-    -- moment it resolves -- Pawl.Engine.Projection.View's convokedByIt is what
-    -- follows it onto the permanent it became.
+    -- moment it resolves -- CR 400.7d is what lets the permanent it became
+    -- reference it, and Pawl.Engine.Projection.View's convokedThisTurnOf is what
+    -- makes the hop.
     Convoked Convoking.Convoking
   | -- | CR 702.122b: creatures CREWED a Vehicle, as they were tapped to pay its
     -- crew ability's cost.

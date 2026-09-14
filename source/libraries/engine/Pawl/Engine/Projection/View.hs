@@ -353,7 +353,9 @@ crewedByIt oid event = case event of
 -- and names the SPELL, which CR 400.7 ends the moment it resolves -- so a
 -- permanent's own entry trigger asking "each creature that convoked it"
 -- (Venerated Loxodon) would find nothing to compare against. The BECAME hop is
--- CR 400.7a's "the permanent that spell becomes", read off the same log:
+-- CR 400.7d -- "an ability of a permanent can reference information about the
+-- spell that became that permanent as it resolved, including what costs were
+-- paid to cast that spell" -- and the becoming is read off the same log:
 -- Pawl.Engine.Event records the stack-to-battlefield move as a GameEvent.Moved
 -- whose `departed` is the spell.
 --
@@ -366,7 +368,8 @@ convokedThisTurnOf oid gs =
       spells = Maybe.mapMaybe (convokedByIt oid) events
    in Set.fromList (concatMap (\spell -> spell : becamePermanents spell events) spells)
 
--- CR 400.7a: the permanents one object became by resolving off the stack, read
+-- CR 400.7d's "the spell that became that permanent", asked the other way
+-- round: the permanents one object became by resolving off the stack, read
 -- off the move log. A list rather than a Maybe for CR 712.21's several arrivals,
 -- which no permanent spell reaches today.
 becamePermanents :: ObjectId -> [GameEvent.GameEvent] -> [ObjectId]
