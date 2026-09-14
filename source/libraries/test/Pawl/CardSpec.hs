@@ -557,11 +557,11 @@ objectRefPositions =
         ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
         ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders Nothing []), [plantedRef "cc"]),
         ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject") []), [plantedRef "bc-original", plantedRef "bc-subject"]),
-        ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied CopyStackObject.defaultQuantity), [plantedRef "cs"]),
+        ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied CopyStackObject.defaultQuantity CopyStackObject.defaultCopier []), [plantedRef "cs"]),
         -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
         -- reach: a copy effect whose candidate description reads a slot no clause
         -- binds is a dangling read like any other.
-        ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each")) CopyStackObject.defaultQuantity), [plantedRef "cs-ref", plantedRef "cs-each"]),
+        ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each")) CopyStackObject.defaultQuantity CopyStackObject.defaultCopier []), [plantedRef "cs-ref", plantedRef "cs-each"]),
         ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
         ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
         ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
@@ -1112,7 +1112,7 @@ ownCounts effect = case effect of
   -- Filters are effectFilters' business below.
   Effect.BecomeCopy {} -> []
   -- CR 702.40a's "for each" count is card data like CreateCopy's.
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity) -> quantityCounts quantity
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> quantityCounts quantity
   -- The Condition is Galvanic Blast's and Synthetic Voltaic Surge's "if you
   -- control three or more artifacts", and its Counts are as much card data as a
   -- Duration's.
@@ -4940,7 +4940,7 @@ effectFilters effect = case effect of
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject exceptions) -> frame SourceHostFramed (objectRefFilters original <> objectRefFilters subject) <> concatMap copyExceptionFilters exceptions
   -- BOTH refs, CreateCopy's arm above: an EachMatching Filter is card text, and
   -- CR 707.10d's candidates are named by one.
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref <> copyTargetsFilters targets)
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity _ exceptions) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref <> copyTargetsFilters targets) <> concatMap copyExceptionFilters exceptions
   -- The ROW's own Filters are framed for printedReplacementFilters' reason: a
   -- stored row is read through the same
   -- Pawl.Engine.Replacement.candidateContext a printed one is, where the
@@ -5181,6 +5181,7 @@ grantedModifications card =
                   Effect.ModifyTarget modify -> [ModifyTarget.modification modify]
                   Effect.CreateCopy create -> copyQuotedAbilities (CreateCopy.exceptions create)
                   Effect.BecomeCopy become -> copyQuotedAbilities (BecomeCopy.exceptions become)
+                  Effect.CopyStackObject copy -> copyQuotedAbilities (CopyStackObject.exceptions copy)
                   Effect.Replace replace -> copyQuotedAbilities (replacementCopyExceptions (Replace.effect replace))
                   _ -> []
               )

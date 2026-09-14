@@ -6854,7 +6854,9 @@ copiesOf quantity =
                             CopyStackObject.MkCopyStackObject
                               { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
                                 CopyStackObject.targets = CopyTargets.ChosenByController,
-                                CopyStackObject.quantity = quantity
+                                CopyStackObject.quantity = quantity,
+                                CopyStackObject.copier = CopyStackObject.defaultCopier,
+                                CopyStackObject.exceptions = []
                               }
                         )
                     )
@@ -7274,7 +7276,12 @@ epicCopy =
           CopyStackObject.MkCopyStackObject
             { CopyStackObject.ref = ObjectRef.InSlot epicSlot,
               CopyStackObject.targets = CopyTargets.ChosenByController,
-              CopyStackObject.quantity = CopyStackObject.defaultQuantity
+              CopyStackObject.quantity = CopyStackObject.defaultQuantity,
+              CopyStackObject.copier = CopyStackObject.defaultCopier,
+              -- Rule 702.50a's "except for its epic ability" is written into the
+              -- archived snapshot instead (Keyword.withoutEpic), the exception
+              -- being epic's own sentence rather than CR 707.10's.
+              CopyStackObject.exceptions = []
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
