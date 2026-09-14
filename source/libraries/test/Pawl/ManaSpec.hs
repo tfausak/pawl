@@ -3493,7 +3493,7 @@ tyvarSpec s registry = Spec.describe s "Tyvar the Bellicose" $ do
     Spec.assertEqWith s "and the Myr's own {C}{C} reached alice's pool" (poolTypes S.alice settled) [ManaType.Colorless, ManaType.Colorless]
   -- The printed rider, spent by Engine.withinTriggerLimit over CR 603.3b's log.
   -- The Myr is untapped between the two activations through Event.untap, the
-  -- road CR 502.1 takes, so the second one pays the same {T} the first did.
+  -- road CR 502.3 takes, so the second one pays the same {T} the first did.
   Spec.it s "the rider: a second resolution the same turn triggers nothing more" $ do
     (myr, elves, _, _, board) <- tyvarBoard s registry
     let once = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer myr)) Engine.settleForPriority)
