@@ -2561,6 +2561,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseLandTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCreatureTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBasicLandType decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseCreatureType decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseSearchZones decider _ _ -> Just (Decider.unwrap decider)
   Prompt.Search decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.CastWhileSearching decider _ _ -> Just (Decider.unwrap decider)
@@ -2686,6 +2687,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseLandTypeSwap {} -> "ChooseLandTypeSwap"
   Prompt.ChooseCreatureTypeSwap {} -> "ChooseCreatureTypeSwap"
   Prompt.ChooseBasicLandType {} -> "ChooseBasicLandType"
+  Prompt.ChooseCreatureType {} -> "ChooseCreatureType"
   Prompt.ChooseSearchZones {} -> "ChooseSearchZones"
   Prompt.Search {} -> "Search"
   Prompt.CastWhileSearching {} -> "CastWhileSearching"

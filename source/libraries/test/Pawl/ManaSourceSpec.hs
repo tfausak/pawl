@@ -66,6 +66,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -681,7 +682,7 @@ burningTreeArranged bte pid =
 -- One green mana with no production tags, plainRed's twin: what the Emissary's
 -- trigger adds alongside it.
 plainGreen :: ManaUnit.ManaUnit
-plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
 
 -- CR 608.2d's OTHER reading of "choose": a scope that admits the CONTROLLER.
 -- Stadium Vendors ({3}{R} 3/3 Creature -- Goblin, "When this creature enters,
@@ -1266,7 +1267,8 @@ restrictedRed =
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction =
         Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])),
-      ManaUnit.rider = Nothing
+      ManaUnit.rider = Nothing,
+      ManaUnit.sourceChosenSubtype = Nothing
     }
 
 -- CR 106.6 on the OTHER road: a mana ability's restricted mana, added inline at
@@ -1329,8 +1331,66 @@ restrictedColorless =
       ManaUnit.tags = Set.empty,
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction = Just (ManaRestriction.onlyCasts (Filter.HasCardType CardType.Artifact)),
-      ManaUnit.rider = Nothing
+      ManaUnit.rider = Nothing,
+      ManaUnit.sourceChosenSubtype = Nothing
     }
+
+-- CR 106.6 with CR 607.2d: a restriction whose predicate reads a CHOICE the
+-- SOURCE made rather than a word printed on the card. Pillar of Origins ({2}
+-- Artifact, "As this artifact enters, choose a creature type. {T}: Add one mana of
+-- any color. Spend this mana only to cast a creature spell of the chosen type")
+-- is the printing, and the whole card is those two sentences -- the cheapest
+-- member of the Cavern of Souls family.
+--
+-- Nothing is omitted from the card, so pawl's Pillar is neither stricter nor
+-- weaker than printed.
+--
+-- The choice cannot be looked up at payment: Pawl.Types.ManaUnit carries no source
+-- id, so Mana.sourceChosenSubtypeOf bakes the answer onto every unit the Pillar
+-- adds and Mana.admitsUnder hands it to Filter.HasChosenSubtype.
+pillarSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+pillarSpec s registry = Spec.describe s "Pillar of Origins" $ do
+  -- The gameplay-level proof docs/design.md section 4 asks for: cast the Pillar,
+  -- answer its as-enters prompt for real, let it resolve, and ask what its one
+  -- mana can pay for.
+  --
+  -- Run TWICE with different answers on ONE board, Pawl.AuraSpec's Convincing
+  -- Mirage arrangement and for its reason: one half alone would pass for an
+  -- implementation that conjured a fixed type, and two halves that disagree can
+  -- only be told apart by reading the choice.
+  --
+  -- The two spells are Goblin Grappler ({R} Goblin) and Llanowar Elves ({G} Elf
+  -- Druid): one mana each, different colours, different creature types. The
+  -- Pillar's mana is of ANY colour, so neither refusal can be a colour the board
+  -- cannot make, and the two runs are each other's control -- the boards are
+  -- identical and only the answer differs. Each run casts ONE of the two, so
+  -- neither pair can be two refusals.
+  --
+  -- The two lands are Reliquary Towers, which the Pillar's {2} taps: nothing
+  -- untapped is left once it has resolved, and a Tower's colourless could not pay
+  -- either coloured pip in any case.
+  Spec.it s "CR 607.2d whole card: the Pillar's mana casts a creature of the chosen type and no other" $ do
+    pillar <- S.printingOf s registry "Pillar of Origins"
+    tower <- S.printingOf s registry "Reliquary Tower"
+    grappler <- S.printingOf s registry "Goblin Grappler"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (withPillar, pillarSpell) = S.handOne pillar (S.landsInPlay tower 2)
+        run pick =
+          let cast_ = S.runPure (pillarChoosing pick) withPillar (S.cast S.alice pillarSpell)
+           in S.runPure (pillarChoosing pick) cast_ Stack.resolveTop
+        castables gs =
+          let (grapplerId, withGoblin) = S.addHandCard grappler S.alice gs
+              (elvesId, withBoth) = S.addHandCard elves S.alice withGoblin
+           in (S.castable S.alice grapplerId withBoth, S.castable S.alice elvesId withBoth)
+    Spec.assertEqWith s "CR 106.6 choosing Goblin, the Pillar's mana casts the Goblin and refuses the Elf" (castables (run Subtype.Goblin)) (True, False)
+    Spec.assertEqWith s "CR 106.6 choosing Elf, the same board and the pair flips" (castables (run Subtype.Elf)) (False, True)
+
+-- Pillar of Origins' CR 614.1c as-enters creature type, and nothing else: the
+-- card raises no other prompt this case has to steer.
+pillarChoosing :: Subtype.Subtype -> Prompt.Prompt r -> r
+pillarChoosing subtype p = case p of
+  Prompt.ChooseCreatureType {} -> subtype
+  _ -> S.identityAnswer p
 
 -- CR 106.4's retention on the INLINE road (CR 605.3b), the third clause a mana
 -- ability's ManaAddition carries onto the units it adds -- the restriction above
@@ -1567,7 +1627,8 @@ hawkerMana manaType =
             { ManaRestriction.casts = Nothing,
               ManaRestriction.activations = Just (Filter.And [])
             },
-      ManaUnit.rider = Nothing
+      ManaUnit.rider = Nothing,
+      ManaUnit.sourceChosenSubtype = Nothing
     }
 
 -- CR 106.6's SECOND shape, and the one no card in the pool reached before: a
@@ -1892,7 +1953,7 @@ recordingManaTypes manaType p = case p of
 -- One mana of `color` carrying no production tag, plainRed's and plainGreen's
 -- generalisation: CR 107.4h reads the SOURCE, and Quirion Sentinel is not snow.
 plainColor :: Color.Color -> ManaUnit.ManaUnit
-plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
 
 -- CR 601.2g's window offers one source per interchangeability class rather than
 -- one per permanent (#217): three Llanowar Elves that nothing tells apart are one
@@ -2115,7 +2176,7 @@ freeze oid gs =
 -- One mana of one type carrying no production tag: what a basic land really puts
 -- in a pool, and the unit the Celestial Dawn cases below seat directly.
 plainOf :: ManaType.ManaType -> ManaUnit.ManaUnit
-plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
 
 -- A cost of exactly one symbol, so a payability answer is about that symbol and
 -- nothing else.
@@ -2136,7 +2197,7 @@ payable :: PlayerId.PlayerId -> ManaCost.ManaCost -> GameState.GameState -> Bool
 payable = Mana.canPay Cost.manaActivations
 
 plainRed :: ManaUnit.ManaUnit
-plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
@@ -2155,6 +2216,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   zhaoSpec s registry
   geosurgeSpec s registry
   workshopSpec s registry
+  pillarSpec s registry
   lastingSpringSpec s registry
   omenHawkerSpec s registry
   boseijuSpec s registry

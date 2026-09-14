@@ -1952,10 +1952,32 @@ apply batch candidate event =
           let stamp o = o {Object.chosenSubtype = Just picked}
            in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
         pure (Just event)
-      -- CR 614.1c: Stuffy Doll's as-enters player choice. The two arms above ask
-      -- unconditionally because rules 105.1 and 305.6 fix their offers; this one
+      -- CR 614.1c: Pillar of Origins' as-enters creature type choice, the arm
+      -- above one rule over. Asked unconditionally for that arm's reason: CR
+      -- 205.3m's creature types are all legal and all distinguishable, so there is
+      -- no one-option case to elide.
+      --
+      -- Written to Object.chosenSubtype, the same field the arm above writes --
+      -- no printing makes both choices, the two clauses being alternatives of one
+      -- sentence shape, and CR 607.2d links each to the ability that reads it.
+      EntryRewrite.ChooseCreatureType -> do
+        gs <- State.get
+        picked <- case Projection.controllerOf oid gs of
+          -- Unreachable and defensive, the arm above's fallback one rule over:
+          -- Goblin is conjured because the card names no type to default to.
+          Nothing -> pure Subtype.Goblin
+          Just controller -> do
+            let decider = Decide.deciderFor controller gs
+            Game.choose (Prompt.ChooseCreatureType decider controller oid)
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \g ->
+          let stamp o = o {Object.chosenSubtype = Just picked}
+           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+        pure (Just event)
+      -- CR 614.1c: Stuffy Doll's as-enters player choice. The three arms above ask
+      -- unconditionally because rules 105.1, 305.6 and 205.3m fix their offers; this one
       -- asks the BOARD who is available, so it can be elided in the one case those
-      -- two never reach -- a single player still in the game, where CR 102.1's
+      -- three never reach -- a single player still in the game, where CR 102.1's
       -- offer has one member and nothing is left to decide.
       --
       -- Written to Object.chosenPlayer, NOT to the copiable snapshot -- see

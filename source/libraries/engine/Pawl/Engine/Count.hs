@@ -343,6 +343,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.SharesCreatureTypeWithBound _ -> predicate
         Filter.Type.HasChosenName -> predicate
         Filter.Type.HasChosenColor -> predicate
+        Filter.Type.HasChosenSubtype -> predicate
         Filter.Type.OfChosenPlayer -> predicate
         Filter.Type.IsPlayer _ -> predicate
         Filter.Type.IsAttacking -> predicate

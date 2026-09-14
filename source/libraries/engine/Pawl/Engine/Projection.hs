@@ -652,10 +652,18 @@ affectsWith grants peers source oid a partial gs = case a of
 -- reads the choice are printed on the one permanent. Read off the OBJECT and not
 -- its card: Object.chosenColor is per-incarnation, and CR 707.6 leaves a copy to
 -- make its own choice, so two permanents of the one printing answer differently.
+--
+-- BOTH of CR 614.1c's chosen characteristics, filled the same way and by the same
+-- sentence of rule 607.2d: Gauntlet of Power reads the colour and Obelisk of Urd
+-- the creature type. Filling only one would leave the other's atom silently False
+-- in this position, which is the one position either is written in outside a mana
+-- restriction (Pawl.Engine.Mana.admitsUnder, which supplies the subtype off the
+-- mana unit instead and so is unaffected by the read here).
 affectedContext :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Filter.Context
 affectedContext source perspective gs =
   (Filter.contextFor (Game.teams gs) perspective (Just source))
-    { Filter.sourceChosenColor = Game.lookupObject source gs >>= Object.chosenColor
+    { Filter.sourceChosenColor = Game.lookupObject source gs >>= Object.chosenColor,
+      Filter.sourceChosenSubtype = Game.lookupObject source gs >>= Object.chosenSubtype
     }
 
 -- The characteristics view of an object: its CR 613 projection and its projected
@@ -2359,6 +2367,9 @@ filterReads f = case f of
   -- recolours a creature (Painter's Servant) moves an affected set written with
   -- this atom.
   Filter.Type.HasChosenColor -> Set.singleton Colors
+  -- Reads the candidate's SUBTYPES, HasSubtype's answer: the chosen half arrives
+  -- on the Context baked at production, and CR 613.1d's layer writes the other.
+  Filter.Type.HasChosenSubtype -> Set.singleton Subtypes
   -- Reads the candidate's CONTROLLER, SameControllerAsBound's answer above: rule
   -- 702.16k's other half is an owner, which CR 108.3 never projects.
   Filter.Type.OfChosenPlayer -> Set.singleton Controller
@@ -2645,6 +2656,10 @@ filterReadsPeers f = case f of
   -- rather than off a projection; the candidate's own colours come from its
   -- partial, so no PEER is projected.
   Filter.Type.HasChosenColor -> False
+  -- The source's chosen subtype arrives on the Context, baked onto the mana unit
+  -- at production; the candidate's own subtypes come from its partial, so no PEER
+  -- is projected.
+  Filter.Type.HasChosenSubtype -> False
   -- The carrier's chosen player arrives on the Context; the candidate's own
   -- controller and owner are read off its view, so no PEER is projected.
   Filter.Type.OfChosenPlayer -> False

@@ -818,6 +818,13 @@ bulwarkBoard s registry gs = do
   bulwark <- S.printingOf s registry "Synthetic Grave Bulwark"
   pure (snd (S.addGraveyardCard bulwark S.alice gs))
 
+-- CR 614.1c's as-enters creature type, and nothing else: the Obelisk of Urd case
+-- below needs two answers on one board, so the type is a parameter.
+choosingCreatureType :: Subtype.Type.Subtype -> Prompt.Prompt r -> r
+choosingCreatureType subtype p = case p of
+  Prompt.ChooseCreatureType {} -> subtype
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "layer classification matches CR 613.1" $ do
@@ -1581,6 +1588,53 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
             S.withEffectFromAt srcA landA (Timestamp.MkTimestamp 100) Modification.SetLandSubtypeToChosen withChoices
     Spec.assertEqWith s "the Island source's land is only an Island" (Projection.subtypesOf landA gs) (Set.singleton Subtype.Type.Island)
     Spec.assertEqWith s "the Swamp source's land is only a Swamp" (Projection.subtypesOf landB gs) (Set.singleton Subtype.Type.Swamp)
+
+  -- The same entry choice read from the OTHER side: not by a Modification off the
+  -- effect's source, but by the AFFECTED SET that decides which permanents the
+  -- modification reaches (Filter.HasChosenSubtype, answered off
+  -- Projection.affectedContext). Obelisk of Urd ({6} Artifact with convoke, "As
+  -- this artifact enters, choose a creature type. Creatures you control of the
+  -- chosen type get +2/+2") is the printing, and the whole card is those two
+  -- sentences plus the keyword. Nothing is omitted, so pawl's Obelisk is neither
+  -- stricter nor weaker than printed.
+  --
+  -- Gauntlet of Power's arrangement one characteristic over (Pawl.ColorSpec), and
+  -- for its reason: TWO Obelisks choosing two DIFFERENT creature types, because
+  -- one could not tell the atom apart from "any chosen type on the battlefield".
+  -- Cast rather than placed, so each type is a player's answer travelling CR
+  -- 614.1c's entry rewrite; Object.chosenSubtype is per-incarnation and CR 707.6
+  -- does not copy it, which is what makes the two answers survive on one board.
+  --
+  -- Distinct base power and toughness throughout -- 2/1, 1/2, 0/1 -- so no pair of
+  -- readings coincides: a Piker pumped by both Obelisks would be 6/5, by the wrong
+  -- one 2/1, and by its own 4/3.
+  Spec.it s "CR 607.2d two Obelisks of Urd each pump the creatures of their OWN chosen type" $ do
+    plains <- S.printingOf s registry "Plains"
+    obelisk <- S.printingOf s registry "Obelisk of Urd"
+    piker <- S.printingOf s registry "Goblin Piker"
+    dissident <- S.printingOf s registry "Dawnhand Dissident"
+    myr <- S.printingOf s registry "Darksteel Myr"
+    -- Twelve Plains: {6} apiece, and no creature is on the battlefield while
+    -- either is cast, so convoke has nothing to offer and taps nothing.
+    let base = S.landsInPlay plains 12
+        (firstInHand, firstId) = S.handOne obelisk base
+        castGoblin = snd (Engine.runGamePure (choosingCreatureType Subtype.Type.Goblin) firstInHand (S.cast S.alice firstId))
+        goblinOut = snd (Engine.runGamePure (choosingCreatureType Subtype.Type.Goblin) castGoblin Stack.resolveTop)
+        (secondInHand, secondId) = S.handOne obelisk goblinOut
+        castElf = snd (Engine.runGamePure (choosingCreatureType Subtype.Type.Elf) secondInHand (S.cast S.alice secondId))
+        bothOut = snd (Engine.runGamePure (choosingCreatureType Subtype.Type.Elf) castElf Stack.resolveTop)
+        (pikerId, withPiker) = S.addPermanent piker S.alice bothOut
+        (dissidentId, withDissident) = S.addPermanent dissident S.alice withPiker
+        (myrId, gs) = S.addPermanent myr S.alice withDissident
+    Spec.assertEqWith s "the Goblin Piker is 4/3: the Obelisk that chose Goblin, and not the one that chose Elf" (Projection.powerOf pikerId gs) (Just 4)
+    Spec.assertEqWith s "the Piker's toughness is 3 for the same reason" (Projection.toughnessOf pikerId gs) (Just 3)
+    Spec.assertEqWith s "the Elf Dissident is 3/4: the other Obelisk's, and not both" (Projection.powerOf dissidentId gs) (Just 3)
+    Spec.assertEqWith s "the Dissident's toughness is 4 for the same reason" (Projection.toughnessOf dissidentId gs) (Just 4)
+    Spec.assertEqWith s "CR 205.3m the Myr is neither type and stays 0/1" (Projection.powerOf myrId gs) (Just 0)
+    Spec.assertEqWith s "and its toughness stays 1" (Projection.toughnessOf myrId gs) (Just 1)
+    -- The fixture, LAST: an assertion ahead of the six above would absorb a
+    -- mutation to the atom and report itself instead.
+    Spec.assertEqWith s "the fixture: both Obelisks resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Obelisk of Urd")) S.alice gs) 2
 
   -- Turn to Frog {1}{U}: "Until end of turn, target creature loses all
   -- abilities and becomes a blue Frog with base power and toughness 1/1."

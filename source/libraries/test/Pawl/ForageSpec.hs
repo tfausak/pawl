@@ -182,7 +182,8 @@ unitOf color =
       ManaUnit.tags = Set.empty,
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction = Nothing,
-      ManaUnit.rider = Nothing
+      ManaUnit.rider = Nothing,
+      ManaUnit.sourceChosenSubtype = Nothing
     }
 
 -- CR 605.1a's activations alone, Pawl.ManaSpec's discriminator: the priority

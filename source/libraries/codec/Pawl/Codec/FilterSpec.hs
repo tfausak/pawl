@@ -303,6 +303,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.HasChosenColor
       " {\"type\":\"HasChosenColor\"} "
+  Spec.it s "HasChosenSubtype" $
+    Common.assertCodec
+      s
+      codec
+      Filter.HasChosenSubtype
+      " {\"type\":\"HasChosenSubtype\"} "
   Spec.it s "OfChosenPlayer" $
     Common.assertCodec
       s

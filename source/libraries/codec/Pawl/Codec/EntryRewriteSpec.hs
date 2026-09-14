@@ -93,6 +93,12 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       EntryRewrite.ChooseBasicLandType
       " {\"type\":\"ChooseBasicLandType\"} "
+  Spec.it s "ChooseCreatureType (Pillar of Origins)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      EntryRewrite.ChooseCreatureType
+      " {\"type\":\"ChooseCreatureType\"} "
   -- CR 702.155b / 714.3b: read ahead's pair of intrinsic abilities as one
   -- rewrite, payload-free because rule 714.2d reads the bound off the Saga.
   Spec.it s "ReadAhead (Love Song of Night and Day)" $

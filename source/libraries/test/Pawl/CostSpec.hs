@@ -4298,7 +4298,7 @@ convokeWindowSpec s registry = Spec.describe s "Siege Wurm" $ do
               GameState.activePlayer = S.alice,
               GameState.priority = Just S.alice
             }
-        green = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]
+        green = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}]
         -- One {G} left to pay with mana, which is what the Birds produced: the
         -- other six symbols are convoked.
         residual = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]

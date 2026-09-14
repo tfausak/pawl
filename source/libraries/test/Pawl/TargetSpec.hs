@@ -2186,7 +2186,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
               ManaUnit.tags = Set.empty,
               ManaUnit.retention = ManaRetention.Ordinary,
               ManaUnit.restriction = Nothing,
-              ManaUnit.rider = Nothing
+              ManaUnit.rider = Nothing,
+              ManaUnit.sourceChosenSubtype = Nothing
             }
         funded = (Setup.emptyGame S.bothPlayers) {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana (replicate 5 white)), GameState.priority = Just S.alice}
         (defenseId, alone) = S.addPermanent defense S.alice funded
