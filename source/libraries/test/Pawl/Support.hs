@@ -2565,6 +2565,7 @@ promptDecider prompt = case prompt of
   Prompt.CastWhileSearching decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseX decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMutateSide decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseForage decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEntwine decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBuyback decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseKicker decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -2688,6 +2689,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.CastWhileSearching {} -> "CastWhileSearching"
   Prompt.ChooseX {} -> "ChooseX"
   Prompt.ChooseMutateSide {} -> "ChooseMutateSide"
+  Prompt.ChooseForage {} -> "ChooseForage"
   Prompt.ChooseEntwine {} -> "ChooseEntwine"
   Prompt.ChooseBuyback {} -> "ChooseBuyback"
   Prompt.ChooseKicker {} -> "ChooseKicker"
