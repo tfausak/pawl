@@ -547,6 +547,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
 
   cyclingSpec s registry
   equipSpec s registry
+  exhaustSpec s registry
   reinforceSpec s registry
   ninjutsuSpec s registry
   authoredHandAbilitySpec s registry
@@ -1193,6 +1194,74 @@ equipBoard s registry withHeadmaster = do
   -- and every case below reads what Action.legalActions offers.
   pure (splitterId, wretchId, pikerId, g4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
 
+-- CR 702.177: exhaust, the first keyword in the pool whose activated ability is
+-- PRINTED rather than minted -- "Exhaust -- [Cost]: [Effect]" means "[Cost]:
+-- [Effect]. Activate only once", so rule 702.177a adds rules to an ability the
+-- card wrote and no minter ever sees it. Greenbelt Guardian's card file carries
+-- the stamp on the ability itself for that reason, and CR 702.177a's rider beside
+-- it as an ActivationRestriction.OnlyOnce.
+--
+-- Not implemented: the rewriting, so a card carrying the keyword states that
+-- rider itself rather than having the keyword add it (#3044). Not implemented:
+-- CR 702.193a's power-up, the same shape plus a cost reduction of its own
+-- (#3044).
+--
+-- Boom Scholar is the card that NAMES them: "Exhaust abilities of other
+-- permanents you control cost {2} less to activate", which reaches
+-- Pawl.Types.ReduceActivationCost's `grantedBy` as a
+-- KeywordDesignator.OfNullary, the arm a keyword with no family needs.
+exhaustSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+exhaustSpec s registry = Spec.describe s "Exhaust (CR 702.177)" $ do
+  -- CR 118.7 narrowed to one rule-702 keyword, on a board carrying both sides of
+  -- the criterion. Greenbelt Guardian prints "{G}: Target creature gains trample
+  -- until end of turn" and "Exhaust -- {3}{G}: Put three +1/+1 counters on this
+  -- creature"; Black Panther, Wakandan King prints "Mine Vibranium -- {3}: Move
+  -- all +1/+1 counters from target land you control onto target creature", an
+  -- ordinary activated ability of another permanent alice controls.
+  --
+  -- TWO FORESTS is the whole measurement. The exhaust ability's {3}{G} is four
+  -- mana and unpayable; reduced by {2} it is {1}{G} and payable. Black Panther's
+  -- {3} is three mana and unpayable; a reducer that ignored `grantedBy` would
+  -- make it {1} and offer it. So "was this an exhaust ability" is offered against
+  -- not offered, on one board, with the same mana.
+  Spec.it s "CR 118.7 Boom Scholar's reduction reaches an exhaust ability and not an ordinary one" $ do
+    forest <- S.printingOf s registry "Forest"
+    guardian <- S.printingOf s registry "Greenbelt Guardian"
+    panther <- S.printingOf s registry "Black Panther, Wakandan King"
+    scholar <- S.printingOf s registry "Boom Scholar"
+    let build withScholar =
+          let g0 = snd (S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers))
+              g1 = snd (S.addPermanent forest S.alice g0)
+              (theGuardian, g2) = S.addPermanent guardian S.alice g1
+              (thePanther, g3) = S.addPermanent panther S.alice g2
+              g4 = if withScholar then snd (S.addPermanent scholar S.alice g3) else g3
+           in (theGuardian, thePanther, g4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+        (guardianId, pantherId, withIt) = build True
+        (_, pantherWithoutId, withoutIt) = build False
+        exhaustAbility = case Face.activatedAbilities (S.combinedFace guardian) of
+          _ : ability : _ -> Just ability
+          _ -> Nothing
+        offered oid mAbility gs =
+          length
+            ( filter
+                (\action -> case action of A.Activate o ability -> o == oid && maybe True (== ability) mAbility; _ -> False)
+                (Action.legalActions S.alice gs)
+            )
+    -- The gameplay assertion this group exists to prove, and it is FIRST: the
+    -- criterion holding is what keeps the Panther's {3} unpayable while the
+    -- exhaust ability on the same board is offered.
+    Spec.assertEqWith s "the Panther's printed {3} is not reduced away" (offered pantherId Nothing withIt) 0
+    Spec.assertEqWith s "while the exhaust ability on the same board is offered" (offered guardianId exhaustAbility withIt) 1
+    -- The control, one Boom Scholar apart: without the reducer the exhaust
+    -- ability's {3}{G} is as unpayable as the Panther's {3}, so the first pair is
+    -- not passing because two Forests pay everything.
+    Spec.assertEqWith s "where the same board one Boom Scholar short cannot pay {3}{G}" (offered guardianId exhaustAbility withoutIt) 0
+    Spec.assertEqWith s "and the Panther's {3} is unpayable there too" (offered pantherWithoutId Nothing withoutIt) 0
+    -- Keeps the negatives above from passing vacuously: the abilities exist to be
+    -- offered, and the stamp the card wrote is what the criterion reads.
+    Spec.assertEqWith s "CR 702.177a the card writes the keyword on the ability it printed" (fmap ActivatedAbility.keyword exhaustAbility) (Just (Just Keyword.Exhaust))
+    Spec.assertBool s (not (null (Projection.abilitiesOf pantherId withIt))) "and the Panther has an ability to withhold"
+
 equipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 equipSpec s registry = Spec.describe s "Equip" $ do
   -- CR 702.6a: "Equip is an activated ability of Equipment cards. 'Equip [cost]'
@@ -1220,7 +1289,7 @@ equipSpec s registry = Spec.describe s "Equip" $ do
 
   -- CR 118.7 narrowed to one rule-702 family, which is what
   -- Pawl.Types.ReduceActivationCost's `grantedBy` names and what
-  -- Pawl.Engine.Keyword.familyGranting reads off the minter's stamp. The whole card:
+  -- Pawl.Engine.Keyword.designates compares against the minter's stamp. The whole card:
   -- with no mana source in the game, {1} minus {1} is {0} and the Equipment
   -- moves.
   Spec.it s "CR 118.7 whole card: Bureau Headmaster equips a Bonesplitter off no mana at all" $ do
@@ -5148,10 +5217,14 @@ printedActivationThresholdReductionSpec s registry = Spec.describe s "PrintedAct
 -- 702.177a rewrites the second into "{3}{G}: ... Activate only once." Oracle text
 -- checked against Scryfall 2026-09-06.
 --
--- pawl's transcription omits the printed word "Exhaust" and states the rider it
--- rewrites into directly (ActivationRestriction.OnlyOnce). Nothing on this card
--- reads the marker, so the omission is behaviourally exact here; a card that
--- names "exhaust abilities" cannot be written yet (#3044, #3021).
+-- pawl's transcription carries the keyword on that second ability
+-- (Pawl.Types.ActivatedAbility.keyword), which is what Boom Scholar's "exhaust
+-- abilities of other permanents you control" names -- the Exhaust group above is
+-- where that pair is proved.
+--
+-- Not implemented: rule 702.177a's rewriting, so the card states the rider it
+-- rewrites into directly (ActivationRestriction.OnlyOnce) rather than having the
+-- keyword add it (#3044).
 --
 -- EIGHT Forests, which is exactly two activations of {3}{G}: the rider is the
 -- only thing standing between alice and the second one, so a board that ignored

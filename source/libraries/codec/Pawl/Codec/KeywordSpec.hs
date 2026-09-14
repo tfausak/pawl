@@ -1296,6 +1296,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Storied
       " {\"type\":\"Storied\"} "
     Spec.assertBool s (Codec.encode Keyword.codec Keyword.Storied /= Codec.encode Keyword.codec Keyword.Ascend) "storied and ascend encode differently"
+  -- CR 702.177a. Nullary, and the tag is the whole encoding: the rider exhaust
+  -- adds belongs to the ability printed after it, not to this value.
+  Spec.it s "Exhaust" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Exhaust
+      " {\"type\":\"Exhaust\"} "
   -- CR 702.179a. Nullary, and the tag is the whole encoding.
   Spec.it s "StartYourEngines" $
     Common.assertCodec

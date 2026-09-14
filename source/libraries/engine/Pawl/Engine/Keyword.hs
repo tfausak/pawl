@@ -88,6 +88,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.InZone as InZone
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -452,6 +453,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Exhaust -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
@@ -477,7 +479,11 @@ abilitiesFor keyword count = case keyword of
   Keyword.Encore _ -> []
 
 -- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
--- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
+-- Pawl.Types.ActivatedAbility.keyword and what `designates` below compares.
+--
+-- The MINTERS' half of that field. CR 702.177a's exhaust is printed rather than
+-- minted, so its stamp is the card's and never passes through here; see
+-- `addsRulesToPrintedAbility` below for the other half.
 --
 -- Applied by the two rosters rather than inside each minter, so the next keyword
 -- that states an activated ability is stamped whether or not whoever adds it
@@ -672,6 +678,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Exhaust -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1146,6 +1153,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Exhaust -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1756,6 +1764,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Exhaust -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
   -- rather than the stack.
   Keyword.Exert -> []
@@ -2420,6 +2429,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Exhaust -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -3932,6 +3942,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Exhaust -> []
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
   -- writes Object.exertedBy directly.
   Keyword.Exert -> []
@@ -4193,6 +4204,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Exhaust -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
   -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
@@ -4471,6 +4483,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Exhaust -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -4495,29 +4508,41 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Scavenge _ -> []
   Keyword.Encore _ -> []
 
--- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
--- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
--- Fluctuator's "cycling abilities you activate" reaches rule 702.29a's minted
--- ability and nothing else. Nothing is "no keyword minted it", which is every
--- ability the card itself prints.
+-- CR 702.177a: does rule 702 ADD RULES to the activated ability printed after
+-- this keyword, rather than state an ability of its own? These are the only
+-- keywords a CARD may write on Pawl.Types.ActivatedAbility.keyword -- every other
+-- stamp there is a minter's, `mintedBy`'s above -- and Pawl.CardSpec's "CR 702 no
+-- card claims a keyword minted an ability it printed" is the lint that says so.
 --
--- Answered from the ability's own stamp (Pawl.Types.ActivatedAbility.keyword,
--- which `mintedBy` writes) rather than by re-minting each of the object's
--- keywords and testing value equality. Origin rather than shape: the old
--- classification could not tell rule 702.6a's equip ability from a card that
--- printed the same words, and Pawl.ActivateSpec's "CR 118.7 a printed twin of
--- rule 702.6a's ability is not an equip ability" is what proves the difference.
+-- LISTED rather than derived off the rosters: there is no roster to read this
+-- side off, since the ability is the card's. The fallthrough answers False, which
+-- is the closed direction -- a keyword of this shape that is not named here makes
+-- the lint reject the first card that writes it, which is where it would be
+-- noticed.
 --
--- No keywords argument, and so no zone argument either: the minter that made the
--- ability knew its keyword, so the caller no longer has to guess which roster to
--- re-mint from.
+-- CR 702.142a's boast and CR 702.193a's power-up are the rule's other two of this
+-- shape, and neither has a Pawl.Types.Keyword constructor yet (#3044).
+addsRulesToPrintedAbility :: Keyword -> Bool
+addsRulesToPrintedAbility keyword = case keyword of
+  Keyword.Exhaust -> True
+  _ -> False
+
+-- CR 702: does a card's designator name the keyword whose rules this ability is
+-- under? The comparison Pawl.Types.ReduceActivationCost.grantedBy is put through,
+-- against the stamp Pawl.Types.ActivatedAbility.keyword carries.
 --
--- CR 702.184a's station is a NULLARY minting keyword, so familyOf answers
--- Nothing for it and this does too. That is the same answer a reducer got
--- before, and it is correct rather than accidental: no card can name a station
--- family, Pawl.Types.KeywordFamily having no arm for a nullary keyword.
-familyGranting :: ActivatedAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe KeywordFamily.KeywordFamily
-familyGranting ability = familyOf =<< ActivatedAbility.keyword ability
+-- TWO ARMS because rule 702 writes ability-bearing keywords two ways; see
+-- Pawl.Types.KeywordDesignator. A family drops the payload, so Fluctuator's
+-- "cycling abilities you activate" reaches cycling {2} and cycling {1}{U} alike.
+-- A nullary keyword has no payload to drop and no family, so Boom Scholar's
+-- "exhaust abilities of other permanents you control" compares CR 702.177a's
+-- keyword itself.
+--
+-- A CITATION compared to a citation: nothing here reads what the ability does.
+designates :: KeywordDesignator.KeywordDesignator -> Keyword -> Bool
+designates designator keyword = case designator of
+  KeywordDesignator.OfFamily family -> familyOf keyword == Just family
+  KeywordDesignator.OfNullary nullary -> nullary == keyword
 
 -- CR 702: WHICH KEYWORD this is, with its payload dropped -- the classification
 -- Filter.HasKeywordFamily matches on, so that Flensing Raptor's "creature you
@@ -4702,6 +4727,9 @@ familyOf keyword = case keyword of
   Keyword.StartYourEngines -> Nothing
   Keyword.Ascend -> Nothing
   Keyword.Storied -> Nothing
+  -- CR 702.177a's exhaust is NULLARY, so it has no family: the keyword itself
+  -- is what Pawl.Types.KeywordDesignator.OfNullary names.
+  Keyword.Exhaust -> Nothing
   Keyword.Exert -> Nothing
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing

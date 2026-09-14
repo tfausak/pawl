@@ -3769,11 +3769,15 @@ lootAnswer p = case p of
 -- CR 702.177a rewrites each into "[Cost]: [Effect]. Activate only once." Oracle
 -- text checked against Scryfall 2026-09-06.
 --
--- pawl's transcription omits the printed word "Exhaust" and states the rider it
--- rewrites into directly (ActivationRestriction.OnlyOnce), Greenbelt Guardian's
--- arrangement: nothing on this card reads the marker, so the omission is
--- behaviourally exact here; a card that NAMES "exhaust abilities" cannot be
--- written yet (#3044, #3021).
+-- pawl's transcription carries the keyword on each ability
+-- (Pawl.Types.ActivatedAbility.keyword), Greenbelt Guardian's arrangement, so
+-- Boom Scholar's "exhaust abilities of other permanents you control" reaches
+-- these three -- including the mana one, whose stamp Cost.manaActivationAdjustmentsGiven
+-- threads.
+--
+-- Not implemented: rule 702.177a's rewriting, so the card states the rider it
+-- rewrites into directly (ActivationRestriction.OnlyOnce) rather than having the
+-- keyword add it (#3044).
 --
 -- ONE Forest and two Lightning Bolts. The Forest pays no {R}, so Loot's route is
 -- the only way to pay for either Bolt, and the Forest is what Loot's own {G}

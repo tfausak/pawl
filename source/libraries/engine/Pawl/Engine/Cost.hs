@@ -58,6 +58,7 @@ import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityKind as AbilityKind
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
@@ -88,7 +89,6 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword.Type
-import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.Mana as Mana.Type
@@ -803,14 +803,15 @@ selfReductions pid oid gs =
 -- 605.3b gives one no stack window, so it gathers these for itself rather than
 -- through Pawl.Engine.Activate.
 --
--- The KeywordFamily is the ability's PROVENANCE, threaded from the caller that
--- has the ability in hand; see activationCostAdjustments for what it narrows.
+-- The Keyword is the ability's PROVENANCE -- the stamp
+-- Pawl.Types.ActivatedAbility.keyword carries, threaded from the caller that has
+-- the ability in hand; see activationCostAdjustments for what it narrows.
 --
 -- The ObjectIds beside it are CR 601.2c's ANNOUNCED TARGETS, threaded the same
 -- way and read by the same gather -- empty for every caller standing before CR
 -- 601.2c, which is where a reducer naming a target (Dwarven Mauler) simply does
 -- not apply.
-activationAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+activationAdjustments :: Set.Set ObjectId -> Maybe Keyword.Type.Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 activationAdjustments = PlayerEffect.activationCostAdjustments
 
 -- Every way CR 118.7e's choice could resolve the reductions that apply --
@@ -2267,7 +2268,7 @@ manaActivations measure pcs pid oid cost restrictions ability gs = manaActivatio
 -- and no reader here reads: see Pawl.Engine.PlayerEffect.matchesObjectFrom.
 manaActivationsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
 manaActivationsGiven effects measure pcs pid oid printedCost restrictions ability gs =
-  let adjustments = manaActivationAdjustmentsGiven effects oid gs
+  let adjustments = manaActivationAdjustmentsGiven effects (ActivatedAbility.keyword =<< ability) oid gs
       -- The COMPONENT half of CR 601.2f, applied here so every conjunct below
       -- measures the components an effect added as well as the printed ones. The
       -- MANA half is not folded in, because CR 118.7e and CR 601.2f leave two
@@ -2341,12 +2342,15 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
 -- "doesn't target", so the set a reducer would be asked about is empty by the
 -- rule rather than by this caller's position.
 --
--- NO KeywordFamily, though a route now carries its ability
--- (Mana.manaRoutesOfGiven) and so could read ActivatedAbility.keyword: a reducer
--- that names a family -- Fluctuator's "cycling abilities" -- would never match
--- one anyway. Exact rather than elided, and CR 605.1a is the argument: a
--- keyword-granted ability that adds mana would have to move no card to or from a
--- library, which cycling does.
+-- The rule-702 stamp IS threaded, off the route's own ability
+-- (Mana.manaRoutesOfGiven), because CR 702.177a's exhaust is printed on the
+-- ability rather than minting one and a mana ability can carry it -- Loot, the
+-- Pathfinder's "Exhaust -- {G}, {T}: Add three mana of any one color" is the
+-- pool's, and Boom Scholar's "exhaust abilities of other permanents you control"
+-- is what would name it. A family-minted ability could not reach here (CR
+-- 605.1a: one adds mana, targets nothing and is no loyalty ability, which
+-- cycling's card movement rules out), so this argument was exact while exhaust
+-- did not exist.
 --
 -- LoyaltyKind.NonLoyaltyAbility is exact rather than elided for the same reason
 -- and off the same rule: CR 605.1a's third criterion is "it's not a loyalty
@@ -2361,12 +2365,12 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
 -- what makes Suppression Field's "unless they're mana abilities" and Zirda, the
 -- Dawnwaker's "that aren't mana abilities" spare every activation gathered here,
 -- the increase side and the reduction side of one rider.
-manaActivationAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-manaActivationAdjustments pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) oid gs
+manaActivationAdjustments :: Maybe Keyword.Type.Keyword -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+manaActivationAdjustments stamp pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) stamp oid gs
 
 -- The same gather off a hoisted effect list; see manaActivationsGiven.
-manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsGiven effects Set.empty Nothing AbilityKind.ManaAbility LoyaltyKind.NonLoyaltyAbility
+manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Maybe Keyword.Type.Keyword -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+manaActivationAdjustmentsGiven effects stamp = PlayerEffect.activationCostAdjustmentsGiven effects Set.empty stamp AbilityKind.ManaAbility LoyaltyKind.NonLoyaltyAbility
 
 -- CR 118.3 asked of a mana ability's own MANA part, and the one read
 -- manaActivations makes that could ask itself. Nothing is CR 118.6's unpayable
@@ -4009,7 +4013,7 @@ tapForManaWith perform inFlight oid = do
           -- them no stack window in.
           --
           -- `gs` is still current: chooseManaYield only prompts.
-          let gathered = manaActivationAdjustments controller oid gs
+          let gathered = manaActivationAdjustments (ActivatedAbility.keyword =<< ManaOption.ability chosen) controller oid gs
               withComponents = plusComponents gathered (ManaOption.cost chosen)
           -- CR 118.13a: a mana ability is an activated ability (CR 605.1a) and
           -- CR 602.2b sends its activation cost through CR 601.2b, so a symbol
