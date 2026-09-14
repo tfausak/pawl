@@ -11,7 +11,7 @@ import qualified Pawl.Types.UntapRestriction as UntapRestriction
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.UntapRestriction" $ do
   -- Tsabo's Web's second sentence (CR 502.3 / CR 101.2), which is also the pool's
-  -- one writer of Filter.HasNonManaActivatedAbility -- so this round-trips that
+  -- one PRINTED writer of Filter.HasNonManaActivatedAbility -- so this round-trips that
   -- atom in the position a card actually writes it.
   Spec.it s "MkUntapRestriction" $
     Common.assertCodec
