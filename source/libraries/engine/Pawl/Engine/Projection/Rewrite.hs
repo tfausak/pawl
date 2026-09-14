@@ -1232,9 +1232,9 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.ChoiceByCoinFlip f ->
     let rewriteOption o = o {EntryOption.keywords = Set.map (Filter.rewriteKeyword pairs) (EntryOption.keywords o)}
      in EntryRewrite.ChoiceByCoinFlip f {EntryFlip.heads = rewriteOption (EntryFlip.heads f), EntryFlip.tails = rewriteOption (EntryFlip.tails f)}
-  -- CR 105.1's five colours, CR 305.6's five basic land types and CR 102.1's
-  -- seats are the offers themselves, so none of the three prints a word the card
-  -- chose.
+  -- CR 105.1's five colours, CR 305.6's five basic land types, CR 205.3m's
+  -- creature types and CR 102.1's seats are the offers themselves, so none of
+  -- these four prints a word the card chose.
   EntryRewrite.ChooseColor -> rewrite
   EntryRewrite.ChooseBasicLandType -> rewrite
   EntryRewrite.ChooseCreatureType -> rewrite

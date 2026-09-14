@@ -98,7 +98,7 @@ data ManaUnit = MkManaUnit
     -- mana ability paid inline (Pillar of Origins) and Pawl.Engine.Resolve's
     -- Effect.AddMana arm for one that resolves off the stack.
     --
-    -- BAKED and not looked up, which is what the paragraph above requires: there
+    -- BAKED and not looked up, which is what this type's own haddock requires: there
     -- is no source id to look anything up by, the source may have left the
     -- battlefield by the time the mana is spent, and CR 106.6a makes the
     -- restriction the ABILITY's rather than the permanent's.

@@ -3033,6 +3033,8 @@ statesAQuality predicate = case predicate of
   -- CR 701.23b's "stated quality" for HasColor's reason, one indirection along:
   -- the description is a colour whichever way the colour was arrived at.
   Filter.HasChosenColor -> True
+  -- The arm above one characteristic over: a subtype is a stated quality whichever
+  -- way the card arrived at it.
   Filter.HasChosenSubtype -> True
   -- CR 701.23b's "stated quality" too, and rule 702.16k's own "regardless of
   -- that object's characteristic values" is not a counter-argument: the rule
