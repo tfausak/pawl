@@ -114,6 +114,7 @@ import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.CompletedDungeonSpec
 import qualified Pawl.Codec.ConditionSpec
 import qualified Pawl.Codec.ConjureDestinationSpec
+import qualified Pawl.Codec.ConjureSelectionSpec
 import qualified Pawl.Codec.ConjureSpec
 import qualified Pawl.Codec.ContinuousEffectSpec
 import qualified Pawl.Codec.ControlChangedSpec
@@ -788,6 +789,7 @@ spec s registry = do
   Pawl.Codec.CopyTargetsSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
   Pawl.Codec.ConjureDestinationSpec.spec s
+  Pawl.Codec.ConjureSelectionSpec.spec s
   Pawl.Codec.ConjureSpec.spec s
   Pawl.Codec.CreateSpec.spec s
   Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec.spec s

@@ -2,6 +2,7 @@ module Pawl.Types.Conjure where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.ConjureSelection as ConjureSelection
 import qualified Pawl.Types.Quantity as Quantity
 
 -- | Alchemy\'s conjure keyword action: create a card that was in nobody\'s deck
@@ -50,16 +51,15 @@ data Conjure card = MkConjure
     -- names outright (Emporium Thopterist\'s "a card named Ornithopter"); more
     -- than one is the printed spellbook the sentence names instead (Tome of the
     -- Infinite\'s "a random card from Tome of the Infinite\'s spellbook"), and
-    -- the conjure picks one of them at random. One list rather than a card and
-    -- an optional spellbook beside it: a named card is the pick over a
-    -- one-candidate pool, which no board can tell from taking it outright, and
-    -- 'Pawl.Types.Prompt.RandomCard' is raised only for two or more.
-    --
-    -- Not implemented: a spellbook a card picks from BY CHOICE (Follow the
-    -- Tracks\'s "conjure a card of your choice from Follow the Tracks\'s
-    -- spellbook onto the battlefield") rather than at random, which wants a
-    -- second field saying which question is asked (#3647).
+    -- the conjure picks one of them, 'selection' below saying how. One list
+    -- rather than a card and an optional spellbook beside it: a named card is
+    -- the pick over a one-candidate pool, which no board can tell from taking it
+    -- outright, and a prompt is raised only for two or more.
     cards :: NonEmpty.NonEmpty card,
+    -- | Which question the sentence asks of the candidates above -- "a random
+    -- card" or "a card of your choice". Unobservable on a one-candidate list,
+    -- where neither question is asked.
+    selection :: ConjureSelection.ConjureSelection,
     -- | The zone it arrives in.
     destination :: ConjureDestination.ConjureDestination
   }
@@ -68,3 +68,9 @@ data Conjure card = MkConjure
 -- | What a card conjuring one card writes, and the value the codec elides.
 defaultQuantity :: Quantity.Quantity
 defaultQuantity = Quantity.Literal 1
+
+-- | What a card naming one card outright writes, and the value the codec
+-- elides. Randomness rather than choice: the printings that say neither are the
+-- one-candidate ones, where the two are indistinguishable.
+defaultSelection :: ConjureSelection.ConjureSelection
+defaultSelection = ConjureSelection.AtRandom

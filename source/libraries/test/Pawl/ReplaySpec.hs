@@ -755,6 +755,26 @@ combatReplaySpec s =
           let bolt = CardName.MkCardName (Text.pack "Lightning Bolt")
               p = Prompt.RandomCard (bolt NonEmpty.:| [CardName.MkCardName (Text.pack "Ponder")])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseCardName bolt)) Nothing
+        -- RandomCard's twin question: Follow the Tracks's "conjure a card of
+        -- your choice from Follow the Tracks's spellbook". Same payload, and a
+        -- CHOICE, so it carries the Decider and the seat.
+        Spec.it s "ChooseConjuredCard round-trips through the transcript" $ do
+          let bolt = CardName.MkCardName (Text.pack "Lightning Bolt")
+              ponder = CardName.MkCardName (Text.pack "Ponder")
+              p = Prompt.ChooseConjuredCard decider S.alice (bolt NonEmpty.:| [ponder])
+          Spec.assertEqWith s "Ponder round trips" (Replay.decode p (Replay.encode p ponder)) (Just ponder)
+          -- Discriminating, RandomCard's reason one case above.
+          Spec.assertEqWith s "Lightning Bolt round trips" (Replay.decode p (Replay.encode p bolt)) (Just bolt)
+          -- The assertion that fails if the two spellbook prompts share one
+          -- Response constructor: a transcript of randomness must not satisfy a
+          -- prompt that asked the player to choose (CR 701.9b).
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.SelectedCardAtRandom bolt)) Nothing
+        Spec.it s "a short transcript takes the head of the chosen spellbook" $
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseConjuredCard decider S.alice (CardName.MkCardName (Text.pack "Lightning Bolt") NonEmpty.:| [CardName.MkCardName (Text.pack "Ponder")])))
+            (CardName.MkCardName (Text.pack "Lightning Bolt"))
         -- Another Decider-less prompt: CR 706.1a's die. RandomOpponent's
         -- reasons, over a RANGE rather than a candidate list.
         Spec.it s "RollDie round-trips through the transcript" $ do
