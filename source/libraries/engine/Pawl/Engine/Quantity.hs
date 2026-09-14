@@ -1287,9 +1287,10 @@ readsX quantity = case quantity of
   -- the suite green.
   Quantity.Halved (Halved.MkHalved _ inner) -> readsX inner
   -- Halved's descent, for its reason: "twice X" would be a Times over an X that
-  -- is not equal to one. A REGRESSION FENCE rather than proven behaviour --
-  -- Blessed Reversal multiplies a count and not an announced value, so answering
-  -- False here leaves the suite green.
+  -- is not equal to one. A REGRESSION FENCE rather than proven behaviour -- the
+  -- only authors of a Times are Blessed Reversal, which multiplies a count, and
+  -- Pawl.Engine.Keyword.rampage, whose payload is BlockersBeyondFirst, so no
+  -- board today puts an announced X under one.
   Quantity.Times (Times.MkTimes _ inner) -> readsX inner
   -- Toxic Deluge's "-X" is Negate X, which reads X the same way. Without this
   -- arm the CR 107.3 lint would call the card an unannounced-X reader on one
