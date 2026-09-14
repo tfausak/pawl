@@ -1400,9 +1400,9 @@ aliceMain gs =
     }
 
 -- plainOf's colourless twin, differing in EXACTLY one field: what the Spring's
--- ability adds and Serum Powder's does not. Both units carry CR 106.3's artifact
--- tag, the Spring and the Powder alike being artifacts, so the tag is no part of
--- what separates them.
+-- ability adds and Serum Powder's does not. CR 106.3's artifact tag is no part of
+-- what separates them: the Spring and the Powder are both artifacts, so either
+-- board's mana would carry it.
 retainedColorless :: ManaUnit.ManaUnit
 retainedColorless = (plainOf ManaType.Colorless) {ManaUnit.retention = ManaRetention.UntilEndOfTurn, ManaUnit.tags = Set.singleton ProductionTag.Artifact}
 
