@@ -94,7 +94,9 @@ data ManaUnit = MkManaUnit
     --
     -- Read by Pawl.Engine.Mana.admitsUnder, which hands it to
     -- Pawl.Engine.Filter's sourceChosenSubtype for Filter.HasChosenSubtype to
-    -- ask. BOTH producers stamp it -- Pawl.Engine.Mana.manaOptionsOfGiven for a
+    -- ask. The atom's other position, a static ability's affected set (Obelisk of
+    -- Urd), fills that field off the board instead and never reaches this one.
+    -- BOTH producers stamp it -- Pawl.Engine.Mana.manaOptionsOfGiven for a
     -- mana ability paid inline (Pillar of Origins) and Pawl.Engine.Resolve's
     -- Effect.AddMana arm for one that resolves off the stack.
     --

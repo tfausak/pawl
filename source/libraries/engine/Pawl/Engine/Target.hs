@@ -425,9 +425,10 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- target slot's filter is not one -- so HasChosenColor is vacuously
             -- False here (#3449).
             Filter.sourceChosenColor = Nothing,
-            -- Nothing, for the reason one field up: CR 106.6's restriction is the
-            -- only position that carries a baked chosen subtype, and it is no
-            -- target slot -- so HasChosenSubtype is vacuously False here (#3449).
+            -- Nothing, for the reason one field up: an affected set and a CR
+            -- 106.6 restriction are the two positions that carry a chosen subtype,
+            -- and a target slot is neither -- so HasChosenSubtype is vacuously
+            -- False here (#3449).
             Filter.sourceChosenSubtype = Nothing
           }
       evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source

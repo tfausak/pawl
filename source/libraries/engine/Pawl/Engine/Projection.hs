@@ -652,10 +652,18 @@ affectsWith grants peers source oid a partial gs = case a of
 -- reads the choice are printed on the one permanent. Read off the OBJECT and not
 -- its card: Object.chosenColor is per-incarnation, and CR 707.6 leaves a copy to
 -- make its own choice, so two permanents of the one printing answer differently.
+--
+-- BOTH of CR 614.1c's chosen characteristics, filled the same way and by the same
+-- sentence of rule 607.2d: Gauntlet of Power reads the colour and Obelisk of Urd
+-- the creature type. Filling only one would leave the other's atom silently False
+-- in this position, which is the one position either is written in outside a mana
+-- restriction (Pawl.Engine.Mana.admitsUnder, which supplies the subtype off the
+-- mana unit instead and so is unaffected by the read here).
 affectedContext :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Filter.Context
 affectedContext source perspective gs =
   (Filter.contextFor (Game.teams gs) perspective (Just source))
-    { Filter.sourceChosenColor = Game.lookupObject source gs >>= Object.chosenColor
+    { Filter.sourceChosenColor = Game.lookupObject source gs >>= Object.chosenColor,
+      Filter.sourceChosenSubtype = Game.lookupObject source gs >>= Object.chosenSubtype
     }
 
 -- The characteristics view of an object: its CR 613 projection and its projected

@@ -1309,20 +1309,24 @@ data Context = MkContext
     -- sourceChosenNames and carrierChosenPlayer above each have (#3449).
     sourceChosenColor :: Maybe Color.Color,
     -- CR 205.3: the subtype the SOURCE chose as it entered (CR 614.1c), for the
-    -- one atom that asks whether a candidate wears it (HasChosenSubtype, Pillar
-    -- of Origins). Supplied by ONE caller: Pawl.Engine.Mana.admitsUnder, which
-    -- reads it off the mana unit rather than off the board -- CR 607.2d links the
-    -- choosing ability to the mana ability printed beside it, and CR 106.6a makes
-    -- the restriction the ability's, so the answer is the one baked in when the
-    -- mana was produced (Pawl.Types.ManaUnit.sourceChosenSubtype).
+    -- one atom that asks whether a candidate wears it (HasChosenSubtype). TWO
+    -- callers supply it, and they read it from different places, which is what
+    -- this field's two producers are about:
     --
-    -- BAKED rather than read LIVE, which is where this differs from
-    -- sourceChosenColor above: mana outlives its source, so there is no board read
-    -- left to make at the moment CR 106.6 is asked.
+    -- Pawl.Engine.Projection.affectsWith, through affectedContext, reads it LIVE
+    -- off the board, sourceChosenColor's posture one characteristic over -- CR
+    -- 607.2d links the choosing ability to the affected clause printed beside it
+    -- (Obelisk of Urd).
+    --
+    -- Pawl.Engine.Mana.admitsUnder reads it off the MANA UNIT instead, because a
+    -- CR 106.6 restriction is asked when the source may be gone: CR 106.6a makes
+    -- the restriction the ability's, so the answer is the one baked in when the
+    -- mana was produced (Pawl.Types.ManaUnit.sourceChosenSubtype, Pillar of
+    -- Origins). That caller overrides whatever this field holds.
     --
     -- Nothing in contextFor below and so in contextWithSlots and
     -- contextComparingPower too, so the atom is vacuously False in every position
-    -- but that one -- sourceChosenColor's posture.
+    -- but those two -- sourceChosenColor's posture.
     --
     -- Not implemented: the lint that would keep a card from asking the atom in the
     -- positions this is empty in, which sourceChosenColor above shares (#3449).
