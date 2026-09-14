@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
+import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
@@ -26,7 +27,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
           { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
             OfferCast.optionality = CastObligation.Optional,
-            OfferCast.offer = CastOffer.defaultValue
+            OfferCast.offer = CastOffer.defaultValue,
+            OfferCast.repetition = CastRepetition.Once
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
@@ -47,7 +49,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                   CastOffer.Type.spending = ManaSpending.AsProduced,
                   CastOffer.Type.restriction = Nothing,
                   CastOffer.Type.offeredBy = Nothing
-                }
+                },
+            OfferCast.repetition = CastRepetition.Once
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}} "
@@ -69,8 +72,24 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                   CastOffer.Type.spending = ManaSpending.AsProduced,
                   CastOffer.Type.restriction = Nothing,
                   CastOffer.Type.offeredBy = Nothing
-                }
+                },
+            OfferCast.repetition = CastRepetition.Once
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"revealed\"},\"caster\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"optionality\":{\"type\":\"Mandatory\"},\"offer\":{\"withoutPayingManaCost\":true}} "
+  -- The key a repeated offer writes: Fevered Suspicion's "any number", the one
+  -- posture the three cases above all default away from.
+  Spec.it s "MkOfferCast, repetition written" $
+    Common.assertCodec
+      s
+      OfferCast.codec
+      ( OfferCast.MkOfferCast
+          { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
+            OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+            OfferCast.optionality = CastObligation.Optional,
+            OfferCast.offer = CastOffer.defaultValue,
+            OfferCast.repetition = CastRepetition.AnyNumber
+          }
+      )
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"repetition\":{\"type\":\"AnyNumber\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s OfferCast.codec

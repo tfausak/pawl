@@ -29,6 +29,7 @@ import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
+import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
@@ -1049,7 +1050,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
-              OfferCast.offer = CastOffer.defaultValue
+              OfferCast.offer = CastOffer.defaultValue,
+              OfferCast.repetition = CastRepetition.Once
             }
       )
       " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
@@ -1071,7 +1073,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
                     CastOffer.Type.spending = ManaSpending.AsProduced,
                     CastOffer.Type.restriction = Nothing,
                     CastOffer.Type.offeredBy = Nothing
-                  }
+                  },
+              OfferCast.repetition = CastRepetition.Once
             }
       )
       " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}}} "
