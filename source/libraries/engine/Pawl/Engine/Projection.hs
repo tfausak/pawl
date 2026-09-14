@@ -2359,6 +2359,9 @@ filterReads f = case f of
   -- recolours a creature (Painter's Servant) moves an affected set written with
   -- this atom.
   Filter.Type.HasChosenColor -> Set.singleton Colors
+  -- Reads the candidate's SUBTYPES, HasSubtype's answer: the chosen half arrives
+  -- on the Context baked at production, and CR 613.1d's layer writes the other.
+  Filter.Type.HasChosenSubtype -> Set.singleton Subtypes
   -- Reads the candidate's CONTROLLER, SameControllerAsBound's answer above: rule
   -- 702.16k's other half is an owner, which CR 108.3 never projects.
   Filter.Type.OfChosenPlayer -> Set.singleton Controller
@@ -2645,6 +2648,10 @@ filterReadsPeers f = case f of
   -- rather than off a projection; the candidate's own colours come from its
   -- partial, so no PEER is projected.
   Filter.Type.HasChosenColor -> False
+  -- The source's chosen subtype arrives on the Context, baked onto the mana unit
+  -- at production; the candidate's own subtypes come from its partial, so no PEER
+  -- is projected.
+  Filter.Type.HasChosenSubtype -> False
   -- The carrier's chosen player arrives on the Context; the candidate's own
   -- controller and owner are read off its view, so no PEER is projected.
   Filter.Type.OfChosenPlayer -> False

@@ -42,8 +42,8 @@ data ManaRestriction = MkManaRestriction
   }
   deriving (Eq, Ord, Show)
 
--- | The CR 106.6 clause permitting only casts that match this filter -- Geosurge
--- and Mishra's Workshop, which is every restricted printing in @data\/cards@ bar
--- Omen Hawker.
+-- | The CR 106.6 clause permitting only casts that match this filter, which is
+-- the shape Geosurge and Mishra's Workshop print. Not every restricted printing
+-- has it: Omen Hawker fills the other field instead.
 onlyCasts :: Filter.Filter Keyword.Keyword -> ManaRestriction
 onlyCasts f = MkManaRestriction {casts = Just f, activations = Nothing}

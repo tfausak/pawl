@@ -1960,6 +1960,28 @@ apply batch candidate event =
       --
       -- Written to Object.chosenPlayer, NOT to the copiable snapshot -- see
       -- EntryRewrite.ChoosePlayer.
+      -- CR 614.1c: Pillar of Origins' as-enters creature type choice, the arm
+      -- above one rule over. Asked unconditionally for that arm's reason: CR
+      -- 205.3m's creature types are all legal and all distinguishable, so there is
+      -- no one-option case to elide.
+      --
+      -- Written to Object.chosenSubtype, the same field the arm above writes --
+      -- no printing makes both choices, the two clauses being alternatives of one
+      -- sentence shape, and CR 607.2d links each to the ability that reads it.
+      EntryRewrite.ChooseCreatureType -> do
+        gs <- State.get
+        picked <- case Projection.controllerOf oid gs of
+          -- Unreachable and defensive, the arm above's fallback one rule over:
+          -- Goblin is conjured because the card names no type to default to.
+          Nothing -> pure Subtype.Goblin
+          Just controller -> do
+            let decider = Decide.deciderFor controller gs
+            Game.choose (Prompt.ChooseCreatureType decider controller oid)
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \g ->
+          let stamp o = o {Object.chosenSubtype = Just picked}
+           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+        pure (Just event)
       EntryRewrite.ChoosePlayer -> do
         gs <- State.get
         let candidates = Game.stillPlaying gs

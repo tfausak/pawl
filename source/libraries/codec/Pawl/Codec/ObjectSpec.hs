@@ -207,7 +207,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                     ManaUnit.tags = Set.empty,
                     ManaUnit.retention = ManaRetention.Ordinary,
                     ManaUnit.restriction = Nothing,
-                    ManaUnit.rider = Nothing
+                    ManaUnit.rider = Nothing,
+                    ManaUnit.sourceChosenSubtype = Nothing
                   }
               ],
           Object.announcedX = Just 20,
@@ -249,7 +250,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"boughtBack\":true"
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
-          <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null}]"
+          <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChosenSubtype\":null}]"
           <> ",\"announcedX\":20,\"castFrom\":{\"type\":\"Graveyard\"}"
           <> ",\"castUsing\":{\"type\":\"JumpStart\"}"
           <> ",\"exileLookers\":[{\"type\":\"ThePlayer\",\"value\":27}],\"detainedUntil\":[21],\"goadedBy\":[22]"

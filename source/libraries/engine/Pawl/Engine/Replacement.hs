@@ -921,6 +921,7 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.ChoiceByCoinFlip _ -> True
   EntryRewrite.ChooseColor -> True
   EntryRewrite.ChooseBasicLandType -> True
+  EntryRewrite.ChooseCreatureType -> True
   EntryRewrite.ChoosePlayer -> True
   EntryRewrite.ChooseCardNames _ -> True
   EntryRewrite.ChooseCardName _ -> True
@@ -1572,6 +1573,7 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChoiceByCoinFlip _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseColor) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseBasicLandType) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseCreatureType) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChoosePlayer) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChooseCardNames _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChooseCardName _)) -> ReplacementBucket.Other
@@ -1705,6 +1707,7 @@ readsApplier re = case re of
   -- whole offer whoever's row is applying (Painter's Servant).
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseColor) -> False
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseBasicLandType) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseCreatureType) -> False
   -- Same chooser again, and the CANDIDATES are the board's rather than the
   -- applier's: CR 102.1's players in the game are the whole offer whoever's row
   -- is applying (Stuffy Doll).

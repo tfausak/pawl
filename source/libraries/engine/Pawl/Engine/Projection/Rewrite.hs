@@ -1237,6 +1237,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- chose.
   EntryRewrite.ChooseColor -> rewrite
   EntryRewrite.ChooseBasicLandType -> rewrite
+  EntryRewrite.ChooseCreatureType -> rewrite
   EntryRewrite.ChoosePlayer -> rewrite
   -- CR 702.155b's offer is a range of NUMBERS, read off the entering Saga's own
   -- chapter symbols (CR 714.2d), so the rewrite prints no word either.

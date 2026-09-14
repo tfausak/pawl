@@ -297,6 +297,10 @@ data Prompt r where
   -- | CR 614.1c: the one basic land type an entering object's controller
   -- chooses, written to Object.chosenSubtype; no candidate list (CR 305.6).
   ChooseBasicLandType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
+  -- | CR 614.1c: the one creature type an entering object's controller chooses,
+  -- written to Object.chosenSubtype; no candidate list (CR 205.3m), the arm
+  -- above's posture.
+  ChooseCreatureType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
   -- | The printed "and/or" of a multi-zone search: which of the offered zones
   -- this searcher looks through, a nonempty subset (Boonweaver Giant's "may"
   -- is why nonempty). Asked ahead of CR 601.3's offer and the search.

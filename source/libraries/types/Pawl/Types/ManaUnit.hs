@@ -6,10 +6,12 @@ import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ProductionTag as ProductionTag
+import qualified Pawl.Types.Subtype as Subtype
 
 -- | One unit of mana in a pool.
 --
--- FIVE axes, and only the first is a fact about how the mana was made.
+-- SIX axes, and two of them are facts about how the mana was made: the tags, and
+-- the subtype its source had chosen (`sourceChosenSubtype` below).
 -- Pawl.Types.ProductionTag is the CLOSED half -- snow-ness, "this activation
 -- caused you to lose life" -- observable facts about the production event that
 -- the engine determines with no card knowledge.
@@ -26,7 +28,10 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 -- payment evaluates it through the one generic matcher
 -- (Pawl.Engine.Filter.matches) and never cases on what it says.
 --
--- Deliberately no source ObjectId. Snow cares about a PROPERTY of the source, not
+-- Deliberately no source ObjectId, and `sourceChosenSubtype` below is that rule
+-- kept rather than broken: it is a VALUE read off the source at production, which
+-- is the only way a CR 106.6 restriction can ask about the thing that made the
+-- mana. Snow cares about a PROPERTY of the source, not
 -- its identity, and a reference would dangle by construction: mana outlives its
 -- source, and CR 400.7 mints a fresh id on every zone change. Properties are
 -- stamped at production time, by whichever of the two producers is adding the
@@ -81,6 +86,26 @@ data ManaUnit = MkManaUnit
     -- Goggles and Path of Ancestry print. It carries a whole ability rather
     -- than the closed word Pawl.Types.ManaRiderEffect holds, so it is a
     -- different carrier and not a further arm (#2248).
-    rider :: Maybe ManaRider.ManaRider
+    rider :: Maybe ManaRider.ManaRider,
+    -- | CR 607.2d: the subtype this mana's SOURCE had chosen as it entered (CR
+    -- 614.1c), baked in here at production so that a CR 106.6 restriction can
+    -- read it -- Pillar of Origins' "creature spell of the chosen type". Nothing
+    -- for mana from a source that chose none, which is almost every mana.
+    --
+    -- Read by Pawl.Engine.Mana.admitsUnder, which hands it to
+    -- Pawl.Engine.Filter's sourceChosenSubtype for Filter.HasChosenSubtype to
+    -- ask. BOTH producers stamp it -- Pawl.Engine.Mana.manaOptionsOfGiven for a
+    -- mana ability paid inline (Pillar of Origins) and Pawl.Engine.Resolve's
+    -- Effect.AddMana arm for one that resolves off the stack.
+    --
+    -- BAKED and not looked up, which is what the paragraph above requires: there
+    -- is no source id to look anything up by, the source may have left the
+    -- battlefield by the time the mana is spent, and CR 106.6a makes the
+    -- restriction the ABILITY's rather than the permanent's.
+    --
+    -- Not implemented: a restriction reading the source's IDENTITY rather than a
+    -- value it chose -- Ice Cauldron's "only to cast the last card exiled with
+    -- this artifact", which would want the id this type does not carry (#1978).
+    sourceChosenSubtype :: Maybe Subtype.Subtype
   }
   deriving (Eq, Ord, Show)

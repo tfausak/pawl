@@ -1307,7 +1307,26 @@ data Context = MkContext
     -- Not implemented: the lint that would keep a card from asking the atom in the
     -- positions this is empty in, which sourcePower, slotNames, sourceAttachedTo,
     -- sourceChosenNames and carrierChosenPlayer above each have (#3449).
-    sourceChosenColor :: Maybe Color.Color
+    sourceChosenColor :: Maybe Color.Color,
+    -- CR 205.3: the subtype the SOURCE chose as it entered (CR 614.1c), for the
+    -- one atom that asks whether a candidate wears it (HasChosenSubtype, Pillar
+    -- of Origins). Supplied by ONE caller: Pawl.Engine.Mana.admitsUnder, which
+    -- reads it off the mana unit rather than off the board -- CR 607.2d links the
+    -- choosing ability to the mana ability printed beside it, and CR 106.6a makes
+    -- the restriction the ability's, so the answer is the one baked in when the
+    -- mana was produced (Pawl.Types.ManaUnit.sourceChosenSubtype).
+    --
+    -- BAKED rather than read LIVE, which is where this differs from
+    -- sourceChosenColor above: mana outlives its source, so there is no board read
+    -- left to make at the moment CR 106.6 is asked.
+    --
+    -- Nothing in contextFor below and so in contextWithSlots and
+    -- contextComparingPower too, so the atom is vacuously False in every position
+    -- but that one -- sourceChosenColor's posture.
+    --
+    -- Not implemented: the lint that would keep a card from asking the atom in the
+    -- positions this is empty in, which sourceChosenColor above shares (#3449).
+    sourceChosenSubtype :: Maybe Subtype.Subtype
   }
   deriving (Eq, Ord, Show)
 
@@ -1358,7 +1377,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1396,7 +1415,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1669,6 +1688,11 @@ matches context view predicate = case predicate of
   -- as readily as a printed cost does. A source that has chosen none matches
   -- nothing.
   Filter.HasChosenColor -> maybe False (`Set.member` colors view) (sourceChosenColor context)
+  -- CR 205.3 read off the PROJECTION, the HasSubtype arm above with the subtype
+  -- arriving on the Context: whatever CR 613.1d's layer left the candidate
+  -- wearing is what CR 607.2d's link is compared against. A source that has
+  -- chosen none matches nothing.
+  Filter.HasChosenSubtype -> maybe False (`Set.member` subtypes view) (sourceChosenSubtype context)
   -- CR 702.16k's two halves in one disjunction: what the chosen player CONTROLS,
   -- and what they OWN that no other player controls -- which is the second half's
   -- whole content, CR 108.4 leaving a card outside the battlefield and the stack
@@ -2045,6 +2069,7 @@ rewrite pairs predicate = case predicate of
   Filter.SharesCreatureTypeWithBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.HasChosenColor -> predicate
+  Filter.HasChosenSubtype -> predicate
   Filter.OfChosenPlayer -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
@@ -2687,6 +2712,7 @@ bakeBound players predicate = case predicate of
   Filter.SharesCreatureTypeWithBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.HasChosenColor -> predicate
+  Filter.HasChosenSubtype -> predicate
   Filter.OfChosenPlayer -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
@@ -2849,6 +2875,7 @@ manaValueThresholds predicate = case predicate of
   Filter.SharesCreatureTypeWithBound _ -> []
   Filter.HasChosenName -> []
   Filter.HasChosenColor -> []
+  Filter.HasChosenSubtype -> []
   Filter.OfChosenPlayer -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
@@ -3006,6 +3033,7 @@ statesAQuality predicate = case predicate of
   -- CR 701.23b's "stated quality" for HasColor's reason, one indirection along:
   -- the description is a colour whichever way the colour was arrived at.
   Filter.HasChosenColor -> True
+  Filter.HasChosenSubtype -> True
   -- CR 701.23b's "stated quality" too, and rule 702.16k's own "regardless of
   -- that object's characteristic values" is not a counter-argument: the rule
   -- excuses the PROTECTION from reading characteristics, where this predicate
