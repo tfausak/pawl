@@ -15,6 +15,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.CastRestrictionSpec as CastSpec
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
@@ -383,6 +384,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   tollOfTheSiegeSpec s registry
   priceOfKnowledgeSpec s registry
   strandcatcherSpec s registry
+  ownershipLedgerSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -1557,3 +1559,77 @@ strandcatcherSpec s registry =
               after = endStepOf (castAndResolve S.bob f3 (castAndResolve S.alice f2 (castAndResolve S.alice f1 g3)))
           Spec.assertEqWith s "alice drew nothing: bob's Fog is in bob's graveyard" (S.handSize S.alice after) 0
           Spec.assertEqWith s "two cards in hers and one in his, three arrivals in all" (graveyard S.alice after, graveyard S.bob after) (2, 1)
+
+-- CR 108.3's owner over CR 608.2i's cast log, which is not CR 405.4's
+-- controller.
+--
+-- Synthetic Ownership Ledger, {2}{B} Creature -- Zombie 1/3: "{T}: You gain 1
+-- life for each spell you don't own that was cast this turn." SYNTHETIC because
+-- no printing asks an owner question of a PAST cast: Scryfall's o:"spell you
+-- don't own", 2026-09-14, returns seven cards and every one of them is a
+-- "whenever you cast" TRIGGER, which Pawl.Engine.Event.Match answers off the live
+-- spell instead. Tasha, the Witch Queen is the card that would refute this if her
+-- clause were a count.
+--
+-- Both cases run on Pawl.CastRestrictionSpec's Dire Fleet Daredevil boards,
+-- reused for the reason Pawl.DepartureSpec reuses them: they are the only ones in
+-- the tree where a spell's caster and its owner are different players.
+--
+-- The first board logs two casts and alice made both -- the Daredevil out of her
+-- own hand, and bob's Renewed Faith out of bob's graveyard -- so the life the
+-- Ledger gains reads:
+--
+--   owner, the rule            1   only the Faith is bob's
+--   controller instead         0   alice cast both
+--   no owner at all            0   Filter.OwnedBy vacuously False, the bug
+--   neither conjunct           2   every cast counted
+--
+-- The second case is castOwner's other road, and the board it needs is the one
+-- with a second Renewed Faith in alice's OWN hand: a spell still on the stack has
+-- no CR 608.2h record filed under its id, so a fold that reads only records
+-- would answer Nothing for it and count a spell alice owns.
+ownershipLedgerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ownershipLedgerSpec s registry =
+  let printings = do
+        mountain <- S.printingOf s registry "Mountain"
+        plains <- S.printingOf s registry "Plains"
+        daredevil <- S.printingOf s registry "Dire Fleet Daredevil"
+        faith <- S.printingOf s registry "Renewed Faith"
+        ledger <- S.printingOf s registry "Synthetic Ownership Ledger"
+        pure (mountain, plains, daredevil, faith, ledger)
+      -- The Ledger put onto alice's battlefield and tapped for its own ability,
+      -- which S.addPermanent settles so CR 302.6 does not refuse the cost.
+      tallied ledger gs =
+        let (ledgerId, withLedger) = S.addPermanent ledger S.alice gs
+         in case Projection.abilitiesOf ledgerId withLedger of
+              [ability] -> Right (S.lifeOf S.alice (S.runPure S.identityAnswer withLedger (do Activate.activateAbility S.alice ledgerId ability; Stack.resolveTop)))
+              other -> Left (length other)
+      owners gs = fmap (\oid -> fmap Object.owner (Game.lookupObject oid gs)) (GameState.stack gs)
+   in Spec.describe s "Synthetic Ownership Ledger" $ do
+        Spec.it s "CR 108.3 a resolved spell cast off an opponent's card was a spell you don't own" $ do
+          (mountain, plains, daredevil, faith, ledger) <- printings
+          let cast = CastSpec.daredevilFaithCast mountain plains daredevil faith
+              after = S.runPure S.identityAnswer cast Stack.resolveTop
+          Spec.assertEqWith s "CR 108.3 one of the turn's two casts is bob's card, so alice gains 1 over the Faith's 6" (tallied ledger after) (Right (Just 27))
+          -- The proxies, after the behaviour: the Faith really resolved under
+          -- alice, and the log really holds the two casts the count folds.
+          Spec.assertEqWith s "setup: alice was at 26 from the Faith she cast" (S.lifeOf S.alice after) (Just 26)
+          Spec.assertEqWith s "setup: neither other seat gained anything" (S.lifeOf S.bob after, S.lifeOf S.carol after) (Just 20, Just 20)
+        -- The other road, on the board that adds a SECOND Renewed Faith to alice's
+        -- own hand: she casts bob's and lets it resolve, then casts hers and
+        -- leaves it on the stack. A spell still on the stack has no CR 608.2h
+        -- record filed under its id, so the one alice owns is excluded only by
+        -- the live read -- and the board would answer 28 without it.
+        Spec.it s "CR 108.3 a spell still on the stack is read off the object, not off a record" $ do
+          (mountain, plains, daredevil, faith, ledger) <- printings
+          let (handFaithId, board) = CastSpec.daredevilTwoFaiths mountain plains daredevil faith
+          case CastSpec.exiledNamed CastSpec.renewedFaithName board of
+            [exiledId] -> do
+              let resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.alice exiledId)) Stack.resolveTop
+                  pending = S.runPure S.identityAnswer resolved (S.cast S.alice handFaithId)
+              Spec.assertEqWith s "CR 108.3 alice's own spell on the stack is not one she doesn't own, so still 1" (tallied ledger pending) (Right (Just 27))
+              -- The proxies, after the behaviour: her Faith really is on the
+              -- stack unresolved, and bob's really did resolve.
+              Spec.assertEqWith s "setup: one spell on the stack, and alice owns it" (owners pending) [Just S.alice]
+              Spec.assertEqWith s "setup: alice is at 26 from bob's Faith alone" (S.lifeOf S.alice pending) (Just 26)
+            other -> Spec.assertFailure s ("expected exactly one exiled Faith, got " <> show (length other))
