@@ -152,6 +152,7 @@ import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -1604,6 +1605,7 @@ rewriteQuantity pairs quantity = case quantity of
         }
   Quantity.Type.Plus (Plus.MkPlus x y) -> Quantity.Type.Plus (Plus.MkPlus (rewriteQuantity pairs x) (rewriteQuantity pairs y))
   Quantity.Type.Halved (Halved.MkHalved rounding inner) -> Quantity.Type.Halved (Halved.MkHalved rounding (rewriteQuantity pairs inner))
+  Quantity.Type.Times (Times.MkTimes factor inner) -> Quantity.Type.Times (Times.MkTimes factor (rewriteQuantity pairs inner))
   Quantity.Type.Negate x -> Quantity.Type.Negate (rewriteQuantity pairs x)
   Quantity.Type.Literal _ -> quantity
   Quantity.Type.ManaValue -> quantity

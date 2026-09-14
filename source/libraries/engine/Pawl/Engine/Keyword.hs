@@ -162,6 +162,7 @@ import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
@@ -5364,15 +5365,14 @@ melee =
 -- blocker. Rule 702.23a's bonus already counts the blockers itself, so a
 -- per-blocker trigger would count them twice.
 --
--- The BONUS is N COPIES of Quantity.BlockersBeyondFirst summed through
--- Quantity.Plus, Pawl.Types.Quantity having no product node; the fold's Literal 0
--- base answers rampage 0 rather than failing.
+-- The BONUS is Quantity.Times of N and Quantity.BlockersBeyondFirst (CR 107.1);
+-- a factor of 0 is legal, so rampage 0 reads 0 rather than failing.
 --
 -- CR 702.23b's "calculated only once per combat" is CR 611.2d's freeze and needs
 -- nothing of its own.
 rampage :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 rampage n =
-  let bonus = foldr (\a b -> Quantity.Plus (Plus.MkPlus a b)) (Quantity.Literal 0) (List.genericReplicate n Quantity.BlockersBeyondFirst)
+  let bonus = Quantity.Times (Times.MkTimes n Quantity.BlockersBeyondFirst)
       effect =
         Effect.ModifyTarget
           ( ModifyTarget.MkModifyTarget

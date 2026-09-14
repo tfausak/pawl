@@ -278,6 +278,7 @@ import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -3278,6 +3279,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.Star -> []
   Quantity.Type.Plus (Plus.MkPlus a b) -> quantityKindFilters a <> quantityKindFilters b
   Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityKindFilters inner
+  Quantity.Type.Times (Times.MkTimes _ inner) -> quantityKindFilters inner
   Quantity.Type.Negate a -> quantityKindFilters a
   -- The Count's own Filter is countFilters' half above; what this half adds is
   -- the CounterKind a Greatest's per-member Quantity may hide, which is

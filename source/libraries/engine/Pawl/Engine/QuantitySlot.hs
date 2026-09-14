@@ -37,6 +37,7 @@ import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.Times as Times
 
 -- The per-member quantity of a count, VISITED -- the one walk the four functions
 -- below are each an instance of, so a new Aggregation arm carrying a quantity
@@ -94,6 +95,8 @@ overSlots f quantity =
         -- Composition, as Plus is: the rounding names no slot and the payload may name
         -- any.
         Quantity.Halved (Halved.MkHalved rounding inner) -> fmap (Quantity.Halved . Halved.MkHalved rounding) (recur inner)
+        -- Halved's answer: the factor names no slot and the payload may name any.
+        Quantity.Times (Times.MkTimes factor inner) -> fmap (Quantity.Times . Times.MkTimes factor) (recur inner)
         -- Whatever the payload names, since a minus sign changes no slot: Toxic
         -- Deluge's -X is a Negate over the InSlot that names X. A REGRESSION FENCE
         -- rather than proven behaviour -- emptying this arm leaves the suite green,
@@ -278,6 +281,7 @@ nestedRefs quantity = case quantity of
   -- Plus' answer: the rounding hides no reference, so what the payload hides is
   -- the whole question.
   Quantity.Halved (Halved.MkHalved _ inner) -> nestedRefs inner
+  Quantity.Times (Times.MkTimes _ inner) -> nestedRefs inner
   Quantity.Negate a -> nestedRefs a
   -- Both halves `slots` skips: the Scope's own read, and the per-member quantity
   -- of a Greatest, which may hide a reference of its own.
@@ -365,6 +369,9 @@ nestedCounts quantity = case quantity of
   -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it halves
   -- may be one -- Malignus halves a fold over players.
   Quantity.Halved (Halved.MkHalved _ inner) -> nestedCounts inner
+  -- Halved's descent: the factor holds no Count and what it multiplies may be one
+  -- -- Blessed Reversal multiplies a fold over the battlefield.
+  Quantity.Times (Times.MkTimes _ inner) -> nestedCounts inner
   -- Not a leaf: a minus sign hides nothing -- Toxic Deluge's -X.
   Quantity.Negate a -> nestedCounts a
   -- The leaf itself, and DESCENT into a Greatest's per-member number, which may
@@ -555,6 +562,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.Count c -> Quantity.Count (intoCount c)
         Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (recur a) (recur b))
         Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (recur inner))
+        Quantity.Times (Times.MkTimes factor inner) -> Quantity.Times (Times.MkTimes factor (recur inner))
         Quantity.Negate a -> Quantity.Negate (recur a)
         Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (recur inner))
         Quantity.AgainstCardsExiledWith inner -> Quantity.AgainstCardsExiledWith (recur inner)

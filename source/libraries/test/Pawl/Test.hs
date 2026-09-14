@@ -438,6 +438,7 @@ import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TeamIdSpec
 import qualified Pawl.Codec.TeamsSpec
+import qualified Pawl.Codec.TimesSpec
 import qualified Pawl.Codec.TimestampSpec
 import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.TokenRSpec
@@ -1086,6 +1087,7 @@ spec s registry = do
   Pawl.Codec.TargetSlotSpec.spec s
   Pawl.Codec.TeamIdSpec.spec s
   Pawl.Codec.TeamsSpec.spec s
+  Pawl.Codec.TimesSpec.spec s
   Pawl.Codec.TimestampSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.TokenRSpec.spec s
