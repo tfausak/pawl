@@ -319,10 +319,11 @@ data Prompt r where
   -- merges with. Never elided: CR 730.2a makes the two answers differ in the
   -- merged permanent's every characteristic.
   ChooseMutateSide :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt MutateSide.MutateSide
-  -- | CR 701.61a: which half of forage the forager takes, asked as the spell or
-  -- ability resolves -- the ObjectId is the resolving object. Raised only where
-  -- both halves can be carried out, which is what makes it a choice
-  -- (Pawl.Engine.Forage.forage).
+  -- | CR 701.61a: which half of forage the forager takes -- the ObjectId is the
+  -- object the forage hangs on, the spell or ability resolving (Treetop Sentries)
+  -- or the one whose CR 602.1a activation cost is being paid (Thornvault
+  -- Forager). Raised only where both halves can be carried out, which is what
+  -- makes it a choice (Pawl.Engine.Forage.forage).
   ChooseForage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt ForageMode.ForageMode
   -- | CR 601.2b: how many times the optional additional cost of that keyword --
   -- kicker, multikicker, squad, offspring, replicate or casualty (CR 702.33a/c,

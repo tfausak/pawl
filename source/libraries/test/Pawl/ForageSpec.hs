@@ -2,8 +2,18 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers: CR 701.61 FORAGE -- Pawl.Engine.Forage, Effect.Forage's two arms in
--- Pawl.Engine.Resolve.Effect (the executing one and effectIsImpossible's), and
--- Prompt.ChooseForage.
+-- Pawl.Engine.Resolve.Effect (the executing one and effectIsImpossible's),
+-- Prompt.ChooseForage, CostComponent.Forage's arms in Pawl.Engine.Cost, and the
+-- GameEvent.Foraged that TriggerCondition.PlayerForages watches.
+--
+-- THREE FIXTURES, one per provenance rule 701.61a can be reached from. Treetop
+-- Sentries for the instructed forage (below); Thornvault Forager ({1}{G}
+-- Creature -- Squirrel Ranger 2/2, "{T}, Forage: Add two mana in any combination
+-- of colors") for the CR 602.1a activation cost; Corpseberry Cultivator
+-- ({1}{B/G}{B/G} Creature -- Squirrel Warlock 2/3, "At the beginning of combat on
+-- your turn, you may forage." / "Whenever you forage, put a +1/+1 counter on this
+-- creature.") for the event, its two abilities making one card both the forager
+-- and the watcher.
 --
 -- Treetop Sentries ({3}{G} Creature -- Squirrel Archer 2/4, "Reach. When this
 -- creature enters, you may forage. If you do, draw a card.") is the fixture: its
@@ -253,7 +263,7 @@ spec s registry = Spec.describe s "Forage" $ do
   -- haddock's fixture is Treetop Sentries, whose forage an effect instructs;
   -- these two cases drive the cost (Thornvault Forager) and the trigger
   -- (Corpseberry Cultivator) instead.
-  Spec.it s "CR 601.2h / 602.1b a forage paid as an activation cost exiles the three cards the forager chose" $ do
+  Spec.it s "CR 601.2h / 602.1a a forage paid as an activation cost exiles the three cards the forager chose" $ do
     forager <- S.printingOf s registry "Thornvault Forager"
     forest <- S.printingOf s registry "Forest"
     spider <- S.printingOf s registry "Giant Spider"

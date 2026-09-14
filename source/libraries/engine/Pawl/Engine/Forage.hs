@@ -9,9 +9,9 @@
 -- it is.
 --
 -- ONE module and not two procedures, for Pawl.Engine.Blight's reason: rule
--- 701.61a is one rule however a card demands it: CR 601.2f\/602.1b make it a cost
--- (Thornvault Forager) and an effect asks for it outright (Treetop Sentries), and
--- both come here.
+-- 701.61a is one rule however a card demands it. CR 602.1a makes it an
+-- activation cost (Thornvault Forager) and an effect asks for it outright
+-- (Treetop Sentries); both come here.
 module Pawl.Engine.Forage where
 
 import qualified Control.Monad as Monad
@@ -72,7 +72,8 @@ canForage pid gs = length (exileCandidates pid gs) >= 3 || not (null (foodCandid
 -- Food they control. Answers whether the forage happened -- False is the board
 -- canForage refuses, which CR 101.3 makes a no-op.
 --
--- The ObjectId is the object the prompts name: the spell or ability resolving.
+-- The ObjectId is the object the prompts name -- the spell or ability resolving,
+-- or the one whose activation cost is being paid.
 --
 -- THREE PROMPTS in all, each raised only where the rules leave something to ask.
 -- Which half, where both halves can be carried out; which three cards, where the
@@ -85,9 +86,10 @@ canForage pid gs = length (exileCandidates pid gs) >= 3 || not (null (foodCandid
 -- 601.2c) and there is no CR 608.2b legality to re-check.
 --
 -- FILTERED, NOT TRUSTED, Pawl.Engine.Blight's posture: an answer naming
--- something never offered falls back to the offered set's own front. An effect
--- has no "unpaid" to answer with, so reject-not-repair (Pawl.Engine.Cost's) is
--- not available here.
+-- something never offered falls back to the offered set's own front. That holds
+-- for the COST caller too, where the alternative would be Pawl.Engine.Cost's
+-- reject-not-repair: rule 701.61a states no way to fail once canForage holds, so
+-- a payment lost to a bad answer would be a refusal the rules do not offer.
 forage :: PlayerId -> ObjectId -> Game Bool
 forage pid resolving = do
   gs <- State.get

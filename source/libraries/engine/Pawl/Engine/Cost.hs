@@ -2937,10 +2937,11 @@ canPayComponent slots pid oid component gs = case component of
   -- PutPlusOneCountersOnThis above.
   CostComponent.Blight _ -> Blight.canBlight pid gs
   -- CR 608.2d: a player who can neither exile three cards from their graveyard
-  -- nor sacrifice a Food can't choose either half, so the cost cannot be paid and
-  -- CR 601.2h's "unpayable costs can't be paid" never offers the ability. Nothing
-  -- about `oid`: rule 701.61a's candidates are qualified by the FORAGER's own
-  -- graveyard and control, the Blight arm above's shape.
+  -- nor sacrifice a Food can't choose either half, which is how a forage COST is
+  -- unpayable rather than a no-op -- CR 601.2h's "unpayable costs can't be paid",
+  -- reaching an activation through CR 602.2b, so the ability is never offered.
+  -- Nothing about `oid`: rule 701.61a's candidates are qualified by the FORAGER's
+  -- own graveyard and control, the Blight arm above's shape.
   CostComponent.Forage -> Forage.canForage pid gs
   -- CR 701.17b's last sentence, stated of costs in as many words: "the player
   -- can't pay a cost that includes milling a number of cards greater than the

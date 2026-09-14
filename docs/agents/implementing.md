@@ -171,6 +171,10 @@ perfectly good-looking line of output. Read the label, then decide.
   (const False)`, a `seq`.
 - **Run the mutation through the NARROWEST path that shows the behaviour.** A
   test driving the whole priority loop can answer for the wrong reason.
+- **Mutate towards LESS permissive, not more.** `script/mutate.sh` passes tasty
+  no `--timeout`, so a mutation that makes the engine loop hangs instead of
+  going red -- a cost gate widened to "payable" re-offers an activation whose
+  payment then fails, forever. Kill your own PID and mutate the other way.
 - **Report a mutation you could not run.** If a behaviour holds by
   construction, or `-Werror` rejects the mutated source, say plainly --- at the
   code site and in the PR --- that the assertion is a regression fence rather
