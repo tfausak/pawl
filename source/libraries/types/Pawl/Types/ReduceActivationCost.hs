@@ -4,7 +4,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.ManaCost as ManaCost
 
 -- | The payload of Pawl.Types.PlayerEffect's ReduceActivationCost arm (#1305).
@@ -22,17 +22,23 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- Blossoming Tortoise's "of lands you control" -- and is matched by
 -- Pawl.Engine.PlayerEffect.matchesObject against that object's projection.
 -- `grantedBy` names the KIND of ability instead: Nothing is every activated
--- ability of a matching source, and Just a family is only the ability rule 702
--- mints for a keyword of that family, which is Fluctuator's "CYCLING abilities
--- you activate", and Bureau Headmaster's "EQUIP abilities you activate". A
--- source filter cannot say that -- a Barkhide Mauler in
+-- ability of a matching source, and Just a designator is only the ability whose
+-- rules are rule 702's, which is Fluctuator's "CYCLING abilities you activate",
+-- Bureau Headmaster's "EQUIP abilities you activate", and Boom Scholar's
+-- "EXHAUST abilities of other permanents you control". A source filter cannot
+-- say that -- a Barkhide Mauler in
 -- a hand is not distinguished from itself by anything about the object -- and an
 -- ability-shaped Filter atom put in `whichAbilities` could never be true there,
 -- since that field is matched against the object and not the ability.
 --
--- A rule-702 FAMILY designator and not an effect: what the closed half compares
--- here is which rule minted the ability (Pawl.Engine.Keyword.familyGranting),
--- never what the ability does.
+-- A Pawl.Types.KeywordDesignator rather than a bare KeywordFamily, because rule
+-- 702's ability-bearing keywords come both ways: equip and cycling carry a cost
+-- and are named by family, while CR 702.177a's exhaust is nullary and has no
+-- family. That type's haddock has the alternatives rejected.
+--
+-- A rule-702 DESIGNATOR and not an effect: what the closed half compares here is
+-- which keyword's rules the ability is under
+-- (Pawl.Types.ActivatedAbility.keyword), never what the ability does.
 --
 -- `whichKind` is the THIRD, and neither of the two above can say it: CR 605.1a's
 -- classification of the ability BEING ACTIVATED, which is Zirda, the
@@ -62,7 +68,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- Pawl.Engine.Activate.activateAbility gathers twice for exactly that reason.
 data ReduceActivationCost = MkReduceActivationCost
   { whichAbilities :: Filter.Filter Keyword.Keyword,
-    grantedBy :: Maybe KeywordFamily.KeywordFamily,
+    grantedBy :: Maybe KeywordDesignator.KeywordDesignator,
     whichKind :: Maybe AbilityKind.AbilityKind,
     whichTargets :: Maybe (Filter.Filter Keyword.Keyword),
     reduction :: ManaCost.ManaCost,

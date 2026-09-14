@@ -679,6 +679,18 @@ data Keyword
     -- creature that was then an Assassin or a commander under your control,
     -- which CR 601.2b and CR 601.2f-h price as an alternative cost.
     Freerunning (Cost.Cost Keyword)
+  | -- | 702.177a: exhaust adds rules to the activated ability printed AFTER it --
+    -- "Exhaust -- [Cost]: [Effect]" means "[Cost]: [Effect]. Activate only once".
+    -- PRINTED rather than minted, so a card writes this on the ability itself
+    -- through Pawl.Types.ActivatedAbility.keyword, which is what lets Boom
+    -- Scholar's "exhaust abilities of other permanents you control" name it.
+    --
+    -- Not implemented: the rewriting itself, so a card carrying this keyword
+    -- writes CR 702.177a's "activate only once" as its own
+    -- ActivationRestriction.OnlyOnce rather than having the keyword add it
+    -- (#3044). Not implemented either: CR 702.177b's "as long as you haven't
+    -- activated an exhaust ability this turn" (#3044).
+    Exhaust
   | -- | 702.179a: a static ability whose whole content is CR 704.5aa's
     -- state-based action, read off the projection by Pawl.Engine.Sba rather than
     -- minted.

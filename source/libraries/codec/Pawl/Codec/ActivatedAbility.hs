@@ -38,11 +38,12 @@ codec cardCodec abilityCodec = Fields.object $ do
   -- CR 613.1f: emitted only for an ability another clause of the same card refers
   -- to, so the absence of the key means nothing names it.
   name <- Fields.defaulted "name" Nothing (Common.maybe AbilityName.codec) ActivatedAbility.name
-  -- CR 702: the keyword whose rules the ability is under, which only
-  -- Pawl.Engine.Keyword's minters set -- so the key is absent from every ability
-  -- in data/cards/, and Pawl.CardSpec's "CR 702 no card claims a keyword minted
-  -- an ability it printed" is the lint that keeps it that way. It is on the wire
-  -- at all because Pawl.Codec.GameState reaches this codec through
+  -- CR 702: the keyword whose rules the ability is under. A card may write it
+  -- only for a keyword rule 702 does NOT state an ability for -- CR 702.177a's
+  -- exhaust, which adds rules to the ability printed after it -- and
+  -- Pawl.CardSpec's "CR 702 no card claims a keyword minted an ability it
+  -- printed" is the lint that keeps the minters' side theirs. It is also on the
+  -- wire because Pawl.Codec.GameState reaches this codec through
   -- Pawl.Codec.Object: an ability already on the stack carries its stamp, and a
   -- state that round-tripped without the key would come back a printed ability.
   keyword <- Fields.defaulted "keyword" Nothing (Common.maybe Keyword.codec) ActivatedAbility.keyword

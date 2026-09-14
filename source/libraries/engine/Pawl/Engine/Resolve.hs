@@ -1148,7 +1148,8 @@ resolveAbilityWith runSubgame abilId srcId ability = do
       -- paid -- a crew activation that is countered never makes its Vehicle
       -- become crewed.
       --
-      -- Read off ActivatedAbility.keyword, the stamp Keyword.mintedBy writes, so
+      -- Read off ActivatedAbility.keyword, the stamp Keyword.mintedBy writes for
+      -- rule 702.122a, so
       -- this is a case on a rule-702 KEYWORD and not on an effect's identity.
       -- The source is the Vehicle -- CR 113.7's "the object whose ability was
       -- activated" -- which is what rule 702.122e's "[this Vehicle]" names.

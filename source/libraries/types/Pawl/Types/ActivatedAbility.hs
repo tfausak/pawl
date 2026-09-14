@@ -107,18 +107,27 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- lint checks, never a key the engine assumes unique.
     name :: Maybe AbilityName.AbilityName,
     -- | CR 702: the keyword whose rules this ability is under, or Nothing for an
-    -- ability the card simply prints -- which is nearly all of them.
+    -- ability no keyword bears on -- which is nearly all of them.
     --
-    -- Rule 702 states whole activated abilities a permanent or a card in a hand
-    -- has for holding a keyword: CR 702.6a's equip, CR 702.29a's cycling, CR
-    -- 702.67a's fortify, CR 702.77a's reinforce, CR 702.87a's level up, CR
-    -- 702.107a's outlast, CR 702.122a's crew and CR 702.184a's station. This is
-    -- the stamp Pawl.Engine.Keyword's minters put on each one, and
-    -- Pawl.Engine.Keyword.familyGranting reads nothing else --
-    -- Pawl.Types.ReduceActivationCost.grantedBy is what asks, so that Bureau
-    -- Headmaster's "equip abilities you activate" reaches rule 702.6a's ability
-    -- and not a printed twin of it. Pawl.ActivateSpec's "CR 118.7 a printed twin
-    -- of rule 702.6a's ability is not an equip ability" is what proves it.
+    -- TWO WRITERS, because rule 702 reaches an activated ability two ways. It
+    -- STATES one a permanent or a card in a hand has for holding a keyword -- CR
+    -- 702.6a's equip, CR 702.29a's cycling, CR 702.67a's fortify, CR 702.77a's
+    -- reinforce, CR 702.87a's level up, CR 702.107a's outlast, CR 702.122a's crew
+    -- and CR 702.184a's station -- and Pawl.Engine.Keyword's minters stamp each
+    -- of those. Or it ADDS RULES to an ability the card prints after it (CR
+    -- 702.177a's exhaust), and then the CARD writes the stamp, since no minter
+    -- ever sees that ability. Pawl.Engine.Keyword.statesAbility is the line, and
+    -- Pawl.CardSpec's "CR 702 no card claims a keyword minted an ability it
+    -- printed" is the lint that holds a card to the second side of it.
+    --
+    -- Pawl.Types.ReduceActivationCost.grantedBy is what asks, through
+    -- Pawl.Engine.Keyword.designates, so that Bureau Headmaster's "equip
+    -- abilities you activate" reaches rule 702.6a's ability and not a printed
+    -- twin of it, and Boom Scholar's "exhaust abilities of other permanents you
+    -- control" reaches the printed one. Pawl.ActivateSpec's "CR 118.7 a printed
+    -- twin of rule 702.6a's ability is not an equip ability" is what proves the
+    -- first, and its "CR 118.7 Boom Scholar's reduction reaches an exhaust
+    -- ability and not an ordinary one" the second.
     --
     -- ORIGIN, not shape. The classification used to be re-minting plus value
     -- equality, which cannot tell rule 702.6a's ability from a card that printed
@@ -131,9 +140,9 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- prints and every ability a layer-6 grant carries.
     --
     -- THE WHOLE KEYWORD rather than a Pawl.Types.KeywordFamily, because CR
-    -- 702.184a's station is nullary and that type deliberately has no arm for a
-    -- nullary keyword. familyOf answers Nothing for station, which is the same
-    -- answer as before and now for a stated reason rather than by accident.
+    -- 702.184a's station and CR 702.177a's exhaust are nullary and that type
+    -- deliberately has no arm for a nullary keyword.
+    -- Pawl.Types.KeywordDesignator is what a card names either kind with.
     keyword :: Maybe Keyword.Keyword
   }
   deriving (Eq, Ord, Show)

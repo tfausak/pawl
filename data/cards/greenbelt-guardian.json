@@ -72,6 +72,9 @@
               }
             ]
           },
+          "keyword": {
+            "type": "Exhaust"
+          },
           "modal": {
             "modes": [
               {
@@ -105,6 +108,11 @@
               "type": "OnlyOnce"
             }
           ]
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Exhaust"
         }
       ],
       "manaCost": [

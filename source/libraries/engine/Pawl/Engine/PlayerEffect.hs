@@ -68,7 +68,6 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
-import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
@@ -1319,13 +1318,15 @@ spellCostAdjustments pid oid gs =
 -- permanent's here, and the permanent is projected rather than printed for the
 -- same reason (an animated Vehicle's abilities are a creature's).
 --
--- `family` is the SECOND criterion, and the one the source filter cannot say:
--- which rule-702 keyword minted the ability being activated, as the caller
--- derived it (Pawl.Engine.Keyword.familyGranting). A reducer carrying no
+-- `stamp` is the SECOND criterion, and the one the source filter cannot say:
+-- which rule-702 keyword's rules the ability being activated is under, read off
+-- Pawl.Types.ActivatedAbility.keyword by the caller. A reducer carrying no
 -- grantedBy ignores it, which is every reducer whose sentence says "activated
 -- abilities"; Fluctuator's says "cycling abilities" and carries CR 702.29a's
--- family. Compared and never inspected further: a KeywordFamily is a rulebook
--- designator, so nothing here learns what the reduced ability DOES.
+-- family, Boom Scholar's says "exhaust abilities" and carries CR 702.177a's
+-- nullary keyword. Compared through Pawl.Types.KeywordDesignator and never
+-- inspected further: a designator is a rulebook citation, so nothing here learns
+-- what the reduced ability DOES.
 --
 -- `kind` is the criterion BOTH payloads read: CR 605.1a's classification of the
 -- ability being activated, which Suppression Field's "unless they're mana
@@ -1335,7 +1336,7 @@ spellCostAdjustments pid oid gs =
 -- the mana window and says so, and Pawl.Engine.Activate's three sites are
 -- reached only for an ability activatableGiven has already refused to call a
 -- mana ability (CR 605.3b). Compared and never inspected further, exactly as
--- `family` is: which side of a rulebook classification the ability falls on,
+-- `stamp` is: which side of a rulebook classification the ability falls on,
 -- never what it does.
 --
 -- `targets` is the THIRD criterion and the one that arrives from a different
@@ -1358,8 +1359,8 @@ spellCostAdjustments pid oid gs =
 -- sentence says "this effect", so an effect that states no floor is not bound by
 -- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
 -- reduction lands.
-activationCostAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustments targets family kind loyalty pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) targets family kind loyalty srcId gs
+activationCostAdjustments :: Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustments targets stamp kind loyalty pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) targets stamp kind loyalty srcId gs
 
 -- The same gather given the effect list the CALLER has already taken, which is
 -- the half a per-permanent loop wants: `applying` is a walk of everything in
@@ -1375,8 +1376,8 @@ activationCostAdjustments targets family kind loyalty pid srcId gs = activationC
 -- The rows arrive PAIRED WITH THEIR SOURCE and not stripped to bare effects,
 -- because CR 303.4b's "enchanted" is a fact about the row's own permanent: the
 -- criterion is matched through matchesObjectFrom, which needs it.
-activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
+activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
   let -- CR 601.2c's chosen targets, asked of ReduceActivationCost's third
       -- criterion: Dwarven Mauler's "equip abilities you activate THAT TARGET
       -- THIS CREATURE". ANY rather than all, which is what the sentence says of
@@ -1449,7 +1450,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
           -- being activated, which neither the source filter nor the rule-702
           -- family could answer. A reduction carrying no `whichKind` ignores it,
           -- which is every other reducer in `data/cards/`.
-          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> Just g == family) granted && maybe True (== kind) wantedKind && maybe True (aims source) aimedAt
+          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> any (Keyword.designates g) stamp) granted && maybe True (== kind) wantedKind && maybe True (aims source) aimedAt
             then Just (AppliedReduction.MkAppliedReduction amount floor_ False)
             else Nothing
         -- The non-mana addition, gathered by `additionOf` below: CR 601.2f's

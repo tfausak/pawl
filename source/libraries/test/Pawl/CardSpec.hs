@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
@@ -2941,6 +2942,9 @@ keywordPayloadFilters keyword = case keyword of
   -- permanents the rules state, which no Filter this value carries reaches.
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  -- CR 702.177a is payload-free: the rider it adds is the rules', and the ability
+  -- it modifies is the CARD's own, so any Filter in it is swept there.
+  Keyword.Exhaust -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
   -- TriggeredAbility, so any Filter in it is swept there rather than here.
@@ -5945,15 +5949,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offends = any (any (countReadsX . TargetSlot.count) . Modal.allTargetSlots) . triggerModals
     Spec.assertEqWith s "no offenders" (fmap (S.nameOf . Printing.card) (filter (anyFace offends . Printing.card) ps)) []
   -- CR 702: Pawl.Types.ActivatedAbility.keyword is the stamp
-  -- Pawl.Engine.Keyword.mintedBy puts on an ability rule 702 states, and the wire
+  -- Pawl.Engine.Keyword.mintedBy puts on an ability rule 702 STATES, and the wire
   -- carries the key only so an ability already on the stack round-trips through
-  -- Pawl.Codec.GameState. A card that wrote it would be claiming a provenance
-  -- nothing minted, and Bureau Headmaster's "equip abilities you activate" would
-  -- reach an ability the card printed.
+  -- Pawl.Codec.GameState. A card that wrote one of those would be claiming a
+  -- provenance nothing minted, and Bureau Headmaster's "equip abilities you
+  -- activate" would reach an ability the card printed.
+  --
+  -- The other half of rule 702 is where a card MUST write it: CR 702.177a's
+  -- exhaust adds rules to the ability printed after it rather than stating one,
+  -- so no minter ever sees that ability and Boom Scholar's "exhaust abilities of
+  -- other permanents you control" has nothing to reach unless the card says so.
+  -- Pawl.Engine.Keyword.statesAbility is the line, derived from the rosters that
+  -- do the minting.
   --
   -- EVERY face a printing can put an object on the battlefield with, which is
   -- `card : mintedFaces card` and not the printing's own faces: an activated
-  -- ability printed on a CR 111.1 token's face reaches Keyword.familyGranting by
+  -- ability printed on a CR 111.1 token's face reaches Keyword.designates by
   -- the same road, and the pool prints several (Thraben Inspector's Clue, The
   -- Underworld Cookbook's Food). mintedFaces reaches an emblem and a
   -- conjured card too, and the granted abilities grantedActivatedAbilities
@@ -5961,13 +5972,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- granter.
   Spec.it s "CR 702 no card claims a keyword minted an ability it printed" $ do
     ps <- S.allPrintings s
-    let claimed f = filter (Maybe.isJust . ActivatedAbility.keyword) (Face.activatedAbilities f <> grantedActivatedAbilities f)
+    let claimed f = filter (any KeywordEngine.statesAbility . ActivatedAbility.keyword) (Face.activatedAbilities f <> grantedActivatedAbilities f)
         claims f = not (null (claimed f))
         printsAbilities f = not (null (Face.activatedAbilities f))
         everyFace = overFaces (\f -> f : mintedFaces f)
         offenders = filter (any claims . everyFace . Printing.card) ps
-        stamp ability = ability {ActivatedAbility.keyword = Just Keyword.Flying}
+        stamp ability = ability {ActivatedAbility.keyword = Just Keyword.Station}
         liarAbility = stamp (oneEffectActivated (costOf []) (youDraw 1))
+        -- CR 702.177a's side of the line, on the same ability: rule 702 states no
+        -- exhaust ability, so this is the stamp a CARD writes and the sweep must
+        -- let through.
+        printedAbility = (oneEffectActivated (costOf []) (youDraw 1)) {ActivatedAbility.keyword = Just Keyword.Exhaust}
         -- A face reachable ONLY through Effect.Create, which is what lets the
         -- last two assertions below split: the minting face itself claims
         -- nothing, and the claim is found only once the walk descends.
@@ -5990,6 +6005,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (claims ((vanillaFace "Liar" instantLine) {Face.activatedAbilities = [liarAbility]}))
       "and a face claiming one is caught"
+    Spec.assertBool
+      s
+      (not (claims ((vanillaFace "Honest" instantLine) {Face.activatedAbilities = [printedAbility]})))
+      "while CR 702.177a's printed stamp is not a claim"
     Spec.assertBool s (null (claimed minter)) "the minting face itself claims nothing"
     -- Through `everyFace`, the sweep's own walk, so this reddens if that walk
     -- narrows back to the printing's own faces.
