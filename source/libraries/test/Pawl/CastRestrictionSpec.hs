@@ -1470,9 +1470,11 @@ direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
 -- Hostage Taker {2}{U}{B} Creature -- Human Pirate 2/3 (Scryfall, 2026-09-14):
 -- "When this creature enters, exile another target creature or artifact until
 -- this creature leaves the battlefield. You may cast that card for as long as it
--- remains exiled, and mana of any type can be spent to cast that spell." The
--- pool's card that reaches a PERMANENT somebody else owns, which is the board CR
--- 110.2b's default controller is observable on.
+-- remains exiled, and mana of any type can be spent to cast that spell." It
+-- reaches a PERMANENT somebody else owns, which is the board CR 110.2b's default
+-- controller is observable on -- Dire Fleet Daredevil above reaches only
+-- instants and sorceries, and Sen Triplets below is never driven with a
+-- permanent card in bob's hand.
 --
 -- TRANSCRIBED, with one clause restated rather than dropped: "for as long as it
 -- remains exiled" is written as "for as long as the source is on the
