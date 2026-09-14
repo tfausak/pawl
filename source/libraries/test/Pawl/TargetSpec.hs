@@ -2680,7 +2680,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- check: a slot whose bound reads that X and whose pool reads a sibling slot.
   borrowedExhumationSpec s registry
   -- And the bound at EQUALITY rather than order, which is a different atom and
-  -- not a different reading of the one above: "with mana value X" (#2989).
+  -- not a different reading of the one above: "with mana value X"; see #2989.
   chthonianNightmareSpec s registry
   -- The joint check on the road no spell takes: CR 603.3d's placement, where an
   -- announcement that fails it is asked again rather than reversed.
@@ -3253,7 +3253,7 @@ aimingExhumation x oid p = case p of
 --
 -- CR 202.3's computed bound at EQUALITY rather than order, which is the whole
 -- reason the card is here: every group above prints "or less", and transcribing
--- this one with that atom would have run WEAKER than printed (#2989).
+-- this one with that atom would have run WEAKER than printed; see #2989.
 --
 -- The board is stirTheGraveSpec's one operator over, and it tells the two
 -- readings apart because a graveyard card sits BELOW the announced X as well as
@@ -3266,8 +3266,9 @@ aimingExhumation x oid p = case p of
 -- wrong card instead.
 --
 -- The Ogre Sentry is what the cost sacrifices and nothing else: it is alice's
--- only creature, so CR 601.2h has one candidate and the payment cannot reach
--- anything the assertions read. Five energy counters, so the announced 3 and 2
+-- only creature, so CR 601.2b's choice has one candidate and CR 601.2h's payment
+-- cannot reach anything the assertions read -- and it reaches the graveyard only
+-- after CR 601.2c has chosen the target. Five energy counters, so the announced 3 and 2
 -- are both affordable and neither coincides with the supply.
 chthonianNightmareSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 chthonianNightmareSpec s registry = Spec.describe s "ManaValueEqualToAmount (CR 202.3)" $ do

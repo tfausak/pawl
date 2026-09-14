@@ -432,10 +432,11 @@ payableCostAt x extra spending pid oid gs cost =
 -- that and a target slot bounded by X. Filter.ManaValueAtMostAmount and
 -- Filter.ManaValueEqualToAmount are the atoms that read boundUnannounced, so
 -- their cards are the whole list; grepped
--- over data/cards/ on 2026-09-03 the SPELLS among them are Stir the Grave,
+-- over data/cards/ on 2026-09-14 the SPELLS among them are Stir the Grave,
 -- Synthetic Borrowed Exhumation and Synthetic Measured Refrain, each a bare
--- mana cost with no component to carry a criterion; the rest of that list
--- bounds an ACTIVATED or TRIGGERED ability's slot, neither of which takes this
+-- mana cost with no component to carry a criterion; the rest of that list --
+-- Chthonian Nightmare among them -- bounds an ACTIVATED or TRIGGERED ability's
+-- slot, neither of which takes this
 -- road. A card printing an X-bounded target slot beside a slot-reading
 -- additional cost is what would make the two values differ.
 castAimable :: PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set ObjectId)]
