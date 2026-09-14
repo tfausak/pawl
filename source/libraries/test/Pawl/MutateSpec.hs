@@ -579,9 +579,8 @@ spec s registry = Spec.describe s "Mutate" $ do
   -- then the original -- so the merged permanent ends up carrying one component
   -- of each kind and the assertion can tell them apart by position.
   --
-  -- Not implemented: that card's printed exception, which CR 707.10's opcode has
-  -- nowhere to carry (#3458). Cubwarden is not legendary, so the clause is inert
-  -- on this board; omitting it leaves pawl's card stricter than printed.
+  -- That card's printed exception is inert here: Cubwarden is not legendary, so
+  -- CopyException.RemoveSupertypes has nothing to take.
   --
   -- What a REFUSING merge would leave is the discriminating half: CR 608.3f
   -- makes a copy of a permanent spell a token "as it is put onto the
