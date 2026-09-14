@@ -132,7 +132,7 @@ spec s registry = Spec.describe s "Meld" $ do
       s
       "pool"
       (Game.poolOf S.alice after)
-      (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}])
+      (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}])
     Spec.assertEqWith s "and the land is tapped" (S.tappedCount S.alice after) 1
   -- The same front face's second printed ability, which targets: CR 712.8d again,
   -- and the case that shows the front face's TEXT is live rather than just its

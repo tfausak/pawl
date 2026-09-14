@@ -250,6 +250,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.SharesCreatureTypeWithBound _ -> 0
   Filter.Type.HasChosenName -> 0
   Filter.Type.HasChosenColor -> 0
+  Filter.Type.HasChosenSubtype -> 0
   Filter.Type.OfChosenPlayer -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   -- Zero for the nullary atoms' reason, a payload over: CR 400.1's card count is

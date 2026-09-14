@@ -2667,7 +2667,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
                   ManaUnit.retention = retention,
                   ManaUnit.restriction = restriction,
-                  ManaUnit.rider = rider
+                  ManaUnit.rider = rider,
+                  ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0
                 }
             recipients = playerRefPlayers legal controller gs0 ref
          in do
@@ -2704,7 +2705,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
                         ManaUnit.retention = retention,
                         ManaUnit.restriction = restriction,
-                        ManaUnit.rider = rider
+                        ManaUnit.rider = rider,
+                        ManaUnit.sourceChosenSubtype = Mana.sourceChosenSubtypeOf source gs0
                       }
               State.modify' (Mana.addMana pid (replicate howMany unit))
               recordAdded pid (Set.singleton manaType)

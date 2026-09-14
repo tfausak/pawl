@@ -7,12 +7,13 @@ import qualified Pawl.Codec.ManaRetention as ManaRetention
 import qualified Pawl.Codec.ManaRider as ManaRider
 import qualified Pawl.Codec.ManaType as ManaType
 import qualified Pawl.Codec.ProductionTag as ProductionTag
+import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ManaUnit as ManaUnit
 
--- | All five axes, CR 106.6's two included: a restriction is a predicate over
+-- | All six axes, CR 106.6's two included: a restriction is a predicate over
 -- the object being paid for and a rider is an effect on it, so both ride the
 -- unit rather than being recoverable from the source that made it.
 --
@@ -26,11 +27,13 @@ codec = Fields.object $ do
   retention <- Fields.required "retention" ManaRetention.codec ManaUnit.retention
   restriction <- Fields.required "restriction" (Common.maybe ManaRestriction.codec) ManaUnit.restriction
   rider <- Fields.required "rider" (Common.maybe ManaRider.codec) ManaUnit.rider
+  sourceChosenSubtype <- Fields.required "sourceChosenSubtype" (Common.maybe Subtype.codec) ManaUnit.sourceChosenSubtype
   pure
     ManaUnit.MkManaUnit
       { ManaUnit.manaType = manaType,
         ManaUnit.tags = tags,
         ManaUnit.retention = retention,
         ManaUnit.restriction = restriction,
-        ManaUnit.rider = rider
+        ManaUnit.rider = rider,
+        ManaUnit.sourceChosenSubtype = sourceChosenSubtype
       }

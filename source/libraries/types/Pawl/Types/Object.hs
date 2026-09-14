@@ -196,9 +196,13 @@ data Object = MkObject
     -- THE EFFECT'S SOURCE. `protector` below is chosen as the object enters too
     -- and is not one of them, being a designation rule 310 reads directly.
     chosenColor :: Maybe Color.Color,
-    -- | CR 614.1c: a basic land type this object's controller chose as it entered
-    -- (Convincing Mirage). Read by Modification.SetLandSubtypeToChosen off the
-    -- effect's SOURCE. A sibling of chosenColor rather than one generalized
+    -- | CR 614.1c: a subtype this object's controller chose as it entered -- a
+    -- basic land type (Convincing Mirage) or a creature type (Pillar of Origins),
+    -- ONE field because no printing makes both choices. Read by
+    -- Modification.SetLandSubtypeToChosen and by Filter.HasChosenSubtype off the
+    -- effect's SOURCE, the second through the value
+    -- Pawl.Engine.Mana.sourceChosenSubtypeOf bakes onto a mana unit at production.
+    -- A sibling of chosenColor rather than one generalized
     -- choice map, whose sum-typed value every reader would have to re-narrow. Not
     -- a copiable value and per-incarnation, for that field's reasons.
     chosenSubtype :: Maybe Subtype.Subtype,

@@ -1267,6 +1267,7 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.ChoiceByCoinFlip _ -> ([], [])
   EntryRewrite.ChooseColor -> ([], [])
   EntryRewrite.ChooseBasicLandType -> ([], [])
+  EntryRewrite.ChooseCreatureType -> ([], [])
   EntryRewrite.ChoosePlayer -> ([], [])
   EntryRewrite.ChooseCardNames restriction -> ([restriction], [])
   EntryRewrite.ChooseCardName restriction -> ([restriction], [])
@@ -1380,6 +1381,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.ChoiceByCoinFlip _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
+  EntryRewrite.ChooseCreatureType -> []
   EntryRewrite.ChoosePlayer -> []
   EntryRewrite.ChooseCardNames _ -> []
   EntryRewrite.ChooseCardName _ -> []

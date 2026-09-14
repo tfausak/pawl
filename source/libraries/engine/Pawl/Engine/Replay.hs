@@ -132,6 +132,7 @@ encode p answer = case p of
   Prompt.ChooseProtector {} -> Response.ChoseProtector answer
   Prompt.ChoosePlayer {} -> Response.ChosePlayer answer
   Prompt.ChooseBasicLandType {} -> Response.ChoseBasicLandType answer
+  Prompt.ChooseCreatureType {} -> Response.ChoseCreatureType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
   Prompt.OrderCostComponents {} -> Response.OrderedCostComponents answer
@@ -406,6 +407,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseBasicLandType {} -> case response of
     Response.ChoseBasicLandType t -> Just t
+    _ -> Nothing
+  Prompt.ChooseCreatureType {} -> case response of
+    Response.ChoseCreatureType t -> Just t
     _ -> Nothing
   Prompt.OrderTriggers {} -> case response of
     Response.OrderedTriggers order -> Just order
@@ -849,6 +853,9 @@ defaultAnswer p = case p of
   -- ChooseLandTypeSwap arm above falls back to, so the two agree on which type
   -- a short transcript conjures.
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
+  -- CR 205.3m: any creature type is legal, and Goblin is one -- the arm above's
+  -- posture, conjuring a type the prompt offered no list of.
+  Prompt.ChooseCreatureType {} -> Subtype.Goblin
   -- CR 603.3b: the canonical order is always a legal answer.
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   -- CR 615.7: likewise, and it is the order the batch was gathered in.

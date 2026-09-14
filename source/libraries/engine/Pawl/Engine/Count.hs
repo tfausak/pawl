@@ -343,6 +343,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.SharesCreatureTypeWithBound _ -> predicate
         Filter.Type.HasChosenName -> predicate
         Filter.Type.HasChosenColor -> predicate
+        Filter.Type.HasChosenSubtype -> predicate
         Filter.Type.OfChosenPlayer -> predicate
         Filter.Type.IsPlayer _ -> predicate
         Filter.Type.IsAttacking -> predicate
@@ -677,11 +678,11 @@ slotPlayers context gs name = case Map.lookup name (Filter.slotPlayers context) 
 -- -- identity and playerIdentity are Nothing, and combat status, attachment,
 -- tap status and what the object did this turn are all False.
 --
--- `controller`, `token` and `counters` are the exceptions, and none of the
--- three is a characteristic (CR 109.3 / CR 111.6 / CR 122.1), so none can ride
--- the snapshot. Each arm answers them for itself: CR 601.2a makes the player
--- who cast a spell its controller, and a move reads CR 608.2h's record filed
--- under the id it left behind.
+-- `controller`, `owner`, `token` and `counters` are the exceptions, and none of
+-- the four is a characteristic (CR 109.3 / CR 108.3 / CR 111.6 / CR 122.1), so
+-- none can ride the snapshot. Each arm answers them for itself: CR 601.2a makes
+-- the player who cast a spell its controller, and a move reads CR 608.2h's
+-- record filed under the id it left behind.
 snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot _) -> case shape of
@@ -705,10 +706,12 @@ snapshotView gs shape event = case event of
   GameEvent.StepBegan {} -> Nothing
   -- CR 601.2i's cast, read from the snapshot the event took as the spell became
   -- cast rather than off the stack: by the time a look-back count folds the log
-  -- that spell has resolved or been countered, so the live object is gone.
-  -- TriggerCondition.SpellCast is the other reader and does read it live, which
-  -- it can -- CR 601.2i's trigger is checked while the spell is still there.
-  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster _spell snapshot _) -> case shape of
+  -- that spell has usually resolved or been countered, so the live object is
+  -- gone. TriggerCondition.SpellCast is the other reader and does read it live,
+  -- which it can -- CR 601.2i's trigger is checked while the spell is still
+  -- there. The CHARACTERISTICS, that is: castOwner below reads the live object
+  -- for the one field a snapshot cannot carry, wherever there still is one.
+  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell snapshot _) -> case shape of
     -- CR 601.2a: "that player becomes its controller", so the caster the event
     -- recorded IS the view's controller and Filter.ControlledBy You answers "a
     -- spell you've cast". The spell's id is deliberately left out of the view
@@ -719,9 +722,12 @@ snapshotView gs shape event = case event of
     -- anywhere else, so nothing on the stack to be cast was ever one.
     -- CR 122.1 places a counter on an OBJECT, and CR 122.2 makes the card that
     -- became this spell shed whatever it carried on its way to the stack, so a
-    -- cast records none. No CR 608.2h record to read them from either: nothing
-    -- departed the battlefield here.
-    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) Nothing False Map.empty snapshot)
+    -- cast records none.
+    --
+    -- CR 108.3's owner comes from castOwner below, and is NOT `caster` again:
+    -- Dire Fleet Daredevil casts a card its owner never touched
+    -- (Pawl.CountSpec).
+    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) (castOwner gs spell) False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
     -- CR 601.2a moves a card to the STACK, so a cast IS a card arriving there --
     -- but the Moved event the same cast emits is what says so, and answering here
@@ -881,6 +887,25 @@ departedView gs zc snapshot =
         (maybe Map.empty LastKnown.counters lastKnown)
         snapshot
 
+-- CR 108.3: who owns the card that became a recorded cast's spell. Never read
+-- off the caster, whom CR 405.4 makes the spell's controller and no more -- Dire
+-- Fleet Daredevil casts a card out of an opponent's graveyard.
+--
+-- The LIVE object first, since CR 400.7 gives the id to one object for the whole
+-- game and a count can run while the cast's own spell is still on the stack,
+-- before any record exists. Once the spell has resolved or been countered the
+-- zone-change funnel has filed one, and CR 108.3 never moved the answer in
+-- between, so the two roads agree wherever both answer. Both are driven by
+-- Pawl.CountSpec's Daredevil pair.
+--
+-- Nothing where neither road answers -- the spell is gone and nothing was filed
+-- under its id -- which is the honest blank departedView gives for the same
+-- reason, and leaves Filter.OwnedBy False rather than guessing a seat.
+castOwner :: GameState -> ObjectId -> Maybe PlayerId
+castOwner gs spell = case Game.lookupObject spell gs of
+  Just object -> Just (Object.owner object)
+  Nothing -> fmap LastKnown.owner (Map.lookup spell (GameState.lastKnown gs))
+
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a
 -- snapshot says. The `controller`, the OWNER, the tokenhood flag and the counters
@@ -922,9 +947,8 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- `counters` below is. Dimir Strandcatcher's "put into YOUR graveyard" is
       -- what reads it, CR 400.3 keying that zone by owner (Pawl.CountSpec).
       --
-      -- Not implemented: the SpellCast arm has no such record to read and passes
-      -- Nothing, so "a spell an opponent owns was cast this turn" is vacuously
-      -- False (#1069).
+      -- The SpellCast arm supplies it too, off castOwner above rather than off a
+      -- record alone, since a spell still on the stack has none.
       Filter.owner = mOwner,
       -- CR 400.1: a snapshot records characteristics (CR 608.2h) and no zone, and
       -- the object it was taken of has since moved or ceased to exist, so IsInZone

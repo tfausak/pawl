@@ -91,6 +91,7 @@ codec keywordCodec =
       Arm.payload "SharesCreatureTypeWithBound" SlotName.codec Filter.SharesCreatureTypeWithBound (\x -> case x of Filter.SharesCreatureTypeWithBound y -> Just y; _ -> Nothing),
       Arm.nullary "HasChosenName" Filter.HasChosenName,
       Arm.nullary "HasChosenColor" Filter.HasChosenColor,
+      Arm.nullary "HasChosenSubtype" Filter.HasChosenSubtype,
       Arm.nullary "OfChosenPlayer" Filter.OfChosenPlayer,
       Arm.nullary "IsAttacking" Filter.IsAttacking,
       Arm.payload "IsAttackingPlayer" PlayerRelation.codec Filter.IsAttackingPlayer (\x -> case x of Filter.IsAttackingPlayer y -> Just y; _ -> Nothing),

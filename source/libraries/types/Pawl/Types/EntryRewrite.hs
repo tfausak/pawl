@@ -52,6 +52,11 @@ data EntryRewrite ability effect
     -- written to Object.chosenSubtype. Nullary -- CR 305.6's five types are the
     -- offer.
     ChooseBasicLandType
+  | -- | CR 614.1c / Pillar of Origins: choose a creature type as this enters,
+    -- written to Object.chosenSubtype. Nullary, the arm above's shape -- CR
+    -- 205.3m's creature types are the offer, and the prompt enumerates none of
+    -- them.
+    ChooseCreatureType
   | -- | CR 614.1c / Stuffy Doll: choose a player as this enters, written to
     -- Object.chosenPlayer. Nullary -- CR 102.1's seats are the offer, and the
     -- prompt carries the ones still in the game.

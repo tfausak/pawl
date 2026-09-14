@@ -352,6 +352,10 @@ data Response
     -- Singular, and distinct from ChoseLandTypeSwap above for
     -- Prompt.ChooseBasicLandType's reason.
     ChoseBasicLandType Subtype.Subtype
+  | -- | CR 614.1c: the creature type a player chose as an object entered.
+    -- Distinct from ChoseBasicLandType above because the two prompts are, and a
+    -- replay must not answer one with the other's record.
+    ChoseCreatureType Subtype.Subtype
   | -- | CR 701.23: which of the zones a multi-zone search named the searcher
     -- chose to look through (Prompt.ChooseSearchZones). Distinct from Searched,
     -- which records what they then found: Delivery Moogle asks both, one after

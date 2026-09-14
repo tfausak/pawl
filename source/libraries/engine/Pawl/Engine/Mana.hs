@@ -442,6 +442,7 @@ manaOptionsOf = manaOptionsOfGiven Map.empty
 manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaOption]
 manaOptionsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
+      chosenSubtype = sourceChosenSubtypeOf oid gs
       -- CR 106.6, stamped from the instruction that adds the unit: the
       -- restriction is the addition's (CR 106.6a), so every unit one AddMana
       -- produces carries it and a route mixing a restricted addition with an
@@ -467,7 +468,8 @@ manaOptionsOfGiven pcs oid gs =
             ManaUnit.tags = tags,
             ManaUnit.retention = ManaAddition.retention addition,
             ManaUnit.restriction = ManaAddition.restriction addition,
-            ManaUnit.rider = ManaAddition.rider addition
+            ManaUnit.rider = ManaAddition.rider addition,
+            ManaUnit.sourceChosenSubtype = chosenSubtype
           }
       -- CR 105.4's choice is per INSTRUCTION, so the count replicates the unit
       -- AFTER the type is picked: an addition of two AnyColor offers five options
@@ -542,6 +544,19 @@ recipientsOf controller gs ref =
   Maybe.fromMaybe
     []
     (Count.playersFor (const Nothing) (Filter.contextFor (Game.teams gs) (Just controller) Nothing) gs ref)
+
+-- CR 607.2d's production-time capture, and THE one place it is decided: the
+-- subtype the source had chosen as it entered (CR 614.1c), baked onto every unit
+-- it adds so that a CR 106.6 restriction can still ask about it once the source is
+-- out of reach (Pawl.Types.ManaUnit.sourceChosenSubtype). Read by both producers
+-- exactly as the tags below are.
+--
+-- Read off the OBJECT and not off the projection: CR 614.1c's choice is base
+-- state no CR 613 layer writes, and Pawl.Types.Object.chosenSubtype is
+-- per-incarnation, so a Clone of Pillar of Origins answers with the choice IT
+-- made on entering (CR 707.6) rather than with the copied permanent's.
+sourceChosenSubtypeOf :: ObjectId -> GameState -> Maybe Subtype.Subtype
+sourceChosenSubtypeOf oid gs = Game.lookupObject oid gs >>= Object.chosenSubtype
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
 -- adds will carry. THE one place they are decided; manaOptionsOfGiven just above
@@ -862,11 +877,15 @@ serves supply demand =
 -- payment left, so mana a cost could not use is mana the next cost still has.
 --
 -- The perspective is the PAYER (CR 109.5's "you"), which is who the spell's
--- controller is at CR 601.2h and the ability's at CR 602.2b. Not implemented: a
--- restriction that reads the SOURCE that produced the mana. Pawl.Types.ManaUnit carries no source id by
--- construction, so the context has none and a source-relative atom would be
--- vacuously False; Cavern of Souls' "of the chosen type" is the printing that
--- wants one (#1978).
+-- controller is at CR 601.2h and the ability's at CR 602.2b. A restriction that
+-- reads the SOURCE reads it through the values production baked onto the unit
+-- (Pawl.Types.ManaUnit.sourceChosenSubtype), never by looking the source up:
+-- Pillar of Origins' "of the chosen type" is the printing that wants one.
+--
+-- Not implemented: a restriction naming the source's IDENTITY rather than a value
+-- it chose -- Ice Cauldron's "only to cast the last card exiled with this
+-- artifact". Pawl.Types.ManaUnit carries no source id by construction, so the
+-- context has none and such an atom is vacuously False (#1978).
 spendableFor :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> ([ManaUnit], [ManaUnit])
 spendableFor subject pid gs = spendableAmong subject pid gs (unitsOf (Game.poolOf pid gs))
 
@@ -888,6 +907,10 @@ spendableAmong subject pid gs = List.partition (admitsUnder subject pid gs)
 -- the mana. WHICH half of Pawl.Types.ManaRestriction is read is settled by the
 -- subject for the same reason. That is what the partial application buys, so
 -- keep the unit as the last argument and apply it separately.
+--
+-- The one thing the shared context cannot carry is CR 607.2d's chosen subtype,
+-- which is the UNIT's: two Pillars of Origins naming two creature types put mana
+-- in one pool, so the field is written per unit below.
 admitsUnder :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> ManaUnit -> Bool
 admitsUnder subject pid gs =
   let paidFor = case subject of
@@ -901,7 +924,7 @@ admitsUnder subject pid gs =
           Nothing -> False
           Just (half, context, view) -> case half restriction of
             Nothing -> False
-            Just wanted -> Filter.matches context view wanted
+            Just wanted -> Filter.matches (context {Filter.sourceChosenSubtype = ManaUnit.sourceChosenSubtype unit}) view wanted
 
 -- A pool unit as a supply. Its type is settled, so the option set is a
 -- singleton, and its tags are the ones production stamped on it

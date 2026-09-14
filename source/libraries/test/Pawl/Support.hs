@@ -2561,6 +2561,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseLandTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCreatureTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBasicLandType decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseCreatureType decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseSearchZones decider _ _ -> Just (Decider.unwrap decider)
   Prompt.Search decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.CastWhileSearching decider _ _ -> Just (Decider.unwrap decider)
@@ -2686,6 +2687,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseLandTypeSwap {} -> "ChooseLandTypeSwap"
   Prompt.ChooseCreatureTypeSwap {} -> "ChooseCreatureTypeSwap"
   Prompt.ChooseBasicLandType {} -> "ChooseBasicLandType"
+  Prompt.ChooseCreatureType {} -> "ChooseCreatureType"
   Prompt.ChooseSearchZones {} -> "ChooseSearchZones"
   Prompt.Search {} -> "Search"
   Prompt.CastWhileSearching {} -> "CastWhileSearching"
@@ -3467,9 +3469,11 @@ stubView table oid =
                 -- devotion reads no symbol off this stub.
                 Filter.manaCost = Nothing,
                 Filter.controller = ctrl,
-                -- CR 108.3: the table registers no owner, and no Count in the
-                -- pool filters by one, so this stub answers Nothing and OwnedBy
-                -- is vacuously False against it.
+                -- CR 108.3: the table registers no owner, so this stub answers
+                -- Nothing and OwnedBy is vacuously False against it. No case
+                -- driving the stub filters by one; the pool's owner-filtering
+                -- counts (Dimir Strandcatcher, Synthetic Ownership Ledger) are
+                -- gameplay level in Pawl.CountSpec.
                 Filter.owner = Nothing,
                 -- CR 400.1: the table registers no zone, and no Count in the pool
                 -- filters by one, so IsInZone is vacuously False against this stub.

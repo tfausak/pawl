@@ -3940,6 +3940,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasChosenName -> []
   -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.
   Filter.Type.HasChosenColor -> []
+  -- Reads no slot either: CR 205.3's subtype arrives on Filter.Context.
+  Filter.Type.HasChosenSubtype -> []
   -- Reads no slot at all: rule 702.16k's player arrives on Filter.Context.
   Filter.Type.OfChosenPlayer -> []
   Filter.Type.IsPlayer _ -> []
@@ -4206,6 +4208,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChoiceByCoinFlip f -> entryOptionFilters (EntryFlip.heads f) <> entryOptionFilters (EntryFlip.tails f)
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
+  EntryRewrite.ChooseCreatureType -> []
   EntryRewrite.ChoosePlayer -> []
   EntryRewrite.ReadAhead -> []
   -- CR 614.1c's amount is a Quantity (Undergrowth Scavenger's "equal to the number

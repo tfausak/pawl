@@ -1137,7 +1137,8 @@ mirageOn landId subtype p = case p of
 
 -- CR 614.1c's as-enters choice, whose value is a SUBTYPE rather than a colour,
 -- and CR 305.7's set reading it back off the Aura. Convincing Mirage is the
--- pool's only producer of either. It enchants a non-creature OBJECT, which
+-- pool's only producer of the second; Pillar of Origins makes the other kind of
+-- subtype choice (Pawl.ManaSourceSpec). It enchants a non-creature OBJECT, which
 -- Song of the Dryads and Consecrate Land also do -- where the two Curses
 -- (enchantPlayerSpec below) enchant players, CR 702.5d's other shape, reaching
 -- the battlefield through Affected.AttachedPlayerControls rather than
