@@ -1168,12 +1168,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   Spec.it s "PlayerForages round-trips both relations" $ do
     Common.assertCodec
       s
-      codec
+      TriggerCondition.codec
       (TriggerCondition.PlayerForages PlayerRelation.AnyPlayer)
       " {\"type\":\"PlayerForages\",\"value\":{\"type\":\"AnyPlayer\"}} "
     Common.assertCodec
       s
-      codec
+      TriggerCondition.codec
       (TriggerCondition.PlayerForages PlayerRelation.You)
       " {\"type\":\"PlayerForages\",\"value\":{\"type\":\"You\"}} "
   -- CR 509.3d's bystander form. A real Filter rather than the trivial `And []`:

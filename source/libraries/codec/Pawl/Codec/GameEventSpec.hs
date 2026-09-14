@@ -688,6 +688,6 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
   Spec.it s "Foraged" $
     Common.assertCodec
       s
-      codec
+      GameEvent.codec
       (GameEvent.Foraged (PlayerId.MkPlayerId 5))
       " {\"type\":\"Foraged\",\"value\":5} "
