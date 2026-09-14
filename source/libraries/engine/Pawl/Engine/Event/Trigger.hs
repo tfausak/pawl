@@ -182,6 +182,7 @@ movedOf event = case event of
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.ManaAdded _ -> Nothing
+  GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -293,6 +294,9 @@ looksBack condition = case condition of
   TriggerCondition.PermanentTappedForMana {} -> False
   -- CR 605.1b's mana-added event: the same answer, for the same reason.
   TriggerCondition.AbilityAddsMana {} -> False
+  -- CR 605.3b's resolution is not on that list either: the bearer whose mana
+  -- ability resolved is standing on the battlefield as the ability is gathered.
+  TriggerCondition.SelfManaAbilityResolves -> False
   -- CR 603.10a's first family again, read off the event rather than off the
   -- bearer: this triggers when a permanent leaves the battlefield. Inert today --
   -- the bearer is a card in exile, which no look-back source can offer -- but a
@@ -536,6 +540,9 @@ batchScoped condition = case condition of
   -- Caged Sun's "one or more" counts MANA within one addition, not events:
   -- Pawl.Types.ManaAdded is already one per player per activation.
   TriggerCondition.AbilityAddsMana {} -> False
+  -- One resolution, one occurrence -- CR 605.3b resolves one activation at a
+  -- time, and Tyvar the Bellicose's rider counts triggerings and not events.
+  TriggerCondition.SelfManaAbilityResolves -> False
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.PermanentSacrificed {} -> False
   TriggerCondition.AnyOf conditions -> any batchScoped conditions
@@ -934,6 +941,7 @@ eventTriggers events gs =
         GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
         GameEvent.ManaAdded _ -> Map.empty
+        GameEvent.ManaAbilityResolved _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
@@ -1199,6 +1207,7 @@ eventTriggers events gs =
         GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
         GameEvent.ManaAdded _ -> Map.empty
+        GameEvent.ManaAbilityResolved _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
@@ -1437,6 +1446,7 @@ eventTriggers events gs =
         GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
         GameEvent.ManaAdded _ -> Map.empty
+        GameEvent.ManaAbilityResolved _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
@@ -1583,6 +1593,7 @@ eventTriggers events gs =
         GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
         GameEvent.ManaAdded _ -> Map.empty
+        GameEvent.ManaAbilityResolved _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
@@ -2009,6 +2020,9 @@ zonesTriggeredFrom cond =
         TriggerCondition.PermanentTappedForMana {} -> battlefield
         -- CR 605.1b's mana-added event: the same answer, for the same reason.
         TriggerCondition.AbilityAddsMana {} -> battlefield
+        -- CR 113.6's default once more: the bearer's own mana ability resolved,
+        -- so the bearer is a permanent on the battlefield.
+        TriggerCondition.SelfManaAbilityResolves -> battlefield
         -- The same default from the training creature's own side: rule 702.149a's ability
         -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
         -- exception -- for a condition that cannot trigger from there at all -- does not
@@ -2470,6 +2484,10 @@ stateTriggers gs
               TriggerCondition.PermanentTappedForMana {} -> False
               -- CR 605.1b's mana-added event: the same answer, for the same reason.
               TriggerCondition.AbilityAddsMana {} -> False
+              -- CR 605.3b's resolution likewise: the counters it puts are
+              -- counters like any other, so the board afterwards cannot say a
+              -- mana ability was what resolved.
+              TriggerCondition.SelfManaAbilityResolves -> False
               -- CR 702.149c the same: it fires on a resolution, and the counter
               -- that resolution put is a counter like any other, so the board
               -- afterwards says nothing about which creature trained.

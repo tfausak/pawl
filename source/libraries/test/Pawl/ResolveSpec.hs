@@ -3416,7 +3416,7 @@ sphinxNaming named p = case p of
 
 -- Alice's Petra Sphinx over a four-card library of bob's, activated on two
 -- separate resolutions with a different name each time. The untap between them
--- is Event.untap, the same road CR 502.1 takes, so the second activation pays a
+-- is Event.untap, the same road CR 502.3 takes, so the second activation pays a
 -- real {T}.
 twiceSphinx :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 twiceSphinx s registry = do

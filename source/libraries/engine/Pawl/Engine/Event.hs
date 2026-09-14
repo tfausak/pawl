@@ -569,6 +569,7 @@ damageOf event = case event of
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.ManaAdded _ -> Nothing
+  GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -636,6 +637,7 @@ revealOf event = case event of
   GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.ManaAdded _ -> Nothing
+  GameEvent.ManaAbilityResolved _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
@@ -7169,6 +7171,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PermanentTappedForMana {} -> False
   -- CR 605.1b's mana-added event: the same answer, for the same reason.
   TriggerCondition.AbilityAddsMana {} -> False
+  -- CR 605.3b's resolution is a first-pass event as well.
+  TriggerCondition.SelfManaAbilityResolves -> False
   TriggerCondition.PermanentSacrificed {} -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
@@ -7293,6 +7297,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentTappedForMana {} -> False
   -- CR 605.1b's mana-added event: the same answer, for the same reason.
   TriggerCondition.AbilityAddsMana {} -> False
+  -- Nor does CR 605.3b: a creature's mana ability resolves on anyone's turn.
+  TriggerCondition.SelfManaAbilityResolves -> False
   -- Rule 702.149c names no turn either, and the SelfAttacks arm below settles the
   -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.

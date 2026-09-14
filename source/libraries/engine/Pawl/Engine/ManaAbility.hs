@@ -151,6 +151,9 @@ firedFromManaAbility event = case event of
   -- CR 605.1b's second alternative, narrowed by CR 605.5a to the additions an
   -- activated mana ability made.
   Just (GameEvent.ManaAdded added) -> ManaAdded.cause added == ManaAddedCause.ManaAbility
+  -- CR 605.3b's own moment, recorded by the same funnel and so by definition an
+  -- activated mana ability's.
+  Just (GameEvent.ManaAbilityResolved _) -> True
   _ -> False
 
 -- CR 605.1b's middle clause, asked of one condition: does it trigger from the
@@ -167,12 +170,12 @@ firedFromManaAbility event = case event of
 -- 605.1b names three events out of the whole trigger vocabulary, and every other
 -- condition in it watches something that is not mana. -Werror will therefore not
 -- name this site when a mana-watching condition is added, and each such
--- condition owes an arm here -- a mana ability being activated is the one
--- #1572 still holds open.
+-- condition owes an arm here.
 --
 -- CR 603.1b's AnyOf falls to the wildcard, which answers False for a disjunction
--- one of whose disjuncts watches mana. No card prints one, and the rule would
--- want it a mana ability only if EVERY disjunct met CR 605.1b (#1572).
+-- one of whose disjuncts watches mana. The rule would want it a mana ability
+-- only if EVERY disjunct met CR 605.1b; no card prints one (Scryfall
+-- o:/[Ww]henever.*mana abilit/, 2026-09-13, every hit a single condition).
 triggersFromMana :: TriggerCondition.TriggerCondition -> Bool
 triggersFromMana condition = case condition of
   -- CR 106.12 makes "tapped for mana" the resolution of an activated mana
@@ -184,6 +187,13 @@ triggersFromMana condition = case condition of
   -- CR 605.1b's second alternative in as many words, "mana being added to a
   -- player's mana pool".
   TriggerCondition.AbilityAddsMana {} -> True
+  -- CR 605.1b's first alternative read off the resolving ability's own source
+  -- rather than through CR 106.12a's tap: "whenever a mana ability of this
+  -- creature resolves" (Tyvar the Bellicose). True here and still not a mana
+  -- ability on that card, CR 605.5a's third clause deciding it -- the ability
+  -- could not produce mana, so isTriggeredManaAbility's "could add mana"
+  -- conjunct fails and the trigger uses the stack.
+  TriggerCondition.SelfManaAbilityResolves -> True
   _ -> False
 
 -- CR 605.1a's library clause read of ONE cost component: does paying it move a

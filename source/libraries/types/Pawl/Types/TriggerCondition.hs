@@ -269,9 +269,6 @@ data TriggerCondition
   | -- | CR 106.12a's "is tapped for mana" read off the permanent the bearer is
     -- attached to (Wild Growth), live rather than through last known
     -- information, as for the arm above.
-    --
-    -- Not implemented: CR 605.1b's trigger on a mana ability being activated
-    -- (#1572).
     AttachedPermanentTappedForMana
   | -- | CR 106.12a read by a bystander: "whenever you tap a land creature for
     -- mana" (Autumn Willow, Harmony), the arm above's event under a relation and
@@ -281,6 +278,19 @@ data TriggerCondition
     -- land's ability causes you to add one or more mana of the chosen color"
     -- (Caged Sun).
     AbilityAddsMana AbilityAddsMana.AbilityAddsMana
+  | -- | CR 605.1b's first alternative, self-scoped: "whenever a mana ability of
+    -- this creature resolves" (Tyvar the Bellicose), against
+    -- GameEvent.ManaAbilityResolved, with the mana the activation produced bound
+    -- under Pawl.Engine.Binding.eventAmount.
+    --
+    -- RESOLUTION and not that rule's other half, a mana ability being ACTIVATED:
+    -- every printing of the activation form states the negative instead
+    -- (Rings of Brighthearth's "if it isn't a mana ability"), so nothing reads
+    -- the moment between CR 605.3b's activation and the resolution it says
+    -- follows immediately -- Scryfall o:/[Ww]henever.*mana abilit/, 2026-09-13,
+    -- no hit of the positive shape. A card printing one would want a second arm
+    -- here and a second event, not a widening of this one.
+    SelfManaAbilityResolves
   | -- | CR 702.55b / 702.55c: "when the creature this card haunts dies", borne
     -- by the haunting card in exile.
     HauntedCreatureDies

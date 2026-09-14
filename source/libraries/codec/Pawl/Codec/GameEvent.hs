@@ -30,6 +30,7 @@ import qualified Pawl.Codec.Drew as Drew
 import qualified Pawl.Codec.Exploited as Exploited
 import qualified Pawl.Codec.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Codec.LifeChange as LifeChange
+import qualified Pawl.Codec.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Codec.ManaAdded as ManaAdded
 import qualified Pawl.Codec.Mentored as Mentored
 import qualified Pawl.Codec.Milled as Milled
@@ -116,6 +117,7 @@ codec =
       Arm.payload "BecameUntapped" ObjectId.codec GameEvent.BecameUntapped (\x -> case x of GameEvent.BecameUntapped y -> Just y; _ -> Nothing),
       Arm.payload "TappedForMana" TappedForMana.codec GameEvent.TappedForMana (\x -> case x of GameEvent.TappedForMana y -> Just y; _ -> Nothing),
       Arm.payload "ManaAdded" ManaAdded.codec GameEvent.ManaAdded (\x -> case x of GameEvent.ManaAdded y -> Just y; _ -> Nothing),
+      Arm.payload "ManaAbilityResolved" ManaAbilityResolved.codec GameEvent.ManaAbilityResolved (\x -> case x of GameEvent.ManaAbilityResolved y -> Just y; _ -> Nothing),
       Arm.payload "CoinFlipped" CoinFlipped.codec GameEvent.CoinFlipped (\x -> case x of GameEvent.CoinFlipped y -> Just y; _ -> Nothing),
       -- CR 701.54d. One player id, Scried's shape above: the rule names the
       -- tempted player and nothing else.

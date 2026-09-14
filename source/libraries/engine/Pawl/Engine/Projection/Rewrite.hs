@@ -1501,6 +1501,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.AttachedPermanentTappedForMana -> condition
   TriggerCondition.PermanentTappedForMana payload -> TriggerCondition.PermanentTappedForMana payload {PermanentTappedForMana.filter = Filter.rewrite pairs (PermanentTappedForMana.filter payload)}
   TriggerCondition.AbilityAddsMana payload -> TriggerCondition.AbilityAddsMana payload {AbilityAddsMana.source = Filter.rewrite pairs (AbilityAddsMana.source payload)}
+  TriggerCondition.SelfManaAbilityResolves -> condition
   TriggerCondition.SelfTrains -> condition
   TriggerCondition.SelfExploits -> condition
   TriggerCondition.SelfBecomesCrewed -> condition

@@ -92,6 +92,7 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
+import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -4050,11 +4051,23 @@ tapForManaWith perform inFlight oid = do
                   -- CR 605.1b's other event, whether or not {T} was paid, and
                   -- recorded at the same moment for the same CR 605.4a reason.
                   manaAdded = fmap (\(recipient, types) -> GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = recipient, ManaAdded.source = oid, ManaAdded.mana = types, ManaAdded.cause = ManaAddedCause.ManaAbility})) (Map.toList added)
-              applyManaTriggers perform (tappedForMana <> manaAdded)
+                  -- CR 605.3b's own moment: the ability "resolves immediately
+                  -- after it is activated", and this line is where that has just
+                  -- finished happening. UNCONDITIONAL where the tap event is
+                  -- gated on {T} and on a yield -- CR 605.2 keeps an ability that
+                  -- produced nothing a mana ability, and it resolved either way.
+                  --
+                  -- Mana.yieldUnits and not the payer's share, TappedForMana's
+                  -- reason: "the amount of mana this creature produced" (Tyvar
+                  -- the Bellicose) asks what the permanent made, whoever's pool
+                  -- CR 106.4 sent it to.
+                  manaAbilityResolved = GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = oid, ManaAbilityResolved.amount = Natural.length (Mana.yieldUnits chosen)})
+              applyManaTriggers perform (tappedForMana <> manaAdded <> [manaAbilityResolved])
               pure True
 
 -- CR 605.4a: record the events one activated mana ability wrote -- CR 106.12a's
--- tap for mana and CR 605.1b's mana being added -- and apply, where they stand,
+-- tap for mana, CR 605.1b's mana being added and CR 605.3b's own resolution --
+-- and apply, where they stand,
 -- the triggered mana abilities they fired: "a triggered mana ability doesn't go
 -- on the stack ... it resolves immediately after the mana ability that
 -- triggered it, without waiting for priority".
@@ -4086,11 +4099,11 @@ tapForManaWith perform inFlight oid = do
 -- engine-chosen. CR 605.4a keeps them off the stack, so CR 603.3b's process does
 -- not literally run, but it is the rule that gives their controller the order,
 -- and no prompt is raised. Sound only while every such ability's effect is
--- order-independent, which every AddMana into a pool is (#1572).
+-- order-independent, which every AddMana into a pool is (#3724).
 --
 -- Not implemented: the printed "triggers only once" riders
 -- (Pawl.Types.TriggerLimit), which Engine.withinTriggerLimit spends for a trigger
--- that reaches the stack. No triggered mana ability prints one (#1572).
+-- that reaches the stack (#3724).
 applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> [GameEvent.GameEvent] -> Game ()
 applyManaTriggers perform events = do
   Monad.mapM_ (State.modify' . Event.recordEvent) events
