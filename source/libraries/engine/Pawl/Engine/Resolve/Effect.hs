@@ -3763,11 +3763,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               ObjectRef.TopOfGraveyard _ -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
-              -- One card per chooser, and the only ref whose gather asks a question
-              -- rather than reading the board, which is why it is answered here in
-              -- the Game monad. Candidates come from the pre-move state (CR 608.2c),
-              -- so an earlier effect of this resolution -- Port of Karfell's own mill
-              -- -- has already put its cards in the graveyard.
+              -- The ref's count of cards per chooser, and the only ref whose gather
+              -- asks a question rather than reading the board, which is why it is
+              -- answered here in the Game monad. Candidates come from the pre-move
+              -- state (CR 608.2c), so an earlier effect of this resolution -- Port of
+              -- Karfell's own mill -- has already put its cards in the graveyard.
               --
               -- WHO is asked is the ref's Chooser: the resolving controller (CR
               -- 608.2d), or each player the scope names, asked about their own
@@ -3776,15 +3776,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- none (CR 101.3, CR 609.3), per player under EachInScope. Filtered,
               -- not trusted: an answer naming a card never offered falls back to the
               -- first candidate.
-              ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_) -> do
+              --
+              -- HOW MANY is the ref's Quantity, evaluated HERE (CR 608.2c) and clamped
+              -- at zero, chooseCardFromAmong's reading. ONE ask per card, each over
+              -- the candidates the earlier asks have not taken: CR 608.2d cannot
+              -- choose the same card twice, and Fall of the Thran's "two land cards"
+              -- names two cards. One seat answering several asks in sequence is the
+              -- same decision as one simultaneous choice of that many, CR 101.4c
+              -- leaving the order of a player's own simultaneous choices to that
+              -- player. A graveyard holding fewer matches than the count gives what it
+              -- has (CR 609.3).
+              ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_ count) -> do
                 gs <- State.get
-                let ask asked candidates = case candidates of
-                      [] -> pure []
-                      [only] -> pure [only]
-                      first : second : more -> do
-                        let offered = first NonEmpty.:| (second : more)
-                        answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered)
-                        pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+                let viewOf = effectViewOf source legal gs
+                    wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf (chooseContext gs) gs resolving source count)
+                    pick asked n candidates
+                      | n <= (0 :: Natural) = pure []
+                      | otherwise = case candidates of
+                          [] -> pure []
+                          [only] -> pure [only]
+                          first : second : more -> do
+                            let offered = first NonEmpty.:| (second : more)
+                            answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered)
+                            let taken = if List.elem answer (NonEmpty.toList offered) then answer else first
+                            rest <- pick asked (n - 1) (List.delete taken candidates)
+                            pure (taken : rest)
+                    ask asked = pick asked wanted
                 case chooser of
                   Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) legal controller gs scope filter_)
                   Chooser.EachInScope ->

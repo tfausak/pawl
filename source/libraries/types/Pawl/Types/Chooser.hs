@@ -10,14 +10,16 @@ import qualified Pawl.Types.SlotName as SlotName
 -- because a sentence can hand the instruction to somebody else, and then the
 -- player who announces the choice is the player the instruction names.
 --
--- It also decides HOW MANY choices there are, which is not a second axis: one
--- instruction addressed to one player is one choice, and the same instruction
--- addressed to each player in a scope is one choice EACH (CR 608.2e, whose
--- choices are made in APNAP order -- CR 101.4 -- before the actions are
--- processed).
+-- It also decides WHO MAKES how many choices, which is not a second axis: one
+-- instruction addressed to one player is that player's to answer, and the same
+-- instruction addressed to each player in a scope is answered by each of them
+-- (CR 608.2e, whose choices are made in APNAP order -- CR 101.4 -- before the
+-- actions are processed). HOW MANY CARDS each of them picks is the ref's own
+-- count, not this type's.
 data Chooser
-  = -- | CR 608.2c \/ 608.2d's default: the resolving controller, choosing ONCE
-    -- across every graveyard the scope names -- Port of Karfell's "return a
+  = -- | CR 608.2c \/ 608.2d's default: the resolving controller, choosing once
+    -- across every graveyard the scope names rather than once per graveyard --
+    -- Port of Karfell's "return a
     -- creature card from your graveyard to the battlefield tapped", and
     -- Extract from Darkness' "a graveyard", where the scope widens and the
     -- chooser does not.
@@ -29,10 +31,11 @@ data Chooser
     -- graveyards with one phrase, and a player is never offered a card out of
     -- somebody else's.
     --
-    -- Up to ONE card per player in scope, so the ref names as many cards as
-    -- there are players who have one. A player with no matching card is not
-    -- asked and contributes nothing, which is CR 101.3 applied to that player's
-    -- share of the instruction rather than to the whole of it.
+    -- The ref's COUNT per player in scope -- Fall of the Thran's two land cards
+    -- each -- so the ref names that many cards times the players who have them.
+    -- A player with fewer matching cards than the count gives what they have (CR
+    -- 609.3) and one with none is not asked at all, which is CR 101.3 applied to
+    -- that player's share of the instruction rather than to the whole of it.
     --
     -- WHO CONTROLS what arrives is not this type's question: CR 110.2a gives a
     -- battlefield arrival to the player the effect instructed, which for this
@@ -46,8 +49,8 @@ data Chooser
   | -- | The ONE player a slot names -- Skullwinder's "choose an opponent. That
     -- player returns a card from their graveyard to their hand", where the slot
     -- was filled by Pawl.Types.Effect's ChoosePlayer earlier in the same
-    -- resolution. One chooser and so ONE card, EachInScope's cardinality with the
-    -- scope's fold replaced by a single seat.
+    -- resolution. One chooser and so one helping of the ref's count,
+    -- EachInScope's cardinality with the scope's fold replaced by a single seat.
     --
     -- The same arm would serve a slot CR 601.2c filled at CAST -- Obscura
     -- Confluence's "target player returns a creature card from their graveyard to

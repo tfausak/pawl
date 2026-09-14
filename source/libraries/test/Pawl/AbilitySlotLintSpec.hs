@@ -1187,7 +1187,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
         takeFrom scope =
           Effect.MoveToZone
             ( MoveToZone.MkMoveToZone
-                (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController scope (Filter.Type.HasCardType CardType.Artifact)))
+                (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController scope (Filter.Type.HasCardType CardType.Artifact) (Quantity.Type.Literal 1)))
                 Zone.Battlefield
                 EntryRiders.defaultValue
                 Nothing

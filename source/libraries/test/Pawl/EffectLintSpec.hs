@@ -1643,16 +1643,23 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- graveyard, so the only thing that can make it plural is a PlayerRef
           -- naming several -- TopOfLibrary's namesOneSeat with no depth to fail.
           ObjectRef.TopOfGraveyard player -> namesOneSeat player
-          -- One card per CHOOSER: the resolving controller chooses once however
-          -- many graveyards the scope draws candidates from, where Exhume's
-          -- "each player" is one choice each and so several cards on any board
-          -- with more than one stocked graveyard.
-          ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> case chooser of
-            Chooser.TheController -> True
-            Chooser.EachInScope -> False
-            -- One seat, so one graveyard and one card -- TheController's answer
-            -- with the chooser named by a slot instead of by CR 608.2c.
-            Chooser.BoundInSlot _ -> True
+          -- The ref's COUNT per CHOOSER: the resolving controller chooses once
+          -- however many graveyards the scope draws candidates from, where
+          -- Exhume's "each player" is one choice each and so several cards on
+          -- any board with more than one stocked graveyard. A count above one
+          -- -- Fall of the Thran's printed two -- is plural under either
+          -- chooser, and a COMPUTED count is plural whatever the board would
+          -- make it, TopOfLibrary's reading above and for its reason.
+          ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _ count) -> case count of
+            Quantity.Type.Literal n
+              | n <= 1 -> case chooser of
+                  Chooser.TheController -> True
+                  Chooser.EachInScope -> False
+                  -- One seat, so one graveyard and one card -- TheController's
+                  -- answer with the chooser named by a slot instead of by CR
+                  -- 608.2c.
+                  Chooser.BoundInSlot _ -> True
+            _ -> False
           -- One card per CHOOSER again, and here the PlayerRef names the
           -- choosers: Karn Liberated's targeted seat exiles one card, and "each
           -- player" would be one each. The same per-seat count TopOfLibrary
@@ -2212,7 +2219,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     exhume <- S.printingOf s registry "Exhume"
     let anyCard = Filter.Type.HasCardType CardType.Creature
         group = SlotName.MkSlotName (Text.pack "revealed")
-        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.You) anyCard)
+        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.You) anyCard (Quantity.Type.Literal 1))
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
         atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
