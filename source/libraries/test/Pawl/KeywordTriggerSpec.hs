@@ -1825,8 +1825,9 @@ selfAttacksUnblockedSpec s registry =
 --
 -- Bloodbraid Elf {2}{R}{G} Creature -- Elf Berserker 3/2 -- "Haste / Cascade"
 -- (Oracle text checked 2026-09-10) -- is the producer, and the cheapest printing
--- carrying cascade once. Apex Devastator, which the issue named, carries it FOUR
--- times, which a printed keyword SET cannot count (gap #3577).
+-- carrying cascade once. Apex Devastator {8}{G}{G} Creature -- Chimera Hydra
+-- 10/10 -- "Cascade, cascade, cascade, cascade" (Oracle text checked 2026-09-14)
+-- is the producer for CR 702.85c's per-instance clause, two cases below.
 --
 -- The library is stocked so that each conjunct of rule 702.85a's walk is what
 -- stops or fails to stop it: a Hill Giant of mana value 4 exactly (the Elf's own,
@@ -1840,7 +1841,7 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
   -- CR 702.85c: each instance triggers separately, so the mint is one ability per
   -- instance, poisonous' reading. The falsifier is a roster that mints it once.
   Spec.it s "CR 702.85a cascade is minted for a spell on the stack and nowhere else" $ do
-    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Set.singleton Keyword.Type.Cascade)) [Keyword.cascade]
+    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Cascade 1)) [Keyword.cascade]
     Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Cascade 1)) []
     Spec.assertEqWith s "rule 702.85a's condition is the cast" (TriggeredAbility.condition Keyword.cascade) TriggerCondition.SelfCast
 
@@ -1946,6 +1947,81 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
     Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
     Spec.assertEqWith s "four lands paid the Elf's {2}{R}{G} and nothing paid the Berserker's {G}" (S.tappedCount S.alice after) 4
 
+  -- THE PROVING TEST for CR 702.85c. The library's top four cards are each a
+  -- nonland of mana value under the Devastator's ten, so every walk stops at the
+  -- first card it exiles and casts it; which cascade takes which is immaterial,
+  -- since the four instances are identical. Think Twice sits underneath and is
+  -- never reached, so a fifth walk would be visible as its absence.
+  --
+  -- The four hits carry DISTINCT names, so the battlefield tells one cascade from
+  -- two from four: a roster that mints cascade once leaves the Giant, the Wolves
+  -- and the Spider in the library.
+  Spec.it s "CR 702.85c each of Apex Devastator's four printed cascades triggers" $ do
+    apex <- S.printingOf s registry "Apex Devastator"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    spider <- S.printingOf s registry "Giant Spider"
+    think <- S.printingOf s registry "Think Twice"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    let base = Setup.emptyGame S.bothPlayers
+        -- S.addLibraryCard puts each card ON TOP, so this stocks the library
+        -- bottom first: the Piker ends up on top.
+        (_, g1) = S.addLibraryCard think S.alice base
+        (_, g2) = S.addLibraryCard spider S.alice g1
+        (_, g3) = S.addLibraryCard wolves S.alice g2
+        (_, g4) = S.addLibraryCard giant S.alice g3
+        (_, g5) = S.addLibraryCard piker S.alice g4
+        -- {8}{G}{G} is paid for real, so the free casts are the cascades' and a
+        -- board that paid nothing for anything would not tell them apart.
+        lands = replicate 8 mountain <> replicate 2 forest
+        g6 = List.foldl' (\g printing -> snd (S.addPermanent printing S.alice g)) g5 lands
+        (_, g7) = S.addHandCard apex S.alice g6
+        before =
+          g7
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        after = S.runPure cascading before Engine.priorityLoop
+        namesIn zone pid gs = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        orderedIn zone pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
+        named = CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "all four walks cast the card they stopped at, so four free creatures joined the Devastator"
+      (namesIn Zone.Battlefield S.alice after)
+      (Set.fromList [named "Apex Devastator", named "Goblin Piker", named "Hill Giant", named "Russet Wolves", named "Giant Spider", named "Mountain", named "Forest"])
+    Spec.assertEqWith
+      s
+      "the four walks took four cards and the fifth was never reached"
+      (orderedIn Zone.Library S.alice after)
+      [named "Think Twice"]
+    -- Proxies, AFTER the behaviour: rule 702.85a's last sentence empties exile,
+    -- and the ten lands paid the Devastator alone.
+    Spec.assertEqWith s "nothing stayed in exile" (namesIn Zone.Exile S.alice after) Set.empty
+    Spec.assertEqWith s "ten lands paid the {8}{G}{G} and nothing paid the four free spells" (S.tappedCount S.alice after) 10
+
+  -- CR 707.2: the printed count is a copiable value, so a Clone of Apex
+  -- Devastator has four cascades of its own. Read through
+  -- Pawl.Engine.Projection.keywordsOf, which is where a copy and the card
+  -- underneath it part company -- Game.faceOf would answer Clone's own printed
+  -- face for the copy and the Devastator's for the original, and pass either way.
+  Spec.it s "CR 707.2 a Clone of Apex Devastator copies all four instances" $ do
+    apex <- S.printingOf s registry "Apex Devastator"
+    clone <- S.printingOf s registry "Clone"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (apexId, board) = S.addPermanent apex S.alice gs0
+        (_, staged) = S.spellOnStack clone S.alice board
+        resolved = S.runPure copyingTheDevastator staged (Stack.resolveTop >> Engine.settleForPriority)
+        isClone oid = fmap Face.name (Game.faceOf oid resolved) == Just (CardName.MkCardName (Text.pack "Clone"))
+    case filter isClone (Set.toList (GameState.battlefield resolved)) of
+      [cloneId] ->
+        Spec.assertEqWith s "the Clone projects four cascades" (Projection.keywordsOf cloneId resolved) (Map.singleton Keyword.Type.Cascade 4)
+      _ -> Spec.assertFailure s "expected exactly one Clone on the battlefield"
+    Spec.assertEqWith s "and the Devastator it copied still has its own four" (Projection.keywordsOf apexId resolved) (Map.singleton Keyword.Type.Cascade 4)
+
 -- CR 702.40a's storm: "When you cast this spell, copy it for each other spell
 -- that was cast before it this turn."
 --
@@ -1960,7 +2036,7 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
 stormSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stormSpec s registry = Spec.describe s "Storm" $ do
   Spec.it s "CR 702.40a storm is minted for a spell on the stack and nowhere else" $ do
-    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Set.singleton Keyword.Type.Storm)) [Keyword.storm]
+    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Storm 1)) [Keyword.storm]
     Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Storm 1)) []
 
   -- THE PROVING TEST.
@@ -2008,7 +2084,7 @@ replicateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n
 replicateSpec s registry = Spec.describe s "Replicate" $ do
   Spec.it s "CR 702.56a replicate's trigger is minted for a spell on the stack and nowhere else" $ do
     let keyword = Keyword.Type.Replicate (Cost.MkCost Nothing [])
-    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Set.singleton keyword))) 1
+    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Map.singleton keyword 1))) 1
     Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton keyword 1)) []
 
   -- THE PROVING TEST.
@@ -2046,7 +2122,7 @@ casualtySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n 
 casualtySpec s registry = Spec.describe s "Casualty" $ do
   Spec.it s "CR 702.153a casualty's trigger is minted for a spell on the stack and nowhere else" $ do
     let keyword = Keyword.Type.Casualty 2
-    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Set.singleton keyword))) 1
+    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Map.singleton keyword 1))) 1
     Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton keyword 1)) []
 
   -- THE PROVING TEST.
@@ -2115,7 +2191,7 @@ casualtySpec s registry = Spec.describe s "Casualty" $ do
 gravestormSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gravestormSpec s registry = Spec.describe s "Gravestorm" $ do
   Spec.it s "CR 702.69a gravestorm is minted for a spell on the stack and nowhere else" $ do
-    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Set.singleton Keyword.Type.Gravestorm)) [Keyword.gravestorm]
+    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Gravestorm 1)) [Keyword.gravestorm]
     Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Gravestorm 1)) []
 
   -- THE PROVING TEST.
@@ -2163,7 +2239,7 @@ gravestormSpec s registry = Spec.describe s "Gravestorm" $ do
 conspireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 conspireSpec s registry = Spec.describe s "Conspire" $ do
   Spec.it s "CR 702.78a conspire's trigger is minted for a spell on the stack and nowhere else" $ do
-    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Set.singleton Keyword.Type.Conspire))) 1
+    Spec.assertEqWith s "the stack roster mints one" (length (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Conspire 1))) 1
     Spec.assertEqWith s "and the battlefield roster mints none" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Conspire 1)) []
 
   -- THE PROVING TEST.
@@ -2270,6 +2346,15 @@ cascadingIntoTheAdventure p = case p of
   Prompt.ChooseOfferedCastSpell _ _ options ->
     Maybe.fromMaybe (NonEmpty.head options) (List.find ((== CardName.MkCardName (Text.pack "Welcome Home")) . snd) (NonEmpty.toList options))
   _ -> cascading p
+
+-- CR 614.12a's as-enters copy choice answered with the one legal source, which on
+-- the Clone board is the Devastator. Pinned by NAME rather than searched, so a
+-- mutation that drops the printed count cannot be repaired by the answerer
+-- finding some other permanent.
+copyingTheDevastator :: Prompt.Prompt r -> r
+copyingTheDevastator p = case p of
+  Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
+  _ -> S.identityAnswer p
 
 isCast :: A.Action -> Bool
 isCast action = case action of

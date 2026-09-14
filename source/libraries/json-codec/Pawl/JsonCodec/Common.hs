@@ -362,6 +362,33 @@ nonEmpty c =
       Codec.schema = Schema.nonEmptyArray <$> Codec.schema c
     }
 
+-- | A count-per-key multiset spelled as a PLAIN ARRAY WITH REPEATS, ascending by
+-- element, so the wire form is canonical. `set`'s form exactly, minus its
+-- uniqueness check, so a document that says each element once decodes the same
+-- as it did before the count existed.
+--
+-- The other half of 'multiset', and the trade the two divide between them. This
+-- spelling cannot say a count of ZERO, and writes a key as many times as it is
+-- held; the object spelling can and does not. Take this one where the count is
+-- small and comes from PRINTED TEXT that literally repeats the word
+-- (Pawl.Types.Face.keywords, whose card says "Cascade, cascade, cascade,
+-- cascade"), and 'multiset' where a count is arithmetic and can fall to zero
+-- (#126).
+--
+-- A zero entry ENCODES TO NOTHING rather than failing, since encoding is total;
+-- decoding never produces one, so the round trip holds for every value that
+-- came off the wire.
+repeats :: (Ord a) => Codec.Codec a -> Codec.Codec (Map.Map a Natural.Natural)
+repeats c =
+  Codec.MkCodec
+    { Codec.encode =
+        Codec.encode (list c)
+          . concatMap (\(x, n) -> List.genericReplicate n x)
+          . Map.toAscList,
+      Codec.decode = fmap (Map.fromListWith (+) . fmap (\x -> (x, 1))) . Codec.decode (list c),
+      Codec.schema = Schema.array <$> Codec.schema c
+    }
+
 -- | A key and a value as an OBJECT rather than a two-element array, which is the
 -- positional shape #1466 removed.
 --

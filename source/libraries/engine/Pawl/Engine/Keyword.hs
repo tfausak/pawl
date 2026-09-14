@@ -2873,10 +2873,10 @@ bestowCosts keywords =
 -- {0}: CR 118.7a already keeps a generic reduction off the coloured component,
 -- and CR 601.2f's own {0} is the floor.
 --
--- CR 702.41b and CR 702.125c make every instance apply. Face.keywords is a Set,
--- so two affinities naming different qualities are two members and a repeated
--- identical instance collapses to one -- the direction that leaves the spell
--- dearer, and no printing carries a duplicate.
+-- CR 702.41b and CR 702.125c make every instance apply. This takes the DISTINCT
+-- keywords (Face.keywordSet), so two affinities naming different qualities are
+-- two members and a repeated identical instance collapses to one -- the
+-- direction that leaves the spell dearer, and no printing carries a duplicate.
 --
 -- A wildcard rather than an exhaustive case, flashbackCosts' reason.
 selfCostReductionsOf :: Set Keyword -> [CostReduction.CostReduction]
@@ -2927,9 +2927,9 @@ oneLessPerEach count =
 -- Pawl.Engine.Projection.View.baseCharacteristics once CR 601.2b has settled on
 -- one.
 --
--- A LIST because Face.keywords is a Set that could hold two of these, not
--- because a card does: CR 718.1 gives a prototype card "a second set of power,
--- toughness, and mana cost characteristics", singular, and
+-- A LIST because a keyword set could hold two of these, not because a card does:
+-- CR 718.1 gives a prototype card "a second set of power, toughness, and mana
+-- cost characteristics", singular, and
 -- Pawl.Engine.Projection.View.withPrototype reads the first for that reason.
 -- Offered from EVERY zone the card can be cast from, which is CR 113.6e's
 -- classification of an ability that modifies how its own object can be cast --
@@ -2995,8 +2995,8 @@ bestowModifications =
 -- CR 702.140a: the MUTATE costs -- "you may pay [cost] rather than pay this
 -- spell's mana cost" -- offered as alternative costs by
 -- Pawl.Engine.Cost.candidateCostsFor. bestowCosts' shape above in every
--- respect, including the list: Face.keywords is a Set that could hold two, and
--- CR 601.2b's announcement picks one of the offered costs whatever their number.
+-- respect, including the list: a keyword set could hold two, and CR 601.2b's
+-- announcement picks one of the offered costs whatever their number.
 --
 -- Offered from EVERY zone the card can be cast from, bestowCosts' posture: rule
 -- 702.140a's static ability "functions while the spell with mutate is on the
@@ -6161,7 +6161,7 @@ spiritToken =
               Face.loyalty = Nothing,
               Face.defense = Nothing,
               Face.vanguard = Nothing,
-              Face.keywords = Set.singleton Keyword.Flying,
+              Face.keywords = Map.singleton Keyword.Flying 1,
               Face.colorIndicator = Set.fromList [Color.White, Color.Black],
               Face.characteristicPT = Nothing,
               Face.staticAbilities = [],
@@ -6313,7 +6313,7 @@ servoToken =
               Face.loyalty = Nothing,
               Face.defense = Nothing,
               Face.vanguard = Nothing,
-              Face.keywords = Set.empty,
+              Face.keywords = Map.empty,
               Face.colorIndicator = Set.empty,
               Face.characteristicPT = Nothing,
               Face.staticAbilities = [],
@@ -6446,7 +6446,7 @@ creatureToken name subtypes colors power toughness =
               Face.loyalty = Nothing,
               Face.defense = Nothing,
               Face.vanguard = Nothing,
-              Face.keywords = Set.empty,
+              Face.keywords = Map.empty,
               Face.colorIndicator = colors,
               Face.characteristicPT = Nothing,
               Face.staticAbilities = [],
@@ -6771,9 +6771,9 @@ miracleCost keywords =
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
 -- The triggered abilities rule 702 mints for a card read OUTSIDE the battlefield,
--- off its printed keywords. `triggeredAbilitiesOf`'s sibling, and the same roster:
--- a printed keyword set holds one instance of each, which is what the count of 1
--- says.
+-- off its printed keywords. `triggeredAbilitiesOf`'s sibling, and the same
+-- roster: a set rather than the printed counts, `exileTriggeredAbilitiesOf`'s
+-- reading, since rule 702.94a states no per-instance clause.
 --
 -- Rule 702.94a's miracle is the only one any of them reaches today, and CR 113.6k
 -- is what decides that -- Pawl.Engine.Event filters this list by
@@ -6802,8 +6802,10 @@ printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 -- two shapes.
 --
 -- A SET rather than a count-carrying Map, `printedTriggeredAbilitiesOf`'s
--- reading: a printed keyword set holds one instance of each, and rule 702.62
--- states no per-instance clause for a card printing two.
+-- reading: rules 702.62 and 702.35 state no per-instance clause, and no card in
+-- data/cards/ prints either keyword twice, so the caller hands over the distinct
+-- keywords (Face.keywordSet). Rule 702.85c and its siblings do state one, which
+-- is why `stackTriggeredAbilitiesOf` next door counts.
 exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 exileTriggeredAbilitiesOf keywords =
   ( case suspend keywords of
@@ -6824,20 +6826,26 @@ exileTriggeredAbilitiesOf keywords =
 -- the zone itself, so asking `functionsIn` would only re-derive it from a
 -- condition (a cast) that says nothing about the stack.
 --
--- A SET, `exileTriggeredAbilitiesOf`'s reading. The PARAMETERIZED members get
--- one trigger per distinct payload all the same, which is CR 702.56b's and CR
--- 702.153b's "each is paid separately and triggers based on the payments made
--- for it": two replicate costs are two Set members and two instances of
--- Quantity.TimesPaid, each reading its own payment. Not implemented: CR
--- 702.85c's, CR 702.40b's, CR 702.69b's, CR 702.78b's and those two rules'
--- separate trigger for a card printing the SAME keyword twice, which a printed
--- keyword set cannot count (#3577).
-stackTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-stackTriggeredAbilitiesOf keywords =
-  [cascade | Set.member Keyword.Cascade keywords]
-    <> [storm | Set.member Keyword.Storm keywords]
-    <> [gravestorm | Set.member Keyword.Gravestorm keywords]
-    <> Maybe.mapMaybe stackCopyTrigger (Set.toAscList keywords)
+-- COUNTED, where `exileTriggeredAbilitiesOf` next door takes a set: CR 702.85c,
+-- CR 702.40b, CR 702.69b, CR 702.78b, CR 702.56b and CR 702.153b each say the
+-- instances trigger separately, so Apex Devastator's four printed cascades are
+-- four abilities (Pawl.KeywordTriggerSpec's Cascade group). The PARAMETERIZED
+-- members already got one trigger per distinct PAYLOAD, which is CR 702.56b's
+-- and CR 702.153b's "each is paid separately and triggers based on the payments
+-- made for it"; counting adds the repeats of one payload to that.
+stackTriggeredAbilitiesOf :: Map Keyword Natural -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+stackTriggeredAbilitiesOf counts =
+  concatMap (uncurry stackAbilitiesFor) (Map.toAscList counts)
+
+-- The stack-functioning abilities one keyword, held `count` times, contributes.
+-- `abilitiesFor`'s shape one zone over, and a wildcard rather than an exhaustive
+-- case for `stackCopyTrigger`'s reason.
+stackAbilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+stackAbilitiesFor keyword count = case keyword of
+  Keyword.Cascade -> List.genericReplicate count cascade
+  Keyword.Storm -> List.genericReplicate count storm
+  Keyword.Gravestorm -> List.genericReplicate count gravestorm
+  _ -> List.genericReplicate count =<< Maybe.maybeToList (stackCopyTrigger keyword)
 
 -- The arm of `stackTriggeredAbilitiesOf` above that reads a keyword's PAYLOAD,
 -- so it cannot be a membership test: rule 702.56a counts the payments made for

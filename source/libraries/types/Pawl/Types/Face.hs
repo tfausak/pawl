@@ -14,6 +14,7 @@ module Pawl.Types.Face where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
@@ -105,12 +106,17 @@ data Face card = MkFace
     -- per-cleanup and take the printed card the way Face.castingPermissions'
     -- readers do (Pawl.Engine.Vanguard).
     vanguard :: Maybe Vanguard.Vanguard,
-    -- | CR 702. A Set because this is PRINTED text: a card names each keyword
-    -- ability it has once, so there is no printed multiplicity to lose. Where
-    -- multiplicity does arise -- the same ability printed and granted, which CR
-    -- 702.164b's toxic SUMS rather than treating as redundant (contrast CR
-    -- 702.3c/702.9c) -- it arises after the layer fold, and
-    -- Pawl.Types.ProjectedCharacteristics.keywords counts it there.
+    -- | CR 702, counted. A card can print the same keyword twice -- Apex
+    -- Devastator's "Cascade, cascade, cascade, cascade" -- and CR 702.85c makes
+    -- each instance trigger separately, so the count is printed text rather than
+    -- something the layer fold introduces. The same shape
+    -- Pawl.Types.ProjectedCharacteristics.keywords carries, which is what lets CR
+    -- 707.2's copiable values keep all four instances.
+    --
+    -- Zero is not a value this holds: an absent keyword is an absent key, and
+    -- Pawl.Codec.Face's wire form -- one array entry per instance -- has no way to
+    -- spell it. Contrast Pawl.JsonCodec.Common.multiset, whose counters really do
+    -- reach zero.
     --
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
@@ -122,7 +128,7 @@ data Face card = MkFace
     -- Pawl.Engine.Cast.instantSpeed reads rule 702.8a's keyword through the
     -- projection, which is what lets Teferi, Mage of Zhalfir grant it to a card
     -- in a hand.
-    keywords :: Set.Set Keyword.Keyword,
+    keywords :: Map.Map Keyword.Keyword Natural.Natural,
     -- | CR 204.1/204.2: the colour indicator printed left of the type line. An
     -- object is each colour it denotes, IN ADDITION to the colours of its mana
     -- cost (CR 202.2/202.2e). Empty for a card whose colours come from its cost
@@ -586,3 +592,9 @@ defaultSpell =
   Modal.MkModal
     (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
     (ModeSelection.ChooseExactly 1)
+
+-- | The keywords a face prints, with the multiplicity dropped. What a
+-- membership question wants -- "does this card print flash" -- where the count
+-- matters only to a rule that says each instance acts separately (CR 702.85c).
+keywordSet :: Face card -> Set.Set Keyword.Keyword
+keywordSet = Map.keysSet . keywords

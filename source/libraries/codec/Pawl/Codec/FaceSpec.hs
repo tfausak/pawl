@@ -134,7 +134,7 @@ baseFace =
       Face.loyalty = Nothing,
       Face.defense = Nothing,
       Face.vanguard = Nothing,
-      Face.keywords = Set.empty,
+      Face.keywords = Map.empty,
       Face.staticAbilities = [],
       Face.spell = minimalModal,
       Face.activatedAbilities = [],
@@ -186,7 +186,7 @@ minimalFace =
       Face.loyalty = Nothing,
       Face.defense = Nothing,
       Face.vanguard = Nothing,
-      Face.keywords = Set.empty,
+      Face.keywords = Map.empty,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
       Face.staticAbilities = [],
@@ -250,7 +250,7 @@ baseFaceJson =
 populatedFace :: Face.Face Card.Card
 populatedFace =
   baseFace
-    { Face.keywords = Set.singleton Keyword.Deathtouch,
+    { Face.keywords = Map.singleton Keyword.Deathtouch 1,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
       Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) [] minimalModal [] Activator.Controller Nothing (Just (AbilityName.MkAbilityName (Text.pack "activated"))) Nothing],
       Face.replacementEffects = [PrintedReplacement.MkPrintedReplacement Nothing (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False Nothing)))) Set.empty Nothing],
@@ -341,6 +341,20 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
       " {\"name\":\"Mountain\",\"typeLine\":{\"types\":[{\"type\":\"Land\"}]}} "
   Spec.it s "MkFace, every required field present and every optional field absent" $
     Common.assertJsonCodec s encodeFace decodeFace baseFace baseFaceJson
+  -- CR 702.85c, on the wire: Apex Devastator's "Cascade, cascade, cascade,
+  -- cascade" is four array entries, and they come back as a count of four rather
+  -- than collapsing the way a set would (data/cards/apex-devastator.json).
+  Spec.it s "a keyword printed four times decodes to a count of four" $
+    Common.assertJsonCodec
+      s
+      encodeFace
+      decodeFace
+      baseFace {Face.keywords = Map.singleton Keyword.Cascade 4}
+      ( "{\"name\":\"Test Card\",\"manaCost\":[{\"type\":\"Generic\",\"value\":1}],"
+          <> "\"typeLine\":{\"types\":[{\"type\":\"Creature\"}]},"
+          <> "\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1},"
+          <> "\"keywords\":[{\"type\":\"Cascade\"},{\"type\":\"Cascade\"},{\"type\":\"Cascade\"},{\"type\":\"Cascade\"}]}"
+      )
   -- Most defaulted fields also get their own absent-key assertion below, not
   -- just the aggregate round trip above: a decoder that defaulted the WRONG
   -- field could still pass the aggregate equality if two defaults happened to

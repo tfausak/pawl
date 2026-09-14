@@ -82,9 +82,10 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- The KEYWORDS are the exception to "no abilities of any kind", and CR 702.168b
 -- is why: disguise's listing is "a 2/2 face-down creature card WITH WARD {2}",
 -- so rule 708.2's "no characteristics other than those listed" leaves that one
--- ability standing. It arrives here as an ordinary Face.keywords set, so CR
--- 702.21a's trigger is minted from the projection by the same road every printed
--- ward takes; nothing about being face down is special-cased downstream.
+-- ability standing. It arrives here as an ordinary Face.keywords entry at one
+-- instance each, so CR 702.21a's trigger is minted from the projection by the
+-- same road every printed ward takes; nothing about being face down is
+-- special-cased downstream.
 --
 -- The one field that is not empty besides the type line and the P/T is `spell`:
 -- a face-down creature spell still has to RESOLVE, and Face.defaultSpell is
@@ -109,7 +110,7 @@ faceDownFace listed =
       Face.loyalty = Nothing,
       Face.defense = Nothing,
       Face.vanguard = Nothing,
-      Face.keywords = FaceDownCharacteristics.keywords listed,
+      Face.keywords = Map.fromSet (const 1) (FaceDownCharacteristics.keywords listed),
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
       Face.staticAbilities = [],
@@ -393,8 +394,10 @@ merge2 l r =
           Face.typeLine = unionTypeLines (Face.typeLine l) (Face.typeLine r),
           -- CR 709.4c again: a keyword is the NAME of an ability the object has (CR
           -- 702.1), so "each ability in the text box of each half" is what unions
-          -- these.
-          Face.keywords = Set.union (Face.keywords l) (Face.keywords r),
+          -- these. The counts ADD rather than max: two halves each printing
+          -- cascade give the combined object two of rule 702.85a's abilities, and
+          -- CR 702.85c makes each trigger.
+          Face.keywords = Map.unionWith (+) (Face.keywords l) (Face.keywords r),
           -- CR 709.4: the colour indicator is a characteristic (CR 109.3), and no
           -- subrule narrows it the way 709.4b narrows the mana cost.
           Face.colorIndicator = Set.union (Face.colorIndicator l) (Face.colorIndicator r),
@@ -802,7 +805,7 @@ castableFaces card = case Card.layout card of
 -- some split cards" reaches.
 fusedFace :: Card.Card -> Maybe (Face.Face Card.Card)
 fusedFace card = case Card.layout card of
-  Layout.Split | Keyword.hasFuse (Face.keywords (combined card)) -> do
+  Layout.Split | Keyword.hasFuse (Face.keywordSet (combined card)) -> do
     spell <- fuseSpells (fmap Face.spell (Card.faces card))
     pure ((combined card) {Face.spell = spell})
   _ -> Nothing
@@ -887,7 +890,7 @@ mergeDisjointModes l r =
 -- 118.9a a free offer does not also offer the converted face" is the proof.
 convertedFace :: Card.Card -> Maybe (Face.Face Card.Card)
 convertedFace card =
-  let printed = Face.keywords (frontFace card)
+  let printed = Face.keywordSet (frontFace card)
    in case Card.layout card of
         Layout.Transforming
           | not (null (Keyword.moreThanMeetsTheEyeCosts printed)) || not (null (Keyword.disturbCosts printed)) ->
@@ -1483,7 +1486,7 @@ subtractHalf face =
   face
     { Face.name = CardName.MkCardName Text.empty,
       Face.manaCost = Nothing,
-      Face.keywords = Set.empty,
+      Face.keywords = Map.empty,
       Face.staticAbilities = [],
       Face.spell = Face.defaultSpell,
       Face.activatedAbilities = [],

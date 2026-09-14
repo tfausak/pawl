@@ -120,17 +120,17 @@ viewOfCard face =
           -- CR 604.3 / 702.114a: a CDA functions in all zones, and this view
           -- enters no CR 613 fold, so devoid is applied here.
           Filter.colors =
-            if definesColorless (Face.keywords face)
+            if definesColorless (Face.keywordSet face)
               then Set.empty
               else printedColorsOf face,
           -- CR 604.3 / 702.73a, the same one layer down: changeling "works
           -- everywhere".
           Filter.subtypes =
-            if definesEveryCreatureType (Face.keywords face)
+            if definesEveryCreatureType (Face.keywordSet face)
               then Set.union Subtype.everyCreatureType (TypeLine.subtypes typeLine)
               else TypeLine.subtypes typeLine,
           -- CR 702: read off the printed face, like the type line above.
-          Filter.keywords = Face.keywords face,
+          Filter.keywords = Face.keywordSet face,
           -- CR 208.1 read off the PRINTED power box -- see printedPower below.
           Filter.power = printedPower face,
           -- CR 208.1's other half off the printed toughness box.
@@ -278,7 +278,7 @@ viewOfCard face =
             not
               ( all
                   ManaAbility.isManaAbility
-                  (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face) <> Keyword.graveyardAbilitiesOf (Face.keywords face))
+                  (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywordSet face) <> Keyword.graveyardAbilitiesOf (Face.keywordSet face))
               ),
           -- CR 602.1 over the same three lists, without CR 605.1a's exclusion --
           -- Zirda, the Dawnwaker's companion condition is read here, since a card
@@ -288,7 +288,7 @@ viewOfCard face =
           -- view builder shares: a Mountain must answer the same here as it does
           -- on the battlefield.
           Filter.hasActivatedAbility =
-            not (null (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face) <> Keyword.graveyardAbilitiesOf (Face.keywords face)))
+            not (null (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywordSet face) <> Keyword.graveyardAbilitiesOf (Face.keywordSet face)))
               || Subtype.intrinsicManaAbility (TypeLine.types typeLine) (TypeLine.subtypes typeLine),
           -- CR 702.184c reaches a permanent's CONTROLLER; this builder describes
           -- a printed FACE with no controller and no board to grant it one.
@@ -1034,7 +1034,7 @@ staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
   -- The printed read reaches a copied Room too, and has to: copiableSnapshotOf
   -- above answers Nothing for one, and Game.faceOf answers with the copied card's
   -- halves subtracted by THIS object's designations (CR 709.5).
-  Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
+  Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywordSet face)) (Game.faceOf oid gs)
 
 -- CR 116.2: the special actions this object's copiable rules text grants -- its
 -- copy snapshot's when it has one, its printed face's otherwise.
@@ -1196,8 +1196,10 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- Game.namesOf decides which halves show.
               PC.names = Game.namesOf oid gs,
               PC.supertypes = TypeLine.supertypes (Face.typeLine face),
-              -- CR 702: a printed keyword appears once; layer 6 adds multiplicity.
-              PC.keywords = Map.fromSet (const 1) (Face.keywords face),
+              -- CR 702, and CR 707.2: the printed count is a copiable value, so a
+              -- Clone of Apex Devastator gets all four of its cascades. Layer 6
+              -- adds to it (Pawl.KeywordTriggerSpec's Cascade group).
+              PC.keywords = Face.keywords face,
               PC.colors = printedColorsOf face,
               -- CR 202.1: the printed cost of the face the object is showing, so CR
               -- 708.2a's face-down substitution leaves a face-down object with none.
@@ -1320,7 +1322,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
 -- singular, so no printing offers two for Object.prototyped's Bool to have to
 -- choose between.
 withPrototype :: ObjectId -> GameState -> Face.Face Card.Type.Card -> ProjectedCharacteristics -> ProjectedCharacteristics
-withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupObject oid gs), Keyword.prototypes (Face.keywords face)) of
+withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupObject oid gs), Keyword.prototypes (Face.keywordSet face)) of
   (True, frame : _) ->
     pc
       { PC.manaCost = Just (Prototype.cost frame),

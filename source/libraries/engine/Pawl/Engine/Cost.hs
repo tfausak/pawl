@@ -460,7 +460,7 @@ candidateCostsGiven permitted pid name oid gs =
                   then
                     fmap
                       (\cost -> CandidateCost.plain (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
-                      (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (Card.frontFace card)))
+                      (Keyword.moreThanMeetsTheEyeCosts (Face.keywordSet (Card.frontFace card)))
                   else []
               -- CR 702.146a: disturb, `converted`'s offer with rule 702.146a's ZONE
               -- attached -- "you may cast this card transformed FROM YOUR GRAVEYARD
@@ -474,7 +474,7 @@ candidateCostsGiven permitted pid name oid gs =
               disturbed =
                 fmap
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Disturb cost)) (withAdditional cost))
-                  (Keyword.disturbCosts (Face.keywords (Card.frontFace card)))
+                  (Keyword.disturbCosts (Face.keywordSet (Card.frontFace card)))
               -- The converted face's candidates REPLACE the zone's own list rather
               -- than joining it: the back face is a candidate at all only because
               -- rule 702.162a's or rule 702.146a's permission put it there, so that
@@ -659,7 +659,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- only a card with foretell (#1486).
                 Zone.Exile
                   | Maybe.isJust (Object.foretold obj) ->
-                      fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
+                      fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywordSet face)))
                 -- CR 118.9: a CR 601.3 permission that says "without paying its
                 -- mana cost" (Extract Power) is an alternative cost of nothing,
                 -- and REPLACES the printed cost for the plotted arm's reason --
@@ -793,7 +793,7 @@ selfReductions pid oid gs =
          in fmap (ManaCost.MkManaCost . times) copies
    in case Game.faceOf oid gs of
         Nothing -> []
-        Just face -> Maybe.mapMaybe scaled (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywords face))
+        Just face -> Maybe.mapMaybe scaled (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face))
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes
 -- through rule 601.2b-i like a spell's. No commander tax: CR 903.8 taxes
@@ -968,7 +968,7 @@ totalManas adjustments =
 -- that carrier has, see #1859, and not something this function narrows.
 manaSubstitutions :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
 manaSubstitutions slots pid oid gs manaCost =
-  let keywords = maybe Set.empty Face.keywords (Game.faceOf oid gs)
+  let keywords = maybe Set.empty Face.keywordSet (Game.faceOf oid gs)
       -- The cost's symbols as one entry per KIND, a Generic counting for its own
       -- amount (CR 107.4b) where every other symbol is one mana.
       sizeOf symbol = case symbol of
