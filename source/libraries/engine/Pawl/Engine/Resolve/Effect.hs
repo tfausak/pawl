@@ -835,30 +835,30 @@ recipientSeat gs recipient = case recipient of
   Recipient.ToPlayer pid -> Just pid
   _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerWithLastKnown oid gs
 
--- CR 701.21a: which player one Effect.Sacrifice instructs, as the function that
--- performs it. The rule's second sentence -- "a player can't sacrifice ...
--- something that's a permanent they don't control" -- is what makes the two arms
--- observably different rather than two spellings of one thing.
+-- CR 701.21a: which player one Effect.Sacrifice instructs, as a pairing rather
+-- than a performance -- the whole sweep goes to Event.sacrificeAll as one CR
+-- 608.2f batch, so this names each member's sacrificing player and performs
+-- nothing. The rule's second sentence -- "a player can't sacrifice ... something
+-- that's a permanent they don't control" -- is what makes the two arms observably
+-- different rather than two spellings of one thing.
 --
--- EffectController hands Event.sacrifice this effect's controller and lets that
--- rule REFUSE, which is the printed "sacrifice it": Ray of Command stealing a
--- Thatcher Revolt token before its delayed "sacrifice those tokens" turns on
--- leaves the token on the battlefield, and Pawl.ResolveSpec's "CR 701.21a a
--- stolen token is not sacrificed by the player who was told to sacrifice it" is
--- the proof.
+-- EffectController names this effect's controller and lets the funnel REFUSE,
+-- which is the printed "sacrifice it": Ray of Command stealing a Thatcher Revolt
+-- token before its delayed "sacrifice those tokens" turns on leaves the token on
+-- the battlefield, and Pawl.ResolveSpec's "CR 701.21a a stolen token is not
+-- sacrificed by the player who was told to sacrifice it" is the proof.
 --
--- PermanentController reads the controller off the permanent instead, live (CR
--- 613.1b's layer 2), which is the printed "[that permanent]'s controller
--- sacrifices it" -- CR 701.54c's three-temptation tier, whose blocker its own
--- controller sacrifices. Rule 701.21a can never refuse this arm, by construction.
--- Nothing to do for an object that is gone or has no controller (CR 400.7), which
--- is also how the funnel answers.
-sacrificerFor :: Sacrificer.Sacrificer -> PlayerId -> ObjectId -> Game ()
-sacrificerFor sacrificer controller oid = case sacrificer of
-  Sacrificer.EffectController -> Event.sacrifice controller oid
-  Sacrificer.PermanentController -> do
-    gs <- State.get
-    Monad.forM_ (Projection.controllerOf oid gs) (\pid -> Event.sacrifice pid oid)
+-- PermanentController reads the controller off the permanent instead (CR 613.1b's
+-- layer 2), which is the printed "[that permanent]'s controller sacrifices it" --
+-- CR 701.54c's three-temptation tier, whose blocker its own controller
+-- sacrifices. Rule 701.21a can never refuse this arm, by construction. Read off
+-- the board the BATCH was swept from, which is the same board the funnel judges
+-- its two refusals against (CR 608.2f). Nothing to pair for an object that is
+-- gone or has no controller (CR 400.7), which is also how the funnel answers.
+sacrificerFor :: Sacrificer.Sacrificer -> PlayerId -> GameState -> ObjectId -> Maybe (PlayerId, ObjectId)
+sacrificerFor sacrificer controller gs oid = case sacrificer of
+  Sacrificer.EffectController -> Just (controller, oid)
+  Sacrificer.PermanentController -> fmap (\pid -> (pid, oid)) (Projection.controllerOf oid gs)
 
 -- slotGroup's singular: the ONE object bound at a slot, read live off the
 -- resolving object rather than out of `chosen`, which is a PROJECTION -- CR
@@ -3454,9 +3454,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- applies per MEMBER rather than to the whole word: a member that is gone is
     -- simply not affected, and the rest still are.
     --
-    -- One at a time rather than as one event (#757).
+    -- ONE event over the whole sweep, not one call per victim: CR 608.2f makes
+    -- an action an instruction takes on multiple objects simultaneous, so every
+    -- member's CR 616.1 loop reads the board the batch began on -- All Is Dust
+    -- sacrificing Rest in Peace beside another coloured permanent exiles both.
+    -- Pawl.EventSpec's All Is Dust case is the proof.
     gs <- State.get
-    Monad.mapM_ (sacrificerFor sacrificer controller) (objectRefObjects legal resolving controller source gs ref)
+    Event.sacrificeAll (Maybe.mapMaybe (sacrificerFor sacrificer controller gs) (objectRefObjects legal resolving controller source gs ref))
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) -> do
     -- CR 708.2: ONE assignment to Object.facing per victim is the whole effect.
     -- What each permanent becomes is the list the effect carries (CR 708.2a's
@@ -4833,9 +4837,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   pure (victim, List.genericTake wanted (valid <> filler))
             _ -> pure (victim, [])
     doomed <- traverse pickFor victims
-    -- One at a time rather than as one event, Effect.Sacrifice's fold above
-    -- (#757). The reachable caller of the two: All Is Dust lands here.
-    Monad.forM_ doomed (\(victim, oids) -> Monad.mapM_ (Event.sacrifice victim) oids)
+    -- CR 101.4's last sentence -- "then all creatures chosen this way are
+    -- sacrificed simultaneously" -- so the picks from every seat go to the funnel
+    -- as ONE batch against one board.
+    Event.sacrificeAll (concatMap (\(victim, oids) -> fmap (\oid -> (victim, oid)) oids) doomed)
   -- CR 701.38a: each player, starting with the seat the payload specifies and
   -- proceeding in turn order, votes for one of the listed choices. What the
   -- tally then binds is rule 701.38b's business and splits below -- the objects

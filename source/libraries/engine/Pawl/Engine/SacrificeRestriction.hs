@@ -14,7 +14,7 @@
 -- neither be OFFERED as a sacrifice (Pawl.Engine.Replacement.sacrificeCandidates,
 -- which is what CR 118.3's payability count and every sacrifice prompt read)
 -- nor be sacrificed by an instruction that named it without asking
--- (Pawl.Engine.Event.sacrifice, the CR 701.21 funnel). Gating only the first
+-- (Pawl.Engine.Event.sacrificeIn, the CR 701.21 funnel). Gating only the first
 -- would leave every targeted sacrifice in the pool going through.
 module Pawl.Engine.SacrificeRestriction where
 

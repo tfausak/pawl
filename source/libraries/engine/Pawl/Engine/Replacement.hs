@@ -1364,7 +1364,7 @@ matchesPermanent gs slots source filter_ oid =
 -- rather than merely unsacrificeable: this one function is what
 -- Pawl.Engine.Cost's CR 118.3 payability count, its Prompt.ChooseSacrifices
 -- offer, Pawl.Engine.Resolve's edict and Pawl.Engine.Event's as-enters offer all
--- read. The other half of the gate is in Event.sacrifice, for the instructions
+-- read. The other half of the gate is in Event.sacrificeIn, for the instructions
 -- that name a victim without consulting a candidate list.
 --
 -- `slots` is matchesPermanent's: Pawl.Engine.Cost hands over CR 601.2c's targets

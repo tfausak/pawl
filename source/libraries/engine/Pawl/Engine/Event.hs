@@ -285,9 +285,8 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- The group is spent on exit whether or not the body recorded anything, so a
 -- bracket leaves a gap rather than leaking its group to the next event.
 --
--- Not bracketed: CR 701.21's fold over a bound group (#757), token creation and
--- CR 508.1's attacker declaration, so the events each records are read as a
--- sequence (see #441). CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
+-- Not bracketed: token creation and CR 508.1's attacker declaration, so the
+-- events each records are read as a sequence (see #441). CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
 -- brackets each combat damage step -- the damage and its CR 120.3 results, with
 -- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
 -- each source's gain an event of its own.
@@ -6000,11 +5999,52 @@ protectedFromCountering :: ObjectId -> GameState -> Bool
 protectedFromCountering oid gs =
   maybe False (\pid -> PlayerEffect.cantBeCountered pid oid gs) (Projection.controllerOf oid gs)
 
--- CR 701.21/701.21a: the single sacrifice funnel. The permanent goes to its
--- OWNER's graveyard through changeZone, and -- unlike destroy -- with no
--- indestructible gate and no regeneration shield consulted, since sacrificing is
--- not destroying. Restricted to permanents on the battlefield, so anything else is
--- a no-op.
+-- CR 701.21/701.21a: the single sacrifice funnel, one permanent. The permanent
+-- goes to its OWNER's graveyard through changeZone, and -- unlike destroy --
+-- with no indestructible gate and no regeneration shield consulted, since
+-- sacrificing is not destroying. Restricted to permanents on the battlefield, so
+-- anything else is a no-op.
+--
+-- The door for a caller whose instruction names ONE permanent -- a cost's
+-- SacrificeThis, a trigger's own source, `apply`'s CR 614.1c as-enters
+-- sacrifice. sacrificeAll is the same door for an instruction that names
+-- several, sacrificeInBatch for a batch nested in a larger event, and
+-- sacrificeIn is the shared body.
+sacrifice :: PlayerId -> ObjectId -> Game ()
+sacrifice pid oid = sacrificeIn Nothing [(pid, oid)]
+
+-- CR 608.2f: the sacrifice funnel for a whole batch one instruction named -- All
+-- Is Dust's "each player sacrifices all permanents they control that are one or
+-- more colors", Golgothian Sylex's sweep, an edict naming several seats. "In
+-- most cases, each such action is processed simultaneously", so the members are
+-- ONE event against ONE board rather than a sequence.
+--
+-- PAIRED rather than a player and a list, because CR 701.21a makes the
+-- sacrificing player a fact about each member: an edict's batch spans seats, and
+-- the rule's "a permanent they don't control" is asked of each pair.
+sacrificeAll :: [(PlayerId, ObjectId)] -> Game ()
+sacrificeAll = sacrificeIn Nothing
+
+-- sacrificeAll for a batch that is one PART of a larger simultaneous event, whose
+-- board is `asOf`. destroyInBatch's door one funnel over, and CR 704.3's
+-- state-based-action check is the same event: Pawl.Engine.Sba's CR 704.5s / 714.4
+-- Saga sacrifices stand on the board the pass began in, so a replacement effect
+-- belonging to a Saga the same pass is sacrificing still applies to the rest.
+sacrificeInBatch :: GameState -> [(PlayerId, ObjectId)] -> Game ()
+sacrificeInBatch asOf = sacrificeIn (Just asOf)
+
+-- The shared body. Two readers of a board, split the way destroyIn splits its
+-- three:
+--
+--   1. Both refusals below and the CR 616.1 replacement loop the graveyard move
+--      runs read `gs`, the containing event's board. That is CR 608.2f / 704.3's
+--      "single event" reading: who controlled a permanent and whether it could be
+--      sacrificed are facts about the moment the event's conditions were judged,
+--      and an effect belonging to a permanent the same event is removing still
+--      applies.
+--   2. The existence and zone filter reads `live`, per CR 614.7's shape: a
+--      permanent an earlier part of the event already moved is not on the
+--      battlefield, so nothing is sacrificed for it.
 --
 -- TWO refusals live here, and the arms below cite each: CR 701.21a's "a permanent
 -- they don't control", and CR 101.2's "can't" beating a rule or effect's "can" --
@@ -6013,10 +6053,10 @@ protectedFromCountering oid gs =
 -- Pawl.Engine.Replacement.sacrificeCandidates cannot get past either.
 --
 -- CR 701.21a also forbids sacrificing a permanent you do not control, which is why
--- this takes the sacrificing player. Enforced here at the one funnel rather than
--- trusted from each caller: a cost payment, a triggered ability's own source and
--- `apply`'s CR 614.1c as-enters sacrifice are controlled by the paying player by
--- construction, but an edict's victim is a permanent a PLAYER named.
+-- each member carries the sacrificing player. Enforced here at the one funnel
+-- rather than trusted from each caller: a cost payment, a triggered ability's own
+-- source and `apply`'s CR 614.1c as-enters sacrifice are controlled by the paying
+-- player by construction, but an edict's victim is a permanent a PLAYER named.
 --
 -- Records GameEvent.PermanentSacrificed, which is what makes CR 603.10a's
 -- "abilities that trigger when a player sacrifices a permanent" expressible: CR
@@ -6030,55 +6070,62 @@ protectedFromCountering oid gs =
 -- redirects the move -- Rest in Peace exiling it instead -- does not un-sacrifice
 -- the permanent, and an event recorded afterwards would either name an
 -- incarnation the redirection never produced or not be recorded at all.
-sacrifice :: PlayerId -> ObjectId -> Game ()
-sacrifice pid oid = do
-  gs <- State.get
-  case Game.lookupObject oid gs of
-    Nothing -> pure ()
-    Just obj -> case Object.zone obj of
-      -- CR 701.21a: "A player can't sacrifice something that isn't a permanent, or
-      -- something that's a permanent they don't control." The zone case below is
-      -- the first clause; this is the second. Enforced HERE, at the one funnel,
-      -- rather than trusted from each caller -- the callers are a cost payment, a
-      -- trigger's own source, `apply`'s CR 614.1c as-enters sacrifice, and an
-      -- edict whose victim a player NAMED, and only the last of those could ever
-      -- be wrong. Resolve's Effect.Sacrifice road asks the same question of the
-      -- permanent before it gets here (Resolve.sacrificerFor), since a
-      -- printed "its controller sacrifices it" names a player this arm could only
-      -- refuse.
-      Zone.Battlefield
-        | Projection.controllerOf oid gs /= Just pid -> pure ()
-        -- CR 101.2: "if a rule or effect allows or directs something to happen,
-        -- and another effect states that it can't happen, the 'can't' effect
-        -- takes precedence" -- Garland, Royal Kidnapper's "can't be sacrificed".
-        -- CR 101.3 says what happens instead: "any part of an instruction that's
-        -- impossible to perform is ignored", so nothing moves, no event is
-        -- recorded, and no destruction is substituted.
-        --
-        -- The SECOND of the two gates, and it earns its place at the funnel:
-        -- Effect.Sacrifice names its victims through an ObjectRef and consults
-        -- no candidate list at all, which is how Lightning Skelemental's "at the
-        -- beginning of the end step, sacrifice this creature" reaches here.
-        -- Pawl.SacrificeRestrictionSpec proves that path goes through this arm
-        -- and no other -- gating only the candidate list leaves it green.
-        --
-        -- The other two callers that name a victim outright answer CR 101.2
-        -- before they get here as well, and for their own reasons:
-        -- Pawl.Engine.Cost refuses the SacrificeThis cost so CR 118.3 is not
-        -- broken, and Pawl.Engine.Sba drops a CR 704.5s Saga so CR 704.3's
-        -- repeat terminates. This arm is the backstop under both.
-        | SacrificeRestriction.prohibited oid gs -> pure ()
-        | otherwise -> do
-            State.modify' (recordEvent (GameEvent.PermanentSacrificed (PermanentWasSacrificed.MkPermanentWasSacrificed pid oid)))
-            changeZone oid Zone.Graveyard
-      Zone.Library -> pure ()
-      Zone.Hand -> pure ()
-      Zone.Graveyard -> pure ()
-      Zone.Stack -> pure ()
-      Zone.Exile -> pure ()
-      -- CR 408.1: a command-zone object is not a permanent, so it is never
-      -- sacrificed.
-      Zone.Command -> pure ()
+--
+-- The whole body is ONE event, destroyIn's bracket for destroyIn's reason: CR
+-- 608.2f makes an action taken on multiple objects simultaneous, and every caller
+-- hands a batch one instruction or one CR 704.3 pass named.
+sacrificeIn :: Maybe GameState -> [(PlayerId, ObjectId)] -> Game ()
+sacrificeIn asOf victims = simultaneously $ do
+  began <- State.get
+  let gs = Maybe.fromMaybe began asOf
+  Monad.forM_ victims $ \(pid, oid) -> do
+    live <- State.get
+    case Game.lookupObject oid live of
+      Nothing -> pure ()
+      Just obj -> case Object.zone obj of
+        -- CR 701.21a: "A player can't sacrifice something that isn't a permanent, or
+        -- something that's a permanent they don't control." The zone case below is
+        -- the first clause; this is the second. Enforced HERE, at the one funnel,
+        -- rather than trusted from each caller -- the callers are a cost payment, a
+        -- trigger's own source, `apply`'s CR 614.1c as-enters sacrifice, and an
+        -- edict whose victim a player NAMED, and only the last of those could ever
+        -- be wrong. Resolve's Effect.Sacrifice road asks the same question of the
+        -- permanent before it gets here (Resolve.sacrificerFor), since a
+        -- printed "its controller sacrifices it" names a player this arm could only
+        -- refuse.
+        Zone.Battlefield
+          | Projection.controllerOf oid gs /= Just pid -> pure ()
+          -- CR 101.2: "if a rule or effect allows or directs something to happen,
+          -- and another effect states that it can't happen, the 'can't' effect
+          -- takes precedence" -- Garland, Royal Kidnapper's "can't be sacrificed".
+          -- CR 101.3 says what happens instead: "any part of an instruction that's
+          -- impossible to perform is ignored", so nothing moves, no event is
+          -- recorded, and no destruction is substituted.
+          --
+          -- The SECOND of the two gates, and it earns its place at the funnel:
+          -- Effect.Sacrifice names its victims through an ObjectRef and consults
+          -- no candidate list at all, which is how Lightning Skelemental's "at the
+          -- beginning of the end step, sacrifice this creature" reaches here.
+          -- Pawl.SacrificeRestrictionSpec proves that path goes through this arm
+          -- and no other -- gating only the candidate list leaves it green.
+          --
+          -- The other two callers that name a victim outright answer CR 101.2
+          -- before they get here as well, and for their own reasons:
+          -- Pawl.Engine.Cost refuses the SacrificeThis cost so CR 118.3 is not
+          -- broken, and Pawl.Engine.Sba drops a CR 704.5s Saga so CR 704.3's
+          -- repeat terminates. This arm is the backstop under both.
+          | SacrificeRestriction.prohibited oid gs -> pure ()
+          | otherwise -> do
+              State.modify' (recordEvent (GameEvent.PermanentSacrificed (PermanentWasSacrificed.MkPermanentWasSacrificed pid oid)))
+              changeZoneInBatch gs oid Zone.Graveyard
+        Zone.Library -> pure ()
+        Zone.Hand -> pure ()
+        Zone.Graveyard -> pure ()
+        Zone.Stack -> pure ()
+        Zone.Exile -> pure ()
+        -- CR 408.1: a command-zone object is not a permanent, so it is never
+        -- sacrificed.
+        Zone.Command -> pure ()
 
 -- CR 111.2: create `n` tokens with the given effect-defined characteristics under
 -- `controller`'s control, summoning-sick (CR 302.6). A token is created from

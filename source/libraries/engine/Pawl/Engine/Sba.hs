@@ -884,19 +884,20 @@ performStateBasedActions = Event.simultaneously $ do
   -- CR 704.5s / 714.4: the Saga's controller SACRIFICES it. Neither a
   -- put-into-graveyard nor a destruction, so it joins neither batch above -- CR
   -- 701.21a is its own game action, ungated by indestructible and offering
-  -- regeneration nothing, and it goes through Pawl.Engine.Event.sacrifice, the one
-  -- funnel for it.
+  -- regeneration nothing, and it goes through Pawl.Engine.Event.sacrificeInBatch,
+  -- the one funnel for it.
   --
-  -- One call per Saga on the LIVE board, unlike the two batches above, because
-  -- that funnel takes one object and re-reads the state. The difference is
-  -- unobservable here in a way it would not be for the batches: a sacrifice moves
-  -- only the Saga named, and the classifier already fixed which Sagas and whose
-  -- from the pre-pass board -- so nothing this pass does can add one, and the
-  -- funnel's own existence check is what drops one another action already moved.
+  -- ONE batch on the SAME pre-pass board as the two above, for CR 704.3's reason:
+  -- the whole check is one event, so a replacement effect belonging to a Saga this
+  -- pass is itself sacrificing is still in force for the rest of the batch. Two
+  -- Sagas finishing together is the board that shows it, and
+  -- Pawl.SagaSpec's "CR 704.3 / 714.4 two Sagas finishing together are sacrificed
+  -- as one event" is the proof.
   --
-  -- A board with two finished Sagas is where a batched version would differ, and
-  -- only if one of them replaced the other's move; no card in the pool does (#842).
-  Monad.mapM_ (uncurry Event.sacrifice) told
+  -- The funnel's own existence check stays live, which is what drops a Saga some
+  -- other action this pass already moved (CR 614.7's shape, destroyInBatch's third
+  -- reader).
+  Event.sacrificeInBatch gs told
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
   -- CR 104.2a/800.4a: one departure at a time, in REVERSE of `leaving` -- the

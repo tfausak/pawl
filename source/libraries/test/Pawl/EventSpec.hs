@@ -91,6 +91,38 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
       zc : _ -> Spec.assertEqWith s "event says exile" (ZoneChange.to zc) Zone.Exile
       [] -> Spec.assertFailure s "expected an emitted zone change"
 
+  -- CR 608.2f / 701.21a: All Is Dust's "each player sacrifices all permanents
+  -- they control that are one or more colors" is ONE action on several objects,
+  -- so every member's CR 616.1 loop reads the board the batch began on. Rest in
+  -- Peace is coloured, so the sweep names it too; it is added FIRST, so under a
+  -- per-victim fold it leaves the battlefield before bob's creature is asked
+  -- about and bob's creature reaches a graveyard the batch rule says is closed.
+  --
+  -- Bob's seat holds the second permanent rather than alice's, because All Is
+  -- Dust itself goes to ALICE's graveyard when it finishes resolving -- by then
+  -- Rest in Peace has gone, so that move is not replaced and a graveyard count
+  -- taken on alice would read 1 either way.
+  Spec.it s "CR 608.2f All Is Dust sacrifices as one event, so Rest in Peace still exiles the permanent that goes second" $ do
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    piker <- S.printingOf s registry "Goblin Piker"
+    allIsDust <- S.printingOf s registry "All Is Dust"
+    forest <- S.printingOf s registry "Forest"
+    let (_, g0) = S.addPermanent restInPeace S.alice (S.landsInPlay forest 7)
+        (_, g1) = S.addPermanent piker S.bob g0
+        (g2, spellId) = S.handOne allIsDust g1
+        cast = snd (Engine.runGamePure S.identityAnswer g2 (S.cast S.alice spellId))
+        after = settleAndResolve cast
+        -- CR 400.7 mints a new object for the arrival, so the exiled card is a
+        -- different id from the permanent; ownership is what names it.
+        exiledOwnedBy pid = length (filter (\oid -> fmap Object.owner (Game.lookupObject oid after) == Just pid) (Set.toList (GameState.exile after)))
+    Spec.assertEqWith s "bob's creature was exiled, not buried" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
+    Spec.assertEqWith s "and bob's card is the one in exile" (exiledOwnedBy S.bob) 1
+    -- Rest in Peace's own move is replaced by its own effect, which is what makes
+    -- the board discriminating: it is gone from the battlefield by the time bob's
+    -- creature would be asked about under a fold.
+    Spec.assertEqWith s "Rest in Peace was sacrificed too" (exiledOwnedBy S.alice) 1
+    Spec.assertEqWith s "both coloured permanents left the battlefield" (length (Game.zoneMembers Zone.Battlefield S.bob after), length (Game.zoneMembers Zone.Battlefield S.alice after)) (0, 7)
+
   Spec.it s "without Rest in Peace, a creature goes to the graveyard" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (theCreature, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
