@@ -1160,8 +1160,11 @@ resolveAbilityWith runSubgame abilId srcId ability = do
       -- lookup here answers Nothing. CR 702.122b's crewing itself is
       -- GameEvent.Crewed, which Activate writes at the payment.
       --
-      -- Not implemented: rule 702.122e's rider, the intervening "if" that would
-      -- read these creatures (#915).
+      -- Rule 702.122e's rider is what needs them on the event rather than on the
+      -- board: Pawl.Engine.Event.Binding stamps this set under
+      -- Pawl.Engine.Binding.crewers, so an intervening "if" reads only the
+      -- activation that caused the trigger (Pawl.CrewSpec's Mighty Servant of
+      -- Leuk-o group).
       case ActivatedAbility.keyword ability of
         Just (Keyword.Crew _) ->
           State.modify'

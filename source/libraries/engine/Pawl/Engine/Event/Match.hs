@@ -120,6 +120,18 @@ declarationsOf bearer gs =
         _ -> False
    in length (Seq.filter (declaredIt . LoggedEvent.event) (GameState.events gs))
 
+-- CR 702.122e: how many times the bearer has become crewed this turn --
+-- declarationsOf above one rule over, over GameEvent.BecameCrewed rather than
+-- the attack declaration. Counted per VEHICLE, and CR 400.7 mints a new object
+-- on a zone change, so a Vehicle that left and returned becomes crewed for the
+-- first time again.
+crewingsOf :: ObjectId -> GameState -> Int
+crewingsOf bearer gs =
+  let crewedIt event = case event of
+        GameEvent.BecameCrewed ev -> Crewing.vehicle ev == bearer
+        _ -> False
+   in length (Seq.filter (crewedIt . LoggedEvent.event) (GameState.events gs))
+
 -- Clarion Spirit's "your SECOND spell each turn": which of the turn's matching
 -- casts this one is, counting from one.
 --
@@ -7086,8 +7098,16 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- ability of the bearer RESOLVING. SelfTrains' arm above, line for line and
   -- for its reasons -- a bare id comparison, no view and no Filter, so a Vehicle
   -- that has since left the battlefield is still answered about the event.
-  TriggerCondition.SelfBecomesCrewed -> case event of
-    GameEvent.BecameCrewed ev -> Crewing.vehicle ev == bearer
+  TriggerCondition.SelfBecomesCrewed frequency -> case event of
+    GameEvent.BecameCrewed ev ->
+      Crewing.vehicle ev == bearer && case frequency of
+        TriggerFrequency.EveryTime -> True
+        -- Rule 702.122e's "for the first time each turn", counted the way
+        -- SelfAttacks' arm above counts declarations and for its reasons: the
+        -- crewing being matched is already logged when the scan reaches here, so
+        -- "the first time" is "the only one so far", and Engine.handoffTurn
+        -- clearing the log is what makes it "each turn".
+        TriggerFrequency.FirstTimeEachTurn -> crewingsOf bearer gs <= 1
     GameEvent.Convoked _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.Trained _ -> False

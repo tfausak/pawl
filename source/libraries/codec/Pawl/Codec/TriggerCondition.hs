@@ -134,7 +134,7 @@ codec =
           Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
           Arm.nullary "SelfExploits" TriggerCondition.SelfExploits,
           Arm.nullary "SelfTrains" TriggerCondition.SelfTrains,
-          Arm.nullary "SelfBecomesCrewed" TriggerCondition.SelfBecomesCrewed,
+          Arm.payload "SelfBecomesCrewed" TriggerFrequency.codec TriggerCondition.SelfBecomesCrewed (\x -> case x of TriggerCondition.SelfBecomesCrewed y -> Just y; _ -> Nothing),
           Arm.nullary "SelfCrewsVehicle" TriggerCondition.SelfCrewsVehicle,
           Arm.payload "PermanentSacrificed" PermanentSacrificed.codec TriggerCondition.PermanentSacrificed (\x -> case x of TriggerCondition.PermanentSacrificed y -> Just y; _ -> Nothing),
           Arm.payload "SagaFinalChapterTriggers" PlayerRelation.codec TriggerCondition.SagaFinalChapterTriggers (\x -> case x of TriggerCondition.SagaFinalChapterTriggers y -> Just y; _ -> Nothing),

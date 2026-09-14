@@ -424,11 +424,16 @@ data TriggerCondition
     SelfExploits
   | -- | CR 702.122e: "whenever this Vehicle becomes crewed" (Mobilizer Mech),
     -- which that rule defines as a crew ability of the bearer RESOLVING.
-    -- Self-scoped.
+    -- Self-scoped; the TriggerFrequency is Mighty Servant of Leuk-o's "for the
+    -- first time each turn", SelfAttacks' payload one rule over.
     --
-    -- Not implemented: rule 702.122e's second sentence, the intervening "if"
-    -- that reads the creatures which paid THAT activation's crew cost (#915).
-    SelfBecomesCrewed
+    -- Rule 702.122e's second sentence is read off Pawl.Engine.Binding.crewers,
+    -- which Pawl.Engine.Event.Binding stamps for every match: an intervening
+    -- "if" counts that slot rather than the board, so it means only the
+    -- creatures that paid the cost of the activation that caused the trigger.
+    -- Pawl.CrewSpec's "CR 702.122e a second crewing this turn does not trigger
+    -- it again" and "crewed by exactly two" are what prove it.
+    SelfBecomesCrewed TriggerFrequency.TriggerFrequency
   | -- | CR 702.122b: "whenever this creature crews a Vehicle" (Gearshift Ace),
     -- which that rule makes true of a creature tapped to pay a Vehicle's crew
     -- cost. Self-scoped, SelfBecomesCrewed's other side: that one is asked of the

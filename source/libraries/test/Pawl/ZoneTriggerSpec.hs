@@ -2382,7 +2382,7 @@ representativeEvents cond =
         TriggerCondition.SelfExploits -> one (GameEvent.Exploited (Exploited.MkExploited departed departed))
         -- CR 702.122e's own event, and the only one this condition admits, on
         -- `departed` for SelfTrains' reason above.
-        TriggerCondition.SelfBecomesCrewed -> one (GameEvent.BecameCrewed (Crewing.MkCrewing departed (Set.singleton departed)))
+        TriggerCondition.SelfBecomesCrewed _ -> one (GameEvent.BecameCrewed (Crewing.MkCrewing departed (Set.singleton departed)))
         -- CR 702.122b's own event, with `departed` on BOTH sides so the pair
         -- matches whichever side the arm reads.
         TriggerCondition.SelfCrewsVehicle -> one (GameEvent.Crewed (Crewing.MkCrewing departed (Set.singleton departed)))
@@ -2659,7 +2659,7 @@ everyTriggerCondition =
     TriggerCondition.SelfManaAbilityResolves,
     TriggerCondition.SelfTrains,
     TriggerCondition.SelfExploits,
-    TriggerCondition.SelfBecomesCrewed,
+    TriggerCondition.SelfBecomesCrewed TriggerFrequency.EveryTime,
     TriggerCondition.SelfCrewsVehicle,
     -- ALL THREE relations, on the PlayerAttacksWith rows' reasoning above: an
     -- eventBindings arm that had cased on the relation and stamped nothing under

@@ -1504,7 +1504,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfManaAbilityResolves -> condition
   TriggerCondition.SelfTrains -> condition
   TriggerCondition.SelfExploits -> condition
-  TriggerCondition.SelfBecomesCrewed -> condition
+  TriggerCondition.SelfBecomesCrewed {} -> condition
   TriggerCondition.SelfCrewsVehicle -> condition
   TriggerCondition.PermanentSacrificed payload -> TriggerCondition.PermanentSacrificed payload {PermanentSacrificed.filter = Filter.rewrite pairs (PermanentSacrificed.filter payload)}
   TriggerCondition.SagaFinalChapterTriggers _ -> condition
