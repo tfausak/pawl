@@ -2211,6 +2211,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.PartnerText _ -> keyword
   Keyword.Type.ChooseABackground -> keyword
   Keyword.Type.DoctorsCompanion -> keyword
+  -- CR 702.124j's payload is a card NAME, which CR 612.2 says outright a
+  -- subtype- or colour-word change cannot touch.
+  Keyword.Type.PartnerWith _ -> keyword
   -- CR 702.23a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Rampage _ -> keyword
   Keyword.Type.Aftermath -> keyword

@@ -2739,6 +2739,9 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j's payload is a card NAME, not a quality: the Filter.HasName its
+  -- minted ability carries is the engine's, never a card's.
+  Keyword.PartnerWith _ -> []
   -- CR 702.121a names no quality: the bonus is computed from the combat record
   -- by the ability Pawl.Engine.Keyword mints, not from anything the card prints.
   Keyword.Melee -> []

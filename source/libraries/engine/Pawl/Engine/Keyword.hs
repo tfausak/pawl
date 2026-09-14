@@ -391,6 +391,10 @@ abilitiesFor keyword count = case keyword of
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j is the odd one of the five: it "represents two abilities",
+  -- and the second functions in the game rather than before it. CR 603.2 gives
+  -- one ability per instance, rule 702.124j stating no clause of its own.
+  Keyword.PartnerWith name -> List.genericReplicate count (partnerWith name)
   Keyword.Escalate _ -> []
   Keyword.Riot -> []
   Keyword.Escape _ -> []
@@ -621,6 +625,9 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j's second ability is a TRIGGERED ability, which `abilitiesFor`
+  -- mints; no part of it belongs to this roster.
+  Keyword.PartnerWith _ -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1094,6 +1101,9 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j's second ability is a TRIGGERED ability, which `abilitiesFor`
+  -- mints; no part of it belongs to this roster.
+  Keyword.PartnerWith _ -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1701,6 +1711,9 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j's second ability is a TRIGGERED ability, which `abilitiesFor`
+  -- mints; no part of it belongs to this roster.
+  Keyword.PartnerWith _ -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -2313,6 +2326,9 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j's second ability is a TRIGGERED ability, which `abilitiesFor`
+  -- mints; no part of it belongs to this roster.
+  Keyword.PartnerWith _ -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -3864,6 +3880,9 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j's second ability is a TRIGGERED ability, which `abilitiesFor`
+  -- mints; no part of it belongs to this roster.
+  Keyword.PartnerWith _ -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -4146,6 +4165,9 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j's second ability is a TRIGGERED ability, which `abilitiesFor`
+  -- mints; no part of it belongs to this roster.
+  Keyword.PartnerWith _ -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -4423,6 +4445,9 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.PartnerText _ -> []
   Keyword.ChooseABackground -> []
   Keyword.DoctorsCompanion -> []
+  -- CR 702.124j's second ability is a TRIGGERED ability, which `abilitiesFor`
+  -- mints; no part of it belongs to this roster.
+  Keyword.PartnerWith _ -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -4648,6 +4673,8 @@ familyOf keyword = case keyword of
   Keyword.DoctorsCompanion -> Nothing
   -- CR 702.124i's text is the payload the family drops.
   Keyword.PartnerText _ -> Just KeywordFamily.PartnerText
+  -- CR 702.124j's name is the payload the family drops.
+  Keyword.PartnerWith _ -> Just KeywordFamily.PartnerWith
   Keyword.Escalate _ -> Just KeywordFamily.Escalate
   Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing
@@ -6573,6 +6600,63 @@ soulshift n =
 -- The slot rule 702.46a's one target is chosen into, mentorTarget's position.
 soulshiftTarget :: SlotName.SlotName
 soulshiftTarget = SlotName.MkSlotName (Text.pack "soulshifted")
+
+-- CR 702.124j's SECOND ability: "When this permanent enters, target player may
+-- search their library for a card named [name], reveal it, put it into their
+-- hand, then shuffle." The rule's first ability is deck construction and mints
+-- nothing here -- Pawl.Engine.Commander.designations reads it off the printed
+-- face instead.
+--
+-- TARGET PLAYER and not the controller, which is what makes the slot a target
+-- slot rather than a PlayerRef.Relative: rule 702.124j says "target player", so
+-- a card whose controller has no copy of the named card can still point the
+-- trigger at somebody who does. The searcher and the library are the SAME slot,
+-- rule 702.124j's "their library" being the targeted player's -- the coupled
+-- reading Pawl.Types.Search.owner argues for.
+--
+-- The "may" hangs on the TARGET, not on the controller: Optionality.Optional
+-- names the slot, so the player being searched is the one asked.
+--
+-- SearchDestination.RevealThenHand is rule 702.124j's "reveal it, put it into
+-- their hand", which is one sentence and one arm. The printed reminder text
+-- shortens it to "put it into their hand from their library"; the rule is what
+-- this follows.
+--
+-- Filter.HasName and not a printing identity: CR 201.2a is what "a card named
+-- [name]" asks, so a differently-printed copy of the named card is found and a
+-- renamed one is not.
+partnerWith :: CardName.CardName -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+partnerWith name =
+  let slot = TargetSlot.required Pool.Players Nothing
+      effect =
+        Effect.Search
+          Search.MkSearch
+            { Search.searcher = PlayerRef.InSlot partnerWithTarget,
+              Search.owner = PlayerRef.InSlot partnerWithTarget,
+              Search.zones = Set.singleton Zone.Library,
+              Search.quantity = Just (Quantity.Literal 1),
+              Search.filter = Filter.HasName name,
+              -- Rule 702.124j prints no "up to", and the filter states a quality,
+              -- so CR 701.23b governs and this value is unobservable --
+              -- searchForSameManaValue's reading.
+              Search.upTo = False,
+              Search.destination = SearchDestination.RevealThenHand,
+              -- Nothing attaches and the filter asks no CR 701.3a question.
+              Search.subject = Nothing
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.InSlot partnerWithTarget)) Nothing (Seq.singleton effect))) (Map.singleton partnerWithTarget slot)))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slot rule 702.124j's one target is chosen into, soulshiftTarget's position.
+partnerWithTarget :: SlotName.SlotName
+partnerWithTarget = SlotName.MkSlotName (Text.pack "partnered")
 
 -- CR 702.55a: haunt. Soulshift's shape -- the CR 700.4 dies event and one target
 -- slot -- with the clause mandatory, rule 702.55a stating no "may".
