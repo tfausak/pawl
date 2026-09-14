@@ -5217,10 +5217,14 @@ printedActivationThresholdReductionSpec s registry = Spec.describe s "PrintedAct
 -- 702.177a rewrites the second into "{3}{G}: ... Activate only once." Oracle text
 -- checked against Scryfall 2026-09-06.
 --
--- pawl's transcription omits the printed word "Exhaust" and states the rider it
--- rewrites into directly (ActivationRestriction.OnlyOnce). Nothing on this card
--- reads the marker, so the omission is behaviourally exact here; a card that
--- names "exhaust abilities" cannot be written yet (#3044, #3021).
+-- pawl's transcription carries the keyword on that second ability
+-- (Pawl.Types.ActivatedAbility.keyword), which is what Boom Scholar's "exhaust
+-- abilities of other permanents you control" names -- the Exhaust group above is
+-- where that pair is proved.
+--
+-- Not implemented: rule 702.177a's rewriting, so the card states the rider it
+-- rewrites into directly (ActivationRestriction.OnlyOnce) rather than having the
+-- keyword add it (#3044).
 --
 -- EIGHT Forests, which is exactly two activations of {3}{G}: the rider is the
 -- only thing standing between alice and the second one, so a board that ignored

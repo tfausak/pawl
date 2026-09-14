@@ -116,7 +116,8 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- and CR 702.184a's station -- and Pawl.Engine.Keyword's minters stamp each
     -- of those. Or it ADDS RULES to an ability the card prints after it (CR
     -- 702.177a's exhaust), and then the CARD writes the stamp, since no minter
-    -- ever sees that ability. Pawl.Engine.Keyword.statesAbility is the line, and
+    -- ever sees that ability. Pawl.Engine.Keyword.addsRulesToPrintedAbility is
+    -- the line, and
     -- Pawl.CardSpec's "CR 702 no card claims a keyword minted an ability it
     -- printed" is the lint that holds a card to the second side of it.
     --
@@ -131,13 +132,13 @@ data ActivatedAbility card ability = MkActivatedAbility
     --
     -- ORIGIN, not shape. The classification used to be re-minting plus value
     -- equality, which cannot tell rule 702.6a's ability from a card that printed
-    -- the same words. The objection to a field was that it would put an
-    -- engine-only fact on the wire where a card could author a lie; the answer is
-    -- a lint rather than an absent key, since Pawl.Codec.GameState reaches this
-    -- type through Pawl.Codec.Object and an ability on the stack has to
-    -- round-trip its stamp. Pawl.CardSpec's "CR 702 no card claims a keyword
-    -- minted an ability it printed" is that lint, over every ability a face
-    -- prints and every ability a layer-6 grant carries.
+    -- the same words. The objection to a field was that it would let a card
+    -- author a lie about a minter's work; the answer is a lint rather than an
+    -- absent key, since Pawl.Codec.GameState reaches this type through
+    -- Pawl.Codec.Object and an ability on the stack has to round-trip its stamp
+    -- either way. Pawl.CardSpec's "CR 702 no card claims a keyword minted an
+    -- ability it printed" is that lint, over every ability a face prints and
+    -- every ability a layer-6 grant carries.
     --
     -- THE WHOLE KEYWORD rather than a Pawl.Types.KeywordFamily, because CR
     -- 702.184a's station and CR 702.177a's exhaust are nullary and that type

@@ -5997,8 +5997,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- exhaust adds rules to the ability printed after it rather than stating one,
   -- so no minter ever sees that ability and Boom Scholar's "exhaust abilities of
   -- other permanents you control" has nothing to reach unless the card says so.
-  -- Pawl.Engine.Keyword.statesAbility is the line, derived from the rosters that
-  -- do the minting.
+  -- Pawl.Engine.Keyword.addsRulesToPrintedAbility is the line.
   --
   -- EVERY face a printing can put an object on the battlefield with, which is
   -- `card : mintedFaces card` and not the printing's own faces: an activated
@@ -6010,7 +6009,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- granter.
   Spec.it s "CR 702 no card claims a keyword minted an ability it printed" $ do
     ps <- S.allPrintings s
-    let claimed f = filter (any KeywordEngine.statesAbility . ActivatedAbility.keyword) (Face.activatedAbilities f <> grantedActivatedAbilities f)
+    let claimed f = filter (not . all KeywordEngine.addsRulesToPrintedAbility . ActivatedAbility.keyword) (Face.activatedAbilities f <> grantedActivatedAbilities f)
         claims f = not (null (claimed f))
         printsAbilities f = not (null (Face.activatedAbilities f))
         everyFace = overFaces (\f -> f : mintedFaces f)

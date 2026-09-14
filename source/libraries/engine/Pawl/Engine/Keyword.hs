@@ -482,7 +482,8 @@ abilitiesFor keyword count = case keyword of
 -- Pawl.Types.ActivatedAbility.keyword and what `designates` below compares.
 --
 -- The MINTERS' half of that field. CR 702.177a's exhaust is printed rather than
--- minted, so its stamp is the card's and never passes through here.
+-- minted, so its stamp is the card's and never passes through here; see
+-- `addsRulesToPrintedAbility` below for the other half.
 --
 -- Applied by the two rosters rather than inside each minter, so the next keyword
 -- that states an activated ability is stamped whether or not whoever adds it
@@ -4507,25 +4508,24 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Scavenge _ -> []
   Keyword.Encore _ -> []
 
--- CR 702: does rule 702 STATE this keyword's activated ability, rather than add
--- rules to one the card prints? True for every keyword the three rosters above
--- mint an activated ability for -- CR 702.6a's equip, CR 702.29a's cycling, CR
--- 702.184a's station -- and False for CR 702.177a's exhaust, whose ability is
--- PRINTED with the stamp on it.
+-- CR 702.177a: does rule 702 ADD RULES to the activated ability printed after
+-- this keyword, rather than state an ability of its own? These are the only
+-- keywords a CARD may write on Pawl.Types.ActivatedAbility.keyword -- every other
+-- stamp there is a minter's, `mintedBy`'s above -- and Pawl.CardSpec's "CR 702 no
+-- card claims a keyword minted an ability it printed" is the lint that says so.
 --
--- The line Pawl.CardSpec's "CR 702 no card claims a keyword minted an ability it
--- printed" draws: a card may write Pawl.Types.ActivatedAbility.keyword only where
--- this is False, since the minters are the only writers on the other side.
+-- LISTED rather than derived off the rosters: there is no roster to read this
+-- side off, since the ability is the card's. The fallthrough answers False, which
+-- is the closed direction -- a keyword of this shape that is not named here makes
+-- the lint reject the first card that writes it, which is where it would be
+-- noticed.
 --
--- DERIVED from the rosters rather than listed, mintsReplacement's shape: a
--- keyword added to one of them is on this side of the line by that fact alone.
--- The count 1 is battlefieldAbilitiesFor's, and any count would do -- no roster
--- mints an ability only above one instance.
-statesAbility :: Keyword -> Bool
-statesAbility keyword =
-  not (null (handAbilitiesFor keyword))
-    || not (null (graveyardAbilitiesFor keyword))
-    || not (null (battlefieldAbilitiesFor keyword 1))
+-- CR 702.142a's boast and CR 702.193a's power-up are the rule's other two of this
+-- shape, and neither has a Pawl.Types.Keyword constructor yet (#3044).
+addsRulesToPrintedAbility :: Keyword -> Bool
+addsRulesToPrintedAbility keyword = case keyword of
+  Keyword.Exhaust -> True
+  _ -> False
 
 -- CR 702: does a card's designator name the keyword whose rules this ability is
 -- under? The comparison Pawl.Types.ReduceActivationCost.grantedBy is put through,
