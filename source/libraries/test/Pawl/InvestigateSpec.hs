@@ -892,6 +892,35 @@ wildEvocationSpec s registry =
       choosingHalf want p = case p of
         Prompt.ChooseOfferedCastSpell _ _ options -> (fst (NonEmpty.head options), want)
         _ -> rolling 0 p
+      -- choosingHalf with CR 601.2c pinned as well, for a board where a half's
+      -- slot admits more than one permanent: S.identityAnswer would take the
+      -- least Recipients instead, and alice's own Wild Evocation is an
+      -- enchantment Tear could be aimed at.
+      choosingHalfAimed :: [ObjectId.ObjectId] -> CardName.CardName -> Prompt.Prompt r -> r
+      choosingHalfAimed wanted want p = case p of
+        Prompt.ChooseOfferedCastSpell _ _ options -> (fst (NonEmpty.head options), want)
+        _ -> takingTargets 1 wanted p
+      -- CR 118.8c's question alone, counted, with CR 709.3's half pinned by name:
+      -- "bob was asked whether to cast" on a board whose offered card has two
+      -- castable halves, only one of them excused.
+      offersChoosing :: CardName.CardName -> GameState.GameState -> Int
+      offersChoosing want gs =
+        let counting :: Prompt.Prompt r -> State.State Int r
+            counting p = case p of
+              Prompt.OfferedCast {} -> do
+                State.modify (+ 1)
+                pure (S.identityAnswer p)
+              _ -> pure (choosingHalf want p)
+         in State.execState
+              (Engine.runGame counting (atBobsUpkeep gs) (Engine.settleForPriority >> Engine.priorityLoop))
+              0
+      -- choosingHalf TAKING CR 608.2g's offer, for the same reason `exercising`
+      -- below does it: S.identityAnswer declines, so a leg asserting an excused
+      -- cast can still be made would be green whatever the engine did.
+      takingHalf :: CardName.CardName -> Prompt.Prompt r -> r
+      takingHalf want p = case p of
+        Prompt.OfferedCast {} -> OptionalDecision.Exercises
+        _ -> choosingHalf want p
       -- The same again, TAKING the offer. S.identityAnswer bottoms out in
       -- Replay.defaultAnswer, whose Prompt.OfferedCast arm declines, so a leg
       -- asserting a cast HAPPENED on an excused branch would otherwise pass
@@ -1144,6 +1173,73 @@ wildEvocationSpec s registry =
           Spec.assertEqWith s "and it really was cast: bob's hand is empty and the stack is clear" (bobsHand after, length (GameState.stack after)) ([], 0)
           Spec.assertEqWith s "one option is no CR 709.3 choice, so no half was offered at all" (halvesOffered gs) []
           Spec.assertEqWith s "and CR 608.2g's instruction asked nothing either" (offersUnder 0 gs) 0
+        -- CR 702.102a: "if a player casts a split card with fuse FROM THEIR HAND,
+        -- the player may choose to cast both halves of that split card rather
+        -- than choose one half". The permission is about the zone the card is in,
+        -- so CR 608.2g's offer of a card in a hand reaches it exactly as the
+        -- ordinary cast action does, and the fused spell is a THIRD option beside
+        -- the two halves rather than a replacement for either.
+        --
+        -- Wear // Tear is the pool's fuse card: its halves destroy DIFFERENT
+        -- permanents, so "both halves resolved" is a board neither half alone
+        -- reaches, and all three answers are legal on one board.
+        --
+        -- THREE legs off that one board, differing only in the half answered,
+        -- because each of the two wrong shapes -- the fused spell missing, and
+        -- the fused spell standing in place of a half -- is green under a
+        -- narrower pair.
+        Spec.it s "CR 702.102a an offered cast from a hand offers the fused spell beside both halves" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          sphere <- S.printingOf s registry "Chromatic Sphere"
+          prison <- S.printingOf s registry "Ghostly Prison"
+          wearTear <- S.printingOf s registry "Wear"
+          let (sphereId, withSphere) = S.addPermanent sphere S.alice (board evocation [wearTear])
+              (prisonId, gs) = S.addPermanent prison S.alice withSphere
+              leg want = runBobsUpkeep (choosingHalfAimed [sphereId, prisonId] (named want)) gs
+              standing g = (S.onBattlefield sphereId g, S.onBattlefield prisonId g)
+          Spec.assertEqWith s "CR 702.102d: the fused answer destroys the artifact AND the enchantment" (standing (leg "Wear//Tear")) (False, False)
+          Spec.assertEqWith s "CR 709.3a: Wear alone leaves the Prison and Tear alone leaves the Sphere" (standing (leg "Wear"), standing (leg "Tear")) ((False, True), (True, False))
+          Spec.assertEqWith s "both start on the battlefield, so each leg is a change" (standing gs) (True, True)
+          Spec.assertEqWith s "and the one CR 709.3 choice carried three casts" (halvesOffered gs) [[named "Wear", named "Tear", named "Wear//Tear"]]
+        -- CR 118.8c is a property of the HALF being cast, which CR 709.3a is what
+        -- makes it: "only the chosen half is evaluated to see if it can be
+        -- cast". So one mandatory offer of a two-halved card can excuse one half
+        -- and force the other, off the same board and the same offer.
+        --
+        -- Synthetic Ransack // Synthetic Ransom is the card, and no printing is.
+        -- Scryfall `(layout:adventure or layout:split or layout:modal_dfc or
+        -- layout:omen) o:/as an additional cost/`, 2026-09-14, returns four --
+        -- Kazuul's Fury // Kazuul's Cliffs, Start // Finish, My Precious //
+        -- Allure of Power, and Extus, Oriq Overlord // Awaken the Blood Avatar --
+        -- and every one of them sacrifices a creature, which CR 400.2 makes a
+        -- PUBLIC zone (Extus's is a "you may" besides, an optional cost rule
+        -- 118.8c does not reach at all). A printing pairing a multi-half layout
+        -- with a hidden-zone additional cost is what would refute that.
+        --
+        -- The synthetic's two halves differ in exactly one thing: the front
+        -- states "discard a land card" (CR 701.23b's stated quality in CR 400.2's
+        -- hidden zone) and the back states no additional cost at all.
+        --
+        -- The Forest is in bob's hand throughout, so the cost is PAYABLE and the
+        -- third leg pays it: this is rule 118.8c's "even if those cards are
+        -- present in that zone" rather than the CR 601.3 guard the Plummet leg
+        -- above exercises.
+        Spec.it s "CR 118.8c the excuse is the half's, so one half is offered and the other forced" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          ransack <- S.printingOf s registry "Synthetic Ransack"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          let gs = withLibrary [wraith, bolt] (board evocation [ransack, forest, piker])
+              ransackLeg = runBobsUpkeep (choosingHalf (named "Synthetic Ransack")) gs
+              ransomLeg = runBobsUpkeep (choosingHalf (named "Synthetic Ransom")) gs
+              takenLeg = runBobsUpkeep (takingHalf (named "Synthetic Ransack")) gs
+              librarySize g = length (Game.zoneMembers Zone.Library S.bob g)
+          Spec.assertEqWith s "the half stating NO hidden-zone cost is still an instruction: bob gained the five life without being asked" (S.lifeOf S.bob ransomLeg) (Just 25)
+          Spec.assertEqWith s "the half that states one became a may, and declining it drew nothing and discarded nothing" (S.lifeOf S.bob ransackLeg, librarySize ransackLeg, bobsGraveyard ransackLeg) (Just 20, 2, [])
+          Spec.assertEqWith s "and taking it pays the stated-quality cost: the Forest was discarded and two cards drawn" (List.sort (bobsGraveyard takenLeg), librarySize takenLeg) (["Forest", "Synthetic Ransack//Synthetic Ransom"], 0)
+          Spec.assertEqWith s "so exactly one of the two halves put CR 118.8c's question on the wire" (offersChoosing (named "Synthetic Ransack") gs, offersChoosing (named "Synthetic Ransom") gs) (1, 0)
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.

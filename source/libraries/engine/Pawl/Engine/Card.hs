@@ -770,11 +770,11 @@ castableFaces card = case Card.layout card of
 -- that cannot be fused. Not in `castableFaces` above and never offered beside its
 -- halves there, because rule 702.102a states a zone this function cannot see --
 -- "fuse is a static ability found on some split cards that applies WHILE THE CARD
--- WITH FUSE IS IN A PLAYER'S HAND" -- so Pawl.Engine.Cast.castableSpells, which
--- has the zone, is what offers it. Every other road to a cast (an effect's offer,
--- Pawl.Engine.Resolve.Effect.offerCast) therefore reaches the halves alone. Not
--- implemented: fusing under a permission an effect grants for a cast from the
--- hand (gap #2787).
+-- WITH FUSE IS IN A PLAYER'S HAND" -- so a caller that has the zone is what
+-- offers it. Both roads to a cast do: Pawl.Engine.Cast.castableSpells for the
+-- ordinary action, and Pawl.Engine.Resolve.Effect.offerCast for a permission an
+-- effect grants (Pawl.InvestigateSpec's "CR 702.102a an offered cast from a hand
+-- offers the fused spell beside both halves").
 --
 -- Built on `combined`, which is CR 702.102b read rather than restated: "a fused
 -- split spell has the combined characteristics of its two halves. (See rule

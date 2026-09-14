@@ -918,7 +918,8 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 --   1. IS THERE ANYTHING TO OFFER -- an id the reference named (CR 400.7) may no
 --      longer resolve to an object (CR 603.7c).
 --   2. WHICH FACE: CR 712.11a for the `transformed` rider, otherwise
---      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3, CR 720.3), less the face
+--      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3, CR 720.3) plus CR
+--      702.102a's fused face for a fuse card in the caster's hand, less the face
 --      CR 702.162a's or CR 702.146a's alternative cost is the only road to, when
 --      this offer states an alternative cost of its own (CR 118.9a).
 --   3. WHAT IT COSTS (CR 118.9): `withoutPayingManaCost` or a stated
@@ -964,20 +965,40 @@ offerCast context named caster optionality offer = do
       -- rule 702.162a's limb is driven (Pawl.InvestigateSpec's "CR 118.9a a free
       -- offer does not also offer the converted face").
       --
-      -- Card.castableFaces carries the HALVES and never Card.fusedFace, so an
-      -- offer naming a card in a hand offers each half and no fused cast. Not
-      -- implemented: CR 702.102a's fused cast under a permission an effect grants
-      -- (#2787). The direction is the safe one -- this list only ever offers less
-      -- than the rules allow, never a cast for free.
-      faces card
+      -- Card.castableFaces carries the HALVES and never Card.fusedFace, so rule
+      -- 702.102a's third offer is added here, beside them and never instead of
+      -- them: "if a player casts a split card with fuse FROM THEIR HAND, the
+      -- player may choose to cast both halves of that split card rather than
+      -- choose one half". CR 608.2g's offer is a permission about a zone, so it
+      -- reaches that cast exactly as the ordinary action does; which of the three
+      -- is taken stays the caster's choice below.
+      --
+      -- THE ZONE is the rule's own -- fuse "applies while the card with fuse is in
+      -- a player's hand" -- and so is the SEAT: "from their hand", which CR 400.3
+      -- makes the owner's, the seat Game.zoneMembers indexes a hand by. So an
+      -- offer letting a player cast out of somebody ELSE'S hand (Sen Triplets,
+      -- see #2169) offers that card's halves alone -- the rule's own narrowing
+      -- and not an elision. Pawl.Engine.Cast.castableSpells'
+      -- fusedProposals is this same offer on the ordinary-action road, and the two
+      -- read the same zone for the same reason.
+      --
+      -- FACE UP alone, that road's other narrowing, needs no arm here: an
+      -- OfferCast opcode carries no morph rider at all (see `proposed` below).
+      fusedFaces oid card
+        | elem oid (Game.zoneMembers Zone.Hand caster gs) = Maybe.maybeToList (Card.fusedFace card)
+        | otherwise = []
+      faces oid card
         | CastOffer.transformed offer = fmap pure (Card.backFace card)
-        | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Card.castableFaces card))
-        | otherwise = Just (Card.castableFaces card)
+        | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Card.castableFaces card) <> fusedFaces oid card)
+        | otherwise = Just (Card.castableFaces card <> fusedFaces oid card)
       -- One proposal per half, gated on its own (CR 709.3a, CR 712.11c), which
       -- is why the whole tuple is built per face rather than once per card.
       --
-      -- The excuse being the half's is unobserved: no printing pairs a
-      -- multi-half layout with a hidden-zone additional cost (gap #1814).
+      -- The excuse below being the HALF's and not the card's is what CR 709.3a
+      -- makes it, and Pawl.InvestigateSpec's "CR 118.8c the excuse is the half's,
+      -- so one half is offered and the other forced" is the board that proves it:
+      -- one mandatory offer of a split card whose front half states a hidden-zone
+      -- additional cost and whose back half states none.
       proposal oid face =
         let name = Face.name face
             -- CR 118.9a: at most ONE alternative cost, so the applied one
@@ -1025,7 +1046,7 @@ offerCast context named caster optionality offer = do
         concatMap
           ( \oid -> Maybe.fromMaybe [] $ do
               card <- Game.cardOf oid gs
-              fmap (Maybe.mapMaybe (proposal oid)) (faces card)
+              fmap (Maybe.mapMaybe (proposal oid)) (faces oid card)
           )
           named
   -- No survivor is no offer; one survivor is one outcome, so CR 601.3's choice is
