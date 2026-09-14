@@ -17,12 +17,13 @@
 -- zone change and a commander crosses zones constantly, so nothing keyed to an
 -- object could survive its first cast.
 --
--- WHAT IS NOT IMPLEMENTED, none of which the pool can reach:
+-- WHAT IS NOT IMPLEMENTED:
 --
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
---   * CR 702.124j's partner with [name], and CR 903.3a's "this card can be
---     your commander" (#939).
+--   * CR 903.3a's "this card can be your commander" (#939) -- Rowan Kenrith
+--     and Will Kenrith print it, and reaching it means enforcing rule 903.3's
+--     restriction first, which is #940's.
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
 module Pawl.Engine.Commander where
 
@@ -37,6 +38,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Subtype as Subtype.Engine
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Deck as Deck
@@ -68,7 +70,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- commanders. One designation is rule 903.3's; two are rule 702.124h's, and
 -- only when EACH of them has partner -- "you can have two commanders if both
 -- have partner" -- or rule 702.124i's, and only when both have the SAME
--- partner—[text] ability, or rule 702.124k's, and only when one has "choose a
+-- partner—[text] ability, or rule 702.124j's, and only when each names the
+-- other, or rule 702.124k's, and only when one has "choose a
 -- Background" and the other is a legendary Background enchantment card, or rule
 -- 702.124m's, and only when one has "Doctor's companion" and the other is a
 -- legendary Time Lord Doctor creature card with no other creature types.
@@ -106,8 +109,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- designates on its own like any other. So the ONE-card case is gated for a
 -- Background and not for a Doctor.
 --
--- Not implemented: CR 702.124j's partner with [name], which admits a different
--- pair; and CR 903.3a's "this card can be your commander" (#939).
+-- Not implemented: CR 903.3a's "this card can be your commander" (#939).
 designations :: Deck.Deck -> Set.Set Printing.Printing
 designations deck =
   let named = Deck.commander deck
@@ -117,6 +119,7 @@ designations deck =
         [_] -> named
         [_, _] | all hasPartner named -> named
         [a, b] | sharesPartnerText a b -> named
+        [a, b] | namesEachOther a b -> named
         [a, b] | choosesBackground a && isBackground b -> named
         [a, b] | choosesBackground b && isBackground a -> named
         [a, b] | isDoctorsCompanion a && isTheDoctor b -> named
@@ -138,6 +141,41 @@ sharesPartnerText a b = not (Set.null (Set.intersection (partnerTexts a) (partne
 partnerTexts :: Printing.Printing -> Set.Set PartnerText.PartnerText
 partnerTexts printing =
   Set.fromList [text | Keyword.PartnerText text <- Set.toList (Face.keywords (Card.frontFace (Printing.card printing)))]
+
+-- | CR 702.124j's requirement of the pair: "two legendary cards ... if each has
+-- a 'partner with [name]' ability with the other's name". Both memberships,
+-- because the rule asks it of EACH card. Every printed pair names both ways, so
+-- the two are proved only as a conjunction; no board tells them apart.
+--
+-- The legendary test is rule 702.124j's own word and is not idle the way it
+-- would be under CR 702.124h: Ley Weaver and Lore Weaver name each other and are
+-- not legendary, so they are the pair this conjunct alone refuses.
+-- Pawl.CommanderSpec's "CR 702.124j the pair admits only two legendary cards
+-- that name each other" is the proof.
+namesEachOther :: Printing.Printing -> Printing.Printing -> Bool
+namesEachOther a b =
+  legendary a
+    && legendary b
+    && Set.member (printedName b) (partnerWithNames a)
+    && Set.member (printedName a) (partnerWithNames b)
+
+-- | The names this card's front face has a partner with ability for, for the
+-- reason `designations` gives. A set because CR 702.124g lets one card carry
+-- more than one partner ability.
+partnerWithNames :: Printing.Printing -> Set.Set CardName.CardName
+partnerWithNames printing =
+  Set.fromList [name | Keyword.PartnerWith name <- Set.toList (Face.keywords (Card.frontFace (Printing.card printing)))]
+
+-- | CR 702.124j's "[name]", matched against the printed front face's name -- CR
+-- 201.2a's identity, and the same face every other limb here reads.
+printedName :: Printing.Printing -> CardName.CardName
+printedName = Face.name . Card.frontFace . Printing.card
+
+-- | CR 702.124j's "two LEGENDARY cards". Narrower than `legendaryCreature`,
+-- which CR 702.124m's limb needs: rule 702.124j asks only for a legendary card.
+legendary :: Printing.Printing -> Bool
+legendary printing =
+  Set.member Supertype.Legendary (TypeLine.supertypes (Face.typeLine (Card.frontFace (Printing.card printing))))
 
 -- | CR 702.124k's requirement of the card that names the other.
 choosesBackground :: Printing.Printing -> Bool
@@ -182,9 +220,8 @@ isTheDoctor printing =
 -- 702.124k for a legendary enchantment, so neither limb above shares this.
 legendaryCreature :: Printing.Printing -> Bool
 legendaryCreature printing =
-  let typeLine = Face.typeLine (Card.frontFace (Printing.card printing))
-   in Set.member Supertype.Legendary (TypeLine.supertypes typeLine)
-        && Set.member CardType.Creature (TypeLine.types typeLine)
+  legendary printing
+    && Set.member CardType.Creature (TypeLine.types (Face.typeLine (Card.frontFace (Printing.card printing))))
 
 -- | CR 702.124a: a partner ability is read off the printed front face, for the
 -- reason `designations` gives.

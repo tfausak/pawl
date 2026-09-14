@@ -162,6 +162,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   taxSpec s registry
   partnerSpec s registry
   partnerTextSpec s registry
+  partnerWithSpec s registry
   backgroundSpec s registry
   doctorsCompanionSpec s registry
   bounceSpec s registry
@@ -553,6 +554,38 @@ partnerTextSpec s registry = Spec.describe s "Partner text" $ do
     Spec.assertEqWith s "CR 702.124i: Bjorna beside a different partner—[text] designates neither" (commandZoneNames (board [bjorna, april])) []
     Spec.assertEqWith s "CR 702.124f: plain partner is not this one, so Bjorna beside Akiri designates neither" (commandZoneNames (board [bjorna, akiri])) []
     Spec.assertEqWith s "control leg: Bjorna named alone still is (CR 903.3)" (commandZoneNames (board [bjorna])) [S.nameOf (Printing.card bjorna)]
+
+partnerWithSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+partnerWithSpec s registry = Spec.describe s "Partner with" $ do
+  -- CR 702.124j: "each has a 'partner with [name]' ability with the other's
+  -- name", and CR 702.124b starts both in the command zone.
+  Spec.it s "CR 702.124j two cards that name each other are both designated" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    silvar <- S.printingOf s registry "Silvar, Devourer of the Free"
+    trynn <- S.printingOf s registry "Trynn, Champion of Freedom"
+    let gs = partnerBoard mountain plains 6 [silvar, trynn]
+    Spec.assertEqWith s "both are in the command zone" (List.sort (commandZoneNames gs)) (List.sort [S.nameOf (Printing.card silvar), S.nameOf (Printing.card trynn)])
+    Spec.assertEqWith s "she is designated both" (fmap (List.sort . commanderPrintingsOf gs) (Map.lookup S.alice (GameState.players gs))) (Just (List.sort [silvar, trynn]))
+  -- Each leg is the control board with ONE printing swapped. Lore Weaver has
+  -- partner with, but names Ley Weaver rather than Silvar; Akiri has plain
+  -- partner, which CR 702.124f keeps from combining with this one; and Ley
+  -- Weaver beside Lore Weaver DO name each other, which is what makes rule
+  -- 702.124j's "two LEGENDARY cards" the only thing refusing that pair.
+  Spec.it s "CR 702.124j the pair admits only two legendary cards that name each other" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    silvar <- S.printingOf s registry "Silvar, Devourer of the Free"
+    trynn <- S.printingOf s registry "Trynn, Champion of Freedom"
+    ley <- S.printingOf s registry "Ley Weaver"
+    lore <- S.printingOf s registry "Lore Weaver"
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    let board = partnerBoard mountain plains 6
+    Spec.assertEqWith s "control leg: Silvar beside Trynn designates both" (List.length (commandZoneNames (board [silvar, trynn]))) 2
+    Spec.assertEqWith s "CR 702.124j: Silvar beside a partner with naming somebody else designates neither" (commandZoneNames (board [silvar, lore])) []
+    Spec.assertEqWith s "CR 702.124j: Ley Weaver and Lore Weaver name each other but are not legendary, so neither is designated" (commandZoneNames (board [ley, lore])) []
+    Spec.assertEqWith s "CR 702.124f: plain partner is not this one, so Silvar beside Akiri designates neither" (commandZoneNames (board [silvar, akiri])) []
+    Spec.assertEqWith s "control leg: Silvar named alone still is (CR 903.3)" (commandZoneNames (board [silvar])) [S.nameOf (Printing.card silvar)]
 
 backgroundSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 backgroundSpec s registry = Spec.describe s "Choose a Background" $ do

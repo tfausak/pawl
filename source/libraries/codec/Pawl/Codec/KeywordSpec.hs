@@ -1,9 +1,11 @@
 module Pawl.Codec.KeywordSpec where
 
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
@@ -1087,6 +1089,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.PartnerText PartnerText.FriendsForever)
       " {\"type\":\"PartnerText\",\"value\":{\"type\":\"FriendsForever\"}} "
     Spec.assertBool s (Codec.encode Keyword.codec (Keyword.PartnerText PartnerText.FriendsForever) /= Codec.encode Keyword.codec (Keyword.PartnerText PartnerText.CharacterSelect)) "two texts encode differently"
+  -- CR 702.124j's name rides the constructor, since the pairing is by name.
+  Spec.it s "PartnerWith carries its name" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.PartnerWith (CardName.MkCardName (Text.pack "Trynn, Champion of Freedom")))
+      " {\"type\":\"PartnerWith\",\"value\":\"Trynn, Champion of Freedom\"} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.PartnerWith (CardName.MkCardName (Text.pack "Trynn, Champion of Freedom"))) /= Codec.encode Keyword.codec (Keyword.PartnerWith (CardName.MkCardName (Text.pack "Ley Weaver")))) "two names encode differently"
   Spec.it s "ChooseABackground" $
     Common.assertCodec
       s

@@ -8,6 +8,7 @@
 module Pawl.KeywordTriggerSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -26,6 +27,7 @@ import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Natural as Natural.Extra
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -2704,3 +2706,92 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   selfBlocksCreatureSpec s registry
   selfBecomesBlockedSpec s registry
   selfAttacksUnblockedSpec s registry
+  partnerWithSpec s registry
+
+-- CR 702.124j's SECOND ability: "When this permanent enters, target player may
+-- search their library for a card named [name], reveal it, put it into their
+-- hand, then shuffle." Silvar, Devourer of the Free names Trynn, Champion of
+-- Freedom, and is CAST rather than placed, so the entry is the game's own.
+--
+-- THREE seats, because two collapse "target player" onto "the one opponent" and
+-- an engine that searched the CONTROLLER's library would be caught only by luck.
+-- alice casts, carol is targeted, and bob is the seat neither role names.
+--
+-- A Trynn in EVERY library, because one library holding the only copy cannot
+-- tell "read carol's library" from "read every library". The Goblin Piker in
+-- carol's library gives Filter.HasName a card to reject; it is added second, so
+-- Support.addLibraryCard makes it the head and a filter that admitted everything
+-- would fetch it instead.
+partnerWithSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+partnerWithSpec s registry =
+  let board swamp mountain piker silvar trynn =
+        let lands =
+              List.foldl'
+                (\g p -> snd (S.addPermanent p S.alice g))
+                S.threePlayerGame
+                [swamp, swamp, swamp, mountain, mountain]
+            (aliceCard, g1) = S.addLibraryCard trynn S.alice lands
+            (bobCard, g2) = S.addLibraryCard trynn S.bob g1
+            (_, g3) = S.addLibraryCard trynn S.carol g2
+            (carolPiker, g4) = S.addLibraryCard piker S.carol g3
+            (gs, spellId) = S.handOne silvar g4
+         in (gs, spellId, aliceCard, bobCard, carolPiker)
+      settle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+      settle answer gs spellId =
+        let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+         in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+      handNamesOf pid gs = fmap (`S.soleFaceName` gs) (Game.zoneMembers Zone.Hand pid gs)
+   in Spec.describe s "Partner with" $ do
+        Spec.it s "CR 702.124j the entry trigger searches the TARGET player's library" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          silvar <- S.printingOf s registry "Silvar, Devourer of the Free"
+          trynn <- S.printingOf s registry "Trynn, Champion of Freedom"
+          let (gs, spellId, aliceCard, bobCard, carolPiker) = board swamp mountain piker silvar trynn
+              settled = settle atCarolSearching gs spellId
+              trynnName = CardName.MkCardName (Text.pack "Trynn, Champion of Freedom")
+          Spec.assertEqWith s "CR 702.124j: the named card is in the TARGETED player's hand" (handNamesOf S.carol settled) [trynnName]
+          Spec.assertEqWith s "CR 702.124j: and carol's library kept only the card the name rejected" (Game.zoneMembers Zone.Library S.carol settled) [carolPiker]
+          Spec.assertEqWith s "the caster's own library is untouched" (Game.zoneMembers Zone.Library S.alice settled) [aliceCard]
+          Spec.assertEqWith s "and so is the third seat's" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
+          Spec.assertEqWith s "CR 702.124j: the find was revealed, which is the rule's own word" (fmap fst (S.revealsOf settled)) [S.carol]
+        -- The negative, on the same board with ONE thing changed: the answer.
+        -- Support.identityAnswer declines every optional, so rule 702.124j's
+        -- "may" leaves the named card in the library.
+        Spec.it s "CR 702.124j the targeted player may decline" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          silvar <- S.printingOf s registry "Silvar, Devourer of the Free"
+          trynn <- S.printingOf s registry "Trynn, Champion of Freedom"
+          let (gs, spellId, _, _, _) = board swamp mountain piker silvar trynn
+              settled = settle atCarolDeclining gs spellId
+          Spec.assertEqWith s "CR 702.124j: carol's hand is empty, the search never happened" (handNamesOf S.carol settled) []
+          Spec.assertEqWith s "and her library still holds both cards" (List.length (Game.zoneMembers Zone.Library S.carol settled)) 2
+
+-- Silvar's answerer: aim the trigger at carol wherever she is offered (a
+-- preference rather than a filter, so a slot she is no candidate for still gets
+-- a legal answer), then exercise rule 702.124j's "may" and take the find ONLY as
+-- carol.
+--
+-- Both pins are on carol rather than on "whoever is asked": an engine that put
+-- the option or the search to the spell's controller finds nothing at all,
+-- rather than being helpfully answered with a legal choice.
+atCarolSearching :: Prompt.Prompt r -> r
+atCarolSearching p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap
+      (\(n, legal) -> Set.fromList (take (Natural.Extra.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
+      sets
+  Prompt.ChooseOptional _ pid _ _ _ -> if pid == S.carol then OptionalDecision.Exercises else OptionalDecision.Declines
+  Prompt.Search _ pid matches cap -> if pid == S.carol then List.genericTake cap matches else []
+  _ -> S.identityAnswer p
+
+-- atCarolSearching with rule 702.124j's "may" declined, and nothing else
+-- changed: the target is still aimed at carol, so the two boards differ in
+-- exactly that answer.
+atCarolDeclining :: Prompt.Prompt r -> r
+atCarolDeclining p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  _ -> atCarolSearching p

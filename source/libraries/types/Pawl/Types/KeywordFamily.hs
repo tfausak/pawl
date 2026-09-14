@@ -164,6 +164,9 @@ data KeywordFamily
   | -- | CR 702.124i: partner—[text], whichever of the four. No card in the pool
     -- asks yet, and it is owed at the keyword rather than at the first asker.
     PartnerText
+  | -- | CR 702.124j: partner with [name], whichever name. No card in the pool
+    -- asks yet, and it is owed at the keyword rather than at the first asker.
+    PartnerWith
   | -- | CR 702.123a: fabricate N.
     Fabricate
   | -- | CR 702.130a: afflict N.
