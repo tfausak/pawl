@@ -557,7 +557,8 @@ recipientsOf controller gs ref =
 -- separate term for it: a snow source is a source that is snow, which for a
 -- permanent is CR 205.4g's supertype and nothing else. Forsworn Paladin's "mana
 -- from a Treasure" is the same question one type line over, CR 205.3g's artifact
--- subtype.
+-- subtype, and Shadow the Hedgehog's "mana from an artifact" one line further,
+-- CR 205.2a's card type.
 --
 -- CR 205.4g and CR 205.3g are PERMANENT-scoped and CR 106.3's first clause is
 -- wider, so this read would be too narrow for a source that is not a permanent. Nothing reaches
@@ -567,13 +568,18 @@ recipientsOf controller gs ref =
 -- for every producer in the pool and need not be one in general.
 productionTagsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Set.Set ProductionTag.ProductionTag
 productionTagsGiven pcs oid gs =
-  Set.union
-    (if Set.member Supertype.Snow (Projection.supertypesGiven pcs oid gs) then Set.singleton ProductionTag.Snow else Set.empty)
-    -- Forsworn Paladin's "mana from a Treasure", read off the same source and by
-    -- the same rule: CR 106.3 names the source, and being a Treasure is CR
-    -- 205.3g's subtype where being snow is CR 205.4g's supertype. Two independent
-    -- axes, so the answer is a union rather than a choice.
-    (if Set.member Subtype.Treasure (Projection.subtypesGiven pcs oid gs) then Set.singleton ProductionTag.Treasure else Set.empty)
+  Set.unions
+    [ if Set.member Supertype.Snow (Projection.supertypesGiven pcs oid gs) then Set.singleton ProductionTag.Snow else Set.empty,
+      -- Forsworn Paladin's "mana from a Treasure", read off the same source and by
+      -- the same rule: CR 106.3 names the source, and being a Treasure is CR
+      -- 205.3g's subtype where being snow is CR 205.4g's supertype. Two independent
+      -- axes, so the answer is a union rather than a choice.
+      if Set.member Subtype.Treasure (Projection.subtypesGiven pcs oid gs) then Set.singleton ProductionTag.Treasure else Set.empty,
+      -- Shadow the Hedgehog's "mana from an artifact", the same read a third axis
+      -- over: CR 205.2a's card type, and independent of the other two -- a snow
+      -- Treasure token is all three at once, which is why this stays a union.
+      if Set.member CardType.Artifact (Projection.cardTypesGiven pcs oid gs) then Set.singleton ProductionTag.Artifact else Set.empty
+    ]
 
 -- The units of one yield, in printed order.
 unitsOf :: Mana -> [ManaUnit]

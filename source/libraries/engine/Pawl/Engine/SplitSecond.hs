@@ -39,10 +39,11 @@ import qualified Pawl.Types.Keyword as Keyword
 -- CR 708.2a's no-text characteristics, which the projection seeds from
 -- Game.faceOf and so answers unchanged.
 --
--- Not implemented: split second granted from OUTSIDE the spell -- Shadow the
--- Hedgehog's "each spell you cast has split second if mana from an artifact was
--- spent to cast it" (#1284). The projection would read such a grant; nothing can
--- yet write one.
+-- A grant from OUTSIDE the spell reads the same way and needs nothing extra
+-- here: Shadow the Hedgehog's "each spell you cast has split second if mana from
+-- an artifact was spent to cast it" is a battlefield permanent's static ability
+-- reaching a stack object, and Pawl.SplitSecondSpec's "granted by another
+-- permanent" group is what proves this reader sees it.
 inForce :: GameState -> Bool
 inForce gs =
   let onStack oid = Map.member Keyword.SplitSecond (Projection.keywordsOf oid gs)

@@ -10,6 +10,7 @@ import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -522,6 +523,14 @@ data Filter keyword
     -- memory of it, so it is never IsInZone above, which reads where the object
     -- is now. Vacuously False for everything that was never cast.
     WasCastFrom Zone.Zone
+  | -- | CR 601.2h read RETROSPECTIVELY off the candidate: mana carrying this
+    -- production tag (CR 106.3) was among what paid the candidate's cost --
+    -- Shadow the Hedgehog's "if mana from an artifact was spent to cast it".
+    -- Pawl.Types.Quantity's TagWasSpent is the same read of the same record
+    -- (Pawl.Types.Object.manaSpent) asked of the object an evaluation is AIMED
+    -- at; this atom is the per-candidate one a static ability's Affected filter
+    -- needs. Vacuously False for a player and for everything nothing paid for.
+    TagWasSpent ProductionTag.ProductionTag
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

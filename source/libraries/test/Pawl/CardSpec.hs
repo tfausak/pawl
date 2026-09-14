@@ -3996,6 +3996,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasActivatedAbility -> []
   Filter.Type.IsInZone _ -> []
   Filter.Type.WasCastFrom _ -> []
+  Filter.Type.TagWasSpent _ -> []
   Filter.Type.And fs -> concatMap filterSlotsReadSingly fs
   Filter.Type.Or fs -> concatMap filterSlotsReadSingly fs
   Filter.Type.Not f -> filterSlotsReadSingly f

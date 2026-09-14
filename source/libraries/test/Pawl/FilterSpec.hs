@@ -23,6 +23,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
@@ -259,6 +260,12 @@ noPerspective = Filter.contextFor Teams.none Nothing Nothing
 -- cases need and what no other view here can show.
 castFromGraveyard :: Filter.View
 castFromGraveyard = blackCreature {Filter.zone = Just Zone.Stack, Filter.castFrom = Just Zone.Graveyard}
+
+-- A spell on the stack whose payment carried CR 106.3's artifact tag and nothing
+-- else -- Shadow the Hedgehog's condition, and the one axis the TagWasSpent cases
+-- vary.
+paidWithArtifactMana :: Filter.View
+paidWithArtifactMana = blackCreature {Filter.zone = Just Zone.Stack, Filter.manaSpentTags = Set.singleton ProductionTag.Artifact, Filter.manaSpentAmount = 2}
 
 -- A SPELL on the stack aimed at creature 9 and at player 1 -- `blackCreature`
 -- moved to the stack and given targets, which is what the two Targets cases
@@ -1899,6 +1906,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate and an uncast object are vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.WasCastFrom Zone.Graveyard))) "player"
       Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.WasCastFrom Zone.Graveyard))) "and a permanent nothing cast"
+
+  -- CR 601.2h. The gameplay-level proof is Pawl.SplitSecondSpec's Shadow the
+  -- Hedgehog group -- a spell that stops an opponent's cast when artifact mana
+  -- paid for it and does not when land mana did; these cases pin the atom itself.
+  Spec.describe s "TagWasSpent" $ do
+    Spec.it s "matches a tag the candidate's payment carried and no other" $ do
+      Spec.assertBool s (Filter.matches self paidWithArtifactMana (Filter.Type.TagWasSpent ProductionTag.Artifact)) "the view's own recorded tag"
+      Spec.assertBool s (not (Filter.matches self paidWithArtifactMana (Filter.Type.TagWasSpent ProductionTag.Treasure))) "and not a different one"
+
+    -- The pair that makes the atom discriminating: two views differing in the
+    -- recorded tag set alone, so neither answer can come from anything else.
+    Spec.it s "a payment that carried no tag does not match" $
+      Spec.assertBool s (not (Filter.matches self (paidWithArtifactMana {Filter.manaSpentTags = Set.empty}) (Filter.Type.TagWasSpent ProductionTag.Artifact))) "the same spell, paid off an untagged source"
+
+    -- Vacuously False with nothing to ask: a player is not an object (CR 109.1)
+    -- and an object nothing was paid for carries an empty record.
+    Spec.it s "a player candidate and an unpaid-for object are vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.TagWasSpent ProductionTag.Artifact))) "player"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.TagWasSpent ProductionTag.Artifact))) "and a permanent nothing paid for"
 
   Spec.describe s "IsToken" $ do
     Spec.it s "matches a view whose object is a token" $ do

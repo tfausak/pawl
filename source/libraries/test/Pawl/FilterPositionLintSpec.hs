@@ -305,6 +305,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasActivatedAbility -> 0
   Filter.Type.IsInZone _ -> 0
   Filter.Type.WasCastFrom _ -> 0
+  Filter.Type.TagWasSpent _ -> 0
   Filter.Type.IsRingBearer -> 0
   Filter.Type.HasDesignation _ -> 0
 
