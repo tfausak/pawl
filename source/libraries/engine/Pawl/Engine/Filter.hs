@@ -124,10 +124,9 @@ data View = MkView
     -- battlefield and the stack no controller at all. That is manaValue's
     -- posture rather than power's, for manaValue's reason.
     --
-    -- Not strictly more across every view: the event-snapshot view below is the
-    -- one where the order reverses, Count.viewOfSnapshot filling `controller`
-    -- off CR 608.2h's record where a cast leaves the owner beside it Nothing,
-    -- see #1069.
+    -- Not strictly more across every view: an event snapshot answers both off
+    -- the arm rather than off an object (Count.viewOfSnapshot), and a snapshot
+    -- whose object left no CR 608.2h record behind answers neither.
     --
     -- Nothing only where there is no OBJECT to read it off: a player view, an
     -- event snapshot, or a printed card being matched by a search, which CR

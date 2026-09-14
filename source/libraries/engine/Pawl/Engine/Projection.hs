@@ -736,13 +736,13 @@ viewWithLastKnown src gs oid =
 --
 -- And so does the OWNER, written over the field viewOfCharacteristics fills: that
 -- function reads CR 108.3 off the live object and answers Nothing for an id naming
--- nothing (#1069), which is what CR 608.2b wants of a gone TARGET and not what CR
+-- nothing, which is what CR 608.2b wants of a gone TARGET and not what CR
 -- 608.2h wants here. An intervening "if" asking whose zone a dead entrant came out
 -- of (Pawl.Engine.Quantity's EnteredFrom) reads it, and would otherwise take the
 -- whole quantity to Nothing. Proved by Pawl.ConditionSpec's "the entrant killed
 -- between the two checks still grows the Knight" -- that it answers at all;
 -- substituting the record's controller for its owner leaves that case green, so
--- WHICH player is a fence (see #1069).
+-- WHICH player is a fence.
 --
 -- The TOKEN status is written over the same way, off the record's `source`
 -- through the one classifier Game.isToken itself uses -- so CR 111.6's fixed
