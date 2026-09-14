@@ -65,6 +65,7 @@ codec keywordCodec =
       Arm.nullary "SharesColorWithSource" Filter.SharesColorWithSource,
       Arm.nullary "ManaValueIsEven" Filter.ManaValueIsEven,
       Arm.nullary "ManaValueAtMostAmount" Filter.ManaValueAtMostAmount,
+      Arm.nullary "ManaValueEqualToAmount" Filter.ManaValueEqualToAmount,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy (\x -> case x of Filter.ControlledBy y -> Just y; _ -> Nothing),
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy (\x -> case x of Filter.OwnedBy y -> Just y; _ -> Nothing),
       Arm.payload "IsPlayer" PlayerRelation.codec Filter.IsPlayer (\x -> case x of Filter.IsPlayer y -> Just y; _ -> Nothing),

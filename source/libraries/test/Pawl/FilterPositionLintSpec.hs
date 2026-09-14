@@ -230,6 +230,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.ManaValueEqualToSource -> 0
   Filter.Type.ManaValueIsEven -> 0
   Filter.Type.ManaValueAtMostAmount -> 0
+  Filter.Type.ManaValueEqualToAmount -> 0
   Filter.Type.ControlledBy _ -> 0
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
   -- PlayerRelation, which holds no Filter for a card author to reach.
@@ -378,6 +379,11 @@ jsonAtoms tag value = case value of
 manaValueAtMostAmountTag :: Text.Text
 manaValueAtMostAmountTag = Text.pack "ManaValueAtMostAmount"
 
+-- The same bound at EQUALITY (Chthonian Nightmare's "with mana value X"), which
+-- needs the same position and so the same count.
+manaValueEqualToAmountTag :: Text.Text
+manaValueEqualToAmountTag = Text.pack "ManaValueEqualToAmount"
+
 -- CR 702.122d's atom, which no card may write.
 cantCrewVehiclesTag :: Text.Text
 cantCrewVehiclesTag = Text.pack "CantCrewVehicles"
@@ -392,17 +398,20 @@ cantCrewVehiclesTag = Text.pack "CantCrewVehicles"
 -- naming its bound. Only that slot's own "filter" subtree is counted, which is
 -- sound because a Filter holds no TargetSlot: nothing nests below it to be
 -- double-counted.
-amountedSlotAtoms :: Value.Value -> Int
-amountedSlotAtoms value = case value of
-  Value.Array a -> sum (fmap amountedSlotAtoms (Array.unwrap a))
+--
+-- Parameterized by the TAG for jsonAtoms' reason: the order bound and the
+-- equality bound want the same position and so the same count.
+amountedSlotAtoms :: Text.Text -> Value.Value -> Int
+amountedSlotAtoms tag value = case value of
+  Value.Array a -> sum (fmap (amountedSlotAtoms tag) (Array.unwrap a))
   Value.Object o ->
     let pairs = Object.unwrap o
         keyed k = fmap Pair.value (filter (\pair -> String.unwrap (Pair.name pair) == Text.pack k) pairs)
         here =
           if null (keyed "pool") || null (keyed "amount")
             then 0
-            else sum (fmap (jsonAtoms manaValueAtMostAmountTag) (keyed "filter"))
-     in here + sum (fmap (amountedSlotAtoms . Pair.value) pairs)
+            else sum (fmap (jsonAtoms tag) (keyed "filter"))
+     in here + sum (fmap (amountedSlotAtoms tag . Pair.value) pairs)
   Value.String _ -> 0
   Value.Null _ -> 0
   Value.Boolean _ -> 0
@@ -417,13 +426,28 @@ amountedSlotAtoms value = case value of
 -- affected set, a search filter, a cost criterion -- is a silent False rather than
 -- a rejected card. This is where that is made loud.
 manaValueAtMostAmountCounts :: Face.Face Card.Type.Card -> (Int, Int)
-manaValueAtMostAmountCounts card =
-  let encoded = Codec.encode (Face.Codec.codec Card.codec) card
-      slotted = amountedSlotAtoms encoded
-   in (slotted, jsonAtoms manaValueAtMostAmountTag encoded - slotted)
+manaValueAtMostAmountCounts = amountedCounts manaValueAtMostAmountTag
 
 manaValueAtMostAmountOffends :: Face.Face Card.Type.Card -> Bool
 manaValueAtMostAmountOffends card = snd (manaValueAtMostAmountCounts card) /= 0
+
+-- The pair above for the EQUALITY bound, whose position claim is the same one:
+-- Pawl.Engine.Target.slotContext fills Filter.Context.slotAmount off the slot, so
+-- Chthonian Nightmare's "with mana value X" written anywhere else is a silent
+-- False too.
+manaValueEqualToAmountCounts :: Face.Face Card.Type.Card -> (Int, Int)
+manaValueEqualToAmountCounts = amountedCounts manaValueEqualToAmountTag
+
+manaValueEqualToAmountOffends :: Face.Face Card.Type.Card -> Bool
+manaValueEqualToAmountOffends card = snd (manaValueEqualToAmountCounts card) /= 0
+
+-- How many of `tag` sit in a slot that names an amount, and how many anywhere
+-- else -- the second number being the offence.
+amountedCounts :: Text.Text -> Face.Face Card.Type.Card -> (Int, Int)
+amountedCounts tag card =
+  let encoded = Codec.encode (Face.Codec.codec Card.codec) card
+      slotted = amountedSlotAtoms tag encoded
+   in (slotted, jsonAtoms tag encoded - slotted)
 
 -- CR 701.3a is answerable only where an attach FRAMES the match, and
 -- Filter.CanHostSubject is vacuously False in every other Filter position. A card
@@ -1317,6 +1341,44 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- reading the amount key rather than rejecting every planted atom.
     let amounted = slotWith (TargetSlot.withAmount (Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You)) (TargetSlot.required Pool.Creatures (Just buried)))
     Spec.assertEqWith s "the same atom in a slot that names one is not" (manaValueAtMostAmountCounts amounted) (1, 0)
+  -- The same claim for the EQUALITY bound, which needs the same position for the
+  -- same reason and gets no protection from the lint above: the two atoms are
+  -- distinct tags, so a card writing "with mana value X" outside a slot that names
+  -- an amount would be a silent False that the at-most sweep never sees.
+  Spec.it s "CR 202.3 no card asks ManaValueEqualToAmount outside a slot that names an amount" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace manaValueEqualToAmountOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: Chthonian Nightmare is the pool's one author of the atom, and
+    -- the card that is ACCEPTED here rather than skipped.
+    nightmare <- S.printingOf s registry "Chthonian Nightmare"
+    Spec.assertEqWith
+      s
+      "the Nightmare's slot names its bound"
+      (manaValueEqualToAmountCounts (S.combinedFace nightmare))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and it is the pool's only one"
+      (sum (fmap (uncurry (+) . manaValueEqualToAmountCounts . S.combinedFace) ps))
+      1
+    -- The rejected side, the at-most lint's pair one operator over: the same atom
+    -- buried under all three combinators, in a target slot that names no amount.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ManaValueEqualToAmount]]
+        slotWith slot =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slot)))
+                  (ModeSelection.ChooseExactly 1)
+            }
+        amountless = slotWith (TargetSlot.required Pool.Creatures (Just buried))
+    Spec.assertEqWith s "a planted atom in an amountless slot is an offence" (manaValueEqualToAmountCounts amountless) (0, 1)
+    Spec.assertBool s (manaValueEqualToAmountOffends amountless) "and the lint says so"
+    -- And the pair that differs in exactly one thing, as above.
+    let amounted = slotWith (TargetSlot.withAmount (Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You)) (TargetSlot.required Pool.Creatures (Just buried)))
+    Spec.assertEqWith s "the same atom in a slot that names one is not" (manaValueEqualToAmountCounts amounted) (1, 0)
   -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
   -- answerable only where Filter.Context.sourceAttachedTo is filled, which is the
   -- positions `hostFramed` admits. See hostOfSourceOffends for the two offences.
