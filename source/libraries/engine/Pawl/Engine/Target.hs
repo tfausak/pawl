@@ -1599,8 +1599,10 @@ askChooser controller chooser oid source x slots sets mine = do
 -- The gate reads only what its chooser may see, CR 406.3a being the reason: a
 -- face-down card has no characteristics, so the only filters that can admit one
 -- ask about public facts -- who owns it (CR 108.3), whether it is face down.
--- pawl's own answer leaks where that rule is unimplemented, a face-down exiled
--- card still reading its printed characteristics (#1479).
+-- Pawl.Engine.Projection.View.baseCharacteristics is what makes that true of
+-- pawl's own answer, and Pawl.ExileSpec's Runic Repetition group proves it: a
+-- slot wanting flashback admits no card of a face-down pile, so no pile is
+-- offered for it at all.
 piledOffer :: Maybe PlayerId -> GameState -> Set Recipient -> Set Recipient
 piledOffer perspective gs =
   let replace recipient = Maybe.fromMaybe recipient $ do

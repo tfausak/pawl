@@ -104,8 +104,11 @@ data Object = MkObject
     -- Pawl.Engine.Exile.mayLookAt names, and everybody else the pile
     -- Pawl.Engine.Exile.pileOf sorts it into.
     --
-    -- Not implemented: CR 406.3a's "no characteristics", so a filter that read a
-    -- face-down exiled card's card types would see the printed ones (#1479).
+    -- CR 406.3a's "no characteristics" is the other half, and it is
+    -- Pawl.Engine.Projection.View.baseCharacteristics that answers it: the seed
+    -- CR 613.1 starts from holds nothing for a card flagged here, so a filter
+    -- reading one sees no name, no type and no keyword. Pawl.ExileSpec's Runic
+    -- Repetition group is what proves it.
     --
     -- Per-incarnation: reset by newIncarnation (CR 400.7), the effect's own rider
     -- through Event.changeZoneEntering being CR 406.3's "otherwise".
