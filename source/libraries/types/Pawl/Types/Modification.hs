@@ -313,6 +313,35 @@ data Modification ability
     -- survive, and neither its card types nor its subtypes move.
     RemoveSupertype Supertype.Supertype
   | ChangeSubtypeWord ChangeSubtypeWord.ChangeSubtypeWord -- layer 3, CR 612 (Magical Hack, Artificial Evolution: from -> to)
+  | -- | layer 3, CR 613.1c / 612.5: the two objects in this effect's affected set
+    -- exchange their text boxes (Exchange of Words, which CR 612.5 names as the
+    -- only card that does it).
+    --
+    -- NULLARY and MUTUAL: the two sides are the effect's own affected set, which
+    -- CR 611.2c froze to exactly two ids at resolution, so one continuous effect
+    -- with one timestamp produces both rewrites and neither can be applied twice
+    -- or half-undone. Pawl.Engine.Projection.exchangePartner is what reads the
+    -- other side out of that set, which is why this arm carries no ObjectId of
+    -- its own -- one that did would need two effects, and CR 613.7a would then
+    -- have two timestamps to order.
+    --
+    -- Layer 3 and not layer 1: CR 612.5 replaces the RULES TEXT alone, where a
+    -- copy effect (CR 706/707) would take the name, types and P/T with it. So a
+    -- 5/5 Dragon given a 1/1 Bird's text box stays a 5/5 Dragon, and CR 707.2
+    -- leaves the copiable values untouched, so a Clone of either creature copies
+    -- the PRINTED text.
+    --
+    -- The text moved is the receiving object's, so CR 113.7 makes the receiver
+    -- the source of every ability that arrives and each "this permanent"
+    -- self-reference re-binds to it -- the same posture GainAbility takes, and
+    -- for the same reason.
+    --
+    -- Not implemented: exchanging a static ability, a player static ability or a
+    -- special action. Those three are gathered from the object's COPIABLE
+    -- characteristics rather than from the projection
+    -- (Pawl.Engine.Projection.View's staticAbilitiesOf), so moving them at layer
+    -- 3 would take every gather-time reader with it (#3748).
+    ExchangeTextBoxes
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect (GainControl) -- it is
     -- the effect's source's controller, never chosen. Applied only by

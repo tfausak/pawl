@@ -57,6 +57,7 @@ codec abilityCodec =
           Arm.payload "SetColor" colors Modification.SetColor (\x -> case x of Modification.SetColor y -> Just y; _ -> Nothing),
           Arm.payload "AddColor" colors Modification.AddColor (\x -> case x of Modification.AddColor y -> Just y; _ -> Nothing),
           Arm.nullary "AddChosenColor" Modification.AddChosenColor,
+          Arm.nullary "ExchangeTextBoxes" Modification.ExchangeTextBoxes,
           Arm.nullary "SwitchPowerToughness" Modification.SwitchPowerToughness,
           Arm.nullary "AssignCombatDamageWithToughness" Modification.AssignCombatDamageWithToughness,
           Arm.nullary "GrantsStationToughness" Modification.GrantsStationToughness
