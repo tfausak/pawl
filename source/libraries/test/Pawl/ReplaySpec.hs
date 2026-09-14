@@ -39,6 +39,7 @@ import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.ForageMode as ForageMode
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -1430,6 +1431,14 @@ combatReplaySpec s =
           -- Discriminating: a decode that ignored the response and returned the
           -- head would pass one leg by accident.
           Spec.assertEqWith s "blighting the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        -- CR 701.61a: which half of forage the forager took is a decision, so it
+        -- has to survive a transcript like any other.
+        Spec.it s "ChooseForage round-trips through the transcript" $ do
+          let p = Prompt.ChooseForage decider S.alice oid
+          Spec.assertEqWith s "sacrificing a Food round trips" (Replay.decode p (Replay.encode p ForageMode.SacrificeFood)) (Just ForageMode.SacrificeFood)
+          -- Discriminating: a decode that ignored the response and answered the
+          -- half rule 701.61a names first would pass one leg by accident.
+          Spec.assertEqWith s "exiling three cards round trips" (Replay.decode p (Replay.encode p ForageMode.ExileCards)) (Just ForageMode.ExileCards)
         Spec.it s "a blight choice does not decode as a Ring-bearer choice" $ do
           -- Discriminating: fails if ChooseBlight reuses ChoseRingBearer rather than
           -- getting its own ObjectId-shaped constructor. These two are not merely

@@ -1065,6 +1065,7 @@ ownCounts effect = case effect of
   -- Earthbend's N likewise.
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
+  Effect.Forage -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
@@ -1422,6 +1423,7 @@ effectNestedEffects effect = case effect of
   Effect.Blight {} -> []
   Effect.Earthbend {} -> []
   Effect.TemptWithTheRing -> []
+  Effect.Forage -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
@@ -1867,6 +1869,7 @@ effectReplacements effect = case effect of
   Effect.Blight _ -> []
   Effect.Earthbend _ -> []
   Effect.TemptWithTheRing -> []
+  Effect.Forage -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
@@ -2276,6 +2279,7 @@ effectMintedFaces effect = case effect of
   Effect.Blight _ -> []
   Effect.Earthbend _ -> []
   Effect.TemptWithTheRing -> []
+  Effect.Forage -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
@@ -4854,6 +4858,7 @@ effectFilters effect = case effect of
   -- Filters, the latter framed by the source's host as every ObjectRef is.
   Effect.Earthbend (Earthbend.MkEarthbend quantity ref) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
   Effect.TemptWithTheRing -> []
+  Effect.Forage -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed [f] <> frame Unframed (quantityFilters quantity)

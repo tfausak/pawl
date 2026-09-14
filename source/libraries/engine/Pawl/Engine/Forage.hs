@@ -12,7 +12,7 @@
 -- 701.61a is one rule however a card demands it, so a forage COST (Feed the
 -- Cycle, Camellia, the Seedmiser) would come here too rather than restate it.
 -- Not implemented: no CostComponent spells forage, so no printed cost reaches
--- this module yet (#3729).
+-- this module yet (#3720).
 module Pawl.Engine.Forage where
 
 import qualified Control.Monad as Monad
@@ -48,10 +48,11 @@ exileCandidates = Game.zoneMembers Zone.Graveyard
 -- Food only by a continuous effect is a candidate and one that has stopped being
 -- one is not.
 --
--- Subtype and not card type: Food is an artifact type (CR 301.4), and a creature
+-- Subtype and not card type: Food is an artifact type (CR 205.3g), and a creature
 -- carrying it (Gingerbrute) is as much a Food as a bare artifact is.
 --
--- ASCENDING, exileCandidates' reason.
+-- ASCENDING, so the single-Food shortcut below and a transcript are
+-- deterministic -- Pawl.Engine.Blight.candidates' posture.
 foodCandidates :: PlayerId -> GameState.GameState -> [ObjectId]
 foodCandidates pid gs =
   List.sort (filter (\oid -> Set.member Subtype.Food (Projection.subtypesOf oid gs)) (Projection.controls pid gs))
@@ -89,7 +90,7 @@ canForage pid gs = length (exileCandidates pid gs) >= 3 || not (null (foodCandid
 -- not available here.
 --
 -- Not implemented: nothing records that a player foraged, so "whenever you
--- forage" (Corpseberry Cultivator) has no event to watch (#3730).
+-- forage" (Corpseberry Cultivator) has no event to watch (#3721).
 forage :: PlayerId -> ObjectId -> Game Bool
 forage pid resolving = do
   gs <- State.get
