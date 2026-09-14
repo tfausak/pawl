@@ -549,6 +549,72 @@ ascentGond ascent gond piker ascentFirst =
              in S.attach gondId pikerId g4
    in (pikerId, bareId, place g2, snd (S.addPermanent ascent S.alice g2))
 
+-- Villainous Ogre, a bare Goblin Piker, Synthetic Tinker's Conversion and
+-- Maskwood Nexus, all alice's; `conversionFirst` sets the CR 613.7 timestamp
+-- order the way ascentGond's flag does.
+--
+-- CR 613.8a clause (b)'s "what it applies to", where what moves the set is what
+-- an ability's OWN CR 604.2 gate reads rather than the ability's presence. Both
+-- effects are CR 613.1d layer 4 and neither is characteristic-defining, so
+-- clauses (a) and (c) hold; clause (b) holds at the Ogre, since applying the
+-- Nexus makes it a Demon, so alice controls a Demon, so the Ogre has "{B}:
+-- Regenerate this creature" and enters the Conversion's set. The Nexus does not
+-- depend on the Conversion -- gaining the artifact card type leaves a creature
+-- alice controls a creature alice controls -- so the edge is one-way and
+-- CR 613.8b gives Nexus-then-Conversion in EITHER timestamp order.
+--
+-- The Goblin Piker is vanilla, so it never enters the Conversion's set however
+-- the layers fall, and it is what stops the Conversion reading as "every
+-- creature". The regenerate ability is never activated: these cases read a
+-- projection off a board that gives nobody priority.
+--
+-- The Conversion is SYNTHETIC -- {2}{U} Enchantment, whole text: "Creatures with
+-- an activated ability that isn't a mana ability are artifacts in addition to
+-- their other types." -- for the reason ascentGond gives, and at layer 4 rather
+-- than layer 6 because layer 6 cannot show the defect: Projection.layer sends
+-- only Keywords-writing modifications there, and Keywords is the one aspect the
+-- narrow row already declared. Scryfall o:"with activated abilities",
+-- o:/with an activated abilit/ and o:"activated abilities" t:enchantment,
+-- 2026-09-14: no printed type-, colour-, control- or P/T-changing effect takes
+-- "has an activated ability" as its affected set. A card that would refute this:
+-- any such effect phrased "creatures with an activated ability ...".
+ogreConversionNexus ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Bool ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ogreConversionNexus ogre piker conversion nexus conversionFirst =
+  let (ogreId, g1) = S.addPermanent ogre S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g2) = S.addPermanent piker S.alice g1
+      place g =
+        if conversionFirst
+          then snd (S.addPermanent nexus S.alice (snd (S.addPermanent conversion S.alice g)))
+          else snd (S.addPermanent conversion S.alice (snd (S.addPermanent nexus S.alice g)))
+   in (ogreId, pikerId, place g2)
+
+-- The same board reached through gameplay: alice has four Forests, the Ogre, the
+-- Piker and the Conversion on the battlefield and Maskwood Nexus in hand. Cast
+-- the Nexus and read the Ogre's card types BEFORE and AFTER it resolves, so the
+-- Nexus's timestamp is the later one and nothing but its resolution differs.
+ogreAcrossNexus ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (Bool, Bool)
+ogreAcrossNexus forest ogre piker conversion nexus =
+  let (ogreId, g1) = S.addPermanent ogre S.alice (S.landsInPlay forest 4)
+      (_, g2) = S.addPermanent piker S.alice g1
+      (_, g3) = S.addPermanent conversion S.alice g2
+      (g4, nexusId) = S.handOne nexus g3
+      cast = snd (Engine.runGamePure S.identityAnswer g4 (S.cast S.alice nexusId))
+      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+      isArtifact gs = Set.member CardType.Artifact (Projection.cardTypesOf ogreId gs)
+   in (isArtifact cast, isArtifact resolved)
+
 -- The printings the graveyard-dependency group below shares: Synthetic Charnel
 -- Measure, Grist, the Hunger Tide and a Hill Giant.
 charnelPrintings ::
@@ -2339,6 +2405,54 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (pikerId, bareId, gs, _) = ascentGond ascent gond piker False
     Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "still flies, order-independent"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying bareId gs)) "and the bare Piker still does not"
+
+  -- The same limb of CR 613.8a clause (b), one step further in: what moves the
+  -- Conversion's set is not the ability's presence but what the ability's OWN
+  -- CR 604.2 gate reads. See ogreConversionNexus for the board.
+  --
+  -- This is the proving test for filterReads declaring that
+  -- HasNonManaActivatedAbility reads every aspect: with the row at Keywords
+  -- alone, movesSet screens the Conversion's {Types, Keywords} against the
+  -- Nexus's {Subtypes}, finds them disjoint, and never asks changesAt -- so the
+  -- Conversion applies first in CR 613.7 timestamp order against an Ogre that
+  -- controls no Demon and so has no ability.
+  Spec.it s "CR 613.8a the Nexus satisfies the Ogre's gate, so the Ogre joins the Conversion's set (Conversion older)" $ do
+    ogre <- S.printingOf s registry "Villainous Ogre"
+    piker <- S.printingOf s registry "Goblin Piker"
+    conversion <- S.printingOf s registry "Synthetic Tinker's Conversion"
+    nexus <- S.printingOf s registry "Maskwood Nexus"
+    let (ogreId, pikerId, gs) = ogreConversionNexus ogre piker conversion nexus True
+    Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf ogreId gs)) "CR 613.8b: the Conversion waits for the Nexus, so the Ogre is an artifact"
+    Spec.assertBool s (not (Set.member CardType.Artifact (Projection.cardTypesOf pikerId gs))) "the vanilla Piker has no activated ability, so the Conversion passes it by"
+    Spec.assertBool s (Set.member Subtype.Type.Demon (Projection.subtypesOf ogreId gs)) "and the Nexus still made the Ogre a Demon"
+
+  -- The dependency overrides CR 613.7, so the answer is the same with the
+  -- timestamps swapped. This board passes on timestamp order alone, which is why
+  -- it is not the proving test.
+  Spec.it s "CR 613.8b the Conversion still waits for the Nexus with the timestamps swapped (Nexus older)" $ do
+    ogre <- S.printingOf s registry "Villainous Ogre"
+    piker <- S.printingOf s registry "Goblin Piker"
+    conversion <- S.printingOf s registry "Synthetic Tinker's Conversion"
+    nexus <- S.printingOf s registry "Maskwood Nexus"
+    let (ogreId, pikerId, gs) = ogreConversionNexus ogre piker conversion nexus False
+    Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf ogreId gs)) "still an artifact, order-independent"
+    Spec.assertBool s (not (Set.member CardType.Artifact (Projection.cardTypesOf pikerId gs))) "and the Piker still is not"
+
+  -- The same dependency reached through gameplay rather than through placement,
+  -- which is what fixes the timestamp order: the Nexus enters after the
+  -- Conversion, and CR 613.7a gives its static ability's effect the object's own
+  -- CR 613.7d timestamp.
+  Spec.it s "CR 613.8a casting the Nexus makes the Ogre an artifact when it resolves" $ do
+    forest <- S.printingOf s registry "Forest"
+    ogre <- S.printingOf s registry "Villainous Ogre"
+    piker <- S.printingOf s registry "Goblin Piker"
+    conversion <- S.printingOf s registry "Synthetic Tinker's Conversion"
+    nexus <- S.printingOf s registry "Maskwood Nexus"
+    Spec.assertEqWith
+      s
+      "not an artifact while the Nexus is still on the stack, an artifact once it resolves"
+      (ogreAcrossNexus forest ogre piker conversion nexus)
+      (False, True)
 
   -- The same limb of CR 613.8a clause (b), asked about an object OFF the
   -- battlefield. CR 613.1 names no zone, so the scan CR 613.8a describes ranges
@@ -4822,9 +4936,10 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
     Spec.assertEqWith s "the Ogre is a Demon" (Set.member Subtype.Type.Demon (Projection.subtypesOf ogreId gs)) True
     Spec.assertEqWith s "so the ability is offered" (length (Activate.abilitiesFor ogreId gs)) 1
   -- CR 613.1: and the clause is judged at the depth of whoever asked. Asked of
-  -- Projection.viewUpTo directly, because the atom's three printings -- Tsabo's
-  -- Web, Ravager Wurm and Tazri, Stalwart Survivor -- all read a finished
-  -- projection, so no card puts this question inside the fold; see #1758.
+  -- Projection.viewUpTo directly rather than through a card, because a card that
+  -- puts the question inside the fold cannot say WHICH bound it was asked at --
+  -- the dependency group's ogreConversionNexus is that card and reads the
+  -- finished answer.
   --
   -- The two bounds are one layer apart, and layer 4 is that layer: below it the
   -- Nexus has not made the Ogre a Demon yet, so the clause is false and the Ogre
