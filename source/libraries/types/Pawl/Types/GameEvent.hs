@@ -547,4 +547,14 @@ data GameEvent
     -- binding of the INSTRUCTING effect, under the name Pawl.Types.Blight's slot
     -- gives it.
     Blighted PlayerId.PlayerId
+  | -- | CR 701.61a: this player foraged. Recorded by Pawl.Engine.Forage.forage
+    -- once rule 701.61a's action is carried out, and ONLY then: rule 701.61
+    -- states no counterpart to rule 701.54d's "even if some or all of those
+    -- actions were impossible", so a player CR 608.2d refused the forage writes
+    -- none. The Blighted arm above draws the same line for its own rule.
+    --
+    -- The player alone, and neither the cards exiled nor the Food sacrificed:
+    -- both halves of rule 701.61a already write their own Moved events, and no
+    -- printing reads which half a forage took.
+    Foraged PlayerId.PlayerId
   deriving (Eq, Ord, Show)

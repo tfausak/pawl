@@ -164,5 +164,7 @@ codec =
           -- shape above with the Filter over the attacker instead.
           Arm.payload "PermanentBecomesBlockedBy" filterCodec TriggerCondition.PermanentBecomesBlockedBy (\x -> case x of TriggerCondition.PermanentBecomesBlockedBy y -> Just y; _ -> Nothing),
           -- CR 701.68d's "whenever a player blights", RingTemptsPlayer's shape above.
-          Arm.payload "PlayerBlights" PlayerRelation.codec TriggerCondition.PlayerBlights (\x -> case x of TriggerCondition.PlayerBlights y -> Just y; _ -> Nothing)
+          Arm.payload "PlayerBlights" PlayerRelation.codec TriggerCondition.PlayerBlights (\x -> case x of TriggerCondition.PlayerBlights y -> Just y; _ -> Nothing),
+          -- CR 701.61a's "whenever you forage", the arm above's shape.
+          Arm.payload "PlayerForages" PlayerRelation.codec TriggerCondition.PlayerForages (\x -> case x of TriggerCondition.PlayerForages y -> Just y; _ -> Nothing)
         ]
