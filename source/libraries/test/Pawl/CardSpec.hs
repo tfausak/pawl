@@ -3206,7 +3206,7 @@ objectRefFilters ref = case ref of
   -- Port of Karfell's "a creature card from your graveyard"; its ZoneScope and
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
-  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f) -> unframed [f]
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f _) -> unframed [f]
   -- Elvish Piper's "a creature card from your hand"; its PlayerRef names the
   -- choosers, who are also the hands' owners (CR 402.3), so the Filter is the
   -- whole of what there is to lint -- the chosen graveyard card's arm's answer,
