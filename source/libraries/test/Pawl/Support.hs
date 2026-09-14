@@ -3467,9 +3467,11 @@ stubView table oid =
                 -- devotion reads no symbol off this stub.
                 Filter.manaCost = Nothing,
                 Filter.controller = ctrl,
-                -- CR 108.3: the table registers no owner, and no Count in the
-                -- pool filters by one, so this stub answers Nothing and OwnedBy
-                -- is vacuously False against it.
+                -- CR 108.3: the table registers no owner, so this stub answers
+                -- Nothing and OwnedBy is vacuously False against it. No case
+                -- driving the stub filters by one; the pool's owner-filtering
+                -- counts (Dimir Strandcatcher, Synthetic Ownership Ledger) are
+                -- gameplay level in Pawl.CountSpec.
                 Filter.owner = Nothing,
                 -- CR 400.1: the table registers no zone, and no Count in the pool
                 -- filters by one, so IsInZone is vacuously False against this stub.
