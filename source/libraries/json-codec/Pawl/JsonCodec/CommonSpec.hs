@@ -235,6 +235,29 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         s
         (Either.isLeft (Codec.decode (Common.multiset Common.integer) =<< Common.parse (Text.pack "[{\"key\":1,\"value\":1},{\"key\":1,\"value\":2}]")))
         "expected a decode failure"
+  Spec.describe s "repeats" $ do
+    -- Ascending by element and one entry per instance, which is what keeps a card
+    -- file that names each keyword once reading exactly as it did under 'set'.
+    Spec.it s "round trips a repeated element" $
+      Common.assertCodec
+        s
+        (Common.repeats Common.integer)
+        (Map.fromList [(1, 3), (2, 1)] :: Map.Map Integer Natural.Natural)
+        "[1,1,1,2]"
+    -- 'set' would reject this array; that this one sums it is the whole point.
+    Spec.it s "decodes an array whose repeats are not adjacent" $
+      Spec.assertEq
+        s
+        (Codec.decode (Common.repeats Common.integer) =<< Common.parse (Text.pack "[2,1,2]"))
+        (Right (Map.fromList [(1, 1), (2, 2)] :: Map.Map Integer Natural.Natural))
+    -- The trade against 'multiset', stated as a test rather than only in prose: a
+    -- zero count writes nothing, so it is not a value this spelling can carry
+    -- back (Pawl.Types.Face.keywords never holds one).
+    Spec.it s "writes nothing for a zero count" $
+      Spec.assertEq
+        s
+        (Common.render (Codec.encode (Common.repeats Common.integer) (Map.fromList [(1, 0)] :: Map.Map Integer Natural.Natural)))
+        (Text.pack "[]")
   Spec.describe s "textMap" $ do
     -- Written in ascending key order rather than the map's traversal order, so
     -- the render is canonical. The entries are given in DESCENDING order here,

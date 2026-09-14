@@ -113,7 +113,10 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   -- ability in both.
   characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe Quantity.codec) (fmap CharacteristicPT.power . Face.characteristicPT)
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) Face.enchant
-  keywords <- Fields.defaulted "keywords" Set.empty (Common.set Keyword.codec) Face.keywords
+  -- ONE ARRAY ENTRY PER INSTANCE (Common.repeats), which is how Apex Devastator
+  -- prints it: "Cascade, cascade, cascade, cascade". A card naming each keyword
+  -- once reads and writes exactly as it did when this was a set.
+  keywords <- Fields.defaulted "keywords" Map.empty (Common.repeats Keyword.codec) Face.keywords
   colorIndicator <- Fields.defaulted "colorIndicator" Set.empty (Common.set Color.codec) Face.colorIndicator
   spell <- Fields.defaulted "spell" Face.defaultSpell (Modal.codec cardCodec (GrantedAbility.codec cardCodec)) Face.spell
   staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list (StaticAbility.codec cardCodec)) Face.staticAbilities

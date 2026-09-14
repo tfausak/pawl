@@ -145,7 +145,7 @@ cardTimingOk pid oid name gs = case proposedFace oid name gs of
       -- first: the window is False at all but one step of one player's turn, and
       -- the projection fold behind the second limb then never runs.
       || ( Turn.declareBlockersWindow pid gs
-             && (Keyword.hasSneak (Face.keywords face) || Keyword.hasSneak (Map.keysSet (Projection.keywordsOf oid gs)))
+             && (Keyword.hasSneak (Face.keywordSet face) || Keyword.hasSneak (Map.keysSet (Projection.keywordsOf oid gs)))
          )
 
 -- CR 702.190a: the window ONE CANDIDATE COST may be announced in. Ordinarily the
@@ -262,7 +262,7 @@ instantSpeed oid face gs = Card.isInstant face || flashOn oid face gs
 -- would separate the limbs, and nothing in CR 305 or CR 702.8 forbids one.
 flashOn :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 flashOn oid face gs =
-  Keyword.hasFlash (Face.keywords face)
+  Keyword.hasFlash (Face.keywordSet face)
     || Keyword.hasFlash (Map.keysSet (Projection.keywordsOf oid gs))
 
 -- CR 601.2c / 700.2a: castable when the fillable modes admit some selection at
@@ -601,7 +601,7 @@ entwineOffer :: ManaSpending -> PlayerId -> ObjectId -> [([ManaCost.ManaCost], C
 entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
   Nothing -> Nothing
   Just face -> do
-    cost <- costTotal (Keyword.entwineCosts (Face.keywords face))
+    cost <- costTotal (Keyword.entwineCosts (Face.keywordSet face))
     let modal = Face.spell face
         legal = Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
@@ -912,7 +912,7 @@ castableZones pid oid face gs =
         -- it; see #2169. CR 400.1 gives each player their own hand and CR 400.3
         -- keeps a card in its owner's, so the owner is the seat rule 304.1 names.
         Zone.Hand ->
-          not (Keyword.hasAftermath (Face.keywords face))
+          not (Keyword.hasAftermath (Face.keywordSet face))
             && (ownedBy pid oid gs || PlayerEffect.mayCastFrom pid Zone.Hand oid gs)
         Zone.Graveyard -> permitsCastFromGraveyard pid oid face gs
         Zone.Exile -> permitsCastFromExile pid oid face gs
@@ -1533,7 +1533,7 @@ castableSpells pid gs =
           -- down and ANNOUNCE THAT YOU'RE USING A MORPH ABILITY" -- so the
           -- facing this proposes carries FaceDownReason.Morphed, and CR 701.40b's
           -- procedure is closed to the permanent it becomes.
-          : (if Maybe.isJust (Keyword.morphCost (Face.keywords face)) then [Facing.faceDown FaceDownReason.Morphed] else [])
+          : (if Maybe.isJust (Keyword.morphCost (Face.keywordSet face)) then [Facing.faceDown FaceDownReason.Morphed] else [])
             -- CR 702.168b names its own allower the same way -- "turn the card face
             -- down and ANNOUNCE THAT YOU ARE USING A DISGUISE ABILITY" -- and lists
             -- ward {2} where rule 702.37c lists nothing, so this facing carries both
@@ -1546,7 +1546,7 @@ castableSpells pid gs =
             -- printing with both would be the card that refutes it, and the rules
             -- allow one (CR 701.58c and CR 701.58d put both procedures on one
             -- permanent).
-            <> ( if Maybe.isJust (Keyword.disguiseCost (Face.keywords face))
+            <> ( if Maybe.isJust (Keyword.disguiseCost (Face.keywordSet face))
                    then [Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}]
                    else []
                )
@@ -1589,7 +1589,7 @@ castableSpells pid gs =
 -- permissions -- a classification, never card identity.
 permitsCastWhileSearching :: Face.Face Card.Type.Card -> Bool
 permitsCastWhileSearching face =
-  elem CastingPermission.CastFromLibraryWhileSearching (permissionsWith (Face.keywords face) face)
+  elem CastingPermission.CastFromLibraryWhileSearching (permissionsWith (Face.keywordSet face) face)
 
 -- CR 601.3 / 702.34a: may this player cast this card from the graveyard it lies
 -- in?
@@ -1634,7 +1634,7 @@ permitsDisturb oid face gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card ->
     fmap Face.name (Card.convertedFace card) == Just (Face.name face)
-      && not (null (Keyword.disturbCosts (Face.keywords (Card.frontFace card))))
+      && not (null (Keyword.disturbCosts (Face.keywordSet (Card.frontFace card))))
 
 -- CR 400.1 / 400.3: is this the object's owner, and so the player whose copy of a
 -- per-player zone it lies in?
@@ -2180,7 +2180,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- candidate, and the cast rewinds under CR 601.2e to the moment before it
       -- was proposed, leaving the spell castable again for fewer modes. That is
       -- rule 601.2e's own process, not a divergence from it.
-      let escalated = escalateTotal (Keyword.escalateCosts (Face.keywords face)) (Natural.length chosenModes)
+      let escalated = escalateTotal (Keyword.escalateCosts (Face.keywordSet face)) (Natural.length chosenModes)
           withEscalate candidate = maybe candidate (Cost.plus candidate) escalated
           -- CR 700.2h: the chosen modes' own printed costs, levied HERE for
           -- escalate's reason -- they are a function of the answer just given,
@@ -2195,7 +2195,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
           --
           -- Not implemented: such a keyword granted to the spell as it is cast,
           -- which the printed face does not carry (#3635).
-          optionalOffers = Keyword.optionalCosts (Face.keywords face)
+          optionalOffers = Keyword.optionalCosts (Face.keywordSet face)
       -- CR 702.33a: kicker, asked HERE -- after the modes and before the cost, the
       -- variable and the targets -- because that is where CR 601.2b puts the
       -- announcement of an additional cost, and rule 702.33a bundles nothing else
@@ -2245,7 +2245,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- reason: the candidate costs below and the CR 702.27a stamp read one value.
       let buybackAffordable extra =
             any (\(reduced, candidate) -> payableCost reduced spending pid sid gs (Cost.plus (withOptionalPayments paid candidate) extra)) announcedCandidates
-      boughtBack <- case Keyword.buybackCost (Face.keywords face) of
+      boughtBack <- case Keyword.buybackCost (Face.keywordSet face) of
         Nothing -> pure Nothing
         Just extra
           | buybackAffordable extra -> do
@@ -2626,7 +2626,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- whole payment's, which Binding.tappedPermanent would
                           -- have shared with a tap the printed cost demanded.
                           Monad.when
-                            (Set.member Keyword.Type.Convoke (maybe Set.empty Face.keywords (Game.faceOf sid pricedGs)))
+                            (Set.member Keyword.Type.Convoke (maybe Set.empty Face.keywordSet (Game.faceOf sid pricedGs)))
                             ( let convokers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedPermanent substitutedBindings)))
                                in Monad.unless
                                     (Set.null convokers)

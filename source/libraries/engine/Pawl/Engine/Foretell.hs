@@ -76,7 +76,7 @@ actionCost =
 foretellCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 foretellCostOf oid gs = do
   card <- Game.cardOfHandMember oid gs
-  Keyword.foretellCost (Face.keywords (Card.combined card))
+  Keyword.foretellCost (Face.keywordSet (Card.combined card))
 
 -- CR 702.143a / 116.2h: may this player foretell this card right now? Three
 -- conjuncts, each a clause of the rule:

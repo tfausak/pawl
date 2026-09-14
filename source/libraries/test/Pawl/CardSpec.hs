@@ -320,7 +320,7 @@ vanillaFace name typeLine =
       Face.loyalty = Nothing,
       Face.defense = Nothing,
       Face.vanguard = Nothing,
-      Face.keywords = Set.empty,
+      Face.keywords = Map.empty,
       Face.colorIndicator = Set.empty,
       Face.staticAbilities = [],
       Face.spell = Face.defaultSpell,
@@ -418,7 +418,7 @@ waxFace :: Face.Face Card.Type.Card
 waxFace =
   (vanillaFace "Wax" (spellLine CardType.Instant Set.empty (Set.singleton Subtype.Arcane)))
     { Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.Green)],
-      Face.keywords = Set.singleton Keyword.Flying,
+      Face.keywords = Map.singleton Keyword.Flying 1,
       Face.staticAbilities = [grantsItself Keyword.Flying],
       Face.activatedAbilities = [oneEffectActivated (costOf []) (youDraw 1)],
       Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfDies (youDraw 1)]
@@ -431,7 +431,7 @@ waneFace :: Face.Face Card.Type.Card
 waneFace =
   (vanillaFace "Wane" (spellLine CardType.Sorcery (Set.singleton Supertype.Snow) (Set.singleton Subtype.Trap)))
     { Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.White)],
-      Face.keywords = Set.singleton Keyword.Trample,
+      Face.keywords = Map.singleton Keyword.Trample 1,
       Face.staticAbilities = [grantsItself Keyword.Trample],
       Face.activatedAbilities = [oneEffectActivated (costOf []) (youDraw 2)],
       Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)],
@@ -500,7 +500,7 @@ cardSpec s = Spec.describe s "Card" $ do
     -- leave this empty.
     Spec.assertEqWith s "the right half's supertype" (TypeLine.supertypes (Face.typeLine c)) (Set.singleton Supertype.Snow)
     -- CR 709.4c again: a keyword is the printed NAME of an ability (CR 702.1).
-    Spec.assertEqWith s "each keyword" (Face.keywords c) (Set.fromList [Keyword.Flying, Keyword.Trample])
+    Spec.assertEqWith s "each keyword" (Face.keywordSet c) (Set.fromList [Keyword.Flying, Keyword.Trample])
     -- CR 709.4c reaches CR 113.6g's clause too -- "this spell can't be countered"
     -- is an ability in a half's text box -- and CR 702.102b hands the combined
     -- characteristics to a fused split spell, which is the object that reads this
@@ -5349,7 +5349,7 @@ cardFilters :: Face.Face Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword
 cardFilters card =
   frame
     Unframed
-    ( concatMap keywordFilters (Set.toList (Face.keywords card))
+    ( concatMap keywordFilters (Set.toList (Face.keywordSet card))
         <> concatMap quantityFilters (characteristicQuantities card)
         <> concatMap quantityFilters (Face.maximumX card)
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
@@ -5738,7 +5738,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends (path, result) = case result of
           Left reason -> Just (path <> ": " <> Text.unpack reason)
           Right card ->
-            if Set.member Keyword.Fuse (Face.keywords (Card.combined card)) && Maybe.isNothing (Card.fusedFace card)
+            if Set.member Keyword.Fuse (Face.keywordSet (Card.combined card)) && Maybe.isNothing (Card.fusedFace card)
               then Just (path <> ": prints fuse and cannot be fused")
               else Nothing
     Spec.assertEqWith s "every card with fuse fuses" (Maybe.mapMaybe offends loaded) []
@@ -6507,7 +6507,7 @@ realSplitCardSpec s registry = Spec.describe s "RealSplitCard" $ do
     -- One-sided: aftermath is printed on Victory only, so a merge that took the
     -- LEFT half's keyword set -- which a record update over `l` does by default --
     -- leaves this empty.
-    Spec.assertEqWith s "aftermath, from the right half alone" (Face.keywords c) (Set.singleton Keyword.Aftermath)
+    Spec.assertEqWith s "aftermath, from the right half alone" (Face.keywordSet c) (Set.singleton Keyword.Aftermath)
   m2bCardSpec s registry
   basicLandSpec s
 

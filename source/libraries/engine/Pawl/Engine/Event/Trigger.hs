@@ -1367,7 +1367,7 @@ eventTriggers events gs =
       -- madness, whose own first ability is what put its card here.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) | not (Object.exiledFaceDown obj) ->
-          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> Keyword.exileTriggeredAbilitiesOf (Face.keywords face) of
+          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> Keyword.exileTriggeredAbilitiesOf (Face.keywordSet face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -1546,7 +1546,7 @@ eventTriggers events gs =
       revealedInHand event = case event of
         GameEvent.Revealed (Revealed.MkRevealed _ oid RevealCause.ForMiracle _) -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
           (Just obj, Just face) ->
-            case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywords face)) of
+            case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywordSet face)) of
               [] -> Map.empty
               abilities -> Map.singleton oid (Object.owner obj, abilities)
           _ -> Map.empty

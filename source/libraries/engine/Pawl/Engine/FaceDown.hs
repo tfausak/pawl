@@ -88,7 +88,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 morphCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 morphCostOf oid gs = do
   face <- Game.faceUpFaceOf oid gs
-  Keyword.morphCost (Face.keywords face)
+  Keyword.morphCost (Face.keywordSet face)
 
 -- CR 702.168d: "show all players what the permanent's disguise cost WOULD BE if
 -- it were face up". Nothing when the card underneath has no disguise ability,
@@ -104,7 +104,7 @@ morphCostOf oid gs = do
 disguiseCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 disguiseCostOf oid gs = do
   face <- Game.faceUpFaceOf oid gs
-  Keyword.disguiseCost (Face.keywords face)
+  Keyword.disguiseCost (Face.keywordSet face)
 
 -- CR 701.40b: "show all players that the card representing that permanent IS A
 -- CREATURE CARD and what THAT CARD'S MANA COST is, pay that cost". Its

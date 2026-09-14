@@ -2472,7 +2472,7 @@ frogmiteSpec s registry =
       Spec.assertEqWith
         s
         "and one affinity, for artifacts"
-        (Set.toList (Face.keywords face))
+        (Set.toList (Face.keywordSet face))
         [Keyword.Affinity (Filter.Type.HasCardType CardType.Artifact)]
     -- Three Forests. Two Golems take {2} off a {4}, leaving {2} and one Forest
     -- spare -- which is what an over-tapping payment could not produce. The tapped
@@ -2560,7 +2560,7 @@ exhalationSpec s registry =
       Spec.assertEqWith
         s
         "and undaunted, which carries no payload"
-        (Set.toList (Face.keywords face))
+        (Set.toList (Face.keywordSet face))
         [Keyword.Undaunted]
     Spec.it s "CR 702.125a two opponents take {2} off, and the total is what pays" $ do
       plains <- S.printingOf s registry "Plains"

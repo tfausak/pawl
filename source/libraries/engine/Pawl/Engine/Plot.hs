@@ -56,7 +56,7 @@ import qualified Pawl.Types.Zone as Zone
 plotCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 plotCostOf oid gs = do
   card <- Game.cardOfHandMember oid gs
-  Keyword.plotCost (Face.keywords (Card.combined card))
+  Keyword.plotCost (Face.keywordSet (Card.combined card))
 
 -- CR 702.170a / 116.2k: may this player plot this card right now? Three
 -- conjuncts, each a clause of the rule:

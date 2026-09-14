@@ -40,9 +40,10 @@ data FaceDownCharacteristics = MkFaceDownCharacteristics
     -- has no power to list, and CR 208.3 gives a noncreature permanent none.
     power :: Maybe Power.Power,
     toughness :: Maybe Toughness.Toughness,
-    -- | CR 702.168b / 701.58a: the ward {2} disguise and cloak list. A Set and
-    -- not a count, Pawl.Types.Face.keywords' reason -- a listing says WHICH
-    -- keywords the object has, and no rule lists one twice.
+    -- | CR 702.168b / 701.58a: the ward {2} disguise and cloak list. A Set where
+    -- Pawl.Types.Face.keywords counts: a listing says WHICH keywords the object
+    -- has, and no rule lists one twice. Pawl.Engine.Card.faceDownFace is where
+    -- the two meet, at one instance each.
     keywords :: Set.Set Keyword.Keyword
   }
   deriving (Eq, Ord, Show)

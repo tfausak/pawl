@@ -6936,7 +6936,7 @@ offerMiracleReveal :: PlayerId -> ObjectId -> Game ()
 offerMiracleReveal pid drawn = do
   gs <- State.get
   case Game.faceOf drawn gs of
-    Just face | Maybe.isJust (Keyword.miracleCost (Face.keywords face)) -> do
+    Just face | Maybe.isJust (Keyword.miracleCost (Face.keywordSet face)) -> do
       let decider = Decide.deciderFor pid gs
       decision <- Game.choose (Prompt.OfferedMiracleReveal decider pid drawn (Face.name face))
       case decision of
