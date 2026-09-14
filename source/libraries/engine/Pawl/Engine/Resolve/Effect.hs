@@ -919,7 +919,8 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 -- repetition Pawl.Types.CastRepetition names -- Fevered Suspicion's "you may cast
 -- ANY NUMBER of spells from among those nonland cards", where Shell of the Last
 -- Kappa's "cast A SPELL from among cards exiled with Shell of the Last Kappa"
--- stops after one.
+-- stops after one. CR 608.2g's own "which may include casting other spells this
+-- way" is what admits the repeat.
 --
 -- The card a round took is dropped from the next round's candidates rather than
 -- the round re-reading the whole set: CR 400.7 has already made the cast card a
