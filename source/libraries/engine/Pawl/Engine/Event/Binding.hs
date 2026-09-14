@@ -33,6 +33,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.ObjectId (ObjectId)
@@ -745,6 +746,17 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- only a GameEvent.TappedForMana, which carries the permanent outright.
   (TriggerCondition.PermanentTappedForMana {}, GameEvent.TappedForMana tapped) ->
     Binding.setManaSource (TappedForMana.permanent tapped) Map.empty
+  -- CR 605.1b's resolution read off the bearer's own mana ability: the permanent
+  -- needs no slot -- it IS the bearer, whom Binding.triggerSource already names
+  -- -- and what the payload reads instead is how much mana the activation made,
+  -- which Tyvar the Bellicose's "equal to the amount of mana this creature
+  -- produced" takes through Quantity.InSlot.
+  --
+  -- Unconditional given a match, AttachedPermanentTappedForMana's claim and for
+  -- its reason: matchesTrigger accepts only a GameEvent.ManaAbilityResolved
+  -- whose permanent IS the bearer, and the amount is on the event outright.
+  (TriggerCondition.SelfManaAbilityResolves, GameEvent.ManaAbilityResolved resolved) ->
+    Binding.setEventAmount (ManaAbilityResolved.amount resolved) Map.empty
   -- CR 725.1's newly crowned player: Garland, Royal Kidnapper's "that player",
   -- whose creature the trigger then targets and whose crown its duration watches.
   -- Bound whichever relation matched, for the reason the PlayerLosesLife arm
@@ -1508,6 +1520,9 @@ eventBindingSlots cond = case cond of
   -- A deliberate empty: Caged Sun's "that color" is the bearer's chosen color,
   -- and it names no source. A card that did would take manaSource.
   TriggerCondition.AbilityAddsMana {} -> Set.empty
+  -- The amount the resolving mana ability produced, which the arm above stamps
+  -- for every match. No manaSource beside it: the permanent is the bearer.
+  TriggerCondition.SelfManaAbilityResolves -> Set.singleton Binding.eventAmount
   -- Empty for SelfEvolves' reason and not for AttachedCreatureMentors' -- rule
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.

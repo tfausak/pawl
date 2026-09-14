@@ -857,6 +857,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- neither of which holds a Count.
   TriggerCondition.PermanentTappedForMana {} -> []
   TriggerCondition.AbilityAddsMana {} -> []
+  TriggerCondition.SelfManaAbilityResolves -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
@@ -3494,6 +3495,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentTappedForMana payload -> unframed [PermanentTappedForMana.filter payload]
   -- Caged Sun's "a land's" is a Filter over the ability's source, swept alike.
   TriggerCondition.AbilityAddsMana payload -> unframed [AbilityAddsMana.source payload]
+  TriggerCondition.SelfManaAbilityResolves -> []
   -- CR 701.21a's Filter narrows the sacrificed permanent -- Vengeful Tracker's
   -- "an artifact" -- and is swept like PermanentDies' below.
   TriggerCondition.PermanentSacrificed payload -> unframed [PermanentSacrificed.filter payload]
@@ -3760,6 +3762,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.AttachedPermanentTappedForMana -> []
   TriggerCondition.PermanentTappedForMana {} -> []
   TriggerCondition.AbilityAddsMana {} -> []
+  TriggerCondition.SelfManaAbilityResolves -> []
   -- CR 702.55a names the haunted creature through the haunting object's own
   -- attachment rather than through a slot.
   TriggerCondition.HauntedCreatureDies -> []

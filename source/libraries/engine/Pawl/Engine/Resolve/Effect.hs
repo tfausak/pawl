@@ -2589,9 +2589,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- than off the stack; what resolves here in the ordinary way is a triggered
   -- producer CR 605.1b leaves out, Burning-Tree Emissary's shape.
   --
-  -- Not implemented: CR 605.1b's trigger on a mana ability being activated, so
-  -- a producer that watches it still resolves off the stack here (#1572).
-  --
   -- CR 605.1b's "mana being added to a player's mana pool" is recorded here as
   -- well as on Cost's road, one event per recipient, carrying
   -- ManaAddedCause.Resolution so that CR 605.5a can tell the two apart
@@ -7743,8 +7740,7 @@ performManaAbility =
 --
 -- CR 700.2b's mode choice is FORCED or nothing: a modal triggered mana ability
 -- would want the prompt Engine.placeBorne raises, and CR 605.4a leaves no stack
--- object to raise it against. Not implemented: such an ability; no card prints
--- one (#1572).
+-- object to raise it against. Not implemented: such an ability (#3724).
 performTriggeredManaAbility :: PendingTrigger.PendingTrigger -> Game ()
 performTriggeredManaAbility pending = case PendingTrigger.source pending of
   TriggerSource.Sourceless -> pure ()

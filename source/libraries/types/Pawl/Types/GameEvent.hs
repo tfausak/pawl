@@ -24,6 +24,7 @@ import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
@@ -509,6 +510,17 @@ data GameEvent
     -- AddMana arm as a spell or ability resolves. Which of the two is the
     -- payload's Pawl.Types.ManaAddedCause, CR 605.5a being the rule that asks.
     ManaAdded ManaAdded.ManaAdded
+  | -- | CR 605.3b: an activated mana ability RESOLVED -- which permanent's, and
+    -- how much mana the activation produced. Appended by
+    -- Pawl.Engine.Cost.tapForManaWith beside the two arms above, after CR
+    -- 405.6c's non-mana effects have run.
+    --
+    -- Distinct from TappedForMana above, which CR 106.12a narrows to an
+    -- activation whose cost includes {T}: this arm is written whatever the cost
+    -- was, so a mana ability with no tap symbol reaches it and not that one.
+    -- Tyvar the Bellicose's "whenever a mana ability of this creature resolves"
+    -- is what observes the difference.
+    ManaAbilityResolved ManaAbilityResolved.ManaAbilityResolved
   | -- | CR 705.1: a player flipped a coin, and CR 705.2 decided whether they won
     -- it -- or left it winnerless. Recorded by both roads that flip:
     -- Pawl.Engine.Resolve's Effect.FlipCoin arm, after the outcome is settled and

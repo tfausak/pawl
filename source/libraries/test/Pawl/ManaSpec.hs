@@ -3446,6 +3446,89 @@ poolUnitsOf :: PlayerId.PlayerId -> GameState.GameState -> [ManaUnit.ManaUnit]
 poolUnitsOf pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> units
 
+-- CR 605.1b's FIRST alternative, the trigger source the four groups above leave
+-- untouched: Tyvar the Bellicose ({2}{B}{G} Legendary Creature -- Elf Warrior,
+-- 5/4), whose second ability grants each creature you control "Whenever a mana
+-- ability of this creature resolves, put a number of +1/+1 counters on it equal
+-- to the amount of mana this creature produced. This ability triggers only once
+-- each turn."
+--
+-- NOT a mana ability, CR 605.5a's third clause: the granted trigger could not
+-- produce mana, so it uses the stack like any other -- which is what separates
+-- this group from the Wild Growth one, where CR 605.4a keeps the trigger off it.
+--
+-- FOUR permanents can be tapped for mana on the one board, and each is the
+-- others' control: alice's Palladium Myr ("{T}: Add {C}{C}") produces two mana,
+-- her Llanowar Elves ("{T}: Add {G}") produces one, her Forest is a mana source
+-- that is no creature and so was granted nothing, and bob's Llanowar Elves is
+-- the first again under the other seat.
+--
+-- Not implemented: Tyvar's OTHER printed ability, "Whenever one or more Elves
+-- you control attack, they gain deathtouch until end of turn" -- CR 508.3c's
+-- condition (TriggerCondition.PlayerAttacksWith) binds the attacking PLAYER and
+-- nothing names the creatures the declaration announced, so "they" cannot be
+-- written. pawl's Tyvar is STRICTER than printed (#3723).
+tyvarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tyvarSpec s registry = Spec.describe s "Tyvar the Bellicose" $ do
+  Spec.it s "CR 605.1b a creature's mana ability resolving puts a counter on it per mana it produced" $ do
+    (myr, elves, forest, theirElves, board) <- tyvarBoard s registry
+    let tapped = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer myr)
+        -- CR 605.5a: the granted trigger could add no mana, so it waits on the
+        -- stack rather than applying inline the way CR 605.4a's would.
+        waiting = S.runPure S.identityAnswer tapped Engine.settleForPriority
+        settled = resolveDown waiting
+        -- The same board differing in exactly one thing: how much mana the
+        -- activation produced. One Llanowar Elf's {G} against the Myr's {C}{C}.
+        one = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer elves)) Engine.settleForPriority)
+        -- And in exactly one other: a Forest is a mana source that is no
+        -- creature, so Tyvar granted it nothing.
+        land = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer forest)) Engine.settleForPriority)
+        -- And in exactly one other again: whose creature it was.
+        theirs = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer theirElves)) Engine.settleForPriority)
+    Spec.assertEqWith s "CR 605.1b the Myr made two mana, so two +1/+1 counters went on it" (S.counterOf CounterKind.PlusOnePlusOne myr settled) 2
+    Spec.assertEqWith s "the amount: one Llanowar Elf made one mana, so one counter" (S.counterOf CounterKind.PlusOnePlusOne elves one) 1
+    Spec.assertEqWith s "the Filter: alice's Forest is no creature, so Tyvar granted it nothing" (S.counterOf CounterKind.PlusOnePlusOne forest land) 0
+    Spec.assertEqWith s "the PlayerRelation: bob's Elf is no creature ALICE controls, so it gets nothing" (S.counterOf CounterKind.PlusOnePlusOne theirElves theirs) 0
+    Spec.assertEqWith s "CR 605.5a the granted trigger went ON the stack, being no mana ability" (length (GameState.stack waiting)) 1
+    Spec.assertEqWith s "and the Myr's own {C}{C} reached alice's pool" (poolTypes S.alice settled) [ManaType.Colorless, ManaType.Colorless]
+  -- The printed rider, spent by Engine.withinTriggerLimit over CR 603.3b's log.
+  -- The Myr is untapped between the two activations through Event.untap, the
+  -- road CR 502.1 takes, so the second one pays the same {T} the first did.
+  Spec.it s "the rider: a second resolution the same turn triggers nothing more" $ do
+    (myr, elves, _, _, board) <- tyvarBoard s registry
+    let once = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer myr)) Engine.settleForPriority)
+        untapped = S.runPure S.identityAnswer once (Event.untap myr)
+        twice = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer untapped (Cost.tapForMana S.manaPerformer myr)) Engine.settleForPriority)
+        -- The same board differing in exactly one thing: which creature's mana
+        -- ability resolved the second time. CR 113.7 gives each its own
+        -- instance of the granted ability, so the Elf's limit is unspent.
+        another = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer once (Cost.tapForMana S.manaPerformer elves)) Engine.settleForPriority)
+    Spec.assertEqWith s "the rider: the Myr's second resolution added no third counter" (S.counterOf CounterKind.PlusOnePlusOne myr twice) 2
+    Spec.assertEqWith s "the fixture: the second activation really did make its mana" (poolTypes S.alice twice) [ManaType.Colorless, ManaType.Colorless, ManaType.Colorless, ManaType.Colorless]
+    Spec.assertEqWith s "and the limit is per source: the Elf's own instance is unspent" (S.counterOf CounterKind.PlusOnePlusOne elves another) 1
+
+-- alice controls a Tyvar the Bellicose, a Palladium Myr, a Llanowar Elves and a
+-- Forest; bob controls a Llanowar Elves. Returns the Myr, alice's Elf, the
+-- Forest, bob's Elf and the board.
+--
+-- Tyvar is placed FIRST, so the three permanents that follow are on the
+-- battlefield beside a static ability already granting: CR 604.2's effect is
+-- re-derived per projection, so the order is a readability choice rather than a
+-- load-bearing one.
+tyvarBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+tyvarBoard s registry = do
+  tyvar <- S.printingOf s registry "Tyvar the Bellicose"
+  myrPrinting <- S.printingOf s registry "Palladium Myr"
+  elvesPrinting <- S.printingOf s registry "Llanowar Elves"
+  forestPrinting <- S.printingOf s registry "Forest"
+  let (_, withTyvar) = S.addPermanent tyvar S.alice (Setup.emptyGame S.bothPlayers)
+      (myr, withMyr) = S.addPermanent myrPrinting S.alice withTyvar
+      (elves, withElves) = S.addPermanent elvesPrinting S.alice withMyr
+      (forest, withForest) = S.addPermanent forestPrinting S.alice withElves
+      (theirElves, withBob) = S.addPermanent elvesPrinting S.bob withForest
+  Spec.assertEqWith s "the fixture: Tyvar is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Tyvar the Bellicose") S.alice withBob) 1
+  pure (myr, elves, forest, theirElves, withBob)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
@@ -3478,6 +3561,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   autumnWillowSpec s registry
   gauntletOfPowerSpec s registry
   cagedSunSpec s registry
+  tyvarSpec s registry
   drainPowerSpec s registry
   yurlokSpec s registry
   almsEngineSpec s registry

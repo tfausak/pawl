@@ -46,6 +46,7 @@ import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaType as ManaType
@@ -612,6 +613,18 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = PlayerId.MkPlayerId 1, ManaAdded.source = ObjectId.MkObjectId 9, ManaAdded.mana = Set.singleton (ManaType.Colored Color.Green), ManaAdded.cause = ManaAddedCause.ManaAbility}))
       " {\"type\":\"ManaAdded\",\"value\":{\"player\":1,\"source\":9,\"mana\":[{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}],\"cause\":{\"type\":\"ManaAbility\"}}} "
+  -- CR 605.3b's moment, distinguished from the tap event about the same
+  -- permanent: the amount is what this one carries and that one does not.
+  Spec.it s "ManaAbilityResolved" $ do
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = ObjectId.MkObjectId 9, ManaAbilityResolved.amount = 2}))
+      " {\"type\":\"ManaAbilityResolved\",\"value\":{\"amount\":2,\"permanent\":9}} "
+    Spec.assertBool
+      s
+      (Codec.encode GameEvent.codec (GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = ObjectId.MkObjectId 9, ManaAbilityResolved.amount = 1})) /= Codec.encode GameEvent.codec (GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = ObjectId.MkObjectId 9, TappedForMana.mana = Set.singleton (ManaType.Colored Color.Green)})))
+      "a mana ability resolving and a tap for mana by the same object encode differently"
   -- CR 701.3a's two ends, and the ORDER is what the distinct ids prove: the
   -- attachment first, then what it went onto. A swap would credit the host with
   -- becoming attached to the Aura.

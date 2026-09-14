@@ -537,6 +537,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedPermanentTappedForMana
       " {\"type\":\"AttachedPermanentTappedForMana\"} "
+  -- CR 605.1b's other alternative, self-scoped and so carrying nothing:
+  -- Tyvar the Bellicose's granted "whenever a mana ability of this creature
+  -- resolves".
+  Spec.it s "SelfManaAbilityResolves" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfManaAbilityResolves
+      " {\"type\":\"SelfManaAbilityResolves\"} "
   -- The same event read by a bystander, so every part of the printed sentence
   -- rides the condition -- Autumn Willow, Harmony's "whenever YOU tap a LAND
   -- CREATURE for mana", which narrows the mana not at all.

@@ -573,6 +573,8 @@ library codec
     Pawl.Codec.LoyaltyKindSpec
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.Mana
+    Pawl.Codec.ManaAbilityResolved
+    Pawl.Codec.ManaAbilityResolvedSpec
     Pawl.Codec.ManaAdded
     Pawl.Codec.ManaAddedCause
     Pawl.Codec.ManaAddedCauseSpec
@@ -1794,6 +1796,7 @@ library types
     Pawl.Types.LoyaltyKind
     Pawl.Types.Mana
     Pawl.Types.ManaAbilityPerformer
+    Pawl.Types.ManaAbilityResolved
     Pawl.Types.ManaAdded
     Pawl.Types.ManaAddedCause
     Pawl.Types.ManaAddition

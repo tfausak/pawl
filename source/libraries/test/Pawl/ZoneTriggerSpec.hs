@@ -87,6 +87,7 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
@@ -2370,6 +2371,7 @@ representativeEvents cond =
         -- CR 605.1b's mana-added event, on `departed` for the arm above's
         -- reason; the arm binds nothing either way.
         TriggerCondition.AbilityAddsMana {} -> one (GameEvent.ManaAdded (ManaAdded.MkManaAdded {ManaAdded.player = S.alice, ManaAdded.source = departed, ManaAdded.mana = Set.singleton (ManaType.Colored Color.Green), ManaAdded.cause = ManaAddedCause.ManaAbility}))
+        TriggerCondition.SelfManaAbilityResolves -> one (GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = departed, ManaAbilityResolved.amount = 1}))
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
@@ -2654,6 +2656,7 @@ everyTriggerCondition =
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.You (Filter.Type.And []) ManaSpecification.ChosenColor),
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.Opponent (Filter.Type.And []) ManaSpecification.AnyMana),
     TriggerCondition.AbilityAddsMana (AbilityAddsMana.MkAbilityAddsMana PlayerRelation.AnyPlayer (Filter.Type.And []) ManaSpecification.AnyMana),
+    TriggerCondition.SelfManaAbilityResolves,
     TriggerCondition.SelfTrains,
     TriggerCondition.SelfExploits,
     TriggerCondition.SelfBecomesCrewed,
