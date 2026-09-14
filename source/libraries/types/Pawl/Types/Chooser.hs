@@ -19,10 +19,9 @@ import qualified Pawl.Types.SlotName as SlotName
 data Chooser
   = -- | CR 608.2c \/ 608.2d's default: the resolving controller, choosing once
     -- across every graveyard the scope names rather than once per graveyard --
-    -- Port of Karfell's "return a
-    -- creature card from your graveyard to the battlefield tapped", and
-    -- Extract from Darkness' "a graveyard", where the scope widens and the
-    -- chooser does not.
+    -- Port of Karfell's "return a creature card from your graveyard to the
+    -- battlefield tapped", and Extract from Darkness' "a graveyard", where the
+    -- scope widens and the chooser does not.
     TheController
   | -- | Each player the scope names, choosing in THEIR OWN graveyard -- Exhume's
     -- "each player puts a creature card from their graveyard onto the

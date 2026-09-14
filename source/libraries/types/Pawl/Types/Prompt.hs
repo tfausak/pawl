@@ -215,7 +215,8 @@ data Prompt r where
   ChooseDelayedTriggerEvent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty GameEvent.GameEvent -> Prompt Natural.Natural
   -- | CR 608.2d: which graveyard card a Pawl.Types.ObjectRef.ChosenCardInGraveyard
   -- takes; the PlayerId is the chooser, who need not own the graveyard, asked
-  -- in APNAP order (CR 101.4).
+  -- in APNAP order (CR 101.4). ONE of these per card the ref's count names, each
+  -- over the candidates the earlier asks left.
   ChooseCardInGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 608.2d: which card of their own hand a Pawl.Types.ObjectRef.ChosenCardInHand
   -- takes; also CostComponent.PutCardFromHandOntoBattlefield's question while a

@@ -445,8 +445,8 @@ objectRefQuantities ref = case ref of
   -- CR 404.1's top card is ONE card, so the graveyard arm states no depth at all.
   ObjectRef.TopOfGraveyard _ -> []
   -- How many cards each chooser picks out of a graveyard -- Fall of the Thran's
-  -- printed two. A REGRESSION FENCE for the ChosenCardFromAmong arm's reason:
-  -- every count in the pool is a Literal, which reads no slot.
+  -- printed two. A REGRESSION FENCE for the ChosenCardFromAmong arm below's
+  -- reason: every count in the pool is a Literal, which reads no slot.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _ count) -> [count]
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ _) -> []
   -- How many cards are picked out of the group -- Ancestral Memories' printed
