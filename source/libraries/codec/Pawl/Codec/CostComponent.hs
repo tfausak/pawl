@@ -57,6 +57,7 @@ codec keywordCodec =
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis (\x -> case x of CostComponent.PutPlusOneCountersOnThis y -> Just y; _ -> Nothing),
       Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "BlightX" CostComponent.BlightX,
+      Arm.nullary "Forage" CostComponent.Forage,
       Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
       Arm.nullary "ExileThis" CostComponent.ExileThis,
       Arm.payload "ExileCardsFromGraveyard" (ExileCardsFromGraveyard.codec keywordCodec) CostComponent.ExileCardsFromGraveyard (\x -> case x of CostComponent.ExileCardsFromGraveyard y -> Just y; _ -> Nothing),

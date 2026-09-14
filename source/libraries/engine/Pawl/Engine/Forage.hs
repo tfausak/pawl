@@ -9,10 +9,9 @@
 -- it is.
 --
 -- ONE module and not two procedures, for Pawl.Engine.Blight's reason: rule
--- 701.61a is one rule however a card demands it, so a forage COST (Feed the
--- Cycle, Camellia, the Seedmiser) would come here too rather than restate it.
--- Not implemented: no CostComponent spells forage, so no printed cost reaches
--- this module yet (#3720).
+-- 701.61a is one rule however a card demands it: CR 601.2f\/602.1b make it a cost
+-- (Thornvault Forager) and an effect asks for it outright (Treetop Sentries), and
+-- both come here.
 module Pawl.Engine.Forage where
 
 import qualified Control.Monad as Monad
@@ -26,6 +25,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ForageMode as ForageMode
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -88,9 +88,6 @@ canForage pid gs = length (exileCandidates pid gs) >= 3 || not (null (foodCandid
 -- something never offered falls back to the offered set's own front. An effect
 -- has no "unpaid" to answer with, so reject-not-repair (Pawl.Engine.Cost's) is
 -- not available here.
---
--- Not implemented: nothing records that a player foraged, so "whenever you
--- forage" (Corpseberry Cultivator) has no event to watch (#3721).
 forage :: PlayerId -> ObjectId -> Game Bool
 forage pid resolving = do
   gs <- State.get
@@ -103,7 +100,7 @@ forage pid resolving = do
     (True, []) -> pure (Just ForageMode.ExileCards)
     (False, _) -> pure (Just ForageMode.SacrificeFood)
     (True, _) -> fmap Just (Game.choose (Prompt.ChooseForage decider pid resolving))
-  case mode of
+  did <- case mode of
     Nothing -> pure False
     Just ForageMode.ExileCards -> do
       chosen <-
@@ -130,3 +127,14 @@ forage pid resolving = do
         -- CR 701.21a, through the one funnel a sacrifice goes through.
         Event.sacrifice pid food
         pure True
+  -- CR 701.61a's forage itself, for "whenever you forage" (Corpseberry
+  -- Cultivator) to watch. HERE and not at a caller, Pawl.Engine.Blight's reason:
+  -- this is the one place every provenance meets, so an effect's forage and a
+  -- cost's write the same event.
+  --
+  -- Only where the action was carried out. Rule 701.61 has no counterpart to CR
+  -- 701.54d's "even if some or all of those actions were impossible", so the
+  -- board CR 608.2d refuses writes nothing -- and neither half's own Moved event
+  -- could stand in for this one, a forage being one action however it was taken.
+  Monad.when did (State.modify' (Event.recordEvent (GameEvent.Foraged pid)))
+  pure did

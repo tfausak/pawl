@@ -90,6 +90,14 @@ data CostComponent keyword
     -- player puts N -1\/-1 counters on a creature they control, and can't pay at
     -- all where they control none (CR 701.68b).
     Blight Natural.Natural
+  | -- | CR 701.61a as a cost / Thornvault Forager, Camellia, the Seedmiser: the
+    -- paying player forages, and can't pay at all where neither half of rule
+    -- 701.61a can be carried out (CR 608.2d, Pawl.Engine.Forage.canForage).
+    --
+    -- Nullary, rule 701.61a fixing everything but the forager's own two choices --
+    -- Pawl.Types.Effect's Forage arm is the same instruction from the other
+    -- provenance, and Pawl.Engine.Forage.forage is the one procedure both reach.
+    Forage
   | -- | CR 107.3a / 601.2b / Soul Immolation: X as a blight amount, announced by
     -- the caster and rewritten to a Blight by Pawl.Engine.Cost.substituteX. The
     -- printed ceiling on X rides Pawl.Types.Face.maximumX (CR 101.1).

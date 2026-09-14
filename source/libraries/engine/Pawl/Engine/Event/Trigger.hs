@@ -186,6 +186,7 @@ movedOf event = case event of
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
+  GameEvent.Foraged _ -> Nothing
 
 -- CR 603.10a: is this one of the conditions the game "looks back in time" for?
 --
@@ -231,6 +232,7 @@ looksBack condition = case condition of
   -- Not on CR 603.10a's list either, and no zone change at all: CR 701.68a
   -- puts counters on a permanent that stays where it is.
   TriggerCondition.PlayerBlights _ -> False
+  TriggerCondition.PlayerForages _ -> False
   -- Not on CR 603.10a's list, and CR 706.1's roll is no zone change: it moves
   -- no object at all, so CR 603.10's first sentence governs.
   TriggerCondition.PlayerRollsDice _ -> False
@@ -484,6 +486,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerScries _ -> False
   TriggerCondition.RingTemptsPlayer _ -> False
   TriggerCondition.PlayerBlights _ -> False
+  TriggerCondition.PlayerForages _ -> False
   TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
@@ -945,6 +948,7 @@ eventTriggers events gs =
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
+        GameEvent.Foraged _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
         GameEvent.Moved {} -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
@@ -1211,6 +1215,7 @@ eventTriggers events gs =
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
+        GameEvent.Foraged _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
       -- one ability those rules put there. The one source that widens the SCANNED
@@ -1450,6 +1455,7 @@ eventTriggers events gs =
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
+        GameEvent.Foraged _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       -- CR 114.4 / CR 113.6p: "abilities of emblems function in the command zone".
       -- The third source that widens the SCANNED ZONE rather than recovering an
@@ -1597,6 +1603,7 @@ eventTriggers events gs =
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
+        GameEvent.Foraged _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
         let -- The bearer's own slot environment, so a condition naming a slot
@@ -1909,6 +1916,7 @@ zonesTriggeredFrom cond =
         -- blight is a condition a battlefield permanent can watch, so CR 113.6k's
         -- exception does not apply.
         TriggerCondition.PlayerBlights _ -> battlefield
+        TriggerCondition.PlayerForages _ -> battlefield
         -- CR 113.6's default again, and NOT the graveyard, though Dungeon Crawler
         -- watches from there: completing a dungeon is a condition a battlefield
         -- permanent could watch perfectly well, so CR 113.6k's exception does not
@@ -2333,6 +2341,7 @@ stateTriggers gs
               -- CR 603.2 once more: a blight is something that HAPPENS, with
               -- its own log entry, never a CR 603.8 state standing still.
               TriggerCondition.PlayerBlights _ -> False
+              TriggerCondition.PlayerForages _ -> False
               -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
               -- entry, never a CR 603.8 state that could be true standing still.
               TriggerCondition.PlayerRollsDice _ -> False

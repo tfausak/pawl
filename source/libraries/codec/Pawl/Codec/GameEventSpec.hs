@@ -685,3 +685,9 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Blighted (PlayerId.MkPlayerId 4))
       " {\"type\":\"Blighted\",\"value\":4} "
+  Spec.it s "Foraged" $
+    Common.assertCodec
+      s
+      codec
+      (GameEvent.Foraged (PlayerId.MkPlayerId 5))
+      " {\"type\":\"Foraged\",\"value\":5} "

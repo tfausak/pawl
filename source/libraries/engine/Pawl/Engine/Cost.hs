@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Forage as Forage
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Interchangeable as Interchangeable
 import qualified Pawl.Engine.Keyword as Keyword
@@ -1148,6 +1149,7 @@ substituteXInComponent x component = case component of
   CostComponent.RemovePlusOneCountersFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
+  CostComponent.Forage -> component
   -- PayLifeX's rewrite one keyword action over: CR 107.3a gives ONE announced
   -- value to the whole cost, so Soul Immolation's "blight X" takes the same X a
   -- mana cost's {X} would have taken.
@@ -1207,6 +1209,9 @@ componentHasVariable component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> True
+  -- Nullary: CR 701.61a states no number at all, so there is nothing for CR
+  -- 601.2b to announce.
+  CostComponent.Forage -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1292,6 +1297,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.RemovePlusOneCountersFromThis _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
+  CostComponent.Forage -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1572,6 +1578,7 @@ loyaltyAmountOf component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
+  CostComponent.Forage -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
@@ -1676,6 +1683,11 @@ zoneOfComponent component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
+  -- Nothing, and NOT Just Zone.Graveyard: rule 113.6m asks about an ability that
+  -- moves THE OBJECT IT'S ON, and CR 701.61a moves OTHER cards -- the
+  -- ExileCardsFromGraveyard arm above's answer, for its reason, and the Food half
+  -- is Sacrifice's.
+  CostComponent.Forage -> Nothing
 
 -- CR 118.8c: does this cost include "actions involving cards with a stated
 -- quality in a hidden zone"? What Resolve.offerCast reads to decide whether a
@@ -1741,6 +1753,10 @@ componentStatesHiddenQuality component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
+  -- Cards, but in PUBLIC zones (CR 400.2) on both halves of rule 701.61a, so the
+  -- first conjunct fails -- the Sacrifice and ExileCardsFromGraveyard arms above,
+  -- for their reason. Rule 701.61a states no quality either way.
+  CostComponent.Forage -> False
   -- The other hidden zone (CR 400.2), and the FIRST conjunct is satisfied where
   -- no other arm's is -- but the second is not: CR 701.17a takes the cards off
   -- the top, so "mill a card" describes no quality for a player to fail to find.
@@ -2135,6 +2151,12 @@ claimOf slots pid oid component gs =
         -- which is right -- CR 122.6 stacks counters.
         CostComponent.Blight _ -> Nothing
         CostComponent.BlightX -> Nothing
+        -- Nothing, though this one DOES take objects out of a pool: CR 701.61a's two
+        -- halves spend out of DIFFERENT pools on different axes -- three cards off a
+        -- graveyard, or one Food off the battlefield -- and a Claim names one axis, so
+        -- no single claim describes the component. A FENCE, no card in `data/cards/`
+        -- printing two forages in one cost.
+        CostComponent.Forage -> Nothing
         -- Nothing, Blight's arm above and for its reason one rule over: CR 701.20b
         -- leaves the revealed card in the hand, so nothing leaves any pool. CR
         -- 701.20c is what makes the shared-choice half right here too -- a card
@@ -2485,6 +2507,10 @@ uncountedCeiling component = case component of
   -- Zero, PayLifeX's answer above and for its reason: an unannounced X cannot be
   -- paid even once.
   CostComponent.BlightX -> Just 0
+  -- 1, and counted by none of the three totals: `claimOf` states no claim for
+  -- this component, so `objectCeiling` has no pool to divide. An UNDERSTATEMENT
+  -- -- a graveyard of nine pays three forages -- and the header's safe direction.
+  CostComponent.Forage -> Just 1
 
 -- This player's life total as an amount that could be PAID (CR 119.4), floored
 -- at zero: a player at or below 0 life can pay nothing but CR 119.4b's zero.
@@ -2668,6 +2694,7 @@ lifeOwedByComponent component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
+  CostComponent.Forage -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -2711,6 +2738,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
+  CostComponent.Forage -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -2908,6 +2936,12 @@ canPayComponent slots pid oid component gs = case component of
   -- 701.68a's candidate is qualified by CONTROL alone, the whole difference from
   -- PutPlusOneCountersOnThis above.
   CostComponent.Blight _ -> Blight.canBlight pid gs
+  -- CR 608.2d: a player who can neither exile three cards from their graveyard
+  -- nor sacrifice a Food can't choose either half, so the cost cannot be paid and
+  -- CR 601.2h's "unpayable costs can't be paid" never offers the ability. Nothing
+  -- about `oid`: rule 701.61a's candidates are qualified by the FORAGER's own
+  -- graveyard and control, the Blight arm above's shape.
+  CostComponent.Forage -> Forage.canForage pid gs
   -- CR 701.17b's last sentence, stated of costs in as many words: "the player
   -- can't pay a cost that includes milling a number of cards greater than the
   -- number of cards in their library". Not the general "as many as possible" of
@@ -2978,6 +3012,9 @@ criteriaOf component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
+  -- Rule 701.61a's two candidate sets are the rulebook's own and carry no card
+  -- Filter, so there is no criterion for the lint to sweep.
+  CostComponent.Forage -> []
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   CostComponent.MillCards _ -> []
@@ -3574,6 +3611,10 @@ paidInSecondPass component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
+  -- CR 701.61a moves cards from a graveyard to exile, or a Food from the
+  -- battlefield to a graveyard, and neither is a library, so the first pass holds
+  -- it -- the header's reading.
+  CostComponent.Forage -> False
   -- CR 701.20b moves nothing out of any zone, so rule 601.2h's library half has
   -- nothing to ask of it.
   CostComponent.RevealCardFromHand _ -> False
@@ -3669,6 +3710,12 @@ orderSensitive component = case component of
   -- The arm above's classification, which is what CR 601.2b turns this into.
   -- Unreachable unsubstituted: `pay` runs on the announced cost.
   CostComponent.BlightX -> True
+  -- True: CR 701.61a moves three cards out of a graveyard or a Food off the
+  -- battlefield, either of which another part of the same cost could have spent.
+  -- A FENCE rather than proven behaviour -- Thornvault Forager is the one card in
+  -- `data/cards/` printing this component, and its cost's other part is a {T},
+  -- which answers True too, so `orderObservable` is False either way.
+  CostComponent.Forage -> True
   -- CR 701.17a puts a card into a graveyard, which a graveyard-reading part of
   -- the same cost could then spend (Circling Vultures' "the top creature card of
   -- your graveyard"). Alone in CR 601.2h's second pass on this pool, so nothing
@@ -4646,6 +4693,16 @@ payComponent moment slots pid oid component = case component of
   -- Unpayable, `canPayComponent`'s answer and for its reason -- PayLifeX's arm
   -- above, verbatim.
   CostComponent.BlightX -> pure Payment.Unpaid
+  -- CR 701.61a's whole procedure, which Pawl.Engine.Forage owns -- the Blight arm
+  -- above's shape. Unpaid on the board CR 608.2d refuses, which canPayComponent
+  -- has already checked, so reaching it means the graveyard or the Food went away
+  -- between the check and the payment.
+  --
+  -- The forage BINDS NOTHING: rule 701.61a names neither the cards exiled nor the
+  -- Food sacrificed afterwards, so no printing has anything to read.
+  CostComponent.Forage -> do
+    did <- Forage.forage pid oid
+    pure (if did then bindsNothing else Payment.Unpaid)
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.

@@ -245,6 +245,10 @@ costMovesLibraryCard component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
+  -- CR 701.61a moves cards out of a GRAVEYARD and a Food off the battlefield,
+  -- neither of which is a library, so this cost leaves CR 605.1a's clause intact
+  -- -- Thornvault Forager's "{T}, Forage: Add two mana" is a mana ability.
+  CostComponent.Forage -> False
 
 -- CR 605: does this effect add mana, and on what instruction? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by

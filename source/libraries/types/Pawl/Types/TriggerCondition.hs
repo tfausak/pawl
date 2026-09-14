@@ -545,4 +545,8 @@ data TriggerCondition
     -- counters -- rule 701.68a's N of zero, or a replacement that kept them off
     -- -- fires it too.
     PlayerBlights PlayerRelation.PlayerRelation
+  | -- | CR 701.61a: "whenever you forage" (Corpseberry Cultivator), against
+    -- GameEvent.Foraged. Fires on the forage itself, so which half of rule
+    -- 701.61a the forager took does not separate two forages here.
+    PlayerForages PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

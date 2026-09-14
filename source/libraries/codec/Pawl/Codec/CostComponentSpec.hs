@@ -162,6 +162,14 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       CostComponent.BlightX
       " {\"type\":\"BlightX\"} "
+  -- CR 701.61a as a cost, nullary on the wire because the rule states no number:
+  -- Thornvault Forager's "{T}, Forage".
+  Spec.it s "Forage" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.Forage
+      " {\"type\":\"Forage\"} "
   -- CR 406.2's halves: the two that name the object the cost is on, one per
   -- zone, and the one that names a count and a criterion.
   Spec.it s "ExileThisFromGraveyard" $

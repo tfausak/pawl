@@ -969,8 +969,10 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
   TriggerCondition.PermanentConnives _ -> []
-  -- CR 701.68d's carries a PlayerRelation, which is no Count.
+  -- CR 701.68d's and CR 701.61a's each carry a PlayerRelation, which is no
+  -- Count.
   TriggerCondition.PlayerBlights _ -> []
+  TriggerCondition.PlayerForages _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
   TriggerCondition.SelfExerted -> []
   -- CR 701.3a's carries a Filter, and a Filter holds no Count for
@@ -3069,6 +3071,7 @@ costComponentFilters component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
+  CostComponent.Forage -> []
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   -- CR 701.17a takes the cards off the top, so this component carries no Filter
@@ -3621,8 +3624,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
-  -- CR 701.68d's carries a PlayerRelation, which is no Filter.
+  -- CR 701.68d's and CR 701.61a's each carry a PlayerRelation, which is no
+  -- Filter.
   TriggerCondition.PlayerBlights _ -> []
+  TriggerCondition.PlayerForages _ -> []
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
   TriggerCondition.PermanentExplores f -> unframed [f]
@@ -3819,6 +3824,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerBlights _ -> []
+  TriggerCondition.PlayerForages _ -> []
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
