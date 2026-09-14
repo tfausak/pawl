@@ -126,6 +126,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -2678,6 +2679,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- And the same announcement read TWICE, by the offer and by CR 601.2c's joint
   -- check: a slot whose bound reads that X and whose pool reads a sibling slot.
   borrowedExhumationSpec s registry
+  -- And the bound at EQUALITY rather than order, which is a different atom and
+  -- not a different reading of the one above: "with mana value X"; see #2989.
+  chthonianNightmareSpec s registry
   -- The joint check on the road no spell takes: CR 603.3d's placement, where an
   -- announcement that fails it is asked again rather than reversed.
   itzquinthSpec s registry
@@ -3238,6 +3242,98 @@ aimingExhumation x oid p = case p of
             else Set.singleton (Recipient.ToObject oid)
       )
       asked
+  _ -> S.identityAnswer p
+
+-- Chthonian Nightmare ({1}{B} Enchantment, Modern Horizons 3, paper; Oracle text
+-- fetched from Scryfall this session and transcribed whole): "When this
+-- enchantment enters, you get {E}{E}{E} (three energy counters). / Pay X {E},
+-- Sacrifice a creature, Return this enchantment to its owner's hand: Return
+-- target creature card with mana value X from your graveyard to the battlefield.
+-- Activate only as a sorcery."
+--
+-- CR 202.3's computed bound at EQUALITY rather than order, which is the whole
+-- reason the card is here: every group above prints "or less", and transcribing
+-- this one with that atom would have run WEAKER than printed; see #2989.
+--
+-- The board is stirTheGraveSpec's one operator over, and it tells the two
+-- readings apart because a graveyard card sits BELOW the announced X as well as
+-- at it and above it: alice's graveyard holds a mana value 2 creature card, a
+-- mana value 3 one, a mana value 4 one and a mana value 3 INSTANT, and the
+-- answerer PREFERS every card the equality excludes. At X=3 an "or less" bound
+-- would have admitted the mana value 2 card and the answerer would have taken it,
+-- so which permanent arrives is what separates them; the second case announces 2
+-- on the same board, where a bound frozen at 3 or read as ">=" would arrive at the
+-- wrong card instead.
+--
+-- The Ogre Sentry is what the cost sacrifices and nothing else: it is alice's
+-- only creature, so CR 601.2b's choice has one candidate and CR 601.2h's payment
+-- cannot reach anything the assertions read -- and it reaches the graveyard only
+-- after CR 601.2c has chosen the target. Five energy counters, so the announced 3 and 2
+-- are both affordable and neither coincides with the supply.
+chthonianNightmareSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+chthonianNightmareSpec s registry = Spec.describe s "ManaValueEqualToAmount (CR 202.3)" $ do
+  -- THE proving case, at gameplay level: which card came back.
+  Spec.it s "CR 601.2c whole card: only the graveyard card AT the announced X comes back" $ do
+    (nightmare, srcId, ids, board) <- chthonianBoard s registry
+    case (Face.activatedAbilities (S.combinedFace nightmare), ids) of
+      (ability : _, [pikerId, _, wolvesId, cancelId]) -> do
+        let after = S.runPure (chthonianPlan 3 [pikerId, wolvesId, cancelId]) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+        Spec.assertEqWith s "CR 202.3: the mana value 3 creature card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")) S.alice after) 1
+        Spec.assertEqWith s "and the mana value 2 one an \"or less\" bound would have admitted is not" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
+        Spec.assertEqWith s "nor the mana value 4 one above the bound" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.alice after) 0
+        Spec.assertEqWith s "nor the mana value 3 INSTANT, which the card-type conjunct keeps out" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Cancel")) S.alice after) 0
+        -- The proxies last: the announcement really was paid at 3, so the bound
+        -- above was read off a value the board charged for.
+        Spec.assertEqWith s "CR 118.3 two counters left, so the announced 3 was really spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
+        Spec.assertEqWith s "CR 701.21a the cost sacrificed alice's one creature" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Ogre Sentry")) S.alice after) 0
+        Spec.assertBool s (not (S.onBattlefield srcId after)) "and returned the Nightmare itself to hand"
+        Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
+      _ -> Spec.assertFailure s "fixture should give alice the Nightmare's one ability and four graveyard cards"
+
+  -- The bound MOVES with the announcement, on the same board: announcing 2 picks
+  -- out the mana value 2 card and leaves the 3 the case above returned. Nothing
+  -- constant and nothing frozen at the first case's value can pass both.
+  Spec.it s "CR 601.2b announcing 2 instead returns the mana value 2 card and leaves the 3" $ do
+    (nightmare, srcId, ids, board) <- chthonianBoard s registry
+    case (Face.activatedAbilities (S.combinedFace nightmare), ids) of
+      (ability : _, [_, tyrantId, wolvesId, cancelId]) -> do
+        let after = S.runPure (chthonianPlan 2 [tyrantId, wolvesId, cancelId]) board (Activate.activateAbility S.alice srcId ability Monad.>> Stack.resolveTop)
+        Spec.assertEqWith s "CR 202.3: the mana value 2 creature card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+        Spec.assertEqWith s "and the mana value 3 one the answerer preferred is not" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")) S.alice after) 0
+        Spec.assertEqWith s "CR 118.3 three counters left, so this announcement was 2" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
+      _ -> Spec.assertFailure s "fixture should give alice the Nightmare's one ability and four graveyard cards"
+
+-- alice with a settled Chthonian Nightmare, one creature for the cost to
+-- sacrifice, five energy counters and four cards in her graveyard, holding
+-- priority in her own precombat main phase -- which the ability's CR 307.5
+-- sorcery-speed restriction demands.
+chthonianBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (Printing.Printing, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+chthonianBoard s registry = do
+  nightmare <- S.printingOf s registry "Chthonian Nightmare"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  cards <- traverse (S.printingOf s registry) ["Goblin Piker", "Kalakscion, Hunger Tyrant", "Russet Wolves", "Cancel"]
+  let (srcId, g0) = S.addPermanent nightmare S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g1) = S.addPermanent sentry S.alice g0
+      (ids, g2) = List.foldl' (\(acc, g) c -> let (oid, g3) = S.addGraveyardCard c S.alice g in (acc <> [oid], g3)) ([], g1) cards
+  pure
+    ( nightmare,
+      srcId,
+      ids,
+      S.addPlayerCounter PlayerCounterKind.Energy 5 S.alice g2 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+    )
+
+-- Announces this X and aims the target slot at the graveyard cards the bound
+-- EXCLUDES, falling back to the smallest legal recipient -- stirPlan's shape, with
+-- CR 601.2h's sacrifice pinned rather than left to the base answerer.
+chthonianPlan :: Natural.Type.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+chthonianPlan x bait p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
+  Prompt.ChooseSacrifices _ _ _ offered n -> Set.fromList (List.genericTake n offered)
   _ -> S.identityAnswer p
 
 -- CR 603.3d's announcement for Itzquinth's reflexive ability, threaded through a

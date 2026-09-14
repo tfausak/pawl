@@ -955,9 +955,9 @@ data Context = MkContext
     -- source, CR 105.2's own reading -- nothing shares a colour with either.
     sourceColors :: Set.Set Color.Color,
     -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
-    -- as its mana-value bound, for the one atom that asks
-    -- (ManaValueAtMostAmount) -- Celestine, the Living Saint's "where X is the
-    -- amount of life you gained this turn". The slot carries the Quantity
+    -- as its mana-value bound, for the two atoms that ask
+    -- (ManaValueAtMostAmount, ManaValueEqualToAmount) -- Celestine, the Living
+    -- Saint's "where X is the amount of life you gained this turn". The slot carries the Quantity
     -- (Pawl.Types.TargetSlot's `amount`); this is that Quantity already
     -- evaluated, because this module holds no game state and cannot evaluate one.
     --
@@ -970,7 +970,8 @@ data Context = MkContext
     slotAmount :: Maybe Integer,
     -- CR 601.2b: the slot NAMES a computed bound and the announcement that fixes
     -- it has not been made yet, so `slotAmount` above is Nothing for a reason that
-    -- is not "no bound was stated". ManaValueAtMostAmount does not narrow then --
+    -- is not "no bound was stated". Neither ManaValueAtMostAmount nor
+    -- ManaValueEqualToAmount narrows then --
     -- Stir the Grave's "mana value X or less" states no ceiling until its caster
     -- names X, and CR 601.2b puts no ceiling on the value they may name.
     --
@@ -1520,6 +1521,18 @@ matches context view predicate = case predicate of
     -- still excluded, PowerLessThanSource's posture above.
     (Just _, Nothing) -> boundUnannounced context
     _ -> False
+  -- The arm above at equality (Chthonian Nightmare's "with mana value X"), and
+  -- vacuously False on the same two absences for its reasons: "with mana value X"
+  -- is no more true of a candidate that has none than "X or less" is, and a slot
+  -- naming no amount has stated no number for the candidate's to equal.
+  Filter.ManaValueEqualToAmount -> case (manaValue view, slotAmount context) of
+    (Just mv, Just n) -> mv == n
+    -- CR 601.2b, the arm above's answer and for its reason: a bound the
+    -- announcement has not fixed states nothing, and the permissive direction is
+    -- what keeps the castability gate from refusing a spell the announcement could
+    -- still make legal.
+    (Just _, Nothing) -> boundUnannounced context
+    _ -> False
   -- PlayerRelation.holds is what each arm MEANS, and its haddock carries the
   -- argument: an Opponent is CR 102.3's player not on your team, which is every
   -- other player in a free-for-all (CR 806.1) and at two seats (CR 102.2), and
@@ -1998,6 +2011,7 @@ rewrite pairs predicate = case predicate of
   Filter.ManaValueEqualToSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
+  Filter.ManaValueEqualToAmount -> predicate
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason.
   Filter.ControlledByDefendingPlayer -> predicate
@@ -2637,6 +2651,7 @@ bakeBound players predicate = case predicate of
   Filter.ManaValueEqualToSource -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
+  Filter.ManaValueEqualToAmount -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
@@ -2736,9 +2751,9 @@ bakeBound players predicate = case predicate of
 -- the mana-value vocabulary a filter in this POSITION may use, so above every
 -- literal returned here the only distinction a Filter can still draw is parity,
 -- and a sample running two past the greatest literal has already seen every
--- verdict the Filter can give. ManaValueAtMostAmount is the third atom that reads
--- a mana value, and the position is why it does not widen the sample -- see its
--- arm below.
+-- verdict the Filter can give. ManaValueAtMostAmount and ManaValueEqualToAmount
+-- are the third and fourth atoms that read a mana value, and the position is why
+-- neither widens the sample -- see their arms below.
 --
 -- Exhaustive rather than a catch-all, bakeBound's posture and for a sharper
 -- reason: an atom reading the mana value some other way -- a multiple-of-three
@@ -2782,6 +2797,9 @@ manaValueThresholds predicate = case predicate of
   -- it there. An atom bounding the mana value in any position this function's
   -- callers reach would have to break this build instead.
   Filter.ManaValueAtMostAmount -> []
+  -- The arm above's comparison at equality, and empty for its reason: it names no
+  -- literal either, and its position is the same target slot.
+  Filter.ManaValueEqualToAmount -> []
   Filter.HasCardType _ -> []
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
@@ -2925,6 +2943,9 @@ statesAQuality predicate = case predicate of
   -- A quality like the literal bound's, one atom over: "with mana value X or
   -- less" describes the card as much when X is computed as when it is printed.
   Filter.ManaValueAtMostAmount -> True
+  -- A quality for the arm above's reason: "with mana value X" describes the card
+  -- as much at equality as "X or less" does under order.
+  Filter.ManaValueEqualToAmount -> True
   Filter.HasCardType _ -> True
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True

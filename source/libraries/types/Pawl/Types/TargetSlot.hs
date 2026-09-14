@@ -44,7 +44,9 @@ data TargetSlot = MkTargetSlot
     -- | CR 202.3 / 601.2c: the COMPUTED number this slot's Filter compares a
     -- candidate's mana value against -- Celestine, the Living Saint's "creature
     -- card with mana value X or less ... where X is the amount of life you gained
-    -- this turn". Filter.ManaValueAtMostAmount is the atom that reads it, and
+    -- this turn". Filter.ManaValueAtMostAmount and Filter.ManaValueEqualToAmount
+    -- are the atoms that read it -- the second at equality, Chthonian Nightmare's
+    -- "with mana value X" -- and
     -- Pawl.Engine.Target.slotContext is where it is evaluated and handed over.
     --
     -- HERE rather than in the Filter arm, which is where it belongs on the face of
