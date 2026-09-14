@@ -827,6 +827,49 @@ spec s registry = Spec.describe s "Mutate" $ do
       (List.sort [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Falcon Abomination")])
     Spec.assertEqWith s "CR 730.3 and the merged permanent itself is gone" (Game.lookupObject host dead) Nothing
     Spec.assertEqWith s "setup: alice's graveyard was empty before it died" (graveyardNames merged) []
+  -- CR 730.3's split read by CR 603.6c's last sentence: each component card is
+  -- put into the graveyard, and a "put into a graveyard from anywhere" trigger is
+  -- never a leaves-the-battlefield ability, so it fires off the CARD that arrived
+  -- rather than the permanent that left. The trailing component announces its
+  -- arrival in a GameEvent.CardArrived of its own, so the condition has to read
+  -- that event as well as the GameEvent.Moved naming the leading one.
+  --
+  -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*, Oracle verified
+  -- 2026-09-14): "When Serra Avatar is put into a graveyard from anywhere,
+  -- shuffle it into its owner's library." A non-Human creature, so CR 702.140a
+  -- admits it as the host, and its shuffle is visible in a zone the merge never
+  -- writes to. Pawl.ZoneTriggerSpec covers the unmerged card.
+  --
+  -- BOTH ARRANGEMENTS, which is the pair of boards differing in exactly one
+  -- thing: CR 730.3a lets the owner order the two cards, and only one of the two
+  -- orders makes the Avatar the leading card the Moved event names. Asserting one
+  -- order alone passes whichever way the engine reads the event.
+  Spec.it s "CR 730.3/603.6c a merged permanent's component fires its own put-into-a-graveyard trigger from either arrangement" $ do
+    plains <- S.printingOf s registry "Plains"
+    avatar <- S.printingOf s registry "Serra Avatar"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
+        (host, withHost) = S.addPermanent avatar S.alice base
+        (board, spellId) = S.handOne cubwarden withHost
+        merged = merging MutateSide.Over host board spellId
+        avatarName = CardName.MkCardName (Text.pack "Serra Avatar")
+        cubwardenName = CardName.MkCardName (Text.pack "Cubwarden")
+        -- Settled twice around the resolution so the trigger reaches the stack
+        -- and nothing a wrong implementation left behind is still sitting there.
+        died order =
+          S.runPure
+            (arrangingAt order)
+            merged
+            (Event.destroy Regenerability.Regenerable [host] >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+    Monad.forM_ [[0, 1], [1, 0]] $ \order -> do
+      let after = died order
+      Spec.assertBool s (elem avatarName (libraryNames after)) "CR 603.6c the Avatar component's own trigger shuffled it into its owner's library"
+      Spec.assertBool s (notElem avatarName (graveyardNames after)) "CR 701.24 leaving the graveyard it arrived in"
+      Spec.assertBool s (elem cubwardenName (graveyardNames after)) "setup: CR 730.3 the other component is in the graveyard, so the split really ran"
+    -- The fixture fact the arrangement rests on: two components, so
+    -- Pawl.Engine.Event.arrangeComponents really was asked and the two orders are
+    -- two different boards.
+    Spec.assertEqWith s "setup: the merged permanent held two components" (fmap (Seq.length . Game.componentsOf . Object.source) (Game.lookupObject host merged)) (Just 2)
   -- CR 702.140a's two restrictions, as three casts off ONE board that differ in
   -- the creature the mutate slot is aimed at and in nothing else -- same mana,
   -- same timing, same stock -- so a negative cannot pass for want of a payment.
@@ -1177,6 +1220,20 @@ protectionFromRed = Keyword.Protection Protection.MkProtection {Protection.quali
 -- What CR 730.3's split puts into alice's graveyard, by name.
 graveyardNames :: GameState.GameState -> [CardName.CardName]
 graveyardNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Graveyard S.alice gs)
+
+-- The same read one zone over, which is where CR 701.24's shuffle puts a card
+-- that answered its own put-into-a-graveyard trigger.
+libraryNames :: GameState.GameState -> [CardName.CardName]
+libraryNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Library S.alice gs)
+
+-- CR 730.3a's arrangement, answered by INDEX so the two orders are the one thing
+-- two runs of the same board differ by. Pawl.Engine.Game.permute rejects anything
+-- that is not a permutation and leaves the canonical order standing, so a wrong
+-- answer here would quietly collapse the pair into one board.
+arrangingAt :: [Natural.Natural] -> Prompt.Prompt r -> r
+arrangingAt order p = case p of
+  Prompt.OrderComponentCards {} -> order
+  _ -> S.identityAnswer p
 
 -- The cards representing one permanent, top first, by name -- CR 730.2's order,
 -- read through the classifier CR 712.21 and CR 730.3 share.
