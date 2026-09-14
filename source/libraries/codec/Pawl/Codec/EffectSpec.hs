@@ -1950,6 +1950,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.TemptWithTheRing
       " {\"type\":\"TemptWithTheRing\"} "
+  -- CR 701.61a: nullary, because rule 701.61a fixes both halves and the
+  -- forager, leaving an author nothing to write.
+  Spec.it s "Forage" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Forage
+      " {\"type\":\"Forage\"} "
   -- CR 701.49: the plain keyword action, whose payload is absent -- rule 701.49
   -- fixes the venturer, and CR 701.49a lets the player choose from every dungeon
   -- card they own, leaving an author nothing to write.

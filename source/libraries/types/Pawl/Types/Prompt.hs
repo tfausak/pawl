@@ -24,6 +24,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ForageMode as ForageMode
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
@@ -318,6 +319,11 @@ data Prompt r where
   -- merges with. Never elided: CR 730.2a makes the two answers differ in the
   -- merged permanent's every characteristic.
   ChooseMutateSide :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt MutateSide.MutateSide
+  -- | CR 701.61a: which half of forage the forager takes, asked as the spell or
+  -- ability resolves -- the ObjectId is the resolving object. Raised only where
+  -- both halves can be carried out, which is what makes it a choice
+  -- (Pawl.Engine.Forage.forage).
+  ChooseForage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt ForageMode.ForageMode
   -- | CR 601.2b: how many times the optional additional cost of that keyword --
   -- kicker, multikicker, squad, offspring, replicate or casualty (CR 702.33a/c,
   -- 702.157a, 702.175a, 702.56a, 702.153a) --

@@ -26,6 +26,7 @@ import qualified Pawl.Types.Concession as Concession
 import Pawl.Types.Desync (Desync)
 import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.ForageMode as ForageMode
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -109,6 +110,7 @@ encode p answer = case p of
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseMutateSide {} -> Response.ChoseMutateSide answer
+  Prompt.ChooseForage {} -> Response.ChoseForage answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseKicker {} -> Response.AnnouncedKicker answer
   Prompt.ChooseBuyback {} -> Response.AnnouncedBuyback answer
@@ -511,6 +513,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseMutateSide {} -> case response of
     Response.ChoseMutateSide side -> Just side
+    _ -> Nothing
+  Prompt.ChooseForage {} -> case response of
+    Response.ChoseForage mode -> Just mode
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -965,6 +970,9 @@ defaultAnswer p = case p of
   -- CR 702.140c: a two-way choice with no decline, so a short transcript takes
   -- the side the rule names first.
   Prompt.ChooseMutateSide {} -> MutateSide.Over
+  -- CR 701.61a: a two-way choice raised only where both halves can be carried
+  -- out, so a short transcript takes the half the rule names first.
+  Prompt.ChooseForage {} -> ForageMode.ExileCards
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.

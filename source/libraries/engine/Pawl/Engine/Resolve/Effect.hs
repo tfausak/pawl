@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Forage as Forage
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Initiative as Initiative
@@ -2334,6 +2335,10 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Blight {} -> False
   Effect.Earthbend {} -> False
   Effect.TemptWithTheRing {} -> False
+  -- CR 701.61a: neither half of forage can be carried out by a player holding
+  -- fewer than three cards in their graveyard who controls no Food, which is
+  -- Pawl.Engine.Forage.canForage. The executing arm reads the same two pools.
+  Effect.Forage -> not (Forage.canForage controller gs)
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
   -- CR 701.38b lists the choices, and an object vote's empty list is the
@@ -7175,6 +7180,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 701.54a: the Ring tempts the resolving controller; the keyword action is
   -- Pawl.Engine.Ring.tempt's.
   Effect.TemptWithTheRing -> Ring.tempt controller
+  -- CR 701.61a: the resolving controller forages; the keyword action is
+  -- Pawl.Engine.Forage.forage's, prompts and all.
+  Effect.Forage -> Monad.void (Forage.forage controller resolving)
   -- CR 701.49: the whole keyword action, which Pawl.Engine.Dungeon owns.
   Effect.Venture quality -> Dungeon.venture controller quality
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do

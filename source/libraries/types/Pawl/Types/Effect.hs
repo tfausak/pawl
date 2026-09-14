@@ -592,6 +592,10 @@ data Effect card ability
     -- Pawl.Engine.Ring.tempt as one procedure that cannot stop early (CR
     -- 701.54d). Nullary, rule 701.54a fixing everything.
     TemptWithTheRing
+  | -- | CR 701.61a: the resolving controller forages, performed by
+    -- Pawl.Engine.Forage.forage as one procedure. Nullary, rule 701.61a fixing
+    -- everything but the forager's own two choices.
+    Forage
   | -- | CR 701.49: the resolving controller ventures into the dungeon,
     -- performed by Pawl.Engine.Dungeon.venture. The payload is CR 701.49d's
     -- "[quality]", a CR 205.3p dungeon type rather than a Filter.

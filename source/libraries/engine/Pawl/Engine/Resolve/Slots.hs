@@ -661,6 +661,7 @@ effectObjectRefs effect = case effect of
   -- CR 701.66a's "target land you control".
   Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> [ref]
   Effect.TemptWithTheRing -> []
+  Effect.Forage -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
   Effect.Vote {} -> []
@@ -809,6 +810,7 @@ effectPlayerRefs effect = case effect of
   -- Rule 701.66a reaches no player the card did not target.
   Effect.Earthbend {} -> []
   Effect.TemptWithTheRing -> []
+  Effect.Forage -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
   -- CR 701.38a's specified player, the seat the vote starts with.
@@ -896,6 +898,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Blight (Blight.Type.MkBlight _ quantity _) -> quantitySlots quantity
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantitySlots quantity
   Effect.TemptWithTheRing -> Map.empty
+  Effect.Forage -> Map.empty
   Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
   -- CR 101.4's "each player sacrifices": the arm takes every player recipient
@@ -1478,6 +1481,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Blight (Blight.Type.MkBlight _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.TemptWithTheRing -> True
+  Effect.Forage -> True
   Effect.Venture {} -> True
   Effect.ExileHandThenDraw -> True
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -1695,6 +1699,7 @@ readsX =
         Effect.Blight (Blight.Type.MkBlight _ quantity _) -> Quantity.readsX quantity
         Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.readsX quantity
         Effect.TemptWithTheRing -> False
+        Effect.Forage -> False
         Effect.Venture {} -> False
         Effect.ExileHandThenDraw -> False
         Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
@@ -1899,6 +1904,7 @@ boundSlots effect = case effect of
   -- reserved-binding sweep.
   Effect.Earthbend _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
+  Effect.Forage -> Set.empty
   Effect.Venture {} -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty

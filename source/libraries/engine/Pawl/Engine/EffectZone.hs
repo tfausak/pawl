@@ -128,6 +128,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.Blight _ -> Nothing
   Effect.Earthbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
+  Effect.Forage -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing

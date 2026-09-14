@@ -232,6 +232,7 @@ ownQuantities effect = case effect of
   Effect.Blight (Blight.MkBlight _ quantity _) -> [quantity]
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> [quantity]
   Effect.TemptWithTheRing -> []
+  Effect.Forage -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> [quantity]
@@ -1174,6 +1175,7 @@ effectObjectRefs effect =
         -- below: the animation and the counters act on it and nothing gathers.
         Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> read_ [ref]
         Effect.TemptWithTheRing -> []
+        Effect.Forage -> []
         Effect.Venture {} -> []
         Effect.ExileHandThenDraw -> []
         Effect.PlayerSacrifices {} -> []

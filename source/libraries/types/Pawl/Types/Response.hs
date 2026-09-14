@@ -16,6 +16,7 @@ import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.ForageMode as ForageMode
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
@@ -601,4 +602,6 @@ data Response
   | -- | CR 702.140c's answer: which side of the target creature a mutating
     -- creature spell was put on.
     ChoseMutateSide MutateSide.MutateSide
+  | -- | CR 701.61a's answer: which half of forage the forager took.
+    ChoseForage ForageMode.ForageMode
   deriving (Eq, Ord, Show)
