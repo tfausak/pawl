@@ -1904,6 +1904,11 @@ matches context view predicate = case predicate of
   -- above this atom goes on answering the same way for as long as the spell is on
   -- the stack -- which is what lets CR 601.2f price it; see #2363.
   Filter.WasCastFrom z -> castFrom view == Just z
+  -- CR 601.2h off Object.manaSpent, WasCastFrom's posture one record over: a
+  -- STAMP written once the payment settled, so it goes on answering the same way
+  -- for as long as the object lasts. Vacuously False for a player and for
+  -- everything nothing was ever paid for -- `manaSpentTags` is empty there.
+  Filter.TagWasSpent tag -> Set.member tag (manaSpentTags view)
   -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
   -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:
   -- CR 701.54a ends the designation when another creature takes it, and the next
@@ -2107,6 +2112,11 @@ rewrite pairs predicate = case predicate of
   -- Untouched for IsInZone's reason: CR 612.1 swaps a subtype, a colour or a card
   -- type word, and a zone name is none of the three.
   Filter.WasCastFrom _ -> predicate
+  -- Untouched for IsInZone's reason once more: CR 612.1 swaps a subtype, a colour
+  -- or a card type word, and a Pawl.Types.ProductionTag names none of the three --
+  -- "mana from an artifact" is a fact about a PAST production event, not a word
+  -- on this object for Artificial Evolution to reach.
+  Filter.TagWasSpent _ -> predicate
   -- Rewritten THROUGH the kind, for the reason rewriteCounterKind gives.
   Filter.HasCounters kind -> Filter.HasCounters (rewriteCounterKind pairs kind)
   -- Left standing where the atom above is rewritten: CR 612.1 swaps WORDS, and a
@@ -2743,6 +2753,7 @@ bakeBound players predicate = case predicate of
   Filter.HasActivatedAbility -> predicate
   Filter.IsInZone _ -> predicate
   Filter.WasCastFrom _ -> predicate
+  Filter.TagWasSpent _ -> predicate
 
 -- The mana-value LITERALS a Filter compares against: every `n` in a
 -- ManaValueAtMost atom inside it, at any depth.
@@ -2895,6 +2906,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasActivatedAbility -> []
   Filter.IsInZone _ -> []
   Filter.WasCastFrom _ -> []
+  Filter.TagWasSpent _ -> []
 
 -- CR 701.23b vs CR 701.23d: does this predicate state a QUALITY? A search whose
 -- filter states one may find fewer cards than it asks for, or none, even when the
@@ -3061,6 +3073,10 @@ statesAQuality predicate = case predicate of
   -- from a search in practice -- a card sitting in a library was never cast -- and
   -- stated rather than left to a wildcard because there is no wildcard here.
   Filter.WasCastFrom _ -> True
+  -- CR 601.2h states a quality exactly as the two atoms above do, and is
+  -- unreachable from a search for their reason: a card sitting in a library was
+  -- never paid for.
+  Filter.TagWasSpent _ -> True
 
 -- Every slot NAME a Filter carries, as one traversal: `boundSlots` below READS
 -- them and `renameBound` REWRITES them. One walk rather than two, because the two

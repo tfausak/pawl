@@ -29,16 +29,22 @@
 --
 -- Molten Disaster ({X}{R}{R} Sorcery, "Kicker {R}. If this spell was kicked, it
 -- has split second. Molten Disaster deals X damage to each creature without
--- flying and each player.") is the GRANTED half, and it is the only fixture
--- that can be: Sudden Shock prints the keyword, so no board built on it can
--- tell a printed reading of the stack from a projected one. Its pair of boards
--- differ in the CR 702.33a kicker answer and in nothing else.
+-- flying and each player.") is the SELF-GRANTED half: Sudden Shock prints the
+-- keyword, so no board built on it can tell a printed reading of the stack from
+-- a projected one. Its pair of boards differ in the CR 702.33a kicker answer and
+-- in nothing else.
+--
+-- Shadow the Hedgehog is the grant from OUTSIDE the spell, and the two are what
+-- the pool holds: Scryfall o:"split second" -kw:"split second", 2026-09-14,
+-- returns these two printings and no third.
 module Pawl.SplitSecondSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -60,6 +66,7 @@ spec s registry = Spec.describe s "SplitSecond" $ do
   stillAllowedSpec s registry
   durationSpec s registry
   grantedSpec s registry
+  grantedFromOutsideSpec s registry
 
 -- alice: eight Mountains, the `subject` spell and two Lightning Bolts in hand.
 -- bob: eight Mountains, one Lightning Bolt in hand, a Prodigal Sorcerer out.
@@ -364,3 +371,91 @@ grantedSpec s registry =
 -- settle. `after`'s body but for the answerer.
 castDisaster :: KickerDecision.KickerDecision -> Board -> GameState.GameState
 castDisaster decision b = S.runPure (disaster decision) (state b) (S.cast S.alice (subject b) >> Engine.settleForPriority)
+
+-- alice controls Shadow the Hedgehog, one Seat of the Synod and one Island, and
+-- holds Ancestral Recall; bob has four Mountains and a Lightning Bolt.
+--
+-- Both of alice's blue sources are untapped and either pays the {U} on its own,
+-- so WHICH one pays is an answer and not a board -- the Seat is an artifact (CR
+-- 205.2a) and the Island is not, and nothing else about the two runs differs.
+data ShadowBoard = MkShadowBoard
+  { seat :: ObjectId.ObjectId,
+    island :: ObjectId.ObjectId,
+    recall :: ObjectId.ObjectId,
+    bobsBolt :: ObjectId.ObjectId,
+    shadowState :: GameState.GameState
+  }
+
+-- `withShadow` decides only whether Shadow the Hedgehog is on the battlefield,
+-- which is the second pair the group needs: artifact mana alone must not grant
+-- anything.
+shadowBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m ShadowBoard
+shadowBoard s registry withShadow = do
+  mountain <- S.printingOf s registry "Mountain"
+  islandPrinting <- S.printingOf s registry "Island"
+  seatPrinting <- S.printingOf s registry "Seat of the Synod"
+  shadow <- S.printingOf s registry "Shadow the Hedgehog"
+  recallPrinting <- S.printingOf s registry "Ancestral Recall"
+  boltPrinting <- S.printingOf s registry "Lightning Bolt"
+  let base = S.landsFor mountain S.bob 4 (Setup.emptyGame S.bothPlayers)
+      (seatId, gs1) = S.addPermanent seatPrinting S.alice base
+      (islandId, gs2) = S.addPermanent islandPrinting S.alice gs1
+      gs3 = if withShadow then snd (S.addPermanent shadow S.alice gs2) else gs2
+      (recallId, gs4) = S.addHandCard recallPrinting S.alice gs3
+      (boltId, gs5) = S.addHandCard boltPrinting S.bob gs4
+  pure
+    MkShadowBoard
+      { seat = seatId,
+        island = islandId,
+        recall = recallId,
+        bobsBolt = boltId,
+        shadowState =
+          gs5
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+      }
+
+-- Answers CR 601.2g's source question with `wanted` and defers everywhere else,
+-- so the source that pays is PINNED rather than searched: an interpreter looking
+-- for any legal payment would find the other land again after a mutation.
+-- Pawl.ManaSpec's prefersSource is the same answerer.
+paysWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+paysWith wanted p = case p of
+  Prompt.ChooseManaSource _ _ candidates ->
+    Just (if elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+-- alice casts Ancestral Recall off the named land, and the triggers settle.
+castRecall :: ObjectId.ObjectId -> ShadowBoard -> GameState.GameState
+castRecall source b = S.runPure (paysWith source) (shadowState b) (S.cast S.alice (recall b) >> Engine.settleForPriority)
+
+grantedFromOutsideSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+grantedFromOutsideSpec s registry =
+  -- CR 702.61a granted from OUTSIDE the spell: Shadow the Hedgehog's "each spell
+  -- you cast has split second if mana from an artifact was spent to cast it" is a
+  -- static ability of a permanent on the battlefield reaching a spell on the
+  -- stack (CR 611.1), where Molten Disaster's grant above is the spell's own.
+  Spec.describe s "granted by another permanent" $ do
+    -- THE PROVING CASE. One board, one spell, one hand; the only difference is
+    -- which of alice's two untapped blue sources paid the {U}, and CR 106.3 makes
+    -- that the whole of what Shadow's clause reads.
+    Spec.it s "CR 702.61a artifact mana grants the spell split second and land mana does not" $ do
+      b <- shadowBoard s registry True
+      boltPrinting <- S.printingOf s registry "Lightning Bolt"
+      let byIsland = castRecall (island b) b
+          bySeat = castRecall (seat b) b
+      Spec.assertBool s (elem (castOf (bobsBolt b) boltPrinting) (Action.legalActions S.bob byIsland)) "control: paid off the Island, bob's Bolt is still offered"
+      Spec.assertEqWith s "paid off the Seat of the Synod, split second takes every cast of his away" (filter isCast (Action.legalActions S.bob bySeat)) []
+      Spec.assertEqWith s "and both boards put exactly one spell on the stack, so neither answer is about an empty stack" (length (GameState.stack byIsland), length (GameState.stack bySeat)) (1, 1)
+
+    -- The other pair, and the one that says the GRANT is what did it: the same
+    -- artifact mana pays on a board with no Shadow the Hedgehog, and bob keeps his
+    -- cast.
+    Spec.it s "CR 702.61a artifact mana alone grants nothing" $ do
+      b <- shadowBoard s registry False
+      boltPrinting <- S.printingOf s registry "Lightning Bolt"
+      let bySeat = castRecall (seat b) b
+      Spec.assertBool s (elem (castOf (bobsBolt b) boltPrinting) (Action.legalActions S.bob bySeat)) "with no Shadow the Hedgehog out, the Seat's mana leaves the cast offered"
+      Spec.assertEqWith s "off a board that still put the spell on the stack" (length (GameState.stack bySeat)) 1

@@ -17,6 +17,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -576,6 +577,15 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.Or [Filter.WasCastFrom Zone.Graveyard, Filter.WasCastFrom Zone.Exile])
       " {\"type\":\"Or\",\"value\":[{\"type\":\"WasCastFrom\",\"value\":{\"type\":\"Graveyard\"}},{\"type\":\"WasCastFrom\",\"value\":{\"type\":\"Exile\"}}]} "
+  -- Shadow the Hedgehog's "if mana from an artifact was spent to cast it". No
+  -- Arm.tagged codec is forced, so a constructor with no arm here round trips
+  -- nowhere and a card naming it fails to parse (#2262).
+  Spec.it s "TagWasSpent Artifact" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.TagWasSpent ProductionTag.Artifact)
+      " {\"type\":\"TagWasSpent\",\"value\":{\"type\":\"Artifact\"}} "
   Spec.it s "HasDesignation Renowned" $
     Common.assertCodec
       s

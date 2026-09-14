@@ -28,4 +28,12 @@ data ProductionTag
     -- turn" -- it is plain card text over CR 106.3's source, and this says so
     -- rather than manufacturing a citation.
     Treasure
+  | -- | "Mana from an artifact" (Shadow the Hedgehog): the mana's source (CR
+    -- 106.3) was a permanent with CR 205.2a's artifact card type.
+    --
+    -- Treasure's posture one axis over, and uncoined by the rules for the same
+    -- reason: plain card text over CR 106.3's source, read off the card TYPE
+    -- where the arm above reads CR 205.3g's subtype and Snow reads CR 205.4g's
+    -- supertype.
+    Artifact
   deriving (Bounded, Enum, Eq, Ord, Show)

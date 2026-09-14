@@ -741,9 +741,21 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 -- pool both chooses a colour and adds twice.
 prefersColor :: Color.Color -> Prompt.Prompt r -> r
 prefersColor wanted p = case p of
-  Prompt.ChooseManaYield _ _ _ candidates ->
-    S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]) candidates
+  Prompt.ChooseManaYield _ _ _ candidates -> optionOfTypes [ManaType.Colored wanted] candidates
   _ -> S.identityAnswer p
+
+-- S.optionYielding by mana TYPE rather than by whole unit. CR 106.3's production
+-- tags are the engine's to stamp (Pawl.Types.ProductionTag), so an answerer
+-- choosing a COLOUR must not have to predict them: the same answerer serves Birds
+-- of Paradise and Chromatic Star, and only the second one's units carry
+-- ProductionTag.Artifact. S.optionYielding stays the whole-unit matcher, which is
+-- what Pawl.ManaSourceSpec's Halfling case needs to tell a restricted unit from
+-- an unrestricted one.
+optionOfTypes :: [ManaType.ManaType] -> NonEmpty.NonEmpty ManaOption.ManaOption -> ManaOption.ManaOption
+optionOfTypes wanted candidates =
+  Maybe.fromMaybe
+    (NonEmpty.head candidates)
+    (List.find ((==) wanted . fmap ManaUnit.manaType . Mana.yieldUnits) (NonEmpty.toList candidates))
 
 -- Alice controls `permanents` and holds `spell`; she casts it and resolves it,
 -- with every prompt answered by `answer`.
@@ -1588,8 +1600,12 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
     let (_, g1) = S.addPermanent ashaya S.alice (Setup.emptyGame S.bothPlayers)
         (myrId, gs) = S.addPermanent palladiumMyr S.alice g1
-        green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+        -- CR 106.3: the Myr is an artifact whichever yield is taken, so both
+        -- units carry ProductionTag.Artifact -- including the {G} Ashaya's land
+        -- grant adds, which is a land that is still an artifact.
+        artifactUnit t = ManaUnit.MkManaUnit {ManaUnit.manaType = t, ManaUnit.tags = Set.singleton ProductionTag.Artifact, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+        green = artifactUnit (ManaType.Colored Color.Green)
+        colorless = artifactUnit ManaType.Colorless
     Spec.assertEqWith
       s
       "the Forest's {G} and the artifact's {C}{C}"
@@ -2313,10 +2329,7 @@ nextColor p = case p of
     State.modify' (drop 1)
     pure $ case scripted of
       Nothing -> S.identityAnswer p
-      Just color ->
-        S.optionYielding
-          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}])
-          candidates
+      Just color -> optionOfTypes [ManaType.Colored color] candidates
   _ -> pure (S.identityAnswer p)
 
 -- CR 601.2g before CR 601.2h, on a mana ability whose activation cost holds

@@ -61,6 +61,7 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
@@ -1399,9 +1400,11 @@ aliceMain gs =
     }
 
 -- plainOf's colourless twin, differing in EXACTLY one field: what the Spring's
--- ability adds and Serum Powder's does not.
+-- ability adds and Serum Powder's does not. CR 106.3's artifact tag is no part of
+-- what separates them: the Spring and the Powder are both artifacts, so either
+-- board's mana would carry it.
 retainedColorless :: ManaUnit.ManaUnit
-retainedColorless = (plainOf ManaType.Colorless) {ManaUnit.retention = ManaRetention.UntilEndOfTurn}
+retainedColorless = (plainOf ManaType.Colorless) {ManaUnit.retention = ManaRetention.UntilEndOfTurn, ManaUnit.tags = Set.singleton ProductionTag.Artifact}
 
 -- CR 106.6's OTHER subject, and the one no card in the pool reached before: a
 -- restriction over ACTIVATIONS rather than over casts. Omen Hawker ({U} 1/1
