@@ -253,8 +253,11 @@ data Keyword
     -- Pawl.Engine.Cost.manaSubstitutions rather than among the candidate costs;
     -- CR 702.51d makes a second instance redundant, which a Set already is.
     --
-    -- Not implemented: CR 702.51c's record of which creatures convoked the spell,
-    -- which Venerated Loxodon's entry trigger reads (#3583).
+    -- CR 702.51c's record of which creatures convoked the spell is
+    -- GameEvent.Convoked, written by Pawl.Engine.Cast as the cost is paid and
+    -- read by Filter.ConvokedSourceThisTurn; Pawl.CostSpec's "CR 702.51c the
+    -- entry trigger grows the creatures that convoked the Loxodon, and nothing
+    -- else" is the proof.
     Convoke
   | -- | 702.54a: bloodthirst N -- if an opponent was dealt damage this turn, this
     -- permanent enters with N +1/+1 counters on it; a CR 614.1c entry replacement

@@ -295,6 +295,17 @@ data View = MkView
     -- card means by "it" -- is the source on the Context, which the builders that
     -- fill this field do not hold.
     crewedThisTurn :: Set.Set ObjectId.ObjectId,
+    -- CR 702.51c: which spells did this candidate convoke earlier this turn, and
+    -- which permanents did those spells become? The same log the fields above
+    -- read, and LAZY for their reason -- nothing forces it unless a Filter
+    -- contains ConvokedSourceThisTurn.
+    --
+    -- The two ends of rule 702.51c's relation are split the way
+    -- `crewedThisTurn` above splits rule 702.122c's: this half is the
+    -- candidate's, and the "it" the card names is the source on the Context. The
+    -- PERMANENTS are in the set beside the spells because a spell is gone by the
+    -- time its own entry trigger resolves (CR 400.7d).
+    convokedThisTurn :: Set.Set ObjectId.ObjectId,
     -- CR 302.6: has this candidate's CONTROLLER controlled it continuously since
     -- their most recent turn began? Read from Object.sickness, the field CR
     -- 302.6's own gates on attacking and the tap symbol are read from, and
@@ -790,6 +801,7 @@ playerView pid =
       -- CR 702.122b crews with a CREATURE, and a player is not one -- CR 506.3
       -- rules the combat fields above out for the same kind of reason.
       crewedThisTurn = Set.empty,
+      convokedThisTurn = Set.empty,
       -- CR 302.6's continuity is about a creature a player CONTROLS, and a player
       -- is not one -- False is the answer here rather than a default.
       controlledSinceTurnBegan = False,
@@ -1767,6 +1779,13 @@ matches context view predicate = case predicate of
   Filter.CrewedSourceThisTurn -> case source context of
     Just src -> Set.member src (crewedThisTurn view)
     Nothing -> False
+  -- CR 702.51c: the sibling above's relation one keyword over -- the candidate's
+  -- own field says which spells it convoked and which permanents those became,
+  -- and the SOURCE on the context says which one the card's "it" names.
+  -- Vacuously False for a context with no source, that one's reason.
+  Filter.ConvokedSourceThisTurn -> case source context of
+    Just src -> Set.member src (convokedThisTurn view)
+    Nothing -> False
   -- CR 302.6: not a look-back over the log at all, unlike AttackedThisTurn,
   -- MilledThisTurn and DealtDamageThisTurn -- the engine keeps the answer as
   -- Object.sickness, written at the untap step and cleared whenever control
@@ -2030,6 +2049,7 @@ rewrite pairs predicate = case predicate of
   Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
   Filter.CrewedSourceThisTurn -> predicate
+  Filter.ConvokedSourceThisTurn -> predicate
   -- Untouched for AttackedThisTurn's reason: the atom names no subtype.
   Filter.ControlledSinceTurnBegan -> predicate
   -- Untouched for the atom above's reason: it names no subtype either.
@@ -2658,6 +2678,7 @@ bakeBound players predicate = case predicate of
   Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
   Filter.CrewedSourceThisTurn -> predicate
+  Filter.ConvokedSourceThisTurn -> predicate
   -- Untouched: the atom names no slot for CR 603.2's map to substitute into.
   Filter.ControlledSinceTurnBegan -> predicate
   -- Untouched for the atom above's reason: it names no slot either.
@@ -2812,6 +2833,7 @@ manaValueThresholds predicate = case predicate of
   Filter.CantCrewVehicles -> []
   Filter.DealtDamageThisTurn -> []
   Filter.CrewedSourceThisTurn -> []
+  Filter.ConvokedSourceThisTurn -> []
   Filter.ControlledSinceTurnBegan -> []
   Filter.ControlGainedSinceLastUpkeep -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
@@ -2967,6 +2989,7 @@ statesAQuality predicate = case predicate of
   Filter.CantCrewVehicles -> True
   Filter.DealtDamageThisTurn -> True
   Filter.CrewedSourceThisTurn -> True
+  Filter.ConvokedSourceThisTurn -> True
   Filter.ControlledSinceTurnBegan -> True
   Filter.ControlGainedSinceLastUpkeep -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to

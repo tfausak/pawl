@@ -102,6 +102,7 @@ codec keywordCodec =
       Arm.nullary "DeclaredBlockerThisCombat" Filter.DeclaredBlockerThisCombat,
       Arm.nullary "MilledThisTurn" Filter.MilledThisTurn,
       Arm.nullary "CrewedSourceThisTurn" Filter.CrewedSourceThisTurn,
+      Arm.nullary "ConvokedSourceThisTurn" Filter.ConvokedSourceThisTurn,
       Arm.nullary "CantCrewVehicles" Filter.CantCrewVehicles,
       Arm.nullary "DealtDamageThisTurn" Filter.DealtDamageThisTurn,
       Arm.nullary "ControlledSinceTurnBegan" Filter.ControlledSinceTurnBegan,

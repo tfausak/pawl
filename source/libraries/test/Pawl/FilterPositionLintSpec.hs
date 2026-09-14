@@ -268,6 +268,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.CantCrewVehicles -> 0
   Filter.Type.DealtDamageThisTurn -> 0
   Filter.Type.CrewedSourceThisTurn -> 0
+  Filter.Type.ConvokedSourceThisTurn -> 0
   Filter.Type.ControlledSinceTurnBegan -> 0
   Filter.Type.ControlGainedSinceLastUpkeep -> 0
   -- A DESCENT and not a zero, unlike every other atom here: CR 303.4's atom

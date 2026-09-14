@@ -37,6 +37,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.Convoking as Convoking
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.DuringPhase as DuringPhase
@@ -2543,11 +2544,11 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           paidCost = Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix}
                       -- CR 702.51b / 702.66b / 702.126b: convoke, delve and
                       -- improvise apply once the total cost is determined, so the
-                      -- payer is offered the substitutes HERE -- after `paidCost`
-                      -- and before CR 601.2h's payment, which is the same list the
-                      -- gate above measured.
-                      substituted <- Cost.announceManaSubstitutions pid sid paidCost
-                      payment <- Cost.pay perform PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid substituted
+                      -- offer is handed to the payment rather than made here --
+                      -- CR 601.2g's mana window opens first, and the payer is
+                      -- asked once it closes (Cost.paySubstituting). The list is
+                      -- the same one the gate above measured.
+                      (payment, substitutedBindings) <- Cost.paySubstituting perform PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid (Cost.announceManaSubstitutions pid sid) paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed
@@ -2581,6 +2582,39 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- be read by a later clause of the same resolution
                           -- (#1872).
                           State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setPaid bound (Object.bindings o)}) sid (GameState.objects g)})
+                          -- CR 702.51c: the creatures tapped to pay for mana in
+                          -- this spell's total cost convoked it, so the relation
+                          -- is recorded at the payment and a spell that is
+                          -- countered still leaves it behind -- Activate's
+                          -- GameEvent.Crewed and for its reason. A case on the
+                          -- rule-702 keyword stamp, never on an effect.
+                          --
+                          -- The taps CONVOKE only where the face states convoke:
+                          -- CR 702.126a's improvise substitutes through the same
+                          -- component and rule 702.126 names no relation at all.
+                          -- No printing states both (Scryfall keyword:convoke
+                          -- keyword:improvise, 2026-09-13, no hit), so nothing in
+                          -- the pool mixes the two pools of taps.
+                          --
+                          -- Off the SUBSTITUTION's own bindings rather than the
+                          -- whole payment's, which Binding.tappedPermanent would
+                          -- have shared with a tap the printed cost demanded.
+                          Monad.when
+                            (Set.member Keyword.Type.Convoke (maybe Set.empty Face.keywords (Game.faceOf sid pricedGs)))
+                            ( let convokers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedPermanent substitutedBindings)))
+                               in Monad.unless
+                                    (Set.null convokers)
+                                    ( State.modify'
+                                        ( Event.recordEvent
+                                            ( GameEvent.Convoked
+                                                Convoking.MkConvoking
+                                                  { Convoking.spell = sid,
+                                                    Convoking.convokedBy = convokers
+                                                  }
+                                            )
+                                        )
+                                    )
+                            )
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement
                           -- records nothing.

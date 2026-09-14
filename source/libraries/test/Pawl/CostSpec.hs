@@ -73,9 +73,11 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -2110,6 +2112,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   shufflingReversalSpec s registry
   reversalRigSpec s registry
   siegeWurmSpec s registry
+  veneratedLoxodonSpec s registry
+  convokeWindowSpec s registry
   foundryAssemblerSpec s registry
   treasureCruiseSpec s registry
   merrowSkyswimmerSpec s registry
@@ -4263,6 +4267,111 @@ siegeWurmSpec s registry = Spec.describe s "Siege Wurm" $ do
         (allRed, _, redBoard) = convokeBoard piker spider wurm 7 0
     Spec.assertBool s (S.castable S.alice withGreens greenBoard) "five Pikers and two Spiders pay {5}{G}{G}"
     Spec.assertBool s (not (S.castable S.alice allRed redBoard)) "seven Pikers and no green creature do not"
+
+-- CR 601.2g and convoke's reminder text ("Each creature you tap while casting
+-- this spell pays for {1} or one mana of that creature's color"): the mana
+-- window comes first, and the payer says how much of the cost is convoked once
+-- it has closed.
+--
+-- The BOARD the issue named: a Siege Wurm ({5}{G}{G}), five Goblin Pikers, one
+-- Giant Spider and one Birds of Paradise, and no land -- so the one mana ability
+-- on the board is a colour choice, which is exactly the thing the payer must be
+-- able to make before committing.
+--
+-- A test-local answerer in State.State, and not a pure one: the subject is the
+-- prompt protocol's ORDER, which a `Prompt r -> r` cannot see (Pawl.ManaSpec's
+-- countingAnswer is the pattern).
+convokeWindowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+convokeWindowSpec s registry = Spec.describe s "Siege Wurm" $ do
+  Spec.it s "CR 601.2g the mana window opens before the payer says how much of a Siege Wurm's cost is convoked" $ do
+    wurm <- S.printingOf s registry "Siege Wurm"
+    piker <- S.printingOf s registry "Goblin Piker"
+    spider <- S.printingOf s registry "Giant Spider"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    let (pikerIds, gs1) = addPermanents piker 5 (Setup.emptyGame S.bothPlayers)
+        (spiderId, gs2) = S.addPermanent spider S.alice gs1
+        (birdsId, gs3) = S.addPermanent birds S.alice gs2
+        (spell, gs4) = S.addHandCard wurm S.alice gs3
+        gs =
+          gs4
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        green = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]
+        -- One {G} left to pay with mana, which is what the Birds produced: the
+        -- other six symbols are convoked.
+        residual = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
+        note tag = State.modify' (<> [Text.pack tag])
+        answer :: Prompt.Prompt r -> State.State [Text.Text] r
+        answer p = case p of
+          Prompt.ChooseManaSource _ _ candidates -> do
+            note "window"
+            pure (if elem birdsId (NonEmpty.toList candidates) then Just birdsId else Nothing)
+          Prompt.ChooseManaYield _ _ _ candidates -> pure (S.optionYielding green candidates)
+          Prompt.ChooseCost _ _ _ candidates -> do
+            note "substitution"
+            pure (Cost.firstOffered (filter ((== Just residual) . Cost.Type.mana) candidates))
+          Prompt.ChooseTaps _ _ _ candidates n -> pure (Set.fromList (filter (`elem` (if n == 1 then [spiderId] else pikerIds)) candidates))
+          _ -> pure (S.identityAnswer p)
+        ((_, after), asked) = State.runState (Engine.runGame answer gs (S.cast S.alice spell)) []
+    -- THE ORDER. Both decisions are made -- the list holds both tags -- and the
+    -- window's is made first, which is what CR 601.2g asks for.
+    Spec.assertEqWith s "CR 601.2g the window was offered before the substitution was announced" asked [Text.pack "window", Text.pack "substitution"]
+    -- What the order alone does not say: the cast really went through on that
+    -- answer, so the tags describe a payment rather than an abandoned one.
+    Spec.assertBool s (isTapped birdsId after) "the Birds of Paradise was tapped for its mana"
+    -- And the Birds is NOT among the convokers: the window tapped it, so the
+    -- offer made afterwards no longer counts it as an untapped creature.
+    Spec.assertEqWith s "every other creature was tapped to convoke the rest" (S.tappedCount S.alice after) 7
+
+-- Venerated Loxodon {4}{W} Creature -- Elephant Cleric 4/4: "Convoke. When this
+-- creature enters, put a +1/+1 counter on each creature that convoked it."
+--
+-- CR 702.51c's relation and the only printing that READS it, which is what makes
+-- the record observable at gameplay level: nothing else in the pool asks which
+-- creatures convoked a spell.
+--
+-- The board separates the two questions the record could be confused with. The
+-- Giant Spider is an untapped creature alice controls that convoked nothing, so
+-- an implementation counting "each creature you control" grows it; the Palace
+-- Guard pays the {W} where the Pikers pay the {4}, so the two substitution
+-- components have to land in the one relation rather than the last one winning.
+veneratedLoxodonSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+veneratedLoxodonSpec s registry = Spec.describe s "Venerated Loxodon" $ do
+  Spec.it s "CR 702.51c the entry trigger grows the creatures that convoked the Loxodon, and nothing else" $ do
+    loxodon <- S.printingOf s registry "Venerated Loxodon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (pikerIds, gs1) = addPermanents piker 4 (Setup.emptyGame S.bothPlayers)
+        (guardId, gs2) = S.addPermanent palaceGuard S.alice gs1
+        (spiderId, gs3) = S.addPermanent spider S.alice gs2
+        (spell, gs4) = S.addHandCard loxodon S.alice gs3
+        gs =
+          gs4
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- CR 702.51a's two clauses again, one prompt each: the colored clause
+        -- asks for ONE white creature and the generic clause for FOUR, so the
+        -- count is what tells the two structurally identical prompts apart.
+        -- Filtered against the offer rather than built, `convoking`'s posture.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter ((== Just (ManaCost.MkManaCost [])) . Cost.Type.mana) candidates)
+          Prompt.ChooseTaps _ _ _ candidates n -> Set.fromList (filter (`elem` (if n == 1 then [guardId] else pikerIds)) candidates)
+          _ -> S.identityAnswer p
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        entered = S.runPure answer cast (Stack.resolveTop >> Engine.settleForPriority)
+        grown = S.runPure answer entered Stack.resolveTop
+        counters oid g = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid g)
+    Spec.assertEqWith s "CR 702.51c each of the four Goblin Pikers that convoked it grew a +1/+1 counter" (fmap (`counters` grown) pikerIds) (replicate 4 (Just 1))
+    Spec.assertEqWith s "and so did the Palace Guard, which paid the colored half" (counters guardId grown) (Just 1)
+    Spec.assertEqWith s "the Giant Spider convoked nothing and grew none" (counters spiderId grown) (Just 0)
+    -- What the counters alone do not say: the Loxodon really was cast this way.
+    Spec.assertEqWith s "the Loxodon resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Venerated Loxodon")) S.alice grown) 1
 
 -- Foundry Assembler {5} Artifact Creature -- Assembly-Worker 3/3: "Improvise."
 --

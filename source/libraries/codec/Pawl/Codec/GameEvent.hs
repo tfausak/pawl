@@ -19,6 +19,7 @@ import qualified Pawl.Codec.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Codec.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Codec.CoinFlipped as CoinFlipped
 import qualified Pawl.Codec.ControlChanged as ControlChanged
+import qualified Pawl.Codec.Convoking as Convoking
 import qualified Pawl.Codec.CounterChange as CounterChange
 import qualified Pawl.Codec.Countering as Countering
 import qualified Pawl.Codec.Crewing as Crewing
@@ -89,6 +90,7 @@ codec =
       Arm.payload "Mentored" Mentored.codec GameEvent.Mentored (\x -> case x of GameEvent.Mentored y -> Just y; _ -> Nothing),
       Arm.payload "Exploited" Exploited.codec GameEvent.Exploited (\x -> case x of GameEvent.Exploited y -> Just y; _ -> Nothing),
       Arm.payload "Trained" ObjectId.codec GameEvent.Trained (\x -> case x of GameEvent.Trained y -> Just y; _ -> Nothing),
+      Arm.payload "Convoked" Convoking.codec GameEvent.Convoked (\x -> case x of GameEvent.Convoked y -> Just y; _ -> Nothing),
       Arm.payload "Crewed" Crewing.codec GameEvent.Crewed (\x -> case x of GameEvent.Crewed y -> Just y; _ -> Nothing),
       Arm.payload "BecameCrewed" Crewing.codec GameEvent.BecameCrewed (\x -> case x of GameEvent.BecameCrewed y -> Just y; _ -> Nothing),
       Arm.payload "PermanentSacrificed" PermanentWasSacrificed.codec GameEvent.PermanentSacrificed (\x -> case x of GameEvent.PermanentSacrificed y -> Just y; _ -> Nothing),

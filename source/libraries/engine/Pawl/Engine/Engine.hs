@@ -762,6 +762,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Exploited {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Convoked _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.Moved {} -> Nothing

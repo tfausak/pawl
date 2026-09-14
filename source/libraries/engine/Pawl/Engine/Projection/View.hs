@@ -42,6 +42,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlClock as ControlClock
+import qualified Pawl.Types.Convoking as Convoking
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.Face as Face
@@ -61,6 +62,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -81,6 +83,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- The view CR 608.2h's record answers with: viewWithLastKnownAnywhere's body,
 -- shared with the ability-source read in viewOfCharacteristics, which needs it
@@ -186,6 +189,10 @@ viewOfCard face =
           -- builder describes a printed FACE rather than either --
           -- `milledThisTurn` above's reason.
           Filter.crewedThisTurn = Set.empty,
+          -- CR 702.51c relates a creature to a spell it convoked, and this
+          -- builder describes a printed FACE rather than either -- the field
+          -- above's reason.
+          Filter.convokedThisTurn = Set.empty,
           -- CR 302.6 asks about an OBJECT a player controls; this builder
           -- describes a printed FACE, which is none -- `milledThisTurn` above's
           -- reason.
@@ -339,6 +346,49 @@ crewedByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
 crewedByIt oid event = case event of
   GameEvent.Crewed crewed
     | Set.member oid (Crewing.crewedBy crewed) -> Just (Crewing.vehicle crewed)
+  _ -> Nothing
+
+-- CR 702.51c: which spells did this object convoke, and which permanents did
+-- those spells become? GameEvent.Convoked is written as the cast's cost is paid
+-- and names the SPELL, which CR 400.7 ends the moment it resolves -- so a
+-- permanent's own entry trigger asking "each creature that convoked it"
+-- (Venerated Loxodon) would find nothing to compare against. The BECAME hop is
+-- CR 400.7d -- "an ability of a permanent can reference information about the
+-- spell that became that permanent as it resolved, including what costs were
+-- paid to cast that spell" -- and the becoming is read off the same log:
+-- Pawl.Engine.Event records the stack-to-battlefield move as a GameEvent.Moved
+-- whose `departed` is the spell.
+--
+-- Both ends are kept, so an effect that reads the relation while the spell is
+-- still on the stack answers too. A spell that never resolved contributes only
+-- itself.
+convokedThisTurnOf :: ObjectId -> GameState -> Set.Set ObjectId
+convokedThisTurnOf oid gs =
+  let events = fmap LoggedEvent.event (Foldable.toList (GameState.events gs))
+      spells = Maybe.mapMaybe (convokedByIt oid) events
+   in Set.fromList (concatMap (\spell -> spell : becamePermanents spell events) spells)
+
+-- CR 400.7d's "the spell that became that permanent", asked the other way
+-- round: the permanents one object became by resolving off the stack, read
+-- off the move log. A list rather than a Maybe for CR 712.21's several arrivals,
+-- which no permanent spell reaches today.
+becamePermanents :: ObjectId -> [GameEvent.GameEvent] -> [ObjectId]
+becamePermanents spell events =
+  [ arrival
+  | GameEvent.Moved m <- events,
+    let zc = Moved.change m,
+    ZoneChange.departed zc == spell,
+    ZoneChange.to zc == Zone.Battlefield,
+    arrival <- Foldable.toList (Moved.arrivals m)
+  ]
+
+-- CR 702.51c: if this event records a convoking THIS object paid for, which
+-- spell it convoked. GameEvent.Convoked, written as the cost is paid, so a spell
+-- that is countered still leaves the relation behind.
+convokedByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
+convokedByIt oid event = case event of
+  GameEvent.Convoked convoked
+    | Set.member oid (Convoking.convokedBy convoked) -> Just (Convoking.spell convoked)
   _ -> Nothing
 
 -- CR 302.6: has `controller` had this object under their control continuously
@@ -586,6 +636,12 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- candidate can answer; Pawl.Engine.Filter's CrewedSourceThisTurn compares
       -- them against the source it is evaluating for.
       Filter.crewedThisTurn = Set.fromList (Maybe.mapMaybe (crewedByIt oid . LoggedEvent.event) (Foldable.toList (GameState.events gs))),
+      -- CR 702.51c / 608.2i: the same log once more, read for the spells this
+      -- candidate convoked -- and for the permanents those spells became, which
+      -- is the hop `crewedThisTurn` above does not need. Pawl.Engine.Filter's
+      -- ConvokedSourceThisTurn compares the set against the source it is
+      -- evaluating for.
+      Filter.convokedThisTurn = convokedThisTurnOf oid gs,
       -- CR 302.6: Object.sickness, compared against the PROJECTED controller
       -- rather than read as a bare flag -- rule 302.6's subject is a player, so
       -- `Settled` names one, and Pawl.Engine.Engine.checkControlContinuity drops a
