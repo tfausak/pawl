@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 module Pawl.EventSpec where
 
 import qualified Data.Map.Strict as Map
@@ -30,6 +32,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
@@ -67,6 +70,15 @@ settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority
 
 settleAndResolve :: GameState.GameState -> GameState.GameState
 settleAndResolve gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+
+-- Answer Shimatsu the Bloodcloaked's CR 614.1c offer with exactly the two
+-- permanents named, FILTERED out of what was offered rather than built: an offer
+-- that never held them sacrifices nothing rather than quietly sacrificing them.
+-- Every other prompt keeps Pawl.Support's answer.
+sacrificingExactly :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+sacrificingExactly first second prompt = case prompt of
+  Prompt.ChooseAnyNumberToSacrifice _ _ _ offered -> Set.fromList (filter (\oid -> oid == first || oid == second) offered)
+  _ -> S.identityAnswer prompt
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
@@ -122,6 +134,60 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     -- creature would be asked about under a fold.
     Spec.assertEqWith s "Rest in Peace was sacrificed too" (exiledOwnedBy S.alice) 1
     Spec.assertEqWith s "both coloured permanents left the battlefield" (length (Game.zoneMembers Zone.Battlefield S.bob after), length (Game.zoneMembers Zone.Battlefield S.alice after)) (0, 7)
+
+  -- CR 614.1c / 608.2f: Shimatsu the Bloodcloaked's as-enters "sacrifice any
+  -- number of permanents" is ONE action on the set chosen, so every member's CR
+  -- 616.1 loop reads the board the batch began on. Rest in Peace is added before
+  -- the Piker and so comes first in the ascending order the funnel is handed;
+  -- under a per-victim fold it has already left when the Piker's move is
+  -- replaced, and the Piker reaches a graveyard the batch rule says is closed.
+  --
+  -- The Mountains that pay for Shimatsu are offered too and are deliberately NOT
+  -- chosen, which is what leaves alice's graveyard about these two alone.
+  Spec.it s "CR 608.2f Shimatsu's as-enters sacrifice is one event, so Rest in Peace exiles the permanent chosen after it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    piker <- S.printingOf s registry "Goblin Piker"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let (rip, g0) = S.addPermanent restInPeace S.alice (S.landsInPlay mountain 4)
+        (thePiker, g1) = S.addPermanent piker S.alice g0
+        (g2, spellId) = S.handOne shimatsu g1
+        -- Inlined at both call sites rather than let-bound: GADTs implies
+        -- MonoLocalBinds, so a local answerer would not generalise.
+        cast = snd (Engine.runGamePure (sacrificingExactly rip thePiker) g2 (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure (sacrificingExactly rip thePiker) cast Engine.priorityLoop)
+    Spec.assertEqWith s "alice's graveyard is empty, both sacrifices having been exiled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    -- The anti-vacuity half: an answer that chose nothing would leave the
+    -- graveyard empty too. Two cards in exile is the pair actually sacrificed.
+    Spec.assertEqWith s "and both are in exile" (Set.size (GameState.exile after)) 2
+    Spec.assertEqWith s "leaving four Mountains and Shimatsu on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 5
+
+  -- CR 101.4 / 608.2f: an edict's picks are taken from every seat first and only
+  -- then sacrificed, as one action. Rishadan Cutpurse's "each opponent sacrifices
+  -- a permanent of their choice unless they pay {1}" is the multi-seat producer,
+  -- and THREE seats are what make it one: at two seats the batch has a single
+  -- member and nothing can go second.
+  --
+  -- Bob's only permanent is Rest in Peace and carol's only permanent is a Piker,
+  -- so CR 609.3 elides both picks and the batch is exactly those two, in APNAP
+  -- order. Under a per-victim fold Rest in Peace has already left when carol's
+  -- Piker moves, and the Piker reaches a graveyard the batch rule says is closed.
+  -- Neither opponent has a land, so neither can take CR 118.12a's "unless".
+  Spec.it s "CR 101.4 an edict's picks are sacrificed as one event, so Rest in Peace exiles the seat that goes second" $ do
+    island <- S.printingOf s registry "Island"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cutpurse <- S.printingOf s registry "Rishadan Cutpurse"
+    let (_, g0) = S.addPermanent restInPeace S.bob (S.landsFor island S.alice 3 (Setup.emptyGame S.threePlayers))
+        (_, g1) = S.addPermanent piker S.carol g0
+        (g2, spellId) = S.handOne cutpurse g1
+        cast = snd (Engine.runGamePure S.identityAnswer g2 (S.cast S.alice spellId))
+        after = settleAndResolve cast
+    Spec.assertEqWith s "carol's Piker was exiled, not buried" (length (Game.zoneMembers Zone.Graveyard S.carol after)) 0
+    -- The anti-vacuity half: an edict that sacrificed nothing would leave that
+    -- graveyard empty too. Two cards in exile is the pair actually sacrificed.
+    Spec.assertEqWith s "and both sacrifices are in exile" (Set.size (GameState.exile after)) 2
+    Spec.assertEqWith s "neither opponent kept their permanent" (length (Game.zoneMembers Zone.Battlefield S.bob after) + length (Game.zoneMembers Zone.Battlefield S.carol after)) 0
 
   Spec.it s "without Rest in Peace, a creature goes to the graveyard" $ do
     piker <- S.printingOf s registry "Goblin Piker"

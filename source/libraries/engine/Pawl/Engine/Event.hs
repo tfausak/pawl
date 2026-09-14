@@ -2302,7 +2302,11 @@ apply batch candidate event =
                   -- that was never offered would otherwise sacrifice it and pay
                   -- for a counter with it.
                   pure (Set.intersection answer (Set.fromList offered))
-            Monad.mapM_ (sacrifice controller) (Set.toAscList chosen)
+            -- ONE batch (CR 608.2f): "sacrifice any number of permanents" is one
+            -- action on several objects, so every member's CR 616.1 loop reads the
+            -- board the batch began on. Pawl.EventSpec's Shimatsu case is the
+            -- proof -- Rest in Peace among the chosen still exiles what follows it.
+            sacrificeAll (fmap ((,) controller) (Set.toAscList chosen))
             -- "That many": the permanents CHOSEN, which is also the permanents
             -- sacrificed -- every member was on the battlefield under this
             -- player's control when it was offered, and nothing between there and

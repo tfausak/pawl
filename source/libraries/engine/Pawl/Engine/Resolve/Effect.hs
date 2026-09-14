@@ -4860,7 +4860,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     doomed <- traverse pickFor victims
     -- CR 101.4's "then the actions happen simultaneously", which its own Example
     -- writes out for this very instruction, so the picks from every seat go to the
-    -- funnel as ONE batch against one board.
+    -- funnel as ONE batch against one board. Pawl.EventSpec's Rishadan Cutpurse
+    -- case is the proof, on three seats: a Rest in Peace sacrificed by one
+    -- opponent still exiles what the other's pick would otherwise bury.
     Event.sacrificeAll (concatMap (\(victim, oids) -> fmap (\oid -> (victim, oid)) oids) doomed)
   -- CR 701.38a: each player, starting with the seat the payload specifies and
   -- proceeding in turn order, votes for one of the listed choices. What the
