@@ -2268,7 +2268,9 @@ clauseIsImpossible resolving source controller legal gs clause =
 -- also what keeps a slot a sibling effect of the same clause will define (Carth
 -- the Lion's Reveal then MoveToZone) from reading as impossible while it is
 -- still unbound. Drawing is never impossible either (CR 121.3), nor is
--- searching (CR 701.23b's fail to find).
+-- searching (CR 701.23b's fail to find). Effect.Mill is the one arm that asks
+-- more than "nothing at all happens", because rule 701.17b states the whole
+-- comparison itself.
 --
 -- Exhaustive with no wildcard, ownSlotsAreExhaustive's shape and for its reason:
 -- a new opcode must answer here. Each arm below mirrors the read its
@@ -2276,9 +2278,10 @@ clauseIsImpossible resolving source controller legal gs clause =
 --
 -- Not implemented: every other opcode answers the conservative "not
 -- impossible", so an option that provably does nothing is still offered where
--- its instruction is one of those -- a sacrifice by a player who controls
--- nothing to sacrifice, a counter move off a permanent with none, a TurnFaceUp
--- on a face-up permanent (#3673).
+-- its instruction is one of those -- a counter move off a permanent bearing
+-- none of the kind, a TurnFaceUp on a face-up permanent, and the Chosen* object
+-- refs, whose candidate pool is the arm's own rather than objectRefObjects
+-- (#3673).
 effectIsImpossible :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.DealDamage {} -> False
@@ -2301,7 +2304,19 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.AttachBound {} -> False
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
-  Effect.Mill {} -> False
+  -- CR 701.17b: "a player can't mill a number of cards greater than the number
+  -- of cards in their library. If given the choice to do so, they can't choose
+  -- to take that action." The rule states the whole comparison and not merely
+  -- the empty library, so this is the one opcode whose impossibility is not the
+  -- shared "nothing at all happens" test. Not CR 121.3's carve-out either --
+  -- that one is for drawing alone. The millers and the per-miller amount are the
+  -- executing arm's own reads.
+  Effect.Mill (Mill.MkMill ref quantity _ _) ->
+    let millers = playerRefPlayers legal controller gs ref
+        beyondLibrary pid = case evaluateForRecipient viewOf context gs resolving source pid quantity of
+          Just n | n > 0 -> n > List.genericLength (Game.zoneMembers Zone.Library pid gs)
+          _ -> False
+     in not (null millers) && all beyondLibrary millers
   Effect.Reveal {} -> False
   Effect.FromOutsideTheGame {} -> False
   Effect.ExileThisSpell {} -> False
@@ -2422,7 +2437,16 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- Pawl.Engine.Forage.canForage. The executing arm reads the same two pools.
   Effect.Forage -> not (Forage.canForage controller gs)
   Effect.Venture {} -> False
-  Effect.PlayerSacrifices {} -> False
+  -- CR 608.2d's own worked example: a player who controls nothing the edict
+  -- matches cannot sacrifice one. Through Replacement.sacrificeCandidates, so CR
+  -- 101.2's "can't be sacrificed" narrows the pool here exactly as it does in the
+  -- executing arm, and the amount is read per victim there too.
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) ->
+    let victims = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+        nothingToGive victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
+          Just n | n > 0 -> null (Replacement.sacrificeCandidates (Filter.slotObjects context) victim Nothing filter_ gs)
+          _ -> False
+     in not (null victims) && all nothingToGive victims
   -- CR 701.38b lists the choices, and an object vote's empty list is the
   -- naming-nobody case: nobody votes and nothing is bound, which CR 609.3
   -- carries out vacuously. A word vote's list is printed, so it cannot be empty.
