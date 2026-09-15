@@ -15,6 +15,17 @@ import qualified Pawl.Types.PlayerId as PlayerId
 data Discarded = MkDiscarded
   { player :: PlayerId.PlayerId,
     card :: ObjectId.ObjectId,
-    cause :: DiscardCause.DiscardCause
+    cause :: DiscardCause.DiscardCause,
+    -- | CR 702.35a's "exiled this way": rule 702.35a's own replacement is what
+    -- redirected this discard into exile, rather than the card having been put
+    -- into a graveyard or exiled by somebody else's redirect. False for every
+    -- discard that is not one, which is every discard of a card without madness
+    -- and every discard whose CR 616.1 choice fell on another row -- Rest in
+    -- Peace's, which exiles the card without madness applying.
+    --
+    -- A FIELD beside the cause rather than a second event: the act is one
+    -- discard, and rule 702.35a's trigger asks about the replacement applied to
+    -- it, not about a further thing that happened.
+    exiledForMadness :: Bool
   }
   deriving (Eq, Ord, Show)

@@ -87,6 +87,9 @@ data TriggerCondition
     SelfRevealedForMiracle
   | -- | CR 701.9a: "when you discard this card" (Bartered Cow). Self-scoped.
     SelfDiscarded
+  | -- | CR 702.35a: "when this card is exiled this way" -- madness's triggered
+    -- half, linked (CR 603.11) to the static half that exiled it. Self-scoped.
+    SelfExiledForMadness
   | -- | CR 701.9a read by a bystander: "whenever [a player] discards a card"
     -- (Megrim).
     PlayerDiscards PlayerRelation.PlayerRelation

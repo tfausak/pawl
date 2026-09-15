@@ -6,6 +6,7 @@ import qualified Pawl.Codec.DiscardCause as DiscardCause
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Discarded as Discarded
 
@@ -17,9 +18,11 @@ codec = Fields.object $ do
   player <- Fields.required "player" PlayerId.codec Discarded.player
   card <- Fields.required "card" ObjectId.codec Discarded.card
   cause <- Fields.required "cause" DiscardCause.codec Discarded.cause
+  exiledForMadness <- Fields.required "exiledForMadness" Common.boolean Discarded.exiledForMadness
   pure
     Discarded.MkDiscarded
       { Discarded.player = player,
         Discarded.card = card,
-        Discarded.cause = cause
+        Discarded.cause = cause,
+        Discarded.exiledForMadness = exiledForMadness
       }

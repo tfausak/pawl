@@ -6971,11 +6971,35 @@ discard cause pid oid = Monad.void (discardReturning cause pid oid)
 -- complete -- an unknown id, or a CR 616.1 loop the player cancelled.
 discardReturning :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game (Seq.Seq ObjectId)
 discardReturning cause pid oid = do
+  before <- State.get
+  -- READ BEFORE THE MOVE: CR 400.7 deletes this incarnation, so the hand card's
+  -- own keywords are unreadable by the time the funnel returns.
+  let hasMadness = maybe False (not . null . Keyword.madnessCosts . Face.keywordSet) (Game.faceOf oid before)
   moved <- changeZoneReturning oid Zone.Graveyard
+  after <- State.get
+  -- CR 702.35a's "exiled THIS WAY": which redirect the CR 616.1 loop applied,
+  -- not where the card wound up. GameState.exiledWith is the funnel's own record
+  -- of CR 607.2b's link -- the object whose replacement effect made the
+  -- destination exile -- so the row was rule 702.35a's exactly when that object
+  -- is the discarded card itself. Rest in Peace's row chosen instead files Rest
+  -- in Peace, and an unredirected discard files nothing.
+  --
+  -- The MADNESS conjunct is what makes "the row was the card's own" and "the row
+  -- was rule 702.35a's" coincide rather than merely agree: the only other row a
+  -- card in a hand can be the source of is a printed one whose
+  -- PrintedReplacement.functionsFrom names the hand, and a card printing both
+  -- that and madness is what would tell the two apart. None does -- and none can
+  -- be built accidentally, since Pawl.Engine.Keyword.handReplacementsOf is the
+  -- one minter that reaches a hand at all.
+  --
+  -- The PRINTED face, Projection.replacementsAffecting's read at the matching
+  -- mint point and for its reason: a madness ability granted to a card in a hand
+  -- mints no row there either (gap #1859), so the two questions agree on it.
+  let exiledForMadness newId = hasMadness && Map.lookup newId (GameState.exiledWith after) == Just oid
   -- One record per arrival: a card discarded is a card, so this loop runs once
   -- for every move the funnel makes. A melded permanent is never in a hand, so
   -- the sequence never holds two here.
-  Monad.forM_ moved $ \newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause)))
+  Monad.forM_ moved $ \newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause (exiledForMadness newId))))
   pure moved
 
 -- Ask the interpreter to shuffle this player's library (CR 103.3 / 701.24).
@@ -7126,6 +7150,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.SelfDiscarded -> False
+  TriggerCondition.SelfExiledForMadness -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.PlayerCycles _ -> False
   -- CR 121.1's draw is something that happens to a player, not an ability
@@ -7403,6 +7428,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.SelfDiscarded -> False
+  TriggerCondition.SelfExiledForMadness -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False

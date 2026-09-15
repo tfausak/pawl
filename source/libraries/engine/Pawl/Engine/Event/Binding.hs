@@ -371,7 +371,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for the
   -- same reason -- a player the EVENT names, which CR 109.5's `you` cannot stand
   -- in for.
-  (TriggerCondition.PlayerDiscards _, GameEvent.Discarded (Discarded.MkDiscarded discarder _ _)) ->
+  (TriggerCondition.PlayerDiscards _, GameEvent.Discarded (Discarded.MkDiscarded discarder _ _ _)) ->
     Binding.setTriggerPlayer discarder Map.empty
   -- CR 702.86a's "defending player": CR 508.5 resolves that phrase through what
   -- the attacking creature is attacking, and Pawl.Engine.Combat.declareAttackers
@@ -1126,6 +1126,10 @@ eventBindingSlots cond = case cond of
   -- source, and the discarding player is its owner -- the same seat CR 113.8 makes
   -- the ability's controller, whom Binding.setYou already names.
   TriggerCondition.SelfDiscarded -> Set.empty
+  -- CR 702.35a's exiled card is the bearer itself, already bound as CR 113.7's
+  -- source, and its owner is the seat CR 108.4a makes the ability's controller,
+  -- whom Binding.setYou already names.
+  TriggerCondition.SelfExiledForMadness -> Set.empty
   -- CR 701.9a's discarding player, which is nobody the bearer already names --
   -- Megrim's "that player" is the opponent whose hand the card left.
   TriggerCondition.PlayerDiscards _ -> Set.singleton Binding.triggerPlayer

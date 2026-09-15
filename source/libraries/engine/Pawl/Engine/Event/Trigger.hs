@@ -385,6 +385,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.SelfDiscarded -> False
+  TriggerCondition.SelfExiledForMadness -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
@@ -604,6 +605,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.SelfDiscarded -> False
+  TriggerCondition.SelfExiledForMadness -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
@@ -1151,12 +1153,12 @@ eventTriggers events gs =
       -- about cycling specifically. An ordinary discard's card reaches the
       -- graveyard too and is offered by `inGraveyards` under CR 113.6k.
       cycledCard event = case event of
-        GameEvent.Discarded (Discarded.MkDiscarded _ oid DiscardCause.ToPayCyclingCost) -> case Game.lookupObject oid gs of
+        GameEvent.Discarded (Discarded.MkDiscarded _ oid DiscardCause.ToPayCyclingCost _) -> case Game.lookupObject oid gs of
           Nothing -> Map.empty
           Just obj -> case Game.faceOf oid gs of
             Nothing -> Map.empty
             Just face -> Map.singleton oid (Object.owner obj, Face.triggeredAbilities face)
-        GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary) -> Map.empty
+        GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary _) -> Map.empty
         -- A draw names no object either. The card it puts in a hand may well bear
         -- an ability that triggers from there -- CR 702.94a's miracle -- but that
         -- one fires on the REVEAL rather than on the draw, and `revealedInHand`
@@ -2135,6 +2137,13 @@ zonesTriggeredFrom cond =
         -- eventTriggers' exile scan, which takes a card's keyword-minted list
         -- without asking `functionsIn` at all.
         TriggerCondition.SelfDiscarded -> Set.singleton Zone.Graveyard
+        -- CR 113.6k again: rule 702.35a's replacement has already put the card
+        -- in EXILE by the time this condition is asked, so exile is the one zone
+        -- it can trigger from. Unread in practice -- eventTriggers' exile scan
+        -- takes a card's keyword-minted abilities without asking `functionsIn`
+        -- at all (see `exileCandidate`) -- and stated here so the rule is
+        -- written down once.
+        TriggerCondition.SelfExiledForMadness -> Set.singleton Zone.Exile
         -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
         -- graveyard does not see an opponent discard.
         TriggerCondition.PlayerDiscards _ -> battlefield
@@ -2414,6 +2423,7 @@ stateTriggers gs
               TriggerCondition.SelfCycled -> False
               TriggerCondition.SelfRevealedForMiracle -> False
               TriggerCondition.SelfDiscarded -> False
+              TriggerCondition.SelfExiledForMadness -> False
               TriggerCondition.PlayerDiscards _ -> False
               TriggerCondition.PlayerCycles _ -> False
               TriggerCondition.PlayerDrawsNthCard {} -> False

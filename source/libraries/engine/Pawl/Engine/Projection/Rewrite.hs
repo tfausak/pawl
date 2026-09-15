@@ -1438,6 +1438,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfCycled -> condition
   TriggerCondition.SelfRevealedForMiracle -> condition
   TriggerCondition.SelfDiscarded -> condition
+  TriggerCondition.SelfExiledForMadness -> condition
   TriggerCondition.SelfCast -> condition
   TriggerCondition.SelfBecomesTargeted _ -> condition
   TriggerCondition.ControllerBecomesTarget {} -> condition

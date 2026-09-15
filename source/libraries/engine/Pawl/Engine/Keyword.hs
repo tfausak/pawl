@@ -3503,8 +3503,17 @@ handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts key
 -- its source is in a hand, which is what supplies the from-zone -- finality's
 -- argument in Pawl.Engine.Projection.finalityOf.
 --
--- Not implemented: the difference between the two, a card put from a hand into a
--- graveyard without being discarded (#3670).
+-- The two readings part only on CR 701.9c's card -- one put into a graveyard
+-- from a hand without being discarded -- and no printing writes that: Scryfall
+-- `oracle:"your hand into your graveyard"` and `oracle:"their hand into their
+-- graveyard"`, 2026-09-15, answer nothing, and every hit for `oracle:"from
+-- your hand into"` and `oracle:"from their hand into"` names a library. A
+-- printing that put a card from a hand into a graveyard in so many words is
+-- what would need the field.
+--
+-- Rule 702.35a's "exiled THIS WAY" does NOT rest on that: the TRIGGER asks which
+-- replacement applied rather than where the card landed, so Rest in Peace's row
+-- chosen over this one under CR 616.1 offers no cast -- see `madnessCast`.
 madnessDiscardExile :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
 madnessDiscardExile =
   ReplacementEffect.ZoneChangeR
@@ -7487,15 +7496,17 @@ epicCopy =
 -- documents one ability over. It is therefore the DECLINE, and only the decline,
 -- that reaches the graveyard.
 --
--- The CONDITION is CR 701.9a's discard read self-scoped, matched against the id
--- the CR 400.7 funnel minted -- which is the exile incarnation, since rule
--- 702.35a's replacement has already run. No intervening "if": rule 702.35a
--- states none.
+-- The CONDITION is rule 702.35a's "when this card is exiled THIS WAY", matched
+-- against the id the CR 400.7 funnel minted -- which is the exile incarnation,
+-- since rule 702.35a's replacement has already run. No intervening "if": rule
+-- 702.35a states none.
 --
--- Not implemented: rule 702.35a's "this way". A card discarded while some OTHER
--- replacement exiled it -- Rest in Peace's, chosen over madness's under CR 616.1
--- -- reaches this trigger all the same, because the exile scan sees only that
--- the card is in exile and was discarded (#3670).
+-- NOT TriggerCondition.SelfDiscarded, which is Bartered Cow's cause-blind read
+-- and fires on a discard however it was redirected: an opponent's Rest in Peace
+-- row chosen over madness's under CR 616.1 exiles the card WITHOUT madness
+-- applying, and rule 702.35a's trigger must not fire then. Pawl.CastSpec's "CR
+-- 702.35a Rest in Peace's row chosen over madness's offers no cast" is what
+-- proves it.
 madnessCast :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 madnessCast cost =
   let offer =
@@ -7538,7 +7549,7 @@ madnessCast cost =
               MoveToZone.duration = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfDiscarded,
+        { TriggeredAbility.condition = TriggerCondition.SelfExiledForMadness,
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [offer, toGraveyard]))) Map.empty))
