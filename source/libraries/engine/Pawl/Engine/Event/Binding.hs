@@ -117,6 +117,18 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- happened. Given a match both are unconditional, which is what
   -- eventBindingSlots' per-condition promise needs: every GameEvent.DamageDealt
   -- carries a DamageEvent.amount.
+  -- The same two slots for the arm without CR 510.1's combat narrowing, and for
+  -- the same reasons: the recipient is "that player" and the amount is "that
+  -- much", both unconditional given a match.
+  (TriggerCondition.SelfDealsDamageToPlayer _, GameEvent.DamageDealt ev) ->
+    case DamageEvent.target ev of
+      Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
+      Recipient.ToCreature _ -> Map.empty
+      Recipient.ToPlaneswalker _ -> Map.empty
+      Recipient.ToBattle _ -> Map.empty
+      Recipient.ToObject _ -> Map.empty
+      -- Unreachable, for the reason the DamageToPlayerPrevented arm above gives.
+      Recipient.ToPile _ -> Map.empty
   (TriggerCondition.SelfDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
     case DamageEvent.target ev of
       Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
@@ -1074,6 +1086,9 @@ eventBindingSlots cond = case cond of
   -- same slot CR 615.13's prevention and CR 119.9's life gain stamp. Guaranteed
   -- given a match -- every DamageDealt event carries an amount.
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
+  -- The same pair for the arm without the combat narrowing, and equally guaranteed
+  -- -- every DamageDealt event carries an amount, whichever CR 120.3 kind it was.
+  TriggerCondition.SelfDealsDamageToPlayer _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
   -- CR 120.3's amount for enrage, which Coalhauler Swine's "it deals that much
   -- damage to each player" reads: the same slot CR 615.13's prevention and CR
   -- 119.9's life gain stamp, and guaranteed given a match -- every DamageDealt

@@ -19,14 +19,12 @@
 -- about the two CR 710.1c withholds.
 --
 -- Also CR 603.2's recipient half: Akki's trigger names an OPPONENT, which the
--- card spells as TriggerCondition.SelfDealsCombatDamageToPlayer's Opponent
--- relation. CR 614.9's redirection is what tells that apart from "a player" --
--- see the Harm's Way pair at the end.
+-- card spells as TriggerCondition.SelfDealsDamageToPlayer's Opponent relation.
+-- CR 614.9's redirection is what tells that apart from "a player" -- see the
+-- Harm's Way pair at the end -- and the Soul's Fire pair beside it is CR 120.1's
+-- other half, noncombat damage from the same creature.
 --
--- Not implemented: Akki's printed trigger is "whenever this creature deals
--- damage to an opponent", and the card carries the COMBAT-damage condition, so
--- noncombat damage it deals to an opponent does not flip it (#3363). Nor CR
--- 710.5's alternative name, which is #679's.
+-- Not implemented: CR 710.5's alternative name, which is #679's.
 --
 -- CR 707.2 / 707.3's copies of it are the Clone cases at the end, and CR
 -- 707.9b's exceptions on a copy that flips are the Sakashima case after them.
@@ -43,6 +41,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -54,11 +53,14 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -167,6 +169,42 @@ akkiDuel = S.duel S.beginningOfCombat [S.settled "akki" "Akki Lavarunner"] []
 attackScript :: Seq.Seq S.Timed
 attackScript = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "akki"])]
 
+-- Point Soul's Fire's `victim` slot at one player, leaving its `dealer` slot to
+-- the only creature on the board. FILTERED out of the offered set rather than
+-- built (#222), and by preference rather than by slot name, so a dealer slot
+-- that offers no player keeps every candidate it was given.
+aimSoulsFireAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimSoulsFireAt pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
+  _ -> S.identityAnswer p
+
+-- alice's Akki alone on the battlefield with three Mountains, and Soul's Fire
+-- cast from her hand at the named player. CR 117.5's settle places the flip
+-- trigger and the second resolveTop runs it, so CR 603.2's match, CR 603.3's
+-- placement and CR 608's resolution all happen inside the engine.
+--
+-- Akki is the only creature either seat controls, so the `dealer` slot is
+-- forced and the two boards below differ in exactly one thing: who the `victim`
+-- slot names.
+soulsFireBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  m (ObjectId.ObjectId, GameState.GameState)
+soulsFireBoard s registry victim = do
+  akki <- S.printingOf s registry "Akki Lavarunner"
+  mountain <- S.printingOf s registry "Mountain"
+  soulsFire <- S.printingOf s registry "Soul's Fire"
+  let (akkiId, withAkki) = S.addPermanent akki S.alice (S.landsInPlay mountain 3)
+      (ready, spellId) = S.handOne soulsFire withAkki
+      after =
+        S.runPure
+          (aimSoulsFireAt victim)
+          ready
+          (S.cast S.alice spellId *> Stack.resolveTop *> Engine.settleForPriority *> Stack.resolveTop)
+  pure (akkiId, after)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Flip" $ do
   -- CR 710.2, first sentence: "in every zone other than the battlefield, and
@@ -269,6 +307,36 @@ spec s registry = Spec.describe s "Flip" $ do
     -- The proxy, after the behaviour: the redirect really moved the event, so
     -- the negative is not a combat that failed to deal damage.
     Spec.assertEqWith s "CR 614.9: alice took the 1 and bob took none" (S.lifeOf S.bob redirected, S.lifeOf S.alice redirected) (Just 20, Just 19)
+  -- CR 603.2 with CR 120.1: Akki's printed trigger is "whenever this creature
+  -- deals damage to an opponent" and qualifies the damage in no way, so a
+  -- NONCOMBAT instance of it fires the same trigger an unblocked attack does.
+  --
+  -- Soul's Fire {2}{R} Instant: "Target creature you control deals damage equal
+  -- to its power to any target." CR 120.2b makes Akki the source rather than the
+  -- instant, which is the whole reason this card and not a Shock reaches the
+  -- rule -- and the damage is noncombat, which no combat-narrowed condition
+  -- admits.
+  Spec.it s "CR 603.2 Akki flips on the NONCOMBAT damage Soul's Fire makes it deal to bob" $ do
+    (oid, after) <- soulsFireBoard s registry S.bob
+    -- THE gameplay assertion, ahead of every proxy.
+    Spec.assertEqWith s "CR 603.2: the noncombat 1 to an opponent flipped Akki" (halfReadings oid after) alternativeHalf
+    Spec.assertEqWith s "and the status itself is set" (fmap Object.flipped (Game.lookupObject oid after)) (Just True)
+    -- The proxies, after it: the damage really happened, really came from Akki,
+    -- and really was not combat damage.
+    Spec.assertEqWith s "bob took the 1 and alice took none" (S.lifeOf S.bob after, S.lifeOf S.alice after) (Just 19, Just 20)
+    Spec.assertEqWith s "CR 120.2b: Akki dealt it, not the instant" (fmap DamageEvent.source (S.damageEventsOf after)) [oid]
+    Spec.assertEqWith s "and CR 510.1 had nothing to do with it" (fmap DamageEvent.kind (S.damageEventsOf after)) [DamageKind.Noncombat]
+  -- The paired control, differing in exactly one thing: the same instant, the
+  -- same mana, the same dealer, the same one noncombat damage -- aimed at alice.
+  -- CR 109.5's "you" is Akki's own controller, who is no opponent of hers, so
+  -- the Opponent relation must reject it. A reading that took the relation for
+  -- PlayerRelation.AnyPlayer flips Akki here.
+  Spec.it s "CR 603.2 the same noncombat damage aimed at alice does not flip Akki" $ do
+    (oid, after) <- soulsFireBoard s registry S.alice
+    Spec.assertEqWith s "CR 603.2: alice is no opponent of alice, so Akki is still Akki" (halfReadings oid after) normalHalf
+    Spec.assertEqWith s "and the status was never set" (fmap Object.flipped (Game.lookupObject oid after)) (Just False)
+    Spec.assertEqWith s "alice took the 1 and bob took none" (S.lifeOf S.bob after, S.lifeOf S.alice after) (Just 20, Just 19)
+    Spec.assertEqWith s "the same dealer and the same kind" (fmap DamageEvent.source (S.damageEventsOf after), fmap DamageEvent.kind (S.damageEventsOf after)) ([oid], [DamageKind.Noncombat])
   -- CR 707.2 / 110.5: status is not copied, so a Clone entering as a copy of a
   -- FLIPPED Akki copies the flip card and arrives unflipped (CR 110.5b) -- a 1/1
   -- Akki Lavarunner, not a legendary Tok-Tok. The control is the same Akki read

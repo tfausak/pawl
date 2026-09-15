@@ -554,12 +554,91 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- not redundant with the attack: CR 614.9's redirection replaces the event's
   -- recipient and nothing else, so Harm's Way can make an attacking creature's
   -- combat damage land on its own controller, and an "opponent" trigger must not
-  -- fire there. Pawl.FlipSpec's "CR 603.2 Harm's Way sends Akki's combat damage
-  -- to alice, and Akki does not flip" is what proves it.
+  -- fire there. The arm below is where that is proved, the pool's "to an
+  -- opponent" flip card carrying it.
   TriggerCondition.SelfDealsCombatDamageToPlayer relation -> case event of
     GameEvent.DamageDealt ev ->
       DamageEvent.source ev == bearer
         && DamageEvent.kind ev == DamageKind.Combat
+        && maybe False (PlayerRelation.holds (Game.teams gs) relation you) (Recipient.playerOf (DamageEvent.target ev))
+    GameEvent.Moved {} -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 603.2 / 120.1: the bearer dealt damage of ANY kind to a PLAYER the
+  -- relation admits -- the arm above with CR 510.1's combat test dropped, so a
+  -- Soul's Fire pointed at a player fires it exactly as an unblocked attack does.
+  --
+  -- The relation is read off the RECIPIENT against CR 109.5's `you`, the arm
+  -- above's reading, and CR 614.9's redirection is what makes it observable:
+  -- Pawl.FlipSpec's "CR 603.2 Harm's Way sends Akki's combat damage to alice, and
+  -- Akki does not flip" and "CR 603.2 the same noncombat damage aimed at alice
+  -- does not flip Akki" prove the relation, from each damage kind; "CR 603.2 Akki
+  -- flips on the NONCOMBAT damage Soul's Fire makes it deal to bob" proves that
+  -- the kind is not narrowed.
+  TriggerCondition.SelfDealsDamageToPlayer relation -> case event of
+    GameEvent.DamageDealt ev ->
+      DamageEvent.source ev == bearer
         && maybe False (PlayerRelation.holds (Game.teams gs) relation you) (Recipient.playerOf (DamageEvent.target ev))
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
