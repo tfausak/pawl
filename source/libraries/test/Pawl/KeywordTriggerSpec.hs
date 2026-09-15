@@ -2022,6 +2022,128 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
       _ -> Spec.assertFailure s "expected exactly one Clone on the battlefield"
     Spec.assertEqWith s "and the Devastator it copied still has its own four" (Projection.keywordsOf apexId resolved) (Map.singleton Keyword.Type.Cascade 4)
 
+-- CR 702.60a's ripple, cascade's neighbour on the stack roster: "When you cast
+-- this spell, you may reveal the top N cards of your library, or, if there are
+-- fewer than N cards in your library, you may reveal all the cards in your
+-- library. If you reveal cards from your library this way, you may cast any of
+-- those cards with the same name as this spell without paying their mana costs,
+-- then put all revealed cards not cast this way on the bottom of your library in
+-- any order."
+--
+-- Surging Dementia {1}{B} Sorcery -- "Ripple 4 / Target player discards a card"
+-- (Oracle text checked 2026-09-14) -- is the producer. Its reminder text drops
+-- the rule's "in any order"; the rule is what is transcribed.
+--
+-- The library is stocked so that the SAME-NAME filter is what picks the cards
+-- out and not their position: two more Surging Dementias sit at the first and
+-- third place of the top four, with a Goblin Piker and a Hill Giant between and
+-- after them. Both of those are castable creatures, so a filter admitting
+-- everything would put them on the battlefield for free. Think Twices sit under
+-- the four and are never revealed, which is how the reveal's DEPTH is visible at
+-- all.
+rippleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rippleSpec s registry =
+  let -- The library, stocked bottom first (S.addLibraryCard puts each card ON
+      -- TOP), under two Swamps for the printed {1}{B} and four cards in bob's
+      -- hand for the discards to take.
+      --
+      -- `under` is the depth of Think Twices beneath the top four, and it is what
+      -- makes the COUNT of casts observable at all: a free cast's own ripple
+      -- triggers again (CR 702.60a), and a card this reveal passed over goes to
+      -- the BOTTOM -- so with fillers in between, a second Dementia left behind by
+      -- a one-card offer is out of the next reveal's reach rather than picked up
+      -- by it.
+      board top under = do
+        dementia <- S.printingOf s registry "Surging Dementia"
+        think <- S.printingOf s registry "Think Twice"
+        swamp <- S.printingOf s registry "Swamp"
+        mountain <- S.printingOf s registry "Mountain"
+        stock <- mapM (S.printingOf s registry) top
+        let base = Setup.emptyGame S.bothPlayers
+            g1 = List.foldl' (\g _ -> snd (S.addLibraryCard think S.alice g)) base (replicate under ())
+            g2 = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) g1 (reverse stock)
+            g3 = S.landsFor swamp S.alice 2 g2
+            g4 = List.foldl' (\g _ -> snd (S.addHandCard mountain S.bob g)) g3 (replicate 4 ())
+            (oid, g5) = S.addHandCard dementia S.alice g4
+        pure (oid, g5 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+      -- alice casts the Dementia at bob and the stack is resolved down to empty,
+      -- keeping the whole transcript: CR 401.4's arrangement is a RESPONSE and
+      -- not a board, so nothing else can tell a stated order from a random one.
+      runWith :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> ([Response.Response], GameState.GameState)
+      runWith answer oid gs =
+        let step (log_, g) action = let ((_, g'), more) = Replay.record answer g (action >> Engine.settleForPriority) in (log_ <> more, g')
+            resolveAll acc = if null (GameState.stack (snd acc)) then acc else resolveAll (step acc Stack.resolveTop)
+         in resolveAll (step ([], gs) (S.cast S.alice oid))
+      run = runWith rippling
+      namesIn zone pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
+      named = CardName.MkCardName . Text.pack
+      arrangements = length . filter isArrangement
+   in Spec.describe s "Ripple" $ do
+        -- CR 702.60b: each instance triggers separately, so the mint is one
+        -- ability per instance, cascade's reading. The falsifier is a roster that
+        -- mints it once.
+        Spec.it s "CR 702.60a ripple is minted for a spell on the stack and nowhere else" $ do
+          Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton (Keyword.Type.Ripple 4) 1)) [Keyword.ripple 4]
+          Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Ripple 4) 1)) []
+          Spec.assertEqWith s "CR 702.60b two printed instances are two abilities" (Keyword.stackTriggeredAbilitiesOf (Map.singleton (Keyword.Type.Ripple 4) 2)) [Keyword.ripple 4, Keyword.ripple 4]
+          Spec.assertEqWith s "rule 702.60a's condition is the cast" (TriggeredAbility.condition (Keyword.ripple 4)) TriggerCondition.SelfCast
+
+        -- THE PROVING TEST.
+        Spec.it s "CR 702.60a the reveal casts BOTH same-named cards free and bottoms the rest" $ do
+          (oid, gs) <- board ["Surging Dementia", "Goblin Piker", "Surging Dementia", "Hill Giant"] 5
+          let (_, after) = run oid gs
+          Spec.assertEqWith
+            s
+            "both Surging Dementias among the four were cast, so bob discarded three cards in all"
+            (S.handSize S.bob after)
+            1
+          Spec.assertEqWith
+            s
+            "and the two cards that do not share the spell's name were not cast, free or otherwise"
+            (Set.fromList (namesIn Zone.Battlefield S.alice after))
+            (Set.singleton (named "Swamp"))
+          -- Proxies, AFTER the two behavioural assertions so neither can absorb a
+          -- mutation: three Dementias finished in the graveyard, and only the
+          -- first of them was paid for.
+          Spec.assertEqWith s "three Surging Dementias reached the graveyard" (length (filter (== named "Surging Dementia") (namesIn Zone.Graveyard S.alice after))) 3
+          Spec.assertEqWith s "two Swamps paid the printed {1}{B} and nothing paid the two free casts" (S.tappedCount S.alice after) 2
+
+        -- CR 702.60a's "YOU MAY reveal", the board above with ONE thing changed --
+        -- the answer to that one question. Declining it is not the same as
+        -- revealing and casting nothing: the four cards stay where they were,
+        -- which is what a reveal that happened would not leave behind.
+        Spec.it s "CR 702.60a declining the reveal leaves the top of the library where it was" $ do
+          (oid, gs) <- board ["Surging Dementia", "Goblin Piker", "Surging Dementia", "Hill Giant"] 5
+          let (log_, after) = runWith decliningTheReveal oid gs
+          Spec.assertEqWith s "no card was revealed, so nothing was cast and bob discarded once" (S.handSize S.bob after) 3
+          Spec.assertEqWith
+            s
+            "and the four cards are still on top in the order they were stocked"
+            (take 4 (namesIn Zone.Library S.alice after))
+            [named "Surging Dementia", named "Goblin Piker", named "Surging Dementia", named "Hill Giant"]
+          -- A proxy, AFTER the behaviour: nothing reached the bottom, so CR
+          -- 401.4 had nothing to arrange.
+          Spec.assertEqWith s "CR 401.4 nothing was arranged" (arrangements log_) 0
+
+        -- The negative, the board above with ONE thing changed -- which cards the
+        -- top four are. Nothing shares the spell's name, so rule 702.60a's offer
+        -- names nobody and all four go to the bottom.
+        Spec.it s "CR 702.60a a reveal finding no same-named card casts nothing and bottoms all four" $ do
+          (oid, gs) <- board ["Goblin Piker", "Hill Giant", "Russet Wolves", "Mountain"] 1
+          let (log_, after) = run oid gs
+          Spec.assertEqWith s "bob discarded to the one Dementia alice paid for and no other" (S.handSize S.bob after) 3
+          Spec.assertEqWith
+            s
+            "the four revealed cards went under the card the reveal never reached"
+            (take 1 (namesIn Zone.Library S.alice after), length (namesIn Zone.Library S.alice after))
+            ([named "Think Twice"], 5)
+          -- CR 401.4, which is the whole of what rule 702.60a's "in any order"
+          -- says differently from rule 702.85a's "in a random order": the owner
+          -- arranges the batch, so exactly one arrangement was asked of alice. A
+          -- LibraryPlacement.RandomOrder here would ask none.
+          Spec.assertEqWith s "CR 401.4 alice was asked to arrange the four cards she bottomed" (arrangements log_) 1
+          Spec.assertEqWith s "two Swamps paid the printed {1}{B} and nothing else was cast" (S.tappedCount S.alice after) 2
+
 -- CR 702.40a's storm: "When you cast this spell, copy it for each other spell
 -- that was cast before it this turn."
 --
@@ -2336,6 +2458,38 @@ cascading p = case p of
     h : t -> t <> [h]
     [] -> []
   _ -> S.identityAnswer p
+
+-- alice takes rule 702.60a's "may reveal" (Prompt.ChooseOptional, whose default
+-- is to decline), takes CR 608.2g's offer of every card it names, aims each
+-- Dementia's "target player" at bob, and ROTATES CR 401.4's arrangement rather
+-- than answering with the identity, so an arrangement in the transcript is an
+-- answer alice gave rather than one the channel would have produced anyway.
+--
+-- Every Dementia's target prompt is answered the same way on purpose: what this
+-- board separates is which CARDS were cast, not who they hit, and pinning the
+-- one legal opponent keeps a free cast from being refused for want of a target.
+rippling :: Prompt.Prompt r -> r
+rippling p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  Prompt.ArrangeLibraryArrivals _ _ _ ids -> case zipWith const [0 ..] ids of
+    h : t -> t <> [h]
+    [] -> []
+  _ -> pinTarget (Recipient.ToPlayer S.bob) p
+
+-- `rippling` with rule 702.60a's one "may" declined, and nothing else changed:
+-- the two boards differ in that answer alone.
+decliningTheReveal :: Prompt.Prompt r -> r
+decliningTheReveal p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  _ -> rippling p
+
+-- CR 401.4's answer in a transcript: what says the owner was ASKED, where the
+-- board says only where the cards ended up.
+isArrangement :: Response.Response -> Bool
+isArrangement response = case response of
+  Response.ArrangedLibraryArrivals _ -> True
+  _ -> False
 
 -- The cascade answerer above, plus CR 715.3's choice between an adventurer card's
 -- two halves answered with the ADVENTURE, pinned by name: a bound that admitted
@@ -2770,6 +2924,7 @@ incrementSpec s registry =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cascadeSpec s registry
+  rippleSpec s registry
   stormSpec s registry
   replicateSpec s registry
   casualtySpec s registry

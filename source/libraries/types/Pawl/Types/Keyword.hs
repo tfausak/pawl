@@ -279,6 +279,14 @@ data Keyword
     -- number of times, and a cast trigger copying the spell once per payment,
     -- minted by Pawl.Engine.Keyword.stackTriggeredAbilitiesOf.
     Replicate (Cost.Cost Keyword)
+  | -- | 702.60a: ripple N -- a triggered ability that functions only while the
+    -- card with ripple is on the stack. When you cast the spell, you may reveal
+    -- the top N cards of your library, cast any of them with the same name as
+    -- this spell for free, and put the rest on the bottom of your library in any
+    -- order. Minted by Pawl.Engine.Keyword.stackTriggeredAbilitiesOf, cascade's
+    -- neighbour there; CR 702.60b's several instances trigger separately, which
+    -- is that function's count.
+    Ripple Natural.Natural
   | -- | 702.61a: "As long as this spell is on the stack, players can't cast
     -- spells or activate abilities that aren't mana abilities." A
     -- rules-modifying continuous effect (CR 611.1) other players' gates ask

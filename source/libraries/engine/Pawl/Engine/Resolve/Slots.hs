@@ -2557,7 +2557,18 @@ effectContext gs controller source legal bindings =
           -- Through CR 608.2h's last-known reader, slotNames' reason: a cascade
           -- spell countered while its trigger is still on the stack has left, and
           -- "this spell's mana value" is a reference the trigger already made.
-          Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnownAnywhere gs source
+          Filter.sourceManaValue = Filter.manaValue =<< Projection.viewWithLastKnownAnywhere gs source,
+          -- CR 201.2a off the SOURCE, for the one atom that compares a
+          -- candidate's names against them (Filter.SameNameAsSource, CR
+          -- 702.60a's ripple). The ONE filler of that field, the mana value's
+          -- reason one characteristic over: it is empty everywhere else, and
+          -- Pawl.FilterPositionLintSpec is what keeps a card out of those
+          -- positions.
+          --
+          -- Through CR 608.2h's last-known reader for that field's reason: a
+          -- ripple spell countered while its trigger is still on the stack has
+          -- left, and "this spell" is a reference the trigger already made.
+          Filter.sourceNames = foldMap Filter.names (Projection.viewWithLastKnownAnywhere gs source)
         }
 
 -- The ONE object each of a resolution's TARGET slots names, shared by

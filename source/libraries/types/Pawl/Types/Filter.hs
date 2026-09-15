@@ -195,6 +195,17 @@ data Filter keyword
     -- has the same name as one showing either; vacuously False where the slot
     -- names no object or the bound object has no name (CR 708.2a).
     SameNameAsBound SlotName.SlotName
+  | -- | CR 201.2 / 709.4a asked of the candidate and the SOURCE rather than a
+    -- slot: the candidate shares a name with the object the evaluation comes
+    -- from (CR 702.60a's "with the same name as this spell"). SameNameAsBound's
+    -- comparison with ManaValueLessThanSource's other operand -- read off
+    -- Pawl.Engine.Filter.Context's sourceNames, and vacuously False where the
+    -- source has no name (CR 708.2a) or none was supplied.
+    --
+    -- A SOURCE atom and not a slot one because CR 702.60a's trigger binds
+    -- nothing to compare against: TriggerCondition.SelfCast names no slot, and
+    -- the spell the rule points at is CR 113.7's source.
+    SameNameAsSource
   | -- | CR 110.2 asked of TWO objects: the candidate has the same controller as
     -- the object this slot holds -- Bioshift's "another target creature with the
     -- same controller".
