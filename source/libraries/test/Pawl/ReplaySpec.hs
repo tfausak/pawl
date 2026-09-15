@@ -529,6 +529,25 @@ combatReplaySpec s =
             "identity permutation"
             (Replay.defaultAnswer (Prompt.OrderDamage decider S.alice orderDamageEvents))
             [0, 1 :: Natural.Natural]
+        -- CR 615.7's batch DIVISION, whose answer carries the same [Natural]
+        -- shape as every order above and means something else entirely: a
+        -- shared Response constructor would read a permutation as an
+        -- allocation.
+        Spec.it s "AllocateDamage records and replays a division" $ do
+          let p = Prompt.AllocateDamage decider S.alice orderDamageEvents 6
+              answer = [4, 2] :: [Natural.Natural]
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "an OrderDamage transcript entry does not answer an AllocateDamage"
+            (Replay.decode p (Replay.encode (Prompt.OrderDamage decider S.alice orderDamageEvents) answer))
+            Nothing
+        Spec.it s "defaultAnswer spends the countdown down the batch" $
+          Spec.assertEqWith
+            s
+            "the 5 takes 5 of the 6, and the 3 takes the last 1"
+            (Replay.defaultAnswer (Prompt.AllocateDamage decider S.alice orderDamageEvents 6))
+            [5, 1 :: Natural.Natural]
         -- CR 601.2h's payment order, the third prompt carrying a [Natural]
         -- permutation, and discriminating against the two above for their own
         -- stated reason: a shared Response constructor would let a trigger

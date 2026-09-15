@@ -931,9 +931,8 @@ deflectionCombat :: ObjectId.ObjectId -> ObjectId.ObjectId -> [Recipient.Recipie
 deflectionCombat blocker attacker wanted p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers {} -> Map.singleton blocker (Set.singleton attacker)
-  Prompt.OrderDamage _ _ events ->
-    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
-     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  Prompt.AllocateDamage _ _ events share ->
+    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
   _ -> S.identityAnswer p
 
 -- Cast Molten Disaster UNKICKED for `x`, spending a contested shield on the
@@ -947,9 +946,8 @@ castDisaster :: Natural.Natural -> [Recipient.Recipient] -> Prompt.Prompt r -> r
 castDisaster x wanted p = case p of
   Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
   Prompt.ChooseX {} -> x
-  Prompt.OrderDamage _ _ events ->
-    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
-     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  Prompt.AllocateDamage _ _ events share ->
+    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
   _ -> S.identityAnswer p
 
 -- Aim CR 115.4's "any target" at `victim` and spend a contested prevention
@@ -959,9 +957,8 @@ castDisaster x wanted p = case p of
 aimCreatureAndOrder :: ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
 aimCreatureAndOrder victim wanted p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets
-  Prompt.OrderDamage _ _ events ->
-    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
-     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  Prompt.AllocateDamage _ _ events share ->
+    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
   _ -> S.identityAnswer p
 
 -- Win Winter Sky's CR 705.2 call, then spend a contested shield in `wanted`
@@ -971,9 +968,8 @@ winTheFlipAndOrder :: [Recipient.Recipient] -> Prompt.Prompt r -> r
 winTheFlipAndOrder wanted p = case p of
   Prompt.FlipCoin -> CoinFace.Heads
   Prompt.CallCoin {} -> CoinFace.Heads
-  Prompt.OrderDamage _ _ events ->
-    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
-     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  Prompt.AllocateDamage _ _ events share ->
+    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
   _ -> S.identityAnswer p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

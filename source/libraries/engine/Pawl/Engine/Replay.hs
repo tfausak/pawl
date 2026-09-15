@@ -23,6 +23,7 @@ import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.DamageEvent as DamageEvent
 import Pawl.Types.Desync (Desync)
 import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -135,6 +136,7 @@ encode p answer = case p of
   Prompt.ChooseCreatureType {} -> Response.ChoseCreatureType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
+  Prompt.AllocateDamage {} -> Response.AllocatedDamage answer
   Prompt.OrderCostComponents {} -> Response.OrderedCostComponents answer
   Prompt.OrderCombatTolls {} -> Response.OrderedCombatTolls answer
   Prompt.OrderComponentCards {} -> Response.OrderedComponentCards answer
@@ -416,6 +418,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OrderDamage {} -> case response of
     Response.OrderedDamage order -> Just order
+    _ -> Nothing
+  Prompt.AllocateDamage {} -> case response of
+    Response.AllocatedDamage allocation -> Just allocation
     _ -> Nothing
   Prompt.OrderCostComponents {} -> case response of
     Response.OrderedCostComponents order -> Just order
@@ -858,8 +863,13 @@ defaultAnswer p = case p of
   Prompt.ChooseCreatureType {} -> Subtype.Goblin
   -- CR 603.3b: the canonical order is always a legal answer.
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  -- CR 615.7: likewise, and it is the order the batch was gathered in.
+  -- CR 122.1c: likewise, and it is the order the batch was gathered in.
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
+  -- CR 615.7: spending the countdown down the batch in its own order is always
+  -- a legal division -- the one pawl made before the division became the
+  -- shielded side's to choose.
+  Prompt.AllocateDamage _ _ events countdown ->
+    snd (List.mapAccumL (\left event -> let spend = min left (DamageEvent.amount event) in (left - spend, spend)) countdown events)
   -- CR 601.2h: likewise, and it is the cost's PRINTED order -- what pawl paid in
   -- before the order became the payer's to choose.
   Prompt.OrderCostComponents _ _ _ components -> zipWith const [0 ..] components

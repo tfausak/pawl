@@ -2439,8 +2439,9 @@ setShield identity_ damageR spent = case identity_ of
 
 -- CR 615.7's remaining amount, for the two rewrites that count one down --
 -- Mending Hands' shield and Harm's Way's counted redirection -- and Nothing for
--- every rewrite that has no such number. `unspent` and `contestedResource` read
--- the same field through their own arms; this is the write-back's reading.
+-- every rewrite that has no such number. `unspent` reads the same field through
+-- its own arms and `allocations` reads it through this one; this is the
+-- write-back's reading.
 --
 -- A CLASSIFICATION of effects, in `prevents`' genre: one arm per constructor,
 -- no wildcard, so a third counted rewrite is asked here rather than never
@@ -2474,15 +2475,30 @@ remainingOf rewrite = case rewrite of
 -- (a destination that left): that one hands the event back unchanged and
 -- spends nothing (CR 609.7b), so there is nothing to split.
 --
+-- `allowances` is the batch's CR 615.7 allocation for THIS event (`orderBatch`),
+-- empty for a lone proposal and for a batch nothing is contested in; where it
+-- names a countdown, that share caps what the countdown covers here, which is
+-- how the shielded side's division of the points is carried into the loop.
+--
 -- A CLASSIFICATION of effects, in `prevents`' genre: one arm per constructor,
 -- no wildcard.
-partialCoverage :: GameState -> ReplacementCandidate -> ProposedEvent -> Maybe Natural
-partialCoverage gs candidate event = case (ReplacementCandidate.effect candidate, event) of
+partialCoverage :: GameState -> Map.Map CandidateId Natural -> ReplacementCandidate -> ProposedEvent -> Maybe Natural
+partialCoverage gs allowances candidate event = case (ReplacementCandidate.effect candidate, event) of
   (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de) -> case rewrite of
     DamageRewrite.RedirectNext remaining dest
-      | Maybe.isJust (redirectDestination gs dest) && remaining < DamageEvent.amount de -> Just remaining
+      | Maybe.isJust (redirectDestination gs dest) && covered < DamageEvent.amount de -> Just covered
       | otherwise -> Nothing
-    DamageRewrite.PreventNext _ -> Nothing
+      where
+        covered = min remaining (Map.findWithDefault (DamageEvent.amount de) (ReplacementCandidate.identity candidate) allowances)
+    -- CR 615.7's shield does its own arithmetic (Event.apply), shrinking the
+    -- event rather than splitting it -- so nothing to split UNLESS the batch's
+    -- allocation gave it less than the whole event, which is the one share it
+    -- must not exceed here.
+    DamageRewrite.PreventNext _
+      | Just allowed <- Map.lookup (ReplacementCandidate.identity candidate) allowances,
+        allowed < DamageEvent.amount de ->
+          Just allowed
+      | otherwise -> Nothing
     DamageRewrite.PreventAll -> Nothing
     DamageRewrite.PreventAllBut _ -> Nothing
     DamageRewrite.PreventRemovingShieldCounter -> Nothing
@@ -2984,35 +3000,175 @@ groupPreventions ps =
 -- player owes both events a CR 616.1 choice and "if no order is specified, the
 -- player chooses the order".
 --
--- Asked as an ORDER over the contested events rather than as a pick, because a
--- pick repeated IS an order: applying a shield to an event covers as much of it
--- as the shield has left and no more, which nobody may decline or divide, so the
--- only freedom the rule grants is which event the shield reaches first.
+-- Asked as an ORDER over the contested events for the resources counted in
+-- WHOLE EVENTS or applications -- CR 122.1c's shield counters, CR 614.3's use
+-- count -- because a pick repeated is an order there: such a row covers a whole
+-- event or none of it, which nobody may decline or divide. The countdowns
+-- counted in POINTS are divisible, and `allocations` asks those as an
+-- allocation instead.
 --
 -- CR 616.1's APNAP clause is honoured here too, and over the WHOLE batch rather
 -- than only over the shield questions: `byApnap` groups the batch by chooser
--- before anything is asked, so every question one player is owed -- CR 615.7's
--- allocation and each of their events' CR 616.1 choices alike -- is asked before
--- the next player's. A lone ProposedEvent still has exactly one affected object
+-- before anything is asked and `askSeat` exhausts one seat's questions before
+-- the next's, so every question one player is owed -- CR 615.7's division, CR
+-- 122.1c's order and each of their events' CR 616.1 choices alike -- is asked
+-- before the next player's. A lone ProposedEvent still has exactly one affected object
 -- and therefore one chooser, which is why the batch is the only place the clause
 -- can be honoured at all.
 --
--- The two rules order DIFFERENT LEVELS and so cannot contend for this list. CR
--- 615.7's freedom is entirely within one chooser: `contested` splits a shield's
--- contested hits by whoever CR 616.1 asks about each of them -- both read the
--- chooser off the recipient through `chooserOf` -- so a shield covering
--- recipients with two different choosers contributes one group each rather than
--- one group asked of the wrong player. `askOne` then permutes only within that
--- player's own positions. CR 101.4c is the rule that licenses it: a player
--- making several simultaneous choices makes them in the order specified, or
--- chooses the order themselves.
-orderBatch :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+-- The two rules settle DIFFERENT LEVELS and so cannot contend for this list. CR
+-- 615.7's freedom is entirely within one chooser: `contested` and `allocations`
+-- both split a row's contested hits by whoever CR 616.1 asks about each of them
+-- -- all three read the chooser off the recipient through `chooserOf` -- so a
+-- row covering recipients with two different choosers contributes one group
+-- each rather than one group asked of the wrong player. `askOne` then permutes,
+-- and `askAllocation` divides, only within that player's own positions. CR
+-- 101.4c is the rule that licenses it: a player making several simultaneous
+-- choices makes them in the order specified, or chooses the order themselves.
+orderBatch :: [DamageEvent.DamageEvent] -> Game ([DamageEvent.DamageEvent], [Map.Map CandidateId Natural])
 orderBatch events = do
   gs <- State.get
-  -- Sorted FIRST: `contested` reports batch positions, so it has to see the list
-  -- `askOne` will splice into.
+  -- Sorted FIRST: `contested` and `allocations` both report batch positions, so
+  -- they have to see the list `askOne` will splice into.
   let sorted = byApnap gs events
-  Monad.foldM askOne sorted (contested gs sorted)
+      seats =
+        List.sortOn
+          (seatOf gs)
+          ( Set.toList
+              ( Set.fromList
+                  (fmap fst (contested gs sorted) <> fmap (\(_, _, pid, _) -> pid) (allocations gs sorted))
+              )
+          )
+  (ordered, allowances) <- Monad.foldM askSeat (sorted, Map.empty) seats
+  pure (ordered, fmap (\i -> Map.findWithDefault Map.empty i allowances) (zipWith const [0 ..] ordered))
+
+-- Every question one seat is owed about this batch, asked before the next
+-- seat's: CR 616.1's APNAP clause, which is why the two kinds are folded
+-- together here rather than swept for separately.
+--
+-- The seat's ORDER question comes first, and its allocations are computed
+-- against the list that answer produced. That is what keeps the positions an
+-- allocation names honest: `askOne` permutes only within one chooser's own
+-- positions, and both `contested` and `allocations` read the chooser off each
+-- hit's recipient, so no later seat's answer can move an event this seat has
+-- already divided its countdown over.
+askSeat :: ([DamageEvent.DamageEvent], Map.Map Natural (Map.Map CandidateId Natural)) -> PlayerId -> Game ([DamageEvent.DamageEvent], Map.Map Natural (Map.Map CandidateId Natural))
+askSeat (batch, allowances) pid = do
+  before <- State.get
+  ordered <- case lookup pid (contested before batch) of
+    Nothing -> pure batch
+    Just positions -> askOne batch (pid, positions)
+  after <- State.get
+  divided <- Monad.foldM (askAllocation ordered) allowances (filter (\(_, _, chooser, _) -> chooser == pid) (allocations after ordered))
+  pure (ordered, divided)
+
+-- CR 615.7's own sentence -- "the player or the controller of the permanent
+-- chooses which damage the shield prevents" -- asked as an ALLOCATION: how many
+-- of the countdown's points go to each event it is contested over. Harm's Way's
+-- rulings say the same of the counted redirect, and say it in points: "If you
+-- like, you can choose to redirect 1 damage that would be dealt by the chosen
+-- source to each of two different recipients."
+--
+-- What there is to divide is the row's remainder less whatever an earlier seat
+-- has already committed of it, capped at what this seat's hits could absorb --
+-- CR 615.7's "once the shield has been reduced to 0, any remaining damage is
+-- dealt normally" read forwards. A shield is neither optional nor declinable, so
+-- the answer must spend all of that; a division that does not, or that gives an
+-- event more than its own amount, is rejected rather than repaired and the
+-- canonical division stands.
+--
+-- Elided on the two readings the rule cannot tell apart: one hit, where the
+-- whole share is forced onto it, and a share large enough for every hit, where
+-- every division covers everything.
+askAllocation :: [DamageEvent.DamageEvent] -> Map.Map Natural (Map.Map CandidateId Natural) -> (CandidateId, Natural, PlayerId, [Natural]) -> Game (Map.Map Natural (Map.Map CandidateId Natural))
+askAllocation ordered allowances (identity_, left, pid, positions) = do
+  gs <- State.get
+  let byPosition :: Map.Map Natural DamageEvent.DamageEvent
+      byPosition = Map.fromList (zip [0 ..] ordered)
+      group = Maybe.mapMaybe (\i -> Map.lookup i byPosition) positions
+      committed = sum (fmap (Map.findWithDefault 0 identity_) (Map.elems allowances))
+      share = min (left - min left committed) (sum (fmap DamageEvent.amount group))
+      canonical = spendDown share group
+      record division = List.foldl' (\acc (i, n) -> Map.insertWith (<>) i (Map.singleton identity_ n) acc) allowances (zip positions division)
+  if length group < 2 || share >= sum (fmap DamageEvent.amount group)
+    then pure (record canonical)
+    else do
+      answer <- Game.choose (Prompt.AllocateDamage (Decide.deciderFor pid gs) pid group share)
+      let honoured
+            | length answer == length group,
+              sum answer == share,
+              and (zipWith (\n event -> n <= DamageEvent.amount event) answer group) =
+                answer
+            | otherwise = canonical
+      pure (record honoured)
+
+-- Spend a countdown down a list of events in their own order, each taking as
+-- much as it can. The canonical division, and the one pawl settled a contested
+-- batch by before the division became the shielded side's to choose.
+spendDown :: Natural -> [DamageEvent.DamageEvent] -> [Natural]
+spendDown countdown =
+  snd . List.mapAccumL (\left event -> let spend = min left (DamageEvent.amount event) in (left - spend, spend)) countdown
+
+-- CR 615.7 / Harm's Way's rulings: the countdowns a batch cannot satisfy, one
+-- entry per (row, chooser) as (the row's identity, what it has left, whose
+-- choice it is, the batch positions it is contested over).
+--
+-- The two counted rewrites and no others, read off `remainingOf` -- the same
+-- total classification the write-back uses, so a third counted rewrite is
+-- allocated rather than silently ordered.
+--
+-- The CONTEST is judged over the whole row before the split by chooser, which is
+-- the rule's own unit: the pool is exhausted by everything it admits, not by one
+-- seat's share of it. Two seats sharing one row are then asked in APNAP order,
+-- each seeing what is left (`askAllocation`).
+allocations :: GameState -> [DamageEvent.DamageEvent] -> [(CandidateId, Natural, PlayerId, [Natural])]
+allocations gs events =
+  let indexed :: [(Natural, DamageEvent.DamageEvent)]
+      indexed = zip [0 ..] events
+      allocationsBy candidate = Maybe.fromMaybe [] $ do
+        rewrite <- damageRewriteOf candidate
+        left <- remainingOf rewrite
+        let hits = hitsOf gs indexed candidate
+        Monad.guard (length hits >= 2)
+        Monad.guard (left < sum (fmap (DamageEvent.amount . snd) hits))
+        pure
+          ( fmap
+              (\(pid, ps) -> (ReplacementCandidate.identity candidate, left, pid, Set.toAscList (Set.fromList ps)))
+              (Map.toList (Map.fromListWith (<>) (Maybe.mapMaybe (\(position, event) -> fmap (\pid -> (pid, [position])) (chooserOf gs (ProposedEvent.WouldDealDamage event))) hits)))
+          )
+   in concatMap allocationsBy (collect gs (GameState.replacements gs))
+
+-- The damage rewrite a candidate carries, and Nothing for a candidate that
+-- rewrites some other class of event.
+damageRewriteOf :: ReplacementCandidate -> Maybe Rewrite
+damageRewriteOf candidate = case ReplacementCandidate.effect candidate of
+  ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _) -> Just rewrite
+  _ -> Nothing
+
+-- The indexed batch entries one candidate admits, CR 615.12's filter included.
+-- Shared by `contested` and `allocations`, so the order question and the
+-- allocation question judge the same hits.
+--
+-- CR 615.12's filter is a PREVENTION's: a redirect never prevents, so
+-- unpreventable damage contends for Harm's Way's 2 exactly as any other damage
+-- does, and `applies` alone says whether the row reaches it.
+hitsOf :: GameState -> [(Natural, DamageEvent.DamageEvent)] -> ReplacementCandidate -> [(Natural, DamageEvent.DamageEvent)]
+hitsOf gs indexed candidate =
+  let contends event = case damageRewriteOf candidate of
+        Just rewrite -> not (prevents rewrite) || preventable gs event || spentInertly rewrite
+        Nothing -> False
+   in filter
+        ( \entry ->
+            contends (snd entry)
+              && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate
+        )
+        indexed
+
+-- CR 615.7: a candidate the batch's allocation gave none of its countdown to
+-- covers none of this event, so CR 616.1 never offers it. Event.loop's filter,
+-- which is why the Map's shape stays here rather than being read there.
+allocatedOut :: Map.Map CandidateId Natural -> ReplacementCandidate -> Bool
+allocatedOut allowances candidate = Map.lookup (ReplacementCandidate.identity candidate) allowances == Just 0
 
 -- CR 616.1 / 101.4: group a batch by whose CR 616.1 choice each event is, active
 -- player first. A stable sort, so events sharing a chooser keep their gather
@@ -3063,16 +3219,16 @@ askOne batch (pid, positions) = do
           moved = Map.fromList (zip positions permuted)
       pure (fmap (\(i, e) -> Map.findWithDefault e i moved) (zip [0 ..] batch))
 
--- The batch positions one chooser's countdowns -- prevention shields, and
--- Harm's Way's counted redirection -- have to be allocated across, one entry
--- per chooser, in CR 616.1's APNAP order.
+-- The batch positions one chooser's whole-event resources -- CR 122.1c's shield
+-- counters, CR 614.3's use count -- have to be ordered across, one entry per
+-- chooser, in CR 616.1's APNAP order.
 --
--- A countdown is CONTESTED when it admits two or more of the batch's events (CR
+-- A resource is CONTESTED when it admits two or more of the batch's events (CR
 -- 615.7) and cannot cover all of them -- the comparison being made in the unit
--- its OWN rule counts, which `contestedResource` below supplies: damage for CR
--- 615.7's counted shield and for the counted redirect, whole events for CR
--- 122.1c's shield counters. One large enough to cover the lot takes all of it
--- whatever the order, so there is nothing to ask.
+-- its OWN rule counts, which `contestedResource` below supplies: whole events
+-- for CR 122.1c's shield counters, applications for CR 614.3's use count. One
+-- large enough to cover the lot takes all of it whatever the order, so there is
+-- nothing to ask.
 --
 -- Several shields contribute ONE question per CHOOSER, over the union of what
 -- they contest: the order the batch is settled in is a single fact about the
@@ -3100,22 +3256,6 @@ contested :: GameState -> [DamageEvent.DamageEvent] -> [(PlayerId, [Natural])]
 contested gs events =
   let indexed :: [(Natural, DamageEvent.DamageEvent)]
       indexed = zip [0 ..] events
-      -- Reached only for a candidate `contestedResource` gave a resource for,
-      -- which is a DamageR and nothing else, so the wildcard names no rewrite.
-      -- CR 615.12's filter is a PREVENTION's: a redirect never prevents, so
-      -- unpreventable damage contends for Harm's Way's 2 exactly as any other
-      -- damage does, and `applies` alone says whether the row reaches it.
-      contends candidate event = case ReplacementCandidate.effect candidate of
-        ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _) ->
-          not (prevents rewrite) || preventable gs event || spentInertly rewrite
-        _ -> False
-      hitsOf candidate =
-        filter
-          ( \entry ->
-              contends candidate (snd entry)
-                && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate
-          )
-          indexed
       -- CR 615.7's chooser is CR 616.1's, read off each hit's own shielded
       -- recipient and GROUPED, since one shield can cover recipients with
       -- different choosers: Divine Deflection's covers a player and the
@@ -3128,7 +3268,7 @@ contested gs events =
       -- by one seat's share of it.
       contestedBy candidate = Maybe.fromMaybe [] $ do
         (left, demand) <- contestedResource gs candidate
-        case hitsOf candidate of
+        case hitsOf gs indexed candidate of
           hits@(_ : _ : _)
             | left < demand (fmap snd hits) ->
                 pure
@@ -3148,16 +3288,17 @@ contested gs events =
         (\(pid, positions) -> (pid, Set.toAscList (Set.fromList positions)))
         (List.sortOn (seatOf gs . fst) (Map.toList merged))
 
--- CR 615.7 / 122.1c: a prevention that a batch can exhaust, as the pair (what it
--- has left, what a set of events would demand of it) -- both in the unit the
--- effect's own rule counts. Nothing for an effect no batch can run out of.
+-- CR 122.1c / 614.3: a prevention that a batch can exhaust in WHOLE EVENTS or
+-- applications, as the pair (what it has left, what a set of events would demand
+-- of it). Nothing for an effect no batch can run out of, and Nothing for the two
+-- countdowns counted in POINTS, which `allocations` divides instead.
 --
--- The two units are the rules' own and not interchangeable. CR 615.7's shield
+-- The units are the rules' own and not interchangeable. CR 615.7's shield
 -- "counts only the amount of damage; the number of events or sources dealing it
--- doesn't matter", so its unit is damage. CR 122.1c's pair prevents a whole
--- event per counter whatever its amount, so its unit is events -- and what it
--- has left is a number on the PERMANENT rather than on the row, which is why
--- this reads the board.
+-- doesn't matter", so an ORDER cannot express its answer and `allocations`
+-- asks it. CR 122.1c's pair prevents a whole event per counter whatever its
+-- amount, so its unit is events -- and what it has left is a number on the
+-- PERMANENT rather than on the row, which is why this reads the board.
 --
 -- A CLASSIFICATION of effects -- what SHAPE an effect has, never which effect it
 -- is -- in the same genre as bucketOf and readsApplier above. One arm per
@@ -3166,18 +3307,15 @@ contested gs events =
 contestedResource :: GameState -> ReplacementCandidate -> Maybe (Natural, [DamageEvent.DamageEvent] -> Natural)
 contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _) -> case rewrite of
-    DamageRewrite.PreventNext remaining -> Just (remaining, sum . fmap DamageEvent.amount)
-    -- Harm's Way's counted redirection is the same resource in the same unit:
-    -- "Harm's Way will redirect just 2 of that damage ... You choose which 2
-    -- damage is redirected" (its Oracle rulings), which is CR 615.7's
-    -- allocation on a rule-614 rewrite. The CR states the counted allocation
-    -- only for preventions; the redirect's rests on those rulings.
-    --
-    -- Not implemented: splitting the countdown by POINT across two
-    -- simultaneous events -- the ruling's "1 damage ... to each of two
-    -- different recipients". `orderBatch` asks an order, and the first event
-    -- takes what it can (#3188).
-    DamageRewrite.RedirectNext remaining _ -> Just (remaining, sum . fmap DamageEvent.amount)
+    -- CR 615.7's own shield, and Harm's Way's counted redirection beside it
+    -- ("Harm's Way will redirect just 2 of that damage ... You choose which 2
+    -- damage is redirected" -- its Oracle rulings; the CR states the counted
+    -- allocation only for preventions, so the redirect's rests on those). Both
+    -- are counted in POINTS, which an order cannot divide: they are allocated
+    -- instead, by `allocations` above, which reads the same countdown off
+    -- `remainingOf`.
+    DamageRewrite.PreventNext _ -> Nothing
+    DamageRewrite.RedirectNext _ _ -> Nothing
     -- CR 122.1c: one counter per application, so a batch of n events demands n
     -- of them, and the permanent's counters are the supply.
     DamageRewrite.PreventRemovingShieldCounter ->
