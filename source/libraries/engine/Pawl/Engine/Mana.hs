@@ -23,7 +23,9 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Subtype as Subtype.Engine
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
@@ -77,6 +79,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -334,7 +337,7 @@ intrinsicManaAddition manaType =
   ManaAddition.MkManaAddition
     { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
       ManaAddition.production = ManaProduction.OfType manaType,
-      ManaAddition.count = 1,
+      ManaAddition.count = Quantity.Type.Literal 1,
       ManaAddition.retention = ManaRetention.Ordinary,
       ManaAddition.restriction = Nothing,
       ManaAddition.rider = Nothing
@@ -491,6 +494,22 @@ manaOptionsOfGiven pcs oid gs =
             ManaUnit.rider = ManaAddition.rider addition,
             ManaUnit.sourceChosenSubtype = chosenSubtype
           }
+      -- CR 106.3's count, read off the BOARD rather than off the card: Cabal
+      -- Coffers' "Add {B} for each Swamp you control" is ONE instruction whose
+      -- size the board settles as it is carried out, so the yield this option
+      -- offers has to measure it here. Pawl.Engine.Resolve.Effect's AddMana arm
+      -- evaluates the same quantity for an addition that resolves off the stack,
+      -- and manaSuppliesGiven measures CR 605.3a's offer off this very yield, so
+      -- all three read one number and no board can tell them apart.
+      --
+      -- The perspective is the source's CONTROLLER (CR 109.5 / 110.2), which is
+      -- what makes "you control" mean the player who would tap it; an object
+      -- nobody controls leaves the context's perspective unset, and a "you"
+      -- filter then matches nobody. A NEGATIVE count adds nothing (CR 107.1b's
+      -- game value floors at a count of none), and an undeterminable one reads 0
+      -- for Quantity.determineWith's reason.
+      countContext = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
+      howMany addition = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) countContext gs oid (ManaAddition.count addition))))
       -- CR 105.4's choice is per INSTRUCTION, so the count replicates the unit
       -- AFTER the type is picked: an addition of two AnyColor offers five options
       -- here, not twenty-five. Loot, the Pathfinder's "{G}, {T}: Add three mana
@@ -509,7 +528,7 @@ manaOptionsOfGiven pcs oid gs =
       expand (cost, restrictions, ability, additions, others) =
         fmap
           (\parts -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.ability = ability, ManaOption.yield = List.foldl' (\acc (ref, units) -> Map.insertWith (\new old -> Mana.MkMana (unitsOf old <> unitsOf new)) ref (Mana.MkMana units) acc) Map.empty parts, ManaOption.effects = others})
-          (traverse (\addition -> fmap ((,) (ManaAddition.player addition) . replicate (Natural.toIntSaturating (ManaAddition.count addition)) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
+          (traverse (\addition -> fmap ((,) (ManaAddition.player addition) . replicate (howMany addition) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
    in ListUtils.nubOrd (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- Every unit one option adds, whoever gets it, in printed order within each

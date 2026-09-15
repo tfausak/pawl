@@ -2711,7 +2711,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- anyway, which is why the line is here.
   Effect.AddMana (ManaAddition.MkManaAddition ref production count retention restriction rider) -> do
     gs0 <- State.get
-    let howMany = Natural.toIntSaturating count
+    -- CR 106.3: how many units this ONE instruction adds, read off the board at
+    -- RESOLUTION rather than off the card -- Cabal Coffers' "for each Swamp you
+    -- control". Pawl.Engine.Mana.manaOptionsOfGiven evaluates the same quantity
+    -- for CR 605.3b's inline road, so the offer and the addition measure one
+    -- board. A negative count adds nothing, and an undeterminable one reads 0.
+    let howMany = max 0 (Integer.toIntSaturating (Maybe.fromMaybe 0 (Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext gs0 controller source legal (slotBindings resolving gs0)) gs0 resolving source count)))
         -- CR 605.1b's event, per recipient. Nothing is recorded where the
         -- instruction added no mana: an addition of none is no addition, and CR
         -- 605.1b's clause is about mana that arrived.

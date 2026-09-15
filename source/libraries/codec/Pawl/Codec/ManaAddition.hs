@@ -7,6 +7,7 @@ import qualified Pawl.Codec.ManaRestriction as ManaRestriction
 import qualified Pawl.Codec.ManaRetention as ManaRetention
 import qualified Pawl.Codec.ManaRider as ManaRider
 import qualified Pawl.Codec.PlayerRef as PlayerRef
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -14,6 +15,7 @@ import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Quantity as Quantity
 
 -- | CR 109.5's "you", the recipient a card that names nobody means.
 defaultPlayer :: PlayerRef.PlayerRef
@@ -34,9 +36,11 @@ defaultPlayer = PlayerRef.Relative PlayerRelation.You
 -- are the printings in the pool that write the key; CR 702.189a's firebending
 -- means the same thing and writes no key at all, being minted from the keyword.
 --
--- @count@ is DEFAULTED to 1: an instruction adds one mana unless the card says
--- otherwise, and Stadium Vendors' "two mana of any one color they choose" is the
--- printing in the pool that writes it.
+-- @count@ is DEFAULTED to @Literal 1@: an instruction adds one mana unless the
+-- card says otherwise, which Stadium Vendors' "two mana of any one color they
+-- choose" and Loot, the Pathfinder's "three mana of any one color" do. A whole
+-- Quantity and not a number, so Cabal Coffers' "for each Swamp you control" has
+-- a spelling too.
 --
 -- @restriction@ and @rider@ are CR 106.6's two shapes, each DEFAULTED to
 -- Nothing: almost every printing says neither, and the two are independent --
@@ -46,7 +50,7 @@ codec :: Codec.Codec ManaAddition.ManaAddition
 codec = Fields.object $ do
   player <- Fields.defaulted "player" defaultPlayer PlayerRef.codec ManaAddition.player
   production <- Fields.required "production" ManaProduction.codec ManaAddition.production
-  count <- Fields.defaulted "count" 1 Common.natural ManaAddition.count
+  count <- Fields.defaulted "count" (Quantity.Literal 1) Quantity.codec ManaAddition.count
   retention <- Fields.defaulted "retention" ManaRetention.Ordinary ManaRetention.codec ManaAddition.retention
   restriction <- Fields.defaulted "restriction" Nothing (Common.maybe ManaRestriction.codec) ManaAddition.restriction
   rider <- Fields.defaulted "rider" Nothing (Common.maybe ManaRider.codec) ManaAddition.rider

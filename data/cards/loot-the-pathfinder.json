@@ -33,7 +33,10 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "count": 3,
+                          "count": {
+                            "type": "Literal",
+                            "value": 3
+                          },
                           "production": {
                             "type": "AnyColor"
                           }

@@ -5099,7 +5099,7 @@ firebending n =
             { -- CR 109.5: rule 702.189a's "you" is the ability's controller.
               ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
               ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Red),
-              ManaAddition.count = n,
+              ManaAddition.count = Quantity.Literal (toInteger n),
               ManaAddition.retention = ManaRetention.UntilEndOfCombat,
               ManaAddition.restriction = Nothing,
               ManaAddition.rider = Nothing

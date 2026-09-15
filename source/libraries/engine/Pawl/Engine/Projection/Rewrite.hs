@@ -96,6 +96,9 @@ import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.ManaAddition as ManaAddition
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
+import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
@@ -429,7 +432,24 @@ rewriteEffect pairs effect = case effect of
   -- CR 612.1: a text-changer's own restriction clause is text like any other.
   Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
     Effect.ChangeText (ChangeText.MkChangeText family (Set.map (swapWordIn family pairs) forbidden) slot)
-  Effect.AddMana _ -> effect
+  -- CR 612.1 reaches the COUNT: it is a Quantity, whose Count carries a Filter
+  -- that may name a subtype -- Cabal Coffers' "for each Swamp you control"
+  -- under a Magical Hack. Pawl.ManaSpec's "Cabal Coffers" hacked board is what
+  -- proves it. The PRODUCTION is not reachable by a subtype pair, naming a mana
+  -- type, which is a symbol rather than a printed subtype word.
+  --
+  -- CR 106.6's restriction and rider carry a filter each, and rule 612.1 reaches
+  -- those by the same sentence. A REGRESSION FENCE rather than a proved
+  -- behaviour: every printing in `data/cards/` writing one says "artifact
+  -- spells" or "abilities of artifacts", CR 205.2a card types a subtype pair
+  -- cannot swap, so neutralising these two lines leaves the whole suite green.
+  Effect.AddMana addition ->
+    Effect.AddMana
+      addition
+        { ManaAddition.count = rewriteQuantity pairs (ManaAddition.count addition),
+          ManaAddition.restriction = fmap (rewriteManaRestriction pairs) (ManaAddition.restriction addition),
+          ManaAddition.rider = fmap (rewriteManaRider pairs) (ManaAddition.rider addition)
+        }
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref (Filter.rewrite pairs filter_))
   Effect.MoveMana _ -> effect
   Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination subject) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject)
@@ -980,6 +1000,22 @@ replaceWholeWord from to =
                       then go (done <> to) after
                       else go (done <> Text.take 1 match) (Text.drop 1 match)
    in go Text.empty
+
+-- CR 612.1 through CR 106.6a's spending restriction: both halves are filters of
+-- printed text. See the AddMana arm above for why this is a fence rather than a
+-- proof.
+rewriteManaRestriction :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ManaRestriction.ManaRestriction -> ManaRestriction.ManaRestriction
+rewriteManaRestriction pairs restriction =
+  restriction
+    { ManaRestriction.casts = fmap (Filter.rewrite pairs) (ManaRestriction.casts restriction),
+      ManaRestriction.activations = fmap (Filter.rewrite pairs) (ManaRestriction.activations restriction)
+    }
+
+-- CR 612.1 through CR 106.6a's other clause: the rider's condition says WHICH
+-- objects it is about, and that is printed text too. Its effect
+-- (Pawl.Types.ManaRiderEffect) names no word a subtype pair could reach.
+rewriteManaRider :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ManaRider.ManaRider -> ManaRider.ManaRider
+rewriteManaRider pairs rider = rider {ManaRider.condition = Filter.rewrite pairs (ManaRider.condition rider)}
 
 -- CR 612.1 over an ACTIVATED ability printed on a permanent: the payload, CR
 -- 702.178a's "as long as" gate, and the ACTIVATION COST (CR 118.1, CR 602.1a),
