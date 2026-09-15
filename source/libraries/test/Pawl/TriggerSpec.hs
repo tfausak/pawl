@@ -17,7 +17,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -1167,19 +1166,14 @@ delayedSpec s registry =
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       walls gs = filter (\oid -> Set.member Subtype.Wall (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
-      -- Answers Prompt.ChooseBoundToken with the LAST token minted, recording
-      -- every candidate list so a test can assert whether the prompt was issued
-      -- at all. Naming the last is what makes the assertion discriminating:
-      -- binding the FIRST is exactly what the engine used to do silently.
-      chooseLastToken :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
-      chooseLastToken p = case p of
-        Prompt.ChooseBoundToken _ _ _ candidates -> do
-          State.modify' (<> [NonEmpty.toList candidates])
-          pure (NonEmpty.last candidates)
-        _ -> pure (S.identityAnswer p)
-      -- Answers Prompt.ChooseBoundToken with an object that was never minted, so
-      -- the engine's filter is what decides the binding. Id 999 names nothing --
-      -- the same posture S.noSource takes.
+      -- Records the CONSTRUCTOR of every prompt the resolution issues, so a
+      -- test can assert that a doubled Create asks nothing a single one did not.
+      -- Kinds rather than payloads: the claim is about which questions are put,
+      -- and the two casts differ only in the doubler.
+      recordKinds :: Prompt.Prompt r -> State.State [Text.Text] r
+      recordKinds p = do
+        State.modify' (<> [S.promptKind p])
+        pure (S.identityAnswer p)
       -- Stamp an expiry onto every armed delayed ability, so the CR 603.7b
       -- stated-duration mechanism can be exercised on a real armed entry.
       withExpiry expiry gs =
@@ -1187,15 +1181,11 @@ delayedSpec s registry =
           { GameState.delayedTriggers =
               fmap (\entry -> entry {DelayedTrigger.expiry = expiry}) (GameState.delayedTriggers gs)
           }
-      chooseUnmintedToken :: Prompt.Prompt r -> r
-      chooseUnmintedToken p = case p of
-        Prompt.ChooseBoundToken {} -> ObjectId.MkObjectId 999
-        _ -> S.identityAnswer p
-      -- alice casts the spell in hand and resolves it under chooseLastToken,
-      -- handing back the board alongside the candidate lists it was asked about.
+      -- alice casts the spell in hand and resolves it under recordKinds,
+      -- handing back the board alongside the prompts it issued.
       castUnderChoice gs oid =
         State.runState
-          ( Engine.runGame chooseLastToken gs $ do
+          ( Engine.runGame recordKinds gs $ do
               S.cast S.alice oid
               Engine.priorityLoop
           )
@@ -1394,19 +1384,17 @@ delayedSpec s registry =
         -- CR 614.16 meets CR 603.7c. Doubling Season ("If an effect would
         -- create one or more tokens under your control, it creates twice that
         -- many of those tokens instead") scales Tidal Wave's Create at
-        -- RESOLUTION, so two Walls are minted where CR 603.7c's "it" names one
-        -- particular object. CR 707.10e is the codified analogue and settles
-        -- that the leftover is a CHOICE, not something the engine may decide:
-        -- where a replacement causes a copy to target more than one object,
-        -- "the copy's controller chooses one of them to be the new target",
-        -- and its Frontline Heroism / Anointed Procession example is this exact
-        -- shape -- two tokens created, "the copy targets one of those tokens of
-        -- your choice."
+        -- RESOLUTION, so two Walls stand where CR 603.7c's "it" named one. The
+        -- rider goes on BOTH: Anointed Procession's rulings say "if the effect
+        -- creating the tokens instructs you to do something with those tokens at
+        -- a later time, like exiling them at the end of combat, you'll do that
+        -- for all the tokens", and Flamerush Rider's say the same in so many
+        -- words ("you'll exile each of those tokens"). So there is nothing for
+        -- the engine to ask.
         --
-        -- Discriminating: the answerer names the LAST minted token, and the
-        -- unfixed engine bound the first, so the wrong Wall would be the one
-        -- that died and the surviving assertion would fail too.
-        Spec.it s "CR 614.16/603.7c a doubled Create asks which minted token \"it\" names" $ do
+        -- Discriminating: the engine used to bind ONE of the two, so exactly one
+        -- Wall survived the end step, and it asked its controller which.
+        Spec.it s "CR 614.16/603.7c a doubled Create binds every minted token, so the rider takes both" $ do
           tidalWave <- S.printingOf s registry "Tidal Wave"
           island <- S.printingOf s registry "Island"
           doublingSeason <- S.printingOf s registry "Doubling Season"
@@ -1414,44 +1402,16 @@ delayedSpec s registry =
               (gs, waveId) = S.handOne tidalWave base
               ((_, armed), asked) = castUnderChoice gs waveId
               after = resolveAll (settle (beginEndStep armed))
+              (plainGs, plainWaveId) = S.handOne tidalWave (S.landsInPlay island 3)
+              (_, plain) = castUnderChoice plainGs plainWaveId
           Spec.assertEqWith s "the replacement really doubled the Create" (length (walls armed)) 2
-          case asked of
-            [[unchosen, chosen]] -> do
-              Spec.assertEqWith s "the token named by \"it\" was sacrificed, and only it" (walls after) [unchosen]
-              Spec.assertBool s (Set.notMember chosen (GameState.battlefield after)) "the chosen Wall is off the battlefield"
-            _ -> Spec.assertFailure s ("expected one prompt offering two tokens, got " <> show asked)
-        -- The companion, and the elision this pairs with: without the
-        -- replacement the Create mints exactly one token, so "it" has only one
-        -- possible referent and there is nothing to ask. Where the rules leave
-        -- nothing to ask, don't prompt.
-        Spec.it s "CR 603.7c one minted token is no choice, so nothing is asked" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          let (gs, waveId) = S.handOne tidalWave (S.landsInPlay island 3)
-              ((_, armed), asked) = castUnderChoice gs waveId
-              after = resolveAll (settle (beginEndStep armed))
-          Spec.assertEqWith s "one Wall minted" (length (walls armed)) 1
-          Spec.assertEqWith s "no binding prompt was issued" asked []
-          Spec.assertEqWith s "and it is still sacrificed at the end step" (walls after) []
-        -- FILTERED, NOT TRUSTED, the posture Sba.chooseLegendVictims takes for
-        -- CR 704.5j: an answer naming something that was never minted would
-        -- otherwise leave CR 603.7c's "it" pointing at nothing and the delayed
-        -- ability would sacrifice neither Wall. The slot is bound either way,
-        -- deterministically to the first token.
-        Spec.it s "CR 603.7c an answer naming an unminted object falls back to the first token" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          doublingSeason <- S.printingOf s registry "Doubling Season"
-          let (_, base) = S.addPermanent doublingSeason S.alice (S.landsInPlay island 3)
-              (gs, waveId) = S.handOne tidalWave base
-              cast = S.runPure chooseUnmintedToken gs (S.cast S.alice waveId)
-              armed = S.runPure chooseUnmintedToken cast Engine.priorityLoop
-              after = resolveAll (settle (beginEndStep armed))
-          case walls armed of
-            [firstWall, secondWall] -> do
-              Spec.assertEqWith s "only the second minted Wall is left" (walls after) [secondWall]
-              Spec.assertBool s (Set.notMember firstWall (GameState.battlefield after)) "the first minted Wall was bound, and it is gone"
-            other -> Spec.assertFailure s ("expected two Wall tokens, got " <> show (length other))
+          Spec.assertEqWith s "both minted Walls were sacrificed" (walls after) []
+          -- The proxy, after the behaviour: the doubled cast puts no question
+          -- the undoubled one did not. A COMPARISON and not an empty list, so a
+          -- recorder that saw nothing could not carry it; the non-empty check is
+          -- what says the recorder is live.
+          Spec.assertBool s (not (null plain)) "the recorder sees the prompts the undoubled cast issues"
+          Spec.assertEqWith s "and the doubling asked nothing extra" asked plain
         -- CR 116.2c's OTHER use, beside ending a continuous effect: the special
         -- action is taken "usually to end a continuous effect or to stop a
         -- delayed triggered ability from triggering". Synthetic Standing Bounty
@@ -1510,15 +1470,14 @@ tokenSetSpec s registry =
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       humans gs = filter (\oid -> Set.member Subtype.Human (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
-      -- Records every Prompt.ChooseBoundToken the resolution issues, so a test
-      -- can assert the plural binding asks NOTHING -- "them" names every minted
-      -- token, and where the rules leave nothing to ask, don't prompt.
-      recordPrompts :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
-      recordPrompts p = case p of
-        Prompt.ChooseBoundToken _ _ _ candidates -> do
-          State.modify' (<> [NonEmpty.toList candidates])
-          pure (NonEmpty.head candidates)
-        _ -> pure (S.identityAnswer p)
+      -- Records the CONSTRUCTOR of every prompt the resolution issues, so a
+      -- test can assert the plural binding asks NOTHING extra -- "them" names
+      -- every minted token, and where the rules leave nothing to ask, don't
+      -- prompt.
+      recordPrompts :: Prompt.Prompt r -> State.State [Text.Text] r
+      recordPrompts p = do
+        State.modify' (<> [S.promptKind p])
+        pure (S.identityAnswer p)
       castUnderPrompts gs oid =
         State.runState
           ( Engine.runGame recordPrompts gs $ do
@@ -1534,16 +1493,13 @@ tokenSetSpec s registry =
         Spec.it s "CR 111.3 the spell mints three 1/1 Humans with haste and arms one delayed ability" $ do
           revolt <- S.printingOf s registry "Thatcher Revolt"
           mountain <- S.printingOf s registry "Mountain"
-          let ((_, armed), asked) = castRevolt revolt (boardOf mountain)
+          let ((_, armed), _) = castRevolt revolt (boardOf mountain)
           case humans armed of
             tokens@[_, _, _] -> do
               Spec.assertEqWith s "each is 1/1" (fmap (`Projection.powerOf` armed) tokens) [Just 1, Just 1, Just 1]
               Spec.assertBool s (all (\oid -> Projection.hasKeyword Keyword.Type.Haste oid armed) tokens) "each has haste"
               Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers armed)) 1
             other -> Spec.assertFailure s ("expected exactly three Human tokens, got " <> show (length other))
-          -- The second invariant: a group binding names every token, so unlike
-          -- CR 603.7c's singular "it" there is no candidate to choose between.
-          Spec.assertEqWith s "no binding prompt was issued" asked []
         -- Binding one of the three would be the engine choosing; binding all
         -- three is what "those tokens" says.
         Spec.it s "CR 111.1 \"those tokens\" names every minted token, so all three are sacrificed" $ do
@@ -1554,21 +1510,26 @@ tokenSetSpec s registry =
           Spec.assertEqWith s "three were minted" (length (humans armed)) 3
           Spec.assertEqWith s "and none is left" (humans after) []
           Spec.assertEqWith s "the store is empty" (Seq.length (GameState.delayedTriggers after)) 0
-        -- CR 614.16 meets the plural binding, and this is where it differs from
-        -- CR 603.7c's singular "it": a replacement that multiplies the count just
-        -- makes the set bigger. "Those tokens" still names all of them, so there
-        -- is nothing to ask and nothing survives -- where the singular case must
-        -- prompt (see delayedSpec's doubled Tidal Wave).
-        Spec.it s "CR 614.16 a doubled Create binds all six, unprompted" $ do
+        -- CR 614.16 meets the plural binding: a replacement that multiplies the
+        -- count just makes the set bigger. "Those tokens" still names all of
+        -- them, so there is nothing to ask and nothing survives.
+        --
+        -- The prompt claim is a COMPARISON against the same cast without the
+        -- doubler rather than an empty list, so a recorder that saw nothing
+        -- could not carry it; the non-empty check on the control is what says
+        -- the recorder is live.
+        Spec.it s "CR 614.16 a doubled Create binds all six, asking nothing extra" $ do
           revolt <- S.printingOf s registry "Thatcher Revolt"
           mountain <- S.printingOf s registry "Mountain"
           doublingSeason <- S.printingOf s registry "Doubling Season"
           let (_, base) = S.addPermanent doublingSeason S.alice (boardOf mountain)
               ((_, armed), asked) = castRevolt revolt base
               after = resolveAll (settle (beginEndStep armed))
+              (_, plain) = castRevolt revolt (boardOf mountain)
           Spec.assertEqWith s "the replacement really doubled the Create" (length (humans armed)) 6
-          Spec.assertEqWith s "still nothing to ask" asked []
           Spec.assertEqWith s "and all six are sacrificed" (humans after) []
+          Spec.assertBool s (not (null plain)) "the recorder sees the prompts the undoubled cast issues"
+          Spec.assertEqWith s "the doubling asked nothing extra" asked plain
         -- CR 603.7c's "no longer in the zone it's expected to be in": one token
         -- already gone does not spare the others, and the ability is still spent.
         Spec.it s "CR 603.7c one token already gone leaves the rest sacrificed" $ do
@@ -1583,19 +1544,6 @@ tokenSetSpec s registry =
           Spec.assertEqWith s "and both are gone" (humans after) []
           Spec.assertEqWith s "the store is still emptied" (Seq.length (GameState.delayedTriggers after)) 0
           Spec.assertEqWith s "nothing stuck on the stack" (GameState.stack after) []
-        -- The positive control for the three "nothing to ask" assertions above.
-        -- They are claims about the ANSWERER as much as about the engine: a
-        -- recordPrompts that matched the wrong constructor or dropped its
-        -- State.modify' would report an empty list for every case in this group
-        -- and every one of them would pass. So the SAME answerer is pointed at
-        -- Tidal Wave under Doubling Season, the singular case that must prompt.
-        Spec.it s "the recorder does see a prompt when the singular case asks for one" $ do
-          tidalWave <- S.printingOf s registry "Tidal Wave"
-          island <- S.printingOf s registry "Island"
-          doublingSeason <- S.printingOf s registry "Doubling Season"
-          let (_, base) = S.addPermanent doublingSeason S.alice (S.landsInPlay island 3)
-              (_, asked) = uncurry castUnderPrompts (S.handOne tidalWave base)
-          Spec.assertEqWith s "one prompt, offering the two minted Walls" (fmap length asked) [2]
 
 -- Salt Road Skirmish {3}{B} Sorcery: "Destroy target creature. Create two 1/1 red
 -- Warrior creature tokens. They gain haste until end of turn. Sacrifice them at

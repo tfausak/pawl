@@ -34,7 +34,6 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
-import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Extra.Natural as Natural
@@ -1772,20 +1771,14 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- card is discarded this way" is one that writes it. Discard.These
           -- binds nothing at all and so is not here.
           Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded)) -> Maybe.maybeToList mDiscarded
-          -- CR 111.1's minted tokens, whose plurality is Resolve.namesEveryToken
-          -- -- any count that is not a literal one, so a computed count is
-          -- plural here for the reason a computed depth is. No seat test, unlike
-          -- the mill's and the draw's: at a literal one the arm never binds the
-          -- group however many creators the reference named, taking the single
-          -- binding for one token and ASKING where CR 614.16 multiplied the
-          -- count.
-          Effect.Create (Create.MkCreate quantity _ _ mSlot _)
-            | Resolve.namesEveryToken quantity ->
-                Maybe.maybeToList mSlot
+          -- CR 111.1's minted tokens. No count test and no seat test, unlike
+          -- the mill's and the draw's: Resolve.bindMinted binds every token the
+          -- effect created whatever the printed count says, so CR 614.16 makes
+          -- a literal one plural too -- a doubler, or Queen Allenal of Ruadach
+          -- appending a Soldier.
+          Effect.Create (Create.MkCreate _ _ _ mSlot _) -> Maybe.maybeToList mSlot
           -- Create's arm and Create's test: Resolve.bindMinted binds both.
-          Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ _ mSlot _)
-            | Resolve.namesEveryToken quantity ->
-                Maybe.maybeToList mSlot
+          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ _ mSlot _) -> Maybe.maybeToList mSlot
           _ -> []
         takesAtMostOne player quantity = case quantity of
           Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
@@ -1834,7 +1827,9 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.Evolve slot -> [slot]
           Effect.Mentor slot -> [slot]
           Effect.Train slot -> [slot]
-          Effect.Attach slot -> [slot]
+          -- Effect.Attach is NOT one: CR 301.5c makes a slot naming several
+          -- objects the Equipment controller's choice, and its arm asks
+          -- slotGroup first and hands the group to Attach.arbitrate.
           Effect.AttachTarget (AttachTarget.MkAttachTarget slot _) -> [slot]
           Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot _) -> [slot]
           -- The DESTINATION alone: AttachBound's `subject` goes through
@@ -1950,7 +1945,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded)) -> Maybe.isJust mDiscarded
           _ -> False
         bindsTokens effect = case effect of
-          Effect.Create (Create.MkCreate quantity _ _ mSlot _) -> Maybe.isJust mSlot && Resolve.namesEveryToken quantity
+          Effect.Create (Create.MkCreate _ _ _ mSlot _) -> Maybe.isJust mSlot
           _ -> False
         exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
         destroyedSlot = SlotName.MkSlotName (Text.pack "destroyed")
@@ -2036,7 +2031,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- reaches is a fence the corpus sweep can never exercise. Psychic Miasma is
     -- one that writes the first and Thatcher Revolt one that writes the second.
     Spec.assertBool s (any (anyFace (any bindsDiscarded . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a counted discard moved"
-    Spec.assertBool s (any (anyFace (any bindsTokens . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding a batch of minted tokens"
+    Spec.assertBool s (any (anyFace (any bindsTokens . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a create minted"
     Spec.assertBool
       s
       ( clashes
@@ -2060,14 +2055,15 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (clashes [destruction, Effect.ExileHaunting (ExileHaunting.MkExileHaunting destroyedSlot elsewhereSlot)]) "a slotOne read of a plurally bound slot is caught"
     Spec.assertBool s (not (clashes [destruction, Effect.AttachBound (AttachBound.MkAttachBound destroyedSlot elsewhereSlot)])) "a group-tolerant read of a plurally bound slot is left alone"
     -- The BINDING side's own two, each against the same singular read and each
-    -- paired with the board that must stay legal. CR 701.9's counted discard
-    -- binds unconditionally, so the pair differs in the slot name; CR 111.1's
-    -- Create binds only where the card says "those tokens", so its pair differs
-    -- in the COUNT alone -- which is what proves the guard rather than the arm.
+    -- paired with the board that must stay legal, differing in the slot name.
+    -- CR 701.9's counted discard and CR 111.1's Create both bind
+    -- unconditionally: a create's printed count says nothing about how many
+    -- tokens it mints, CR 614.16 being free to multiply a literal one, so the
+    -- COUNT is not a pair this lint can be built on.
     Spec.assertBool s (clashes [discarding, removal destroyedSlot]) "a singular read of a counted discard's slot is caught"
     Spec.assertBool s (not (clashes [discarding, removal elsewhereSlot])) "a singular read of another slot is left alone beside a discard"
-    Spec.assertBool s (clashes [minting 2, removal destroyedSlot]) "a singular read of a batch of minted tokens is caught"
-    Spec.assertBool s (not (clashes [minting 1, removal destroyedSlot])) "a singular read of ONE minted token is left alone"
+    Spec.assertBool s (clashes [minting 1, removal destroyedSlot]) "a singular read of a minted token is caught even at a printed count of one"
+    Spec.assertBool s (not (clashes [minting 1, removal elsewhereSlot])) "a singular read of another slot is left alone beside a create"
     -- The reading side's other carrier: CR 603.7c hands the arming resolution's
     -- environment to a delayed ability, whose condition names a slot and reads
     -- it through Binding.objectSlots. Paired with the same condition over a slot

@@ -142,7 +142,6 @@ encode p answer = case p of
   Prompt.OrderTimestamps {} -> Response.OrderedTimestamps answer
   Prompt.OrderManaActivations {} -> Response.OrderedManaActivations answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
-  Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
   Prompt.ChooseExilesFromGraveyard {} -> Response.ChoseExilesFromGraveyard answer
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
@@ -438,9 +437,6 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseReplacement {} -> case response of
     Response.ChoseReplacement n -> Just n
-    _ -> Nothing
-  Prompt.ChooseBoundToken {} -> case response of
-    Response.ChoseBoundToken oid -> Just oid
     _ -> Nothing
   Prompt.ChooseSacrifices {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
@@ -888,8 +884,6 @@ defaultAnswer p = case p of
   Prompt.OrderManaActivations _ _ batch -> zipWith const [0 ..] batch
   -- CR 616.1: the bucket is non-empty when this is asked, so index 0 is legal.
   Prompt.ChooseReplacement {} -> 0
-  -- CR 603.7c: every minted token is a legal thing for "it" to name.
-  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   -- The first `count` candidates, which the engine offers in ascending order.
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   -- CR 406.2: the first `count` candidates, the arm above's rule over the

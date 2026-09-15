@@ -277,8 +277,8 @@ data Effect card ability
     DecreaseSpeed SpeedDecrease.SpeedDecrease
   | -- | CR 111: create this many tokens with the given effect-defined
     -- characteristics (CR 111.3), the `card` being the token's text embedded
-    -- literally. Create.slot binds what was minted; see Resolve.namesEveryToken
-    -- for which tokens CR 603.7c's "it" names.
+    -- literally. Create.slot binds EVERY token minted (Resolve.bindMinted), so
+    -- CR 603.7c's "it" reaches the ones CR 614.16 added too.
     Create (Create.Create card)
   | -- | Alchemy's conjure keyword action: create a card that was in nobody's
     -- deck and put it into a zone (Emporium Thopterist). Digital-only, so there

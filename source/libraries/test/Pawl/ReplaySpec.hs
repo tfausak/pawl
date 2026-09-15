@@ -1056,29 +1056,6 @@ combatReplaySpec s =
           -- the foil here.
           let p = Prompt.ChooseLegend decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseRingBearer (ObjectId.MkObjectId 7))) Nothing
-        -- CR 603.7c: which of several minted tokens "it" names is a decision, so
-        -- it has to survive a transcript like any other.
-        Spec.it s "ChooseBoundToken round-trips through the transcript" $ do
-          let a = ObjectId.MkObjectId 7
-              b = ObjectId.MkObjectId 9
-              p = Prompt.ChooseBoundToken decider S.alice oid (a NonEmpty.:| [b])
-          Spec.assertEqWith s "binding the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
-          -- Discriminating: a decode that ignored the response and returned
-          -- the head would pass one leg by accident.
-          Spec.assertEqWith s "binding the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
-        Spec.it s "a bound-token choice does not decode as a legend choice" $ do
-          -- Discriminating: fails if ChooseBoundToken reuses ChoseLegend rather
-          -- than getting its own ObjectId-shaped constructor.
-          let p = Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
-          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))) Nothing
-        Spec.it s "a short transcript binds the first token minted" $
-          -- CR 603.7c: every minted token is a legal referent, so the head is
-          -- legal -- and it is what the engine bound before the choice existed.
-          Spec.assertEqWith
-            s
-            "the head"
-            (Replay.defaultAnswer (Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
-            (ObjectId.MkObjectId 7)
         -- CR 701.54a: which creature a tempted player made their Ring-bearer is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseRingBearer round-trips through the transcript" $ do

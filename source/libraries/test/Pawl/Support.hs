@@ -2590,7 +2590,6 @@ promptDecider prompt = case prompt of
   Prompt.OrderTriggers decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderDamage decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseReplacement decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseBoundToken decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseSacrifices decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExilesFromGraveyard decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseAnyNumberToSacrifice decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2717,7 +2716,6 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.OrderTriggers {} -> "OrderTriggers"
   Prompt.OrderDamage {} -> "OrderDamage"
   Prompt.ChooseReplacement {} -> "ChooseReplacement"
-  Prompt.ChooseBoundToken {} -> "ChooseBoundToken"
   Prompt.ChooseSacrifices {} -> "ChooseSacrifices"
   Prompt.ChooseExilesFromGraveyard {} -> "ChooseExilesFromGraveyard"
   Prompt.ChooseAnyNumberToSacrifice {} -> "ChooseAnyNumberToSacrifice"

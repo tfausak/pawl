@@ -487,9 +487,6 @@ data Response
   | -- | CR 616.1: the index of the replacement effect a player chose to apply
     -- next.
     ChoseReplacement Natural.Natural
-  | -- | CR 603.7c: the minted token a Create's slot bound, once a CR 614.16
-    -- replacement had made several of them.
-    ChoseBoundToken ObjectId.ObjectId
   | -- | CR 701.21a: the permanents a player chose to sacrifice to pay a cost.
     ChoseSacrifices (Set.Set ObjectId.ObjectId)
   | -- | CR 406.2: the cards a player chose to exile from their own graveyard to
