@@ -522,6 +522,11 @@ data Prompt r where
   -- receive at one moment, first named stamped earlier; asked by
   -- Pawl.Engine.Restamp.order, per group in APNAP order, for two or more.
   OrderTimestamps :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
+  -- | CR 605.3a: the order one player activates a batch of mana abilities in
+  -- when an effect has them activate several at once (Drain Power), first named
+  -- activated first; asked by Pawl.Engine.Resolve.Effect's ActivateManaAbilities
+  -- arm, per seat in APNAP order (CR 101.4), for two or more permanents.
+  OrderManaActivations :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
   -- | CR 103.5: whether the player takes a mulligan, once per round in turn
   -- order until they keep; the offer carries what a player at a table sees.
   DeclareMulligan :: Decider.Decider -> PlayerId.PlayerId -> MulliganOffer.MulliganOffer -> Prompt MulliganDecision.MulliganDecision
