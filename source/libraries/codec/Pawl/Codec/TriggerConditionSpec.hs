@@ -169,6 +169,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfDiscarded
       " {\"type\":\"SelfDiscarded\"} "
+  -- CR 702.35a's linked half, which is NOT SelfDiscarded: the card is exiled by
+  -- madness's own replacement rather than by whatever else redirected the discard.
+  Spec.it s "SelfExiledForMadness" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfExiledForMadness
+      " {\"type\":\"SelfExiledForMadness\"} "
   -- CR 701.9a's discard. Both relations, since the PlayerRelation is the whole
   -- content of the "whenever an opponent discards" phrasing.
   Spec.it s "PlayerDiscards round-trips both relations" $ do

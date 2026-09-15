@@ -950,6 +950,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
   TriggerCondition.SelfDiscarded -> []
+  TriggerCondition.SelfExiledForMadness -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
   -- CR 702.29a's cycling read as a discard: the same PlayerRelation, so no Count
@@ -3624,6 +3625,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
   TriggerCondition.SelfDiscarded -> []
+  TriggerCondition.SelfExiledForMadness -> []
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.PlayerCycles _ -> []
   TriggerCondition.PlayerDrawsNthCard {} -> []
@@ -3745,6 +3747,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
   TriggerCondition.SelfDiscarded -> []
+  TriggerCondition.SelfExiledForMadness -> []
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.PlayerCycles _ -> []
   TriggerCondition.PlayerDrawsNthCard _ -> []

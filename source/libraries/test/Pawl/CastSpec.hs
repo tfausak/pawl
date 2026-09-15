@@ -4557,6 +4557,23 @@ madnessSpec s registry = Spec.describe s "Madness" $ do
     Spec.assertBool s (elem (S.printingName wurm) (namesIn Zone.Graveyard declined)) "the Wurm is in its owner's graveyard"
     Spec.assertBool s (notElem (S.printingName wurm) (namesIn Zone.Exile declined)) "and no longer in exile"
     Spec.assertEqWith s "and no Wurm was cast" (S.countOnBattlefieldByName (S.printingName wurm) S.alice declined) 0
+  -- Rule 702.35a's "exiled THIS WAY", the case the destination cannot answer: CR
+  -- 616.1 gives the Wurm's owner two applicable redirects, and the one she picks
+  -- is what decides whether rule 702.35a's second ability triggers at all. Both
+  -- put the Wurm in exile, so a trigger keyed on where it landed fires either way
+  -- and hands alice a cast the rules do not offer.
+  Spec.it s "CR 702.35a Rest in Peace's row chosen over madness's offers no cast" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    wurm <- S.printingOf s registry "Arrogant Wurm"
+    reunion <- S.printingOf s registry "Cathartic Reunion"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (ready, reunionId, restId) = madnessRestBoard mountain forest wurm reunion restInPeace
+        byRest = madnessRestRun True restId reunionId ready
+        byMadness = madnessRestRun False restId reunionId ready
+    Spec.assertEqWith s "CR 702.35a Rest in Peace exiled the discarded Wurm, so no madness trigger and no cast" (S.countOnBattlefieldByName (S.printingName wurm) S.alice byRest) 0
+    Spec.assertEqWith s "CR 702.35a madness's own row exiled it on the SAME board, and the cast is offered" (S.countOnBattlefieldByName (S.printingName wurm) S.alice byMadness) 1
+    Spec.assertBool s (elem (S.printingName wurm) (namesIn Zone.Exile byRest)) "and the Wurm Rest in Peace exiled is still in exile, where nothing watches it"
 
 -- Takes rule 702.35a's offered cast and answers everything else as S.identityAnswer
 -- does, which is what the declining case reuses unchanged.
@@ -4584,11 +4601,52 @@ namesIn zone gs = fmap (\oid -> S.soleFaceName oid gs) (Game.zoneMembers zone S.
 -- takes a player who draws from an empty library out before any assertion runs.
 madnessBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
 madnessBoard mountain forest wurm reunion =
+  let (reunionId, ready) = madnessStock mountain forest wurm reunion
+   in S.runPure S.identityAnswer ready (S.cast S.alice reunionId)
+
+-- The same board one step earlier, with the Reunion still in hand: the CR 616.1
+-- case below has to put Rest in Peace onto the battlefield BEFORE the cast, since
+-- the discard is paid as an additional cost of casting.
+madnessStock :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+madnessStock mountain forest wurm reunion =
   let base = aliceOnTurn (S.landsFor forest S.alice 3 (S.landsInPlay mountain 2))
       stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) base [1 :: Int .. 4]
       handed = snd (S.addHandCard mountain S.alice (snd (S.addHandCard wurm S.alice stocked)))
-      (reunionId, ready) = S.addHandCard reunion S.alice handed
-   in S.runPure S.identityAnswer ready (S.cast S.alice reunionId)
+   in S.addHandCard reunion S.alice handed
+
+-- `madnessBoard`'s board with BOB's Rest in Peace already on the battlefield, so
+-- the Wurm's discard has two applicable redirects and CR 616.1 asks its owner
+-- which to apply. ONE board for both cases below, which differ in nothing but
+-- that answer.
+--
+-- Rest in Peace is placed rather than cast, so its own enters trigger never runs
+-- and the graveyards it would have emptied are nothing to do with this.
+madnessRestBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+madnessRestBoard mountain forest wurm reunion restInPeace =
+  let (reunionId, ready) = madnessStock mountain forest wurm reunion
+      (restId, withRest) = S.addPermanent restInPeace S.bob ready
+   in (withRest, reunionId, restId)
+
+-- `madnessAnswer` plus CR 616.1's choice, pinned by SOURCE rather than by index
+-- so the mutation cannot repair it: True takes Rest in Peace's row, False takes
+-- the Wurm's own.
+madnessRestAnswer :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+madnessRestAnswer restFirst restId p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> (ReplacementEntry.source entry == restId) == restFirst) entries)
+  _ -> madnessAnswer p
+
+-- `madnessSpec`'s first case's script, run on the Rest in Peace board: cast the
+-- Reunion, place whatever triggered, and resolve twice -- rule 702.35a's trigger
+-- and then the Wurm it may have put on the stack. The SAME script runs both
+-- cases; where no trigger was placed the two resolutions take the Reunion and
+-- then nothing.
+madnessRestRun :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+madnessRestRun restFirst restId reunionId ready =
+  let discarded = S.runPure (madnessRestAnswer restFirst restId) ready (S.cast S.alice reunionId)
+      placed = S.runPure (madnessRestAnswer restFirst restId) discarded Engine.placePendingTriggers
+      first = S.runPure (madnessRestAnswer restFirst restId) placed Stack.resolveTop
+   in S.runPure (madnessRestAnswer restFirst restId) first Stack.resolveTop
 
 -- CR 702.88's whole ability, on Staggershock {2}{R} Instant -- "Staggershock
 -- deals 2 damage to any target. / Rebound" (Oracle text fetched from Scryfall

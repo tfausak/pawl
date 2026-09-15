@@ -815,8 +815,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- ordinary discard of a card that HAS cycling reaches the same graveyard through
   -- the same funnel and must fire nothing.
   TriggerCondition.SelfCycled -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded _ oid DiscardCause.ToPayCyclingCost) -> oid == bearer
-    GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary) -> False
+    GameEvent.Discarded (Discarded.MkDiscarded _ oid DiscardCause.ToPayCyclingCost _) -> oid == bearer
+    GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary _) -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -981,7 +981,82 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- an ability of a card in a graveyard, so the two seats coincide by
   -- construction and there is no PlayerRelation to read.
   TriggerCondition.SelfDiscarded -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded _ oid _) -> oid == bearer
+    GameEvent.Discarded (Discarded.MkDiscarded _ oid _ _) -> oid == bearer
+    GameEvent.Drew {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 702.35a's "when this card is exiled THIS WAY": the same discard the arm
+  -- above reads, narrowed to the one rule 702.35a's own replacement redirected
+  -- into exile. `Discarded.exiledForMadness` is where the discard funnel records
+  -- which redirect applied (Pawl.Engine.Event.discardReturning); the DESTINATION
+  -- cannot answer it, since Rest in Peace's row chosen over madness's under CR
+  -- 616.1 exiles the card just the same and rule 702.35a's trigger must not fire.
+  --
+  -- The bearer is the EXILE incarnation, which is the id the CR 400.7 funnel
+  -- minted and the id the event carries -- see the arm above.
+  TriggerCondition.SelfExiledForMadness -> case event of
+    GameEvent.Discarded (Discarded.MkDiscarded _ oid _ exiledForMadness) -> exiledForMadness && oid == bearer
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -1065,7 +1140,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- TriggerSpec's "CR 702.29d cycling a card fires the discard trigger exactly
   -- once" is the test that proves it.
   TriggerCondition.PlayerDiscards relation -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded discarder _ _) -> PlayerRelation.holds (Game.teams gs) relation you discarder
+    GameEvent.Discarded (Discarded.MkDiscarded discarder _ _ _) -> PlayerRelation.holds (Game.teams gs) relation you discarder
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -1145,8 +1220,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 702.29d needs no clause: one cycle is one Discarded event, so this fires
   -- once by construction, exactly as the discard arm above does.
   TriggerCondition.PlayerCycles relation -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded discarder _ DiscardCause.ToPayCyclingCost) -> PlayerRelation.holds (Game.teams gs) relation you discarder
-    GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary) -> False
+    GameEvent.Discarded (Discarded.MkDiscarded discarder _ DiscardCause.ToPayCyclingCost _) -> PlayerRelation.holds (Game.teams gs) relation you discarder
+    GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary _) -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
