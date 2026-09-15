@@ -3009,21 +3009,22 @@ groupPreventions ps =
 --
 -- CR 616.1's APNAP clause is honoured here too, and over the WHOLE batch rather
 -- than only over the shield questions: `byApnap` groups the batch by chooser
--- before anything is asked, so every question one player is owed -- CR 615.7's
--- allocation and each of their events' CR 616.1 choices alike -- is asked before
--- the next player's. A lone ProposedEvent still has exactly one affected object
+-- before anything is asked and `askSeat` exhausts one seat's questions before
+-- the next's, so every question one player is owed -- CR 615.7's division, CR
+-- 122.1c's order and each of their events' CR 616.1 choices alike -- is asked
+-- before the next player's. A lone ProposedEvent still has exactly one affected object
 -- and therefore one chooser, which is why the batch is the only place the clause
 -- can be honoured at all.
 --
--- The two rules order DIFFERENT LEVELS and so cannot contend for this list. CR
--- 615.7's freedom is entirely within one chooser: `contested` splits a shield's
--- contested hits by whoever CR 616.1 asks about each of them -- both read the
--- chooser off the recipient through `chooserOf` -- so a shield covering
--- recipients with two different choosers contributes one group each rather than
--- one group asked of the wrong player. `askOne` then permutes only within that
--- player's own positions. CR 101.4c is the rule that licenses it: a player
--- making several simultaneous choices makes them in the order specified, or
--- chooses the order themselves.
+-- The two rules settle DIFFERENT LEVELS and so cannot contend for this list. CR
+-- 615.7's freedom is entirely within one chooser: `contested` and `allocations`
+-- both split a row's contested hits by whoever CR 616.1 asks about each of them
+-- -- all three read the chooser off the recipient through `chooserOf` -- so a
+-- row covering recipients with two different choosers contributes one group
+-- each rather than one group asked of the wrong player. `askOne` then permutes,
+-- and `askAllocation` divides, only within that player's own positions. CR
+-- 101.4c is the rule that licenses it: a player making several simultaneous
+-- choices makes them in the order specified, or chooses the order themselves.
 orderBatch :: [DamageEvent.DamageEvent] -> Game ([DamageEvent.DamageEvent], [Map.Map CandidateId Natural])
 orderBatch events = do
   gs <- State.get

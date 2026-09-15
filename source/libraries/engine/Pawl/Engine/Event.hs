@@ -1444,6 +1444,12 @@ applyReplacementsReporting asOf batch allowances event = do
 -- The second component is the RESIDUE: the events a partial cover split off
 -- this one (Replacement.partialCoverage), each settled through its own
 -- continuation of the loop. Empty for every class but damage.
+--
+-- `allowances` is CR 615.7's division of each contested countdown, settled for
+-- the whole batch before any of it was asked (Replacement.orderBatch) and
+-- carried in per event: it caps what a countdown covers here, and a share of 0
+-- keeps its row out of CR 616.1's offer entirely. Empty for every caller but
+-- the batch, which is every caller but resolveDamage.
 applyReplacementsFully :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
 applyReplacementsFully asOf batch allowances = loop asOf batch allowances Set.empty [] Nothing False
 
