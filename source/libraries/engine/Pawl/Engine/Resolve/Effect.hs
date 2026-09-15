@@ -3966,6 +3966,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- makes the primary order APNAP, and both objects are the resolving
               -- controller's, so its secondary sentence is reached only when the
               -- action cannot be processed simultaneously -- and this one is.
+              --
+              -- CR 608.2c's default chooser, spelled here rather than carried on the
+              -- ref: this arm's own sentence prints no other seat, and no ref it
+              -- could is written.
               ObjectRef.SourceAndChosenPermanent filter_ -> do
                 counterpart <- chosenPermanent filter_ (PlayerRef.Relative PlayerRelation.You)
                 gs <- State.get
