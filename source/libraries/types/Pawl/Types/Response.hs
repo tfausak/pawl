@@ -478,6 +478,12 @@ data Response
     -- transcript against the wrong one would reorder a sweep instead of a batch
     -- of stamps.
     OrderedTimestamps [Natural.Natural]
+  | -- | CR 605.3a: the order a player chose to activate a batch of mana
+    -- abilities in, as a permutation of the offered indices. A separate
+    -- constructor from the ones above for their reason: replaying a transcript
+    -- against the wrong one would reorder a batch of stamps instead of a batch
+    -- of activations.
+    OrderedManaActivations [Natural.Natural]
   | -- | CR 616.1: the index of the replacement effect a player chose to apply
     -- next.
     ChoseReplacement Natural.Natural
