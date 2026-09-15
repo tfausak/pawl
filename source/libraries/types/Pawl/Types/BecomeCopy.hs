@@ -1,6 +1,7 @@
 module Pawl.Types.BecomeCopy where
 
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- | The payload of Pawl.Types.Effect's BecomeCopy arm: an effect turning an
@@ -39,18 +40,23 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- `subject` is Unstable Shapeshifter's "this permanent" and so an EachMatching
 -- over IsSource, and the Mirror's targeted card and so a slot. Mirrorweave's
 -- "each other creature becomes a copy of target nonlegendary creature" is the
--- swept shape the same field takes, and needs only a duration besides (#1753).
+-- swept shape the same field takes.
 --
--- NO DURATION FIELD, and that is structural rather than an omission. This opcode
--- writes the copiable values themselves (CR 707.2 / 613.1a layer 1) by stamping
--- the subject's copy snapshot, which is what CR 707.3 requires -- "objects that
--- copy the object will use the new copiable values" -- and a snapshot has nowhere
--- to record an expiry. Not implemented: a copy effect the card gives a duration
--- ("until your next turn", Crystalline Resonance), which needs a layer-1
--- continuous effect beside the stamp (#1753).
+-- The DURATION is Nothing for the printings that state none, and those take a
+-- different road: the copiable values are STAMPED onto the subject's copy
+-- snapshot (Pawl.Engine.Binding.setCopy), which is what CR 707.3 asks for --
+-- "objects that copy the object will use the new copiable values" -- and a
+-- snapshot has nowhere to record an ending. A stated duration (Mirrorweave's
+-- "until end of turn") is stored as a Pawl.Types.ActiveCopy row instead, which
+-- carries the same snapshot plus the expiry that ends it, and which
+-- Pawl.Engine.Projection.View.stampedSnapshotOf layers over the stamp -- so CR
+-- 707.3 holds on both roads and only the stored one can end.
 data BecomeCopy ability = MkBecomeCopy
   { original :: ObjectRef.ObjectRef,
     subject :: ObjectRef.ObjectRef,
+    -- | CR 611.2a: how long the copy lasts, absent on a card that states no
+    -- duration.
+    duration :: Maybe Duration.Duration,
     -- | CR 707.9's "except ..." clause, empty for a copy effect that states none.
     -- The SAME list EntryRewrite.AsCopy carries, and applied by the same fold
     -- (Pawl.Engine.Replacement.applyCopyExceptions) into the snapshot this opcode

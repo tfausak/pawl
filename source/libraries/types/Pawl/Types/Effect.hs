@@ -297,9 +297,9 @@ data Effect card ability
     -- The payload carries CR 707.9's exceptions, so the Shapeshifter keeps the
     -- trigger that copied and can copy again.
     --
-    -- Not implemented: a stated duration ("until your next turn", Crystalline
-    -- Resonance), which needs a layer-1 continuous effect beside the stamp
-    -- (#1753).
+    -- The payload's `duration` picks the road: absent, the copiable values are
+    -- stamped onto the subject and last for good; stated (Mirrorweave), they are
+    -- stored as a Pawl.Types.ActiveCopy row that Pawl.Engine.Expiry can end.
     BecomeCopy (BecomeCopy.BecomeCopy ability)
   | -- | CR 707.10: put a copy of a spell or of an activated or triggered ability
     -- on the stack onto the stack (Twincast, Lithoform Engine), cloning the

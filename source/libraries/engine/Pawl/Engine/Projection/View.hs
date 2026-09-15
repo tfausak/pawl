@@ -981,6 +981,12 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 -- above call it; Pawl.Engine.Game.halvesCardOf makes the other read in the
 -- engine, off the object it already holds.
 --
+-- LAYER 1a IS NOT THE BINDING ALONE. A copy effect that stated a duration is
+-- stored rather than stamped (Pawl.Types.ActiveCopy), so Game.storedCopyOf is
+-- consulted first and the binding is what a swept row falls back to. Here rather
+-- than in any one reader, for the reason copiableSnapshotOf above gives: a
+-- per-reader fork is what that accessor exists to prevent.
+--
 -- CR 730.2h is the one fork: a FLIPPED merged permanent reads the flipped
 -- stamp its merge left beside the ordinary one, so each flip component
 -- contributes its alternative characteristics. CR 110.5a keeps status out of the
@@ -998,11 +1004,14 @@ stampedSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 stampedSnapshotOf oid gs = do
   object <- Game.lookupObject oid gs
   let bindings = Object.bindings object
+      stamped = case Game.storedCopyOf oid gs of
+        Just stored -> Just stored
+        Nothing -> Binding.copyOf bindings
   if Object.flipped object
     then case Binding.flippedCopyOf bindings of
       Just flipped -> Just flipped
-      Nothing -> fmap (\stamp -> Maybe.fromMaybe stamp (PC.flipped stamp)) (Binding.copyOf bindings)
-    else Binding.copyOf bindings
+      Nothing -> fmap (\stamp -> Maybe.fromMaybe stamp (PC.flipped stamp)) stamped
+    else stamped
 
 -- CR 707.2a: the static abilities this object's copiable rules text gives it --
 -- its copy snapshot's when it has one, its printed face's otherwise. Equal to

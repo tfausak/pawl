@@ -12,6 +12,7 @@ import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
+import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
@@ -136,6 +137,11 @@ data GameState = MkGameState
     -- | CR 611.2: stored continuous effects from resolutions, each with an
     -- expiry; static-ability effects are re-derived live instead.
     continuousEffects :: [ContinuousEffect.ContinuousEffect Card.Card],
+    -- | CR 613.1a / 611.2: stored copy effects from resolutions that stated a
+    -- duration, each with an expiry. A copy effect stating none is stamped onto
+    -- the object instead (Pawl.Engine.Binding.setCopy), which is what has
+    -- nowhere to record an ending.
+    copyEffects :: [ActiveCopy.ActiveCopy],
     -- | CR 614.3 / 615.3: floating replacement effects from resolutions, each
     -- with an expiry and a use count; static replacement abilities are
     -- re-derived live instead.

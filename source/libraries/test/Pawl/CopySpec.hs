@@ -28,7 +28,10 @@
 -- ability in the copiable values; and CR 707.9c's decline-to-copy exception
 -- riding both roads at once -- Vesuvan Doppelganger, whose copy keeps its own
 -- colour on entry and keeps it again when the ability it quoted copies a second
--- creature).
+-- creature), and CR 611.2a's stated DURATION riding it -- Mirrorweave, whose
+-- copy ends in the cleanup step while a token copy taken under it keeps the
+-- values (CR 707.2b), and under which a Clone's own stamp is masked and then
+-- revealed again.
 -- Gameplay-level: Clone enters via the zone-change funnel, the Counterpart is
 -- cast and resolved, the Radstag evolves and the Shapeshifter's trigger resolves,
 -- and their projected characteristics are asserted.
@@ -1772,6 +1775,75 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the token entered as the Hill Giant's 3/3" (S.powerToughnessOf tokenId minted) $ Just (3, 3)
         Spec.assertEqWith s "carrying one triggered ability (CR 707.9a)" (length (Projection.triggeredAbilitiesOf tokenId minted)) 1
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- THE PROVING TEST for CR 611.2a's duration on a COPY effect. Mirrorweave
+  -- {2}{W/U}{W/U} Instant: "Each other creature becomes a copy of target
+  -- nonlegendary creature until end of turn."
+  --
+  -- Three readings of one board, each of which a different implementation gets
+  -- wrong:
+  --
+  --   * DURING the turn the copy is real -- the Piker is the Giant, by P/T and
+  --     by name (CR 707.2).
+  --   * At CLEANUP it ends (CR 514.2 / 611.2a), which a stamped copy cannot do:
+  --     the Piker is its printed 2/1 again.
+  --   * A token copy taken WHILE it stood keeps the copied values afterwards
+  --     (CR 707.2b, "changing the copiable values of the original object won't
+  --     cause the copy to change"), the token's own stamp being a value.
+  --
+  -- THE CLONE is the tripwire for the stamp underneath. It is a copy of the
+  -- Piker already, so the stored row has to outrank a stamp while it stands and
+  -- REVEAL that same stamp when it ends: a Clone that came back as the printed
+  -- Clone would be a 0/0 the CR 704.5f state-based action buries, and one that
+  -- stayed the Giant never ended. Read through Game.cardOf rather than the
+  -- projection it answers "Clone" throughout.
+  --
+  -- Three distinct printed pairs, so no reading is reached by a coincidence: the
+  -- Piker's 2/1, the Blind-Spot Giant's 4/3, the Clone's own 0/0.
+  Spec.it s "CR 611.2a Mirrorweave's copy ends at cleanup, and the token copy taken under it does not" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    clone <- S.printingOf s registry "Clone"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    let (pikerId, board0) = S.addPermanent piker S.alice (S.landsInPlay island 7)
+        (giantId, board1) = S.addPermanent blindSpotGiant S.alice board0
+        (_, stagedClone) = S.spellOnStack clone S.alice board1
+        withClone = resolveAndSettle (copyNamed pikerId) stagedClone
+        woven = castAndResolve (aimByFiltering giantId) mirrorweave withClone
+        minted = castAndResolve (aimByFiltering pikerId) counterpart woven
+        toCleanup =
+          minted
+            { GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+            }
+        afterMain = S.runPure S.identityAnswer toCleanup Engine.runStep
+        afterEnd = S.runPure S.identityAnswer afterMain Engine.runStep
+        afterCleanup = S.runPure S.identityAnswer afterEnd Engine.runStep
+        giantName = Set.singleton . CardName.MkCardName $ Text.pack "Blind-Spot Giant"
+        pikerName = Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
+    case (cloneOnBattlefield withClone, tokensOnBattlefield minted) of
+      (Just cloneId, [tokenId]) -> do
+        -- 1. The precondition, not the behaviour: the copy happened at all.
+        Spec.assertEqWith s "CR 707.2 under Mirrorweave the Piker is the Giant's 4/3" (S.powerToughnessOf pikerId minted) $ Just (4, 3)
+        Spec.assertEqWith s "and the Giant by name" (Projection.namesOf pikerId minted) giantName
+        -- 2. THE GAMEPLAY ASSERTION, and the one the duration exists for: the
+        -- cleanup step ends it and the permanent is itself again.
+        Spec.assertEqWith s "CR 514.2 / 611.2a after cleanup the Piker is its printed 2/1 again" (S.powerToughnessOf pikerId afterCleanup) $ Just (2, 1)
+        Spec.assertEqWith s "and the Piker by name (CR 707.3)" (Projection.namesOf pikerId afterCleanup) pikerName
+        -- 3. CR 707.2b: the token copied a value, so the ending does not reach it.
+        Spec.assertEqWith s "CR 707.2b the token copy is still the Giant's 4/3 after cleanup" (S.powerToughnessOf tokenId afterCleanup) $ Just (4, 3)
+        Spec.assertEqWith s "and the Giant by name still" (Projection.namesOf tokenId afterCleanup) giantName
+        -- 4. The stamp underneath, revealed rather than lost: the Clone is the
+        -- Piker again and not the printed Clone.
+        Spec.assertEqWith s "CR 707.3 the Clone falls back to the copy it already was" (S.powerToughnessOf cloneId afterCleanup) $ Just (2, 1)
+        Spec.assertEqWith s "the Piker by name, not Clone" (Projection.namesOf cloneId afterCleanup) pikerName
+        -- Diagnostics, after the behaviour.
+        Spec.assertEqWith s "the Clone was the Giant under Mirrorweave too" (S.powerToughnessOf cloneId minted) $ Just (4, 3)
+        Spec.assertEqWith s "the token entered as the Giant (CR 707.2)" (S.powerToughnessOf tokenId minted) $ Just (4, 3)
+        Spec.assertEqWith s "the target itself is the Giant throughout" (S.powerToughnessOf giantId afterCleanup) $ Just (4, 3)
+        Spec.assertEqWith s "the cleanup step ran" (GameState.phase afterEnd) (Phase.Ending EndingStep.Cleanup)
+      (found, tokens) -> Spec.assertFailure s ("expected a Clone and exactly one token, got " <> show (found, length tokens))
 
   -- THE PROVING TEST for CR 707.9a's "this ability" inside an ACTIVATED ability.
   -- Dimir Doppelganger {1}{U}{B} Creature -- Shapeshifter 0/2: "{1}{U}{B}: Exile
