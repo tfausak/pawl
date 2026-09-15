@@ -242,6 +242,9 @@ rewriteModification pairs m =
         -- CR 702.14a's generic term, which has no land type in it. A Hack on
         -- Hammerheim changes what its removal reaches not at all.
         Modification.LoseKeywordFamily _ -> acc
+        -- CR 612.5's exchange names no word to swap: its two sides are object
+        -- ids in the effect's affected set, so there is nothing here to rewrite.
+        Modification.ExchangeTextBoxes -> acc
         Modification.SwitchPowerToughness -> acc
         -- Nothing to rewrite: two bare markers naming no subtype word.
         Modification.AssignCombatDamageWithToughness -> acc
@@ -1190,8 +1193,10 @@ rewriteCopyException pairs exception = case exception of
   -- that changes a color word or a subtype can't change a card name". CR 612.7's
   -- Spy Kit is the effect that does change one, and it is unimplemented (#887).
   CopyException.SetName _ -> exception
-  -- CR 612.2 names colour words, but pawl's only text changer swaps subtypes, so
-  -- no pair reaches a colour exception; a missing mana cost carries no word.
+  -- CR 612.2 names colour words, but the only text changer that supplies a WORD
+  -- PAIR here swaps subtypes -- CR 612.5's exchange of text boxes names no word
+  -- at all -- so no pair reaches a colour exception; a missing mana cost carries
+  -- no word.
   CopyException.SetColors _ -> exception
   CopyException.NoManaCost -> exception
   -- CR 707.9c's clause names a characteristic and no word, so CR 612.2's subtype

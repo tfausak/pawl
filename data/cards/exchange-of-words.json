@@ -1,0 +1,120 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Exchange of Words",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "ForAsLongAs",
+                            "value": {
+                              "type": "Compares",
+                              "value": {
+                                "comparison": {
+                                  "type": "Exactly"
+                                },
+                                "measured": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Members"
+                                    },
+                                    "filter": {
+                                      "type": "IsSource"
+                                    },
+                                    "scope": {
+                                      "type": "InZone",
+                                      "value": {
+                                        "player": {
+                                          "type": "EachPlayer"
+                                        },
+                                        "zone": {
+                                          "type": "Battlefield"
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "threshold": {
+                                  "type": "Literal",
+                                  "value": 1
+                                }
+                              }
+                            }
+                          },
+                          "modification": {
+                            "type": "ExchangeTextBoxes"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "creatures"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "creatures": {
+                    "count": {
+                      "type": "Printed",
+                      "value": {
+                        "least": 2,
+                        "most": 2
+                      }
+                    },
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
