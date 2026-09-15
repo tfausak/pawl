@@ -335,11 +335,34 @@ recordTransformed oids gs = case oids of
     simultaneouslyPure
       ( \g0 ->
           List.foldl'
-            (\g oid -> recordEvent (GameEvent.Transformed (Transformed.MkTransformed oid (Projection.project oid g))) g)
+            (\g oid -> recordEvent (GameEvent.Transformed (transformedAt oid g)) g)
             g0
             oids
       )
       gs
+
+-- CR 603.10's "what the objects involved in the event look like", sampled off
+-- the board the turn has just been written to: the projected characteristics, and
+-- beside them the two axes CR 109.3 keeps out of them -- who controls the
+-- permanent, and what is attached to it.
+--
+-- Both would otherwise be answered at the CR 117.5 scan, which runs AFTER
+-- state-based actions: CR 704.5n unattaches an Equipment from a permanent that
+-- has just turned into a noncreature, so Neglected Heirloom's "when equipped
+-- creature transforms" would find nothing attached and never fire. The printed
+-- ruling says it does fire and only then becomes unattached.
+--
+-- The attachers' IDS, not their views -- Pawl.Types.Transformed says why -- and
+-- Game.attachments rather than a projection read, the link living on the attached
+-- permanent.
+transformedAt :: ObjectId -> GameState -> Transformed.Transformed
+transformedAt oid gs =
+  Transformed.MkTransformed
+    { Transformed.object = oid,
+      Transformed.characteristics = Projection.project oid gs,
+      Transformed.controller = Projection.controllerOf oid gs,
+      Transformed.attachments = Game.attachments oid gs
+    }
 
 openEventGroup :: GameState -> GameState
 openEventGroup gs = gs {GameState.eventGroupDepth = GameState.eventGroupDepth gs + 1}

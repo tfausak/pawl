@@ -254,6 +254,7 @@ spec s registry = Spec.describe s "Transform" $ do
   transformedPermanentSpec s registry
   transformTriggerSpec s registry
   bystanderTransformSpec s registry
+  equippedTransformSpec s registry
   convertSpec s registry
   gainLifeConvertSpec s registry
   moreThanMeetsTheEyeSpec s registry
@@ -940,7 +941,7 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
   Spec.it s "CR 701.27e the condition refuses an event naming a different face" $ do
     let board = emptyBoard
         bearer = S.noSource
-        event into = GameEvent.Transformed (Transformed.MkTransformed bearer S.emptyCharacteristics {PC.names = Set.singleton into})
+        event into = GameEvent.Transformed Transformed.MkTransformed {Transformed.object = bearer, Transformed.characteristics = S.emptyCharacteristics {PC.names = Set.singleton into}, Transformed.controller = Nothing, Transformed.attachments = Set.empty}
         matches into = Event.matchesTrigger board bearer S.alice (TriggerCondition.SelfTransformedInto thallidBack) (event into)
     Spec.assertBool s (matches thallidBack) "the face it names matches"
     Spec.assertBool s (not (matches thallidFront)) "and the other face of the same card does not"
@@ -1084,9 +1085,10 @@ bystanderTransformSpec s registry = Spec.describe s "TransformsIntoWatched" $ do
     Spec.assertEqWith s "and Aang really did turn over" (faceNameOf aangId turned) (Just aangBack)
   -- The same board with the Aang moved one seat: CR 109.5's "you" is the Cult's
   -- controller, so a permanent BOB controls turning over is not a permanent alice
-  -- controls. Control is no characteristic (CR 109.3), so it rides no sample and
-  -- the arm reads it off the board; this board cannot tell the two reads apart,
-  -- and the one that could is the arm's own elision (#2050).
+  -- controls. Control is no characteristic (CR 109.3), so it rides the event
+  -- beside the sample rather than the snapshot; this board cannot tell the
+  -- sampled read from a live one, nothing in data/cards/ having a way to change
+  -- control between the turn and the CR 117.5 scan.
   Spec.it s "CR 109.5 a permanent bob controls turning over makes none" $ do
     cult <- S.printingOf s registry "Cult of the Waxing Moon"
     aang <- S.printingOf s registry "Aang, at the Crossroads"
@@ -1133,6 +1135,74 @@ bystanderTransformSpec s registry = Spec.describe s "TransformsIntoWatched" $ do
         after = resolveStack (gather turned)
     Spec.assertEqWith s "the one turn into a non-Human made one Wolf" (S.countOnBattlefieldByName wolfToken S.alice after) 1
     Spec.assertEqWith s "and the scan saw a Human, the permanent being back on its front face" (faceNameOf aangId turned) (Just aangFront)
+
+-- CR 603.10's FIRST sentence over an axis CR 109.3 keeps out of an object's
+-- characteristics: what was attached to the permanent that turned over. The
+-- fixture is Neglected Heirloom // Ashmouth Blade, a {1} Artifact -- Equipment
+-- reading "Equipped creature gets +1/+1. When equipped creature transforms,
+-- transform this Equipment. Equip {1}", on the Ratchet convertSpec already uses.
+--
+-- It is the producer because the printed ruling states the outcome outright:
+-- "If the equipped creature transforms into a noncreature permanent, Neglected
+-- Heirloom will become unattached before it transforms into Ashmouth Blade." So
+-- the Equipment falls off AND the ability fires, which is only possible if the
+-- condition is checked against the board immediately after the turn rather than
+-- against the one the CR 117.5 scan is handed.
+--
+-- The board is bystanderTransformSpec's CR 702.161a case with the Cult swapped
+-- for the Heirloom: on bob's turn living metal is off, so Ratchet, Rescue Racer
+-- is an Artifact -- Vehicle and no creature, CR 704.5n unattaches the Equipment,
+-- and a live read of `HasAttached IsSource` finds nothing.
+--
+-- The negative is the same board with the attach left out, which is the ONE
+-- thing the two differ in: the Heirloom is on the battlefield either way, Ratchet
+-- turns over either way, and the CR 117.5 scan sees an unattached Equipment
+-- either way.
+equippedTransformSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+equippedTransformSpec s registry = Spec.describe s "EquippedCreatureTransforms" $ do
+  Spec.it s "CR 603.10 / 704.5n the Heirloom turns over though the unattach beat the scan" $ do
+    heirloom <- S.printingOf s registry "Neglected Heirloom"
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    let (ratchetId, heirloomId, board) = heirloomBoard heirloom ratchet True
+        bobsTurn = S.runPure S.identityAnswer board Engine.handoffTurn
+        turned = sweep bobsTurn
+        settled = gather turned
+        after = resolveStack settled
+    Spec.assertEqWith s "the Heirloom turned over into Ashmouth Blade" (faceNameOf heirloomId after) (Just ashmouthBlade)
+    -- The three preconditions the behaviour rests on, read AFTER the assertion
+    -- above so none of them can absorb a mutation aimed at it.
+    Spec.assertEqWith s "the Equipment was attached when Ratchet turned and unattached by the scan" (fmap (hostOf heirloomId) [turned, settled]) [Just (Recipient.ToCreature ratchetId), Nothing]
+    Spec.assertEqWith s "Ratchet was a creature before the turn and is not one after" (fmap (Set.member CardType.Creature . Projection.cardTypesOf ratchetId) [bobsTurn, turned]) [True, False]
+    Spec.assertEqWith s "and it really is bob's turn, so living metal is off" (GameState.activePlayer turned) S.bob
+  Spec.it s "CR 603.10 an Equipment attached to nothing reads no transform of its own" $ do
+    heirloom <- S.printingOf s registry "Neglected Heirloom"
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    let (ratchetId, heirloomId, board) = heirloomBoard heirloom ratchet False
+        bobsTurn = S.runPure S.identityAnswer board Engine.handoffTurn
+        turned = sweep bobsTurn
+        after = resolveStack (gather turned)
+    Spec.assertEqWith s "the Heirloom is still showing its front face" (faceNameOf heirloomId after) (Just heirloomFront)
+    Spec.assertEqWith s "and Ratchet really did turn over, so there WAS an event to decline" (faceNameOf ratchetId turned) (Just ratchetBack)
+
+-- The two names Neglected Heirloom // Ashmouth Blade prints.
+heirloomFront, ashmouthBlade :: CardName.CardName
+heirloomFront = CardName.MkCardName (Text.pack "Neglected Heirloom")
+ashmouthBlade = CardName.MkCardName (Text.pack "Ashmouth Blade")
+
+-- alice's Ratchet with alice's Heirloom beside it, equipped or not. CR 303.4b's
+-- attach is S.attach rather than an equip activation: CR 702.6b makes equip a
+-- sorcery-speed ability, and the turn is handed to bob before anything turns
+-- over.
+heirloomBoard :: Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+heirloomBoard heirloom ratchet equipped =
+  let (ratchetId, withRatchet) = S.addPermanent ratchet S.alice emptyBoard
+      (heirloomId, placed) = S.addPermanent heirloom S.alice withRatchet
+   in (ratchetId, heirloomId, if equipped then S.attach heirloomId ratchetId placed else placed)
+
+-- CR 301.5a: what this permanent is attached to, off Object.attachedTo, which is
+-- where CR 704.5n's unattach writes.
+hostOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
+hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo
 
 -- "Destroy each Fungus", which on this board is the Thallid alone -- the
 -- Saproling the transform limb made is a Phyrexian Saproling and not one.

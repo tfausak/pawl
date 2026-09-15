@@ -312,13 +312,16 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.TurnedFaceDown (ObjectId.MkObjectId 5))
       " {\"type\":\"TurnedFaceDown\",\"value\":5} "
-  -- CR 701.27a, the different game action CR 701.27b holds it apart from. Two
-  -- fields rather than one: CR 701.27e reads what the permanent turned INTO.
+  -- CR 701.27a, the different game action CR 701.27b holds it apart from. More
+  -- than one field: CR 701.27e reads what the permanent turned INTO, and CR
+  -- 603.10 adds the two axes CR 109.3 keeps out of that. The two CR 603.10 axes
+  -- are at their defaults here and covered by Pawl.Codec.TransformedSpec, which
+  -- is where the payload's own round trip lives.
   Spec.it s "Transformed" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.Transformed (Transformed.MkTransformed (ObjectId.MkObjectId 5) ProjectedCharacteristicsSpec.testCharacteristics))
+      (GameEvent.Transformed Transformed.MkTransformed {Transformed.object = ObjectId.MkObjectId 5, Transformed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics, Transformed.controller = Nothing, Transformed.attachments = Set.empty})
       ("{\"type\":\"Transformed\",\"value\":{\"object\":5,\"characteristics\":" <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "}}")
   -- CR 702.112b. One id, TurnedFaceUp's payload exactly: the designation says only
   -- which permanent got it.
