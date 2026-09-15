@@ -35,6 +35,12 @@
 -- Pawl.Engine.Projection.View.staticAbilitiesOf. See convertSpec, whose fixture is
 -- Ratchet, Field Medic // Ratchet, Rescue Racer.
 --
+-- Also CR 603.10's first sentence over the two axes CR 109.3 keeps out of an
+-- object's characteristics -- who controlled the permanent that turned over and
+-- what was attached to it -- which Pawl.Types.Transformed carries beside the
+-- sample. See equippedTransformSpec, whose fixture is Neglected Heirloom //
+-- Ashmouth Blade on that same Ratchet.
+--
 -- Also CR 701.27g's "transformed permanent", the phrase a CARD asks rather than
 -- the engine: Pawl.Types.Filter's Transformed atom, filled by
 -- Pawl.Engine.Projection.View.viewOfCharacteristics. See transformedPermanentSpec,
@@ -1190,7 +1196,7 @@ heirloomFront = CardName.MkCardName (Text.pack "Neglected Heirloom")
 ashmouthBlade = CardName.MkCardName (Text.pack "Ashmouth Blade")
 
 -- alice's Ratchet with alice's Heirloom beside it, equipped or not. CR 303.4b's
--- attach is S.attach rather than an equip activation: CR 702.6b makes equip a
+-- attach is S.attach rather than an equip activation: CR 702.6a makes equip a
 -- sorcery-speed ability, and the turn is handed to bob before anything turns
 -- over.
 heirloomBoard :: Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
