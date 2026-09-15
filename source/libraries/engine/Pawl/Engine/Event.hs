@@ -5066,7 +5066,29 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- id moves before its host, and the live board has already
                         -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
                         -- in the same batch, ahead of its host" is the proof.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj)) (GameState.lastKnown g1)
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Game.isAttacking oid gs) (Game.attackTargetOf oid gs) (Game.isBlocking oid gs) (Object.protector obj) (Object.paidCosts obj) (Object.controlClock obj)) (GameState.lastKnown g1),
+                        -- CR 608.2h's record for a STACK object, filed in the same
+                        -- write and from the same board as `lastKnown` above, which
+                        -- cannot keep it: rule 707.10 copies the DECISIONS, and CR
+                        -- 109.3 makes none of them a characteristic, so what an
+                        -- Effect.CopyStackObject needs afterwards is the whole
+                        -- object. CR 702.40a's storm over a Grapeshot countered
+                        -- while its trigger waited is the board.
+                        --
+                        -- The copiable snapshot is stamped on the way in for the
+                        -- reason `lastKnown` takes one: CR 613.1a's layer is read
+                        -- off `obj`, which is about to cease, and CR 707.2 asks the
+                        -- copy for those values rather than for a fresh reading of a
+                        -- card.
+                        --
+                        -- insertWith keeping the OLDER entry, because an arming
+                        -- effect files its own reading first and rule 702.50a's
+                        -- epic ("copy this spell except for its epic ability") is
+                        -- not this unmodified object.
+                        GameState.stackArchive =
+                          if fromZone == Zone.Stack
+                            then Map.insertWith (\_ old -> old) oid (obj {Object.bindings = Binding.setCopy (copiedSnapshot oid gs) (Object.bindings obj)}) (GameState.stackArchive g1)
+                            else GameState.stackArchive g1
                       }
               -- CR 712.21: "If a melded permanent leaves the battlefield, one
               -- permanent leaves the battlefield and two cards are put into the
