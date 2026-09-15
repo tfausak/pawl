@@ -10,6 +10,12 @@ import qualified Pawl.Types.ExileLooker as ExileLooker
 codec :: Codec.Codec ExileLooker.ExileLooker
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "ThePlayer" PlayerId.codec ExileLooker.ThePlayer (\x -> case x of ExileLooker.ThePlayer y -> Just y; _ -> Nothing),
       Arm.nullary "TheExiler" ExileLooker.TheExiler
     ]
+
+tagOf :: ExileLooker.ExileLooker -> String
+tagOf x = case x of
+  ExileLooker.ThePlayer {} -> "ThePlayer"
+  ExileLooker.TheExiler {} -> "TheExiler"

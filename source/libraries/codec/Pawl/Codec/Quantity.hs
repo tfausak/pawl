@@ -42,6 +42,7 @@ import qualified Pawl.Types.Quantity as Quantity
 codec :: Codec.Codec Quantity.Quantity
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Literal" Common.integer Quantity.Literal (\x -> case x of Quantity.Literal y -> Just y; _ -> Nothing),
       Arm.nullary "ManaValue" Quantity.ManaValue,
       Arm.nullary "Power" Quantity.Power,
@@ -182,3 +183,58 @@ codec =
       -- CR 702.184c, engine-only: Power's shape, nothing on the wire.
       Arm.nullary "StationMeasure" Quantity.StationMeasure
     ]
+
+tagOf :: Quantity.Quantity -> String
+tagOf x = case x of
+  Quantity.Literal {} -> "Literal"
+  Quantity.ManaValue {} -> "ManaValue"
+  Quantity.Power {} -> "Power"
+  Quantity.Toughness {} -> "Toughness"
+  Quantity.InSlot {} -> "InSlot"
+  Quantity.Star {} -> "Star"
+  Quantity.Plus {} -> "Plus"
+  Quantity.Halved {} -> "Halved"
+  Quantity.Times {} -> "Times"
+  Quantity.Negate {} -> "Negate"
+  Quantity.Count {} -> "Count"
+  Quantity.ManaCount {} -> "ManaCount"
+  Quantity.LifeTotal {} -> "LifeTotal"
+  Quantity.Speed {} -> "Speed"
+  Quantity.IsMonarch {} -> "IsMonarch"
+  Quantity.HasPlayerDesignation {} -> "HasPlayerDesignation"
+  Quantity.IsStartingPlayer {} -> "IsStartingPlayer"
+  Quantity.IsActivePlayer {} -> "IsActivePlayer"
+  Quantity.PlayerCounters {} -> "PlayerCounters"
+  Quantity.Devotion {} -> "Devotion"
+  Quantity.ObjectCounters {} -> "ObjectCounters"
+  Quantity.ObjectCountersOfAnyKind {} -> "ObjectCountersOfAnyKind"
+  Quantity.HasDesignation {} -> "HasDesignation"
+  Quantity.DesignationValue {} -> "DesignationValue"
+  Quantity.WasKicked {} -> "WasKicked"
+  Quantity.TimesPaid {} -> "TimesPaid"
+  Quantity.CastUsing {} -> "CastUsing"
+  Quantity.TagWasSpent {} -> "TagWasSpent"
+  Quantity.ManaSpent {} -> "ManaSpent"
+  Quantity.WasToken {} -> "WasToken"
+  Quantity.WasAttacking {} -> "WasAttacking"
+  Quantity.WasBlocking {} -> "WasBlocking"
+  Quantity.ClassLevel {} -> "ClassLevel"
+  Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
+  Quantity.AttackersDeclaredThisTurn {} -> "AttackersDeclaredThisTurn"
+  Quantity.CardsDiscardedThisTurn {} -> "CardsDiscardedThisTurn"
+  Quantity.LifeGainedThisTurn {} -> "LifeGainedThisTurn"
+  Quantity.PlayersDealtDamageThisTurn {} -> "PlayersDealtDamageThisTurn"
+  Quantity.DamageDealtToPlayersThisTurn {} -> "DamageDealtToPlayersThisTurn"
+  Quantity.DamageDealtToThisTurn {} -> "DamageDealtToThisTurn"
+  Quantity.SpellsCastLastTurn {} -> "SpellsCastLastTurn"
+  Quantity.SpellsCastBefore {} -> "SpellsCastBefore"
+  Quantity.PermanentsDiedThisTurn {} -> "PermanentsDiedThisTurn"
+  Quantity.DungeonsCompleted {} -> "DungeonsCompleted"
+  Quantity.CompletedDungeon {} -> "CompletedDungeon"
+  Quantity.EnteredThisTurn {} -> "EnteredThisTurn"
+  Quantity.EnteredFrom {} -> "EnteredFrom"
+  Quantity.WasCastFrom {} -> "WasCastFrom"
+  Quantity.BlockersBeyondFirst {} -> "BlockersBeyondFirst"
+  Quantity.AgainstSlot {} -> "AgainstSlot"
+  Quantity.AgainstCardsExiledWith {} -> "AgainstCardsExiledWith"
+  Quantity.StationMeasure {} -> "StationMeasure"

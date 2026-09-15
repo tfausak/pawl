@@ -10,6 +10,12 @@ import qualified Pawl.Types.Sickness as Sickness
 codec :: Codec.Codec Sickness.Sickness
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Sick" Sickness.Sick,
       Arm.payload "Settled" PlayerId.codec Sickness.Settled (\x -> case x of Sickness.Settled y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Sickness.Sickness -> String
+tagOf x = case x of
+  Sickness.Sick {} -> "Sick"
+  Sickness.Settled {} -> "Settled"

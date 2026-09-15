@@ -11,7 +11,14 @@ import qualified Pawl.Types.TurnWindow as TurnWindow
 codec :: Codec.Codec TurnWindow.TurnWindow
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "AnyTurn" TurnWindow.AnyTurn,
       Arm.nullary "ControllersNextTurn" TurnWindow.ControllersNextTurn,
       Arm.payload "OnTurn" Common.natural TurnWindow.OnTurn (\x -> case x of TurnWindow.OnTurn y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: TurnWindow.TurnWindow -> String
+tagOf x = case x of
+  TurnWindow.AnyTurn {} -> "AnyTurn"
+  TurnWindow.ControllersNextTurn {} -> "ControllersNextTurn"
+  TurnWindow.OnTurn {} -> "OnTurn"

@@ -8,7 +8,14 @@ import qualified Pawl.Types.CastingRestriction as CastingRestriction
 codec :: Codec.Codec CastingRestriction.CastingRestriction
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "DuringPhase" DuringPhase.codec CastingRestriction.DuringPhase (\x -> case x of CastingRestriction.DuringPhase y -> Just y; _ -> Nothing),
       Arm.nullary "AttackedThisStep" CastingRestriction.AttackedThisStep,
       Arm.nullary "AfterBlockersDeclared" CastingRestriction.AfterBlockersDeclared
     ]
+
+tagOf :: CastingRestriction.CastingRestriction -> String
+tagOf x = case x of
+  CastingRestriction.DuringPhase {} -> "DuringPhase"
+  CastingRestriction.AttackedThisStep {} -> "AttackedThisStep"
+  CastingRestriction.AfterBlockersDeclared {} -> "AfterBlockersDeclared"

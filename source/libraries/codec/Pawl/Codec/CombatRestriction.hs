@@ -29,6 +29,7 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 codec :: Codec.Codec CombatRestriction.CombatRestriction
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "CantAttack" AffectedUnless.codec CombatRestriction.CantAttack (\x -> case x of CombatRestriction.CantAttack y -> Just y; _ -> Nothing),
       Arm.payload "CantBlock" AffectedUnless.codec CombatRestriction.CantBlock (\x -> case x of CombatRestriction.CantBlock y -> Just y; _ -> Nothing),
       Arm.payload "CantBeBlockedBy" CantBeBlockedBy.codec CombatRestriction.CantBeBlockedBy (\x -> case x of CombatRestriction.CantBeBlockedBy y -> Just y; _ -> Nothing),
@@ -37,3 +38,13 @@ codec =
       Arm.payload "CantAttackMoreThan" LimitUnless.codec CombatRestriction.CantAttackMoreThan (\x -> case x of CombatRestriction.CantAttackMoreThan y -> Just y; _ -> Nothing),
       Arm.payload "CantBlockMoreThan" LimitUnless.codec CombatRestriction.CantBlockMoreThan (\x -> case x of CombatRestriction.CantBlockMoreThan y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: CombatRestriction.CombatRestriction -> String
+tagOf x = case x of
+  CombatRestriction.CantAttack {} -> "CantAttack"
+  CombatRestriction.CantBlock {} -> "CantBlock"
+  CombatRestriction.CantBeBlockedBy {} -> "CantBeBlockedBy"
+  CombatRestriction.CantAttackPlayer {} -> "CantAttackPlayer"
+  CombatRestriction.CantAttackAlone {} -> "CantAttackAlone"
+  CombatRestriction.CantAttackMoreThan {} -> "CantAttackMoreThan"
+  CombatRestriction.CantBlockMoreThan {} -> "CantBlockMoreThan"

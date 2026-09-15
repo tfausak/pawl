@@ -18,6 +18,7 @@ import qualified Pawl.Types.CopyException as CopyException
 codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (CopyException.CopyException ability)
 codec abilityCodec =
   Arm.tagged
+    tagOf
     [ Arm.payload "SetPowerToughness" SetPowerToughness.codec CopyException.SetPowerToughness $ \x -> case x of
         CopyException.SetPowerToughness y -> Just y
         _ -> Nothing,
@@ -49,3 +50,18 @@ codec abilityCodec =
         CopyException.GainAbility y -> Just y
         _ -> Nothing
     ]
+
+tagOf :: CopyException.CopyException ability -> String
+tagOf x = case x of
+  CopyException.SetPowerToughness {} -> "SetPowerToughness"
+  CopyException.GainKeywords {} -> "GainKeywords"
+  CopyException.GainThisAbility {} -> "GainThisAbility"
+  CopyException.AddCardTypes {} -> "AddCardTypes"
+  CopyException.AddSubtypes {} -> "AddSubtypes"
+  CopyException.AddSupertypes {} -> "AddSupertypes"
+  CopyException.RemoveSupertypes {} -> "RemoveSupertypes"
+  CopyException.SetName {} -> "SetName"
+  CopyException.SetColors {} -> "SetColors"
+  CopyException.NoManaCost {} -> "NoManaCost"
+  CopyException.DontCopyColors {} -> "DontCopyColors"
+  CopyException.GainAbility {} -> "GainAbility"

@@ -34,8 +34,8 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
   -- CR 702.29a: Fluctuator's "cycling abilities", the shape whose grantedBy is
   -- written. Its own case rather than an edit to the one above, because
   -- grantedBy is DEFAULTED -- a round trip whose value is Nothing encodes no key
-  -- at all and would stay green with the field dropped from the codec (#2262's
-  -- shape, arrived at through a default rather than an Arm.tagged wildcard).
+  -- at all and would stay green with the field dropped from the codec. Nothing
+  -- forces a defaulted field the way Arm.tagged's tag function forces a tag.
   Spec.it s "MkReduceActivationCost, narrowed to one keyword family" $
     Common.assertCodec
       s

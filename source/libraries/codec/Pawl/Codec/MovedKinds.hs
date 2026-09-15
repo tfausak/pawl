@@ -26,6 +26,7 @@ import qualified Pawl.Types.MovedKinds as MovedKinds
 codec :: Codec.Codec MovedKinds.MovedKinds
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Every" MovedKinds.Every,
       Arm.payload "Named" EntryRiders.counter (uncurry MovedKinds.Named) (\x -> case x of MovedKinds.Named kind quantity -> Just (kind, quantity); _ -> Nothing),
       Arm.payload "EveryOfKind" (CounterKind.codec Keyword.codec) MovedKinds.EveryOfKind (\x -> case x of MovedKinds.EveryOfKind kind -> Just kind; _ -> Nothing),
@@ -36,3 +37,15 @@ codec =
       Arm.nullary "EachAbsentKind" MovedKinds.EachAbsentKind,
       Arm.nullary "UpToOneChosen" MovedKinds.UpToOneChosen
     ]
+
+tagOf :: MovedKinds.MovedKinds -> String
+tagOf x = case x of
+  MovedKinds.Every {} -> "Every"
+  MovedKinds.Named {} -> "Named"
+  MovedKinds.EveryOfKind {} -> "EveryOfKind"
+  MovedKinds.Chosen {} -> "Chosen"
+  MovedKinds.AnyNumber {} -> "AnyNumber"
+  MovedKinds.AtLeastOne {} -> "AtLeastOne"
+  MovedKinds.AnyNumberOfKind {} -> "AnyNumberOfKind"
+  MovedKinds.EachAbsentKind {} -> "EachAbsentKind"
+  MovedKinds.UpToOneChosen {} -> "UpToOneChosen"

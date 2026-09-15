@@ -12,6 +12,12 @@ import qualified Pawl.Types.PerCreature as PerCreature
 codec :: Codec.Codec PerCreature.PerCreature
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Fixed" (Cost.codec Keyword.codec) PerCreature.Fixed (\x -> case x of PerCreature.Fixed y -> Just y; _ -> Nothing),
       Arm.payload "Counted" Quantity.codec PerCreature.Counted (\x -> case x of PerCreature.Counted y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: PerCreature.PerCreature -> String
+tagOf x = case x of
+  PerCreature.Fixed {} -> "Fixed"
+  PerCreature.Counted {} -> "Counted"

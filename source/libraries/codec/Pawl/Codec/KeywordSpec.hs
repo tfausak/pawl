@@ -167,9 +167,9 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.LivingMetal
       " {\"type\":\"LivingMetal\"} "
   -- CR 702.162a states its cost as part of the keyword, so the payload is
-  -- required. Pinned by hand because Pawl.Codec.Keyword's arm list carries its
-  -- own `_ -> Nothing` fallthrough, which would ship a constructor with no arm
-  -- and no failing round trip (#2262).
+  -- required. Pinned by hand because Arm.tagged forces a constructor's TAG and
+  -- not its arm, so a constructor could ship with no arm and no failing round
+  -- trip.
   Spec.it s "MoreThanMeetsTheEye carries its cost" $ do
     let mtmte n = Keyword.MoreThanMeetsTheEye (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
     Common.assertCodec
@@ -454,8 +454,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.62a's payload is a Cost and rule 702.62a's N beside it, Equip's shape
   -- one field over -- so it is an OBJECT rather than a bare cost, and cannot
   -- collide with Plot's tag whatever the cost. Nothing but this case guards the
-  -- ENCODE direction, since Pawl.Codec.Keyword is an Arm.tagged list whose own
-  -- `_ -> Nothing` fallthroughs let a missing arm compile (#2262).
+  -- ENCODE direction, since Arm.tagged forces a constructor's TAG and not its
+  -- arm, so a missing arm compiles.
   Spec.it s "Suspend carries its counters and its cost" $ do
     let suspend n cost = Keyword.Suspend (Suspend.MkSuspend n (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic cost])) []))
     Common.assertCodec
@@ -479,8 +479,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.6a's payload is a Cost and CR 702.6c's quality, Cycling's shape. The
   -- corpus load guards the DECODE direction for free -- the Equipment in
   -- data/cards/ fail to parse without the arm -- and nothing but this case
-  -- guards the encode, since Pawl.Codec.Keyword is an Arm.tagged list whose own
-  -- `_ -> Nothing` fallthroughs let a missing arm compile (#2262).
+  -- guards the encode, since Arm.tagged forces a constructor's TAG and not its
+  -- arm, so a missing arm compiles.
   Spec.it s "Equip carries its cost and its quality" $ do
     let equip n = Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) Nothing)
         equipHuman n = Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) (Just (Filter.HasSubtype Subtype.Human)))
@@ -914,8 +914,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.30a's payload is a Cost too, and the tag must not collide with the
   -- upkeep cost above: what a permanent owes at the first upkeep after it came
   -- under your control is not what it owes at every upkeep thereafter. No arm of
-  -- the keyword codec is forced (#2262), so this is the round trip that would
-  -- catch a missing one.
+  -- the keyword codec is forced by the compiler, only its tag, so this is the
+  -- round trip that would catch a missing one.
   Spec.it s "Echo carries its cost, and is not CumulativeUpkeep" $ do
     let echo n = Keyword.Echo (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
     Common.assertCodec

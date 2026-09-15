@@ -89,7 +89,8 @@ spec s = Spec.describe s "Pawl.Codec.MoveCounters" $ do
   -- first side is a battlefield sweep rather than a slot, and the kind is named
   -- where the count is not. This is the wire form data/cards/spike-cannibal.json
   -- writes, and the case that FORCES an EveryOfKind arm on Pawl.Codec.MovedKinds
-  -- -- Arm.tagged compiles with no arm and answers Nothing on encode (#2262).
+  -- -- Arm.tagged forces a constructor's tag and not its arm, and an unarmed tag
+  -- encodes as {}.
   Spec.it s "MkMoveCounters, a whole tally off a group" $
     Common.assertCodec
       s

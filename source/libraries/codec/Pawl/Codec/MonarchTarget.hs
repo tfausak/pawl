@@ -10,7 +10,14 @@ import qualified Pawl.Types.MonarchTarget as MonarchTarget
 codec :: Codec.Codec MonarchTarget.MonarchTarget
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "TheController" MonarchTarget.TheController,
       Arm.nullary "ControllerOfSource" MonarchTarget.ControllerOfSource,
       Arm.payload "InSlot" SlotName.codec MonarchTarget.InSlot (\x -> case x of MonarchTarget.InSlot y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: MonarchTarget.MonarchTarget -> String
+tagOf x = case x of
+  MonarchTarget.TheController {} -> "TheController"
+  MonarchTarget.ControllerOfSource {} -> "ControllerOfSource"
+  MonarchTarget.InSlot {} -> "InSlot"

@@ -26,6 +26,7 @@ codec ::
   Codec.Codec (DamageRewrite.DamageRewrite effect)
 codec effectCodec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "PreventAll" DamageRewrite.PreventAll,
       Arm.nullary "PreventRemovingShieldCounter" DamageRewrite.PreventRemovingShieldCounter,
       Arm.payload "PreventNext" Common.natural DamageRewrite.PreventNext (\x -> case x of DamageRewrite.PreventNext y -> Just y; _ -> Nothing),
@@ -46,3 +47,16 @@ redirectNext = Fields.object $ do
   remaining <- Fields.required "remaining" Common.natural fst
   to <- Fields.required "to" Recipient.codec snd
   pure (remaining, to)
+
+tagOf :: DamageRewrite.DamageRewrite effect -> String
+tagOf x = case x of
+  DamageRewrite.PreventAll {} -> "PreventAll"
+  DamageRewrite.PreventRemovingShieldCounter {} -> "PreventRemovingShieldCounter"
+  DamageRewrite.PreventNext {} -> "PreventNext"
+  DamageRewrite.PreventAllBut {} -> "PreventAllBut"
+  DamageRewrite.SetAmount {} -> "SetAmount"
+  DamageRewrite.Scale {} -> "Scale"
+  DamageRewrite.Redirect {} -> "Redirect"
+  DamageRewrite.RedirectNext {} -> "RedirectNext"
+  DamageRewrite.RedirectMatching {} -> "RedirectMatching"
+  DamageRewrite.RunEffects {} -> "RunEffects"

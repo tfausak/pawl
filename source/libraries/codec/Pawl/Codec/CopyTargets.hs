@@ -10,8 +10,16 @@ import qualified Pawl.Types.CopyTargets as CopyTargets
 codec :: Codec.Codec CopyTargets.CopyTargets
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Copied" CopyTargets.Copied,
       Arm.nullary "ChosenByController" CopyTargets.ChosenByController,
       Arm.payload "ForEach" ObjectRef.codec CopyTargets.ForEach (\x -> case x of CopyTargets.ForEach y -> Just y; _ -> Nothing),
       Arm.payload "Stated" ObjectRef.codec CopyTargets.Stated (\x -> case x of CopyTargets.Stated y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: CopyTargets.CopyTargets -> String
+tagOf x = case x of
+  CopyTargets.Copied {} -> "Copied"
+  CopyTargets.ChosenByController {} -> "ChosenByController"
+  CopyTargets.ForEach {} -> "ForEach"
+  CopyTargets.Stated {} -> "Stated"

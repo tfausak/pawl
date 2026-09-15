@@ -11,7 +11,14 @@ import qualified Pawl.Types.PhasedOut as PhasedOut
 codec :: Codec.Codec PhasedOut.PhasedOut
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Directly" PlayerId.codec PhasedOut.Directly (\x -> case x of PhasedOut.Directly y -> Just y; _ -> Nothing),
       Arm.payload "Indirectly" PlayerId.codec PhasedOut.Indirectly (\x -> case x of PhasedOut.Indirectly y -> Just y; _ -> Nothing),
       Arm.payload "Orphaned" PlayerId.codec PhasedOut.Orphaned (\x -> case x of PhasedOut.Orphaned y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: PhasedOut.PhasedOut -> String
+tagOf x = case x of
+  PhasedOut.Directly {} -> "Directly"
+  PhasedOut.Indirectly {} -> "Indirectly"
+  PhasedOut.Orphaned {} -> "Orphaned"

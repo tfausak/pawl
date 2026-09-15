@@ -11,6 +11,12 @@ codec :: Codec.Codec TurnUpRewrite.TurnUpRewrite
 codec =
   let filterCodec = Filter.codec Keyword.codec
    in Arm.tagged
+        tagOf
         [ Arm.payload "WithCounters" WithCounters.codec TurnUpRewrite.WithCounters (\x -> case x of TurnUpRewrite.WithCounters y -> Just y; _ -> Nothing),
           Arm.payload "MayAttachTo" filterCodec TurnUpRewrite.MayAttachTo (\x -> case x of TurnUpRewrite.MayAttachTo y -> Just y; _ -> Nothing)
         ]
+
+tagOf :: TurnUpRewrite.TurnUpRewrite -> String
+tagOf x = case x of
+  TurnUpRewrite.WithCounters {} -> "WithCounters"
+  TurnUpRewrite.MayAttachTo {} -> "MayAttachTo"

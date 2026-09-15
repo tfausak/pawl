@@ -1299,9 +1299,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       )
       "Convert and Transform of the same slot encode differently"
   -- CR 710.2. Transform's wire shape again, and the same assertion carries the
-  -- weight: Pawl.Codec.Effect is Arm.tagged, so a missing arm compiles with no
-  -- round-trip test at all (#2262), and a tag collapsed onto Transform's would
-  -- make a flip card transform instead.
+  -- weight: Arm.tagged forces the TAG of a new constructor and not its arm, so a
+  -- missing arm has no round-trip test at all, and a tag collapsed onto
+  -- Transform's would make a flip card transform instead.
   --
   -- The SLOT arm only. CR 710.1a puts the ability that flips a permanent in that
   -- permanent's own text box, and every flip card in the pool prints "flip it";
@@ -1328,8 +1328,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       "Flip and Transform of the same slot encode differently"
   -- CR 701.42a. The slot Hanweir Battlements' own exile bound, plus the combined
   -- back face inline -- through the card codec, which here writes a bare name.
-  -- Pawl.Codec.Effect is Arm.tagged, so a missing arm compiles with no round-trip
-  -- test at all (#2262): this case is what catches one.
+  -- Arm.tagged forces the TAG of a new constructor and not its arm, so a missing
+  -- arm has no round-trip test at all: this case is what catches one.
   Spec.it s "Meld" $ do
     Common.assertJsonCodec
       s
@@ -1444,9 +1444,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       Effect.EndTurn
       " {\"type\":\"EndTurn\"} "
   -- CR 724.2: nullary for the same reason, and hand-written for the reason every
-  -- arm here is -- Arm.tagged's list ends in `_ -> Nothing`, so a constructor
-  -- with no arm encodes to nothing and decodes from nothing without a warning
-  -- (#2262).
+  -- arm here is -- Arm.tagged forces the TAG of a new constructor and not its
+  -- arm, so a constructor with no arm encodes as {} and decodes from nothing
+  -- without a warning.
   Spec.it s "EndCombatPhase" $
     Common.assertJsonCodec
       s

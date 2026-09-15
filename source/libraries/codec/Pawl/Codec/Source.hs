@@ -14,6 +14,7 @@ import qualified Pawl.Types.Source as Source
 codec :: Codec.Codec Source.Source
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "OfCard" PrintingId.codec Source.OfCard (\x -> case x of Source.OfCard y -> Just y; _ -> Nothing),
       Arm.payload "OfMeld" MeldSource.codec Source.OfMeld (\x -> case x of Source.OfMeld y -> Just y; _ -> Nothing),
       Arm.payload "OfMerge" (Common.nonEmpty MergeComponent.codec) Source.OfMerge (\x -> case x of Source.OfMerge y -> Just y; _ -> Nothing),
@@ -25,3 +26,16 @@ codec =
       Arm.payload "OfCardCopy" PrintingId.codec Source.OfCardCopy (\x -> case x of Source.OfCardCopy y -> Just y; _ -> Nothing),
       Arm.payload "OfInherentTrigger" InherentTriggerSource.codec Source.OfInherentTrigger (\x -> case x of Source.OfInherentTrigger y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Source.Source -> String
+tagOf x = case x of
+  Source.OfCard {} -> "OfCard"
+  Source.OfMeld {} -> "OfMeld"
+  Source.OfMerge {} -> "OfMerge"
+  Source.OfToken {} -> "OfToken"
+  Source.OfAbility {} -> "OfAbility"
+  Source.OfTrigger {} -> "OfTrigger"
+  Source.OfEmblem {} -> "OfEmblem"
+  Source.OfSpellCopy {} -> "OfSpellCopy"
+  Source.OfCardCopy {} -> "OfCardCopy"
+  Source.OfInherentTrigger {} -> "OfInherentTrigger"

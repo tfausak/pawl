@@ -8,6 +8,12 @@ import qualified Pawl.Types.Status as Status
 codec :: Codec.Codec Status.Status
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Playing" Status.Playing,
       Arm.payload "Departed" Departure.codec Status.Departed (\x -> case x of Status.Departed y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Status.Status -> String
+tagOf x = case x of
+  Status.Playing {} -> "Playing"
+  Status.Departed {} -> "Departed"

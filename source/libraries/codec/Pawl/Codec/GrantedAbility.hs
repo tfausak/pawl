@@ -19,6 +19,12 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (GrantedAbility.GrantedAbility card)
 codec cardCodec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Activated" (ActivatedAbility.codec cardCodec (codec cardCodec)) GrantedAbility.Activated (\x -> case x of GrantedAbility.Activated y -> Just y; _ -> Nothing),
       Arm.payload "Triggered" (TriggeredAbility.codec cardCodec (codec cardCodec)) GrantedAbility.Triggered (\x -> case x of GrantedAbility.Triggered y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: GrantedAbility.GrantedAbility card -> String
+tagOf x = case x of
+  GrantedAbility.Activated {} -> "Activated"
+  GrantedAbility.Triggered {} -> "Triggered"

@@ -10,6 +10,12 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 codec :: Codec.Codec TriggerSource.TriggerSource
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "OfObject" ObjectId.codec TriggerSource.OfObject (\x -> case x of TriggerSource.OfObject y -> Just y; _ -> Nothing),
       Arm.nullary "Sourceless" TriggerSource.Sourceless
     ]
+
+tagOf :: TriggerSource.TriggerSource -> String
+tagOf x = case x of
+  TriggerSource.OfObject {} -> "OfObject"
+  TriggerSource.Sourceless {} -> "Sourceless"

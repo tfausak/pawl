@@ -14,7 +14,14 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 codec :: Codec.Codec ZoneScope.ZoneScope
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Scoped" PlayerScope.codec ZoneScope.Scoped (\x -> case x of ZoneScope.Scoped y -> Just y; _ -> Nothing),
       Arm.payload "InSlot" SlotName.codec ZoneScope.InSlot (\x -> case x of ZoneScope.InSlot y -> Just y; _ -> Nothing),
       Arm.payload "ControllerOfBound" SlotName.codec ZoneScope.ControllerOfBound (\x -> case x of ZoneScope.ControllerOfBound y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: ZoneScope.ZoneScope -> String
+tagOf x = case x of
+  ZoneScope.Scoped {} -> "Scoped"
+  ZoneScope.InSlot {} -> "InSlot"
+  ZoneScope.ControllerOfBound {} -> "ControllerOfBound"

@@ -10,7 +10,14 @@ import qualified Pawl.Types.EntryAttack as EntryAttack
 codec :: Codec.Codec EntryAttack.EntryAttack
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Chosen" EntryAttack.Chosen,
       Arm.payload "SameAs" SlotName.codec EntryAttack.SameAs (\x -> case x of EntryAttack.SameAs y -> Just y; _ -> Nothing),
       Arm.payload "UnderPlayer" SlotName.codec EntryAttack.UnderPlayer (\x -> case x of EntryAttack.UnderPlayer y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: EntryAttack.EntryAttack -> String
+tagOf x = case x of
+  EntryAttack.Chosen {} -> "Chosen"
+  EntryAttack.SameAs {} -> "SameAs"
+  EntryAttack.UnderPlayer {} -> "UnderPlayer"

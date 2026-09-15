@@ -29,6 +29,7 @@ codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec
 codec abilityCodec =
   let colors = Common.set Color.codec
    in Arm.tagged
+        tagOf
         [ Arm.payload "GainAbility" abilityCodec Modification.GainAbility (\x -> case x of Modification.GainAbility y -> Just y; _ -> Nothing),
           Arm.payload "GainKeyword" Keyword.codec Modification.GainKeyword (\x -> case x of Modification.GainKeyword y -> Just y; _ -> Nothing),
           Arm.nullary "GainFlashbackAtManaCost" Modification.GainFlashbackAtManaCost,
@@ -62,3 +63,38 @@ codec abilityCodec =
           Arm.nullary "AssignCombatDamageWithToughness" Modification.AssignCombatDamageWithToughness,
           Arm.nullary "GrantsStationToughness" Modification.GrantsStationToughness
         ]
+
+tagOf :: Modification.Modification ability -> String
+tagOf x = case x of
+  Modification.GainAbility {} -> "GainAbility"
+  Modification.GainKeyword {} -> "GainKeyword"
+  Modification.GainFlashbackAtManaCost {} -> "GainFlashbackAtManaCost"
+  Modification.GainEnchant {} -> "GainEnchant"
+  Modification.LoseAllAbilities {} -> "LoseAllAbilities"
+  Modification.LoseNamedAbility {} -> "LoseNamedAbility"
+  Modification.LoseKeyword {} -> "LoseKeyword"
+  Modification.LoseKeywordFamily {} -> "LoseKeywordFamily"
+  Modification.SetBasePowerToughness {} -> "SetBasePowerToughness"
+  Modification.ModifyPowerToughness {} -> "ModifyPowerToughness"
+  Modification.SetLandSubtype {} -> "SetLandSubtype"
+  Modification.SetLandSubtypeToChosen {} -> "SetLandSubtypeToChosen"
+  Modification.AddLandSubtype {} -> "AddLandSubtype"
+  Modification.SetCreatureSubtype {} -> "SetCreatureSubtype"
+  Modification.AddCreatureSubtype {} -> "AddCreatureSubtype"
+  Modification.AddEveryCreatureSubtype {} -> "AddEveryCreatureSubtype"
+  Modification.LoseEveryCreatureSubtype {} -> "LoseEveryCreatureSubtype"
+  Modification.AddSubtype {} -> "AddSubtype"
+  Modification.AddCardType {} -> "AddCardType"
+  Modification.SetCardType {} -> "SetCardType"
+  Modification.AddSupertype {} -> "AddSupertype"
+  Modification.RemoveSupertype {} -> "RemoveSupertype"
+  Modification.ChangeSubtypeWord {} -> "ChangeSubtypeWord"
+  Modification.SetController {} -> "SetController"
+  Modification.SetControllerToSource {} -> "SetControllerToSource"
+  Modification.SetColor {} -> "SetColor"
+  Modification.AddColor {} -> "AddColor"
+  Modification.AddChosenColor {} -> "AddChosenColor"
+  Modification.ExchangeTextBoxes {} -> "ExchangeTextBoxes"
+  Modification.SwitchPowerToughness {} -> "SwitchPowerToughness"
+  Modification.AssignCombatDamageWithToughness {} -> "AssignCombatDamageWithToughness"
+  Modification.GrantsStationToughness {} -> "GrantsStationToughness"
