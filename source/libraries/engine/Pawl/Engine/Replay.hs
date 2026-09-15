@@ -140,6 +140,7 @@ encode p answer = case p of
   Prompt.OrderComponentCards {} -> Response.OrderedComponentCards answer
   Prompt.OrderForEach {} -> Response.OrderedForEach answer
   Prompt.OrderTimestamps {} -> Response.OrderedTimestamps answer
+  Prompt.OrderManaActivations {} -> Response.OrderedManaActivations answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
@@ -431,6 +432,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OrderTimestamps {} -> case response of
     Response.OrderedTimestamps order -> Just order
+    _ -> Nothing
+  Prompt.OrderManaActivations {} -> case response of
+    Response.OrderedManaActivations order -> Just order
     _ -> Nothing
   Prompt.ChooseReplacement {} -> case response of
     Response.ChoseReplacement n -> Just n
@@ -878,6 +882,10 @@ defaultAnswer p = case p of
   -- CR 613.7m: likewise, and it is the engine's own APNAP-then-ascending order --
   -- what pawl stamped in before the intra-seat key became that seat's to choose.
   Prompt.OrderTimestamps _ _ batch -> zipWith const [0 ..] batch
+  -- CR 605.3a: likewise, and it is the engine's own APNAP-then-ascending sweep
+  -- order -- what pawl activated in before the intra-seat key became that
+  -- seat's to choose.
+  Prompt.OrderManaActivations _ _ batch -> zipWith const [0 ..] batch
   -- CR 616.1: the bucket is non-empty when this is asked, so index 0 is legal.
   Prompt.ChooseReplacement {} -> 0
   -- CR 603.7c: every minted token is a legal thing for "it" to name.

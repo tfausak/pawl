@@ -3496,9 +3496,11 @@ drainPowerSpec s registry = Spec.describe s "Drain Power" $ do
     Spec.assertEqWith s "CR 106.13 bob loses all of it" (poolTypes S.bob after) []
     Spec.assertEqWith s "and carol, whom the spell did not name, keeps hers" (poolTypes S.carol after) [ManaType.Colored Color.White]
     -- CR 602.2: WHICH mana ability of Bayou is bob's choice -- only an object's
-    -- controller activates its activated ability -- so the one prompt
+    -- controller activates its activated ability -- so the one yield prompt
     -- the resolution raises is his. Bayou is the only one of the three lands that
-    -- offers two, which is why the list is one long.
+    -- offers two, which is why the list is one long. (The resolution also asks
+    -- bob CR 605.3a's ordering, which `aimedAt` does not record; the group below
+    -- is where that is the subject.)
     Spec.assertEqWith s "CR 602.2 the choice of ability is the targeted player's" asked [S.bob]
   -- CR 106.13's parenthetical: "note that these may be the same player".
   Spec.it s "CR 106.13 a self-targeted transfer nets the mana once" $ do
@@ -3517,6 +3519,45 @@ drainPowerSpec s registry = Spec.describe s "Drain Power" $ do
     -- the pool before it adds, so neither unit is doubled. The tapped Islands
     -- offer nothing, which is CR 609.3's "as much as possible".
     Spec.assertEqWith s "CR 106.13 the pool is what it held, not twice that" (poolTypes S.alice after) [ManaType.Colored Color.White, ManaType.Colored Color.Green]
+  -- CR 605.3a: WHICH ORDER bob activates his two lands in is his, and it is
+  -- observable -- Mystic Gate's "{W/U}, {T}: Add {W}{W}, {W}{U}, or {U}{U}" is
+  -- paid for out of the mana the Plains put in his pool, which is there only if
+  -- the Plains went first.
+  --
+  -- The Gate is added FIRST, so it holds the LOWER object id and the engine's
+  -- own sweep (battlefieldMatching, APNAP then ascending) is the order that
+  -- loses the {W}{W}.
+  --
+  -- The two runs differ in ONE answer, the ordering. A bob who instead taps the
+  -- Plains inside the Gate's own payment -- CR 605.3a's other window, which the
+  -- engine offers and this answerer declines -- reaches {W}{W} either way; what
+  -- the engine may not do is pick the order for him.
+  Spec.it s "CR 605.3a the order the batch is activated in is the targeted player's" $ do
+    drainPower <- S.printingOf s registry "Drain Power"
+    island <- S.printingOf s registry "Island"
+    mysticGate <- S.printingOf s registry "Mystic Gate"
+    plains <- S.printingOf s registry "Plains"
+    let (gs, spellId) = S.handOne drainPower (S.landsFor island S.alice 2 (S.landsFor plains S.bob 1 (S.landsFor mysticGate S.bob 1 S.threePlayerGame)))
+        ((_, cast), _) = State.runState (Engine.runGame (activatingInOrder [1, 0]) gs (S.cast S.alice spellId)) []
+        ((_, after), asked) = State.runState (Engine.runGame (activatingInOrder [1, 0]) cast Stack.resolveTop) []
+        -- The SAME board with the other answer, which is the engine's own sweep
+        -- order: one different answer is the only difference between the two.
+        ((_, gateFirst), _) = State.runState (Engine.runGame (activatingInOrder [0, 1]) cast Stack.resolveTop) []
+    -- The fixture, asserted rather than assumed (the group above's reason).
+    Spec.assertEqWith s "the spell left alice's hand" (S.handSize S.alice cast) 0
+    Spec.assertEqWith s "alice spent her {U}{U} paying for it" (poolTypes S.alice cast) []
+    -- CR 605.3a and CR 106.13 together: the Plains paid for the Gate, so what
+    -- crosses to alice is the Gate's {W}{W} and nothing else.
+    Spec.assertEqWith s "CR 605.3a bob's order pays for the Gate with the Plains" (poolTypes S.alice after) [ManaType.Colored Color.White, ManaType.Colored Color.White]
+    -- The discriminating half: the SAME board and the same answer to every other
+    -- prompt, with the Gate taken first. Its {W/U} is then payable only out of
+    -- CR 605.3a's OTHER window, which this answerer declines as it declines
+    -- every optional source, so CR 609.3 leaves the activation doing nothing and
+    -- only the Plains' {W} crosses.
+    Spec.assertEqWith s "CR 609.3 the Gate taken first adds nothing" (poolTypes S.alice gateFirst) [ManaType.Colored Color.White]
+    -- CR 602.2: the order is the ACTIVATING player's, bob's, not the resolving
+    -- controller's.
+    Spec.assertEqWith s "CR 602.2 the ordering is asked of the targeted player" asked [S.bob]
 
 -- alice holds Drain Power and two Islands to pay for it; bob controls the three
 -- lands the spell will make him tap -- a Bayou (two mana abilities, so its colour
@@ -3559,6 +3600,22 @@ aimedAt victim color p = case p of
     State.modify' (<> [Decider.unwrap decider])
     pure (prefersColor color p)
   Prompt.ChooseTargets _ _ _ offered -> pure (S.preferring (== Recipient.ToPlayer victim) offered)
+  _ -> pure (S.identityAnswer p)
+
+-- Targets bob, hands `answer` to the one CR 605.3a ordering prompt the
+-- resolution raises, takes the {W}{W} yield wherever it is offered -- the Plains
+-- and the Gate-with-no-mana both fall through to their only option -- and
+-- records the player the ordering was asked of.
+--
+-- Stateful rather than pure because WHOSE the order is is half the subject; a
+-- pure answerer could pick the permutation but never report who was asked.
+activatingInOrder :: [Natural] -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+activatingInOrder answer p = case p of
+  Prompt.OrderManaActivations decider _ _ -> do
+    State.modify' (<> [Decider.unwrap decider])
+    pure answer
+  Prompt.ChooseManaYield _ _ _ candidates -> pure (optionOfTypes [ManaType.Colored Color.White, ManaType.Colored Color.White] candidates)
+  Prompt.ChooseTargets _ _ _ offered -> pure (S.preferring (== Recipient.ToPlayer S.bob) offered)
   _ -> pure (S.identityAnswer p)
 
 -- The units of any player's pool -- poolUnits' twin for the two pools a CR

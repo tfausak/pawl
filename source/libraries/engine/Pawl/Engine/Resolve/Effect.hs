@@ -2772,18 +2772,36 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- does not shorten the list mid-sweep; a permanent gone by the time its turn
   -- comes simply offers nothing.
   --
-  -- Not implemented: the ORDER the actor activates them in, which is theirs (CR
-  -- 605.3a says when they may, not in which order) and is taken here as
-  -- battlefieldMatching's, ascending. Observable wherever one land's mana pays
-  -- for another's ability -- Cabal Coffers after the Swamps (#3378).
+  -- The ORDER within one actor's batch is the ACTOR's: CR 605.3a says when a
+  -- player may activate a mana ability and not in which order several of them
+  -- are activated, and CR 609.3's "as much as possible" makes an order that
+  -- leaves one permanent's ability unpayable a legal outcome rather than a
+  -- licence to reorder around it. Observable wherever one land's mana pays for
+  -- another's ability -- Mystic Gate after a Plains, which Pawl.ManaSpec's
+  -- "CR 605.3a the order is the targeted player's" case proves.
+  --
+  -- Asked at two or more, ON THE COUNT ALONE, as Prompt.OrderTimestamps' caller
+  -- is: whether two orders are distinguishable turns on choices this actor has
+  -- not made yet -- which mana ability of each permanent (Prompt.ChooseManaYield)
+  -- and what its cost then leaves in the pool -- so no gate here can tell. A
+  -- batch of one is one order.
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> do
     gs0 <- State.get
     let matching = battlefieldMatching legal resolving controller source gs0 filter_
         theirs pid = filter (\oid -> Projection.controllerOf oid gs0 == Just pid) matching
     -- CR 101.4's APNAP order over several actors, apnapPlayersOf's own
     -- intersection; Drain Power names one.
-    Monad.forM_ (apnapPlayersOf ref legal controller gs0) $ \pid ->
-      Monad.mapM_ (Cost.tapForMana performManaAbility) (theirs pid)
+    Monad.forM_ (apnapPlayersOf ref legal controller gs0) $ \pid -> do
+      let batch = theirs pid
+      ordered <- case batch of
+        _ : _ : _ -> do
+          gs1 <- State.get
+          answer <- Game.choose (Prompt.OrderManaActivations (Decide.deciderFor pid gs1) pid batch)
+          -- Filtered, not trusted: Game.permute keeps the gathered order for an
+          -- answer that is not a permutation of the offered indices.
+          pure (Game.permute batch answer)
+        _ -> pure batch
+      Monad.mapM_ (Cost.tapForMana performManaAbility) ordered
   -- CR 106.13: one player loses all their unspent mana and another adds "the mana
   -- lost this way". WHOLE UNITS cross (Mana.moveMana), which is the rule's second
   -- sentence -- what produced the mana, its CR 106.4 retention and both of CR
