@@ -214,6 +214,19 @@ data Filter keyword
     -- nothing to compare against: TriggerCondition.SelfCast names no slot, and
     -- the spell the rule points at is CR 113.7's source.
     SameNameAsSource
+  | -- | CR 108.3 asked of the candidate and the SOURCE rather than of the
+    -- perspective: the candidate has the same owner as the object the evaluation
+    -- comes from (CR 702.140a's "with the same owner as this spell"). OwnedBy's
+    -- comparison with SameNameAsSource's other operand -- read off
+    -- Pawl.Engine.Filter.Context's sourceOwner, and vacuously False where the
+    -- candidate has no owner (CR 109.1) or none was supplied.
+    --
+    -- Never OwnedBy You, which is CR 109.5's perspective -- the spell's
+    -- CONTROLLER at CR 601.2c and CR 608.2b. The two part the moment a player
+    -- casts a card another player owns (Hostage Taker's permission), which is
+    -- what Pawl.MutateSpec's "CR 702.140a a stolen mutate spell may target the
+    -- owner's creature and not the caster's" proves.
+    SameOwnerAsSource
   | -- | CR 110.2 asked of TWO objects: the candidate has the same controller as
     -- the object this slot holds -- Bioshift's "another target creature with the
     -- same controller".

@@ -3954,6 +3954,7 @@ filterSlotsReadSingly predicate = case predicate of
   -- Names no slot at all: CR 702.60a's comparison is against the SOURCE, whose
   -- names arrive on Filter.Context.
   Filter.Type.SameNameAsSource -> []
+  Filter.Type.SameOwnerAsSource -> []
   -- Reads the whole set too, one field further over.
   Filter.Type.SameControllerAsBound _ -> []
   -- Reads the whole set too, off its own field.

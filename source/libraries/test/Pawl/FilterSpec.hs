@@ -714,6 +714,30 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "CR 108.3 OwnedBy is False when the context has no perspective" $ do
       Spec.assertBool s (not (Filter.matches noPerspective blackCreature (Filter.Type.OwnedBy PlayerRelation.Opponent))) "no perspective"
 
+  -- CR 702.140a's owner comparison: OwnedBy's question asked of the SOURCE's
+  -- owner instead of CR 109.5's perspective. blackCreature is the one view the
+  -- two can disagree on -- controlled by player 0, owned by player 1 -- and every
+  -- context here carries player 0 as its perspective, so the pair below is what
+  -- separates this atom from OwnedBy You above.
+  Spec.describe s "SameOwnerAsSource" $ do
+    let sourceOwnedBy n = self {Filter.sourceOwner = Just (PlayerId.MkPlayerId n)}
+    Spec.it s "CR 702.140a holds when the source's owner owns the candidate" $
+      Spec.assertBool s (Filter.matches (sourceOwnedBy 1) blackCreature Filter.Type.SameOwnerAsSource) "player 1 owns both"
+
+    Spec.it s "CR 702.140a fails for the candidate's controller, whom OwnedBy You would take" $
+      Spec.assertBool s (not (Filter.matches (sourceOwnedBy 0) blackCreature Filter.Type.SameOwnerAsSource)) "player 0 controls it but does not own it"
+
+    -- The two vacuity postures, OwnedBy's above: no object behind the view, and
+    -- no source owner for the comparison to be about.
+    Spec.it s "CR 702.140a is False when the view has no owner" $
+      Spec.assertBool s (not (Filter.matches (sourceOwnedBy 1) devoidBigCreature Filter.Type.SameOwnerAsSource)) "no owner"
+
+    Spec.it s "CR 702.140a is False when no source owner was supplied" $
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.SameOwnerAsSource)) "contextFor leaves it Nothing"
+
+    Spec.it s "CR 702.140a is False for a player" $
+      Spec.assertBool s (not (Filter.matches (sourceOwnedBy 1) aPlayer Filter.Type.SameOwnerAsSource)) "player"
+
   Spec.describe s "IsSource" $ do
     Spec.it s "matches the context's source" $ do
       Spec.assertBool
