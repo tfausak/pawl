@@ -27,7 +27,7 @@ module Pawl.Types.ManaRetention where
 -- Pawl.Types.Expiry machinery: Pawl.Engine.Expiry.arm turns one into an Expiry
 -- stamped on a STORED effect, and Pawl.Engine.Expiry's sweeps end it there. A
 -- retained mana unit is not a stored effect -- it lives in a pool and is read by
--- Pawl.Engine.Mana.emptyManaPools -- so reusing Duration would mean a second
+-- Pawl.Engine.Mana.emptiedManaPools -- so reusing Duration would mean a second
 -- consumer that ignores five of its six arms, or a fake continuous effect per
 -- unit of mana.
 data ManaRetention

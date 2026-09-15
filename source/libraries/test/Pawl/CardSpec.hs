@@ -4088,6 +4088,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a player effect names.
   PlayerEffect.DontLoseUnspentMana _ -> []
+  PlayerEffect.LoseLifeForUnspentMana -> []
   -- CR 609.4b carries a ManaFilter and a set of mana types, for the same reason:
   -- what it names is MANA.
   PlayerEffect.SpendManaAsThough _ -> []

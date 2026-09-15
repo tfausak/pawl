@@ -1038,7 +1038,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
   -- any unspent mana left in a player's mana pool empties."
   --
   -- PlayerEffect.DontLoseUnspentMana (Upwelling's, CR 106.4) is read LIVE by
-  -- Mana.emptyManaPools, so an entry that expires as the combat phase ends keeps
+  -- Mana.emptiedManaPools, so an entry that expires as the combat phase ends keeps
   -- nothing, while the same entry swept AFTERWARDS would keep the pool for a
   -- phase it no longer covers. That is the whole of the ordering, made visible.
   --
@@ -2059,7 +2059,7 @@ skippedEndingPhaseSpec s registry = Spec.describe s "SkippedEndingPhase" $ do
     Spec.assertEqWith s "and her cleanup step ended the pump" (Projection.powerOf pikerId bobsTurn) (Just 2)
   -- THE PROVING CASE for CR 514.2's mana half, which is the one with no
   -- counterweight: Mana.endManaRetention is the only place a
-  -- ManaRetention.UntilEndOfTurn reverts, and Mana.emptyManaPools keeps anything
+  -- ManaRetention.UntilEndOfTurn reverts, and Mana.emptiedManaPools keeps anything
   -- that is not Ordinary -- so a retention the skip strands is stranded for the
   -- rest of the game, not merely for a turn.
   --

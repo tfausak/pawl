@@ -95,6 +95,9 @@ data PlayerEffect
   | -- | CR 500.5 / 703.4q / Upwelling, Omnath Locus of Mana: this player does not
     -- lose the mana the filter names as a step or phase ends.
     DontLoseUnspentMana ManaFilter.ManaFilter
+  | -- | CR 500.5 / 119.3 / Yurlok of Scorch Thrash: as this player loses unspent
+    -- mana, they lose that much life.
+    LoseLifeForUnspentMana
   | -- | CR 609.4b / 613.11 / Celestial Dawn: this player may spend the mana the
     -- payload's filter names as though it were mana of the types it names.
     SpendManaAsThough SpendManaAsThough.SpendManaAsThough

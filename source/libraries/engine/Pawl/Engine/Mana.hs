@@ -46,6 +46,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAddition as ManaAddition
@@ -678,6 +679,10 @@ addMana pid units gs =
 -- Every gainer receives the whole batch. No card writes more than one of either
 -- side (rule 106.13 closes the category at one card), so nothing reaches the
 -- reading where that would mint mana.
+--
+-- Not implemented: the life a player-axis static charges for losing unspent mana
+-- (PlayerEffect.LoseLifeForUnspentMana), which rule 106.13's own wording makes
+-- this a road to. Only emptyManaPools below asks (#3775).
 moveMana :: [PlayerId] -> [PlayerId] -> GameState -> GameState
 moveMana losers gainers gs =
   let moved = concatMap (\pid -> unitsOf (Game.poolOf pid gs)) losers
@@ -719,14 +724,50 @@ moveMana losers gainers gs =
 --
 -- `gs` is the state as the step ends, so the effect is read at that moment -- an
 -- Upwelling that left the battlefield during the step is simply not there.
-emptyManaPools :: GameState -> GameState
-emptyManaPools gs =
+emptiedManaPools :: GameState -> GameState
+emptiedManaPools gs =
   let keptByUnit unit = ManaUnit.retention unit /= ManaRetention.Ordinary
       keeps pid unit = PlayerEffect.keepsUnspentMana pid gs unit || keptByUnit unit
       retain pid pool = case filter (keeps pid) (Mana.unwrap pool) of
         [] -> Nothing
         kept -> Just (Mana.MkMana kept)
    in gs {GameState.manaPool = Map.mapMaybeWithKey retain (GameState.manaPool gs)}
+
+-- CR 703.4q's turn-based action whole: the sweep above, and CR 119.3's life loss
+-- a player-axis static may charge for it (Yurlok of Scorch Thrash, "a player
+-- losing unspent mana causes that player to lose that much life"). THE road the
+-- engine takes -- `emptiedManaPools` is only its mana half, so no boundary can
+-- take the mana without charging for it.
+--
+-- HOW MUCH is counted off the sweep rather than off the pool, which is what puts
+-- retained mana outside the charge: a unit Upwelling or a CR 500.5a retention
+-- keeps was never lost, and rule 106.4's "the player is said to lose this mana"
+-- is what the sentence reads.
+--
+-- ONE loss per player, of the whole amount, which is Yurlok's own ruling ("the
+-- loss of life happens at the same time the mana is lost") and why
+-- PlayerEffect.losesLifeForUnspentMana is a Bool: a second Yurlok charges
+-- nothing more. Bracketed simultaneously, CR 608.2f's shape for one action taken
+-- on several players -- a FENCE rather than a proved behaviour, no CR 603.2c
+-- batch condition watching life loss.
+--
+-- The state the effect is read on is the one the step ENDS in, as the sweep
+-- reads it, so a Yurlok that left during the step charges nobody. Through
+-- Event.resolveLifeLoss, CR 614.1's funnel, carrying CR 119.3's ByEffect: this
+-- is an effect's loss and not a payment's, so a row scoped to a payment does not
+-- reach it.
+emptyManaPools :: Game ()
+emptyManaPools = do
+  gs <- State.get
+  let swept = emptiedManaPools gs
+      sizeOf pool = Natural.length (Mana.unwrap pool)
+      lostBy pid before = Natural.minusSaturating (sizeOf before) (maybe 0 sizeOf (Map.lookup pid (GameState.manaPool swept)))
+      losses = Map.filter (/= 0) (Map.mapWithKey lostBy (GameState.manaPool gs))
+  State.put swept
+  Event.simultaneously . Monad.forM_ (Map.toList losses) $ \(pid, lost) ->
+    Monad.when (PlayerEffect.losesLifeForUnspentMana pid gs) $ do
+      settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid lost
+      Event.changeLife pid (negate (toInteger settled))
 
 -- CR 514.2: "all 'until end of turn' and 'this turn' effects end", during the
 -- cleanup step. A unit's retention is such an effect, so it ends here -- and the
