@@ -1186,6 +1186,12 @@ matchesController gs src rel oid = relationHolds gs src (Projection.controllerOf
 -- unavailable. No board separates the two: Pawl.Engine.Event files a record for
 -- every object that leaves a zone, and Pawl.Engine.Departure for every object of
 -- a departing player.
+--
+-- Not implemented: CR 702.16k's damage clause read through CR 108.4's owner
+-- fallback, which the last-known view above defeats -- it keeps the controller
+-- the source had before it left, so a departed source is judged as one the
+-- player who last controlled it controls rather than as one nobody controls
+-- (#3202).
 matchesDamageSource :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> DamageEvent.DamageEvent -> Bool
 matchesDamageSource gs context filter_ de =
   let oid = DamageEvent.source de

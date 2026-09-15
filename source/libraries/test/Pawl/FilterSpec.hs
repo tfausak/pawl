@@ -1029,6 +1029,19 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches (chose 0) aPlayer Filter.Type.OfChosenPlayer)) "player"
 
+    -- CR 702.16k's targeting clause, which names the aiming spell or ability's
+    -- controller instead of either half above: both rows are `blackCreature`,
+    -- controlled by player 0, and only the aimer moves.
+    Spec.it s "CR 702.16k an aiming controller answers in place of the candidate's" $ do
+      let aimedBy n = (chose 0) {Filter.aimingController = Just (Just (PlayerId.MkPlayerId n))}
+      Spec.assertBool s (Filter.matches (aimedBy 0) blackCreature Filter.Type.OfChosenPlayer) "the chosen player is aiming"
+      Spec.assertBool s (not (Filter.matches (aimedBy 1) blackCreature Filter.Type.OfChosenPlayer)) "somebody else is, though the chosen player controls the source"
+
+    -- CR 109.5's absent "you", the posture every player-referencing atom here
+    -- takes: an aiming object whose controller is unknown names nobody.
+    Spec.it s "an aimer with no controller is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches ((chose 0) {Filter.aimingController = Just Nothing}) blackCreature Filter.Type.OfChosenPlayer)) "no perspective"
+
   Spec.describe s "IsAttacking" $ do
     Spec.it s "matches a view whose combat status says so" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.IsAttacking) "attacking"

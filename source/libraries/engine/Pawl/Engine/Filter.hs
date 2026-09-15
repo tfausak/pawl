@@ -1295,6 +1295,34 @@ data Context = MkContext
     -- sourcePower's, slotNames', sourceAttachedTo's and sourceChosenNames'
     -- siblings each have.
     carrierChosenPlayer :: Maybe PlayerId.PlayerId,
+    -- CR 702.16b / CR 702.16k: the controller of the spell or ability being
+    -- AIMED, which rule 702.16k's targeting clause names in place of the source
+    -- object's -- "can't be targeted by spells or abilities the specified player
+    -- controls". Read by the one atom that asks who an object belongs to
+    -- (OfChosenPlayer), and filled by the one position that judges a protection
+    -- quality against an aiming object, Pawl.Engine.Target.targetable.
+    --
+    -- Nothing in the other three positions rule 702.16 reads a quality in, and
+    -- rightly: its damage clause names "sources controlled by the specified
+    -- player", and its Aura, Equipment and blocking clauses name objects that
+    -- player controls, so all four of those judge the OBJECT the atom is matched
+    -- against -- which is what the atom's own arm reads when this is unfilled.
+    --
+    -- NESTED, because the two Maybes answer different questions: the outer says
+    -- whether an aiming spell or ability frames the match at all, and the inner
+    -- is CR 109.5's "you" for it, which the caller may not know (see
+    -- Pawl.Engine.Target's `perspective`). An unknown "you" names nobody and
+    -- matches nothing, the vacuous posture every player-referencing question here
+    -- takes.
+    --
+    -- Not derivable from the aiming object's own view: CR 113.8 with CR 109.5
+    -- fix an activated ability's controller as the player who activated it, so
+    -- a source stolen in response, or a card whose ability is activated from a
+    -- zone where CR 108.4 leaves it no controller at all, answers for the wrong
+    -- player. See
+    -- Pawl.TargetSpec's "CR 702.16k a Saltfield Recluse stolen in response still
+    -- weakens the Nemesis that chose the thief".
+    aimingController :: Maybe (Maybe PlayerId.PlayerId),
     -- CR 105.2: the colour the SOURCE chose as it entered (CR 614.1c), for the one
     -- atom that asks whether a candidate wears it (HasChosenColor, Gauntlet of
     -- Power). Supplied by the caller for slotNames' reason, and by ONE:
@@ -1394,7 +1422,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1432,7 +1460,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1723,9 +1751,16 @@ matches context view predicate = case predicate of
   -- No characteristic is read, deliberately: the rule ends "regardless of that
   -- object's characteristic values", so this arm is the one quality that asks who
   -- an object belongs to rather than what it looks like.
+  --
+  -- Rule 702.16k's TARGETING clause names neither half: it asks who controls the
+  -- spell or ability doing the aiming, which is not the object this is matched
+  -- against at all, so where the context supplies that player it answers instead
+  -- of the two disjuncts. See aimingController.
   Filter.OfChosenPlayer -> case carrierChosenPlayer context of
     Nothing -> False
-    Just pid -> controller view == Just pid || (owner view == Just pid && Maybe.isNothing (controller view))
+    Just pid -> case aimingController context of
+      Just aimer -> aimer == Just pid
+      Nothing -> controller view == Just pid || (owner view == Just pid && Maybe.isNothing (controller view))
   -- CR 115.1's "target opponent". The same CR 102.3 reading the ControlledBy arm
   -- above argues for. Vacuously False for an object candidate,
   -- which has no playerIdentity, and for a match with no perspective.
