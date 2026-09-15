@@ -88,6 +88,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -193,6 +194,16 @@ restrictionBoard restricted piker pid =
 aimAtCard :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCard oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  _ -> S.identityAnswer p
+
+-- Answers every target slot with the OFFERED recipient for one object, filtered
+-- out of the set the engine offered rather than built: a hand-built recipient
+-- carrying another tag is dropped by CR 608.2b's re-read at resolution with no
+-- error. The boards below offer several creatures, so S.identityAnswer's
+-- lowest-id answer would not discriminate.
+aimAtOffered :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtOffered oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
   _ -> S.identityAnswer p
 
 -- aimAtCard, plus a Prompt.Shuffle that REVERSES the library rather than
@@ -1224,6 +1235,71 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertBool s (reaches (chose S.carol) nemesisId) "and with carol chosen instead the same Murder reaches it"
         Spec.assertBool s (reaches (chose S.alice) giantId) "while the Hill Giant beside it admits the Murder in the refusing row too"
       Nothing -> Spec.assertFailure s "Murder should declare a target slot"
+
+  -- The same sentence read the other way round: rule 702.16k's targeting clause
+  -- names the controller of the SPELL OR ABILITY, not the controller of the
+  -- object it comes from, and CR 113.8 with CR 109.5 fix an activated ability's
+  -- controller as the player who activated it. So stealing the source in
+  -- response does not hand the ability to the thief, and CR 608.2b's re-check
+  -- must still judge it against the player who activated it. An implementation
+  -- matching the quality against the source OBJECT -- which is what
+  -- Filter.OfChosenPlayer reads when no aimer is supplied -- finds the thief on
+  -- it and counters the ability instead.
+  --
+  -- THREE SEATS, the case above's reason and then one more: carol activates, bob
+  -- steals and is the seat the Nemesis chose, and alice owns the Nemesis, so no
+  -- one player holds two of the roles.
+  --
+  -- SALTFIELD RECLUSE ({2}{W} Creature -- Human Rebel Cleric 1/2, "{T}: Target
+  -- creature gets -2/-0 until end of turn") rather than a pinger: rule 702.16k's
+  -- DAMAGE clause names the source's controller, so a ping off the stolen
+  -- permanent would be prevented whatever this rule answers and the two readings
+  -- could not be told apart. Ray of Command ({3}{U} Instant, "Untap target
+  -- creature an opponent controls and gain control of it until end of turn. That
+  -- creature gains haste until end of turn") is the steal, cast in RESPONSE so
+  -- that CR 115's two moments see two different controllers. Both Oracle texts
+  -- checked against Scryfall on 2026-09-15.
+  --
+  -- A PAIR OF BOARDS differing only in whether the Ray was cast, so the
+  -- weakening cannot be an ability that never worked, and a last row where bob
+  -- holds the Recluse himself -- the direction rule 702.16k does refuse.
+  Spec.it s "CR 702.16k a Saltfield Recluse stolen in response still weakens the Nemesis that chose the thief" $ do
+    nemesis <- S.printingOf s registry "True-Name Nemesis"
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    rayOfCommand <- S.printingOf s registry "Ray of Command"
+    island <- S.printingOf s registry "Island"
+    case Face.activatedAbilities (S.combinedFace recluse) of
+      [ability] | Just theSlot <- soleTargetSlot (ActivatedAbility.modal ability) -> do
+        let (nemesisId, board0) = S.addPermanent nemesis S.alice S.threePlayerGame
+            chose = board0 {GameState.objects = Map.adjust (\o -> o {Object.chosenPlayer = Just S.bob}) nemesisId (GameState.objects board0)}
+            (recluseId, board1) = S.addPermanent recluse S.carol chose
+            (hisRecluseId, board2) = S.addPermanent recluse S.bob board1
+            (rayId, board) = S.addHandCard rayOfCommand S.bob (S.landsFor island S.bob 4 board2)
+            -- One activation, two futures: only the stolen row casts the Ray in
+            -- response, so the boards differ in that and nothing else.
+            activated = S.runPure (aimAtOffered nemesisId) (board {GameState.priority = Just S.carol}) (Activate.activateAbility S.carol recluseId ability)
+            stolen = S.runPure (aimAtOffered recluseId) (activated {GameState.priority = Just S.bob}) (S.cast S.bob rayId Monad.>> Stack.resolveTop)
+            resolve gs = S.runPure S.identityAnswer gs Stack.resolveTop
+        Spec.assertEqWith
+          s
+          "CR 702.16k/113.8 the ability is still carol's, so the stolen Recluse weakens the Nemesis that chose bob"
+          (S.powerToughnessOf nemesisId (resolve stolen))
+          (Just (1, 1))
+        Spec.assertEqWith s "and the Ray really moved the Recluse to bob" (Projection.controllerOf recluseId stolen) (Just S.bob)
+        Spec.assertEqWith
+          s
+          "while with no Ray cast the same ability weakens it too, so the row above is not an ability that never worked"
+          (S.powerToughnessOf nemesisId (resolve activated))
+          (Just (1, 1))
+        Spec.assertBool
+          s
+          (not (Set.member (Recipient.ToCreature nemesisId) (Target.legalRecipients (Just S.bob) hisRecluseId theSlot board)))
+          "and a Recluse bob activates himself may not aim at the Nemesis that chose him"
+        Spec.assertBool
+          s
+          (Set.member (Recipient.ToCreature recluseId) (Target.legalRecipients (Just S.bob) hisRecluseId theSlot board))
+          "though carol's Recluse beside it is a legal target for his, so that refusal is not an empty slot"
+      _ -> Spec.assertFailure s "Saltfield Recluse should print one activated ability with one target slot"
 
   -- CR 702.16j: "A permanent or player with protection from everything has
   -- protection from each object regardless of that object's characteristic
