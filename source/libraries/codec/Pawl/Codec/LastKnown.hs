@@ -5,6 +5,7 @@ module Pawl.Codec.LastKnown where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.AttackTarget as AttackTarget
 import qualified Pawl.Codec.CardName as CardName
+import qualified Pawl.Codec.ControlClock as ControlClock
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
@@ -16,7 +17,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LastKnown as LastKnown
 
--- | All thirteen axes, none derivable from another: the type's own haddock says why
+-- | All fourteen axes, none derivable from another: the type's own haddock says why
 -- CR 608.2h needs each of them beside the projection.
 codec :: Codec.Codec LastKnown.LastKnown
 codec = Fields.object $ do
@@ -33,6 +34,7 @@ codec = Fields.object $ do
   blocking <- Fields.required "blocking" Common.boolean LastKnown.blocking
   protector <- Fields.required "protector" (Common.maybe PlayerId.codec) LastKnown.protector
   paidCosts <- Fields.defaulted "paidCosts" Map.empty (Common.multiset Keyword.codec) LastKnown.paidCosts
+  controlClock <- Fields.defaulted "controlClock" Map.empty (Common.keyedList ControlClock.entry) LastKnown.controlClock
   pure
     LastKnown.MkLastKnown
       { LastKnown.characteristics = characteristics,
@@ -47,5 +49,6 @@ codec = Fields.object $ do
         LastKnown.attackTarget = attackTarget,
         LastKnown.blocking = blocking,
         LastKnown.protector = protector,
-        LastKnown.paidCosts = paidCosts
+        LastKnown.paidCosts = paidCosts,
+        LastKnown.controlClock = controlClock
       }

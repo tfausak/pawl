@@ -147,6 +147,10 @@ data Quantity
   | -- | CR 509.1g / 608.2h: 1 if the object this quantity is evaluated against
     -- was blocking, else 0.
     WasBlocking
+  | -- | CR 702.30a / 608.2h: 1 if the player that reference names came to
+    -- control the object this quantity is evaluated against since the beginning
+    -- of that player's last upkeep, else 0.
+    ControlGainedSinceLastUpkeep PlayerRef.PlayerRef
   | -- | CR 508.3b: how many of that player's opponents were declared attacked
     -- this combat (Combat.declaredAttacked) -- rule 702.121a's melee.
     --

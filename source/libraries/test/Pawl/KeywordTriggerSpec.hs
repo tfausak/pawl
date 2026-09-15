@@ -2552,6 +2552,19 @@ copyingPayingFor wanted who p = case p of
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   _ -> paysFor who p
 
+-- `paysFor` with ONE held card cast the moment CR 117.1 offers its holder
+-- priority, aimed at the named permanent. The cast happens exactly once without
+-- the answerer counting: the card leaves the hand, so no later round offers it.
+--
+-- The target is FILTERED out of the offered set rather than built, S.preferring's
+-- posture: an answerer that searched for some other legal recipient -- Lightning
+-- Bolt reaches a player too -- would repair the assertion a mutation broke.
+respondingWith :: ObjectId.ObjectId -> ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+respondingWith inHand victim who p = case p of
+  Prompt.ChooseAction _ _ actions -> Maybe.fromMaybe A.Pass (List.find (S.isCastOf inHand) actions)
+  Prompt.ChooseTargets _ _ _ offered -> S.preferring (\recipient -> Recipient.objectOf recipient == Just victim) offered
+  _ -> paysFor who p
+
 -- The battlefield object whose PRINTED card is a Clone -- Pawl.CopySpec's
 -- printedOnBattlefield narrowed to the one card this group copies with. Game.faceOf
 -- is right HERE and nowhere else in the group: the question is which printing the
@@ -2709,6 +2722,42 @@ echoSpec s registry =
           Spec.assertEqWith s "CR 707.2 two Forests went, one echo per permanent" (S.tappedCount S.alice after) 2
           Spec.assertEqWith s "both of them offered" (length (payResponses log')) 2
           Spec.assertEqWith s "with both still on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 6
+        -- CR 702.30a prints no "if this permanent is on the battlefield" -- that
+        -- clause is rule 702.24a's, and cumulativeUpkeep's -- so a Jaguar bolted
+        -- in response to its own echo trigger still resolves it and still owes
+        -- alice the choice CR 118.12a's "unless" puts to her. CR 608.2a re-reads
+        -- the "if" against CR 608.2h's record, which is where the clock CR 400.7
+        -- deleted with the permanent still is.
+        --
+        -- ONE thing apart from the first leg above: bob holds a Bolt and casts
+        -- it. alice's three Forests, her window and her answer are unchanged.
+        Spec.it s "CR 608.2a a Jaguar killed in response still asks its controller the cost" $ do
+          (oid, gs0) <- jaguarBoard 3
+          mountain <- S.printingOf s registry "Mountain"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          let (held, staged) = S.addHandCard bolt S.bob (S.landsFor mountain S.bob 1 gs0)
+              ((_, after), log') = ranUpkeep (respondingWith held oid S.alice) S.alice staged
+          Spec.assertBool s (not (S.onBattlefield oid after)) "the Bolt really killed the Jaguar before its echo resolved"
+          Spec.assertEqWith s "CR 702.30a a Forest of alice's paid echo for a permanent already gone" (S.tappedCount S.alice after) 1
+          Spec.assertEqWith s "she being offered it exactly once" (length (payResponses log')) 1
+        -- CR 603.3a fixes the ability's controller when it triggered, so rule
+        -- 702.30a's "you" is alice at BOTH reads of the "if" however control moves
+        -- in between -- and the window the clock holds for her is untouched by
+        -- bob's coming to control the Jaguar, which opens one of his own beside it.
+        --
+        -- Ray of Command rather than a kill, so the source is still there and the
+        -- only thing that moved is the seat: the leg above already covers a source
+        -- that is gone.
+        Spec.it s "CR 603.3a control moving in response still asks the player whose ability it is" $ do
+          (oid, gs0) <- jaguarBoard 3
+          island <- S.printingOf s registry "Island"
+          ray <- S.printingOf s registry "Ray of Command"
+          let (held, staged) = S.addHandCard ray S.bob (S.landsFor island S.bob 4 gs0)
+              ((_, after), log') = ranUpkeep (respondingWith held oid S.alice) S.alice staged
+          Spec.assertEqWith s "the Ray really took the Jaguar" (Projection.View.controllerOf oid after) (Just S.bob)
+          Spec.assertEqWith s "CR 702.30a a Forest of alice's paid echo all the same" (S.tappedCount S.alice after) 1
+          Spec.assertEqWith s "she, and not the thief, being offered it" (length (payResponses log')) 1
+          Spec.assertEqWith s "and bob spent nothing but the Ray's four Islands" (S.tappedCount S.bob after) 4
         -- The cost comes off the keyword's payload, not off the card: Uktabi
         -- Drake's mana cost is {G} and its echo cost {1}{G}{G}. A pair of boards
         -- differing in exactly one thing -- two Forests or three.

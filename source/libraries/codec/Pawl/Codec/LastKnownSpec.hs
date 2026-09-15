@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
@@ -27,7 +28,7 @@ minimalJson = "{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
-  -- CR 608.2h, all twelve axes. `characteristics` and `copiable` are the same type
+  -- CR 608.2h, all fourteen axes. `characteristics` and `copiable` are the same type
   -- and hold DIFFERENT values here, because CR 707.2's layer-1-only reading is
   -- exactly what the whole fold loses -- an encoder writing one where the other
   -- belongs would round trip against equal values.
@@ -48,7 +49,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.attackTarget = Nothing,
           LastKnown.blocking = True,
           LastKnown.protector = Just (PlayerId.MkPlayerId 7),
-          LastKnown.paidCosts = Map.singleton (Keyword.Offspring (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) 1
+          LastKnown.paidCosts = Map.singleton (Keyword.Offspring (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) 1,
+          LastKnown.controlClock = Map.singleton (PlayerId.MkPlayerId 1) ControlClock.SinceLastUpkeep
         }
       ( " {\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
@@ -58,7 +60,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> minimalJson
           <> ",\"attached\":[9]"
           <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
-          <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]} "
+          <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]"
+          <> ",\"controlClock\":[{\"player\":1,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]} "
       )
   -- CR 109.3: neither an attachment nor a chosen name is a characteristic, and
   -- most objects have neither, so the absent case is written out rather than left
@@ -80,7 +83,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.attackTarget = Just (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
           LastKnown.blocking = False,
           LastKnown.protector = Nothing,
-          LastKnown.paidCosts = Map.empty
+          LastKnown.paidCosts = Map.empty,
+          LastKnown.controlClock = Map.empty
         }
       ( " {\"characteristics\":"
           <> minimalJson

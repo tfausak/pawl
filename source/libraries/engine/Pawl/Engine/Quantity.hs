@@ -23,6 +23,7 @@ import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
+import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Devotion as Devotion
 import qualified Pawl.Types.Face as Face
@@ -33,6 +34,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -565,6 +567,21 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- CR 509.1g's other half of the declaration, the arm above in every
         -- respect, reading Pawl.Types.LastKnown.blocking through the same view.
         Quantity.WasBlocking -> fmap (\view -> if Filter.blocking view then 1 else 0) mView
+        -- CR 702.30a's window as a 0/1 -- echo's intervening "if", read of the
+        -- ability's own source at both CR 603.4 and CR 608.2a.
+        --
+        -- Off the BOARD rather than off the view, DamageDealtToThisTurn's posture
+        -- and for its reason: the answer relates an OBJECT to a PLAYER, and a view
+        -- of the one carries no name for the other. CR 603.3a is why the player is
+        -- named at all -- rule 702.30a's "you" is the controller the ability had
+        -- when it triggered, not whoever holds the permanent when it resolves.
+        --
+        -- controlClockOf is what makes the question answerable for a permanent that
+        -- left in response: CR 400.7 deletes the incarnation the clock lived on, and
+        -- CR 608.2h's record is where it still is.
+        Quantity.ControlGainedSinceLastUpkeep ref -> case (playersOf ref, mOid) of
+          (Just [pid], Just oid) -> Just (if Map.lookup pid (controlClockOf gs oid) == Just ControlClock.SinceLastUpkeep then 1 else 0)
+          _ -> Nothing
         -- CR 120.1's damage as a total, read off the event log for the object the
         -- quantity is aimed at (Game.damageDealtToThisTurn) rather than off its view:
         -- CR 608.2i is what makes the question answerable at all for a creature CR
@@ -1094,6 +1111,7 @@ objectSlots quantity = case quantity of
   Quantity.WasToken -> Set.empty
   Quantity.WasAttacking -> Set.empty
   Quantity.WasBlocking -> Set.empty
+  Quantity.ControlGainedSinceLastUpkeep _ -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.AttackersDeclaredThisTurn _ -> Set.empty
@@ -1336,6 +1354,7 @@ readsX quantity = case quantity of
   Quantity.WasToken -> False
   Quantity.WasAttacking -> False
   Quantity.WasBlocking -> False
+  Quantity.ControlGainedSinceLastUpkeep _ -> False
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.AttackersDeclaredThisTurn _ -> False
@@ -1458,3 +1477,17 @@ colorOfManaType :: ManaType.ManaType -> Maybe Color.Color
 colorOfManaType manaType = case manaType of
   ManaType.Colored c -> Just c
   ManaType.Colorless -> Nothing
+
+-- CR 702.30a's clock for one object, live or remembered: Object.controlClock
+-- while the permanent is on the battlefield, and CR 608.2h's
+-- Pawl.Types.LastKnown.controlClock once CR 400.7 has deleted the incarnation
+-- that carried it. Empty for an id naming neither, which reads as "no window",
+-- Pawl.Types.ControlClock's own spelling of that.
+--
+-- The live read FIRST, Pawl.Engine.Target.lastKnownAdmits' ordering turned round:
+-- a permanent still on the battlefield has a clock that is still moving, and its
+-- record would be a stale one from an earlier incarnation of the same id.
+controlClockOf :: GameState -> ObjectId -> Map.Map PlayerId.PlayerId ControlClock.ControlClock
+controlClockOf gs oid = case Game.lookupObject oid gs of
+  Just object -> Object.controlClock object
+  Nothing -> maybe Map.empty LastKnown.controlClock (Map.lookup oid (GameState.lastKnown gs))

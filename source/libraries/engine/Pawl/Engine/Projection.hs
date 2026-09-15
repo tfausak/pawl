@@ -2533,9 +2533,6 @@ filterReads f = case f of
   -- about a player, and Pawl.Engine.Engine.checkControlContinuity drops the settle when
   -- that player stops controlling the object.
   Filter.Type.ControlledSinceTurnBegan -> Set.singleton Controller
-  -- CR 702.30a reads the clock against the candidate's CONTROLLER, the atom
-  -- above's dependency.
-  Filter.Type.ControlGainedSinceLastUpkeep -> Set.singleton Controller
   -- The nest's own reads, declared as if they were the CANDIDATE's even though
   -- they are the HOST's -- exactly right rather than merely safe, for the reason
   -- the note on Aspect above gives. The attachment itself reads nothing, for
@@ -2788,7 +2785,6 @@ filterReadsPeers f = case f of
   Filter.Type.CrewedSourceThisTurn -> False
   Filter.Type.ConvokedSourceThisTurn -> False
   Filter.Type.ControlledSinceTurnBegan -> False
-  Filter.Type.ControlGainedSinceLastUpkeep -> False
   Filter.Type.IsAttachedToSource -> False
   Filter.Type.IsHostOfSource -> False
   Filter.Type.IsToken -> False
@@ -3033,6 +3029,7 @@ quantityReads q = case q of
   Quantity.Type.WasToken -> Set.empty
   Quantity.Type.WasAttacking -> Set.empty
   Quantity.Type.WasBlocking -> Set.empty
+  Quantity.Type.ControlGainedSinceLastUpkeep _ -> Set.empty
   Quantity.Type.DamageDealtToThisTurn -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.AttackersDeclaredThisTurn _ -> Set.empty
