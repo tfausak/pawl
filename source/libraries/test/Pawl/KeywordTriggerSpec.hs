@@ -3028,6 +3028,87 @@ incrementSpec s registry =
           Spec.assertEqWith s "increment held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Increment 2)) [Keyword.increment, Keyword.increment]
           Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Increment 1)) [Keyword.increment]
 
+-- CR 702.59a: "Recover is a triggered ability that functions only while the card
+-- with recover is in a player's graveyard. 'Recover [cost]' means 'When a
+-- creature is put into your graveyard from the battlefield, you may pay [cost].
+-- If you do, return this card from your graveyard to your hand. Otherwise, exile
+-- this card.'"
+--
+-- Sun's Bounty, {1}{W} Instant, "You gain 4 life." / "Recover {1}{W}" -- the
+-- cheapest printing by machinery: its whole non-keyword text is one GainLife, so
+-- nothing but recover is under test.
+--
+-- THE BOARD puts Sun's Bounty in alice's GRAVEYARD, the one zone rule 702.59a
+-- lets it function from, and has alice bolt her own Goblin Piker. The 2/1 dies to
+-- the one damage under CR 704.5g, so the death is the game's own rather than the
+-- fixture's, and the card that recovers is never the card that died.
+--
+-- FOUR lands on BOTH boards, three Plains and a Mountain: the Mountain pays for
+-- the Bolt and two Plains for rule 702.59a's {1}{W}, with a Plains to spare. The
+-- two legs differ in the ANSWER to rule 702.59a's "may" alone, never in whether
+-- the cost could be paid.
+recoverSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+recoverSpec s registry =
+  let bounty = CardName.MkCardName (Text.pack "Sun's Bounty")
+      board = do
+        plains <- S.printingOf s registry "Plains"
+        mountain <- S.printingOf s registry "Mountain"
+        piker <- S.printingOf s registry "Goblin Piker"
+        bolt <- S.printingOf s registry "Lightning Bolt"
+        printing <- S.printingOf s registry "Sun's Bounty"
+        let withLands = S.landsFor mountain S.alice 1 (S.landsFor plains S.alice 3 (Setup.emptyGame S.bothPlayers))
+            (pikerId, withPiker) = S.addPermanent piker S.alice withLands
+            (_, withBounty) = S.addGraveyardCard printing S.alice withPiker
+            (boltId, staged) = S.addHandCard bolt S.alice withBounty
+        pure
+          ( pikerId,
+            boltId,
+            staged
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice,
+                GameState.remaining = S.phasesAfter Phase.PrecombatMain
+              }
+          )
+      -- The Bolt's target is FILTERED out of the offered set rather than built,
+      -- respondingWith's posture: an answerer that searched for some other legal
+      -- recipient would aim at a player and kill nothing.
+      aimingAt :: ObjectId.ObjectId -> (forall a. Prompt.Prompt a -> a) -> (forall b. Prompt.Prompt b -> b)
+      aimingAt victim fallback p = case p of
+        Prompt.ChooseTargets _ _ _ offered -> S.preferring (\recipient -> Recipient.objectOf recipient == Just victim) offered
+        _ -> fallback p
+      castAndResolve :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      castAndResolve answer oid gs = S.runPure answer (S.runPure answer gs (S.cast S.alice oid)) Engine.priorityLoop
+      -- By NAME and not by id: CR 400.7 mints a fresh object as the card leaves
+      -- the graveyard, so the id the fixture held names nothing afterwards.
+      countIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just bounty) (Game.zoneMembers zone S.alice gs))
+   in Spec.describe s "Recover" $ do
+        -- THE case, and the assertion a mutation must redden: the Piker's death
+        -- offers rule 702.59a's payment from a graveyard, and paying it puts the
+        -- card in alice's hand.
+        Spec.it s "CR 702.59a whole card: paying {1}{W} returns Sun's Bounty from the graveyard to hand" $ do
+          (pikerId, boltId, gs) <- board
+          let after = castAndResolve (aimingAt pikerId (paysFor S.alice)) boltId gs
+          Spec.assertEqWith s "CR 702.59a Sun's Bounty is in alice's hand" (countIn Zone.Hand after) 1
+          Spec.assertEqWith s "and no longer in her graveyard" (countIn Zone.Graveyard after) 0
+          Spec.assertEqWith s "and it was not exiled" (countIn Zone.Exile after) 0
+        -- The same board differing in NOTHING but the answer to rule 702.59a's
+        -- "may", with the mana still up: "Otherwise, exile this card" is
+        -- mandatory, so declining is not doing nothing.
+        Spec.it s "CR 702.59a declining the payment exiles Sun's Bounty instead" $ do
+          (pikerId, boltId, gs) <- board
+          let after = castAndResolve (aimingAt pikerId S.identityAnswer) boltId gs
+          Spec.assertEqWith s "CR 702.59a Sun's Bounty is in exile" (countIn Zone.Exile after) 1
+          Spec.assertEqWith s "and never reached alice's hand" (countIn Zone.Hand after) 0
+          Spec.assertEqWith s "and left her graveyard all the same" (countIn Zone.Graveyard after) 0
+        -- The roster, asked directly: rule 702.59a states no per-instance clause,
+        -- so the graveyard mint reads the DISTINCT keywords and a card holding
+        -- recover once contributes one ability.
+        Spec.it s "CR 702.59a the graveyard roster mints it" $ do
+          let cost = Cost.MkCost Nothing []
+          Spec.assertEqWith s "recover is on the graveyard roster" (Keyword.graveyardTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost))) [Keyword.recover cost]
+          Spec.assertEqWith s "and on none of the others" (Keyword.printedTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost)) <> Keyword.exileTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost))) []
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cascadeSpec s registry
@@ -3046,6 +3127,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   prowessSpec s registry
   extortSpec s registry
   incrementSpec s registry
+  recoverSpec s registry
   selfBlocksSpec s registry
   selfBlocksAtLeastSpec s registry
   selfBlocksOneOrMoreSpec s registry

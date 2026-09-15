@@ -2701,6 +2701,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Offspring cost -> costFilters cost
   -- CR 702.56a: the replicate cost, kicker's shape.
   Keyword.Replicate cost -> costFilters cost
+  Keyword.Recover cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.120a: the escalate cost, whose components may hold a Filter exactly as
   -- entwine's may.

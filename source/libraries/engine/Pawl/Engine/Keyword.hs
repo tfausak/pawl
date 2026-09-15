@@ -37,6 +37,7 @@ import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -266,6 +267,10 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.56a's and CR 702.153a's triggers function on the STACK too, so
   -- stackTriggeredAbilitiesOf mints them and this roster stays empty.
   Keyword.Replicate _ -> []
+  -- Rule 702.59a's ability functions only while the card is in a GRAVEYARD, so
+  -- graveyardTriggeredAbilitiesOf mints it and this roster stays empty --
+  -- suspend's shape one zone over.
+  Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   -- CR 702.166a and CR 702.194a state one static ability each and no triggered
   -- ability at all: their optional additional cost is optionalCost's, and what a
@@ -585,6 +590,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Conspire -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
+  Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
@@ -1071,6 +1077,9 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Conspire -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
+  -- CR 702.59a states a TRIGGERED ability, not an activated one, so this roster
+  -- is not where it lands.
+  Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
@@ -1676,6 +1685,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Conspire -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
+  Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
@@ -2292,6 +2302,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Conspire -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
+  Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
@@ -3833,6 +3844,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Conspire -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
+  Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
@@ -4158,6 +4170,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Conspire -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
+  Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
@@ -4440,6 +4453,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Conspire -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
+  Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
@@ -4642,6 +4656,7 @@ familyOf keyword = case keyword of
   Keyword.Squad _ -> Just KeywordFamily.Squad
   Keyword.Offspring _ -> Just KeywordFamily.Offspring
   Keyword.Replicate _ -> Just KeywordFamily.Replicate
+  Keyword.Recover _ -> Just KeywordFamily.Recover
   Keyword.Ripple _ -> Just KeywordFamily.Ripple
   Keyword.Casualty _ -> Just KeywordFamily.Casualty
   -- CR 702.166a carries no parameter, so there is no family to name it by.
@@ -6851,6 +6866,92 @@ exileTriggeredAbilitiesOf keywords =
     -- ability that watches it functions there. One per madness cost, rule
     -- 702.35a's "[cost]" being what one instance differs from another by.
     <> fmap madnessCast (madnessCosts keywords)
+
+-- CR 702.59a's ability, "a triggered ability that functions only while the card
+-- with recover is in a player's graveyard" -- the roster the graveyard scan in
+-- Pawl.Engine.Event.Trigger mints, `exileTriggeredAbilitiesOf`'s sibling one zone
+-- over and ungated by CR 113.6 for that function's reason: rule 702.59a states
+-- the zone itself. CR 113.6m would pin it to the graveyard anyway, the return
+-- naming Zone.Graveyard as its origin (unearth's reading), so the two rules
+-- agree here and the ungated join is the one that does not depend on that.
+--
+-- A SET rather than a count-carrying Map, `exileTriggeredAbilitiesOf`'s reading:
+-- rule 702.59 states no per-instance clause, and no card in data/cards/ prints
+-- recover twice.
+graveyardTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+graveyardTriggeredAbilitiesOf keywords =
+  let costOf keyword = case keyword of
+        Keyword.Recover cost -> Just cost
+        _ -> Nothing
+   in fmap recover (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- CR 702.59a written out: "When a creature is put into your graveyard from the
+-- battlefield, you may pay [cost]. If you do, return this card from your
+-- graveyard to your hand. Otherwise, exile this card."
+--
+-- THE CONDITION is the bystander reading (TriggerCondition.PermanentDies), not a
+-- self-scoped one: rule 702.59a watches A CREATURE, and the card with recover is
+-- a card in a graveyard rather than the permanent that died. "Your graveyard" is
+-- the Filter.OwnedBy conjunct -- CR 404.1 puts a destroyed object in its OWNER's graveyard,
+-- and CR 108.4 leaves the recover card in a graveyard no controller, so CR
+-- 113.8's second clause makes its owner the "you" the filter is read against.
+-- Not narrowed by Not IsSource, which is rule 702.59a's own wording -- "a
+-- creature", with no exception for the card the ability is on. Garza's Assassin
+-- is the one printed creature with recover and its Oracle reminder text says
+-- "another" instead; that card is not in data/cards/ (its recover cost is half
+-- its controller's life rather than mana), so nothing here reads the difference
+-- and the rule's wording is what this follows.
+--
+-- TWO CLAUSES over ONE offer (CR 118.12, Pawl.Types.PayGate.offeredAt): the
+-- return is the PayBranch.IfPaid branch and the exile the IfNotPaid branch of
+-- the same payment, so the player is asked once. Optionality.Mandatory on both,
+-- extort's reason -- rule 702.59a's "may" IS the gate's offer.
+--
+-- BOTH MOVES name Zone.Graveyard as their origin, unearth's reading: that is
+-- what CR 113.6m reads, and the exile half needs it as much as the return does.
+recover :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+recover cost =
+  let gate branch offeredAt =
+        PayGate.MkPayGate
+          { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+            PayGate.cost = cost,
+            PayGate.branch = branch,
+            PayGate.obligation = PayObligation.Optional,
+            PayGate.perEach = Nothing,
+            PayGate.offeredAt = offeredAt
+          }
+      moveTo zone =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot Binding.triggerSource,
+              MoveToZone.zone = zone,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = False,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = False,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Nothing,
+              MoveToZone.origin = Just Zone.Graveyard,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+      returned = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just (gate PayBranch.IfPaid Nothing)) (Seq.singleton (moveTo Zone.Hand))
+      exiled = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just (gate PayBranch.IfNotPaid (Just (ClauseIndex.MkClauseIndex 0)))) (Seq.singleton (moveTo Zone.Exile))
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.PermanentDies (Filter.And [Filter.HasCardType CardType.Creature, Filter.OwnedBy PlayerRelation.You]),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.fromList [returned, exiled]) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- CR 702.85a's ability, "a triggered ability that functions only while the spell
 -- with cascade is on the stack", CR 702.60a's ripple, which functions "only while

@@ -411,6 +411,9 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   Spec.it s "Replicate carries its cost and Casualty its N" $ do
     Common.assertCodec s Keyword.codec (Keyword.Replicate (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])) " {\"type\":\"Replicate\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
     Common.assertCodec s Keyword.codec (Keyword.Casualty 2) " {\"type\":\"Casualty\",\"value\":2} "
+  -- CR 702.59a writes its cost on the card, replicate's shape.
+  Spec.it s "Recover carries its cost" $
+    Common.assertCodec s Keyword.codec (Keyword.Recover (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) [])) " {\"type\":\"Recover\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
   -- CR 702.166a and CR 702.194a mint their costs in the rulebook, so the card
   -- writes bargain bare and teamwork with its N alone.
   Spec.it s "Bargain is nullary and Teamwork carries its N" $ do

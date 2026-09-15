@@ -278,6 +278,11 @@ data Keyword
     -- number of times, and a cast trigger copying the spell once per payment,
     -- minted by Pawl.Engine.Keyword.stackTriggeredAbilitiesOf.
     Replicate (Cost.Cost Keyword)
+  | -- | 702.59a: recover [cost] -- a triggered ability that functions only while
+    -- the card with recover is in a player's graveyard, returning it to hand for
+    -- [cost] when a creature dies and exiling it otherwise. Minted by
+    -- Pawl.Engine.Keyword.graveyardTriggeredAbilitiesOf.
+    Recover (Cost.Cost Keyword)
   | -- | 702.60a: ripple N -- a triggered ability that functions only while the
     -- card with ripple is on the stack. When you cast the spell, you may reveal
     -- the top N cards of your library, cast any of them with the same name as
