@@ -445,10 +445,17 @@ data Response
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as
     -- a permutation of the offered indices.
     OrderedTriggers [Natural.Natural]
-  | -- | CR 615.7: the order a shielded player (or a shielded permanent's
-    -- controller) chose for the simultaneous damage events one prevention shield
-    -- may cover, as a permutation of the offered indices.
+  | -- | CR 122.1c / 614.3: the order a shielded player (or a shielded
+    -- permanent's controller) chose for the simultaneous damage events one
+    -- whole-event prevention may cover, as a permutation of the offered indices.
     OrderedDamage [Natural.Natural]
+  | -- | CR 615.7: how a shielded player (or a shielded permanent's controller)
+    -- divided a counted shield's remaining points among the simultaneous damage
+    -- events it covers, one per offered event. A separate constructor from
+    -- OrderedDamage above for the reason the three orders give: replaying a
+    -- transcript against the wrong one would read an allocation as a
+    -- permutation.
+    AllocatedDamage [Natural.Natural]
   | -- | CR 601.2h: the order a player chose to pay a cost's parts in, as a
     -- permutation of the offered indices. A separate constructor from the two
     -- above, though the payload has the same shape: replaying a transcript

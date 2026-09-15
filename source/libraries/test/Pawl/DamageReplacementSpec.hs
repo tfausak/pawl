@@ -31,7 +31,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
 import Pawl.LifeReplacementSpec (aimCreatureAndOrder, castDeflection, castDisaster, deflectionCombat, winTheFlipAndOrder)
-import Pawl.PreventionSpec (aimAndChoose, aimCreature, aimPlayer, answersFor, atLife, attackNoBlock, bobAttacks, castAndResolve, chosenSourcesIn, countersOn, onlyCreature, preventAllRows, preventionsRecorded, riderHits, settleDamage, shieldsLeft, theAbility, wasAskedToOrderDamage)
+import Pawl.PreventionSpec (aimAndChoose, aimCreature, aimPlayer, answersFor, atLife, attackNoBlock, bobAttacks, castAndResolve, chosenSourcesIn, countersOn, onlyCreature, preventAllRows, preventionsRecorded, riderHits, settleDamage, shieldsLeft, theAbility, wasAskedToAllocateDamage, wasAskedToOrderDamage)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -105,8 +105,8 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
   -- exactly 3 and the other 4 are dealt.
   --
   -- The CR 615.7 allocation choice needs no prompt assertion of its own: the two
-  -- orderings below leave different boards, which nothing but a raised and
-  -- honoured Prompt.OrderDamage can produce.
+  -- divisions below leave different boards, which nothing but a raised and
+  -- honoured Prompt.AllocateDamage can produce.
   Spec.it s "CR 615.7 one shield over you AND your permanents is a single shared pool" $ do
     plains <- S.printingOf s registry "Plains"
     jedit <- S.printingOf s registry "Jedit Ojanen"
@@ -248,8 +248,8 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- nothing is asked.
     Spec.assertBool
       s
-      (wasAskedToOrderDamage (answersFor (castDisaster 2 []) shielded (S.cast S.alice disasterId Monad.>> Stack.resolveTop)))
-      "alice was asked which damage the one batch's shield prevents"
+      (wasAskedToAllocateDamage (answersFor (castDisaster 2 []) shielded (S.cast S.alice disasterId Monad.>> Stack.resolveTop)))
+      "alice was asked how the one batch's shield is divided"
     -- The fences. The shield covers alice's side only, so bob and his Piker take
     -- the whole 2 either way -- and CR 615.5's rider throws back the 3 that was
     -- prevented, which is one pool's worth however it was allocated.
@@ -309,8 +309,8 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- so nothing is asked.
     Spec.assertBool
       s
-      (wasAskedToOrderDamage (answersFor (aimCreatureAndOrder mine []) shielded (S.cast S.alice charId Monad.>> Stack.resolveTop)))
-      "alice was asked which damage the one batch's shield prevents"
+      (wasAskedToAllocateDamage (answersFor (aimCreatureAndOrder mine []) shielded (S.cast S.alice charId Monad.>> Stack.resolveTop)))
+      "alice was asked how the one batch's shield is divided"
     -- The fences. Bob's creature is no part of the sentence, and CR 615.5's rider
     -- throws back the 3 that was prevented, which is one pool's worth however it
     -- was allocated.
@@ -691,9 +691,9 @@ templeAltisaurSpec s registry = Spec.describe s "Temple Altisaur (CR 615.10)" $ 
   -- from other applicable events that would happen at the same time" -- which is
   -- the rule stating the OPPOSITE of CR 615.7 for a static shield: two
   -- simultaneous events each keep their own 1, where a countdown of 1 would have
-  -- covered one of them and asked which. Hence no OrderDamage: with no supply to
-  -- allocate there is nothing to decide, and Replacement.contestedResource giving
-  -- this rewrite one is what that negative catches.
+  -- covered one of them and asked which. Hence no AllocateDamage: with no supply
+  -- to divide there is nothing to decide, and Replacement.remainingOf giving this
+  -- rewrite one is what that negative catches.
   Spec.it s "CR 615.10 two simultaneous events each keep 1, and nothing is asked"
     . withBoard
     $ \_ raptor _ theirs source board -> do
@@ -703,8 +703,8 @@ templeAltisaurSpec s registry = Spec.describe s "Temple Altisaur (CR 615.10)" $ 
       Spec.assertEqWith s "and both events happened, each at 1" (fmap DamageEvent.amount (S.damageEventsOf after)) [1, 1]
       Spec.assertBool
         s
-        (not (wasAskedToOrderDamage (answersFor S.identityAnswer board (Damage.applyDamage batch))))
-        "no OrderDamage was raised: a static shield allocates nothing across a batch"
+        (not (wasAskedToAllocateDamage (answersFor S.identityAnswer board (Damage.applyDamage batch))))
+        "no AllocateDamage was raised: a static shield allocates nothing across a batch"
   -- CR 615.12 / 615.1a: the clause says "prevent", so this IS a prevention
   -- effect, and unpreventable damage is dealt in full. An instead-amount of 1
   -- would cut the Excruciator's 3 to 1 here; the pair of legs is the same 3 from
@@ -1246,12 +1246,12 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
           controlBatch = [hit controlAttacker (Recipient.ToCreature controlVictim) 5, hit controlOther (Recipient.ToCreature controlVictim) 3]
       Spec.assertBool
         s
-        (wasAskedToOrderDamage (answersFor S.identityAnswer controlShielded (Damage.applyDamage controlBatch)))
+        (wasAskedToAllocateDamage (answersFor S.identityAnswer controlShielded (Damage.applyDamage controlBatch)))
         "setup: without Spider-Punk 4 cannot cover 5 and 3, so alice is asked"
       Spec.assertBool
         s
-        (not (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch))))
-        "no OrderDamage was raised: no order of unpreventable damage spends the shield"
+        (not (wasAskedToAllocateDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch))))
+        "no AllocateDamage was raised: no division of unpreventable damage spends the shield"
       let after = settleDamage S.identityAnswer shielded batch
       Spec.assertEqWith s "both events happened in full" (amounts after) [5, 3]
       Spec.assertEqWith s "the whole 8 is marked" (S.damageOf victim after) (Just 8)
@@ -1403,7 +1403,7 @@ phantomTigerSpec s registry = Spec.describe s "Phantom Tiger (CR 615.12)" $ do
 
 -- The players asked to decide something while a damage batch settles, in the
 -- order they were asked. Both batch-level questions count: CR 616.1's "which
--- effect applies next" and CR 615.7's "which damage does the shield prevent".
+-- effect applies next" and CR 615.7's "how is the shield divided".
 --
 -- The prompt STREAM rather than the board, because there is no board that can
 -- tell these two apart: the two players choose about DIFFERENT objects -- each
@@ -1425,9 +1425,9 @@ choosersAsked gs batch =
         Prompt.ChooseReplacement _ pid _ -> do
           State.modify' (<> [pid])
           pure 0
-        Prompt.OrderDamage _ pid events -> do
+        Prompt.AllocateDamage _ pid events share -> do
           State.modify' (<> [pid])
-          pure (zipWith const [0 ..] events)
+          pure (S.allocateInOrder (const ()) events share)
         _ -> pure (S.identityAnswer p)
    in State.execState (Engine.runGame step gs (Damage.applyDamage batch)) []
 
@@ -1457,9 +1457,8 @@ doubledAndShielded plains piker furnace mendingHands =
 -- to generalize a local binding that closes over a local, which `furnace` is.
 allocateShield :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 allocateShield furnace src p = case p of
-  Prompt.OrderDamage _ _ events ->
-    let key e = (DamageEvent.source e /= src, DamageEvent.source e)
-     in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
+  Prompt.AllocateDamage _ _ events share ->
+    S.allocateInOrder (\e -> (DamageEvent.source e /= src, DamageEvent.source e)) events share
   Prompt.ChooseReplacement _ _ entries ->
     maybe 0 Int.toNaturalSaturating (List.findIndex ((/= furnace) . ReplacementEntry.source) entries)
   _ -> S.identityAnswer p
@@ -2740,9 +2739,17 @@ aimAtBobChoosing src p = case p of
 -- RECIPIENT, deflectionCombat's shape.
 orderedBy :: [Recipient.Recipient] -> Prompt.Prompt r -> r
 orderedBy wanted p = case p of
-  Prompt.OrderDamage _ _ events ->
-    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
-     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  Prompt.AllocateDamage _ _ events share ->
+    S.allocateInOrder (\e -> Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)) events share
+  _ -> S.identityAnswer p
+
+-- Divide a contested countdown a point at a time, one to each offered event --
+-- the division Harm's Way's rulings name and no ORDER of the batch can produce.
+-- Pinned by shape rather than searched for, so a mutation cannot be repaired
+-- into the right answer.
+onePointEach :: Prompt.Prompt r -> r
+onePointEach p = case p of
+  Prompt.AllocateDamage _ _ events _ -> fmap (const 1) events
   _ -> S.identityAnswer p
 
 -- CR 614.9's redirection with CR 615.7's countdown, whose producer is Carom
@@ -2952,7 +2959,7 @@ harmsWaySpec s registry = Spec.describe s "Harm's Way (CR 614.9, CR 615.7, CR 60
   -- will redirect just 2 of that damage ... You choose which 2 damage is
   -- redirected" (Oracle rulings). One question to alice, and the answer decides
   -- which recipient keeps its damage.
-  Spec.it s "CR 615.7 a simultaneous batch contends for the 2, and alice orders it" $ do
+  Spec.it s "CR 615.7 a simultaneous batch contends for the 2, and alice divides it" $ do
     (mine, _, omega, _, redirected) <- board
     let batch = [hit omega (Recipient.ToCreature mine) 3, hit omega (Recipient.ToPlayer S.alice) 3]
         creatureFirst = S.runPure (orderedBy [Recipient.ToCreature mine]) redirected (Damage.applyDamage batch)
@@ -2961,8 +2968,68 @@ harmsWaySpec s registry = Spec.describe s "Harm's Way (CR 614.9, CR 615.7, CR 60
     Spec.assertEqWith s "and alice keeps her whole 3" (S.lifeOf S.alice creatureFirst) (Just 17)
     Spec.assertEqWith s "alice first: she keeps 1" (S.lifeOf S.alice aliceFirst) (Just 19)
     Spec.assertEqWith s "and the creature keeps its whole 3" (S.damageOf mine aliceFirst) (Just 3)
+    -- CR 120.6: the event alice gave NONE of the 2 to is dealt whole and alone,
+    -- with no 0-damage event beside it -- Replacement.allocatedOut, which keeps a
+    -- share of 0 out of CR 616.1's offer rather than covering 0 of the event.
+    Spec.assertEqWith
+      s
+      "the creature's 3 is one event, and the moved 2 and its residue the other two"
+      (zip (amounts aliceFirst) (targets aliceFirst))
+      [(3, Recipient.ToCreature mine), (2, Recipient.ToPlayer S.bob), (1, Recipient.ToPlayer S.alice)]
     Spec.assertEqWith s "either way bob takes exactly the 2" (fmap (`S.lifeOf` creatureFirst) [S.bob] <> fmap (`S.lifeOf` aliceFirst) [S.bob]) [Just 18, Just 18]
-    Spec.assertBool s (wasAskedToOrderDamage (answersFor (orderedBy [Recipient.ToPlayer S.alice]) redirected (Damage.applyDamage batch))) "alice was asked to order the batch"
+    Spec.assertBool s (wasAskedToAllocateDamage (answersFor (orderedBy [Recipient.ToPlayer S.alice]) redirected (Damage.applyDamage batch))) "alice was asked how to divide the 2"
+  -- The ruling's LAST sentence, which an order cannot express: "If you like, you
+  -- can choose to redirect 1 damage that would be dealt by the chosen source to
+  -- each of two different recipients." One source dealing 2 to each of two of
+  -- alice's 2/2s -- Pyroclasm's shape, named in the ruling above -- and a
+  -- countdown of 2 split a point each way, so each creature is marked with 1 and
+  -- CR 704.5g takes neither. Spending the 2 down the batch instead, which is
+  -- every ORDER of it, leaves the second creature its whole 2 and kills it.
+  --
+  -- Cabal Evangel ({2}{W}{W} Creature -- Human Cleric 2/2, vanilla; name, cost,
+  -- type line and Oracle text checked against api.scryfall.com 2026-09-15) is the
+  -- recipient: 2 toughness is what makes 1 survivable and 2 lethal, and no
+  -- ability of its own can reach the board.
+  Spec.it s "CR 615.7 alice redirects 1 from each of two simultaneous hits, and both creatures live" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    harmsWay <- S.printingOf s registry "Harm's Way"
+    let base = S.landsInPlay plains 1
+        (first_, g1) = S.addPermanent evangel S.alice base
+        (second_, g2) = S.addPermanent evangel S.alice g1
+        (omega, g3) = S.addPermanent piker S.bob g2
+        (harmsWayId, g4) = S.addHandCard harmsWay S.alice g3
+        ready =
+          g4
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        redirected = S.runPure (aimAtBobChoosing omega) ready (S.cast S.alice harmsWayId Monad.>> Stack.resolveTop)
+        batch = [hit omega (Recipient.ToCreature first_) 2, hit omega (Recipient.ToCreature second_) 2]
+        split_ = S.settleSba (S.runPure onePointEach redirected (Damage.applyDamage batch))
+        downTheBatch = S.settleSba (S.runPure (orderedBy [Recipient.ToCreature first_, Recipient.ToCreature second_]) redirected (Damage.applyDamage batch))
+    -- THE gameplay assertion: 1 came off each, so CR 704.5g takes neither.
+    Spec.assertEqWith
+      s
+      "a point off each leaves both 2/2s alive"
+      (S.onBattlefield first_ split_, S.onBattlefield second_ split_)
+      (True, True)
+    Spec.assertEqWith s "each keeps 1 of its 2" (S.damageOf first_ split_, S.damageOf second_ split_) (Just 1, Just 1)
+    -- The other division, which is what every ORDER of the batch produces: the
+    -- whole 2 goes to the first hit and the second creature dies.
+    Spec.assertEqWith
+      s
+      "spent down the batch instead, the second creature dies"
+      (S.onBattlefield first_ downTheBatch, S.onBattlefield second_ downTheBatch)
+      (True, False)
+    -- Either way the target takes exactly the 2 that moved, so life cannot tell
+    -- the two divisions apart and the board above is the only reading that does.
+    Spec.assertEqWith s "bob takes the 2 either way" (S.lifeOf S.bob split_, S.lifeOf S.bob downTheBatch) (Just 18, Just 18)
+    -- The proxies, after the behaviour.
+    Spec.assertBool s (wasAskedToAllocateDamage (answersFor onePointEach redirected (Damage.applyDamage batch))) "alice was asked how to divide the 2"
+    Spec.assertEqWith s "setup: one counted row of 2, aimed at bob and watching omega" (countedRedirectRows redirected) [(2, Nothing, Recipient.ToPlayer S.bob, Just omega)]
   -- CR 615.12 speaks of PREVENTION effects, and a redirection is not one, so
   -- unpreventable damage still contends for the 2 and is still moved. This is
   -- what gives Replacement.contested's `contends` its observer: filtering the
@@ -2977,7 +3044,7 @@ harmsWaySpec s registry = Spec.describe s "Harm's Way (CR 614.9, CR 615.7, CR 60
     Spec.assertEqWith s "alice first: she keeps 1" (S.lifeOf S.alice aliceFirst) (Just 19)
     Spec.assertEqWith s "the creature keeps its whole 3" (S.damageOf mine aliceFirst) (Just 3)
     Spec.assertEqWith s "and bob takes the 2" (S.lifeOf S.bob aliceFirst) (Just 18)
-    Spec.assertBool s (wasAskedToOrderDamage (answersFor (orderedBy [Recipient.ToPlayer S.alice]) withPunk (Damage.applyDamage batch))) "alice was asked to order the batch"
+    Spec.assertBool s (wasAskedToAllocateDamage (answersFor (orderedBy [Recipient.ToPlayer S.alice]) withPunk (Damage.applyDamage batch))) "alice was asked how to divide the 2"
   -- The BASELINE: the same board, the spell never cast.
   Spec.it s "CR 614.9 no redirect, no move: alice takes the whole 5" $ do
     (_, _, omega, ready, _) <- board

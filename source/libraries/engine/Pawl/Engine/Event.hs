@@ -1220,7 +1220,7 @@ bringInFrom pid outerId gs = case Map.lookup outerId (GameState.outsideObjects g
 -- convenience rather than a constraint.
 resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
 resolveZoneChange asOf zc = do
-  (outcome, _, _, exiledBy, shuffling) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
+  (outcome, _, _, exiledBy, shuffling) <- applyReplacementsFully asOf Set.empty Map.empty (ProposedEvent.WouldChangeZone zc)
   case outcome >>= Replacement.asZoneChange of
     Nothing -> pure (Nothing, exiledBy, shuffling, Nothing)
     Just settled -> do
@@ -1413,7 +1413,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      for the floating one, and the AMOUNT half by its Squad Captain.
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
-  (outcome, _, _, _, _) <- applyReplacementsFully asOf batch event
+  (outcome, _, _, _, _) <- applyReplacementsFully asOf batch Map.empty event
   pure outcome
 
 -- The same loop, answering CR 615.13's second question as well: WHICH prevention
@@ -1429,9 +1429,9 @@ applyReplacementsIn asOf batch event = do
 -- where it was, so one proposed damage event can come out of the loop as two.
 -- Every other class comes out as at most one, which applyReplacementsIn reads
 -- off the first component alone.
-applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game ([ProposedEvent], [Prevention])
-applyReplacementsReporting asOf batch event = do
-  (outcome, residue, prevented, _, _) <- applyReplacementsFully asOf batch event
+applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> ProposedEvent -> Game ([ProposedEvent], [Prevention])
+applyReplacementsReporting asOf batch allowances event = do
+  (outcome, residue, prevented, _, _) <- applyReplacementsFully asOf batch allowances event
   pure (Maybe.maybeToList outcome <> residue, prevented)
 
 -- The loop itself, with the side answers its two classes of caller want: CR
@@ -1444,11 +1444,11 @@ applyReplacementsReporting asOf batch event = do
 -- The second component is the RESIDUE: the events a partial cover split off
 -- this one (Replacement.partialCoverage), each settled through its own
 -- continuation of the loop. Empty for every class but damage.
-applyReplacementsFully :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
-applyReplacementsFully asOf batch = loop asOf batch Set.empty [] Nothing False
+applyReplacementsFully :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
+applyReplacementsFully asOf batch allowances = loop asOf batch allowances Set.empty [] Nothing False
 
-loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
-loop asOf batch applied prevented exiledBy shuffling event = do
+loop :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
+loop asOf batch allowances applied prevented exiledBy shuffling event = do
   gs <- State.get
   -- From scratch each iteration: collect against the CURRENT state (or, for a
   -- CR 608.2f batch, the state the batch began in), minus CR 614.5's
@@ -1474,7 +1474,7 @@ loop asOf batch applied prevented exiledBy shuffling event = do
       -- once, in this loop. Pawl.ReplacementSpec's "a Corpsejack Menace reanimated
       -- beside a modular creature doubles nothing" is the proof.
       notSibling candidate = not (Set.member (ReplacementCandidate.source candidate) batch)
-      fresh = filter (\candidate -> unused candidate && notSibling candidate) (Replacement.applicable asOf gs event)
+      fresh = filter (\candidate -> unused candidate && notSibling candidate && not (Replacement.allocatedOut allowances candidate)) (Replacement.applicable asOf gs event)
   case Replacement.highestBucket fresh of
     -- CR 616.1f / 614.6: no candidate remains, so the surviving event happens.
     [] -> pure (Just event, [], prevented, exiledBy, shuffling)
@@ -1510,19 +1510,19 @@ loop asOf batch applied prevented exiledBy shuffling event = do
         -- (Replacement.oneEventPerRecipient), rather than here, because a later
         -- iteration can still move either half.
         Just candidate
-          | Just covered <- Replacement.partialCoverage gs candidate event,
+          | Just covered <- Replacement.partialCoverage gs allowances candidate event,
             Just (front, rest) <- Replacement.splitDamage covered event -> do
               let applied1 = Set.insert (ReplacementCandidate.identity candidate) applied
-              (survivor, residue1, prevented1, exiledBy1, shuffling1) <- applyChosen asOf batch applied prevented exiledBy shuffling candidate front
-              (leftover, residue2, prevented2, exiledBy2, shuffling2) <- loop asOf batch applied1 prevented1 exiledBy1 shuffling1 rest
+              (survivor, residue1, prevented1, exiledBy1, shuffling1) <- applyChosen asOf batch allowances applied prevented exiledBy shuffling candidate front
+              (leftover, residue2, prevented2, exiledBy2, shuffling2) <- loop asOf batch allowances applied1 prevented1 exiledBy1 shuffling1 rest
               pure (survivor, residue1 <> Maybe.maybeToList leftover <> residue2, prevented2, exiledBy2, shuffling2)
-        Just candidate -> applyChosen asOf batch applied prevented exiledBy shuffling candidate event
+        Just candidate -> applyChosen asOf batch allowances applied prevented exiledBy shuffling candidate event
 
 -- One iteration of `loop`: apply the chosen candidate to the event and continue
 -- with what comes back. Split out so the partial-cover branch above and the
 -- ordinary one apply a candidate the same way.
-applyChosen :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
-applyChosen asOf batch applied prevented exiledBy shuffling candidate event = do
+applyChosen :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
+applyChosen asOf batch allowances applied prevented exiledBy shuffling candidate event = do
   gs <- State.get
   -- CR 615.12: the chosen effect is a prevention effect and this damage
   -- can't be prevented (Spider-Punk), so it is APPLIED and prevents none
@@ -1566,7 +1566,7 @@ applyChosen asOf batch applied prevented exiledBy shuffling candidate event = do
   let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy inert candidate event outcome)
   case outcome of
     Nothing -> pure (Nothing, [], prevented1, exiledBy, shuffling)
-    Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) (shuffling || shufflesAfter candidate) rewritten
+    Just rewritten -> loop asOf batch allowances (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) (shuffling || shufflesAfter candidate) rewritten
 
 -- CR 607.2b's link, read OUTSIDE `apply` from the event before and after --
 -- `preventionBy`'s posture above, for its reason: no arm of that fold has to
@@ -2921,9 +2921,10 @@ apply batch candidate event =
       --
       -- No choice is made here, and none is owed: within one event CR 615.7
       -- leaves nothing to decide, since the prevention is neither optional nor
-      -- divisible by anyone's say-so. The choice the rule DOES describe -- which
-      -- of several simultaneous events the shield covers -- is asked one level
-      -- up, in resolveDamageBatch.
+      -- divisible by anyone's say-so. The choice the rule DOES describe -- how
+      -- much of the shield each of several simultaneous events gets -- is asked
+      -- one level up, in resolveDamageBatch, and arrives here as an event
+      -- already cut to that share (Replacement.partialCoverage).
       --
       -- NOT `consume`. That spends a row per APPLICATION, while CR 615.7's unit
       -- is the amount of damage rather than the number of events or sources
@@ -3796,9 +3797,9 @@ fullyUnlockedAfter halves card = case card of
 -- is the only funnel that sees a single proposal's whole outcome, which is the
 -- scope that collapse wants; the key's source component is what keeps a CR 510.2
 -- batch's separate dealers apart in any case.
-resolveDamage :: DamageEvent.DamageEvent -> Game ([DamageEvent.DamageEvent], [Prevention])
-resolveDamage de = do
-  (outcome, prevented) <- applyReplacementsReporting Nothing Set.empty (ProposedEvent.WouldDealDamage de)
+resolveDamage :: Map CandidateId Natural -> DamageEvent.DamageEvent -> Game ([DamageEvent.DamageEvent], [Prevention])
+resolveDamage allowances de = do
+  (outcome, prevented) <- applyReplacementsReporting Nothing Set.empty allowances (ProposedEvent.WouldDealDamage de)
   pure (Replacement.oneEventPerRecipient (Maybe.mapMaybe Replacement.asDamageEvent outcome), prevented)
 
 -- CR 608.2f / 510.2: settle a whole batch of SIMULTANEOUS damage events, and
@@ -3813,17 +3814,19 @@ resolveDamage de = do
 --   * CR 616.1's APNAP clause, because a lone event has one affected object and
 --     so one chooser: only a batch can present choices to two players at once.
 --     orderBatch settles that order before any of the batch is asked.
---   * CR 615.7's ORDER, because the shield is a single resource allocated across
---     the whole batch and the rule gives that choice to the shielded side -- CR
---     101.4c saying the same of CR 122.1c's shield counters.
+--   * CR 615.7's ALLOCATION, because the shield is a single resource divided
+--     across the whole batch and the rule gives that choice to the shielded side
+--     -- CR 101.4c saying the same of CR 122.1c's shield counters, whose unit is
+--     whole events and whose answer is therefore an order. orderBatch asks both
+--     and hands back each event's share of every countdown.
 --   * CR 615.13's GROUPING, because that rule fires an ability "each time a
 --     prevention effect is applied to one or more simultaneous damage events",
 --     so one instance reaching three of this batch's events is ONE prevention of
 --     the total rather than three.
 resolveDamageBatch :: [DamageEvent.DamageEvent] -> Game ([DamageEvent.DamageEvent], [Prevention])
 resolveDamageBatch events = do
-  ordered <- Replacement.orderBatch events
-  settled <- Monad.mapM resolveDamage ordered
+  (ordered, allowances) <- Replacement.orderBatch events
+  settled <- Monad.zipWithM resolveDamage allowances ordered
   pure (concatMap fst settled, Replacement.groupPreventions (concatMap snd settled))
 
 -- CR 701.8 / 614.8: settle a proposed destruction. `Just` is the object actually

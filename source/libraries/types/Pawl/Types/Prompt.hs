@@ -427,10 +427,16 @@ data Prompt r where
   -- Pawl.Engine.Event.Trigger.delayedPending it is CR 101.4c's asking order, the first
   -- named asked first, elided on the count alone.
   OrderTriggers :: Decider.Decider -> PlayerId.PlayerId -> [TriggerEntry.TriggerEntry] -> Prompt [Natural.Natural]
-  -- | CR 615.7: the order a shield is offered two or more simultaneous damage
-  -- events, a permutation of their indices; asked only where the order is
-  -- observable.
+  -- | CR 122.1c / 614.3: the order a resource counted in whole events or
+  -- applications is offered two or more simultaneous damage events, a
+  -- permutation of their indices; asked only where the order is observable. A
+  -- countdown counted in POINTS is divisible and takes AllocateDamage below.
   OrderDamage :: Decider.Decider -> PlayerId.PlayerId -> [DamageEvent.DamageEvent] -> Prompt [Natural.Natural]
+  -- | CR 615.7: how much of a counted shield's or redirect's remaining points
+  -- goes to each of two or more simultaneous damage events it covers, one
+  -- Natural per offered event and the payload's Natural what there is to
+  -- divide; asked only where two or more divisions differ.
+  AllocateDamage :: Decider.Decider -> PlayerId.PlayerId -> [DamageEvent.DamageEvent] -> Natural.Natural -> Prompt [Natural.Natural]
   -- | CR 616.1: which of the applicable replacement effects applies next, an
   -- index into the candidates, re-asked per iteration (CR 616.1f); elided
   -- where the candidates are indistinguishable in effect and, where

@@ -797,6 +797,21 @@ preferring wanted =
          in Set.fromList (take (Natural.toIntSaturating n) (yes <> no))
     )
 
+-- CR 615.7's allocation stated as an ORDER: spend the whole of the offered share
+-- on the events in `rank` order, each taking as much as it can. What a test
+-- means by "the shield goes on this recipient first", and the division pawl made
+-- before the division became the shielded side's to choose -- so a test written
+-- against the old order question reads the same through this. A test whose
+-- subject is the SPLIT itself answers Prompt.AllocateDamage directly.
+allocateInOrder :: (Ord k) => (DamageEvent.DamageEvent -> k) -> [DamageEvent.DamageEvent] -> Natural -> [Natural]
+allocateInOrder rank events share =
+  let spend left entries = case entries of
+        [] -> []
+        (i, event) : rest ->
+          let taken = min left (DamageEvent.amount event)
+           in (i, taken) : spend (left - taken) rest
+   in fmap snd (List.sortOn fst (spend share (List.sortOn (rank . snd) (zip [0 :: Int ..] events))))
+
 -- Identity interpreter: shuffle returns ids unchanged; actions never occur here.
 identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
@@ -2589,6 +2604,7 @@ promptDecider prompt = case prompt of
   Prompt.ChoosePlayer decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderTriggers decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderDamage decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.AllocateDamage decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseReplacement decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseSacrifices decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExilesFromGraveyard decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -2715,6 +2731,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChoosePlayer {} -> "ChoosePlayer"
   Prompt.OrderTriggers {} -> "OrderTriggers"
   Prompt.OrderDamage {} -> "OrderDamage"
+  Prompt.AllocateDamage {} -> "AllocateDamage"
   Prompt.ChooseReplacement {} -> "ChooseReplacement"
   Prompt.ChooseSacrifices {} -> "ChooseSacrifices"
   Prompt.ChooseExilesFromGraveyard {} -> "ChooseExilesFromGraveyard"

@@ -35,9 +35,9 @@ import qualified Pawl.Types.Uses as Uses
 -- CR 615.7's multi-source choice is asked over
 -- Pawl.Engine.Event.resolveDamageBatch's batch: each DamageEvent still runs
 -- its own CR 616.1 loop, and what the shielded player (or the shielded
--- permanent's controller) decides is the ORDER those loops run in -- among the
--- events their own shield contests, which CR 616.1's APNAP clause has already
--- grouped together (Pawl.Engine.Replacement.orderBatch).
+-- permanent's controller) decides is how many of the shield's remaining POINTS
+-- go to each of the events it contests, which CR 616.1's APNAP clause has
+-- already grouped by chooser (Pawl.Engine.Replacement.orderBatch).
 --
 -- `timestamp` doubles as this instance's CR 614.5 identity:
 -- GameState.nextTimestamp is monotone, so no two floating replacements share one.

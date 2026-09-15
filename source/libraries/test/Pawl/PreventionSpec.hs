@@ -204,6 +204,15 @@ wasAskedToOrderDamage =
         _ -> False
    in any isOrder
 
+-- Was CR 615.7's batch-division question raised at all? The order question's
+-- twin, for the countdowns counted in points rather than in whole events.
+wasAskedToAllocateDamage :: [Response.Response] -> Bool
+wasAskedToAllocateDamage =
+  let isAllocation r = case r of
+        Response.AllocatedDamage _ -> True
+        _ -> False
+   in any isAllocation
+
 countersOn :: CounterKind.CounterKind Keyword.Keyword -> ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
 countersOn kind oid gs =
   maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
@@ -834,11 +843,17 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
       -- Order a contested batch by preferring the event from `src`, by SOURCE id
       -- rather than by position, so the assertion does not depend on the order
       -- the batch was gathered in.
+      -- Take 2 off every event the shield is offered. Pinned by shape rather
+      -- than searched for, so a mutation cannot be repaired into an answer that
+      -- happens to be legal.
+      twoEach :: Prompt.Prompt r -> r
+      twoEach p = case p of
+        Prompt.AllocateDamage _ _ events _ -> fmap (const 2) events
+        _ -> S.identityAnswer p
       shieldFirst :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       shieldFirst src p = case p of
-        Prompt.OrderDamage _ _ events ->
-          let key e = (DamageEvent.source e /= src, DamageEvent.source e)
-           in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
+        Prompt.AllocateDamage _ _ events share ->
+          S.allocateInOrder (\e -> (DamageEvent.source e /= src, DamageEvent.source e)) events share
         _ -> S.identityAnswer p
   -- CR 615.7's arithmetic, one event at a time: the shield takes what it can of
   -- each event and reduces by exactly that much. Three 3-damage events against a
@@ -914,8 +929,8 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     Spec.assertEqWith s "setup: bob is shielded, not alice" (length (GameState.replacements shielded)) 1
     Spec.assertBool
       s
-      (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch)))
-      "bob was asked which damage the shield prevents"
+      (wasAskedToAllocateDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch)))
+      "bob was asked how the shield is divided"
     Spec.assertEqWith s "bob spends the shield on the 5: 1 of it and all of the 3 get through" (amounts tookTheBig) [1, 3]
     Spec.assertEqWith s "bob spends it on the 3 instead: that event never happens, and 4 of the 5 land" (amounts tookTheSmall) [4]
     -- CR 615.7's last sentence again, from the other side: the shield prevents 4
@@ -925,6 +940,27 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     Spec.assertEqWith s "either way the shield prevented exactly 4" (S.lifeOf S.bob tookTheSmall) (Just 16)
     Spec.assertEqWith s "and either way it is spent" (GameState.replacements tookTheBig) []
     Spec.assertEqWith s "and either way it is spent" (GameState.replacements tookTheSmall) []
+  -- CR 615.7 by the POINT rather than by the event: "each 1 damage that would be
+  -- dealt to the shielded permanent or player is prevented", so the shielded
+  -- side may split the shield across the batch and not merely rank it. The same
+  -- board as the case above, divided 2 and 2: both events survive, at 3 and at
+  -- 1, which no ranking of a 5 and a 3 against a shield of 4 can produce -- the
+  -- orders reach [1,3] and [4] and nothing else.
+  Spec.it s "CR 615.7 bob splits the shield between the two events, which no order can do" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (big, g1) = S.addPermanent pikerPrinting S.alice base
+        (small, g2) = S.addPermanent pikerPrinting S.alice g1
+        (g3, spellId) = S.handOne mendingHands g2
+        shielded = castAndResolve (aimPlayer S.bob) g3 spellId
+        batch = [hit big (Recipient.ToPlayer S.bob) 5, hit small (Recipient.ToPlayer S.bob) 3]
+        halved = settleDamage twoEach shielded batch
+    -- THE gameplay assertion: both events happened, each cut by 2.
+    Spec.assertEqWith s "2 off each: a 3 and a 1 are dealt" (amounts halved) [3, 1]
+    Spec.assertEqWith s "and the shield still prevented exactly 4" (S.lifeOf S.bob halved) (Just 16)
+    Spec.assertEqWith s "and it is spent" (GameState.replacements halved) []
   -- The elision half, and the reason the prompt is gated rather than raised for
   -- every batch: a shield big enough to cover the whole batch prevents all of it
   -- in any order, so there is nothing to decide and nothing is asked.
@@ -941,8 +977,8 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
         after = S.runPure S.identityAnswer shielded (Damage.applyDamage batch)
     Spec.assertBool
       s
-      (not (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch))))
-      "no OrderDamage was raised: 4 covers 1 and 2 together"
+      (not (wasAskedToAllocateDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch))))
+      "no AllocateDamage was raised: 4 covers 1 and 2 together"
     Spec.assertEqWith s "both events were prevented whole" (amounts after) []
     Spec.assertEqWith s "bob's life is untouched" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "and 3 of the shield's 4 were spent, so 1 remains" (length (GameState.replacements after)) 1
