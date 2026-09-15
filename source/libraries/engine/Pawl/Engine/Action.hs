@@ -328,7 +328,8 @@ legalActions pid gs =
       --
       -- Cost.activationManaSourcesGiven is the whole gate, and it is the SAME
       -- list CR 605.3a's other two windows are served from (Cost.payMana's
-      -- candidates, where CR 605.3c drops whatever is already mid-activation):
+      -- candidates, where CR 605.3c drops whichever ability is already
+      -- mid-activation):
       -- controlled, and offering some route Cost.manaActivations admits
       -- -- CR 118.3's payability of the ability's own cost (CR 602.2b), which
       -- carries CR 107.5's tapped permanent and CR 302.6's sick creature with

@@ -114,6 +114,25 @@ import qualified Pawl.Types.Supertype as Supertype
 -- (`supplyCapacity`), and this module cannot reach the function that asks.
 type Capacity = Measure -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> [ActivationRestriction.ActivationRestriction] -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> GameState -> Activations.Activations
 
+-- CR 605.3c's set: which ABILITY of which object is mid-activation, so that a
+-- payment window nested inside it cannot offer that ability again. Keyed by the
+-- ability and not by the object alone, because the rule narrows the ability --
+-- Skyshroud Elf's "{1}: Add {R} or {W}" may be paid by tapping the same Elf for
+-- its own "{T}: Add {G}" (Pawl.ManaSpec's Skyshroud Elf group). Nothing is CR
+-- 305.6's intrinsic route, which is printed on no card and so is no ability's.
+--
+-- The ability by VALUE, Pawl.Types.ManaOption's reason: there is no one list to
+-- index into, and two abilities equal as values are interchangeable. Two EQUAL
+-- abilities printed on one permanent are therefore one key, which is stricter
+-- than CR 605.3c and in the safe direction; no printing has them.
+type InFlight = Set.Set (ObjectId, Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))
+
+-- Whether CR 605.3c bars this route: the one reader both the offer
+-- (`manaSourcesGiven`) and the activation (Pawl.Engine.Cost.tapForManaWith) ask
+-- through, so they cannot disagree about which routes the window has left.
+inFlightRoute :: InFlight -> ObjectId -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+inFlightRoute inFlight oid ability = Set.member (oid, ability) inFlight
+
 -- WHICH reader is asking a Capacity: CR 605.3a's windows, which offer a route
 -- only when its whole cost is payable right now, or the supply walk, which
 -- models the route's own mana as a DEMAND instead and so must not ask.
@@ -768,10 +787,16 @@ endRetentionAtEndOf ending gs =
 -- caller that DOES change the state, by tapping -- takes a fresh State.get on
 -- every pass.
 manaSources :: Capacity -> PlayerId -> GameState -> [ObjectId]
-manaSources capacity pid gs = manaSourcesGiven capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+manaSources capacity pid gs = manaSourcesGiven Set.empty capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
-manaSourcesGiven :: Capacity -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-manaSourcesGiven capacity grants pcs pid gs =
+-- `inFlight` is CR 605.3c's narrowing, applied HERE beside CR 118.3's gate
+-- rather than by the caller, because the two are one question: a permanent is a
+-- source when some route of it is both payable and not already mid-activation.
+-- Filtering the answer by object instead would take a permanent's OTHER mana
+-- ability off a window its first one opened -- Skyshroud Elf is the printing,
+-- and Pawl.ManaSpec's Skyshroud Elf group is what proves it.
+manaSourcesGiven :: InFlight -> Capacity -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
+manaSourcesGiven inFlight capacity grants pcs pid gs =
   let -- A route answered 0 is no route at all, so a permanent whose every
       -- route is refused is not a source -- Phyrexian Tower's "{T}, Sacrifice a
       -- creature" with no creature to give (CR 118.3), a tapped Forest's "{T}"
@@ -784,7 +809,7 @@ manaSourcesGiven capacity grants pcs pid gs =
       -- the tap and sickness rules reach only such a cost. A Blood Pet is a
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
-      isSource oid = any (\(cost, restrictions, ability, _, _) -> Activations.times (capacity ForOffer pcs pid oid cost restrictions ability gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      isSource oid = any (\(cost, restrictions, ability, _, _) -> not (inFlightRoute inFlight oid ability) && Activations.times (capacity ForOffer pcs pid oid cost restrictions ability gs) > 0) (manaRoutesOfGiven pcs oid gs)
       -- CR 723.7, in the one form a card prints it: Word of Command's "the
       -- player can activate mana abilities only if they're from lands that
       -- player controls". Read off the control row rather than from the
@@ -1662,7 +1687,7 @@ canPay capacity pid = canPayCommitting PaymentSubject.ForNeither capacity ManaSp
 canPayCommitting :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
 canPayCommitting subject capacity spending pid committed claimed cost gs =
   let pcs = Projection.projectAll gs
-   in canPayCommittingGiven subject capacity spending (manaSourcesGiven (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in canPayCommittingGiven subject capacity spending (manaSourcesGiven Set.empty (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same question given a board already walked -- see payableResolutionsGiven
 -- for what `sources` and `pcs` are and why handing them in changes no answer.
@@ -1895,7 +1920,7 @@ sourceOptions clauses admitting contended supplies =
 payableResolutions :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
 payableResolutions subject capacity spending pid committed claimed cost gs =
   let pcs = Projection.projectAll gs
-   in payableResolutionsGiven subject capacity spending (manaSourcesGiven (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in payableResolutionsGiven subject capacity spending (manaSourcesGiven Set.empty (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same list given a board the CALLER has already walked, which is the half
 -- Action.legalActions' enumeration wants: the wrapper above takes one
