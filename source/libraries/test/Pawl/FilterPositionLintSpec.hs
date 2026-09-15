@@ -94,6 +94,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MovedKinds as MovedKinds
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
@@ -237,6 +238,7 @@ canHostSubjects predicate = case predicate of
   -- PlayerRelation, which holds no Filter for a card author to reach.
   Filter.Type.OwnedBy _ -> 0
   Filter.Type.IsSource -> 0
+  Filter.Type.IsObject _ -> 0
   Filter.Type.TargetsSource -> 0
   Filter.Type.TargetsOnlySource -> 0
   -- A DESCENT and not a zero, for AttachedTo's reason below: CR 115.1's atom
@@ -2077,6 +2079,27 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- hand-built face carrying the atom in a target slot finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.ControlledByPlayer (PlayerId.MkPlayerId 1))]]
+        targetSlot = TargetSlot.required Pool.Creatures (Just buried)
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- CR 702.119c's baked half, in the position the atom above holds: an ObjectId
+  -- that only a cast can know, written by Pawl.Engine.Cost.candidateCostsGiven
+  -- into an emerge candidate's sacrifice criterion and round-tripped by a total
+  -- codec, so nothing but this keeps card JSON from naming an object.
+  Spec.it s "CR 702.119c no card writes IsObject" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "IsObject") (Codec.encode (Face.Codec.codec Card.codec) c)
+        offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
+    Spec.assertEqWith s "the baked atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- Not vacuous, for the sibling sweep's reason.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.IsObject (ObjectId.MkObjectId 1))]]
         targetSlot = TargetSlot.required Pool.Creatures (Just buried)
         planted =
           (S.combinedFace piker)

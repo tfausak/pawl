@@ -332,6 +332,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.ControlledByRecipient -> predicate
         Filter.Type.OwnedBy _ -> predicate
         Filter.Type.IsSource -> predicate
+        Filter.Type.IsObject _ -> predicate
         Filter.Type.TargetsSource -> predicate
         Filter.Type.TargetsOnlySource -> predicate
         -- NOT descended into, for the reason AttachedTo below is not: `candidate` here

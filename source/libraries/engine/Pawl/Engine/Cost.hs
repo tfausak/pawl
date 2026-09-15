@@ -326,24 +326,30 @@ candidateCostsGiven permitted pid name oid gs =
               -- flashback's, rule 702.119a sending the cast through CR 601.2f-h in
               -- its own words.
               --
-              -- ONE CANDIDATE PER MANA VALUE a sacrificeable creature has, which
-              -- is how CR 702.119c's timing is kept: the victim is chosen "as you
-              -- choose to pay a spell's emerge cost (see rule 601.2b)" and CR
-              -- 601.2f needs its mana value before CR 601.2h sacrifices it, so the
-              -- amount has to be settled at the announcement. Picking the
-              -- candidate IS rule 702.119c's choice; picking which creature of
-              -- that mana value to sacrifice is left to CR 601.2h, where two
-              -- creatures sharing a mana value are still told apart (a dies
-              -- trigger, a toughness) and still prompted for.
+              -- ONE CANDIDATE PER SACRIFICEABLE CREATURE, each naming that one
+              -- creature outright (Filter.IsObject): CR 702.119c chooses the
+              -- permanent "as you choose to pay a spell's emerge cost (see rule
+              -- 601.2b)" and sacrifices THAT permanent at CR 601.2h, so picking
+              -- the candidate is rule 702.119c's choice and the component it
+              -- carries admits nothing else. CR 601.2f's amount rides the same
+              -- pick, which is why it has to be made here: the reduction is the
+              -- chosen creature's mana value and the total locks before CR 601.2h.
               --
-              -- Not implemented: a creature that stops being sacrificeable between
-              -- CR 601.2b and CR 601.2h -- one spent to a mana ability at CR
-              -- 601.2g -- leaves the payment to fail on the whole mana value
-              -- rather than on the one creature rule 702.119c locked (#3702).
+              -- What the identity buys over the mana value the amount needs: a
+              -- victim eaten between the two steps -- spent to a mana ability at
+              -- CR 601.2g -- leaves CR 601.2h with nothing to sacrifice and the
+              -- cast reverses (CR 733.1), where a candidate naming a mana value
+              -- would let a second creature of that value pay instead
+              -- (Pawl.CastSpec's "CR 702.119c an Ashnod's Altar that eats the
+              -- chosen creature reverses the cast").
+              --
+              -- Two creatures of one mana value are therefore two candidates
+              -- rather than one, and Prompt.ChooseCost tells them apart -- they
+              -- differ in the object their sacrifice component names.
               --
               -- The pool is Replacement.sacrificeCandidates, so CR 701.21a's
               -- restrictions are asked once, here, rather than left to surprise
-              -- CR 601.2h. Rule 701.21a is also why neither criterion states a
+              -- CR 601.2h. Rule 701.21a is also why the criterion states no
               -- control clause -- "a player can't sacrifice ... something that's a
               -- permanent they don't control", which that pool is already the
               -- caster's. Filter.ControlledBy could not say it anyway:
@@ -351,26 +357,18 @@ candidateCostsGiven permitted pid name oid gs =
               -- perspective, in every zone, so that atom is vacuously False there
               -- whatever the criterion is on.
               emerged =
-                let criterion n =
-                      Filter.Type.And
-                        [ Filter.Type.HasCardType CardType.Creature,
-                          Filter.Type.ManaValueAtMost n,
-                          Filter.Type.Not (Filter.Type.ManaValueAtMost (n - 1))
-                        ]
-                    anyCreature = Filter.Type.HasCardType CardType.Creature
-                    values =
-                      Set.fromList
-                        ( Maybe.mapMaybe
-                            (\vid -> Filter.manaValue (Projection.viewOfObject vid gs))
-                            (Replacement.sacrificeCandidates Map.empty pid (Just oid) anyCreature gs)
-                        )
-                    offer cost n =
+                let anyCreature = Filter.Type.HasCardType CardType.Creature
+                    victims =
+                      Maybe.mapMaybe
+                        (\vid -> fmap ((,) vid) (Filter.manaValue (Projection.viewOfObject vid gs)))
+                        (Replacement.sacrificeCandidates Map.empty pid (Just oid) anyCreature gs)
+                    offer cost (vid, n) =
                       CandidateCost.MkCandidateCost
                         (Just (Keyword.Type.Emerge cost))
-                        (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (criterion n))]})
+                        (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.IsObject vid))]})
                         [ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]]
                  in concatMap
-                      (\cost -> fmap (offer cost) (Set.toAscList values))
+                      (\cost -> fmap (offer cost) victims)
                       (Keyword.emergeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.117a and CR 702.137a: surge and spectacle, evoked's offer
               -- with a GATE -- read off the projection, wrapped by
@@ -559,15 +557,22 @@ candidateCostsGiven permitted pid name oid gs =
                       -- 702.180a's last sentence sending the cast through CR
                       -- 601.2f-h in its own words.
                       --
-                      -- ONE CANDIDATE PER POWER an untapped creature this player
-                      -- controls has, which is how CR 702.180b's timing is kept:
-                      -- the creature is chosen "as you choose to pay a spell's
-                      -- harmonize cost (see rule 601.2b)" and CR 601.2f needs its
-                      -- power before the tap happens, so the amount is settled at
-                      -- the announcement. Picking the candidate IS rule 702.180b's
-                      -- choice; picking which creature of that power to tap is left
-                      -- to the payment, where two creatures sharing a power are
-                      -- still told apart and still prompted for.
+                      -- ONE CANDIDATE PER TAPPABLE CREATURE, `emerged`'s offer
+                      -- above one keyword over and for its reasons: CR 702.180b
+                      -- chooses the creature "as you choose to pay a spell's
+                      -- harmonize cost (see rule 601.2b)" and taps THAT creature
+                      -- as the cost is paid, so the criterion names it outright
+                      -- (Filter.IsObject) and CR 601.2f's amount -- its power --
+                      -- rides the same pick. A creature tapped for mana at CR
+                      -- 601.2g therefore reverses the cast (CR 733.1) rather than
+                      -- letting a second creature of that power pay
+                      -- (Pawl.CastSpec's "CR 702.180b tapping the chosen creature
+                      -- for mana reverses the cast").
+                      --
+                      -- The identity does not replace the description: the
+                      -- criterion keeps `untappedYours`, so the payment re-asks
+                      -- rule 702.180a's "untapped creature you control" of the
+                      -- named creature at CR 601.2h.
                       --
                       -- PLUS the zero-creature candidate, first, which is rule
                       -- 702.180a's "UP TO one untapped creature you control": the
@@ -585,32 +590,25 @@ candidateCostsGiven permitted pid name oid gs =
                       -- whether a creature was tapped would be what told them
                       -- apart.
                       --
-                      -- Not implemented: a creature that stops being tappable
-                      -- between CR 601.2b and the payment leaves it to fail on the
-                      -- whole power rather than on the one creature rule 702.180b
-                      -- locked (#3702).
-                      --
                       -- The pool is `tapCandidates`, the same one the payment draws
-                      -- on, so the powers offered are exactly the powers payable;
-                      -- its perspective is the payer, which is what lets rule
-                      -- 702.180a's "you control" be an atom here.
+                      -- on, so the creatures offered are exactly the creatures
+                      -- payable; its perspective is the payer, which is what lets
+                      -- rule 702.180a's "you control" be an atom here.
                       harmonized =
                         let untappedYours = [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsTapped, Filter.Type.ControlledBy PlayerRelation.You]
-                            criterion n = Filter.Type.And (untappedYours <> [Filter.Type.PowerAtLeast n, Filter.Type.PowerAtMost n])
-                            powers =
-                              Set.fromList
-                                ( Maybe.mapMaybe
-                                    (\vid -> Filter.power (Projection.viewOfObject vid gs))
-                                    (tapCandidates Map.empty pid oid (Filter.Type.And untappedYours) gs)
-                                )
-                            tappingOne cost n =
+                            criterion vid = Filter.Type.And (untappedYours <> [Filter.Type.IsObject vid])
+                            tappable =
+                              Maybe.mapMaybe
+                                (\vid -> fmap ((,) vid) (Filter.power (Projection.viewOfObject vid gs)))
+                                (tapCandidates Map.empty pid oid (Filter.Type.And untappedYours) gs)
+                            tappingOne cost (vid, n) =
                               CandidateCost.MkCandidateCost
                                 (Just (Keyword.Type.Harmonize cost))
-                                (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (criterion n))]})
+                                (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (criterion vid))]})
                                 [ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]]
                             tappingNone cost = CandidateCost.plain (Just (Keyword.Type.Harmonize cost)) (withAdditional cost)
                          in concatMap
-                              (\cost -> tappingNone cost : fmap (tappingOne cost) (Set.toAscList powers))
+                              (\cost -> tappingNone cost : fmap (tappingOne cost) tappable)
                               (Keyword.harmonizeCosts keywords)
                    in fmap flashback (Keyword.flashbackCosts keywords)
                         <> fmap escape (Keyword.escapeCosts keywords)

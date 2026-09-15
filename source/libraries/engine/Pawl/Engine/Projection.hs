@@ -2432,6 +2432,8 @@ filterReads f = case f of
   -- rule change an owner, so no Modification writes Object.owner.
   Filter.Type.OwnedBy _ -> Set.empty
   Filter.Type.IsSource -> Set.empty
+  -- Reads an IDENTITY, IsBound's answer below.
+  Filter.Type.IsObject _ -> Set.empty
   -- CR 115.1 / 109.3: a target is a property of a stack object and no
   -- characteristic, so no Modification writes one.
   Filter.Type.TargetsSource -> Set.empty
@@ -2744,6 +2746,7 @@ filterReadsPeers f = case f of
   Filter.Type.ControlledByRecipient -> False
   Filter.Type.OwnedBy _ -> False
   Filter.Type.IsSource -> False
+  Filter.Type.IsObject _ -> False
   Filter.Type.TargetsSource -> False
   Filter.Type.TargetsOnlySource -> False
   Filter.Type.TargetsPlayer _ -> False

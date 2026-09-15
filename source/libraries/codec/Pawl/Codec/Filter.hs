@@ -8,6 +8,7 @@ import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.Expansion as Expansion
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
+import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.ProductionTag as ProductionTag
@@ -80,6 +81,7 @@ codec keywordCodec =
       -- zone holds no negative number of cards.
       Arm.payload "CardsInGraveyardAtLeast" Common.natural Filter.CardsInGraveyardAtLeast (\x -> case x of Filter.CardsInGraveyardAtLeast y -> Just y; _ -> Nothing),
       Arm.nullary "IsSource" Filter.IsSource,
+      Arm.payload "IsObject" ObjectId.codec Filter.IsObject (\x -> case x of Filter.IsObject y -> Just y; _ -> Nothing),
       Arm.nullary "TargetsSource" Filter.TargetsSource,
       Arm.nullary "TargetsOnlySource" Filter.TargetsOnlySource,
       -- Recursive for ControlsMoreThanYou's reason: the payload describes the one
@@ -185,6 +187,7 @@ tagOf x = case x of
   Filter.ControlsMoreThanYou {} -> "ControlsMoreThanYou"
   Filter.CardsInGraveyardAtLeast {} -> "CardsInGraveyardAtLeast"
   Filter.IsSource {} -> "IsSource"
+  Filter.IsObject {} -> "IsObject"
   Filter.TargetsSource {} -> "TargetsSource"
   Filter.TargetsOnlySource {} -> "TargetsOnlySource"
   Filter.TargetsOnlyOne {} -> "TargetsOnlyOne"
