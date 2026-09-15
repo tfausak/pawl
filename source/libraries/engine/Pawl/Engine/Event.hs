@@ -104,6 +104,7 @@ import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect.Type
+import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -2082,80 +2083,42 @@ apply batch candidate event =
           let stamp o = o {Object.chosenNames = picked}
            in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
         pure (Just event)
-      -- CR 306.5b via CR 614.1c: this permanent enters with N counters. Into the
-      -- pending map through addEnteringCounters, and NOT a direct write to
-      -- Object.counters, because CR 614.16 makes a counter-scaling replacement
-      -- apply even when the original event was not itself an effect -- so Doubling
-      -- Season has to see these. It sees them in THIS loop, as a row against the
-      -- same WouldEnter event, which is what lets CR 616.1 order the two. Consumed
-      -- like every other arm, so CR 614.5 keeps the loop's next iteration from
-      -- counting them twice.
-      --
-      -- CR 614.1c also admits "a number of ... counters ... equal to [something]"
-      -- (Undergrowth Scavenger), so the amount is a Quantity and is evaluated ONCE
-      -- here (CR 608.2h: information the effect requires is determined only once,
-      -- when the effect is applied), when this row applies, rather than per
-      -- iteration of the entry loop around it. CR 107.1b clamps a negative result
-      -- to zero, which is Integer.toNaturalSaturating.
-      --
-      -- The permanent is already materialized on the battlefield when this loop
-      -- runs (see runEntry), so the CR 613 projection answers for it. The Context
-      -- is the ROW's, through Replacement.candidateContext: CR 109.5's "you" is
-      -- the row's controller rather than the entrant's, and a floating row's
-      -- captured slot bindings ride along, which is what a bare Filter.contextFor
-      -- would have dropped; see #2141 for the caller that still does.
+      -- CR 306.5b via CR 614.1c: this permanent enters with N counters. Every
+      -- kind in ONE application, consuming the candidate once, because the row
+      -- carries a map of kinds -- Agent's Toolkit's "+1/+1 counter, a flying
+      -- counter, a deathtouch counter, and a shield counter" (#2314). CR 614.5
+      -- gives a scaling replacement one opportunity over the whole entry, so a
+      -- kind per row would put an ordering in CR 616.1's pool that the card's own
+      -- sentence does not have; Pawl.ReplacementSpec's Agent's Toolkit case reads
+      -- that off a board where the two orders disagree.
       --
       -- Consumed unconditionally: CR 614.5 is about the row having applied, and a
       -- row whose amount would not evaluate has still applied. Consuming only on
       -- the evaluable branch loops.
       --
-      -- EVERY KIND IN ONE APPLICATION, consuming the candidate once, because the
-      -- row carries a map of kinds -- Agent's Toolkit's "+1/+1 counter, a flying
-      -- counter, a deathtouch counter, and a shield counter" (#2314). CR 614.5
-      -- gives a scaling replacement one opportunity over the whole entry, so a
-      -- kind per row would put an ordering in CR 616.1's pool that the card's own
-      -- sentence does not have; Pawl.ReplacementSpec's Agent's Toolkit case
-      -- reads that off a board where the two orders disagree. The amounts are
-      -- evaluated against the SAME board for the same reason: the row applies
-      -- once, so its amounts are read once.
-      --
-      -- CR 107.3m: an X inside the amount is the value announced for the SPELL
-      -- that became this permanent, not the permanent's own 0 -- Protean Hydra's
-      -- "this creature enters with X +1/+1 counters on it". Substituted in rather
-      -- than read as a binding, because CR 400.7 left the permanent none: the
-      -- announcement rides across the move on Object.announcedX, which
-      -- Quantity.substituteAnnouncedX puts back where the rule says it belongs and
-      -- nowhere else.
-      --
-      -- The AMOUNT is CR 614.12's "how they apply", so it counts over
-      -- Projection.boardAsEntering rather than the live battlefield -- Squad
-      -- Captain's "a +1/+1 counter on it for each other creature you control"
-      -- must not count a creature arriving in the same batch. The VIEW stays the
-      -- live one, as Projection.replacementsOf's does and for its reason.
-      -- Pawl.ReplacementSpec's Squad Captain pair proves it, over a Rise of the
-      -- Dark Realms sweep: mutating this call back to the live board reddens
-      -- "no +1/+1 counter".
+      -- placeEntryCounters is the funnel, shared with the EntersWith arm below,
+      -- whose sentence prints a counter half beside its keywords.
       EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
-        gs <- State.get
-        let viewOf = Projection.viewWithLastKnown oid gs
-            context = Replacement.candidateContext gs candidate
-            announcedX = Projection.announcedXOf oid gs
         Replacement.consume (ReplacementCandidate.identity candidate)
-        Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
-          case Quantity.evaluate viewOf context (Projection.boardAsEntering gs) oid (Quantity.substituteAnnouncedX announcedX quantity) of
-            Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
-            Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
+        placeEntryCounters candidate oid counters
         pure (Just event)
-      -- CR 614.1c: "[This permanent] enters ... with [keywords]" -- Faerie
-      -- Squadron's "and with flying", the keyword half of the clause whose counter
-      -- half the arm above places.
+      -- CR 614.1c: "[This permanent] enters with [counters] ... and with
+      -- [keywords]" -- Voidpouncer's whole sentence, counters and keyword
+      -- together.
       --
-      -- A STORED continuous effect (CR 611.2), riot's landing and every word of
-      -- its argument: the clause says the permanent has the keyword and names no
-      -- end, which is CR 611.2a's rest-of-the-game duration, and a stored effect
-      -- is what puts the grant in CR 613.1f's layer 6 with a timestamp for
-      -- Humility to be ordered against. Its source is the entering permanent
-      -- itself (CR 113.7).
+      -- ONE row and one candidate, because CR 616.1 counts replacement EFFECTS
+      -- and the sentence is one: written as two rows the entry asked its
+      -- controller for an order the rules never ask for, and put a second
+      -- question in front of a genuine one where a scaling row shared the pool
+      -- (see #3288). The counters take the arm above's funnel, called from
+      -- here, so CR 614.5 gives a scaler one opportunity across both halves.
+      --
+      -- The keywords are granted as a STORED continuous effect (CR 611.2), riot's
+      -- landing and every word of its argument: the clause says the permanent has
+      -- the keyword and names no end, which is CR 611.2a's rest-of-the-game
+      -- duration, and a stored effect is what puts the grant in CR 613.1f's layer
+      -- 6 with a timestamp for Humility to be ordered against. Its source is the
+      -- entering permanent itself (CR 113.7).
       --
       -- NOT a write into the copiable snapshot, which is what tells this arm from
       -- ChoiceOf's: CR 707.2 copies an "as . . . enters" ability's values only
@@ -2170,8 +2133,10 @@ apply batch candidate event =
       -- keywords cannot be ordered against each other.
       --
       -- No prompt, and none is owed: the clause offers nothing to choose.
-      EntryRewrite.WithKeywords keywords -> do
+      EntryRewrite.EntersWith entersWith -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
+        Foldable.for_ (EntersWith.counters entersWith) $ \withCounters ->
+          placeEntryCounters candidate oid (WithCounters.counters withCounters)
         gs <- State.get
         case Projection.controllerOf oid gs of
           -- Unreachable, and defensive for the reason riot's arm gives below: the
@@ -2199,7 +2164,7 @@ apply batch candidate event =
                             -- permanent that entered.
                             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
                           }
-                   in gs3 {GameState.continuousEffects = fmap effectFor (Set.toList keywords) <> GameState.continuousEffects gs3}
+                   in gs3 {GameState.continuousEffects = fmap effectFor (Set.toList (EntersWith.keywords entersWith)) <> GameState.continuousEffects gs3}
             pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
@@ -3980,6 +3945,47 @@ putOwnCounters oid kind n = do
   case Projection.controllerOf oid gs of
     Nothing -> pure 0
     Just putter -> putCounters (CounterCause.ByEffect putter) oid kind n
+
+-- | CR 614.1c's counter half, placed for both rows that carry one:
+-- EntryRewrite.WithCounters' whole payload, and the counters
+-- EntryRewrite.EntersWith prints beside its keywords. Into the pending map
+-- through addEnteringCounters, and NOT a direct write to Object.counters,
+-- because CR 614.16 makes a counter-scaling replacement apply even when the
+-- original event was not itself an effect -- so Doubling Season has to see
+-- these. It sees them in THIS loop, as a row against the same WouldEnter event,
+-- which is what lets CR 616.1 order the two.
+--
+-- CR 614.1c also admits "a number of ... counters ... equal to [something]"
+-- (Undergrowth Scavenger), so the amount is a Quantity and is evaluated ONCE
+-- here (CR 608.2h: information the effect requires is determined only once, when
+-- the effect is applied), when the row applies, rather than per iteration of the
+-- entry loop around it. CR 107.1b clamps a negative result to zero, which is
+-- Integer.toNaturalSaturating.
+--
+-- The permanent is already materialized on the battlefield when this loop runs
+-- (see runEntry), so the CR 613 projection answers for it. The Context is the
+-- ROW's, through Replacement.candidateContext: CR 109.5's "you" is the row's
+-- controller rather than the entrant's, and a floating row's captured slot
+-- bindings ride along, which is what a bare Filter.contextFor would have
+-- dropped; see #2141 for the caller that still does.
+--
+-- The AMOUNT is CR 614.12's "how they apply", so it counts over
+-- Projection.boardAsEntering rather than the live battlefield -- Squad Captain's
+-- "a +1/+1 counter on it for each other creature you control" must not count a
+-- creature arriving in the same batch. The VIEW stays the live one, as
+-- Projection.replacementsOf's does and for its reason. Pawl.ReplacementSpec's
+-- Squad Captain pair proves it, over a Rise of the Dark Realms sweep: mutating
+-- this call back to the live board reddens "no +1/+1 counter".
+placeEntryCounters :: ReplacementCandidate -> ObjectId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Quantity.Type.Quantity -> Game ()
+placeEntryCounters candidate oid counters = do
+  gs <- State.get
+  let viewOf = Projection.viewWithLastKnown oid gs
+      context = Replacement.candidateContext gs candidate
+      announcedX = Projection.announcedXOf oid gs
+  Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
+    case Quantity.evaluate viewOf context (Projection.boardAsEntering gs) oid (Quantity.substituteAnnouncedX announcedX quantity) of
+      Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
+      Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
 
 -- CR 614.1c: this permanent is going to enter with n more counters of a kind than
 -- it was a moment ago. Written to the pending map rather than to the object; see

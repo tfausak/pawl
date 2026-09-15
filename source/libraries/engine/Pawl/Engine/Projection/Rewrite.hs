@@ -74,6 +74,7 @@ import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
@@ -1254,11 +1255,21 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.ChooseCardNames f -> EntryRewrite.ChooseCardNames (Filter.rewrite pairs f)
   EntryRewrite.ChooseCardName f -> EntryRewrite.ChooseCardName (Filter.rewrite pairs f)
   EntryRewrite.WithCounters w -> EntryRewrite.WithCounters (rewriteWithCounters pairs w)
-  -- CR 702.14a's word once more, this time in a keyword the entry clause grants
-  -- outright. Latent for ChoiceByCoinFlip's reason: Faerie Squadron grants flying,
-  -- which carries no word, and an entry clause granting islandwalk would be what
-  -- proves it.
-  EntryRewrite.WithKeywords ks -> EntryRewrite.WithKeywords (Set.map (Filter.rewriteKeyword pairs) ks)
+  -- BOTH halves of the sentence: the counters take the arm above's descent and
+  -- the keywords take CR 702.14a's word once more, this time in a keyword the
+  -- entry clause grants outright. The keyword half is latent for
+  -- ChoiceByCoinFlip's reason: Faerie Squadron grants flying, which carries no
+  -- word, and an entry clause granting islandwalk would be what proves it.
+  --
+  -- Written out rather than as a record update, so a field added to the payload
+  -- is a missing-field error here rather than a value the text change silently
+  -- keeps.
+  EntryRewrite.EntersWith e ->
+    EntryRewrite.EntersWith
+      EntersWith.MkEntersWith
+        { EntersWith.counters = fmap (rewriteWithCounters pairs) (EntersWith.counters e),
+          EntersWith.keywords = Set.map (Filter.rewriteKeyword pairs) (EntersWith.keywords e)
+        }
   EntryRewrite.UnderSourceControl -> rewrite
   EntryRewrite.SacrificeAnyNumber s ->
     EntryRewrite.SacrificeAnyNumber

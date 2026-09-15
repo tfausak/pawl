@@ -437,6 +437,8 @@ library codec
     Pawl.Codec.EndingStepSpec
     Pawl.Codec.EndTurnSignal
     Pawl.Codec.EndTurnSignalSpec
+    Pawl.Codec.EntersWith
+    Pawl.Codec.EntersWithSpec
     Pawl.Codec.EntryAttack
     Pawl.Codec.EntryAttackSpec
     Pawl.Codec.EntryFlip
@@ -1728,6 +1730,7 @@ library types
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EndTurnSignal
+    Pawl.Types.EntersWith
     Pawl.Types.EntryAttack
     Pawl.Types.EntryFlip
     Pawl.Types.EntryOption

@@ -69,6 +69,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
@@ -1677,7 +1678,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             -- here as it is at every other site.
             ("CR 208.2b's as-enters option", isBoundCounts (base {Face.replacementEffects = entering (EntryRewrite.ChoiceOf [optionWith (Set.singleton (keywordOf boundAtom))])})),
             ("CR 705.2's flipped option", isBoundCounts (base {Face.replacementEffects = entering (EntryRewrite.ChoiceByCoinFlip EntryFlip.MkEntryFlip {EntryFlip.heads = optionWith (Set.singleton (keywordOf boundAtom)), EntryFlip.tails = optionWith Set.empty})})),
-            ("CR 614.1c's granted keyword", isBoundCounts (base {Face.replacementEffects = entering (EntryRewrite.WithKeywords (Set.singleton (keywordOf boundAtom)))}))
+            ("CR 614.1c's granted keyword", isBoundCounts (base {Face.replacementEffects = entering (EntryRewrite.EntersWith (EntersWith.MkEntersWith Nothing (Set.singleton (keywordOf boundAtom))))}))
           ]
     Spec.assertEqWith s "IsBound under a keyword is an offence at every site that reaches one" sited (fmap (fmap (const (1, 0))) sited)
     -- The pair that differs in exactly ONE thing: the same prohibition, the same

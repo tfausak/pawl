@@ -81,6 +81,7 @@ import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Earthbend as Earthbend
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -1286,11 +1287,12 @@ entryRewriteReads rewrite = case rewrite of
   -- Context (Pawl.Engine.Event's WithCounters arm), so a Quantity.InSlot in one
   -- reads the captured map. The KINDS beside them cannot name a slot.
   EntryRewrite.WithCounters counters -> ([], Map.elems (WithCounters.counters counters))
-  -- CR 614.1c's granted keywords name no slot: a keyword may CARRY a Filter (CR
-  -- 702.14c's landwalk), and that Filter is judged against the board rather than
-  -- against a resolution's bindings -- the answer AsCopy's exceptions get above,
-  -- whose CR 707.9a keywords are not reported either.
-  EntryRewrite.WithKeywords _ -> ([], [])
+  -- The counter half is the arm above's answer, and CR 614.1c's granted keywords
+  -- name no slot: a keyword may CARRY a Filter (CR 702.14c's landwalk), and that
+  -- Filter is judged against the board rather than against a resolution's
+  -- bindings -- the answer AsCopy's exceptions get above, whose CR 707.9a
+  -- keywords are not reported either.
+  EntryRewrite.EntersWith entersWith -> ([], foldMap (Map.elems . WithCounters.counters) (EntersWith.counters entersWith))
   EntryRewrite.UnderSourceControl -> ([], [])
   -- BOTH halves: the permanents the sacrifice may take, and CR 702.82a's
   -- per-sacrifice multiplier beside them, which is a Quantity that may name a
@@ -1397,7 +1399,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.ChooseCardNames _ -> []
   EntryRewrite.ChooseCardName _ -> []
   EntryRewrite.WithCounters _ -> []
-  EntryRewrite.WithKeywords _ -> []
+  EntryRewrite.EntersWith _ -> []
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.SacrificeAnyNumber _ -> []
   EntryRewrite.Amplify _ -> []
