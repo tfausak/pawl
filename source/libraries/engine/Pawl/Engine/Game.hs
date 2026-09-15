@@ -327,6 +327,31 @@ removeFromCombat oid gs =
           }
    in gs {GameState.combat = c1}
 
+-- CR 506.4's attacker half for an object that CEASES: a permanent that leaves
+-- the battlefield, whose id Pawl.Engine.Event.changeZoneAttaching deletes from
+-- GameState.objects in the same write. The rule's first clause -- "a permanent
+-- is removed from combat if it leaves the battlefield" -- so that CR 704.5x's
+-- "currently attacking" (Pawl.Engine.Battle.isBeingAttacked) stops seeing it.
+--
+-- NOT removeFromCombat above, and the difference is CR 509.1g. That function
+-- deletes the attacker's KEY from the blockers map, which is how a creature
+-- STILL on the battlefield stops being blocked; but the key is also the record
+-- of what each blocker is blocking, and a blocking creature "remains a blocking
+-- creature until it's removed from combat", which its attacker's departure is
+-- not. A ceasing attacker can be asked neither question -- nothing can look its
+-- id up -- so the key is left alone, exactly as
+-- Pawl.Engine.Departure.objectsLeaveWith leaves it for CR 800.4a.
+--
+-- The companion records keyed by the attacker (joinedUnder, attackedUnder,
+-- attackedControlledBy, attackingNothing) are left alone on removeFromCombat's
+-- own terms: every reader of them looks the attacker up in Combat.attackers
+-- first, and an object id is never reused. CR 508.8's history (Combat.attacked)
+-- is a different question and survives -- the declaration happened.
+ceaseAttacking :: ObjectId -> GameState -> GameState
+ceaseAttacking oid gs =
+  let c = GameState.combat gs
+   in gs {GameState.combat = c {Combat.attackers = Map.delete oid (Combat.attackers c)}}
+
 -- CR 508.1k: is this creature attacking? A key lookup in Combat.attackers, which
 -- the declaration keys by ATTACKER -- the line isBlocking below is careful not to
 -- be.
