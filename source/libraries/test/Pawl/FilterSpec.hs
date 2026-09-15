@@ -741,6 +741,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
         (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) devoidBigCreature Filter.Type.IsSource))
         "no identity"
 
+  -- IsSource's baked half. blackCreature's identity is object 7 throughout, so an
+  -- atom naming any other id must not match it.
+  Spec.describe s "IsObject" $ do
+    Spec.it s "matches the object it names, and no other" $ do
+      Spec.assertBool
+        s
+        (Filter.matches noPerspective blackCreature (Filter.Type.IsObject (ObjectId.MkObjectId 7)))
+        "is that object, and no perspective or source was needed to say so"
+      Spec.assertBool
+        s
+        (not (Filter.matches self blackCreature (Filter.Type.IsObject (ObjectId.MkObjectId 8))))
+        "a different object"
+
+    Spec.it s "no identity in view is vacuously false" $
+      Spec.assertBool
+        s
+        (not (Filter.matches self devoidBigCreature (Filter.Type.IsObject (ObjectId.MkObjectId 7))))
+        "no identity"
+
   -- CR 115.1. The gameplay-level proofs are Pawl.CastSpec's Terror of the Peaks
   -- group (a tax priced by what the spell targets) and its Shell of the Last
   -- Kappa group (a target filter over the same); these cases pin the two atoms.

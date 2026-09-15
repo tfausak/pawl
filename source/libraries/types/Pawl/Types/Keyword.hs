@@ -470,9 +470,9 @@ data Keyword
   | -- | 702.119a: emerge [cost] -- an alternative cost of [cost] plus sacrificing
     -- a creature, whose total is then reduced by generic mana equal to that
     -- creature's mana value. Priced by Pawl.Engine.Cost.candidateCostsGiven, which
-    -- offers one candidate per mana value a sacrificeable creature has, since CR
-    -- 702.119c makes the victim a CR 601.2b choice and CR 601.2f needs its mana
-    -- value before CR 601.2h sacrifices it.
+    -- offers one candidate per sacrificeable creature, naming it: CR 702.119c
+    -- makes the victim a CR 601.2b choice and CR 601.2f needs its mana value
+    -- before CR 601.2h sacrifices that same creature.
     --
     -- Not implemented: CR 702.119b's "emerge from [quality]" variant (#3701).
     Emerge (Cost.Cost Keyword)

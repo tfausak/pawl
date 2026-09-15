@@ -2320,8 +2320,8 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- beside the tag and by the same match, so the amount rule
                   -- 702.119a states and the sacrifice the chosen cost carries
                   -- cannot come from different candidates. Two emerge candidates
-                  -- differ in the mana value their sacrifice component names, so
-                  -- they are never the tie the note above describes.
+                  -- differ in the object their sacrifice component names (CR
+                  -- 702.119c), so they are never the tie the note above describes.
                   chosenReductions = foldMap CandidateCost.reductions chosenCandidate
               -- CR 702.103b: the announcement has settled on the bestow
               -- candidate, so the spell becomes an Aura enchantment with enchant

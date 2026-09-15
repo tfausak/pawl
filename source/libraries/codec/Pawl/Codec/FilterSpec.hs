@@ -15,6 +15,7 @@ import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -166,6 +167,14 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.ControlledByPlayer (PlayerId.MkPlayerId 1))
       " {\"type\":\"ControlledByPlayer\",\"value\":1} "
+  -- Runtime-only for ControlledByPlayer's reason, and round-tripped here for
+  -- its reason.
+  Spec.it s "IsObject" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.IsObject (ObjectId.MkObjectId 7))
+      " {\"type\":\"IsObject\",\"value\":7} "
   Spec.it s "ControlledByRecipient" $
     Common.assertCodec
       s

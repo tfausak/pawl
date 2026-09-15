@@ -3938,6 +3938,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.ControlledByRecipient -> []
   Filter.Type.OwnedBy _ -> []
   Filter.Type.IsSource -> []
+  Filter.Type.IsObject _ -> []
   Filter.Type.TargetsSource -> []
   Filter.Type.TargetsOnlySource -> []
   -- DESCENT, for AttachedTo's reason below: CR 115.1's atom carries the one
