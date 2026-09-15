@@ -2558,7 +2558,7 @@ canPaySomeCompletion slots subject spending pid oid total_ substitute cost gs =
 -- else. It is NOT the list a payability GATE is judged against; that one is
 -- supplyManaSourcesGiven below, and NEITHER contains the other -- see there.
 activationManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActivationsGiven (PlayerEffect.applying pid gs)) grants pcs pid gs
+activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven Set.empty (manaActivationsGiven (PlayerEffect.applying pid gs)) grants pcs pid gs
 
 -- The mana sources a payability GATE is judged against -- the same sweep under
 -- Mana.supplyCapacity, which is the invariant Mana.payableResolutionsGiven
@@ -2577,7 +2577,7 @@ activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActiva
 --     602.2a puts on the stack BEFORE its cost is paid, which closes CR 307.5's
 --     window. Grinning Ignus in that window is an offer that is no supply.
 supplyManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (stackedManaActivations (PlayerEffect.applying pid gs))) grants pcs pid gs
+supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven Set.empty (Mana.supplyCapacity (stackedManaActivations (PlayerEffect.applying pid gs))) grants pcs pid gs
 
 -- `manaActivationsGiven` narrowed to the routes a payment made AFTER its object
 -- reached the stack may take -- which is every cast (CR 601.2a) and every
@@ -3754,6 +3754,11 @@ orderSensitive component = case component of
 -- question forever. What reaches it is a payment REFUSED and not one that was
 -- never payable, CR 118.3's gate keeping an unpayable option off the offer.
 --
+-- Not implemented: `refused` by ROUTE. A permanent whose chosen route failed
+-- loses its OTHER mana abilities on this window too, where CR 605.3a goes on
+-- offering them; `tapForManaWith` answers a Bool and cannot name the route that
+-- refused (#3753).
+--
 -- The life budget only ever binds a cost NOTHING ANNOUNCED for, and every road
 -- into this function now runs `announce` first: a cast, an activation, a CR
 -- 118.12 pay gate, a special action, a combat toll, and a mana ability's own
@@ -3764,7 +3769,7 @@ orderSensitive component = case component of
 -- blue takes the mana way to an unannounced {G/P} off the board, leaving CR
 -- 107.4f's 2 life.
 --
--- The window in full. `inFlight` is the set of permanents whose mana ability is
+-- The window in full. `inFlight` is Pawl.Engine.Mana.InFlight, the ABILITIES
 -- mid-activation, which is the one thing that has to bound the recursion CR
 -- 602.2b creates; `subject` is payMana's own first argument, what this payment is
 -- for. `inFlight` is non-empty only where `subject` is not a Casting: an
@@ -3772,14 +3777,14 @@ orderSensitive component = case component of
 --
 -- CR 605.3c is what the set says -- an ability being activated cannot be
 -- activated again until it has resolved -- and it TERMINATES the recursion,
--- since every nested activation adds one permanent to a set the battlefield
--- bounds.
+-- since every nested activation adds one (permanent, ability) pair to a set the
+-- battlefield and the abilities printed on it bound.
 --
--- Not implemented: CR 605.3c read of the ABILITY rather than of the permanent.
--- A permanent with two mana abilities, one of which could pay the other, is
--- refused here where the rules allow it. No printing in `data/cards/` has two
--- mana routes of which either eats mana (#2205).
-payManaExcept :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+-- The rule narrows the ABILITY and not the permanent, so a permanent's OTHER
+-- mana ability stays on the window its first one opened: Skyshroud Elf's
+-- "{1}: Add {R} or {W}" is paid by tapping the same Elf for its "{T}: Add {G}"
+-- (Pawl.ManaSpec's Skyshroud Elf group is what proves it).
+payManaExcept :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payManaExcept perform inFlight record subject spending pid cost = do
   before <- State.get
   -- No substitution: CR 702.51a, CR 702.66a and CR 702.126a all function while a
@@ -3811,7 +3816,7 @@ payManaExcept perform inFlight record subject spending pid cost = do
 -- The window LOOP still reads the unsubstituted cost, which is what `covered`
 -- below asks about: nothing has been substituted yet while the window is open,
 -- so CR 118.3c's question is put against the whole of it.
-payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> (ManaCost.ManaCost -> Game (ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])) -> ManaCost.ManaCost -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game ())
+payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> (ManaCost.ManaCost -> Game (ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])) -> ManaCost.ManaCost -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game ())
 payManaWindow perform inFlight record subject spending pid substituting cost =
   let -- What the pool would leave if the cost were paid out of it right now.
       --
@@ -3832,8 +3837,11 @@ payManaWindow perform inFlight record subject spending pid substituting cost =
             -- is this same call.
             pcs = Projection.projectAll gs
             -- CR 605.3a offers every source, and this window narrows it by CR
-            -- 605.3c alone: a permanent whose mana ability is mid-activation is
-            -- off its own window and off every window nested inside it.
+            -- 605.3c alone: the ABILITY mid-activation is off its own window and
+            -- off every window nested inside it, while the permanent's other mana
+            -- abilities stay on. Applied inside Mana.manaSourcesGiven, beside the
+            -- CR 118.3 gate it cannot be asked apart from: a permanent is still a
+            -- source when some route of it is both payable and not in flight.
             --
             -- The capacity is taken on the board of the PASS rather than once for
             -- the payment: a tap changes the board, and
@@ -3841,7 +3849,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost =
             -- payer, and manaSourcesGiven offers only what that player controls, so
             -- the capacity's own `pid` is this one.
             windowCapacity = manaActivationsGiven (PlayerEffect.applying pid gs)
-            offered = filter (`Set.notMember` inFlight) (Mana.manaSourcesGiven windowCapacity (Projection.controlGrants gs) pcs pid gs)
+            offered = Mana.manaSourcesGiven inFlight windowCapacity (Projection.controlGrants gs) pcs pid gs
         case filter (`Set.notMember` refused) offered of
           [] -> settle activated
           candidate : rest -> do
@@ -3976,12 +3984,15 @@ chooseSource covered pid candidates gs = do
 tapForMana :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game Bool
 tapForMana perform = tapForManaWith perform Set.empty
 
--- The same activation carrying the permanents whose mana ability is already
--- mid-activation (CR 605.3c), which is payManaExcept's one narrowing: this
--- activation's own permanent joins the set before its cost opens a window of its
--- own, so the recursion cannot revisit it. CR 605.3a's priority window starts
--- from the empty set, nothing being in flight there.
-tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> ObjectId -> Game Bool
+-- The same activation carrying the abilities already mid-activation (CR
+-- 605.3c), which is payManaExcept's one narrowing: the route CHOSEN here joins
+-- the set before its cost opens a window of its own, so the recursion cannot
+-- revisit that ability -- and the options are filtered by the set too, since a
+-- nested window reaching this permanent must not re-offer it. Added here rather
+-- than in `payActivation`, which is the only caller and cannot see which route
+-- was chosen. CR 605.3a's priority window starts from the empty set, nothing
+-- being in flight there.
+tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> ObjectId -> Game Bool
 tapForManaWith perform inFlight oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
@@ -4001,7 +4012,7 @@ tapForManaWith perform inFlight oid = do
           -- offers, rather than one per option: `manaActivations` would take its
           -- own, and that walk is the shape #1073 was about.
           capacity = manaActivationsGiven (PlayerEffect.applying controller gs)
-      case filter (\option -> Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> not (Mana.inFlightRoute inFlight oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
@@ -4031,7 +4042,7 @@ tapForManaWith perform inFlight oid = do
           -- elided by announceReductions wherever the answers cannot differ,
           -- which is every board `data/cards/` can build today.
           announced <- announceReductions controller oid gs announcedCost gathered
-          outcome <- payActivation perform inFlight controller oid (totalWith announced announcedCost)
+          outcome <- payActivation perform (Set.insert (oid, ManaOption.ability chosen) inFlight) controller oid (totalWith announced announcedCost)
           case outcome of
             Payment.Unpaid -> pure False
             -- CR 605.3b: a mana ability's cost binds nothing this path could
@@ -4180,8 +4191,8 @@ applyManaTriggers perform events = do
 -- the path of every tap for mana.
 --
 -- The recursion CR 602.2b makes of that window is bounded by the in-flight set
--- this function adds to (CR 605.3c), not by the order.
-payActivation :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+-- `tapForManaWith` added this route to (CR 605.3c), not by the order.
+payActivation :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 payActivation perform inFlight pid oid cost = do
   before <- State.get
   paid <- case Cost.mana cost of
@@ -4192,7 +4203,7 @@ payActivation perform inFlight pid oid cost = do
     -- so mana restricted to activations may pay it -- Omen Hawker's {C} into
     -- Chromatic Star's {1} -- and mana restricted to casts may not. `oid` is the
     -- ability's SOURCE, which is what "abilities of artifacts" reads.
-    Just manaCost -> payManaExcept perform (Set.insert oid inFlight) Nothing (PaymentSubject.Activating oid) ManaSpending.AsProduced pid manaCost
+    Just manaCost -> payManaExcept perform inFlight Nothing (PaymentSubject.Activating oid) ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure False
   -- CR 602.2b sends this through CR 601.2h, so the payment is made while the

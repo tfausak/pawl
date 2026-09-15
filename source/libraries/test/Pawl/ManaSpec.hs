@@ -2361,8 +2361,9 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
   -- {1}, and the colour it mints is the Altar's {B} -- a chain no board could
   -- reach while the window offered only mana-free routes.
   --
-  -- CR 605.3c is what still bounds it: the Altar is mid-activation, so its own
-  -- window and every window nested inside it are closed to it.
+  -- CR 605.3c is what still bounds it: the Altar's mana ability is
+  -- mid-activation, so its own window and every window nested inside it are
+  -- closed to that ability -- and it is the Altar's only one, so to the Altar.
   --
   -- The pool assertion comes FIRST and is the gameplay one. Under the narrowed
   -- window the payment simply fails and CR 601.2h leaves the pool empty; the
@@ -2384,10 +2385,10 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     Spec.assertEqWith s "CR 605.3a the Altar's window offers the Star, and the Star's own window then offers the Plains" asked [[starId, plainsId], [plainsId]]
 
   -- The window's own candidate list where nothing nested is on offer. CR 605.3c
-  -- is the whole of the narrowing now: the Birds is mana-free and the Altar is
-  -- mid-activation, so the Birds is the only candidate. Recorded rather than
-  -- inferred, since the pool is the same whichever source the answerer would have
-  -- declined.
+  -- is the whole of the narrowing now: the Birds is mana-free and the Altar's
+  -- only mana ability is mid-activation, so the Birds is the only candidate.
+  -- Recorded rather than inferred, since the pool is the same whichever source
+  -- the answerer would have declined.
   Spec.it s "CR 605.3a the Altar's own window offers the Birds and not the Altar" $ do
     altar <- S.printingOf s registry "Transmogrant Altar"
     birds <- S.printingOf s registry "Birds of Paradise"
@@ -2685,9 +2686,10 @@ ignusBoard ignus mountain =
 --
 -- ONE board, two runs differing only in the answer to CR 601.2b's question, so
 -- neither the seeded pool nor the yield can be what separates them. The Gate is
--- the only permanent, so CR 601.2g's window inside the payment has nothing to
--- offer (CR 605.3c takes the Gate itself off it) and the {W/U} is paid out of
--- what is floating.
+-- the only permanent, and CR 605.3c takes only the {W/U} ability itself off CR
+-- 601.2g's window inside the payment -- the Gate's "{T}: Add {C}" IS offered
+-- there, and this fixture declines it (S.identityAnswer), so the {W/U} is paid
+-- out of what is floating.
 mysticGateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 mysticGateSpec s registry = Spec.describe s "Mystic Gate" $ do
   Spec.it s "CR 118.13a the player announces the {W/U} in a mana ability's own activation cost" $ do
@@ -2716,6 +2718,54 @@ mysticGateSpec s registry = Spec.describe s "Mystic Gate" $ do
         asked wanted = State.execState (Engine.runGame (counting wanted) (snd board) (Cost.tapForMana S.manaPerformer (fst board))) (0 :: Int)
     Spec.assertEqWith s "CR 118.13a the {C} route's cost prints no symbol payable two ways, so nothing is announced" (asked [ManaType.Colorless]) 0
     Spec.assertEqWith s "and the {W/U} route on the same board is asked once" (asked [whiteType, blueType]) 1
+
+-- CR 605.3c narrows the ABILITY and not the permanent: "once a player begins to
+-- activate a mana ability, THAT ABILITY can't be activated again until it has
+-- resolved". Skyshroud Elf is the printing that tells the two readings apart --
+-- "{T}: Add {G}." beside "{1}: Add {R} or {W}.", the second eating mana and not
+-- tapping -- so the Elf's own {G} is what pays its {1}, and the whole point of
+-- the card is a line a permanent-wide exclusion refuses.
+--
+-- ONE board and one activation, through Cost.tapForMana: CR 605.3b gives the
+-- ability no stack object, so this is the narrowest path to both halves.
+skyshroudElfSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+skyshroudElfSpec s registry = Spec.describe s "Skyshroud Elf" $ do
+  Spec.it s "CR 605.3c the Elf's other mana ability pays for this one, the rule excluding the ability and not the permanent" $ do
+    elf <- S.printingOf s registry "Skyshroud Elf"
+    let (elfId, board) = S.addPermanent elf S.alice (Setup.emptyGame S.bothPlayers)
+        ((paid, after), offers) = State.runState (Engine.runGame (takesElfRoute elfId) board (Cost.tapForMana S.manaPerformer elfId)) []
+    -- The gameplay assertion: the {1} was paid by the Elf's OWN {T}, so the {G}
+    -- is gone and the {R} is what is floating. An exclusion keyed to the
+    -- permanent leaves the window nothing to offer and the pool empty.
+    Spec.assertEqWith s "CR 605.3a the Elf's {G} paid its own {1}, and the {R} is what that turned into" (poolTypes S.alice after) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "CR 602.2b the activation really paid" paid True
+    -- The other half of the same rule, and the only level it is visible at: the
+    -- ability BEING PAID FOR is off its own window, so the one route left to
+    -- offer inside it is the {T}, and a single option is no question at all
+    -- (Cost.chooseManaYield). A second entry here would be the {1} ability
+    -- offered to pay for itself.
+    Spec.assertEqWith s "CR 605.3c only the outer choice is asked: inside the payment the {1} ability is off its own window, leaving the {T} alone" offers [[[ManaType.Colored Color.Green], [ManaType.Colored Color.Red], [ManaType.Colored Color.White]]]
+
+-- Takes the Elf's "{1}: Add {R}" at the FIRST yield question and its "{T}: Add
+-- {G}" at every later one, recording the candidates of each. PINNED BY INDEX
+-- rather than by what is payable: an answerer that hunted for a payable route
+-- would find the {T} again after a mutation and repair the very choice this
+-- proves. FILTERED, NOT BUILT, for Mana.optionYielding's reason.
+takesElfRoute :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[[ManaType.ManaType]]] r
+takesElfRoute elfId p = case p of
+  Prompt.ChooseManaYield _ _ _ candidates -> do
+    seen <- State.get
+    State.modify' (<> [fmap yieldTypes (NonEmpty.toList candidates)])
+    let wanted = if null seen then [ManaType.Colored Color.Red] else [ManaType.Colored Color.Green]
+    pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find ((==) wanted . yieldTypes) (NonEmpty.toList candidates)))
+  -- The Elf is the only source the window has, and taking it is the line under
+  -- test; an unrecognised id would read as declining (Cost.chooseSource).
+  Prompt.ChooseManaSource _ _ candidates -> pure (List.find (elfId ==) (NonEmpty.toList candidates))
+  _ -> pure (S.identityAnswer p)
+
+-- The colours one offered route would add, in printed order.
+yieldTypes :: ManaOption.ManaOption -> [ManaType.ManaType]
+yieldTypes = fmap ManaUnit.manaType . Mana.yieldUnits
 
 -- alice with one Mystic Gate and one white and one blue mana floating, and
 -- nothing else anywhere. The pool is SEEDED rather than tapped for, so the {W/U}
@@ -3570,6 +3620,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   transmograntAltarSpec s registry
   grinningIgnusSpec s registry
   mysticGateSpec s registry
+  skyshroudElfSpec s registry
   activationAdjustmentSpec s registry
   wildGrowthSpec s registry
   autumnWillowSpec s registry
@@ -3688,8 +3739,9 @@ yurlokSpec s registry = Spec.describe s "Yurlok of Scorch Thrash" $ do
     Spec.assertEqWith s "CR 106.4 and carol, who spent none of hers, is still holding the same three" (poolTypes S.carol after) [ManaType.Colored Color.Black, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
 
 -- Takes the Yurlok wherever it is offered and the Forest wherever it is not --
--- which is the two windows exactly: the Yurlok is mid-activation inside its own
--- (CR 605.3c), so the Forest is the only candidate there.
+-- which is the two windows exactly: the Yurlok's only mana ability is
+-- mid-activation inside its own (CR 605.3c), so the Forest is the only candidate
+-- there.
 --
 -- PINNED, not searched. An answerer taking any legal source would spend the
 -- Forest on alice's own cost at the outer window and never reach the Yurlok, and
