@@ -37,7 +37,6 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1392,10 +1391,16 @@ creatureBecomesBlockedByAtLeastSpec s registry =
               -- The leg is not vacuous: the declaration really did name the
               -- planeswalker, so the silence above is CR 508.1b's and not a
               -- declaration that never happened.
+              --
+              -- Read through CR 608.2h and not off Combat.attackers, because the
+              -- 1/1 dies to the blockers it was declared against: CR 506.4 takes
+              -- an attacker that has left the battlefield out of the live record
+              -- (Pawl.Engine.Game.ceaseAttacking), and what it was attacking as it
+              -- left is what this guard is about.
               Spec.assertEqWith
                 s
                 "and the attack really was declared at Jace"
-                (Map.lookup elves (Combat.Type.attackers (GameState.combat after)))
+                (Game.attackTargetWithLastKnown elves after)
                 (Just (AttackTarget.OfPlaneswalker jace))
             _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants and a Jace"
         -- Rule 509.3e's arity: ONE trigger for the declaration, not one per
