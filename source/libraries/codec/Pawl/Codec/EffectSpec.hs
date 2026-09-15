@@ -813,7 +813,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))) (ObjectRef.EachMatching Filter.IsSource) []))
+      (Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))) (ObjectRef.EachMatching Filter.IsSource) Nothing []))
       " {\"type\":\"BecomeCopy\",\"value\":{\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}}} "
   Spec.it s "Replace" $
     Common.assertJsonCodec

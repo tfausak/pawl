@@ -13,6 +13,7 @@ import qualified Pawl.Codec.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Codec.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Codec.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Codec.ActiveBlockRequirement as ActiveBlockRequirement
+import qualified Pawl.Codec.ActiveCopy as ActiveCopy
 import qualified Pawl.Codec.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Codec.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Codec.ActiveUnregeneratable as ActiveUnregeneratable
@@ -127,6 +128,7 @@ codec resolve = Fields.object $ do
   damageScannedThrough <- Fields.defaulted "damageScannedThrough" 0 Common.natural GameState.damageScannedThrough
   delayedTriggers <- Fields.defaulted "delayedTriggers" Seq.empty (Common.seq DelayedTrigger.codec) GameState.delayedTriggers
   continuousEffects <- Fields.defaulted "continuousEffects" [] (Common.list (ContinuousEffect.codec Card.codec)) GameState.continuousEffects
+  copyEffects <- Fields.defaulted "copyEffects" [] (Common.list ActiveCopy.codec) GameState.copyEffects
   replacements <- Fields.defaulted "replacements" [] (Common.list ActiveReplacement.codec) GameState.replacements
   pendingPreventionRiders <- Fields.defaulted "pendingPreventionRiders" Seq.empty (Common.seq Prevention.codec) GameState.pendingPreventionRiders
   pendingDamageEffects <- Fields.defaulted "pendingDamageEffects" Seq.empty (Common.seq PendingDamageEffect.codec) GameState.pendingDamageEffects
@@ -206,6 +208,7 @@ codec resolve = Fields.object $ do
         GameState.damageScannedThrough = damageScannedThrough,
         GameState.delayedTriggers = delayedTriggers,
         GameState.continuousEffects = continuousEffects,
+        GameState.copyEffects = copyEffects,
         GameState.replacements = replacements,
         GameState.pendingPreventionRiders = pendingPreventionRiders,
         GameState.pendingDamageEffects = pendingDamageEffects,

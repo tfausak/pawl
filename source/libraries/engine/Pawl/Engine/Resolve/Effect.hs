@@ -77,6 +77,7 @@ import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
+import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
@@ -5234,7 +5235,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 pure made
       _ -> pure []
     bindMinted controller source resolving mSlot quantity minted
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef exceptions) ->
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef duration exceptions) ->
     State.modify' $ \gs ->
       -- CR 707.1: each named subject becomes a copy of the named original, in
       -- whatever zone it already sits -- CR 707.4's "while remaining on the
@@ -5245,10 +5246,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- matched nothing all arrive empty and copy nothing. ONE original: CR 707.2
       -- copies the values of "the original object", singular.
       --
-      -- The snapshot is a VALUE, so CR 707.2b holds by construction. Written to
-      -- Binding.copyOf per CR 707.3, at layer 1 (CR 613.1a), so layers 2-7
-      -- re-apply over the new base -- CR 707.4's "doesn't change any noncopy
-      -- effects presently affecting the permanent".
+      -- The snapshot is a VALUE, so CR 707.2b holds by construction. Written at
+      -- layer 1 (CR 613.1a), so layers 2-7 re-apply over the new base -- CR
+      -- 707.4's "doesn't change any noncopy effects presently affecting the
+      -- permanent". WHERE it is written is what `duration` decides, below.
       --
       -- CR 707.9's exceptions are folded into the snapshot on the way in, exactly
       -- as the CR 707.5 entry road folds AsCopy's (Event's EntryR arm), so the
@@ -5258,7 +5259,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- "This ability" is the RESOLVING object's own -- thisAbilitySource, off
       -- Pawl.Types.Source, so the ability is read where CR 602.2a and CR 603.3
       -- already carry it rather than being looked back up on a source that may
-      -- have left (CR 113.7a). Not implemented: a stated duration (#1753).
+      -- have left (CR 113.7a).
       case objectRefObjects legal resolving controller source gs originalRef of
         [original] ->
           let copied = Event.copiedSnapshotWithLastKnown original gs
@@ -5271,7 +5272,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               snapshotFor subject = Replacement.applyCopyExceptions (thisAbilitySource resolving gs) (Just (Event.copiedSnapshot subject gs)) exceptions copied
               write subject = Map.adjust (\o -> o {Object.bindings = Binding.setCopy (snapshotFor subject) (Object.bindings o)}) subject
               subjects = objectRefObjects legal resolving controller source gs subjectRef
-           in gs {GameState.objects = foldr write (GameState.objects gs) subjects}
+           in case duration of
+                -- CR 707.3: the card states no ending, so the copiable values go
+                -- onto the subject itself (Binding.setCopy) and nothing has to
+                -- remember them.
+                Nothing -> gs {GameState.objects = foldr write (GameState.objects gs) subjects}
+                Just stated -> case Expiry.arm (Binding.playersIn legal) controller source stated gs of
+                  -- CR 611.2b: the duration never started, so nothing is stored.
+                  Nothing -> gs
+                  Just expiry ->
+                    -- CR 611.2c: the swept ids are frozen into the stored row,
+                    -- so the set never changes afterwards. ONE timestamp over
+                    -- the whole sweep, as ModifyTarget's arm takes, and the
+                    -- sweep is split into a row per DISTINCT snapshot only
+                    -- because CR 707.9c's retained value is each subject's own
+                    -- -- two subjects sharing a snapshot share a row.
+                    let (ts, gs1) = Game.freshTimestamp gs
+                        row (pc, oids) =
+                          ActiveCopy.MkActiveCopy
+                            { ActiveCopy.source = source,
+                              ActiveCopy.timestamp = ts,
+                              ActiveCopy.expiry = expiry,
+                              ActiveCopy.objects = oids,
+                              ActiveCopy.snapshot = pc
+                            }
+                        rows = fmap row . Map.toList . Map.fromListWith Set.union $ fmap (\subject -> (snapshotFor subject, Set.singleton subject)) subjects
+                     in gs1 {GameState.copyEffects = rows <> GameState.copyEffects gs1}
         _ -> gs
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity copierRef exceptions) -> do
     gs <- State.get

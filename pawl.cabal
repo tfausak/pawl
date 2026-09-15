@@ -111,6 +111,8 @@ library codec
     Pawl.Codec.ActiveBlockProhibitionSpec
     Pawl.Codec.ActiveBlockRequirement
     Pawl.Codec.ActiveBlockRequirementSpec
+    Pawl.Codec.ActiveCopy
+    Pawl.Codec.ActiveCopySpec
     Pawl.Codec.ActivePlayerEffect
     Pawl.Codec.ActivePlayerEffectSpec
     Pawl.Codec.ActiveReplacement
@@ -1542,6 +1544,7 @@ library types
     Pawl.Types.ActiveAttackRequirement
     Pawl.Types.ActiveBlockProhibition
     Pawl.Types.ActiveBlockRequirement
+    Pawl.Types.ActiveCopy
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
     Pawl.Types.ActiveUnregeneratable

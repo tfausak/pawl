@@ -3220,6 +3220,7 @@ oneMountainState mountain ph =
           GameState.damageScannedThrough = 0,
           GameState.delayedTriggers = Seq.empty,
           GameState.continuousEffects = [],
+          GameState.copyEffects = [],
           GameState.replacements = [],
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.pendingDamageEffects = Seq.empty,
