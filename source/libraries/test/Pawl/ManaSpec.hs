@@ -513,7 +513,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     let ab =
           ActivatedAbility.MkActivatedAbility
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) 1 ManaRetention.Ordinary Nothing Nothing)] Map.empty,
+              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) (Quantity.Literal 1) ManaRetention.Ordinary Nothing Nothing)] Map.empty,
               ActivatedAbility.maximumX = [],
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
@@ -529,7 +529,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal =
                 singleModeAbility
-                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) 1 ManaRetention.Ordinary Nothing Nothing)]
+                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) (Quantity.Literal 1) ManaRetention.Ordinary Nothing Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.maximumX = [],
               ActivatedAbility.restrictions = [],
@@ -3731,6 +3731,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   riderWindowSpec s registry
   lootSpec s registry
   translatorSpec s registry
+  cabalCoffersSpec s registry
   laviniaTurnRiderSpec s registry
   nimbusMazeSpec s registry
   nimbusMazeTextChangeSpec s registry
@@ -4056,6 +4057,100 @@ translatorBoard translator splitter =
 translatorAnswer :: Prompt.Prompt r -> r
 translatorAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+-- CR 106.3's count read off the BOARD rather than off the card: Cabal Coffers
+-- (Torment) prints "{2}, {T}: Add {B} for each Swamp you control." Oracle text
+-- checked against Scryfall 2026-09-15.
+--
+-- The Swamps are TAPPED, so the Coffers' own yield is the only black mana
+-- anywhere: with untapped Swamps a spell with three black pips would be paid for
+-- whatever the count answered, and the test would prove the fixture. Three
+-- Forests are the only untapped mana on the board -- two pay the Coffers' {2}
+-- and the third pays Bloodletter of Aclazotz's {1}, which leaves its
+-- {B}{B}{B} to the Coffers and to nothing else.
+--
+-- THE PAIR is the two boards this builds, alike in every permanent, every
+-- tap state and the card in hand, and differing only in how many Swamps alice
+-- controls: three against one.
+cabalCoffersBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+cabalCoffersBoard coffers swamp forest bloodletter swamps =
+  let (coffersId, gs1) = S.addPermanent coffers S.alice (S.landsInPlay forest 3)
+      tapNew gs =
+        let (oid, gsN) = S.addPermanent swamp S.alice gs
+         in S.tapObject oid gsN
+      gs2 = List.foldl' (\gs _ -> tapNew gs) gs1 (replicate swamps ())
+      (spell, gs3) = S.addHandCard bloodletter S.alice gs2
+   in ( coffersId,
+        spell,
+        gs3
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.empty
+          }
+      )
+
+cabalCoffersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cabalCoffersSpec s registry = Spec.describe s "Cabal Coffers" $ do
+  Spec.it s "CR 106.3 an addition's count is read off the board, so three Swamps add three black mana and one adds one" $ do
+    coffers <- S.printingOf s registry "Cabal Coffers"
+    swamp <- S.printingOf s registry "Swamp"
+    forest <- S.printingOf s registry "Forest"
+    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
+    let (threeCoffers, threeSpell, three) = cabalCoffersBoard coffers swamp forest bloodletter 3
+        (oneCoffers, oneSpell, one) = cabalCoffersBoard coffers swamp forest bloodletter 1
+        castOf spell gs = snd (Engine.runGamePure S.identityAnswer gs (do S.cast S.alice spell; Stack.resolveTop))
+        arrived = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Bloodletter of Aclazotz") S.alice
+    -- The gameplay-level assertion: a real spell whose three black pips only the
+    -- Coffers can pay, cast end to end off the board CR 106.3 measured.
+    Spec.assertEqWith s "CR 106.3 the three-Swamp board pays {B}{B}{B} and the one-Swamp board cannot" (fmap arrived [castOf threeSpell three, castOf oneSpell one]) [1, 0]
+    -- The count itself, off CR 605.3b's inline road: what one activation put in
+    -- the pool once its own {2} was paid.
+    Spec.assertEqWith s "CR 106.3 one activation adds one unit per Swamp" (fmap (uncurry (tappedFor S.identityAnswer)) [(threeCoffers, three), (oneCoffers, one)]) [replicate 3 (ManaType.Colored Color.Black), [ManaType.Colored Color.Black]]
+    -- CR 118.3's offer, which reaches the same count through manaSuppliesGiven
+    -- rather than through a payment: the two cannot disagree about what the
+    -- board yields.
+    Spec.assertEqWith s "CR 118.3 the cast gate agrees with the payment at both counts" (fmap (uncurry (S.castable S.alice)) [(threeSpell, three), (oneSpell, one)]) [True, False]
+
+  -- CR 612.1: the count is printed text like any other, so a swap naming its
+  -- word moves which permanents it counts -- the site
+  -- Pawl.Engine.Projection.Rewrite's AddMana arm had nothing to reach before the
+  -- count became a Quantity.
+  --
+  -- THE PAIR is the two swaps below, on ONE board: the same Coffers, the same
+  -- three tapped Swamps and one tapped Island of alice's, differing only in the
+  -- word swapped FROM. Swamp is the word the Coffers carries and Plains is not,
+  -- so the second swap leaves the route exactly as printed. A swap to a type
+  -- alice DOES control makes the hacked count one rather than none, which is
+  -- what tells a moved word from a broken route.
+  --
+  -- BOB casts the Hack, off an Island of his own: the payment loop floats the
+  -- whole capacity of whoever pays, so alice casting it would tap her Coffers
+  -- for the printed count before the swap ever resolved.
+  Spec.it s "CR 612.1 a text change naming the count's word moves which permanents it counts" $ do
+    coffers <- S.printingOf s registry "Cabal Coffers"
+    swamp <- S.printingOf s registry "Swamp"
+    forest <- S.printingOf s registry "Forest"
+    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
+    island <- S.printingOf s registry "Island"
+    hack <- S.printingOf s registry "Magical Hack"
+    let (coffersId, spell, base) = cabalCoffersBoard coffers swamp forest bloodletter 3
+        (aliceIsland, withIsland) = S.addPermanent island S.alice base
+        (hackId, board) = S.addHandCard hack S.bob (S.landsFor island S.bob 1 (S.tapObject aliceIsland withIsland))
+        after from = snd (Engine.runGamePure (hackedCoffers coffersId from Subtype.Island) board (S.cast S.bob hackId >> Stack.resolveTop >> S.cast S.alice spell >> Stack.resolveTop))
+        arrived = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Bloodletter of Aclazotz") S.alice
+    Spec.assertEqWith s "CR 612.1 the hacked Coffers counts the one Island, and the swap of a word it never carried leaves it counting three Swamps" (fmap (arrived . after) [Subtype.Swamp, Subtype.Plains]) [0, 1]
+
+-- Magical Hack aimed at one permanent by FILTERING the offer rather than
+-- rebuilding it (CR 608.2b drops a hand-built recipient of the wrong shape with
+-- no error), and CR 612.1's swap answered with the pair under test. Every other
+-- decision on the board is settled -- one Island makes the {U}, and the Coffers
+-- is the only black -- so the identity answerer picks nothing that matters.
+hackedCoffers :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+hackedCoffers coffersId from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just coffersId) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
   _ -> S.identityAnswer p
 
 translatorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()

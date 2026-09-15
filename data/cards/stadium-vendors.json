@@ -48,7 +48,10 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "count": 2,
+                          "count": {
+                            "type": "Literal",
+                            "value": 2
+                          },
                           "player": {
                             "type": "InSlot",
                             "value": "chosen"

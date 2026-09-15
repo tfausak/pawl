@@ -410,6 +410,10 @@ manaProduced effect = case effect of
   -- Descended into, unlike CR 615.5's rider above: rule 608.2f's body runs as
   -- part of THIS effect, so an AddMana in it would be mana this ability adds.
   -- No card in the pool writes one, and CR 605.1a would want it seen if one did.
+  -- listToMaybe and not a fold, because one effect answers with at most one
+  -- addition: a body holding several is a shape no printing writes, "add one
+  -- mana for each ..." being the ManaAddition COUNT rather than a repeated body
+  -- (Pawl.Types.ManaAddition).
   Effect.ForEach (ForEach.MkForEach _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
 
 -- CR 605.1a's fourth clause, asked of one effect: does it move a card to or from
