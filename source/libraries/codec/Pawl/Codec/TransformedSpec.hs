@@ -7,6 +7,7 @@ import qualified Pawl.Codec.Transformed as Transformed
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Transformed as Transformed
 
@@ -28,29 +29,41 @@ spec s = Spec.describe s "Pawl.Codec.Transformed" $ do
   -- CR 701.27a, with CR 701.27e's characteristics: the whole projection of the
   -- permanent as it stood the instant the turn finished, Pawl.Codec.Moved's
   -- shape over the same sample.
+  --
+  -- And with CR 603.10's other two axes beside it, which CR 109.3 keeps out of a
+  -- ProjectedCharacteristics: who controlled the permanent, and what was attached
+  -- to it. Both carry non-default values here, so the round trip is over a
+  -- written pair rather than over the omission the case below asserts.
   Spec.it s "MkTransformed carries the sampled characteristics" $
     Common.assertCodec
       s
       Transformed.codec
       ( Transformed.MkTransformed
           { Transformed.object = ObjectId.MkObjectId 1,
-            Transformed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics
+            Transformed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
+            Transformed.controller = Just (PlayerId.MkPlayerId 3),
+            Transformed.attachments = Set.fromList [ObjectId.MkObjectId 7, ObjectId.MkObjectId 9]
           }
       )
       ( "{\"object\":1,\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> "}"
+          <> ",\"controller\":3,\"attachments\":[7,9]}"
       )
   -- CR 708.2a's none, which is a real answer rather than an absence: a permanent
   -- with no name turned over triggers no "transforms into" ability at all, and
   -- the empty array has to survive the round trip for the matcher to see it.
+  --
+  -- This one leaves the CR 603.10 axes at their defaults, so it is also where the
+  -- two keys are asserted ABSENT from the encoding.
   Spec.it s "MkTransformed, a permanent with no name" $
     Common.assertCodec
       s
       Transformed.codec
       ( Transformed.MkTransformed
           { Transformed.object = ObjectId.MkObjectId 2,
-            Transformed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics {PC.names = Set.empty}
+            Transformed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics {PC.names = Set.empty},
+            Transformed.controller = Nothing,
+            Transformed.attachments = Set.empty
           }
       )
       ("{\"object\":2,\"characteristics\":" <> noNamesJson <> "}")
