@@ -1,11 +1,11 @@
 module Pawl.Types.ManaAddition where
 
-import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.Quantity as Quantity
 
 -- | CR 106.3 / 106.4: "this player adds this much mana, decided this way" -- the
 -- whole payload of Pawl.Types.Effect's AddMana arm.
@@ -52,9 +52,17 @@ data ManaAddition = MkManaAddition
   { player :: PlayerRef.PlayerRef,
     production :: ManaProduction.ManaProduction,
     -- | CR 106.3: how many mana this ONE instruction adds, all of the type its
-    -- production decides. The codec defaults it to 1, which is what every
-    -- printing saying "add one mana" means.
-    count :: Natural.Natural,
+    -- production decides. The codec defaults it to @Literal 1@, which is what
+    -- every printing saying "add one mana" means.
+    --
+    -- A Quantity and not a number, because the count is as often read off the
+    -- board as printed: Cabal Coffers' "Add {B} for each Swamp you control" is
+    -- one instruction whose size CR 106.3 settles as it is carried out. Both
+    -- readers evaluate it -- Pawl.Engine.Mana.manaOptionsOfGiven for CR 605.3b's
+    -- inline payment and Pawl.Engine.Resolve.Effect's AddMana arm for one that
+    -- resolves off the stack -- so the offered yield and the mana actually added
+    -- measure the same board.
+    count :: Quantity.Quantity,
     retention :: ManaRetention.ManaRetention,
     -- | CR 106.6: what the mana this instruction adds may be spent on, stamped
     -- onto every unit it produces (Pawl.Types.ManaUnit.restriction). Nothing is
