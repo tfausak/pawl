@@ -227,6 +227,14 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.DontLoseUnspentMana (ManaFilter.OfType (ManaType.Colored Color.Green)))
       " {\"type\":\"DontLoseUnspentMana\",\"value\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
+  -- CR 500.5 / 119.3 / Yurlok of Scorch Thrash: nullary, the sentence naming no
+  -- mana to narrow by.
+  Spec.it s "LoseLifeForUnspentMana, Yurlok's mana burn" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      PlayerEffect.LoseLifeForUnspentMana
+      " {\"type\":\"LoseLifeForUnspentMana\"} "
   -- CR 609.4b / Celestial Dawn's mana sentence, whose two clauses are one
   -- PlayerEffect entry each -- a codec that dropped the payload's `only` would
   -- round-trip one of them and not both.

@@ -46,6 +46,7 @@ codec =
           Arm.payload "IncreaseMaximumHandSize" Common.natural PlayerEffect.IncreaseMaximumHandSize (\x -> case x of PlayerEffect.IncreaseMaximumHandSize y -> Just y; _ -> Nothing),
           Arm.payload "ReduceMaximumHandSize" Common.natural PlayerEffect.ReduceMaximumHandSize (\x -> case x of PlayerEffect.ReduceMaximumHandSize y -> Just y; _ -> Nothing),
           Arm.payload "DontLoseUnspentMana" ManaFilter.codec PlayerEffect.DontLoseUnspentMana (\x -> case x of PlayerEffect.DontLoseUnspentMana y -> Just y; _ -> Nothing),
+          Arm.nullary "LoseLifeForUnspentMana" PlayerEffect.LoseLifeForUnspentMana,
           Arm.payload "SpendManaAsThough" SpendManaAsThough.codec PlayerEffect.SpendManaAsThough (\x -> case x of PlayerEffect.SpendManaAsThough y -> Just y; _ -> Nothing),
           Arm.payload "CantBeTargetedBy" PlayerScope.codec PlayerEffect.CantBeTargetedBy (\x -> case x of PlayerEffect.CantBeTargetedBy y -> Just y; _ -> Nothing),
           Arm.payload "CastAsThoughItHadFlash" filterCodec PlayerEffect.CastAsThoughItHadFlash (\x -> case x of PlayerEffect.CastAsThoughItHadFlash y -> Just y; _ -> Nothing),
@@ -87,6 +88,7 @@ tagOf x = case x of
   PlayerEffect.IncreaseMaximumHandSize {} -> "IncreaseMaximumHandSize"
   PlayerEffect.ReduceMaximumHandSize {} -> "ReduceMaximumHandSize"
   PlayerEffect.DontLoseUnspentMana {} -> "DontLoseUnspentMana"
+  PlayerEffect.LoseLifeForUnspentMana {} -> "LoseLifeForUnspentMana"
   PlayerEffect.SpendManaAsThough {} -> "SpendManaAsThough"
   PlayerEffect.CantBeTargetedBy {} -> "CantBeTargetedBy"
   PlayerEffect.CastAsThoughItHadFlash {} -> "CastAsThoughItHadFlash"

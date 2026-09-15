@@ -5359,7 +5359,7 @@ nextTurnOfAlice :: GameState.GameState -> GameState.GameState
 nextTurnOfAlice gs =
   S.runPure
     S.identityAnswer
-    (Mana.emptyManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
+    (Mana.emptiedManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
     (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
 
 printedActivationOnlyOnceEachTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

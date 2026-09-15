@@ -896,6 +896,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.IncreaseMaximumHandSize _ -> False
   PlayerEffect.ReduceMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
+  PlayerEffect.LoseLifeForUnspentMana -> False
   PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -959,6 +960,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.IncreaseMaximumHandSize _ -> False
   PlayerEffect.ReduceMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
+  PlayerEffect.LoseLifeForUnspentMana -> False
   PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False

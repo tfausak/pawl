@@ -391,6 +391,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.IncreaseMaximumHandSize _ -> effect
   PlayerEffect.ReduceMaximumHandSize _ -> effect
   PlayerEffect.DontLoseUnspentMana _ -> effect
+  PlayerEffect.LoseLifeForUnspentMana -> effect
   PlayerEffect.SpendManaAsThough _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
   PlayerEffect.DamageCantBePrevented _ -> effect

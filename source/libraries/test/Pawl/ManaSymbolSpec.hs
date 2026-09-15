@@ -1921,7 +1921,7 @@ spendChoiceSpec s registry = Spec.describe s "Choosing which mana to spend" $ do
           Prompt.ChooseManaToSpend {} -> unit
           _ -> S.identityAnswer p
         payGreen unit = S.runPureWith (spends unit) floated (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice greenOnly)
-        thenGreen gs = fst (S.runPureWith S.identityAnswer (Mana.emptyManaPools gs) (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice greenOnly))
+        thenGreen gs = fst (S.runPureWith S.identityAnswer (Mana.emptiedManaPools gs) (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice greenOnly))
         (sparedPaid, spared) = payGreen plainGreen
         (spentPaid, spent) = payGreen retainedGreen
     Spec.assertBool s (thenGreen spared) "sparing the retained green, a second {G} is paid after the pool empties"
