@@ -537,8 +537,8 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders slot exceptions) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders) slot (fmap (rewriteCopyException pairs) exceptions))
   -- The exceptions ride this opcode too, and take the same walk AsCopy's do
   -- (rewriteEntryRewrite below).
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject exceptions) ->
-    Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject) (fmap (rewriteCopyException pairs) exceptions))
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject duration exceptions) ->
+    Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject) (fmap (rewriteDuration pairs) duration) (fmap (rewriteCopyException pairs) exceptions))
   -- BOTH refs, CreateCopy's reason: CR 707.2 keeps a text change out of the
   -- copiable values, so what the copy becomes is not rewritten, but CR 707.10d's
   -- description of the candidates ("each other creature you control") is card

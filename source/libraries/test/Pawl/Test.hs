@@ -35,6 +35,7 @@ import qualified Pawl.Codec.ActiveAttackProhibitionSpec
 import qualified Pawl.Codec.ActiveAttackRequirementSpec
 import qualified Pawl.Codec.ActiveBlockProhibitionSpec
 import qualified Pawl.Codec.ActiveBlockRequirementSpec
+import qualified Pawl.Codec.ActiveCopySpec
 import qualified Pawl.Codec.ActivePlayerEffectSpec
 import qualified Pawl.Codec.ActiveReplacementSpec
 import qualified Pawl.Codec.ActiveUnregeneratableSpec
@@ -684,6 +685,7 @@ spec s registry = do
   Pawl.Codec.ActiveActivationProhibitionSpec.spec s
   Pawl.Codec.ActiveBlockProhibitionSpec.spec s
   Pawl.Codec.ActiveBlockRequirementSpec.spec s
+  Pawl.Codec.ActiveCopySpec.spec s
   Pawl.Codec.ActivePlayerEffectSpec.spec s
   Pawl.Codec.ActiveReplacementSpec.spec s
   Pawl.Codec.ActiveUnregeneratableSpec.spec s

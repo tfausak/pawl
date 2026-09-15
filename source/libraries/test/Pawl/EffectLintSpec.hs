@@ -268,7 +268,7 @@ ownQuantities effect = case effect of
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
   Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> [quantity]
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
-  Effect.BecomeCopy {} -> []
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _) -> foldMap durationQuantities duration
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> [quantity]
   Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
@@ -1217,7 +1217,7 @@ effectObjectRefs effect =
         Effect.Create {} -> []
         Effect.Conjure {} -> []
         Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> read_ [ref]
-        Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
+        Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _ _) -> read_ [original, subject]
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _ _ _) -> read_ (ref : copyTargetsRefs targets)
         Effect.Replace {} -> []
         Effect.SkipNextPhase {} -> []

@@ -37,6 +37,7 @@ import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
+import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
@@ -183,6 +184,7 @@ dropAtCleanup gs =
         -- ends an unused grant exactly as it ends AtCleanup's.
         Expiry.WhenUsed -> False
       keepEffect eff = survives (ContinuousEffect.expiry eff)
+      keepCopy active = survives (ActiveCopy.expiry active)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
       keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
@@ -198,6 +200,7 @@ dropAtCleanup gs =
       keepIgnored = survives . IgnoredAbility.expiry
    in gs
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
+          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
@@ -247,6 +250,7 @@ sweepConditional = do
         -- which run outside this sweep.
         Expiry.WhenUsed -> True
       keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
+      keepCopy active = survives (ActiveCopy.source active) (ActiveCopy.expiry active)
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.source active) (ActivePlayerEffect.expiry active)
       keepBlockRequirement active = survives (ActiveBlockRequirement.source active) (ActiveBlockRequirement.expiry active)
@@ -257,6 +261,7 @@ sweepConditional = do
       keepActivationProhibition active = survives (ActiveActivationProhibition.source active) (ActiveActivationProhibition.expiry active)
       keepDelayed entry = maybe True (survives (DelayedTrigger.source entry)) (DelayedTrigger.expiry entry)
       keptEffects = filter keepEffect (GameState.continuousEffects gs)
+      keptCopies = filter keepCopy (GameState.copyEffects gs)
       keptReplacements = filter keepReplacement (GameState.replacements gs)
       keptPlayerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
       keptBlockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs)
@@ -272,6 +277,7 @@ sweepConditional = do
       keptObjects = clearedPermissions keepPermission gs
       changed =
         length keptEffects /= length (GameState.continuousEffects gs)
+          || length keptCopies /= length (GameState.copyEffects gs)
           || length keptReplacements /= length (GameState.replacements gs)
           || length keptPlayerEffects /= length (GameState.playerEffects gs)
           || length keptBlockRequirements /= length (GameState.blockRequirements gs)
@@ -290,6 +296,7 @@ sweepConditional = do
     State.put
       gs
         { GameState.continuousEffects = keptEffects,
+          GameState.copyEffects = keptCopies,
           GameState.replacements = keptReplacements,
           GameState.playerEffects = keptPlayerEffects,
           GameState.blockRequirements = keptBlockRequirements,
@@ -405,6 +412,7 @@ dropAtTurnOf pid gs =
         -- No seat's turn beginning is a use.
         Expiry.WhenUsed -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
+      keepCopy active = survives (ActiveCopy.expiry active)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
       keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
@@ -417,6 +425,7 @@ dropAtTurnOf pid gs =
       keepIgnored = survives . IgnoredAbility.expiry
    in gs
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
+          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
@@ -459,6 +468,7 @@ dropAtEndOf ending gs =
         -- No step or phase ending is a use.
         Expiry.WhenUsed -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
+      keepCopy active = survives (ActiveCopy.expiry active)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
       keepBlockRequirement active = survives (ActiveBlockRequirement.expiry active)
@@ -471,6 +481,7 @@ dropAtEndOf ending gs =
       keepIgnored = survives . IgnoredAbility.expiry
    in gs
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
+          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
@@ -515,6 +526,7 @@ paidExpiries gs =
 sourcedExpiries :: GameState -> [(ObjectId, Expiry)]
 sourcedExpiries gs =
   fmap (\x -> (ContinuousEffect.source x, ContinuousEffect.expiry x)) (GameState.continuousEffects gs)
+    <> fmap (\x -> (ActiveCopy.source x, ActiveCopy.expiry x)) (GameState.copyEffects gs)
     <> fmap (\x -> (ActiveReplacement.source x, ActiveReplacement.expiry x)) (GameState.replacements gs)
     <> fmap (\x -> (ActivePlayerEffect.source x, ActivePlayerEffect.expiry x)) (GameState.playerEffects gs)
     <> fmap (\x -> (ActiveBlockRequirement.source x, ActiveBlockRequirement.expiry x)) (GameState.blockRequirements gs)
@@ -551,6 +563,7 @@ dropWhenPaidBy oid gs =
         Expiry.AtEndOf _ -> True
         Expiry.WhenUsed -> True
       keepEffect x = survives (ContinuousEffect.source x) (ContinuousEffect.expiry x)
+      keepCopy x = survives (ActiveCopy.source x) (ActiveCopy.expiry x)
       keepReplacement x = survives (ActiveReplacement.source x) (ActiveReplacement.expiry x)
       keepPlayerEffect x = survives (ActivePlayerEffect.source x) (ActivePlayerEffect.expiry x)
       keepBlockRequirement x = survives (ActiveBlockRequirement.source x) (ActiveBlockRequirement.expiry x)
@@ -564,6 +577,7 @@ dropWhenPaidBy oid gs =
       keepPermission x = survives (ExilePlayPermission.source x) (ExilePlayPermission.expiry x)
    in gs
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
+          GameState.copyEffects = filter keepCopy (GameState.copyEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),

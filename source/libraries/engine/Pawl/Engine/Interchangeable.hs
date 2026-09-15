@@ -115,12 +115,11 @@ representatives pcs gs candidates =
 --   * The turn, phase, priority, result, daytime, signal, supply and printing
 --     fields describe the GAME rather than any object.
 --
--- GameState.unregeneratables, GameState.blockProhibitions,
+-- GameState.copyEffects, GameState.unregeneratables, GameState.blockProhibitions,
 -- GameState.attackProhibitions and GameState.activationProhibitions ARE listed
 -- below, for the reason every other listed field is: a row names one object and
--- not another (CR 701.19c, CR 509.1b, CR 508.1c, CR 602.2), so two creatures
--- alike in every characteristic are told apart by which of them a prohibition
--- covers.
+-- not another (CR 613.1a, CR 701.19c, CR 509.1b, CR 508.1c, CR 602.2), so two creatures
+-- alike in every characteristic are told apart by which of them a row covers.
 --
 -- GameState.enteringCounters, GameState.detachedBindings and
 -- GameState.broughtIn are listed below because each holds ObjectIds, and NOT
@@ -132,6 +131,7 @@ representatives pcs gs candidates =
 quiet :: GameState -> Bool
 quiet gs =
   null (GameState.continuousEffects gs)
+    && null (GameState.copyEffects gs)
     && null (GameState.replacements gs)
     && null (GameState.playerEffects gs)
     && null (GameState.blockRequirements gs)
