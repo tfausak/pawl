@@ -344,6 +344,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.IsBound _ -> predicate
         Filter.Type.SameNameAsBound _ -> predicate
         Filter.Type.SameNameAsSource -> predicate
+        Filter.Type.SameOwnerAsSource -> predicate
         Filter.Type.SameControllerAsBound _ -> predicate
         Filter.Type.SharesCreatureTypeWithBound _ -> predicate
         Filter.Type.HasChosenName -> predicate

@@ -908,6 +908,48 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "setup: the rejected one alice owns is a Human" (Projection.subtypesOf humanId board) (Set.fromList [Subtype.Cleric, Subtype.Human])
     Spec.assertEqWith s "setup: and the other is a creature bob owns" (fmap Object.owner (Game.lookupObject theirsId board)) (Just S.bob)
     Spec.assertEqWith s "setup: which is a creature all the same" (Projection.subtypesOf theirsId board) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+  -- CR 702.140a's owner, which the case above cannot tell from CR 109.5's "you":
+  -- alice owns and casts every mutate spell there, so the spell's owner and its
+  -- controller are one player. Here they are two -- Hostage Taker exiles BOB's
+  -- Cubwarden and permits ALICE to cast it -- and the rule's "the same owner as
+  -- this spell" points at bob.
+  --
+  -- THE SAME BOARD twice, aimed at two non-Human creatures that differ in their
+  -- OWNER and in nothing else, so a refusal is the owner comparison talking.
+  Spec.it s "CR 702.140a a stolen mutate spell may target the owner's creature and not the caster's" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    taker <- S.printingOf s registry "Hostage Taker"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case stolenCubwarden plains island swamp taker cubwarden falcon piker of
+      Nothing -> Spec.assertFailure s "setup: expected bob's Cubwarden to be exiled under the Hostage Taker"
+      Just (spellId, theirs, hers, board) -> do
+        let aimedAt victim = merging MutateSide.Over victim board spellId
+        -- THE gameplay assertion, ahead of every proxy: the creature the CASTER
+        -- owns is refused, which is exactly what `OwnedBy You` would have
+        -- admitted.
+        Spec.assertEqWith
+          s
+          "CR 702.140a the caster's own non-Human creature is not a legal target, so nothing merged with it"
+          (componentNames hers (aimedAt hers))
+          []
+        -- The control on the same board, off the same lands: the creature the
+        -- SPELL's owner owns is admitted, so the refusal above is about the owner
+        -- and not about the cast.
+        Spec.assertEqWith
+          s
+          "CR 702.140a while the creature the spell's owner owns is, and merges"
+          (componentNames theirs (aimedAt theirs))
+          [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Falcon Abomination")]
+        -- The proxies, after them.
+        Spec.assertEqWith s "setup: CR 108.3 bob owns the card alice is casting" (fmap Object.owner (Game.lookupObject spellId board)) (Just S.bob)
+        Spec.assertEqWith s "setup: the refused creature is alice's own" (fmap Object.owner (Game.lookupObject hers board)) (Just S.alice)
+        Spec.assertEqWith s "setup: and it is a non-Human creature all the same" (Projection.subtypesOf hers board) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+        Spec.assertEqWith s "setup: the admitted one is bob's" (fmap Object.owner (Game.lookupObject theirs board)) (Just S.bob)
+        Spec.assertEqWith s "setup: and non-Human too" (Projection.subtypesOf theirs board) (Set.fromList [Subtype.Bird, Subtype.Zombie])
   -- CR 702.140e's second sentence read over the ability families CR 613.11
   -- applies OUTSIDE the layer system -- the twelve Pawl.Types.RuleAbilities
   -- carries. Every case below is a pair of boards differing in the UNDER
@@ -1073,6 +1115,79 @@ blightsower, saprolingToken, howler :: CardName.CardName
 blightsower = CardName.MkCardName (Text.pack "Blightsower Thallid")
 saprolingToken = CardName.MkCardName (Text.pack "Phyrexian Saproling Token")
 howler = CardName.MkCardName (Text.pack "Wildsong Howler")
+
+-- Hostage Taker {2}{U}{B} Creature -- Human Pirate 2/3 (Scryfall, 2026-09-15):
+-- "When this creature enters, exile another target creature or artifact until
+-- this creature leaves the battlefield. You may cast that card for as long as it
+-- remains exiled, and mana of any type can be spent to cast that spell."
+-- Pawl.CastRestrictionSpec transcribed it; its note there says which clause is
+-- restated rather than dropped.
+--
+-- The one board in the tree where a mutate spell's OWNER is not its CONTROLLER:
+-- alice casts the Taker, it exiles bob's Cubwarden, and alice may then cast that
+-- card. The spell she puts on the stack is bob's.
+--
+-- THREE SEATS, Pawl.CastRestrictionSpec's reason: the caster and the owner
+-- collapse onto the two seats of a duel. carol holds nothing.
+--
+-- TWO non-Human creatures that differ in their owner alone as far as rule
+-- 702.140a can see: bob's Falcon Abomination (Bird Zombie) and alice's Goblin
+-- Piker (Goblin Warrior). Both are settled on the battlefield before either cast.
+--
+-- TWELVE lands -- four Plains, four Islands, four Swamps -- against eight mana of
+-- demand ({2}{U}{B} for the Taker and CR 702.140a's {2}{W}{W} for the mutate), so
+-- neither cast can fail for want of a payment and the negative is about the
+-- filter. The Plains are what pay the {W}{W} without leaning on the Taker's
+-- any-type rider.
+--
+-- The Taker's trigger is PINNED to the Cubwarden rather than searched for: three
+-- permanents pass its "another target creature or artifact", so S.identityAnswer
+-- could re-find a different one after a mutation.
+--
+-- Nothing when the exile did not happen, which the caller reports rather than
+-- asserting against a board it did not get.
+stolenCubwarden ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+stolenCubwarden plains island swamp taker cubwarden falcon piker =
+  let lands = S.landsFor swamp S.alice 4 (S.landsFor island S.alice 4 (S.landsFor plains S.alice 4 S.threePlayerGame))
+      (victim, withVictim) = S.addPermanent cubwarden S.bob lands
+      (theirs, withTheirs) = S.addPermanent falcon S.bob withVictim
+      (hers, withHers) = S.addPermanent piker S.alice withTheirs
+      (handId, board) = S.addHandCard taker S.alice withHers
+      taking :: Prompt.Prompt r -> r
+      taking p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just victim) . Recipient.objectOf) . snd) sets
+        _ -> S.identityAnswer p
+      cast = S.runPure taking (inAliceMainPhase board) (Cast.castSpell S.manaPerformer S.alice handId (S.printingName taker) Facing.FaceUp)
+      entered = S.runPure taking cast Stack.resolveTop
+      -- CR 603.3b/603.3d: the enters trigger goes onto the stack the next time a
+      -- player would receive priority, and its target is chosen there.
+      placed = S.runPure taking entered Engine.settleForPriority
+      after = inAliceMainPhase (S.runPure taking placed Stack.resolveTop)
+   in fmap (\spellId -> (spellId, theirs, hers, after)) (exiledNamed (CardName.MkCardName (Text.pack "Cubwarden")) after)
+
+-- The one exiled card with this name, or Nothing where the move did not happen.
+-- CR 400.7 mints a new object at the destination, so no caller holds its id.
+exiledNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
+exiledNamed name gs = List.find (\o -> Projection.hasName name o gs) (Set.toList (GameState.exile gs))
+
+-- alice's precombat main phase with priority, which is what a sorcery-speed cast
+-- off a permission wants; Pawl.CastRestrictionSpec's inHerMainPhase, spelled here
+-- because the two specs share no fixture module.
+inAliceMainPhase :: GameState.GameState -> GameState.GameState
+inAliceMainPhase gs =
+  gs
+    { GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = S.alice,
+      GameState.priority = Just S.alice
+    }
 
 -- mutateBoard with two more of alice's creatures on it, for the cases that ask
 -- how many creatures may be declared rather than what one of them may do.

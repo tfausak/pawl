@@ -3027,16 +3027,21 @@ mutateCosts keywords =
 -- prints no "up to", so the slot is required (TargetSlot.required), which is
 -- what makes CR 702.140b's "if its target is illegal" a question with an answer.
 --
--- Not implemented: rule 702.140a's owner is the SPELL's, and Filter.OwnedBy
--- resolves against CR 109.5's "you" -- the spell's CONTROLLER at CR 601.2c and
--- CR 608.2b. The two differ only for a spell cast from a zone its owner is not
--- (Pawl.Types.PlayerEffect's CastFromAnotherPlayersZone), and no mutate card in
--- data/cards/ is reachable that way (#3368).
+-- The owner conjunct is Filter.SameOwnerAsSource and NOT Filter.OwnedBy You: rule
+-- 702.140a names the SPELL's owner, where CR 109.5's "you" is the spell's
+-- controller at CR 601.2c and CR 608.2b. The two part for a spell cast off a card
+-- its caster does not own (Hostage Taker's permission). See Pawl.MutateSpec's "CR
+-- 702.140a a stolen mutate spell may target the owner's creature and not the
+-- caster's".
+--
+-- Cubwarden's REMINDER text says "target non-Human creature you own", which CR
+-- 207.2a makes a summary with no game function; rule 702.140a is what is
+-- implemented.
 mutateTarget :: TargetSlot.TargetSlot
 mutateTarget =
   TargetSlot.required
     Pool.Creatures
-    (Just (Filter.And [Filter.Not (Filter.HasSubtype Subtype.Human), Filter.OwnedBy PlayerRelation.You]))
+    (Just (Filter.And [Filter.Not (Filter.HasSubtype Subtype.Human), Filter.SameOwnerAsSource]))
 
 -- CR 702.37a / 702.37e: the MORPH cost -- what a face-down permanent's controller
 -- pays to turn it face up as CR 116.2b's special action -- or Nothing when the

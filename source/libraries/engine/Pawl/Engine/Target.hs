@@ -413,6 +413,23 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
             -- and widening it here would be a capability no card asks for.
             Filter.sourceAttachedTo = Nothing,
+            -- THE one site that fills it, sourcePower's and slotAmount's sibling
+            -- above and for their reason: CR 702.140a's owner comparison lives in
+            -- a target slot's Filter -- the one rule 702.140a MINTS
+            -- (Pawl.Engine.Keyword.mutateTarget) -- and this is where one is
+            -- matched, at both of CR 115's moments.
+            --
+            -- Off Object.owner rather than off a projection or off `perspective`:
+            -- CR 108.3 fixes an owner when the game starts and no layer writes
+            -- one, while CR 109.5's "you" is the CONTROLLER, which is a different
+            -- player for a spell cast off somebody else's card. A source the
+            -- state no longer holds answers Nothing, and the atom answers False
+            -- on it; CR 608.2b reaches this while the spell is still on the
+            -- stack, so no last-known reader is wanted.
+            --
+            -- A THUNK, like its siblings: a slot whose filter never names the
+            -- atom pays for no lookup.
+            Filter.sourceOwner = fmap Object.owner (Game.lookupObject source gs),
             -- Empty, sourceAttachedTo's reason one atom over: CR 201.4's name is
             -- chosen while the spell RESOLVES (CR 608.2c), and a target slot is
             -- matched at CR 601.2c, before any of that has happened. So there is

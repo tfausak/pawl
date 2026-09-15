@@ -91,6 +91,7 @@ codec keywordCodec =
       Arm.payload "IsBound" SlotName.codec Filter.IsBound (\x -> case x of Filter.IsBound y -> Just y; _ -> Nothing),
       Arm.payload "SameNameAsBound" SlotName.codec Filter.SameNameAsBound (\x -> case x of Filter.SameNameAsBound y -> Just y; _ -> Nothing),
       Arm.nullary "SameNameAsSource" Filter.SameNameAsSource,
+      Arm.nullary "SameOwnerAsSource" Filter.SameOwnerAsSource,
       Arm.payload "SameControllerAsBound" SlotName.codec Filter.SameControllerAsBound (\x -> case x of Filter.SameControllerAsBound y -> Just y; _ -> Nothing),
       Arm.payload "SharesCreatureTypeWithBound" SlotName.codec Filter.SharesCreatureTypeWithBound (\x -> case x of Filter.SharesCreatureTypeWithBound y -> Just y; _ -> Nothing),
       Arm.nullary "HasChosenName" Filter.HasChosenName,
@@ -195,6 +196,7 @@ tagOf x = case x of
   Filter.IsBound {} -> "IsBound"
   Filter.SameNameAsBound {} -> "SameNameAsBound"
   Filter.SameNameAsSource {} -> "SameNameAsSource"
+  Filter.SameOwnerAsSource {} -> "SameOwnerAsSource"
   Filter.SameControllerAsBound {} -> "SameControllerAsBound"
   Filter.SharesCreatureTypeWithBound {} -> "SharesCreatureTypeWithBound"
   Filter.HasChosenName {} -> "HasChosenName"

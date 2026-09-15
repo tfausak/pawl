@@ -1231,6 +1231,24 @@ data Context = MkContext
     -- IsHostOfSource where the source's host is unknown", the sweep sourcePower's
     -- and slotNames' siblings each have.
     sourceAttachedTo :: Maybe ObjectId.ObjectId,
+    -- CR 108.3: the OWNER of the SOURCE, for the one atom that compares a
+    -- candidate's owner against it (SameOwnerAsSource, CR 702.140a's "with the
+    -- same owner as this spell"). sourceNames' sibling, though CR 109.3 makes an
+    -- owner no characteristic, and undrivable from `source` here for that
+    -- field's reason -- this module holds no game state -- so the caller that has
+    -- the board supplies it.
+    --
+    -- ONE filler: Pawl.Engine.Target.slotContext, the one site that matches a
+    -- TARGET SLOT's Filter, which both of CR 115's moments (CR 601.2c's choosing
+    -- and CR 608.2b's re-check) reach. Rule 702.140a's slot is the only position
+    -- the atom is written in, and it is MINTED by the rule
+    -- (Pawl.Engine.Keyword.mutateTarget) rather than by card data.
+    --
+    -- Nothing wherever the atom cannot appear, and the atom answers False on that
+    -- Nothing. What keeps a card out of those positions is
+    -- Pawl.FilterPositionLintSpec's "CR 702.140a no card writes a source-owner
+    -- comparison", the sweep SameNameAsSource's own lint is.
+    sourceOwner :: Maybe PlayerId.PlayerId,
     -- CR 201.4: the names the SOURCE has chosen, for the one atom that compares a
     -- candidate's against them (HasChosenName, Ancient Vendetta). Supplied by the
     -- caller for slotNames' reason -- this module holds no game state and cannot
@@ -1422,7 +1440,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1460,7 +1478,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1714,6 +1732,14 @@ matches context view predicate = case predicate of
   -- a source with no name (CR 708.2a), each leave the other side empty and
   -- answer False without a case of their own.
   Filter.SameNameAsSource -> not (Set.disjoint (names view) (sourceNames context))
+  -- CR 108.3 compared across the candidate and the SOURCE rather than against CR
+  -- 109.5's perspective, which is what separates it from OwnedBy above: rule
+  -- 702.140a's mutate slot asks whose card the SPELL is, and a spell cast off
+  -- somebody else's card answers a different player than its controller. A source
+  -- nothing supplied, and a candidate with no owner (CR 109.1), each answer False.
+  Filter.SameOwnerAsSource -> case (owner view, sourceOwner context) of
+    (Just o, Just p) -> o == p
+    _ -> False
   -- CR 110.2 compared across two of one announcement's targets, and the one atom
   -- here that is vacuously TRUE rather than False: a slot the context has no key
   -- for is one nothing has named yet, and a relation with only one party to it
@@ -2123,6 +2149,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameNameAsSource -> predicate
+  Filter.SameOwnerAsSource -> predicate
   Filter.SameControllerAsBound _ -> predicate
   Filter.SharesCreatureTypeWithBound _ -> predicate
   Filter.HasChosenName -> predicate
@@ -2770,6 +2797,7 @@ bakeBound players predicate = case predicate of
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameNameAsSource -> predicate
+  Filter.SameOwnerAsSource -> predicate
   Filter.SameControllerAsBound _ -> predicate
   Filter.SharesCreatureTypeWithBound _ -> predicate
   Filter.HasChosenName -> predicate
@@ -2933,6 +2961,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsBound _ -> []
   Filter.SameNameAsBound _ -> []
   Filter.SameNameAsSource -> []
+  Filter.SameOwnerAsSource -> []
   Filter.SameControllerAsBound _ -> []
   Filter.SharesCreatureTypeWithBound _ -> []
   Filter.HasChosenName -> []
@@ -3087,6 +3116,7 @@ statesAQuality predicate = case predicate of
   Filter.IsBound _ -> True
   Filter.SameNameAsBound _ -> True
   Filter.SameNameAsSource -> True
+  Filter.SameOwnerAsSource -> True
   Filter.SameControllerAsBound _ -> True
   Filter.SharesCreatureTypeWithBound _ -> True
   -- CR 701.23b's "stated quality" for HasName's reason, one indirection along: the

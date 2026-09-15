@@ -250,6 +250,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBound _ -> 0
   Filter.Type.SameNameAsBound _ -> 0
   Filter.Type.SameNameAsSource -> 0
+  Filter.Type.SameOwnerAsSource -> 0
   Filter.Type.SameControllerAsBound _ -> 0
   Filter.Type.SharesCreatureTypeWithBound _ -> 0
   Filter.Type.HasChosenName -> 0
@@ -2014,6 +2015,30 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- face that DOES carry the atom finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.SameNameAsSource]]
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- CR 702.140a's comparison is the atom above's sibling one characteristic over,
+  -- and its one filler is Pawl.Engine.Target.slotContext -- so it is answerable
+  -- only inside a TARGET SLOT's own filter and would be a silent False in an
+  -- affected set, a Count filter, a cost criterion or a search filter. Only
+  -- Pawl.Engine.Keyword writes it -- mutate -- and into a slot the rule MINTS
+  -- rather than one a card authors, so what is swept here is every card filter
+  -- alike.
+  Spec.it s "CR 702.140a no card writes a source-owner comparison" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "SameOwnerAsSource") (Codec.encode (Face.Codec.codec Card.codec) c)
+        offenders = filter (anyFace (\c -> atoms c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous, the sweeps above's reason: the same counter over a hand-built
+    -- face that DOES carry the atom finds it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.SameOwnerAsSource]]
         planted =
           (S.combinedFace piker)
             { Face.spell =
