@@ -1191,9 +1191,10 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
 -- object's controller and what an Aura enchants among the things that are NOT
 -- characteristics, and a zone is no more one (CR 400.1), so a snapshot has
 -- nothing to say about them and a Filter naming one would go silently False.
--- Those come from the live view, which is not what CR 603.10 asks for either;
--- Pawl.Engine.Event's TriggerCondition.PermanentTransforms arm carries the
--- elision that says so.
+-- Those come from the view this is handed, which CR 603.10 also pins to
+-- immediately after the event: the PermanentTransforms arm writes the sampled
+-- controller onto the live view BEFORE calling this, and the sampled attachments
+-- over the result afterwards.
 --
 -- AN EDIT SITE, and the sampled half is built by calling viewOfSnapshot so that
 -- the VALUES cannot disagree -- but the list of fields below is a second

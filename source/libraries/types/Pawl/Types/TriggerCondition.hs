@@ -401,8 +401,8 @@ data TriggerCondition
     -- pair SelfTurnedFaceUp and PermanentTurnedFaceUp make one rule over.
     SelfTransformedInto CardName.CardName
   | -- | CR 701.27e read by a bystander: a permanent the Filter admits turned over
-    -- (Cult of the Waxing Moon), matched against the characteristics the event
-    -- SAMPLED rather than the board's.
+    -- (Cult of the Waxing Moon), matched against what the event SAMPLED rather
+    -- than against the board the CR 117.5 scan reads.
     PermanentTransforms (Filter.Filter Keyword.Keyword)
   | -- | CR 708.7's other written form read by a bystander (Aven Farseer),
     -- filtered and read live after CR 708.8 restores the copiable values.

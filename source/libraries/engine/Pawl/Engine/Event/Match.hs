@@ -6638,7 +6638,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 708.2a admits none; a permanent with no name matches nothing, which is
   -- the rule's own answer rather than a guard.
   TriggerCondition.SelfTransformedInto name -> case event of
-    GameEvent.Transformed (Transformed.MkTransformed oid pc) -> oid == bearer && Set.member name (PC.names pc)
+    GameEvent.Transformed transformed -> Transformed.object transformed == bearer && Set.member name (PC.names (Transformed.characteristics transformed))
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.TurnedFaceDown _ -> False
     GameEvent.BecameDesignated {} -> False
@@ -6716,24 +6716,43 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- scan, which is the argument Pawl.Types.Transformed makes for carrying the
   -- sample.
   --
-  -- Not implemented: the same at-event read for the axes a
-  -- ProjectedCharacteristics cannot carry, which CR 109.3 excludes from an
-  -- object's characteristics but CR 603.10 and CR 603.2 pin all the same -- a
-  -- trigger's condition is checked against the objects as they were immediately
-  -- after the event. Control and ATTACHMENT are the two, and attachment is the
-  -- one a printing reaches: Neglected Heirloom's "when equipped creature
-  -- transforms" is `HasAttached IsSource`, and on a board where the equipped
-  -- creature turns into a noncreature the CR 704.5n unattach runs at the same CR
-  -- 117.5 boundary, BEFORE triggers go on the stack, so the live read here finds
-  -- nothing attached and the ability never fires (#2050).
+  -- The CONTROLLER and the ATTACHMENTS come off the event too, and for CR
+  -- 603.10's reason rather than CR 701.27e's: that rule pins the whole appearance
+  -- of the objects to immediately after the event, and CR 109.3 keeps both axes
+  -- out of an object's characteristics, so neither can ride the snapshot. The
+  -- board this arm is handed has had state-based actions run over it (CR 117.5),
+  -- and CR 704.5n is the one that moves -- an Equipment on a permanent that just
+  -- turned into a noncreature has already fallen off. Proved by
+  -- Pawl.TransformSpec's "CR 603.10 / 704.5n the Heirloom turns over though the
+  -- unattach beat the scan".
+  --
+  -- The controller is written over the LIVE view before the snapshot is folded in
+  -- rather than after, so Count.viewOfSnapshot derives its half against the same
+  -- player CR 603.3a will read. Nothing in data/cards/ tells the two readings
+  -- apart -- the control axis is a regression fence here, not a proved behaviour.
+  --
+  -- Each attacher's own appearance is rebuilt from the board at the scan: the
+  -- event carries their ids, which is what CR 603.10's "objects involved in the
+  -- event" needs for a HasAttached, and viewWithLastKnownAnywhere so an attacher
+  -- that has since left is still read (CR 608.2h).
   --
   -- viewWithLastKnown rather than viewOfObject, PermanentTurnedFaceUp's reason:
   -- a permanent that turned over and left before the CR 117.5 boundary is still
   -- read as it was on the battlefield (CR 608.2h).
   TriggerCondition.PermanentTransforms f -> case event of
-    GameEvent.Transformed (Transformed.MkTransformed oid pc) -> case Projection.viewWithLastKnown oid gs oid of
-      Nothing -> False
-      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) (Count.overlaySnapshot pc view) f
+    GameEvent.Transformed transformed ->
+      let oid = Transformed.object transformed
+       in case Projection.viewWithLastKnown oid gs oid of
+            Nothing -> False
+            Just live ->
+              let sampled =
+                    Count.overlaySnapshot
+                      (Transformed.characteristics transformed)
+                      live {Filter.controller = Transformed.controller transformed}
+               in Filter.matches
+                    (Filter.contextFor (Game.teams gs) (Just you) (Just bearer))
+                    sampled {Filter.attachedViews = Maybe.mapMaybe (Projection.viewWithLastKnownAnywhere gs) (Set.toAscList (Transformed.attachments transformed))}
+                    f
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.TurnedFaceDown _ -> False
     GameEvent.BecameDesignated {} -> False
