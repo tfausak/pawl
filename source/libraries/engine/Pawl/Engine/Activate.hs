@@ -277,9 +277,9 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- id on every zone change, so a part that puts the object into a zone leaves
 -- CR 113.7a's source nothing to move -- a later part has to name the ARRIVAL
 -- instead (Pawl.Engine.Binding.became, or a slot the move itself minted, as
--- Meandering Towershell's "exiled" is), and Pawl.Engine.EffectZone answers
--- Nothing for every ref but the reserved source slot. So first-answer-wins and
--- the rule's order-sensitive reading agree on every ability that can be
+-- Meandering Towershell's "exiled" is), and this caller gives
+-- Pawl.Engine.EffectZone the reserved source slot alone. So first-answer-wins
+-- and the rule's order-sensitive reading agree on every ability that can be
 -- written, and a card whose later part moved the reserved source slot out of a
 -- zone an earlier part put it into is what would refute that; see #2501.
 --
@@ -296,7 +296,10 @@ zoneFunctionedFrom delayed ability =
     Just zone -> Just zone
     Nothing ->
       Maybe.listToMaybe
-        (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom delayed) (Modal.allEffects (ActivatedAbility.modal ability)))
+        -- CR 113.7's source slot ALONE is "the object it's on" here: an
+        -- activation is not an event, so Pawl.Engine.Event.Binding.eventBindings
+        -- never runs for one and CR 400.7e's `became` names nothing.
+        (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom (Set.singleton Binding.triggerSource) delayed) (Modal.allEffects (ActivatedAbility.modal ability)))
 
 -- CR 113.6m's "functions only in that zone", asked of one zone: does this
 -- ability function from there? True for an ability that names no zone at all,

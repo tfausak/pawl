@@ -35,6 +35,7 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -62,6 +63,8 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
@@ -70,6 +73,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -3203,10 +3207,12 @@ kindredSpec s registry =
 --
 -- The clause is not what CARRIES that here, though, and the legs below do not
 -- prove it: this card's payload names Binding.became rather than the trigger
--- source, and Pawl.Engine.EffectZone.zoneFunctionedFrom reads a zone off no
--- other slot, so the fold answers Nothing whichever way the clause goes. The
--- clause is proved by `widowedBladeSpec` below instead, on the one card in the
--- pool whose payload names its own source.
+-- source, and `Event.selfNamingSlots` reads that slot as the ability's own
+-- object only under a condition that puts the BEARER somewhere -- an enchanted
+-- creature's death puts the AURA nowhere -- so the fold answers Nothing
+-- whichever way the clause goes. The clause is proved by `widowedBladeSpec`
+-- below instead, on the one card in the pool whose payload names its own
+-- source.
 --
 -- CR 700.4 is what makes the printed "dies" one of the departures the clause
 -- names; CR 603.10a is what lets the trigger see a host that has already left;
@@ -3367,10 +3373,10 @@ screamsFromWithinSpec s registry =
 -- ability moves is the graveyard card itself, where CR 400.7's replacement is
 -- what leaves an Aura triggering from the battlefield naming a different
 -- incarnation. It is also why this card is the FIRST in the pool to reach
--- CR 113.6m's Aura clause at all -- Pawl.Engine.EffectZone.zoneFunctionedFrom
--- answers Nothing for a move that names any other slot, so every printed Aura
--- with this condition answers Nothing through the fold whether the clause is
--- read or not, and only a bearer whose ability names its own source can tell
+-- CR 113.6m's Aura clause at all -- `Event.selfNamingSlots` gives an
+-- AttachedCreatureDies ability the reserved source slot alone, so every printed
+-- Aura with this condition answers Nothing through the fold whether the clause
+-- is read or not, and only a bearer whose ability names its own source can tell
 -- the exception's two sides apart.
 --
 -- CR 704.5n rather than CR 704.5m is what keeps the Equipment on the battlefield
@@ -3719,29 +3725,34 @@ banewaspAfflictionSpec s registry =
 -- graveyard as the card's origin. The Scarab God is the same shape returning to
 -- hand.
 --
--- Endless Cockroaches cannot prove this: its own effect moves Binding.became
--- rather than the reserved source slot, so Pawl.Engine.EffectZone.zoneFunctionedFrom
--- already answers Nothing for it and the exception is never reached
--- (`becameSlotSpec` above proves the trigger fires either way). Here the
--- delayed ability's own effect names the reserved slot, so the fold DOES pin
--- the graveyard, and only `Event.conditionPutsSelfInto` reading SelfDies against
--- that zone exempts the ability back to the battlefield default -- where its
--- SelfDies condition needs to function to ever be checked at all.
+-- Endless Cockroaches cannot prove this: its own effect names no ORIGIN, so
+-- Pawl.Engine.EffectZone.zoneFunctionedFrom already answers Nothing for it and
+-- the exception is never reached (`becameSlotSpec` above proves the trigger
+-- fires either way). Here the delayed ability's own effect states the graveyard
+-- it moves the card out of, so the fold DOES pin the graveyard, and only
+-- `Event.conditionPutsSelfInto` reading SelfDies against that zone exempts the
+-- ability back to the battlefield default -- where its SelfDies condition needs
+-- to function to ever be checked at all.
 --
 -- The proving quantity is whether the trigger reaches the stack: without the
 -- exception, `functionsIn Zone.Battlefield` is False for this ability,
 -- `leftBattlefield`'s filter excludes it from the death event's own candidates,
 -- and SelfDies is never checked against the one event that could satisfy it.
 --
--- Not carried to the delayed ability's OWN resolution: CR 603.7e gives a
--- delayed ability the ARMING ability's source, which here is the dead
--- battlefield id CR 608.2h's last known information supplies for a SelfDies
--- trigger -- not Binding.became, which only `eventBindings` stamps onto the
--- ARMING ability's own bindings, never onto a delayed ability's. So the
--- payload's `InSlot self` finds nothing to move once the end step arrives; a
--- correct printing would need the delayed ability's own source rebound to the
--- graveyard incarnation, which is a second gap this unit does not fix (#3173).
--- The two legs below stop where that gap starts.
+-- AND CR 400.7e is what lets the DELAYED payload act, which is the other half of
+-- this group. CR 603.7e gives the delayed ability the arming ability's
+-- SOURCE -- the dead battlefield id CR 608.2h supplies for a SelfDies trigger --
+-- so a payload naming the reserved source slot would move nothing. The card
+-- names Binding.became instead, exactly as Screams from Within's does, and CR
+-- 603.7c is what carries it across the arming: the environment
+-- Resolve.Effect.armDelayed captures is the dies trigger's OWN bindings, the
+-- `became` Event.eventBindings stamped among them, so the entry still names the
+-- graveyard card when the end step comes round.
+--
+-- Which is also why the exception above must survive the payload naming that
+-- slot: `Event.zoneFunctionedFrom` reads the SELF-NAMING slots for a condition,
+-- and a condition that puts its own object into a zone makes CR 400.7e's
+-- incarnation one of them.
 ivoryGargoyleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ivoryGargoyleSpec s registry =
   let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
@@ -3749,6 +3760,23 @@ ivoryGargoyleSpec s registry =
       -- Kill the creature, settle CR 117.5 so the SBA pass places the dies
       -- trigger.
       kill victim gs = settle (S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim]))
+      endStep = Phase.Ending EndingStep.EndStep
+      -- prizedAmalgamSpec's step, and for its reason: the phase written and CR
+      -- 513.1's event recorded is what a "beginning of the next end step"
+      -- delayed ability watches for.
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      throughEndStep gs = S.runPure S.identityAnswer (settle (beginEndStep gs)) Engine.priorityLoop
+      gargoyleName = CardName.MkCardName (Text.pack "Ivory Gargoyle")
+      -- CR 400.7 mints a fresh id for the returned card, so both censuses go by
+      -- NAME. Game.zoneMembers indexes by owner (CR 108.3), which is alice for
+      -- everything below.
+      onBattlefield = S.countOnBattlefieldByName gargoyleName S.alice
+      namedIn zone gs = filter (\oid -> S.soleFaceName oid gs == gargoyleName) (Game.zoneMembers zone S.alice gs)
+      -- alice's Gargoyle killed and its dies trigger resolved: one delayed entry
+      -- armed, one Gargoyle card in her graveyard.
+      armedBoard gargoyle =
+        let (victim, g1) = S.addPermanent gargoyle S.alice (Setup.emptyGame S.bothPlayers)
+         in (victim, resolveTop (kill victim g1))
    in Spec.describe s "IvoryGargoyle" $ do
         Spec.it s "CR 113.6m a dies-armed delayed graveyard return still fires from the battlefield" $ do
           gargoyle <- S.printingOf s registry "Ivory Gargoyle"
@@ -3771,6 +3799,62 @@ ivoryGargoyleSpec s registry =
             "no zone is pinned once the exception is read"
             (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face)) (Face.triggeredAbilities face))
             [Nothing]
+        -- The proving leg for CR 400.7e's delayed reader: the card the Gargoyle
+        -- became is on the battlefield again when the end step has passed. The
+        -- census runs FIRST so no precondition can absorb a mutation, and it is
+        -- the quantity no partial fix reaches by another route -- an entry
+        -- resolving against the dead battlefield id moves nothing at all.
+        Spec.it s "CR 400.7e the dies-armed delayed ability returns the card the Gargoyle became" $ do
+          gargoyle <- S.printingOf s registry "Ivory Gargoyle"
+          let (victim, armed) = armedBoard gargoyle
+              after = throughEndStep armed
+          Spec.assertEqWith s "CR 400.7e the Gargoyle is back on the battlefield" (onBattlefield after) 1
+          -- The preconditions the assertion rests on, AFTER it so none of them
+          -- can absorb a mutation aimed at the binding.
+          Spec.assertEqWith s "under a new id, the battlefield one being gone" (Game.lookupObject victim after) Nothing
+          Spec.assertEqWith s "and the graveyard card it named is gone from the graveyard" (length (namedIn Zone.Graveyard after)) 0
+          Spec.assertEqWith s "the board before the end step held none on the battlefield and one in the graveyard" (onBattlefield armed, length (namedIn Zone.Graveyard armed)) (0, 1)
+          Spec.assertEqWith s "and the entry really fired, leaving the store empty" (Seq.length (GameState.delayedTriggers after)) 0
+          -- CR 614.10's other clause of the same trigger, installed as a
+          -- floating replacement: "you skip your next draw step". Read as the
+          -- ROW rather than by advancing to alice's next draw step, which is two
+          -- turns of steps away and is Pawl.TurnSpec's subject rather than this
+          -- group's.
+          Spec.assertEqWith
+            s
+            "CR 614.10 and the skip of alice's next draw step is installed"
+            (fmap ActiveReplacement.effect (GameState.replacements after))
+            [ ReplacementEffect.PhaseR
+                PhasePattern.MkPhasePattern
+                  { PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep),
+                    PhasePattern.whosePhase = Just S.alice
+                  }
+            ]
+        -- The negative, and the same board differing in ONE thing: the graveyard
+        -- card is exiled before the end step. CR 400.7's own sentence -- a new
+        -- zone change makes a new object -- and CR 603.7c's "if that object is no
+        -- longer in the zone it's expected to be in ... the ability won't affect
+        -- it".
+        --
+        -- A FENCE rather than a proof of this group's own change: the payload
+        -- moves nothing here whichever slot it names, so no mutation of the card
+        -- reddens it. What it rules out is the other way the delayed ability
+        -- could have been given a route to the card -- chasing CR 400.7's
+        -- successors from the dead battlefield id, which would find the exiled
+        -- object and return it.
+        Spec.it s "CR 603.7c a Gargoyle exiled out of the graveyard first is not returned" $ do
+          gargoyle <- S.printingOf s registry "Ivory Gargoyle"
+          let (_, armed) = armedBoard gargoyle
+              exiled = case namedIn Zone.Graveyard armed of
+                [card] -> S.runPure S.identityAnswer armed (Event.changeZone card Zone.Exile)
+                _ -> armed
+              after = throughEndStep exiled
+          Spec.assertEqWith s "CR 603.7c nothing came back to the battlefield" (onBattlefield after) 0
+          -- The preconditions, AFTER the assertion for the reason above. The
+          -- middle one is what keeps the leg from passing for want of an exile.
+          Spec.assertEqWith s "the card really left the graveyard for exile" (length (namedIn Zone.Graveyard armed), length (namedIn Zone.Graveyard exiled), length (namedIn Zone.Exile exiled)) (1, 0, 1)
+          Spec.assertEqWith s "the same one entry was armed on this board too" (Seq.length (GameState.delayedTriggers armed)) 1
+          Spec.assertEqWith s "and it still fired and was spent at the end step" (Seq.length (GameState.delayedTriggers after)) 0
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do

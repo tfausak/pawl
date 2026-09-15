@@ -1048,11 +1048,10 @@ spec s registry = Spec.describe s "Mutate" $ do
   -- you skip your next draw step"): a Gargoyle and no Human, and its dies trigger
   -- arms a delayed ability declared on ITS face and not on Cubwarden's.
   --
-  -- The case stops at the ARM rather than at the return, where
-  -- Pawl.LeavesTriggerSpec's ivoryGargoyleSpec stops and for that group's reason:
-  -- CR 603.7e leaves the delayed ability the dead battlefield id, so its payload
-  -- finds nothing to move once the end step arrives (#3173). What this proves is
-  -- that the name resolved to text at all.
+  -- The case stops at the ARM rather than at the return: what this proves is
+  -- that the name resolved to text at all, off a component's card. The return
+  -- itself is Pawl.LeavesTriggerSpec's ivoryGargoyleSpec, on a Gargoyle that
+  -- died as itself.
   Spec.it s "CR 603.7 an Ivory Gargoyle under a Cubwarden still arms its delayed ability" $ do
     plains <- S.printingOf s registry "Plains"
     cubwarden <- S.printingOf s registry "Cubwarden"
