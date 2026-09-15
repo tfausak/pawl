@@ -67,63 +67,37 @@
                 "type": "IsSource"
               },
               "rewrite": {
-                "type": "WithCounters",
-                "value": [
-                  {
-                    "count": {
-                      "type": "Literal",
-                      "value": 2
+                "type": "EntersWith",
+                "value": {
+                  "counters": [
+                    {
+                      "count": {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      "kind": {
+                        "type": "PlusOnePlusOne"
+                      }
                     },
-                    "kind": {
-                      "type": "PlusOnePlusOne"
-                    }
-                  },
-                  {
-                    "count": {
-                      "type": "Literal",
-                      "value": 1
-                    },
-                    "kind": {
-                      "type": "Keyword",
-                      "value": {
-                        "type": "Trample"
+                    {
+                      "count": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "kind": {
+                        "type": "Keyword",
+                        "value": {
+                          "type": "Trample"
+                        }
                       }
                     }
-                  }
-                ]
-              }
-            }
-          }
-        },
-        {
-          "condition": {
-            "type": "Compares",
-            "value": {
-              "comparison": {
-                "type": "AtLeast"
-              },
-              "measured": {
-                "type": "WasKicked"
-              },
-              "threshold": {
-                "type": "Literal",
-                "value": 1
-              }
-            }
-          },
-          "effect": {
-            "type": "EntryR",
-            "value": {
-              "matching": {
-                "type": "IsSource"
-              },
-              "rewrite": {
-                "type": "WithKeywords",
-                "value": [
-                  {
-                    "type": "Haste"
-                  }
-                ]
+                  ],
+                  "keywords": [
+                    {
+                      "type": "Haste"
+                    }
+                  ]
+                }
               }
             }
           }

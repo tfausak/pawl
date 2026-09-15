@@ -2,6 +2,7 @@ module Pawl.Codec.EntryRewrite where
 
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AsCopy as AsCopy
+import qualified Pawl.Codec.EntersWith as EntersWith
 import qualified Pawl.Codec.EntryFlip as EntryFlip
 import qualified Pawl.Codec.EntryOption as EntryOption
 import qualified Pawl.Codec.Filter as Filter
@@ -38,7 +39,7 @@ codec abilityCodec effectCodec =
       Arm.nullary "ChoosePlayer" EntryRewrite.ChoosePlayer,
       Arm.payload "ChooseCardNames" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardNames (\x -> case x of EntryRewrite.ChooseCardNames y -> Just y; _ -> Nothing),
       Arm.payload "ChooseCardName" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardName (\x -> case x of EntryRewrite.ChooseCardName y -> Just y; _ -> Nothing),
-      Arm.payload "WithKeywords" (Common.set Keyword.codec) EntryRewrite.WithKeywords (\x -> case x of EntryRewrite.WithKeywords y -> Just y; _ -> Nothing),
+      Arm.payload "EntersWith" EntersWith.codec EntryRewrite.EntersWith (\x -> case x of EntryRewrite.EntersWith y -> Just y; _ -> Nothing),
       Arm.nullary "UnderSourceControl" EntryRewrite.UnderSourceControl,
       Arm.nullary "ReadAhead" EntryRewrite.ReadAhead,
       Arm.nullary "Riot" EntryRewrite.Riot,
@@ -70,7 +71,7 @@ tagOf x = case x of
   EntryRewrite.ChoosePlayer {} -> "ChoosePlayer"
   EntryRewrite.ChooseCardNames {} -> "ChooseCardNames"
   EntryRewrite.ChooseCardName {} -> "ChooseCardName"
-  EntryRewrite.WithKeywords {} -> "WithKeywords"
+  EntryRewrite.EntersWith {} -> "EntersWith"
   EntryRewrite.UnderSourceControl {} -> "UnderSourceControl"
   EntryRewrite.ReadAhead {} -> "ReadAhead"
   EntryRewrite.Riot {} -> "Riot"

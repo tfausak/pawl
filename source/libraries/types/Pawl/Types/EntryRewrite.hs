@@ -1,9 +1,9 @@
 module Pawl.Types.EntryRewrite where
 
 import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.Filter as Filter
@@ -75,8 +75,10 @@ data EntryRewrite ability effect
     -- printed or minted (CR 306.5b's loyalty, CR 310.4b's defense, CR 714.3a's
     -- lore counter).
     WithCounters WithCounters.WithCounters
-  | -- | CR 614.1c / Faerie Squadron: "[This permanent] enters ... with [keywords]",
-    -- the keyword half of a clause whose counter half is WithCounters above.
+  | -- | CR 614.1c / Faerie Squadron: "[This permanent] enters with [counters] ...
+    -- and with [keywords]", one printed sentence as ONE row -- the counter half
+    -- rides in the payload rather than in a WithCounters row beside it, which CR
+    -- 616.1 would count as a second replacement effect and offer an order for.
     --
     -- Granted as a stored CR 611.2 continuous effect with CR 611.2a's
     -- rest-of-the-game duration, which is where riot's own grant lands and for
@@ -91,12 +93,7 @@ data EntryRewrite ability effect
     -- Not implemented: the same clause granting a whole quoted ability rather
     -- than a keyword -- Degavolver's "Pay 3 life: Regenerate this creature"
     -- (#3006).
-    --
-    -- Not implemented: the two halves as ONE row. A card printing both writes two
-    -- (Faerie Squadron, Voidpouncer), which the CR 616.1 loop then counts as two
-    -- replacement effects where the printed sentence is one, so the entry prompts
-    -- for an order the rules never ask for (#3288).
-    WithKeywords (Set.Set Keyword.Keyword)
+    EntersWith EntersWith.EntersWith
   | -- | CR 616.1b / Gather Specimens: the object enters under the control of the
     -- effect's source's controller, written to Object.enteredUnder.
     UnderSourceControl

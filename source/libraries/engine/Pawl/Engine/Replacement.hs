@@ -931,7 +931,7 @@ admitsEntry gs oid rewrite = case rewrite of
   -- CARD's clause, which rides CR 604.2 on Pawl.Types.PrintedReplacement and has
   -- already been asked before this row was collected -- RunEffects' answer below,
   -- and for its reason.
-  EntryRewrite.WithKeywords _ -> True
+  EntryRewrite.EntersWith _ -> True
   EntryRewrite.UnderSourceControl -> True
   EntryRewrite.SacrificeAnyNumber {} -> True
   -- CR 702.38a states no condition of its own, the arm above's answer: an empty
@@ -1580,7 +1580,7 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters {})) -> ReplacementBucket.Other
   -- CR 616.1e for the arm above's reason, one payload over: what the permanent
   -- enters WITH is neither whose it is, what it copies nor which face is up.
-  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithKeywords _)) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.EntersWith _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> ReplacementBucket.Other
   -- CR 616.1e for the arm above's reason: what the permanent enters WITH is
   -- neither whose it is, what it copies nor which face is up.
@@ -1723,10 +1723,11 @@ readsApplier re = case re of
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's loyalty included).
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters {})) -> False
-  -- CR 614.1c's "enters with" one payload over: the keywords are the effect's own
-  -- field, and the CR 611.2 grant they become names the ENTERING object as both
-  -- its source and its affected set, so nothing here is read off the applier.
-  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithKeywords _)) -> False
+  -- CR 614.1c's "enters with" one payload over: the counters and the keywords are
+  -- the effect's own fields, and the CR 611.2 grant the keywords become names the
+  -- ENTERING object as both its source and its affected set, so nothing here is
+  -- read off the applier.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.EntersWith _)) -> False
   -- CR 614.1c again, and NO despite performing a sacrifice: the sacrificing
   -- player is the ENTERING object's controller, read live off the board at CR
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
@@ -1940,15 +1941,6 @@ readsApplier re = case re of
 -- the same reason -- every use of it above is a test run BEFORE Event.apply, save
 -- the one arm that hands it on as a Filter.Context, which readsApplier's own
 -- comment argues (#3215).
---
--- Not implemented: one PRINTED replacement effect written as TWO rows is two
--- candidates here, so the entry of a Voidpouncer or a Faerie Squadron -- "enters
--- with [counters] ... and with [keyword]", an EntryRewrite.WithCounters row
--- beside an EntryRewrite.WithKeywords one because no arm carries both -- raises a
--- prompt on a board where CR 616.1 asks nobody anything, and offers two choices
--- over three candidates where a scaler beside it makes the rules offer one over
--- two (#3288). The rows differ in `effect`, so `distinguishing` tells them apart;
--- the board converges either way and the divergence is the prompt.
 --
 -- `origin` is NOT such a hole: highestBucket has already partitioned by bucket,
 -- and CR 616.1a's bucket is exactly an origin of SelfReplacement, so every

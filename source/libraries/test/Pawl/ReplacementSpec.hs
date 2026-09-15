@@ -10,6 +10,7 @@
 -- than here.
 module Pawl.ReplacementSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -1244,13 +1245,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
 -- kicked, it enters with two +1/+1 counters on it and with flying." (oracle
 -- checked on Scryfall)
 --
--- The card whose second clause EntryRewrite.WithKeywords exists for (#2323): CR
--- 614.1c's "enters with" naming a keyword rather than a counter. It writes the
--- one sentence as two rows -- the counters and the keyword -- each on CR 604.2's
--- "if this creature was kicked", which is why both reach CR 616.1e together and
--- the entry loop asks for an order. That order is pawl's, not the rules': one
--- printed sentence is one replacement effect, and CR 616.1 asks nothing here
--- (#3288). `kicks` defers it, so these cases read past it either way.
+-- The card whose second clause CR 614.1c's keyword grant exists for (#2323): an
+-- "enters with" naming a keyword rather than a counter. Both halves ride ONE row
+-- under CR 604.2's "if this creature was kicked", so the entry has one candidate
+-- and CR 616.1 asks nobody anything -- which the kicked case reads off the count
+-- of orders (see #3288).
 --
 -- THE BOARD: nine Islands, the Squadron in hand and a Rite of Replication beside
 -- it. Nine is the two casts added up -- {U} plus the kicker {3}{U} is five, and
@@ -1268,9 +1267,7 @@ squadronsOut :: GameState.GameState -> [ObjectId.ObjectId]
 squadronsOut gs = filter (\o -> Projection.hasName (CardName.MkCardName (Text.pack "Faerie Squadron")) o gs) (Set.toList (GameState.battlefield gs))
 
 -- Cast the Squadron with this kicker answer and settle. `kicks` answers CR
--- 702.33a and defers the rest, so CR 616.1's order between the two entry rows is
--- the canonical one -- which the rule makes immaterial, both rows applying either
--- way (CR 616.1f).
+-- 702.33a and defers the rest.
 castSquadron :: KickerDecision.KickerDecision -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
 castSquadron decision gs squadronId =
   let cast = snd (Engine.runGamePure (kicks decision) gs (S.cast S.alice squadronId))
@@ -1285,6 +1282,26 @@ riteAt victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
   _ -> S.identityAnswer p
 
+-- castSquadron kicked, COUNTING the CR 616.1 orders the entry asks for. Stateful
+-- rather than a pure Prompt r -> r, Pawl.EntryReplacementSpec's reason: a pure
+-- answerer cannot tell two structurally identical order prompts apart, and what
+-- is read here is how many there were.
+countingCast :: GameState.GameState -> ObjectId.ObjectId -> (Int, GameState.GameState)
+countingCast gs squadronId =
+  let ((_, after), asked) = State.runState (Engine.runGame countingOrders gs (S.cast S.alice squadronId >> Stack.resolveTop >> Engine.settleForPriority)) 0
+   in (asked, after)
+
+-- Kick, count every CR 616.1 order, and take the first row offered on each --
+-- which row is immaterial (CR 616.1f applies them all), and the count is what the
+-- case reads.
+countingOrders :: Prompt.Prompt r -> State.State Int r
+countingOrders p = case p of
+  Prompt.ChooseKicker {} -> pure (KickerDecision.MkKickerDecision 1)
+  Prompt.ChooseReplacement {} -> do
+    State.modify' (+ 1)
+    pure 0
+  _ -> pure (S.identityAnswer p)
+
 faerieSquadronSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 faerieSquadronSpec s registry = Spec.describe s "Faerie Squadron" $ do
   -- CR 702.33d's designation survives the resolution (CR 400.7d), CR 604.2's
@@ -1295,11 +1312,17 @@ faerieSquadronSpec s registry = Spec.describe s "Faerie Squadron" $ do
     squadron <- S.printingOf s registry "Faerie Squadron"
     rite <- S.printingOf s registry "Rite of Replication"
     let (board, squadronId, _) = squadronBoard island squadron rite
-        settled = castSquadron (KickerDecision.MkKickerDecision 1) board squadronId
+        (asked, settled) = countingCast board squadronId
     case squadronsOut settled of
       [permId] -> do
         Spec.assertBool s (Projection.hasKeyword Keyword.Flying permId settled) "CR 614.1c it has flying"
         Spec.assertEqWith s "and the counter half of the same sentence placed two +1/+1 counters" (S.powerToughnessOf permId settled) (Just (3, 3))
+        -- CR 616.1 hands out an order only where two or more effects apply, and
+        -- one printed sentence is one effect, so the entry asks nothing. Read
+        -- after the two halves above, which say the one row did both jobs: a
+        -- board that asked here would be one where the sentence is two rows
+        -- again.
+        Spec.assertEqWith s "CR 616.1 and the one sentence being one effect, nobody was asked for an order" asked 0
       other -> Spec.assertFailure s ("expected one Squadron, got " <> show (length other))
   -- The same board and the same answerer but for the one answer. The Squadron
   -- enters HERE TOO, so what the two cases tell apart is whether the rewrite ran
