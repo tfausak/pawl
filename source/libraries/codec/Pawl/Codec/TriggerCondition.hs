@@ -94,6 +94,7 @@ codec =
           Arm.payload "PermanentReturnedToHand" filterCodec TriggerCondition.PermanentReturnedToHand (\x -> case x of TriggerCondition.PermanentReturnedToHand y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsReturnedToHand" filterCodec TriggerCondition.PermanentsReturnedToHand (\x -> case x of TriggerCondition.PermanentsReturnedToHand y -> Just y; _ -> Nothing),
           Arm.payload "CardLeavesGraveyard" CardLeavesGraveyard.codec TriggerCondition.CardLeavesGraveyard (\x -> case x of TriggerCondition.CardLeavesGraveyard y -> Just y; _ -> Nothing),
+          Arm.payload "CardsLeaveGraveyard" CardLeavesGraveyard.codec TriggerCondition.CardsLeaveGraveyard (\x -> case x of TriggerCondition.CardsLeaveGraveyard y -> Just y; _ -> Nothing),
           Arm.nullary "AttachedCreatureDies" TriggerCondition.AttachedCreatureDies,
           Arm.nullary "AttachedCreatureBecomesTapped" TriggerCondition.AttachedCreatureBecomesTapped,
           Arm.nullary "SelfBecomesUntapped" TriggerCondition.SelfBecomesUntapped,

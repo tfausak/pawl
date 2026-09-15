@@ -257,6 +257,9 @@ data TriggerCondition
   | -- | CR 603.10a's third look-back family: "whenever a card leaves your
     -- graveyard during your turn" (Kishla Skimmer).
     CardLeavesGraveyard CardLeavesGraveyard.CardLeavesGraveyard
+  | -- | CR 603.2c's batch reading of the arm above: "whenever one or more cards
+    -- leave your graveyard" (Spirit Mascot), once however many left.
+    CardsLeaveGraveyard CardLeavesGraveyard.CardLeavesGraveyard
   | -- | CR 700.4's "dies" read off the permanent the bearer is attached to
     -- (Screams from Within); the one condition CR 113.6m's Aura clause names.
     AttachedCreatureDies

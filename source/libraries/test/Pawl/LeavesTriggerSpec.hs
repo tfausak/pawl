@@ -533,6 +533,70 @@ kishlaSkimmerSpec s registry =
             Spec.assertEqWith s "off the same departure, out of bob's graveyard" (S.countOnBattlefieldByName skeletonName S.bob returned) 1
             Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack (settle returned))) 0
 
+-- CR 603.2c's batch reading of the family above: Spirit Mascot {R}{W} Creature
+-- -- Spirit Ox, 2/2, "Whenever one or more cards leave your graveyard, put a
+-- +1/+1 counter on this creature." (data/cards/spirit-mascot.json; name, cost,
+-- type line and Oracle text checked against Scryfall 2026-09-14.) Nothing of the
+-- card is omitted.
+--
+-- Spirit Mascot rather than Fang, Fearless l'Cie, which prints the same
+-- condition: Fang's "this ability triggers only once each turn" collapses the two
+-- readings on every board, the per-card reading's second triggering being
+-- declined by the limit, so nothing a game can show tells them apart. The Mascot
+-- has no limit, and how many counters it ends with is exactly the difference.
+--
+-- THE DISCRIMINATION is the counter count on one board: two cards leaving one
+-- graveyard in one event group put ONE counter on a batch reading and TWO on
+-- Kishla Skimmer's per-card reading (the group above). Event.Trigger.batchScoped
+-- is the fork, matchesTriggerGiven's arm delegating to the singular's.
+spiritMascotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spiritMascotSpec s registry =
+  let resolveWholeStack gs =
+        if null (GameState.stack gs)
+          then gs
+          else resolveWholeStack (S.runPure S.identityAnswer gs Stack.resolveTop)
+      -- alice's Mascot watching, and two cards in `owner`'s graveyard. Two
+      -- DIFFERENT cards, so neither the graveyard nor the exile zone can be read
+      -- as one card counted twice, and neither is a token -- CR 111.7 would take
+      -- an exiled token away, and the printed "cards" excludes one anyway.
+      board owner = do
+        mascot <- S.printingOf s registry "Spirit Mascot"
+        island <- S.printingOf s registry "Island"
+        forest <- S.printingOf s registry "Forest"
+        plains <- S.printingOf s registry "Plains"
+        let (mascotId, withMascot) = S.addPermanent mascot S.alice (S.landsInPlay plains 1)
+            (firstId, withFirst) = S.addGraveyardCard island owner withMascot
+            (secondId, withBoth) = S.addGraveyardCard forest owner withFirst
+        pure (mascotId, firstId, secondId, withBoth)
+      -- Exile both cards as ONE event group -- CR 603.2c's "one event", which is
+      -- what a batch condition's trigger event is -- then let CR 117.5's scan
+      -- place whatever triggered and resolve the whole stack so every trigger has
+      -- had its say. Bracketed by hand rather than by a spell, the narrowest path
+      -- that shows the behaviour: no targeting and no resolution, so the number
+      -- of departures is the only variable.
+      exileBoth firstId secondId gs =
+        let gone = S.runPure S.identityAnswer gs (Event.simultaneously (Event.changeZone firstId Zone.Exile >> Event.changeZone secondId Zone.Exile))
+         in (gone, resolveWholeStack (S.runPure S.identityAnswer gone Engine.settleForPriority))
+   in Spec.describe s "CardsLeaveGraveyard" $ do
+        -- The proving case.
+        Spec.it s "CR 603.2c two cards leaving alice's graveyard at once put ONE counter on the Mascot" $ do
+          (mascotId, firstId, secondId, gs) <- board S.alice
+          let (gone, after) = exileBoth firstId secondId gs
+          Spec.assertEqWith s "CR 603.2c the printed 2/2 is a 3/3, not the 4/4 a per-card reading would leave" (Projection.powerOf mascotId after, Projection.toughnessOf mascotId after) (Just 3, Just 3)
+          -- The proxies, AFTER the assertion above so neither can absorb a
+          -- mutation aimed at the scoping.
+          Spec.assertEqWith s "one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne mascotId after) 1
+          Spec.assertEqWith s "exactly one trigger reached the stack" (length (GameState.stack (S.runPure S.identityAnswer gone Engine.settleForPriority))) 1
+          Spec.assertEqWith s "and both cards really did leave: alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+        -- "Your graveyard", one difference from the proving case: the two cards
+        -- leave bob's graveyard instead, with the same Mascot watching.
+        Spec.it s "CR 400.3 the same two cards leaving bob's graveyard put no counter on alice's Mascot" $ do
+          (mascotId, firstId, secondId, gs) <- board S.bob
+          let (_, after) = exileBoth firstId secondId gs
+          Spec.assertEqWith s "the Mascot watches its controller's graveyard alone, so it is still the printed 2/2" (Projection.powerOf mascotId after, Projection.toughnessOf mascotId after) (Just 2, Just 2)
+          Spec.assertEqWith s "no +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne mascotId after) 0
+          Spec.assertEqWith s "off the same departures, out of bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
+
 -- What PermanentReturnedToHand's bindings are FOR -- Warped Devotion {2}{B}
 -- Enchantment, "Whenever a permanent is returned to a player's hand, that
 -- player discards a card" (data/cards/warped-devotion.json; name, cost, type
@@ -3714,6 +3778,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   permanentReturnedToHandSpec s registry
   permanentsReturnedToHandSpec s registry
   kishlaSkimmerSpec s registry
+  spiritMascotSpec s registry
   warpedDevotionSpec s registry
   becameSlotSpec s registry
   persistentRoachesSpec s registry

@@ -7175,6 +7175,7 @@ reactsToAbilityTriggering cond = case cond of
   -- A card leaving a graveyard is a zone change too, so CR 603.3b's first pass
   -- takes it like the arms above.
   TriggerCondition.CardLeavesGraveyard {} -> False
+  TriggerCondition.CardsLeaveGraveyard {} -> False
   -- CR 702.55b watches a death, not another ability triggering.
   TriggerCondition.HauntedCreatureDies -> False
   -- CR 701.6a's countering is a spell or ability DOING something, not one
@@ -7469,6 +7470,11 @@ controllerTurnScoped cond = case cond of
   -- unreachable from card data; answering True would make the classification wrong
   -- for the sake of that unreachable case.
   TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.OpponentsTurn) -> False
+  -- The batch reading of the same family, classified off the same field for the
+  -- same reason: Spirit Mascot prints no turn clause where Kishla Skimmer does.
+  TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.ControllersTurn) -> True
+  TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.EachTurn) -> False
+  TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.OpponentsTurn) -> False
   -- Rule 702.55b names no turn.
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False

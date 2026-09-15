@@ -8,6 +8,10 @@ import qualified Pawl.Types.TurnScope as TurnScope
 -- and whose turns count -- Kishla Skimmer's "whenever a card leaves your
 -- graveyard during your turn".
 --
+-- Shared by both of CR 603.2c's readings: TriggerCondition's CardLeavesGraveyard
+-- carries it per card and CardsLeaveGraveyard once per batch (Spirit Mascot),
+-- and nothing in this record differs between them.
+--
 -- A record for Pawl.Types.SpellCast's reason, and with the same two halves: the
 -- Filter is read against the card that LEFT (CR 608.2h), so "your graveyard" is
 -- a Filter.OwnedBy conjunct -- CR 400.3 puts a card in its owner's graveyard,
