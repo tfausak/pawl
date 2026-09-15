@@ -1009,9 +1009,11 @@ castSpouts end arrangement board spell =
 
 -- Aetherspouts ({3}{U}{U} instant, "For each attacking creature, its owner puts
 -- it on their choice of the top or bottom of their library"): the pool's
--- producer for a library end the OWNER picks (CR 401.2, #1035) and for CR 401.4's
--- arrangement of two or more cards reaching one end at once (#990). WotC's own
--- 2014-07-18 ruling on the card states both halves.
+-- producer for a library end the OWNER picks (CR 401.2, #1035), and a producer
+-- for CR 401.4's arrangement of two or more cards reaching one end at once
+-- (#990) -- Surging Dementia's ripple states its end and still hands over the
+-- arrangement, so it reaches that half too. WotC's own 2014-07-18 ruling on the
+-- card states both halves.
 --
 -- Nothing here bears on the order SoulfireEruption's group asks about: CR 608.2f's
 -- secondary sentence is guarded by "if

@@ -2842,6 +2842,9 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.85a names no quality: the nonland-card filter its minted ability
   -- carries is written in Pawl.Engine.Keyword, not into the keyword.
   Keyword.Cascade -> []
+  -- CR 702.60a names no quality either: its N is a count, and the same-name
+  -- filter its minted ability carries reads the SOURCE's own name.
+  Keyword.Ripple _ -> []
   -- CR 702.40a names no quality: its count is written into the minted ability.
   Keyword.Storm -> []
   -- CR 702.69a names none either, for the arm above's reason.
@@ -3936,6 +3939,9 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsBound _ -> []
   -- Reads the whole set too, one field over.
   Filter.Type.SameNameAsBound _ -> []
+  -- Names no slot at all: CR 702.60a's comparison is against the SOURCE, whose
+  -- names arrive on Filter.Context.
+  Filter.Type.SameNameAsSource -> []
   -- Reads the whole set too, one field further over.
   Filter.Type.SameControllerAsBound _ -> []
   -- Reads the whole set too, off its own field.

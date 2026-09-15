@@ -279,6 +279,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.SameNameAsBound (SlotName.MkSlotName (Text.pack "castSpell")))
       " {\"type\":\"SameNameAsBound\",\"value\":\"castSpell\"} "
+  Spec.it s "SameNameAsSource" $ do
+    Common.assertCodec
+      s
+      codec
+      Filter.SameNameAsSource
+      " {\"type\":\"SameNameAsSource\"} "
+    Spec.assertNeWith s "CR 702.60a's source is not CR 709.4a's slot" (Codec.encode codec Filter.SameNameAsSource) (Codec.encode codec (Filter.SameNameAsBound (SlotName.MkSlotName (Text.pack "castSpell"))))
   Spec.it s "SameControllerAsBound" $
     Common.assertCodec
       s

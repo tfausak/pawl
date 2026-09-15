@@ -246,6 +246,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
   Filter.Type.SameNameAsBound _ -> 0
+  Filter.Type.SameNameAsSource -> 0
   Filter.Type.SameControllerAsBound _ -> 0
   Filter.Type.SharesCreatureTypeWithBound _ -> 0
   Filter.Type.HasChosenName -> 0
@@ -1988,6 +1989,29 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- face that DOES carry the atom finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ManaValueLessThanSource]]
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- CR 702.60a's comparison sits in the pair above's position and is filled by
+  -- the same one caller (Pawl.Engine.Resolve.Slots.effectContext), so it is
+  -- answerable only inside a resolution's own references and would be a silent
+  -- False in a card's target slot, affected set, Count filter or search filter.
+  -- Only Pawl.Engine.Keyword writes it -- ripple -- and this is what keeps that
+  -- true.
+  Spec.it s "CR 702.60a no card writes a source-name comparison" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "SameNameAsSource") (Codec.encode (Face.Codec.codec Card.codec) c)
+        offenders = filter (anyFace (\c -> atoms c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous, the sweeps above's reason: the same counter over a hand-built
+    -- face that DOES carry the atom finds it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.SameNameAsSource]]
         planted =
           (S.combinedFace piker)
             { Face.spell =
