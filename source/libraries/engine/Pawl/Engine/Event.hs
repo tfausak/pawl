@@ -5019,6 +5019,18 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 let g1 = Game.removeFromZones pid oid g
                  in g1
                       { GameState.objects = Map.delete oid (GameState.objects g1),
+                        -- CR 506.4, first clause: "a permanent is removed from
+                        -- combat if it leaves the battlefield". In the same write
+                        -- that deletes the object, so nothing can observe a board
+                        -- where the permanent has gone and the combat record still
+                        -- calls it an attacker -- which is what CR 704.5x's
+                        -- "currently attacking" asks (Battle.isBeingAttacked).
+                        --
+                        -- Game.ceaseAttacking and not Game.removeFromCombat, for
+                        -- CR 509.1g's sake; that function's haddock has the
+                        -- difference. CR 508.8's declaration history is untouched
+                        -- either way.
+                        GameState.combat = if fromZone == Zone.Battlefield then GameState.combat (Game.ceaseAttacking oid g1) else GameState.combat g1,
                         -- Stored as the permanent goes, in the same write that
                         -- removes it: nothing can observe a board where the
                         -- permanent has left and its effect has not yet been handed

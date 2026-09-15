@@ -275,7 +275,9 @@ attackersOn pid gs =
 --
 -- Asked where the answer is USED (Damage.combatRecipient, at CR 510.1's
 -- assignment) rather than sampled into the record, because CR 506.4c is emphatic
--- that Combat.attackers' KEYS must not change. Keeping the entry naming a departed
+-- that Combat.attackers' KEYS must not change when the permanent being ATTACKED
+-- leaves -- an attacking creature's own departure does take its key away, which
+-- is rule 506.4's first clause (Game.ceaseAttacking). Keeping the entry naming a departed
 -- planeswalker is required rather than merely harmless: CR 702.19e is an exception
 -- to CR 506.4c, so the entry is what lets Damage.combatRecipient tell "was
 -- attacking a planeswalker that is gone" from "was never attacking anything"

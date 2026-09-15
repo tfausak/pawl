@@ -606,6 +606,38 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
     Spec.assertBool s (not (Battle.isBeingAttacked battle gone)) "nothing is attacking it"
     Spec.assertEqWith s "bob protects it now" (protectorOf battle checked) (Just S.bob)
+  Spec.it s "CR 506.4 an attacker that leaves the battlefield stops attacking, so CR 704.5x repairs at once" $ do
+    -- The rider's other half, on the fixture of the two cases above: alice's lone
+    -- attacker is Bolted off the battlefield BEFORE carol concedes, so CR 506.4's
+    -- first clause removes it from combat and no attacking creature is "currently
+    -- attacking that battle" when the state-based action looks. Without that
+    -- removal the record still names it and the repair waits for CR 511.3.
+    --
+    -- The Bolt targets the Piker by FILTERING the offered set rather than building
+    -- a recipient, so the target is the one the pool offered.
+    (gs, battle, mine, _, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker"] [] []
+    (armed, bolts) <- twoBolts s registry gs
+    case (mine, bolts) of
+      ([piker], bolt : _) -> do
+        let boltAnswer :: Prompt.Prompt r -> r
+            boltAnswer p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature piker) . snd) sets
+              _ -> S.identityAnswer p
+            attacked = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.manaPerformer S.alice)
+            cast = S.runPure boltAnswer attacked (S.cast S.alice bolt)
+            burned = S.runPure boltAnswer cast Engine.priorityLoop
+            gone = S.departs Departure.Type.Conceded S.carol burned
+            checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
+        -- GAMEPLAY FIRST, on the quantity the two readings differ on: bob is the
+        -- only opponent left, so a repair that fires names him and one suspended
+        -- by the rider leaves carol's illegal designation standing.
+        Spec.assertEqWith s "CR 704.5x: bob protects it the moment nothing is attacking it" (protectorOf battle checked) (Just S.bob)
+        -- The premises, after it, so none of them can absorb a mutation of it.
+        Spec.assertBool s (not (Set.member piker (GameState.battlefield burned))) "the Bolt really killed the attacker"
+        Spec.assertBool s (not (Battle.isBeingAttacked battle burned)) "CR 506.4: so nothing is attacking the Siege"
+        Spec.assertEqWith s "the board is still in the declare attackers step, so CR 511.3 has not cleared combat underneath this" (GameState.phase burned) (Phase.Combat CombatStep.DeclareAttackers)
+        Spec.assertBool s (notElem S.carol (Game.stillPlaying gone)) "and carol is gone"
+      _ -> Spec.assertFailure s "fixture should have a Piker and a Bolt"
 
   Spec.it s "CR 506.4 whole cards: a Word of Seizing on the attacked Siege stops it being attacked" $ do
     -- The CONTROLLER clause of rule 506.4, which no candidate list can see: bob
