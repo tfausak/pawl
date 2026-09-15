@@ -2571,6 +2571,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Plot cost -> Keyword.Type.Plot (rewriteCost pairs cost)
   -- CR 702.56a states a cost, so rewriteCost reaches it as flashback's does.
   Keyword.Type.Replicate cost -> Keyword.Type.Replicate (rewriteCost pairs cost)
+  Keyword.Type.Recover cost -> Keyword.Type.Recover (rewriteCost pairs cost)
   Keyword.Type.Squad cost -> Keyword.Type.Squad (rewriteCost pairs cost)
   Keyword.Type.Offspring cost -> Keyword.Type.Offspring (rewriteCost pairs cost)
   -- CR 702.143a states a cost too, so it is reached the same way.

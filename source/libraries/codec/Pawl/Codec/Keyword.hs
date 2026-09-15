@@ -122,6 +122,7 @@ codec =
       Arm.payload "Squad" (Cost.codec codec) Keyword.Squad (\x -> case x of Keyword.Squad y -> Just y; _ -> Nothing),
       Arm.payload "Offspring" (Cost.codec codec) Keyword.Offspring (\x -> case x of Keyword.Offspring y -> Just y; _ -> Nothing),
       Arm.payload "Replicate" (Cost.codec codec) Keyword.Replicate (\x -> case x of Keyword.Replicate y -> Just y; _ -> Nothing),
+      Arm.payload "Recover" (Cost.codec codec) Keyword.Recover (\x -> case x of Keyword.Recover y -> Just y; _ -> Nothing),
       Arm.payload "Ripple" Common.natural Keyword.Ripple (\x -> case x of Keyword.Ripple y -> Just y; _ -> Nothing),
       Arm.payload "Casualty" Common.natural Keyword.Casualty (\x -> case x of Keyword.Casualty y -> Just y; _ -> Nothing),
       Arm.payload "Teamwork" Common.natural Keyword.Teamwork (\x -> case x of Keyword.Teamwork y -> Just y; _ -> Nothing),
@@ -295,6 +296,7 @@ tagOf x = case x of
   Keyword.Squad {} -> "Squad"
   Keyword.Offspring {} -> "Offspring"
   Keyword.Replicate {} -> "Replicate"
+  Keyword.Recover {} -> "Recover"
   Keyword.Ripple {} -> "Ripple"
   Keyword.Casualty {} -> "Casualty"
   Keyword.Teamwork {} -> "Teamwork"
