@@ -1866,11 +1866,13 @@ endPhase ending = do
   -- CR 703.4q: emptying the pool is a turn-based action that does not use the
   -- stack, and CR 500.5's "Then" puts it AFTER the expiries above. This line says
   -- only WHEN; WHICH mana empties is Mana.emptyManaPools', off both retention
-  -- carriers -- per player (Upwelling) and per unit (Shizuko, Caller of Autumn).
+  -- carriers -- per player (Upwelling) and per unit (Shizuko, Caller of Autumn) --
+  -- and CR 119.3's life loss a static may charge for it rides there too (Yurlok
+  -- of Scorch Thrash).
   -- The ordering against a retention that ENDS at this same boundary is
   -- observable, and both carriers are read live: one swept afterwards would keep
   -- the pool across a boundary it no longer covers.
-  State.modify' Mana.emptyManaPools
+  Mana.emptyManaPools
   -- CR 511.3: as soon as the end of combat step ends, creatures, battles and
   -- planeswalkers are removed from combat -- so this belongs at the END of that
   -- step and not in runTurnBasedActions, CR 511.1 giving the step no turn-based
@@ -1937,12 +1939,10 @@ runStepThatBegan phase = do
         -- Everything the ending PHASE owes -- CR 500.5's phase-grain expiries, CR
         -- 703.4q's pool and CR 511.3's removal from combat -- shared with
         -- skipStep so that the two roads out of a phase cannot drift apart. It
-        -- carries CR 500.5's pool empty, which is why the ELSE arm is the one
-        -- that runs it here: a step whose phase ends with it empties the pool
-        -- once, in the rule's own "Then" position.
-        case Turn.phaseEndingAt phase of
-          Just ending -> endPhase ending
-          Nothing -> State.modify' Mana.emptyManaPools
+        -- carries CR 500.5's pool empty, which is why the DEFAULT is the arm that
+        -- runs it here: a step whose phase ends with it empties the pool once, in
+        -- the rule's own "Then" position.
+        maybe Mana.emptyManaPools endPhase (Turn.phaseEndingAt phase)
         -- CR 508.6 read on CR 500.1's span: the step-scoped half of the attack
         -- record ends with the step, so this runs at EVERY step's end and not
         -- just at combat's. See Pawl.Engine.Combat.clearAttackedThisStep for why

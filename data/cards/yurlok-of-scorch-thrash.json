@@ -120,6 +120,16 @@
         }
       ],
       "name": "Yurlok of Scorch Thrash",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "LoseLifeForUnspentMana"
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
       "power": {
         "type": "Literal",
         "value": 4

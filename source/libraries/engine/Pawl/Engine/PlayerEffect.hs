@@ -560,6 +560,7 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
         -- shroud may cast anything, and Pawl.Engine.Target.targetable is where
@@ -733,6 +734,7 @@ prohibitsPlayingLand pid names oid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         -- CR 305.1 again: a land is never cast, so a permission about the timing
@@ -809,6 +811,7 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -870,6 +873,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -927,6 +931,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         -- CR 702.18a/702.11c stop a SPELL from choosing this player as a target.
         -- CR 725.1's effect need not target to crown them (Palace Jailer's "you
@@ -1178,6 +1183,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -1221,6 +1227,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -1267,6 +1274,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -1419,6 +1427,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -1475,6 +1484,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -1529,6 +1539,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -1640,6 +1651,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
   PlayerEffect.ReduceMaximumHandSize _ -> Nothing
   PlayerEffect.DontLoseUnspentMana _ -> Nothing
+  PlayerEffect.LoseLifeForUnspentMana -> Nothing
   PlayerEffect.SpendManaAsThough _ -> Nothing
   PlayerEffect.CantBeTargetedBy _ -> Nothing
   PlayerEffect.CantBeCountered _ -> Nothing
@@ -1822,6 +1834,7 @@ mayCastFrom pid zone oid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
@@ -1916,6 +1929,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
@@ -1982,6 +1996,7 @@ playLandPiles pid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> []
         PlayerEffect.ReduceMaximumHandSize _ -> []
         PlayerEffect.DontLoseUnspentMana _ -> []
+        PlayerEffect.LoseLifeForUnspentMana -> []
         PlayerEffect.SpendManaAsThough _ -> []
         PlayerEffect.CantBeTargetedBy _ -> []
         PlayerEffect.CantBeCountered _ -> []
@@ -2065,6 +2080,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
@@ -2155,6 +2171,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
@@ -2230,6 +2247,7 @@ protectionCarriers gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
@@ -2299,6 +2317,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -2355,6 +2374,7 @@ votesAllowed pid gs =
         PlayerEffect.IncreaseMaximumHandSize {} -> Nothing
         PlayerEffect.ReduceMaximumHandSize {} -> Nothing
         PlayerEffect.DontLoseUnspentMana {} -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough {} -> Nothing
         PlayerEffect.CantBeTargetedBy {} -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
@@ -2438,6 +2458,7 @@ maximumHandSize pid gs =
         PlayerEffect.AddSpellCost {} -> current
         PlayerEffect.PlayAdditionalLands _ -> current
         PlayerEffect.DontLoseUnspentMana _ -> current
+        PlayerEffect.LoseLifeForUnspentMana -> current
         PlayerEffect.SpendManaAsThough _ -> current
         PlayerEffect.CantBeTargetedBy _ -> current
         PlayerEffect.CastAsThoughItHadFlash _ -> current
@@ -2462,7 +2483,7 @@ maximumHandSize pid gs =
 
 -- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
 -- they keep as a step or phase ends (Upwelling, Omnath Locus of Mana)? The typed
--- question Pawl.Engine.Mana.emptyManaPools asks, so the turn-based action of CR
+-- question Pawl.Engine.Mana.emptiedManaPools asks, so the turn-based action of CR
 -- 703.4q never learns which effect answered it.
 --
 -- A PER-UNIT predicate rather than a Bool about the whole pool, because CR 106.4
@@ -2485,11 +2506,12 @@ maximumHandSize pid gs =
 -- only the mana it just added (Shizuko, Caller of Autumn) says different things
 -- about two manas of one pool, which no player-axis filter can express, so its
 -- retention rides the UNIT instead (Pawl.Types.ManaRetention).
--- Pawl.Engine.Mana.emptyManaPools takes the disjunction of the two carriers.
+-- Pawl.Engine.Mana.emptiedManaPools takes the disjunction of the two carriers.
 keepsUnspentMana :: PlayerId -> GameState -> ManaUnit -> Bool
 keepsUnspentMana pid gs =
   let keeps effect = case effect of
         PlayerEffect.DontLoseUnspentMana f -> Just f
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities -> Nothing
@@ -2529,6 +2551,66 @@ keepsUnspentMana pid gs =
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
+-- CR 500.5 / 119.3 / Yurlok of Scorch Thrash: does this player lose life for the
+-- unspent mana rule 500.5's sweep is about to take? The typed question
+-- Pawl.Engine.Mana.emptyManaPools asks beside the keepsUnspentMana its sweep
+-- asks, so the
+-- turn-based action of CR 703.4q never learns which effect answered it.
+--
+-- A BOOL about the whole pool, where its neighbour is a per-unit predicate: the
+-- printed sentence charges for "that much" and names no mana, so there is
+-- nothing to ask a unit. HOW MUCH is what the sweep removed, which the caller
+-- alone knows.
+--
+-- A DISJUNCTION, which is the card's own ruling -- "multiple Yurloks on the
+-- battlefield won't cause additional life loss" -- so a second applicable effect
+-- changes no answer and CR 613.11's timestamp order has nothing to order.
+--
+-- Read LIVE through `applying`, so a Yurlok that left the battlefield during the
+-- step charges nobody (CR 604.2).
+losesLifeForUnspentMana :: PlayerId -> GameState -> Bool
+losesLifeForUnspentMana pid gs =
+  let charges effect = case effect of
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost _ -> False
+        PlayerEffect.IncreaseActivationCost _ -> False
+        PlayerEffect.ReduceSpellCost _ -> False
+        PlayerEffect.ReduceActivationCost _ -> False
+        PlayerEffect.AddActivationCost _ -> False
+        PlayerEffect.AddSpellCost _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> True
+        PlayerEffect.SpendManaAsThough _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
+        PlayerEffect.CantSearchLibraries _ -> False
+        PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
+        PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
+        PlayerEffect.CantPlayLands _ -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
+        PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
+   in any (charges . snd) (applying pid gs)
+
 -- CR 609.4b / 613.11: the clauses saying what this player may spend their mana
 -- as though it were (Celestial Dawn). The typed question Pawl.Engine.Mana asks
 -- at its funnel, so that module never sees a PlayerEffect constructor.
@@ -2550,6 +2632,7 @@ spendManaAsThough pid gs =
   let spends effect = case effect of
         PlayerEffect.SpendManaAsThough clause -> Just clause
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
@@ -2639,6 +2722,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> False
         PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -2741,6 +2825,7 @@ unpreventable gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -2807,6 +2892,7 @@ unredirectable gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -2855,6 +2941,7 @@ statedFlips pid gs =
         PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -2940,6 +3027,7 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.IncreaseMaximumHandSize _ -> pure effect
   PlayerEffect.ReduceMaximumHandSize _ -> pure effect
   PlayerEffect.DontLoseUnspentMana _ -> pure effect
+  PlayerEffect.LoseLifeForUnspentMana -> pure effect
   PlayerEffect.SpendManaAsThough _ -> pure effect
   PlayerEffect.CantBeTargetedBy _ -> pure effect
   PlayerEffect.HasProtectionFromChosenName -> pure effect
@@ -3003,6 +3091,7 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.IncreaseMaximumHandSize _ -> pure effect
   PlayerEffect.ReduceMaximumHandSize _ -> pure effect
   PlayerEffect.DontLoseUnspentMana _ -> pure effect
+  PlayerEffect.LoseLifeForUnspentMana -> pure effect
   PlayerEffect.SpendManaAsThough _ -> pure effect
   PlayerEffect.CantBeTargetedBy _ -> pure effect
   PlayerEffect.HasProtectionFromChosenName -> pure effect

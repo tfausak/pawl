@@ -288,7 +288,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     case Game.zoneMembers Zone.Battlefield S.alice gs of
       [] -> Spec.assertFailure s "fixture should have one Mountain"
       oid : _ ->
-        Spec.assertEqWith s "emptied" (poolSize S.alice (Mana.emptyManaPools (S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer oid)))) 0
+        Spec.assertEqWith s "emptied" (poolSize S.alice (Mana.emptiedManaPools (S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer oid)))) 0
 
   -- CR 122.1 / CR 105.4: "{T}: Add {C}. If Gemstone Caverns has a luck counter on
   -- it, instead add one mana of any color." pawl carries the sentence as two
@@ -922,7 +922,7 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
   Spec.it s "CR 500.5 without Upwelling both players lose their unspent mana" $ do
     forest <- S.printingOf s registry "Forest"
     let (_, floated) = floatedPools [] forest
-        ended = Mana.emptyManaPools floated
+        ended = Mana.emptiedManaPools floated
     Spec.assertEqWith s "alice floated one" (poolSize S.alice floated) 1
     Spec.assertEqWith s "bob floated one" (poolSize S.bob floated) 1
     Spec.assertEqWith s "alice lost it" (poolSize S.alice ended) 0
@@ -932,7 +932,7 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
     forest <- S.printingOf s registry "Forest"
     upwelling <- S.printingOf s registry "Upwelling"
     let (_, floated) = floatedPools [upwelling] forest
-    Spec.assertEqWith s "alice kept it" (poolSize S.alice (Mana.emptyManaPools floated)) 1
+    Spec.assertEqWith s "alice kept it" (poolSize S.alice (Mana.emptiedManaPools floated)) 1
 
   -- The discriminating half of the scope. Alice controls the Upwelling and
   -- bob keeps his mana anyway -- that is what PlayerScope.EachPlayer means,
@@ -941,7 +941,7 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
     forest <- S.printingOf s registry "Forest"
     upwelling <- S.printingOf s registry "Upwelling"
     let (_, floated) = floatedPools [upwelling] forest
-    Spec.assertEqWith s "bob kept it, though alice controls the Upwelling" (poolSize S.bob (Mana.emptyManaPools floated)) 1
+    Spec.assertEqWith s "bob kept it, though alice controls the Upwelling" (poolSize S.bob (Mana.emptiedManaPools floated)) 1
 
   -- CR 604.2: a static ability's continuous effect is active only while its
   -- permanent "remains on the battlefield and has the ability". The effect is
@@ -955,9 +955,9 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
       [] -> Spec.assertFailure s "fixture should have an Upwelling on the battlefield"
       oid : _ -> do
         let gone = S.runPure S.identityAnswer floated (Event.destroy Regenerability.Regenerable [oid])
-        Spec.assertEqWith s "kept while it stands" (poolSize S.alice (Mana.emptyManaPools floated)) 1
-        Spec.assertEqWith s "alice loses it once it is gone" (poolSize S.alice (Mana.emptyManaPools gone)) 0
-        Spec.assertEqWith s "and so does bob" (poolSize S.bob (Mana.emptyManaPools gone)) 0
+        Spec.assertEqWith s "kept while it stands" (poolSize S.alice (Mana.emptiedManaPools floated)) 1
+        Spec.assertEqWith s "alice loses it once it is gone" (poolSize S.alice (Mana.emptiedManaPools gone)) 0
+        Spec.assertEqWith s "and so does bob" (poolSize S.bob (Mana.emptiedManaPools gone)) 0
 
   -- The gameplay-level proof (design.md section 4), end to end through
   -- Engine.runStep. Alice taps a Birds of Paradise for BLUE toward a green
@@ -1019,7 +1019,7 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
         (forestId, g2) = S.addPermanent forest S.alice g1
         (islandId, g3) = S.addPermanent island S.alice g2
         floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer forestId)) (Cost.tapForMana S.manaPerformer islandId)
-        ended = Mana.emptyManaPools floated
+        ended = Mana.emptiedManaPools floated
     Spec.assertEqWith s "two floated" (poolSize S.alice floated) 2
     Spec.assertEqWith s "one survives the step's end" (poolSize S.alice ended) 1
     Spec.assertEqWith
@@ -1039,7 +1039,7 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
         (alicesForest, g2) = S.addPermanent forest S.alice g1
         (bobsForest, g3) = S.addPermanent forest S.bob g2
         floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer alicesForest)) (Cost.tapForMana S.manaPerformer bobsForest)
-        ended = Mana.emptyManaPools floated
+        ended = Mana.emptiedManaPools floated
     Spec.assertEqWith s "alice keeps hers" (poolSize S.alice ended) 1
     Spec.assertEqWith s "bob loses his" (poolSize S.bob ended) 0
 
@@ -3820,13 +3820,12 @@ almsEngineSpec s registry = Spec.describe s "Synthetic Alms Engine" $ do
 -- is the pool's first printing whose ACTIVATED mana ability fills a pool that is
 -- not its controller's: "{1}, {T}: Each player adds {B}{R}{G}."
 --
--- The card is landed with its middle line OMITTED -- "A player losing unspent
--- mana causes that player to lose that much life" -- for want of any carrier for
--- a static that charges life as a pool empties (#3401). Symmetric across seats:
--- it takes the controller's payoff away with every other seat's risk, so this
--- Yurlok is stricter than printed for nobody's benefit in particular. Vigilance
--- and the mana ability are printed as written.
-yurlokSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+-- All three lines are transcribed. The middle one -- "A player losing unspent
+-- mana causes that player to lose that much life" -- is the player-axis static
+-- PlayerEffect.LoseLifeForUnspentMana, scoped to each player as printed, and the
+-- case below is what proves it charges for the mana CR 500.5's sweep actually
+-- took.
+yurlokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 yurlokSpec s registry = Spec.describe s "Yurlok of Scorch Thrash" $ do
   -- THREE seats, and each of them casts or holds something different. Two would
   -- collapse "each player" onto "your opponent", and a board where only the
@@ -3861,6 +3860,38 @@ yurlokSpec s registry = Spec.describe s "Yurlok of Scorch Thrash" $ do
     -- there.
     Spec.assertEqWith s "CR 106.4 bob pays for his own instant out of the {B}{R}{G} the Yurlok put in HIS pool while alice was paying for hers" (fmap (\oid -> Projection.controllerOf oid after) (GameState.stack after)) [Just S.bob, Just S.alice]
     Spec.assertEqWith s "CR 106.4 and carol, who spent none of hers, is still holding the same three" (poolTypes S.carol after) [ManaType.Colored Color.Black, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
+  -- CR 500.5 / 119.3, the middle line at GAMEPLAY level: Engine.runStep runs the
+  -- whole upkeep step -- its priority round and CR 703.4q's end-of-step pool
+  -- empty -- rather than the sweep being called, so the loss is charged where
+  -- the rule puts it. Rule 500.5's other road (Engine.endPhase, a step whose
+  -- phase ends with it) shares Mana.emptyManaPools and cannot answer differently.
+  --
+  -- A PAIR of boards differing in EXACTLY one thing, the Yurlok on the
+  -- battlefield: the same three seats, the same three pools, the same step. THREE
+  -- seats holding three DIFFERENT pools, so "that much life" cannot be read as a
+  -- flat charge and "a player" cannot collapse onto the controller.
+  --
+  -- carol's three are one ordinary green and two retained until end of turn (CR
+  -- 500.5a's unit-axis carrier), and she pays ONE: rule 106.4's "the player is
+  -- said to lose this mana" is what the sentence charges for, not the pool's
+  -- size. Retention on the UNIT rather than a player-axis Upwelling, which would
+  -- keep every seat's mana and leave nothing for the sweep to take anywhere.
+  Spec.it s "CR 500.5 each player loses life for the unspent mana the step's end takes, and for no more" $ do
+    yurlok <- S.printingOf s registry "Yurlok of Scorch Thrash"
+    let (_, withYurlok) = S.addPermanent yurlok S.alice S.threePlayerGame
+        retainedGreen = (unitOf (ManaType.Colored Color.Green)) {ManaUnit.retention = ManaRetention.UntilEndOfTurn}
+        floated gs =
+          Mana.addMana S.carol [unitOf (ManaType.Colored Color.Green), retainedGreen, retainedGreen] $
+            Mana.addMana S.alice [unitOf (ManaType.Colored Color.Black), unitOf (ManaType.Colored Color.Red), unitOf (ManaType.Colored Color.Green)] gs
+        upkeep gs = (floated gs) {GameState.phase = Phase.Beginning BeginningStep.Upkeep, GameState.priority = Just (GameState.activePlayer gs)}
+        ran gs = S.runPure S.identityAnswer (upkeep gs) Engine.runStep
+        charged = ran withYurlok
+        uncharged = ran S.threePlayerGame
+        lives gs = fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]
+    Spec.assertEqWith s "CR 119.3 alice pays 3 life for the three the sweep took, carol 1 for the one of hers it took, and bob nothing" (lives charged) [Just 17, Just 20, Just 19]
+    Spec.assertEqWith s "CR 103.4 and with no Yurlok on the battlefield the same three pools cost nobody anything" (lives uncharged) [Just 20, Just 20, Just 20]
+    Spec.assertEqWith s "CR 500.5a the two retained green are what carol keeps, on either board" (fmap (poolTypes S.carol) [charged, uncharged]) [[ManaType.Colored Color.Green, ManaType.Colored Color.Green], [ManaType.Colored Color.Green, ManaType.Colored Color.Green]]
+    Spec.assertEqWith s "CR 703.4q and alice's three are gone" (poolTypes S.alice charged) []
 
 -- Takes the Yurlok wherever it is offered and the Forest wherever it is not --
 -- which is the two windows exactly: the Yurlok's only mana ability is
@@ -3921,7 +3952,7 @@ untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.
 -- Engine.beginTurnOf clears its per-TURN twin, which is what translatorSpec
 -- reads.
 nextTurnOfAlice :: GameState.GameState -> GameState.GameState
-nextTurnOfAlice gs = untapStep (Mana.emptyManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
+nextTurnOfAlice gs = untapStep (Mana.emptiedManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
 
 -- alice with Loot, one Forest and two Lightning Bolts in hand, in her precombat
 -- main phase and going nowhere.

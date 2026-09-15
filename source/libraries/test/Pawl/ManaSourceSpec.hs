@@ -821,7 +821,7 @@ shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
   -- CR 500.5 / 106.4, driven through Engine.runStep so the WHOLE upkeep step
   -- runs
   -- -- CR 603.2b's event, the trigger, the priority round and the step's own
-  -- end-of-step mana emptying -- rather than by calling Mana.emptyManaPools.
+  -- end-of-step mana emptying -- rather than by calling Mana.emptiedManaPools.
   --
   -- carol's pool is seeded with one ORDINARY green before the step, so the pool
   -- the sweep sees holds four units identical but for their retention. The two
@@ -1416,7 +1416,7 @@ lastingSpringSpec s registry = Spec.describe s "Synthetic Lasting Spring" $ do
   -- and its mulligan action is unreachable from the battlefield. Both are tapped
   -- inline (Cost.tapForMana, the narrowest path to CR 605.3b), both cross the
   -- same upkeep step's end through Engine.runStep -- so the whole step runs,
-  -- CR 500.5's sweep included, rather than Mana.emptyManaPools being called --
+  -- CR 500.5's sweep included, rather than Mana.emptiedManaPools being called --
   -- and both are then asked the same cast in the same later phase.
   --
   -- Sol Ring ({1}) is the gameplay reading: neither board has a land or any
