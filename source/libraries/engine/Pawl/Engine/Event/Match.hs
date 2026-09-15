@@ -5029,6 +5029,12 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
           GameEvent.BecameUnattached {} -> False
+  -- CR 603.2c's batch reading of the arm above (Spirit Mascot's "whenever ONE OR
+  -- MORE cards leave your graveyard"), delegated for PermanentsReturnedToHand's
+  -- reason: which moves this condition admits is the arm above's answer, and
+  -- firing once for the batch is `batchScoped` plus eventTriggers' dedup, never
+  -- this arm.
+  TriggerCondition.CardsLeaveGraveyard p -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.CardLeavesGraveyard p) event
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the

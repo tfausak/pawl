@@ -887,6 +887,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.10a's third family carries a Filter and a TurnScope, and neither holds
   -- a Count.
   TriggerCondition.CardLeavesGraveyard {} -> []
+  TriggerCondition.CardsLeaveGraveyard {} -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
@@ -3540,6 +3541,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.10a's third family carries its Filter inside a record, and it is card
   -- text like any other -- Kishla Skimmer's "your graveyard" is that Filter.
   TriggerCondition.CardLeavesGraveyard payload -> unframed [CardLeavesGraveyard.filter payload]
+  -- The batch reading carries the same record, swept the same way for
+  -- PermanentsReturnedToHand's reason.
+  TriggerCondition.CardsLeaveGraveyard payload -> unframed [CardLeavesGraveyard.filter payload]
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
@@ -3778,6 +3782,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentReturnedToHand _ -> []
   TriggerCondition.PermanentsReturnedToHand _ -> []
   TriggerCondition.CardLeavesGraveyard {} -> []
+  TriggerCondition.CardsLeaveGraveyard {} -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
   TriggerCondition.SelfBecomesUntapped -> []

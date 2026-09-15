@@ -503,6 +503,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard (Filter.OwnedBy PlayerRelation.You) TurnScope.ControllersTurn))
       " {\"type\":\"CardLeavesGraveyard\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"ControllersTurn\"}}} "
+  -- CR 603.2c's batch reading of the family above, carrying the same record:
+  -- Spirit Mascot's "your graveyard" is the Filter and its silence about turns is
+  -- the EachTurn beside it.
+  Spec.it s "CardsLeaveGraveyard round-trips with its Filter and TurnScope" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard (Filter.OwnedBy PlayerRelation.You) TurnScope.EachTurn))
+      " {\"type\":\"CardsLeaveGraveyard\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"}}} "
   -- CR 700.4's death read off the enchanted permanent. Nullary: the link it
   -- matches on is board state, HauntedCreatureDies' reason.
   Spec.it s "AttachedCreatureDies" $

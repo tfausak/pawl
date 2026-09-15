@@ -280,6 +280,9 @@ looksBack condition = case condition of
   -- CR 603.10a's third family, named in that rule's own list: "abilities that
   -- trigger when a card leaves a graveyard".
   TriggerCondition.CardLeavesGraveyard {} -> True
+  -- The batch reading is in the same family, PermanentsDie's reason: CR 603.10a
+  -- names the family without counting its members.
+  TriggerCondition.CardsLeaveGraveyard {} -> True
   -- CR 603.10a's first family read off the HOST rather than the bearer: this
   -- triggers when a permanent leaves the battlefield, so the rule reaches the
   -- ability however the bearer is found.
@@ -526,12 +529,14 @@ batchScoped condition = case condition of
   -- Per-card, PermanentReturnedToHand's answer: Kishla Skimmer's "whenever a card
   -- leaves your graveyard" is CR 603.2c's second sentence, so a resolution that
   -- moved two cards out of one graveyard fires it twice.
-  --
-  -- Not implemented: the batch reading of the same family, Fang, Fearless l'Cie's
-  -- "whenever one or more cards leave your graveyard", which would stand beside
-  -- this arm as PermanentsReturnedToHand stands beside PermanentReturnedToHand
-  -- (gap #3222).
   TriggerCondition.CardLeavesGraveyard {} -> False
+  -- A True beside the arm above, PermanentsReturnedToHand's reason one zone over:
+  -- CR 608.2f's sweep moves the cards as one action, Pawl.Engine.Resolve brackets
+  -- it as one Pawl.Types.EventGroup, and "one or more cards leave your graveyard"
+  -- (Spirit Mascot) names that whole group as its trigger event. Proved by
+  -- Pawl.LeavesTriggerSpec's "CR 603.2c two cards leaving alice's graveyard at
+  -- once put ONE counter on the Mascot".
+  TriggerCondition.CardsLeaveGraveyard {} -> True
   TriggerCondition.AttachedCreatureDies -> False
   -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
   -- occurrence; no printing of that event says "one or more".
@@ -2186,6 +2191,8 @@ zonesTriggeredFrom cond =
         -- controller's graveyard from the battlefield, and CR 113.6k's exception is for
         -- a condition that cannot trigger from there at all.
         TriggerCondition.CardLeavesGraveyard {} -> battlefield
+        -- The batch reading watches the same graveyard from the same zone.
+        TriggerCondition.CardsLeaveGraveyard {} -> battlefield
         -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
         -- abilities of cards with haunt that refer to the haunted creature can trigger
         -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
@@ -2421,6 +2428,7 @@ stateTriggers gs
               TriggerCondition.PermanentReturnedToHand _ -> False
               TriggerCondition.PermanentsReturnedToHand _ -> False
               TriggerCondition.CardLeavesGraveyard {} -> False
+              TriggerCondition.CardsLeaveGraveyard {} -> False
               TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.AbilityIsCountered -> False

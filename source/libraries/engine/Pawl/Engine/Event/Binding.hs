@@ -1332,6 +1332,12 @@ eventBindingSlots cond = case cond of
   -- admits every destination, and CR 400.2 makes a hand and a library hidden, so
   -- CR 400.7e withholds `became` for some of the moves it matches.
   TriggerCondition.CardLeavesGraveyard {} -> Set.empty
+  -- Nothing either, and NECESSARILY so where the arm above's is by decision:
+  -- PermanentsDie's reason, that the trigger event is a whole CR 608.2f batch
+  -- which may have moved several cards out of several graveyards, and no one
+  -- slot can name them all. Spirit Mascot's payload acts on the bearer and names
+  -- none of them.
+  TriggerCondition.CardsLeaveGraveyard {} -> Set.empty
   -- Nothing, where PermanentDies binds CR 400.7e's graveyard card and CR 603.10a's
   -- departed permanent: rule 702.55b's ability speaks about the creature it
   -- HAUNTS -- an object GameState.haunting names rather than the event -- and

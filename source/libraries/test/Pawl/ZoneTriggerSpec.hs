@@ -2209,6 +2209,10 @@ representativeEvents cond =
         -- as much as a list would -- SelfPutIntoGraveyardFromAnywhere's reasoning
         -- pointed the other way. Empty either way: this condition binds nothing.
         TriggerCondition.CardLeavesGraveyard {} -> one (moved Zone.Graveyard Zone.Exile)
+        -- The same one event, PermanentsReturnedToHand's reason: the batch arm
+        -- delegates to the singular's, so the two match alike, and both bind
+        -- nothing.
+        TriggerCondition.CardsLeaveGraveyard {} -> one (moved Zone.Graveyard Zone.Exile)
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all
@@ -2572,6 +2576,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentReturnedToHand Filter.Type.IsSource,
     TriggerCondition.PermanentsReturnedToHand Filter.Type.IsSource,
     TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard Filter.Type.IsSource TurnScope.EachTurn),
+    TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard Filter.Type.IsSource TurnScope.EachTurn),
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.AbilityIsCountered,
