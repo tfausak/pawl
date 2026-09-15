@@ -181,13 +181,13 @@ unlock perform pid oid half = do
         -- printed Room half holds such a symbol -- Scryfall `t:room`,
         -- 2026-09-01 -- so no prompt is raised today.
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (unlockCostOf face)
-        payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
         case payment of
-          -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a
-          -- mana ability tapped in the window this payment opened may have
-          -- shuffled or revealed, and this reject-not-repair restore must not
-          -- undo that too.
-          Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
+          -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
+          -- special action IS the whole of what failed, so `before` goes to
+          -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
+          -- window included -- happens there.
+          Payment.Unpaid -> pure ()
           -- Dropped, Pawl.Engine.Ignore's reason: CR 116.2m's special action
           -- resolves nothing whose effects could read a slot.
           -- CR 709.5e names the actor itself: the player who paid the unlock

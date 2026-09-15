@@ -1092,7 +1092,13 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
           -- DuringResolution: rule 118.12's cost is paid as the spell or ability
           -- resolves, which is CR 609.1's effect, so a blight paid here is CR
           -- 614.16's subject where Soul Immolation's additional cost is not.
-          outcome <- Cost.pay performManaAbility PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
+          -- CR 733.1's reversal base: rule 118.12's payment IS the whole of
+          -- the action that can fail, so the state it begins in is where a
+          -- failure returns to and the CR 605.3a window is the payer's to keep
+          -- (Cost.pay). Taken after the announcement above, which writes no
+          -- state of its own.
+          began <- State.get
+          outcome <- Cost.pay performManaAbility (Just began) PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).

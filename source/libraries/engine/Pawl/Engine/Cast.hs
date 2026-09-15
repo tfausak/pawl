@@ -2574,7 +2574,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                       -- CR 601.2g's mana window opens first, and the payer is
                       -- asked once it closes (Cost.paySubstituting). The list is
                       -- the same one the gate above measured.
-                      (payment, substitutedBindings) <- Cost.paySubstituting perform PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid (Cost.announceManaSubstitutions pid sid) paidCost
+                      (payment, substitutedBindings) <- Cost.paySubstituting perform Nothing PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid (Cost.announceManaSubstitutions pid sid) paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed

@@ -151,13 +151,15 @@ foretell pid oid = do
       -- reasons. CR 116.2h fixes this cost at {2}, so no symbol here is ever
       -- payable in multiple ways and no prompt is ever raised.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure actionCost
-      payment <- Cost.pay Resolve.performManaAbility PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay Resolve.performManaAbility (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
-        -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a mana
-        -- ability tapped in the window this payment opened may have shuffled
-        -- or revealed, and this reject-not-repair restore must not undo that
-        -- too.
-        Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
+        -- CR 733.1's reversal, made inside the payment because this special
+        -- action IS the whole of what failed: `before` is where it began, so
+        -- Cost.pay cancels the payment flat and offers the payer back the mana
+        -- abilities the CR 605.3a window activated. Nothing is left to restore
+        -- here. Pawl.FaceDownSpec's "Reversal at a special action" group proves
+        -- it, at the megamorph cost Pawl.Engine.FaceDown.turnFaceUp pays.
+        Payment.Unpaid -> pure ()
         -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and
         -- resolves nothing, and the later cast pays its own cost.
         Payment.Paid _ -> do

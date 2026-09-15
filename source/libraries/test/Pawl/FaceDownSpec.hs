@@ -124,6 +124,7 @@
 -- Gargoyle is CR 712.16's double-faced permanent. turnedFaceDownSpec has both.
 module Pawl.FaceDownSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -170,6 +171,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -198,6 +200,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   offerSpec s registry
   castSpec s registry
   turnFaceUpSpec s registry
+  turnUpReversalSpec s registry
   turnUpAttachSpec s registry
   turnFaceDownSpec s registry
   restampSpec s registry
@@ -3308,3 +3311,98 @@ revealing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 revealing oid p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> aimedAt oid p
+
+-- How much mana a player has floating. A group-local helper, this suite's
+-- convention (CostSpec carries its own).
+floating :: PlayerId.PlayerId -> GameState.GameState -> Int
+floating pid gs = case Game.poolOf pid gs of
+  Mana.Type.MkMana units -> length units
+
+-- Turn `permanent` face up with alice tapping `taps` of the mana sources the CR
+-- 605.3a window offers and answering CR 733.1's question with `decision`. The
+-- Int counts the CR 733.1 questions raised.
+--
+-- alice is named on both prompts rather than answered for whoever asks, so an
+-- engine that put either question to the wrong player falls through to the
+-- declining fallback instead of passing. The tap count is threaded through
+-- State rather than keyed off the candidate, because the Plains are
+-- interchangeable and the two passes are structurally identical prompts.
+attemptTurnUp :: Int -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
+attemptTurnUp taps decision permanent gs =
+  let answerer :: Prompt.Prompt r -> State.State (Int, Int) r
+      answerer p = case p of
+        Prompt.ChooseManaSource _ player candidates
+          | player == S.alice -> do
+              (taken, questions) <- State.get
+              if taken < taps
+                then do
+                  State.put (taken + 1, questions)
+                  pure (Just (NonEmpty.head candidates))
+                else pure Nothing
+        Prompt.ReverseManaAbilities _ player _
+          | player == S.alice -> do
+              State.modify' (\(taken, questions) -> (taken, questions + 1))
+              pure decision
+        _ -> pure (S.identityAnswer p)
+      ((_, after), (_, asked)) = State.runState (Engine.runGame answerer gs (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph permanent)) (0, 0)
+   in (after, asked)
+
+-- CR 733.1: a special action a player starts and cannot legally complete is
+-- reversed and its payments cancelled, but "each player may also reverse any
+-- legal mana abilities that player activated while making the illegal play" --
+-- so that half is a question and not the engine's to settle. A special action
+-- announces nothing ahead of its payment that writes state (CR 118.13c), so
+-- Cost.pay holds the state the action began in and can honour the answer where a
+-- cast or an activation cannot (Cost.pay says why). Pawl.CostSpec's "Reversal"
+-- group is the same rule at CR 118.12's moment.
+--
+-- Misthoof Kirin is the producer: megamorph {1}{W}, off five Plains with three
+-- spent on CR 702.37a's {3} cast. CR 702.37b makes a megamorph cost a morph
+-- cost, so the action taken is CR 702.37e's. Two untapped Plains leave the cost
+-- payable, so FaceDown.canTurnFaceUp really offers the action -- and tapping ONE
+-- of them is a legal choice that then cannot pay it.
+--
+-- One board and one face-down permanent throughout. The first two cases differ
+-- in NOTHING but alice's answer; the third differs only in whether she tapped
+-- anything at all.
+turnUpReversalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnUpReversalSpec s registry = Spec.describe s "Reversal at a special action" $ do
+  Spec.it s "CR 733.1 the payer may keep the mana ability they activated while making the illegal play" $ do
+    plains <- S.printingOf s registry "Plains"
+    kirin <- S.printingOf s registry "Misthoof Kirin"
+    case faceDownWith plains kirin 5 of
+      Nothing -> Spec.assertFailure s "the megamorph cast did not reach the battlefield"
+      Just (before, permanent) -> do
+        Spec.assertEqWith s "three Plains are tapped before the action" (S.tappedCount S.alice before) 3
+        let (after, asked) = attemptTurnUp 1 OptionalDecision.Declines permanent before
+        Spec.assertEqWith s "CR 107.5 the fourth Plains alice tapped for the megamorph cost stays tapped" (S.tappedCount S.alice after) 4
+        Spec.assertEqWith s "CR 106.4 and the {W} it made stays in her pool" (floating S.alice after) 1
+        Spec.assertEqWith s "CR 702.37e the Kirin is still face down, the cost having gone unpaid" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Morphed))
+        Spec.assertEqWith s "alice was asked once whether to reverse it" asked 1
+
+  Spec.it s "CR 733.1 the payer who reverses it gets the mana and the tap back" $ do
+    plains <- S.printingOf s registry "Plains"
+    kirin <- S.printingOf s registry "Misthoof Kirin"
+    case faceDownWith plains kirin 5 of
+      Nothing -> Spec.assertFailure s "the megamorph cast did not reach the battlefield"
+      Just (before, permanent) -> do
+        let (after, asked) = attemptTurnUp 1 OptionalDecision.Exercises permanent before
+        Spec.assertEqWith s "CR 733.1 the fourth Plains is untapped again" (S.tappedCount S.alice after) 3
+        Spec.assertEqWith s "and nothing of alice's is floating" (floating S.alice after) 0
+        Spec.assertEqWith s "CR 702.37e the Kirin is face down either way" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Morphed))
+        Spec.assertEqWith s "and the same one question was raised" asked 1
+
+  -- The control, and the elision CR 733.1 itself states: what the rule offers
+  -- back is the mana abilities the player ACTIVATED, so a window that activated
+  -- none leaves nothing to decide.
+  Spec.it s "CR 733.1 a window that activated nothing asks nobody" $ do
+    plains <- S.printingOf s registry "Plains"
+    kirin <- S.printingOf s registry "Misthoof Kirin"
+    case faceDownWith plains kirin 5 of
+      Nothing -> Spec.assertFailure s "the megamorph cast did not reach the battlefield"
+      Just (before, permanent) -> do
+        let (after, asked) = attemptTurnUp 0 OptionalDecision.Declines permanent before
+        Spec.assertEqWith s "CR 733.1 nobody was asked whether to reverse anything" asked 0
+        Spec.assertEqWith s "no fourth Plains was tapped" (S.tappedCount S.alice after) 3
+        Spec.assertEqWith s "nothing is floating" (floating S.alice after) 0
+        Spec.assertEqWith s "CR 702.37e and the Kirin is face down all the same" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Morphed))

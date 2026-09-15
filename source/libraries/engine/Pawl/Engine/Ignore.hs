@@ -158,13 +158,13 @@ ignore pid oid name = do
       -- symbol into it, so no prompt is raised today. A printing that did would
       -- be the one to refute that.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
-      payment <- Cost.pay Resolve.performManaAbility PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay Resolve.performManaAbility (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
-        -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a mana
-        -- ability tapped in the window this payment opened may have shuffled
-        -- or revealed, and this reject-not-repair restore must not undo that
-        -- too.
-        Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
+        -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
+        -- special action IS the whole of what failed, so `before` goes to
+        -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
+        -- window included -- happens there.
+        Payment.Unpaid -> pure ()
         -- The payment's bound slots are dropped: CR 116.2d's special action puts
         -- nothing on the stack, so there is no resolving object whose effects
         -- could read one.

@@ -255,13 +255,13 @@ turnFaceUp perform pid procedure oid = do
         -- the payability gate above. Discarded, Pawl.Engine.Activate's reason: rule
         -- 702.150a asks about the player who CAST the object.
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
-        payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
         case payment of
-          -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a
-          -- mana ability tapped in the window this payment opened may have
-          -- shuffled or revealed, and this reject-not-repair restore must not
-          -- undo that too.
-          Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
+          -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
+          -- special action IS the whole of what failed, so `before` goes to
+          -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
+          -- window included -- happens there.
+          Payment.Unpaid -> pure ()
           -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
           -- turning a permanent face up resolves nothing.
           Payment.Paid _ -> performTurnFaceUp (Just procedure) oid

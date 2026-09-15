@@ -213,13 +213,17 @@ take perform pid = do
         -- payable in multiple ways and no prompt is ever raised.
         noSource <- State.state Game.freshObjectId
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid noSource pure actionCost
-        payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid noSource announced
+        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid noSource announced
         case payment of
-          -- CR 733.1's last sentence, Pawl.Engine.Foretell.foretell's reason: a
-          -- mana ability tapped in the window this payment opened may have
-          -- shuffled or revealed, and this reject-not-repair restore must not
-          -- undo that too.
-          Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
+          -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
+          -- special action IS the whole of what failed, so `before` goes to
+          -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
+          -- window included -- happens there. Alone among the special actions
+          -- this one writes before the payment: `freshObjectId` above bumps
+          -- GameState.nextObjectId, which a payer who keeps their mana keeps too.
+          -- Nothing observes it -- an object id is opaque and the counter only
+          -- ever rises -- and reversing puts it back with the rest.
+          Payment.Unpaid -> pure ()
           Payment.Paid _ -> do
             State.modify' (snd . Event.bringIn pid printingId)
             State.modify' $ \gs ->
