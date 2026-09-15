@@ -241,6 +241,9 @@ data KeywordFamily
   | -- | CR 702.56a: replicate [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Replicate
+  | -- | CR 702.59a: recover [cost]. No card in the pool asks yet, and it is owed
+    -- at the keyword rather than at the first asker.
+    Recover
   | -- | CR 702.60a: ripple N. No card in the pool asks yet, and it is owed at
     -- the keyword rather than at the first asker.
     Ripple

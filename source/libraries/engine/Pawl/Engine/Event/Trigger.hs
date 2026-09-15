@@ -1146,8 +1146,10 @@ eventTriggers events gs =
       -- Abilities come from the PRINTED card rather than a projection, no pool
       -- effect changing the TRIGGERED abilities of a card in a graveyard (#1859) --
       -- Teferi, Mage of Zhalfir's grant off the battlefield mints none. Rule 702's
-      -- minted abilities are not consulted either -- none functions from a
-      -- graveyard.
+      -- minted abilities are not consulted either: rule 702.29c scopes this source
+      -- to the cycled card's own abilities, and the one rule 702 keyword that
+      -- functions from a graveyard -- CR 702.59a's recover -- watches a creature
+      -- dying rather than a cycling, so `inGraveyards` is where it is offered.
       --
       -- The controller is the OWNER, CR 113.8's second clause: a card in a
       -- graveyard has no controller (CR 108.4).
@@ -1258,9 +1260,17 @@ eventTriggers events gs =
       -- Its `_ -> Nothing` arm is what keeps the two disjoint: `Game.lookupObject`
       -- fails for an id that has ceased, and a ceased id is exactly the one the
       -- other source answers for.
+      --
+      -- The KEYWORD-MINTED abilities join the printed ones and are NOT filtered by
+      -- `functionsIn`, `exileCandidate`'s split below and for its reason: CR
+      -- 702.59a states the zone itself -- "functions only while the card with
+      -- recover is in a player's graveyard" -- so rule 113.6's default has already
+      -- been overridden by the rule that mints it.
+      -- Pawl.Engine.Keyword.graveyardTriggeredAbilitiesOf is what decides which
+      -- keywords reach this: recover alone.
       graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) of
+          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) <> Keyword.graveyardTriggeredAbilitiesOf (Face.keywordSet face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -1296,10 +1306,12 @@ eventTriggers events gs =
       -- Abilities from the last known projection rather than a printed face: a
       -- ceased id has no face to look up, and `LastKnown` carries none. Identical
       -- to `inGraveyards`' printed read today, no pool effect changing the
-      -- TRIGGERED abilities of a card in a graveyard (gap #1859). Not `abilitiesOf` either --
-      -- nothing rule 702 or rule 310 mints functions from a graveyard, and
-      -- `inGraveyards` does not consult them, so the two graveyard sources read
-      -- alike.
+      -- TRIGGERED abilities of a card in a graveyard (gap #1859). Not `abilitiesOf` either,
+      -- and not `graveyardTriggeredAbilitiesOf`, which `inGraveyards` does consult:
+      -- the one keyword on that roster is CR 702.59a's recover, whose ability
+      -- returns or exiles the card it is on, and an id this source answers for has
+      -- already left the graveyard and ceased -- so the minted ability would have
+      -- nothing to move. Rule 310 mints nothing that functions from a graveyard.
       --
       -- The controller is `LastKnown.controller`, which for a graveyard card is
       -- the OWNER and so agrees with `inGraveyards` -- CR 113.8's second clause,
