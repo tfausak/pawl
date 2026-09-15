@@ -8,6 +8,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -157,6 +158,13 @@ data Filter keyword
     -- 601.2c's "another" and a continuous effect's own "each other" card text are
     -- both written -- one relation, one spelling (#163).
     IsSource
+  | -- | The candidate IS this object, named outright rather than related to the
+    -- evaluation's source. Runtime-only, ControlledByPlayer's posture --
+    -- Pawl.Engine.Cost.candidateCostsGiven bakes CR 702.119c's chosen victim into
+    -- the emerge candidate's sacrifice criterion, and Pawl.FilterPositionLintSpec
+    -- lints the pool against a card authoring one, a baked object in printed text
+    -- being meaningless (#199).
+    IsObject ObjectId.ObjectId
   | -- | CR 115.1: the candidate, a stack object, has the evaluation's source
     -- among its CR 601.2c targets (Terror of the Peaks' "spells ... that target
     -- this creature"); IsSource's posture, vacuously False off the stack.

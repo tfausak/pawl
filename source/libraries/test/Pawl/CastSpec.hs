@@ -84,11 +84,13 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -3387,18 +3389,18 @@ escapeBoard land printing fodder n =
 -- Emerge {7}{U} / This creature has hexproof as long as it entered this turn."
 -- (Oracle text checked on Scryfall, 2026-09-13).
 --
--- ONE BOARD: alice holds the Behemoth over FOUR Islands, with a Hill Giant (mana
--- value 4) and a Dwarven Mauler (mana value 1) on the battlefield. Four mana pays
--- rule 702.119a's {7}{U} reduced by four and nothing else this board offers --
--- the printed {9} and the emerge cost reduced by the Mauler's one both want more
--- -- so a Behemoth that resolved at all proves WHICH creature's mana value rule
--- 702.119a's reduction read, and the graveyard proves WHICH creature rule
--- 702.119c then sacrificed for it.
+-- The first case has ONE BOARD: alice holds the Behemoth over FOUR Islands, with
+-- a Hill Giant (mana value 4) and a Dwarven Mauler (mana value 1) on the
+-- battlefield. Four mana pays rule 702.119a's {7}{U} reduced by four and nothing
+-- else this board offers -- the printed {9} and the emerge cost reduced by the
+-- Mauler's one both want more -- so a Behemoth that resolved at all proves WHICH
+-- creature's mana value rule 702.119a's reduction read, and the graveyard proves
+-- WHICH creature rule 702.119c then sacrificed for it.
 --
 -- The Mauler is not decoration: it is the second mana value, so the offer is a
 -- real CR 601.2b choice rather than a single candidate, and it is the control
 -- that a sacrifice pinned to the wrong creature would take instead.
-emergeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+emergeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 emergeSpec s registry = Spec.describe s "Emerge" $ do
   Spec.it s "CR 702.119a the emerge cost is reduced by the sacrificed creature's mana value" $ do
     island <- S.printingOf s registry "Island"
@@ -3414,6 +3416,65 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
     Spec.assertEqWith s "CR 702.119c and the Hill Giant whose mana value paid for that reduction is the creature that was sacrificed" (length (namedInGraveyard "Hill Giant" after)) 1
     Spec.assertEqWith s "while the Dwarven Mauler, whose one would not have paid for it, stayed" (length (namedOnBattlefield "Dwarven Mauler" after)) 1
 
+  -- CR 702.119c fixes WHICH permanent is sacrificed at CR 601.2b, and CR 601.2h
+  -- sacrifices THAT one. The two part company only when the chosen creature stops
+  -- being sacrificeable in between, which CR 601.2g's mana window is the way to
+  -- reach: Ashnod's Altar ({3} Artifact, "Sacrifice a creature: Add {C}{C}",
+  -- Oracle text checked on Scryfall, 2026-09-15) eats it for mana.
+  --
+  -- ONE BOARD, run twice: four Islands, the Altar, a Hill Giant and Russet
+  -- Wolves (both mana value 4, both vanilla), the Behemoth in hand. The runs
+  -- differ in ONE thing -- which creature the caster names at CR 601.2b -- and
+  -- the Altar eats the Hill Giant either way. Naming the Giant leaves CR 601.2h
+  -- nothing to sacrifice, so the whole cast reverses (CR 733.1); naming the
+  -- Wolves leaves the Wolves, so it is paid.
+  --
+  -- The mana is never what separates them: {7}{U} less four is {3}{U}, which the
+  -- four Islands pay on their own in both runs.
+  Spec.it s "CR 702.119c an Ashnod's Altar that eats the chosen creature reverses the cast" $ do
+    island <- S.printingOf s registry "Island"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    giant <- S.printingOf s registry "Hill Giant"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    behemoth <- S.printingOf s registry "Drownyard Behemoth"
+    let (altarId, gs1) = S.addPermanent altar S.alice (S.landsInPlay island 4)
+        (giantId, gs2) = S.addPermanent giant S.alice gs1
+        (wolvesId, gs3) = S.addPermanent wolves S.alice gs2
+        (spellId, gs4) = S.addHandCard behemoth S.alice gs3
+        board = aliceOnTurn gs4
+        -- ONE activation of the Altar per run, eating the Hill Giant, and
+        -- `victim` is the only thing that moves between the runs. The
+        -- answerer is STATEFUL because the Altar holds no {T} and so is offered
+        -- again on the next pass of CR 601.2g's window, where its only remaining
+        -- creature is the one the emerge cost wants (Pawl.ManaSpec's Ashnod's
+        -- Altar group is the repeat-activation proof); a pure answerer would eat
+        -- both creatures in both runs and neither cast would be paid.
+        --
+        -- The sacrifice prompt is told apart by the object whose cost is being
+        -- paid: the Altar's own, and the spell's if the emerge component ever
+        -- offers a choice at all.
+        run victim =
+          let answer :: Prompt.Prompt r -> State.State Bool r
+              answer prompt = case prompt of
+                Prompt.ChooseCost _ _ _ payable ->
+                  let names cost = elem (CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.IsObject victim))) (Cost.Type.components cost)
+                   in pure (case filter names payable of chosen : _ -> chosen; [] -> S.identityAnswer prompt)
+                Prompt.ChooseManaSource _ _ candidates -> do
+                  eaten <- State.get
+                  if eaten || notElem altarId (NonEmpty.toList candidates)
+                    then pure (S.identityAnswer prompt)
+                    else do
+                      State.put True
+                      pure (Just altarId)
+                Prompt.ChooseSacrifices _ _ oid _ _ | oid == altarId -> pure (Set.singleton giantId)
+                _ -> pure (S.identityAnswer prompt)
+              step g action = snd (State.evalState (Engine.runGame answer g action) False)
+           in step (step board (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
+        standing gs = (length (namedOnBattlefield "Drownyard Behemoth" gs), length (namedOnBattlefield "Hill Giant" gs), length (namedOnBattlefield "Russet Wolves" gs))
+    Spec.assertEqWith s "CR 601.2h the Hill Giant the Altar ate is the one CR 702.119c named, so nothing pays the sacrifice and CR 733.1 reverses the whole cast: the Behemoth is off the battlefield and both creatures are back on it" (standing (run giantId)) (0, 1, 1)
+    Spec.assertEqWith s "CR 702.119c naming the Russet Wolves instead, on the same board and with the Altar eating the same Hill Giant, pays: the Behemoth resolved and both creatures are gone" (standing (run wolvesId)) (1, 0, 0)
+    Spec.assertEqWith s "and the reversed cast put the Behemoth back in alice's hand (CR 733.1)" (length (Game.zoneMembers Zone.Hand S.alice (run giantId))) 1
+
 -- CR 702.180a on Unending Whisper {U} Sorcery, "Draw a card." with "Harmonize
 -- {5}{U}" (Oracle text checked on Scryfall, 2026-09-13). Chosen over Nature's
 -- Rhythm, the issue's card, for its effect and its cost alike: both are
@@ -3427,19 +3488,19 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
 -- rather than letting it go anywhere else from the stack, which is CR 702.34a's
 -- second ability in different words.
 --
--- ONE BOARD: three untapped Islands, the Whisper in alice's graveyard, and a
--- Hill Giant (power 3) and a Goblin Piker (power 2) untapped beside them. Three
--- mana pays {5}{U} reduced by three and nothing else this board offers -- the
--- unreduced cost and the cost reduced by the Piker's two both want more -- so a
--- Whisper that resolved at all proves WHICH creature's power rule 702.180a's
--- reduction read, and the tap states prove WHICH creature rule 702.180b then
--- tapped for it.
+-- The first case has ONE BOARD: three untapped Islands, the Whisper in alice's
+-- graveyard, and a Hill Giant (power 3) and a Goblin Piker (power 2) untapped
+-- beside them. Three mana pays {5}{U} reduced by three and nothing else this
+-- board offers -- the unreduced cost and the cost reduced by the Piker's two both
+-- want more -- so a Whisper that resolved at all proves WHICH creature's power
+-- rule 702.180a's reduction read, and the tap states prove WHICH creature rule
+-- 702.180b then tapped for it.
 --
 -- The Piker is not decoration: it is the second power, so the offer is a real CR
 -- 601.2b choice rather than a single candidate, and it is the control a tap
 -- pinned to the wrong creature would take instead. The `noGiant` board below is
 -- the Piker alone, one permanent from the first, and it is not castable at all.
-harmonizeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+harmonizeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 harmonizeSpec s registry = Spec.describe s "Harmonize" $ do
   Spec.it s "CR 702.180a the harmonize cost is reduced by the tapped creature's power, and the spell is exiled from the stack" $ do
     island <- S.printingOf s registry "Island"
@@ -3460,6 +3521,57 @@ harmonizeSpec s registry = Spec.describe s "Harmonize" $ do
     Spec.assertEqWith s "CR 702.180b the Hill Giant whose power paid for that reduction is the creature that was tapped, and the Piker's two, which would not have paid for it, left it untapped" (tapStateOf giantId after, tapStateOf pikerId after) (Just TapState.Tapped, Just TapState.Untapped)
     Spec.assertEqWith s "CR 702.180a the harmonize cost was paid, so the Whisper is exiled rather than put back into her graveyard" (length (Game.zoneMembers Zone.Exile S.alice after), length (namedInGraveyard "Unending Whisper" after)) (1, 0)
     Spec.assertBool s (not (S.castable S.alice noGiantSpell noGiant)) "CR 702.180a with only the Piker on the board no reduction reaches three, so the same three Islands cannot pay the harmonize cost at all"
+
+  -- CR 702.180b's half of `emerged`'s story above: the creature is chosen at CR
+  -- 601.2b and tapped as the cost is paid, and the two part company when the
+  -- chosen creature is tapped for mana in CR 601.2g's window instead.
+  --
+  -- ONE BOARD, run twice: five untapped Islands, Llanowar Elves and a Bird
+  -- Maiden (both power 1) untapped beside them, the Whisper in alice's graveyard.
+  -- The runs differ in ONE thing -- which creature the caster names at CR 601.2b
+  -- -- and the Elves are tapped for {G} in the mana window either way. Naming the
+  -- Elves leaves the payment no untapped creature to tap, so the whole cast
+  -- reverses (CR 733.1); naming the Maiden leaves the Maiden, so it is paid.
+  --
+  -- The mana is never what separates them: {5}{U} less one is {4}{U}, which the
+  -- five Islands pay on their own in both runs -- which is also why there are
+  -- five and not four, since CR 118.3's gate cannot count the Elves both as the
+  -- creature the cost taps and as a mana source.
+  Spec.it s "CR 702.180b tapping the chosen creature for mana reverses the cast" $ do
+    island <- S.printingOf s registry "Island"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    whisper <- S.printingOf s registry "Unending Whisper"
+    let (elvesId, gs1) = S.addPermanent elves S.alice (S.landsInPlay island 5)
+        (maidenId, gs2) = S.addPermanent maiden S.alice gs1
+        (spellId, gs3) = S.addGraveyardCard whisper S.alice gs2
+        board = aliceOnTurn (List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) gs3 [1 :: Int .. 3])
+        -- Stateful for the emerge case's reason: the Elves are tapped for mana
+        -- once, and the answerer must not go on naming them.
+        run victim =
+          let pinned :: Filter.Filter Keyword.Keyword -> Bool
+              pinned criterion = case criterion of
+                Filter.And atoms -> elem (Filter.IsObject victim) atoms
+                _ -> False
+              names :: Cost.Type.Cost Keyword.Keyword -> Bool
+              names cost = any (\component -> case component of CostComponent.TapPermanents tap -> pinned (TapPermanents.whichPermanents tap); _ -> False) (Cost.Type.components cost)
+              answer :: Prompt.Prompt r -> State.State Bool r
+              answer prompt = case prompt of
+                Prompt.ChooseCost _ _ _ payable -> pure (case filter names payable of chosen : _ -> chosen; [] -> S.identityAnswer prompt)
+                Prompt.ChooseManaSource _ _ candidates -> do
+                  floated <- State.get
+                  if floated || notElem elvesId (NonEmpty.toList candidates)
+                    then pure (S.identityAnswer prompt)
+                    else do
+                      State.put True
+                      pure (Just elvesId)
+                _ -> pure (S.identityAnswer prompt)
+              step g action = snd (State.evalState (Engine.runGame answer g action) False)
+           in step (step board (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
+        standing gs = (handSize S.alice gs, length (namedInGraveyard "Unending Whisper" gs), length (Game.zoneMembers Zone.Exile S.alice gs))
+    Spec.assertEqWith s "CR 601.2h the Elves tapped for mana are the creature CR 702.180b named, so nothing pays the tap and CR 733.1 reverses the whole cast: no card was drawn and the Whisper is still in the graveyard" (standing (run elvesId)) (0, 1, 0)
+    Spec.assertEqWith s "CR 702.180b naming the Bird Maiden instead, on the same board and with the same Elves tapped for mana, pays: the Whisper resolved, drew, and was exiled" (standing (run maidenId)) (1, 0, 1)
+    Spec.assertEqWith s "and the reversed cast left the Bird Maiden untapped, which is the creature a tap pinned to a power rather than to an object would have taken" (tapStateOf maidenId (run elvesId)) (Just TapState.Untapped)
 
 -- CR 702.74a on Mulldrifter {4}{U} 2/2 Creature -- Elemental, "Flying / When
 -- this creature enters, draw two cards. / Evoke {2}{U}" (oracle checked on

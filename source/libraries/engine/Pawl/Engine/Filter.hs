@@ -1651,6 +1651,9 @@ matches context view predicate = case predicate of
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
     _ -> False
+  -- The baked half: the candidate IS this object, with no source to relate it to.
+  -- Vacuously False off an object, `identity` being Nothing for a player view.
+  Filter.IsObject named -> identity view == Just named
   -- CR 115.1 the other way round from IsSource: the SOURCE is among what the
   -- candidate targets. Every object-shaped Recipient counts (Recipient.objectOf),
   -- CR 115.4's "any target" naming a creature, planeswalker or battle by tag.
@@ -2107,6 +2110,7 @@ rewrite pairs predicate = case predicate of
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
+  Filter.IsObject _ -> predicate
   -- Untouched for IsSource's reason: a target relation is not a word CR 612.1
   -- swaps.
   Filter.TargetsSource -> predicate
@@ -2750,6 +2754,7 @@ bakeBound players predicate = case predicate of
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
+  Filter.IsObject _ -> predicate
   -- Untouched for IsSource's reason: both read the Context, and neither names a
   -- slot.
   Filter.TargetsSource -> predicate
@@ -2918,6 +2923,7 @@ manaValueThresholds predicate = case predicate of
   Filter.ControlledByRecipient -> []
   Filter.OwnedBy _ -> []
   Filter.IsSource -> []
+  Filter.IsObject _ -> []
   Filter.TargetsSource -> []
   Filter.TargetsOnlySource -> []
   -- Descended into for AttachedTo's reason: the nest is a description of another
@@ -3071,6 +3077,7 @@ statesAQuality predicate = case predicate of
   Filter.ControlledByRecipient -> True
   Filter.OwnedBy _ -> True
   Filter.IsSource -> True
+  Filter.IsObject _ -> True
   -- CR 701.23b for IsSource's reason, and unreachable from a search besides: a
   -- card in a library targets nothing.
   Filter.TargetsSource -> True
