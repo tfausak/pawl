@@ -2038,8 +2038,9 @@ cascadeSpec s registry = Spec.describe s "Cascade" $ do
 -- out and not their position: two more Surging Dementias sit at the first and
 -- third place of the top four, with a Goblin Piker and a Hill Giant between and
 -- after them. Both of those are castable creatures, so a filter admitting
--- everything would put them on the battlefield for free. Think Twice sits fifth
--- and is never revealed, which is how the reveal's DEPTH is visible at all.
+-- everything would put them on the battlefield for free. Think Twices sit under
+-- the four and are never revealed, which is how the reveal's DEPTH is visible at
+-- all.
 rippleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 rippleSpec s registry =
   let -- The library, stocked bottom first (S.addLibraryCard puts each card ON
@@ -2460,9 +2461,9 @@ cascading p = case p of
 
 -- alice takes rule 702.60a's "may reveal" (Prompt.ChooseOptional, whose default
 -- is to decline), takes CR 608.2g's offer of every card it names, aims each
--- Dementia's "target player" at bob, and ROTATES CR 401.4's arrangement -- a
--- rotation of four being neither the identity nor its own inverse, so the answer
--- is visible in the library if it was ever consulted.
+-- Dementia's "target player" at bob, and ROTATES CR 401.4's arrangement rather
+-- than answering with the identity, so an arrangement in the transcript is an
+-- answer alice gave rather than one the channel would have produced anyway.
 --
 -- Every Dementia's target prompt is answered the same way on purpose: what this
 -- board separates is which CARDS were cast, not who they hit, and pinning the

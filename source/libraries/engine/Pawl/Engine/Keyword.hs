@@ -6844,8 +6844,8 @@ exileTriggeredAbilitiesOf keywords =
 --
 -- COUNTED, where `exileTriggeredAbilitiesOf` next door takes a set: CR 702.85c,
 -- CR 702.60b, CR 702.40b, CR 702.69b, CR 702.78b, CR 702.56b and CR 702.153b each
--- say the instances trigger separately, so Apex Devastator's four printed cascades are
--- four abilities (Pawl.KeywordTriggerSpec's Cascade group). The PARAMETERIZED
+-- say the instances trigger separately, so Apex Devastator's four printed
+-- cascades are four abilities (Pawl.KeywordTriggerSpec's Cascade group). The PARAMETERIZED
 -- members already got one trigger per distinct PAYLOAD, which is CR 702.56b's
 -- and CR 702.153b's "each is paid separately and triggers based on the payments
 -- made for it"; counting adds the repeats of one payload to that.
@@ -7125,9 +7125,9 @@ cascadeExiled = SlotName.MkSlotName (Text.pack "cascaded")
 --
 -- Filter.SameNameAsSource and not a slot comparison, because
 -- TriggerCondition.SelfCast binds nothing: "this spell" is CR 113.7's source.
--- The atom is read TWICE over in one sense and once here -- unlike cascade's
--- filter, which ends the walk as well, this one only picks the offer's cards
--- back out of the revealed batch, the reveal itself being a count.
+-- Written ONCE where cascade writes its filter twice, since the reveal above is a
+-- COUNT: nothing here asks the filter to end a walk, so its only job is picking
+-- the offer's cards back out of the revealed batch.
 ripple :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ripple n =
   let plain =
