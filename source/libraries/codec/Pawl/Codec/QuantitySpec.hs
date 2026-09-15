@@ -327,6 +327,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.WasBlocking
       " {\"type\":\"WasBlocking\"} "
+  -- CR 702.30a's echo window, which carries a PlayerRef where the three above
+  -- carry nothing.
+  Spec.it s "ControlGainedSinceLastUpkeep" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.ControlGainedSinceLastUpkeep (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"ControlGainedSinceLastUpkeep\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 120.1's damage total, on the wire the same way and for the same reason.
   Spec.it s "DamageDealtToThisTurn" $
     Common.assertCodec

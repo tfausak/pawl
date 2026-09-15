@@ -147,6 +147,15 @@ data Quantity
   | -- | CR 509.1g / 608.2h: 1 if the object this quantity is evaluated against
     -- was blocking, else 0.
     WasBlocking
+  | -- | CR 702.30a / 608.2h: 1 if the player that reference names came to
+    -- control the object this quantity is evaluated against since the beginning
+    -- of that player's last upkeep, else 0 -- echo's intervening "if".
+    --
+    -- The PLAYER is named rather than left to be the object's controller
+    -- because CR 603.3a fixes the ability's controller when it triggered, and
+    -- rule 702.30a's "you" is that player at both reads of the "if" (CR
+    -- 603.4, CR 608.2a) however control has moved in between.
+    ControlGainedSinceLastUpkeep PlayerRef.PlayerRef
   | -- | CR 508.3b: how many of that player's opponents were declared attacked
     -- this combat (Combat.declaredAttacked) -- rule 702.121a's melee.
     --

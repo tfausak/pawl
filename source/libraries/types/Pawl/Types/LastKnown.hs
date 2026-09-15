@@ -5,6 +5,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -17,8 +18,8 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Twelve things rather than the characteristics alone, because the other eleven
--- questions CR 608.2h is asked have no home in that fold. Control is not a
+-- Fourteen things rather than the characteristics alone, because the other
+-- thirteen questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
 -- SOURCE: the projection folds characteristics, and CR 603.7's delayed-ability
@@ -33,9 +34,10 @@ import qualified Pawl.Types.Source as Source
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
 -- its own field gives. Nor is the COMBAT STATUS, the eighth through tenth, for
 -- the reason their own fields give. Nor is the PROTECTOR, the eleventh, for the
--- reason its own field gives.
+-- reason its own field gives. Nor are the COSTS PAID, the twelfth, nor the
+-- CONTROL CLOCK, the thirteenth, for the reasons their own fields give.
 --
--- All twelve fields STRICT (!): entries are keyed by an id that no longer exists
+-- All fourteen fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -172,6 +174,17 @@ data LastKnown = MkLastKnown
     -- | CR 400.7d: the optional additional costs paid for the spell that became
     -- it -- Object.paidCosts as it left. Not a characteristic, and gone with the
     -- object, but CR 702.175a's trigger still asks after it on resolution.
-    paidCosts :: !(Map.Map Keyword.Keyword Natural.Natural)
+    paidCosts :: !(Map.Map Keyword.Keyword Natural.Natural),
+    -- | CR 702.30a: how far each player's echo window had run on it --
+    -- Object.controlClock as it left. Not a characteristic (CR 109.3's list has
+    -- no clock), and per-INCARNATION, so CR 400.7 deletes the only copy of it
+    -- the moment the permanent goes.
+    --
+    -- CR 608.2a's re-check of echo's intervening "if" is the reader
+    -- (Pawl.Engine.Quantity's ControlGainedSinceLastUpkeep arm): rule 702.30a
+    -- prints no "if this permanent is on the battlefield", so a permanent that
+    -- left in response still owes its controller the choice, and this is the
+    -- only place the answer still is.
+    controlClock :: !(Map.Map PlayerId.PlayerId ControlClock.ControlClock)
   }
   deriving (Eq, Ord, Show)

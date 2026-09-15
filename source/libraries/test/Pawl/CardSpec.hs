@@ -3311,6 +3311,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.WasToken -> []
   Quantity.Type.WasAttacking -> []
   Quantity.Type.WasBlocking -> []
+  Quantity.Type.ControlGainedSinceLastUpkeep _ -> []
   Quantity.Type.DamageDealtToThisTurn -> []
   -- CR 122.1's PER-PLAYER tally, whose kind is a Pawl.Types.PlayerCounterKind --
   -- a disjoint domain from the object kinds, carrying no Keyword and so no
@@ -3986,7 +3987,6 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.CrewedSourceThisTurn -> []
   Filter.Type.ConvokedSourceThisTurn -> []
   Filter.Type.ControlledSinceTurnBegan -> []
-  Filter.Type.ControlGainedSinceLastUpkeep -> []
   -- DESCENT, for ControlsMoreThanYou's reason.
   Filter.Type.AttachedTo f -> filterSlotsReadSingly f
   -- DESCENT, for the atom above's reason.

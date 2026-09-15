@@ -111,7 +111,6 @@ codec keywordCodec =
       Arm.nullary "CantCrewVehicles" Filter.CantCrewVehicles,
       Arm.nullary "DealtDamageThisTurn" Filter.DealtDamageThisTurn,
       Arm.nullary "ControlledSinceTurnBegan" Filter.ControlledSinceTurnBegan,
-      Arm.nullary "ControlGainedSinceLastUpkeep" Filter.ControlGainedSinceLastUpkeep,
       -- Recursive for ControlsMoreThanYou's reason: the payload describes the
       -- HOST, and a card author writes it exactly as they write any other filter.
       Arm.payload "AttachedTo" (codec keywordCodec) Filter.AttachedTo (\x -> case x of Filter.AttachedTo y -> Just y; _ -> Nothing),
@@ -215,7 +214,6 @@ tagOf x = case x of
   Filter.CantCrewVehicles {} -> "CantCrewVehicles"
   Filter.DealtDamageThisTurn {} -> "DealtDamageThisTurn"
   Filter.ControlledSinceTurnBegan {} -> "ControlledSinceTurnBegan"
-  Filter.ControlGainedSinceLastUpkeep {} -> "ControlGainedSinceLastUpkeep"
   Filter.AttachedTo {} -> "AttachedTo"
   Filter.HasAttached {} -> "HasAttached"
   Filter.IsAttachedToSource {} -> "IsAttachedToSource"

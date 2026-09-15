@@ -3511,7 +3511,6 @@ stubView table oid =
                 -- pool filters by one, so ControlledSinceTurnBegan is vacuously
                 -- False against this stub.
                 Filter.controlledSinceTurnBegan = False,
-                Filter.controlGainedSinceLastUpkeep = False,
                 Filter.attachedToView = Nothing,
                 Filter.attachedViews = [],
                 Filter.attachedTo = Nothing,
