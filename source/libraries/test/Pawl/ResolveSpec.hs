@@ -1076,6 +1076,59 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library still holds all three Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
     Spec.assertEqWith s "the control: the mandatory first clause still happened, so bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
+  -- CR 608.2d's own worked example, one opcode over: Excavating Anurid -- "When
+  -- this creature enters, you may sacrifice a land. If you do, draw a card." --
+  -- entering under a controller who controls no land. Two boards differing in
+  -- exactly that, and an answerer that takes every "may" it is offered, so the
+  -- empty transcript is what says none was put and the hand is the same fact
+  -- read off the board.
+  --
+  -- The hand comes FIRST because it is the rider CR 608.2d is about: an engine
+  -- that offered the impossible sacrifice would hand alice the free card its "If
+  -- you do" hangs on, and every other assertion here would still hold.
+  Spec.it s "CR 608.2d Excavating Anurid's sacrifice is not offered to a landless controller" $ do
+    (gs, fodder) <- anuridBoard s registry False
+    let (asked, after) = enteredAndResolved (anuridAnswer fodder) gs
+    Spec.assertEqWith s "CR 608.2d nothing was sacrificed and so nothing was drawn: alice's hand is empty" (namesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "and her library still holds all three Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+    Spec.assertEqWith s "nothing reached her graveyard either" (namesIn Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
+  -- The control, the same board plus the two lands: the option is a real one, so
+  -- it is offered, the pinned Mountain goes and the rider draws.
+  Spec.it s "CR 608.2d Excavating Anurid's sacrifice is offered when a land can go" $ do
+    (gs, fodder) <- anuridBoard s registry True
+    let (asked, after) = enteredAndResolved (anuridAnswer fodder) gs
+        nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "CR 608.2c the rider ran: the drawn Piker is in alice's hand" (namesIn Zone.Hand S.alice after) [nameOf "Goblin Piker"]
+    Spec.assertEqWith s "and her library is one card shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+    Spec.assertEqWith s "the land she was asked for, and only it, is in her graveyard" (namesIn Zone.Graveyard S.alice after) [nameOf "Mountain"]
+    Spec.assertEqWith s "the Forest she was offered instead is still on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 1
+    Spec.assertEqWith s "CR 603.5's \"may\" was asked once" (optionalsAnswered asked) [OptionalDecision.Exercises]
+  -- CR 701.17b's own second sentence: "a player can't mill a number of cards
+  -- greater than the number of cards in their library. If given the choice to do
+  -- so, they can't choose to take that action." Mineshaft Spider -- "When this
+  -- creature enters, you may mill two cards." -- over a library holding ONE card,
+  -- which is the board that separates rule 701.17b from the empty-library reading
+  -- it would share with the other opcodes, and from CR 121.3's carve-out, which
+  -- is for drawing alone.
+  --
+  -- The graveyard comes first for the reason the Anurid's hand does: an engine
+  -- offering the option would mill as many as possible (CR 701.17b) and bury that
+  -- one card, which nothing else here would notice.
+  Spec.it s "CR 701.17b Mineshaft Spider's mill is not offered over a one-card library" $ do
+    gs <- spiderBoard s registry 1
+    let (asked, after) = enteredAndResolved spiderAnswer gs
+    Spec.assertEqWith s "CR 701.17b the card was not milled: alice's graveyard is empty" (namesIn Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "and her library still holds it" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+    Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
+  -- The control, the same board with a library deep enough to pay for it.
+  Spec.it s "CR 701.17b Mineshaft Spider's mill is offered over a three-card library" $ do
+    gs <- spiderBoard s registry 3
+    let (asked, after) = enteredAndResolved spiderAnswer gs
+        nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "CR 701.17a both cards were milled" (namesIn Zone.Graveyard S.alice after) [nameOf "Goblin Piker", nameOf "Goblin Piker"]
+    Spec.assertEqWith s "and the third is still in her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+    Spec.assertEqWith s "CR 603.5's \"may\" was asked once" (optionalsAnswered asked) [OptionalDecision.Exercises]
   -- CR 608.2f / 603.12: does Effect.ForEach's own body run through the SAME
   -- happened-fold a clause's instructions do, or does every body instruction
   -- run unconditionally regardless of whether the one before it did anything?
@@ -3087,6 +3140,65 @@ branchesAnnounced = Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Ju
 -- would show up as a second answer.
 optionalsAnswered :: [Response.Response] -> [OptionalDecision.OptionalDecision]
 optionalsAnswered = Maybe.mapMaybe (\r -> case r of Response.ChoseOptional d -> Just d; _ -> Nothing)
+
+-- The board the two Excavating Anurid cases share, differing in exactly one
+-- thing: whether alice controls lands at all. Three Goblin Pikers in her library
+-- make the "If you do" draw visible by name and keep CR 104.3c from deciding the
+-- game first, and the lands are a Forest and a Mountain rather than two of one
+-- so the pick can be pinned and the one NOT taken can be asserted still standing
+-- -- two candidates for a count of one, which is also what keeps
+-- Prompt.ChooseSacrifices from eliding itself.
+--
+-- The Anurid is placed rather than cast, so the landless board needs no mana it
+-- would have had to find on lands.
+anuridBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, Maybe ObjectId.ObjectId)
+anuridBoard s registry withLands = do
+  anurid <- S.printingOf s registry "Excavating Anurid"
+  forest <- S.printingOf s registry "Forest"
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) (Setup.emptyGame S.bothPlayers) [1 :: Int .. 3]
+      (fodder, landed) =
+        if withLands
+          then
+            let (_, withForest) = S.addPermanent forest S.alice stocked
+                (mountainId, withMountain) = S.addPermanent mountain S.alice withForest
+             in (Just mountainId, withMountain)
+          else (Nothing, stocked)
+  pure (snd (S.entersWithTrigger anurid S.alice landed), fodder)
+
+-- Excavating Anurid's two answers in one: CR 603.5's "may" always taken, so an
+-- offer the engine should have withheld shows up as a sacrifice and a draw, and
+-- CR 701.21a's pick pinned to the Mountain by id rather than to whichever land
+-- the offer lists first.
+anuridAnswer :: Maybe ObjectId.ObjectId -> Prompt.Prompt r -> r
+anuridAnswer fodder p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  Prompt.ChooseSacrifices _ _ _ offered _ -> Set.fromList (filter (\oid -> Just oid == fodder) offered)
+  _ -> S.identityAnswer p
+
+-- The board the two Mineshaft Spider cases share, differing in exactly one
+-- thing: how deep alice's library is. The Spider mills TWO, so a library of one
+-- is CR 701.17b's "greater than" without being empty.
+spiderBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+spiderBoard s registry depth = do
+  spider <- S.printingOf s registry "Mineshaft Spider"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) (Setup.emptyGame S.bothPlayers) [1 .. depth]
+  pure (snd (S.entersWithTrigger spider S.alice stocked))
+
+-- CR 603.5's "may" always taken, for the reason anuridAnswer gives.
+spiderAnswer :: Prompt.Prompt r -> r
+spiderAnswer p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- The entry trigger placed and resolved, KEEPING the transcript: the prompts a
+-- case asserts about are the ones actually raised.
+enteredAndResolved :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ([Response.Response], GameState.GameState)
+enteredAndResolved answer gs =
+  let ((_, after), asked) = Replay.record answer gs (Engine.settleForPriority >> Stack.resolveTop)
+   in (asked, after)
 
 -- The board the two Teardrop Kami cases share, built to match twiddleBoard as
 -- closely as an ability can: alice's Kami is the source, bob's Goblin Piker the
