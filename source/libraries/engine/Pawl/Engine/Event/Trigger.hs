@@ -57,6 +57,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Subtype as Subtype
@@ -842,15 +843,15 @@ eventTriggers events gs =
       -- the battlefield default, the same way `enchantedObjectLeaves` exempts an
       -- Aura's own death trigger. Endless Cockroaches ("when this creature dies,
       -- return it to its owner's hand") is the shape the rule means, though its
-      -- own payload never reaches the exception today: its effect names
-      -- Binding.became rather than the reserved source slot, so
+      -- own payload never reaches the exception today: its effect states no
+      -- ORIGIN, which is the zone CR 113.6m pins to, so
       -- Pawl.Engine.EffectZone.zoneFunctionedFrom already answers Nothing for it
       -- (Pawl.ZoneTriggerSpec's `becameSlotSpec` proves the trigger fires either
       -- way). Ivory Gargoyle's delayed-trigger pair (CR 113.6m's final
-      -- sentence, #2500) is what reaches the exception instead, its own payload
-      -- naming the reserved slot: `Pawl.LeavesTriggerSpec.ivoryGargoyleSpec` proves
-      -- a mutation dropping the exception empties this event's own candidate
-      -- list.
+      -- sentence, #2500) is what reaches the exception instead, its delayed
+      -- payload stating the graveyard it moves the card out of:
+      -- `Pawl.LeavesTriggerSpec.ivoryGargoyleSpec` proves a mutation dropping the
+      -- exception empties this event's own candidate list.
       --
       -- The delayed map is the HOST's own face while `abilitiesOf` is the
       -- PROJECTED list, so an ability granted by another object that arms a
@@ -1741,10 +1742,11 @@ eventTriggers events gs =
 --
 -- Screams from Within, the pool's Aura with that text, is NOT what the clause
 -- decides: CR 400.7 replaced its battlefield incarnation, so its payload names
--- Binding.became and Pawl.Engine.EffectZone.zoneFunctionedFrom reads a zone off
--- no slot but Binding.triggerSource -- the fold answers Nothing for it either
--- way. data/cards/synthetic-widowed-blade.json is the card that tells the
--- clause's two sides apart, and Pawl.ZoneTriggerSpec proves it.
+-- Binding.became, and `selfNamingSlots` below reads that slot as the ability's
+-- own object only under a condition that puts the BEARER somewhere -- an
+-- enchanted creature's death puts the Aura nowhere -- so the fold answers
+-- Nothing for it either way. data/cards/synthetic-widowed-blade.json is the card
+-- that tells the clause's two sides apart, and Pawl.ZoneTriggerSpec proves it.
 --
 -- The clause's "a previous part of its cost or effect specifies that the object
 -- is put into that zone" half belongs to the fold below rather than here, and
@@ -1771,9 +1773,32 @@ zoneFunctionedFrom subtypes delayed ability =
   let condition = TriggeredAbility.condition ability
    in if Set.member Subtype.Aura subtypes && enchantedObjectLeaves condition
         then Nothing
-        else case Maybe.listToMaybe (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom delayed) (Modal.allEffects (TriggeredAbility.modal ability))) of
+        else case Maybe.listToMaybe (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom (selfNamingSlots condition) delayed) (Modal.allEffects (TriggeredAbility.modal ability))) of
           Nothing -> Nothing
           Just zone -> if conditionPutsSelfInto condition zone then Nothing else Just zone
+
+-- Which slots name "the object it's on" for CR 113.6m, given what the ability
+-- watches. CR 113.7a's source slot always; CR 400.7e's `became` as well when the
+-- condition is the bearer's OWN arrival somewhere, because then the two are one
+-- card and an effect that moves it has to name the incarnation CR 400.7 minted
+-- -- Ivory Gargoyle's delayed return, whose payload names it for that reason.
+--
+-- Read off `conditionPutsSelfInto` rather than a second exhaustive case, and the
+-- two questions really are one: a condition that specifies the bearer is put
+-- into SOME zone is exactly a condition whose `became` is the bearer. A
+-- bystander's death (Yedora, Grave Gardener) binds `became` to somebody else's
+-- card, so answering the source slot alone is what keeps CR 113.6m from pinning
+-- Yedora's ability to a graveyard it does not live in.
+--
+-- SelfLeavesTheBattlefield is deliberately outside: it names no destination, so
+-- `conditionPutsSelfInto` is False for every zone and this is the source slot
+-- alone. See that function's own note -- no printing writes the shape, and the
+-- rule's main sentence is what stands for it.
+selfNamingSlots :: TriggerCondition -> Set.Set SlotName.SlotName
+selfNamingSlots condition =
+  Set.insert
+    Binding.triggerSource
+    (if any (conditionPutsSelfInto condition) [minBound ..] then Set.singleton Binding.became else Set.empty)
 
 -- CR 113.6m's Aura clause, asked of a trigger condition: does it specify "that
 -- the object it enchants leaves the battlefield"? CR 700.4 makes a death one, so

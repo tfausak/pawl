@@ -76,7 +76,7 @@
                           },
                           "ref": {
                             "type": "InSlot",
-                            "value": "self"
+                            "value": "became"
                           },
                           "riders": {
                             "underOwner": true

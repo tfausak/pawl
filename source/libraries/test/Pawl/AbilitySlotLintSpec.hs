@@ -450,6 +450,28 @@ armingTargetSlots card =
           )
     )
 
+-- The other half of CR 603.7c's captured environment: the CR 603.2 event slots a
+-- TRIGGERED arming ability's own condition stamped before it resolved. Ivory
+-- Gargoyle's delayed return reads CR 400.7e's `became` -- the graveyard card the
+-- dies trigger's own event named -- which no target slot and no Create can
+-- supply.
+--
+-- Triggered abilities only: a spell and an activation are not events, so
+-- Pawl.Engine.Event.Binding.eventBindings never runs for either and neither can
+-- put an event slot in the environment it captures.
+--
+-- LOOSE about WHICH carrier armed, armingTargetSlots' own caveat and for its
+-- reason: nothing here tracks that, so a delayed ability reading a slot bound by
+-- a triggered ability that does not arm it would pass. Ivory Gargoyle prints one
+-- triggered ability and it is the one that arms.
+armingEventSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+armingEventSlots card =
+  Set.unions
+    ( fmap
+        (\ability -> Set.union (Event.eventBindingSlots (TriggeredAbility.condition ability)) (Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)))
+        (Face.triggeredAbilities card)
+    )
+
 abilitySlotLintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
@@ -521,7 +543,10 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- the reserved trigger-source slot, a token bound by a Create, the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's
   -- exiled card), a TARGET the arming carrier declared (armingTargetSlots, which
-  -- is CR 603.7c's captured environment -- Ray of Command's third sentence), or a
+  -- is CR 603.7c's captured environment -- Ray of Command's third sentence), an
+  -- event slot a TRIGGERED arming ability's condition stamped into that same
+  -- environment (armingEventSlots -- Ivory Gargoyle's delayed return reading CR
+  -- 400.7e's `became`), or a
   -- CR 603.2 event slot the entry's own condition binds as it fires
   -- (Event.eventBindingSlots -- False Cure's "that player ... they gained", which
   -- Event.delayedPending stamps on top of the captured environment exactly as
@@ -540,7 +565,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- ability declaring a slot no effect of its reads fails here too.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
-    let cardBound card = Set.insert Binding.triggerSource (Set.union (armingTargetSlots card) (Resolve.definedSlots (cardResolutionEffects card)))
+    let cardBound card = Set.insert Binding.triggerSource (Set.unions [armingTargetSlots card, armingEventSlots card, Resolve.definedSlots (cardResolutionEffects card)])
         abilityOffends card ability =
           modalSlotsOffend
             (Set.unions [cardBound card, Event.eventBindingSlots (TriggeredAbility.condition ability), Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)])
