@@ -20,7 +20,7 @@ module Pawl.Engine.EffectZone where
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Pawl.Engine.Binding as Binding
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -36,6 +36,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import Pawl.Types.Zone (Zone)
 
@@ -46,11 +47,19 @@ import Pawl.Types.Zone (Zone)
 --
 -- TWO conditions, and both are the rule's own words. The effect has to name the
 -- zone it moves the object out of, which is the origin Effect.MoveToZone
--- carries; and the object moved) has to be "THE OBJECT) IT'S ON", which is the
--- reserved slot CR 113.7's source is bound under. An effect that moves some
--- other object out of a graveyard -- Raise Dead's target -- says nothing about
--- where its own ability functions, and answering Just for it would strand every
--- such ability in the graveyard.
+-- carries; and the object moved has to be "THE OBJECT IT'S ON", which is the
+-- `itself` set this carries. An effect that moves some other object out of a
+-- graveyard -- Raise Dead's target -- says nothing about where its own ability
+-- functions, and answering Just for it would strand every such ability in the
+-- graveyard.
+--
+-- A SET rather than Pawl.Engine.Binding.triggerSource alone, because CR 400.7
+-- gives one card two names: a bearer whose own departure is what triggered the
+-- ability is read as CR 113.7's source for its characteristics and as CR
+-- 400.7e's `became` for anything done TO it, and only the caller knows which of
+-- those is the same card here. Pawl.Engine.Event.Trigger.zoneFunctionedFrom is
+-- what decides, off the condition; Pawl.Engine.Activate.zoneFunctionedFrom
+-- passes the source slot alone, an activation binding no event slot.
 --
 -- The origin is only ever consulted here, so a card file that states one on a
 -- move of anything but its own source states something nothing reads. That is a
@@ -72,9 +81,9 @@ import Pawl.Types.Zone (Zone)
 -- slot, both of which every arm below answers Nothing for -- and a minted ability
 -- that MOVED its object out of a zone through that slot is what would want the
 -- union (#3083).
-zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
-zoneFunctionedFrom delayed effect = case effect of
-  -- Only an InSlot naming the reserved source slot can be "the object it's on".
+zoneFunctionedFrom :: Set.Set SlotName.SlotName -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
+zoneFunctionedFrom itself delayed effect = case effect of
+  -- Only an InSlot naming one of the `itself` slots can be "the object it's on".
   -- A swept set is never one object, so no sweeping arm can be; a library's
   -- top card is one object, but it is named by POSITION rather than by that slot,
   -- so it cannot be one either, and a chosen card in a graveyard or a hand is
@@ -84,7 +93,7 @@ zoneFunctionedFrom delayed effect = case effect of
   -- card-data error the note above describes for a move of somebody else's
   -- permanent.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ origin _ _) -> case ref of
-    ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
+    ObjectRef.InSlot slot -> if Set.member slot itself then origin else Nothing
     ObjectRef.EachMatching _ -> Nothing
     ObjectRef.EachCardInGraveyard {} -> Nothing
     ObjectRef.EachCardInYourHand -> Nothing
@@ -227,7 +236,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger {ArmDelayedTrigger.name = name}) ->
     case Map.lookup name delayed of
       Nothing -> Nothing
-      Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom Map.empty) (Modal.allEffects (TriggeredAbility.modal ability)))
+      Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself Map.empty) (Modal.allEffects (TriggeredAbility.modal ability)))
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
   Effect.CantBeRegenerated {} -> Nothing
@@ -271,4 +280,4 @@ zoneFunctionedFrom delayed effect = case effect of
   -- states, and CR 113.6m reads it. The loop's own reference names the members
   -- and is never "the object it's on", so only the body can answer at all. No
   -- card in the pool writes such a body.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom delayed) (Foldable.toList body))
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
