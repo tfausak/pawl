@@ -425,6 +425,11 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- neither of the four positions rule 702.16 reads one in.
             -- Pawl.CardSpec's position lint is what keeps a card out of the slot.
             Filter.carrierChosenPlayer = Nothing,
+            -- Nothing, the field above's companion: rule 702.16k's targeting
+            -- clause is read where the protection quality is (targetable below),
+            -- and a slot's own filter is judged against a candidate rather than
+            -- against an aiming object -- so no atom here wants the aimer.
+            Filter.aimingController = Nothing,
             -- Nothing, for the reason one field up: CR 607.2d links the chosen
             -- colour to the affected clause printed beside the choice, and a
             -- target slot's filter is not one -- so HasChosenColor is vacuously
@@ -662,14 +667,20 @@ targetable pcs rowsOf perspective source sourceView gs recipient =
             -- object, which is what `source` and `sourceView` carry, while the
             -- ability doing the protecting belongs to `oid`.
             --
-            -- Not implemented: rule 702.16b's and rule 702.16k's "spells or
-            -- abilities the specified player controls" judged against the
-            -- ABILITY's controller, where `sourceView` is the source OBJECT's
-            -- (#3202).
+            -- Rule 702.16k's targeting clause names the controller of the SPELL
+            -- OR ABILITY rather than the source object's, so `perspective` --
+            -- CR 109.5's "you" for the thing being aimed, which CR 113.8 fixes
+            -- as the player who activated it -- goes in beside the quality.
+            -- Without it a source stolen in response, or one that has left for a
+            -- zone CR 108.4 leaves it no controller in, answers for the wrong
+            -- player. See
+            -- Pawl.TargetSpec's "CR 702.16k a Saltfield Recluse stolen in
+            -- response still weakens the Nemesis that chose the thief".
             protects =
               Filter.matches
                 (Filter.contextFor (Game.teams gs) controller (Just source))
-                  { Filter.carrierChosenPlayer = Game.lookupObject oid gs >>= Object.chosenPlayer
+                  { Filter.carrierChosenPlayer = Game.lookupObject oid gs >>= Object.chosenPlayer,
+                    Filter.aimingController = Just perspective
                   }
                 sourceView
             -- The conjuncts are in cost order, and the order is the whole reason
