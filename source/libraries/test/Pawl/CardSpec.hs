@@ -94,6 +94,7 @@ import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
@@ -3237,7 +3238,7 @@ objectRefFilters ref = case ref of
   -- permanent instead of a subset, so it is framed the same way -- and the
   -- ownership and control the card prints are conjuncts of that Filter, which is
   -- what this traversal hands to the Filter lints.
-  ObjectRef.ChosenPermanent f -> unframed [f]
+  ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f _) -> unframed [f]
   -- The arm above with the source riding along: the Filter still says which
   -- counterpart may be picked and nothing about the source, so it is framed the
   -- same way.

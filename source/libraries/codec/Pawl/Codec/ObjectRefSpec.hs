@@ -12,6 +12,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
@@ -348,16 +349,25 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature))
       " {\"type\":\"AnyNumberMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
-  -- The arm above's singular, and the same Arm.tagged risk (#2262): its payload
-  -- is a bare Filter like EachMatching's and AnyNumberMatching's, so a missing
+  -- The arm above's singular, and the same Arm.tagged risk (#2262): a missing
   -- codec arm would compile and only this case would notice, and a tag copied
-  -- from either sibling would turn one permanent into a sweep or into a subset.
+  -- from a sibling would turn one permanent into a sweep or into a subset.
+  --
+  -- @chooser@ is defaulted, so the choice addressed to CR 608.2c's resolving
+  -- controller writes the filter alone; the case below is what proves another
+  -- seat survives the round trip.
   Spec.it s "ChosenPermanent" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenPermanent (Filter.HasCardType CardType.Creature))
-      " {\"type\":\"ChosenPermanent\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+      (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You)))
+      " {\"type\":\"ChosenPermanent\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  Spec.it s "ChosenPermanent carries a chooser other than the resolving controller" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "opponent")))))
+      " {\"type\":\"ChosenPermanent\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"chooser\":{\"type\":\"InSlot\",\"value\":\"opponent\"}}} "
   -- The arm above with the source named alongside the choice, and a fourth arm
   -- whose payload is a bare Filter, so the same Arm.tagged risk (#2262): a
   -- missing codec arm would compile, and a tag copied from any of the three would
@@ -406,7 +416,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Land))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature)),
-                Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (Filter.HasCardType CardType.Creature)),
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You))),
                 Codec.encode ObjectRef.codec (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature))
               ]
           )

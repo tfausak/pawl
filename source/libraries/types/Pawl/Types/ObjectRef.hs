@@ -3,6 +3,7 @@ module Pawl.Types.ObjectRef where
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
@@ -139,11 +140,16 @@ data ObjectRef
   | -- | CR 608.2d / Tovolar, Dire Overlord: any number of the permanents on the
     -- battlefield matching the Filter, offered rather than swept, the empty answer
     -- legal.
+    --
+    -- Not implemented: a chooser other than CR 608.2c's resolving controller,
+    -- which the arm below carries -- Oracle en-Vec's "target opponent chooses any
+    -- number of creatures they control" (#3023).
     AnyNumberMatching (Filter.Filter Keyword.Keyword)
-  | -- | CR 608.2d / 701.42a / Hanweir Battlements: exactly one of the permanents on
-    -- the battlefield matching the Filter, chosen as the effect runs and not asked
-    -- at a single candidate, where CR 608.2d leaves one legal announcement.
-    ChosenPermanent (Filter.Filter Keyword.Keyword)
+  | -- | CR 608.2d / 701.42a / Hanweir Battlements, Wormfang Crab: exactly one of the
+    -- permanents on the battlefield matching the payload's Filter, chosen as the
+    -- effect runs by the seat its chooser names and not asked at a single
+    -- candidate, where CR 608.2d leaves one legal announcement.
+    ChosenPermanent ChosenPermanent.ChosenPermanent
   | -- | CR 608.2f / 701.42a / Hanweir Battlements: the effect's source together
     -- with exactly one permanent the Filter admits, named as one instruction so
     -- that the pair moves in one event -- proved by Pawl.MeldSpec's "CR 608.2f the

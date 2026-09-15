@@ -3973,9 +3973,71 @@ sacrificerSpec s registry =
               Spec.assertEqWith s "CR 111.7 alice made three tokens and controlled all of them" (length (standing armed), ListUtils.nubOrd (fmap (`Projection.controllerOf` armed) (standing armed))) (3, [Just S.alice])
             _ -> Spec.assertFailure s "fixture should have made three tokens"
 
+-- CR 608.2d's battlefield choice put to somebody other than the resolving
+-- controller, with Wormfang Crab {3}{U} Creature -- Nightmare Crab 3/6: "When
+-- this creature enters, an opponent chooses a permanent you control other than
+-- this creature and exiles it." CR 608.2c makes alice the player who follows the
+-- instruction; the sentence still hands the ANNOUNCEMENT to a seat she names.
+--
+-- THREE seats, so "an opponent" is a real choice and the chooser is neither the
+-- resolving controller nor the table's only other player.
+--
+-- A PAIR OF RUNS differing in exactly one thing -- which permanent carol names --
+-- so that "the Ornithopter went" cannot be read as a fixed order over the
+-- candidates.
+crabSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+crabSpec s registry =
+  let -- The answers pinned by IDENTITY and FILTERED from the offer (#222), the
+      -- Prompt.ChoosePermanent posture. `byOthers` is what ANY seat but carol
+      -- names, which is how the resolving controller's own pick is spelled: a run
+      -- that put the question to the wrong player answers differently rather than
+      -- alike, which is what makes the seat observable at gameplay level.
+      picking :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      picking byCarol byOthers p = case p of
+        Prompt.ChooseOpponent _ _ _ seats
+          | List.elem S.carol (NonEmpty.toList seats) -> S.carol
+        Prompt.ChoosePermanent _ asked _ offered ->
+          let wanted = if asked == S.carol then byCarol else byOthers
+           in if List.elem wanted (NonEmpty.toList offered) then wanted else NonEmpty.head offered
+        _ -> S.identityAnswer p
+      -- alice's Crab entering in front of her Llanowar Elves and her Ornithopter.
+      -- The candidates are those two: the Crab is excluded by the card's "other
+      -- than this creature", and bob and carol control nothing, which is what
+      -- "you control" excludes.
+      crabBoard = do
+        crab <- S.printingOf s registry "Wormfang Crab"
+        elves <- S.printingOf s registry "Llanowar Elves"
+        thopter <- S.printingOf s registry "Ornithopter"
+        let (elvesId, withElves) = S.addPermanent elves S.alice S.threePlayerGame
+            (thopterId, withBoth) = S.addPermanent thopter S.alice withElves
+            (_, entered) = S.entersWithTrigger crab S.alice withBoth
+        pure (S.nameOf (Printing.card elves), S.nameOf (Printing.card thopter), elvesId, thopterId, entered)
+      resolved :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      resolved answer board = S.runPure answer board (Engine.settleForPriority >> Engine.priorityLoop)
+      -- Each exiled object is a CR 400.7 incarnation with an id of its own, so the
+      -- board's ids cannot be compared against; the names are what the sentence
+      -- talks about. alice OWNS all three, so the owner-keyed zone read reaches
+      -- them.
+      owned zone gs = List.sort (Maybe.catMaybes (namesIn zone S.alice gs))
+   in Spec.describe s "CR 608.2d who chooses a permanent on the battlefield" $ do
+        Spec.it s "CR 608.2d the opponent the sentence addresses announces the choice, not the resolving controller" $ do
+          (elvesName, thopterName, elvesId, thopterId, entered) <- crabBoard
+          let carolTakesThopter = resolved (picking thopterId elvesId) entered
+              carolTakesElves = resolved (picking elvesId thopterId) entered
+          Spec.assertEqWith s "CR 608.2d carol named the Ornithopter, so the Ornithopter is what alice exiled" (owned Zone.Exile carolTakesThopter) [thopterName]
+          Spec.assertEqWith s "and the Llanowar Elves the resolving controller would have named still stands" (elem elvesName (owned Zone.Battlefield carolTakesThopter)) True
+          Spec.assertEqWith s "the same board with carol naming the Elves instead exiles the Elves" (owned Zone.Exile carolTakesElves) [elvesName]
+          Spec.assertEqWith s "and leaves the Ornithopter standing, so no fixed order over the candidates explains either run" (elem thopterName (owned Zone.Battlefield carolTakesElves)) True
+          -- Anti-vacuity: both permanents really were alice's and really were on
+          -- the battlefield before the trigger resolved, so each run had two
+          -- candidates to tell apart and exile was empty to begin with.
+          Spec.assertEqWith s "setup: alice controlled both candidates and the Crab, and exile was empty" (owned Zone.Exile entered, length (owned Zone.Battlefield entered)) ([], 3)
+          Spec.assertEqWith s "setup: the entry trigger really went on the stack" (length (GameState.stack (S.runPure S.identityAnswer entered Engine.settleForPriority))) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
   resolveSpec s registry
   wormsSpec s registry
   sacrificerSpec s registry
+  crabSpec s registry

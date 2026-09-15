@@ -58,6 +58,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.Connive as Connive
@@ -2225,7 +2226,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
         atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
         anyNumber = ObjectRef.AnyNumberMatching anyCard
-        onePermanent = ObjectRef.ChosenPermanent anyCard
+        onePermanent = ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent anyCard (PlayerRef.Relative PlayerRelation.You))
         sourceAndOne = ObjectRef.SourceAndChosenPermanent anyCard
         moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue Nothing)
         reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
