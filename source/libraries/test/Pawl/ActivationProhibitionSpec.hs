@@ -48,6 +48,7 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Zone as Zone
 
 -- The permanents an activation action names, of either shape: CR 602.2's
 -- ordinary activation and CR 605.3a's mana one go on one list, so no case can
@@ -204,6 +205,24 @@ storedSpec s registry = Spec.describe s "Stored" $ do
   Spec.it s "CR 605.3a aimed at the twin, the first Ogre is the mana source left" $ do
     (victim, twin, resolved) <- deadlockResolved s registry "Treasonous Ogre" (\_ t -> t)
     Spec.assertEqWith s "only the first Ogre is offered as a mana source" (twinOffers victim twin resolved) [victim]
+  -- CR 400.7: the replayed Troll is a new object, so the row names nothing on
+  -- the board and that Troll may regenerate. `replayed` below has the board.
+  Spec.it s "CR 400.7 whole cards: a Troll bounced by Unsummon and replayed the same turn is no longer prohibited" $ do
+    (victim, twin, arrivals, final) <- replayed s registry True
+    let returned = case arrivals of
+          [oid] -> oid
+          _ -> victim
+        offered = activatableIds (Action.legalActions S.alice final)
+    Spec.assertBool s (elem returned offered) "the replayed Troll's regeneration is offered again"
+    Spec.assertBool s (elem twin offered) "and so is the twin's, which the Trap never named"
+    Spec.assertEqWith s "exactly one permanent arrived on the replay" (length arrivals) 1
+    Spec.assertEqWith s "and the stored row still names the Troll that left" (fmap ActiveActivationProhibition.object (GameState.activationProhibitions final)) [victim]
+  -- The control, differing from the case above in the bounce and nothing else.
+  Spec.it s "CR 602.2 the control: with no bounce that same Troll's regeneration stays withheld" $ do
+    (victim, twin, _, final) <- replayed s registry False
+    let offered = activatableIds (Action.legalActions S.alice final)
+    Spec.assertBool s (notElem victim offered) "the Troll the Trap named is still withheld"
+    Spec.assertBool s (elem twin offered) "and the twin beside it is still offered"
 
 -- The two twins bob may activate right now, narrowed off `activatableIds` so
 -- bob's Mountain -- which CR 605.3a offers him on every board here -- cannot
@@ -258,3 +277,46 @@ mainPhaseForAlice gs =
       GameState.phase = Phase.PrecombatMain,
       GameState.priority = Just S.alice
     }
+
+-- CR 400.7 / 611.2c: the permanent that comes back from a bounce is a NEW
+-- object, and Pawl.Engine.Event's placeObject mints it a fresh ObjectId on every
+-- zone change, so the row Deadlock Trap stored names the permanent that LEFT and
+-- nothing on the board. Uthden Troll plus Unsummon is the pair, both checked
+-- against Scryfall (2026-09-15).
+--
+-- ALICE owns and controls every permanent here, where the group above splits
+-- them across two seats, and that is what lets the bounce and the replay happen
+-- inside ONE main phase: Unsummon returns the Troll to its OWNER's hand (CR
+-- 400.3) and only the active player may cast a creature (CR 302.1), so a
+-- bob-owned Troll could not be replayed before the CR 514.2 cleanup drops the
+-- row anyway.
+--
+-- `bounce` is the only thing the two boards differ in.
+replayed :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+replayed s registry bounce = do
+  trap <- S.printingOf s registry "Deadlock Trap"
+  troll <- S.printingOf s registry "Uthden Troll"
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  unsummon <- S.printingOf s registry "Unsummon"
+  let lands = S.landsFor island S.alice 1 (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
+      (victim, withVictim) = S.addPermanent troll S.alice lands
+      (twin, withTwin) = S.addPermanent troll S.alice withVictim
+      (trapId, withTrap) = S.addPermanent trap S.alice withTwin
+      (withUnsummon, unsummonId) = S.handOne unsummon withTrap
+      board = mainPhaseForAlice (S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice withUnsummon)
+      abilities = Activate.abilitiesFor trapId board
+      prohibited = case abilities of
+        [ability] -> S.runPure (namingTarget victim) board (Activate.activateAbility S.alice trapId ability >> Stack.resolveTop)
+        _ -> board
+      bounced = S.runPure (namingTarget victim) (mainPhaseForAlice prohibited) (S.cast S.alice unsummonId >> Stack.resolveTop)
+      returnedCard = Game.zoneMembers Zone.Hand S.alice bounced
+      replayedBoard = case returnedCard of
+        [cardId] -> S.runPure S.identityAnswer (mainPhaseForAlice bounced) (S.cast S.alice cardId >> Stack.resolveTop)
+        _ -> bounced
+      -- Priority back to alice on BOTH legs, since a resolution hands it on
+      -- (CR 117.3b) and which seat holds it is not what either leg is about.
+      final = mainPhaseForAlice (if bounce then replayedBoard else prohibited)
+      arrivals = Set.toList (Set.difference (GameState.battlefield final) (GameState.battlefield prohibited))
+  Spec.assertEqWith s "Deadlock Trap states exactly one activated ability" (length abilities) 1
+  pure (victim, twin, arrivals, final)
