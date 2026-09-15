@@ -9,16 +9,19 @@
 -- self-contained bidirectional expression and a codec that disagrees with its
 -- own payload is a type error rather than a divergence to be spotted by eye.
 --
--- WHAT THAT GIVES UP is the exhaustiveness check: 'tagged' can no longer tell
--- that its arm list names every constructor, so one added to the type compiles
--- clean here. Not implemented: any check that an arm list covers its type
--- (#2262). Three things soften it. 'tagged' encodes an unmatched value as
--- @{}@, which is the one shape 'Common.asTagged' cannot read, so the gap fails
--- loudly at the first round trip instead of writing something plausible. The
--- arm list was ALREADY the sole source of truth for decoding and for the
--- schema, so a missing constructor was already undetected in two of the three
--- directions. And 'taggedWith' keeps the hand-written total encoder for any
--- caller that wants @-Wincomplete-patterns@ back.
+-- An arm list cannot itself be checked against the type, so 'tagged' takes a
+-- TOTAL tag function beside it: a case over every constructor with no
+-- wildcard, which makes a constructor added with no arm a
+-- @-Wincomplete-patterns@ error in the codec module. That is the tripwire the
+-- arm list does not have; 'Pawl.JsonCodec.ArmSpec'\'s "a tag with no arm
+-- encodes as a document that will not decode" is what pins the remaining gap,
+-- a tag function naming a tag the arm list does not carry.
+--
+-- The encoder still asks the arm's matcher for the payload, so an arm may
+-- decline a value its tag names -- 'Pawl.Codec.CostComponent'\'s @DiscardThis@
+-- writes only one of its two causes -- and an unmatched value encodes as @{}@,
+-- the one shape 'Common.asTagged' cannot read, so that gap fails loudly at the
+-- first round trip instead of writing something plausible.
 --
 -- 'enum' needs neither: an ALL-NULLARY type needs no projection at all, so both
 -- directions come off @Bounded@ and @Show@ and a new constructor is picked up
@@ -116,15 +119,23 @@ optionalPayload t c inject project =
 armEncode :: Arm a -> a -> Maybe Value.Value
 armEncode arm x = fmap (Common.tagged (tag arm)) (projectValue arm x)
 
--- | 'taggedWith' with the encoder derived from the arms' matchers.
+-- | 'taggedWith' with the encoder derived from @tagOf@ and the arms' matchers:
+-- the tag function picks the arm, the arm's matcher extracts the payload.
 --
--- An unmatched value encodes as @{}@ -- deliberately the one object
--- 'Common.asTagged' rejects, since it has no @type@ key. That keeps 'encode'
--- total without inventing a plausible-looking wrong answer: a constructor
--- missing from the arm list fails the moment anything round-trips it, rather
--- than writing a document that decodes to something else.
-tagged :: (Typeable.Typeable a) => [Arm a] -> Codec.Codec a
-tagged arms = taggedWith (\x -> Maybe.fromMaybe (Value.object []) (Foldable.asum (fmap (`armEncode` x) arms))) arms
+-- @tagOf@ is what makes a missing arm visible, since it is the one half a
+-- compiler can check. It is deliberately NOT used for decoding or for the
+-- schema, which stay derived from the arm list alone (#1461).
+--
+-- An unmatched value -- no arm under that tag, or an arm whose matcher declines
+-- it -- encodes as @{}@, deliberately the one object 'Common.asTagged' rejects,
+-- since it has no @type@ key. That keeps 'encode' total without inventing a
+-- plausible-looking wrong answer: the gap fails the moment anything round-trips
+-- it, rather than writing a document that decodes to something else.
+tagged :: (Typeable.Typeable a) => (a -> String) -> [Arm a] -> Codec.Codec a
+tagged tagOf arms =
+  taggedWith
+    (\x -> Maybe.fromMaybe (Value.object []) (List.find ((== tagOf x) . tag) arms >>= (`armEncode` x)))
+    arms
 
 -- | 'tagged' for a union that WRAPS a type rather than being that type's own
 -- wire format, so it is not filed in @$defs@; 'Common.maybe' declines one on the
@@ -135,10 +146,19 @@ tagged arms = taggedWith (\x -> Maybe.fromMaybe (Value.object []) (Foldable.asum
 -- 'Define.define' memoizes on the NAME alone, so a union filed under that name
 -- would swallow its own arm and describe the payload as the union.
 --
--- Encoding, decoding and the arm schemas are 'tagged'\'s; only the @$defs@
--- entry is dropped, so the schema is the bare @oneOf@ inline at the use site.
+-- Decoding and the arm schemas are 'tagged'\'s and only the @$defs@ entry is
+-- dropped, so the schema is the bare @oneOf@ inline at the use site. The
+-- ENCODER is the one thing it cannot share: its arms are not the wrapped type's
+-- constructors, so no total tag function over that type exists --
+-- 'Pawl.Codec.Printing.reference' has two arms that both describe every
+-- @Printing@ and picks between them by asking the matchers in order. That scan
+-- is what this keeps, and with it the unchecked arm list 'tagged' exists to
+-- check; a union WRAPPING a type is the shape any future exception takes.
 anonymous :: (Typeable.Typeable a) => [Arm a] -> Codec.Codec a
-anonymous arms = (tagged arms) {Codec.schema = fmap Schema.oneOf (traverse armSchema arms)}
+anonymous arms =
+  (taggedWith (\x -> Maybe.fromMaybe (Value.object []) (Foldable.asum (fmap (`armEncode` x) arms))) arms)
+    { Codec.schema = fmap Schema.oneOf (traverse armSchema arms)
+    }
 
 -- | 'tagged' with the encoder written out instead of derived, for a caller that
 -- wants @-Wincomplete-patterns@ to see its constructor list. 'enum' is the one

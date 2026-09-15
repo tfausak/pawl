@@ -8,8 +8,16 @@ import qualified Pawl.Types.ManaProduction as ManaProduction
 codec :: Codec.Codec ManaProduction.ManaProduction
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "OfType" ManaType.codec ManaProduction.OfType (\x -> case x of ManaProduction.OfType y -> Just y; _ -> Nothing),
       Arm.nullary "AnyColor" ManaProduction.AnyColor,
       Arm.nullary "Chosen" ManaProduction.Chosen,
       Arm.nullary "SnowSymbol" ManaProduction.SnowSymbol
     ]
+
+tagOf :: ManaProduction.ManaProduction -> String
+tagOf x = case x of
+  ManaProduction.OfType {} -> "OfType"
+  ManaProduction.AnyColor {} -> "AnyColor"
+  ManaProduction.Chosen {} -> "Chosen"
+  ManaProduction.SnowSymbol {} -> "SnowSymbol"

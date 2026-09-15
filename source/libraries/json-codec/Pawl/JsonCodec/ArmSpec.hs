@@ -27,18 +27,29 @@ flatCodec = Arm.enum
 size :: Codec.Codec Integer
 size = Common.integer
 
-codec :: Codec.Codec Example
-codec =
-  Arm.tagged
-    [ Arm.nullary "Plain" Plain,
-      Arm.payload "Sized" size Sized (\x -> case x of Sized n -> Just n; _ -> Nothing),
-      Arm.optionalPayload "Loose" size Loose (\x -> case x of Loose mn -> Just mn; _ -> Nothing)
-    ]
+arms :: [Arm.Arm Example]
+arms =
+  [ Arm.nullary "Plain" Plain,
+    Arm.payload "Sized" size Sized (\x -> case x of Sized n -> Just n; _ -> Nothing),
+    Arm.optionalPayload "Loose" size Loose (\x -> case x of Loose mn -> Just mn; _ -> Nothing)
+  ]
 
--- | An arm list that deliberately OMITS a constructor, to pin what 'Arm.tagged'
--- does when nothing matches.
+codec :: Codec.Codec Example
+codec = Arm.tagged tagOf arms
+
+-- | An arm list that deliberately OMITS a constructor 'tagOf' names, to pin
+-- what 'Arm.tagged' does when the tag has no arm -- the half of the coverage
+-- question a total 'tagOf' does NOT answer.
 partialCodec :: Codec.Codec Example
-partialCodec = Arm.tagged [Arm.nullary "Plain" Plain]
+partialCodec = Arm.tagged tagOf [Arm.nullary "Plain" Plain]
+
+-- | The whole arm list under a tag function that names the WRONG arm for
+-- 'Sized'. Pins that the encoder picks the arm BY TAG rather than by scanning
+-- the matchers: a scan would find @Sized@\'s own arm and write it, where
+-- selecting by tag reaches @Plain@\'s arm, whose matcher declines the value.
+-- 'Pawl.Codec.CostComponent'\'s @DiscardThis@ is the in-tree shape.
+crossedCodec :: Codec.Codec Example
+crossedCodec = Arm.tagged (\x -> case x of Sized {} -> "Plain"; _ -> tagOf x) arms
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
@@ -82,10 +93,10 @@ spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"Absent\"} ") >>= Codec.decode flatCodec))
       "expected a decode failure"
 
-  -- The cost of deriving the encoder: 'Arm.tagged' cannot see that its arm list
-  -- misses a constructor. What it must NOT do is write something that decodes to
-  -- another value, so the unmatched case is @{}@ -- the one object
-  -- 'Common.asTagged' rejects -- and the round trip fails loudly instead.
+  -- What a total 'tagOf' does NOT check: that the tag it names has an arm. What
+  -- 'Arm.tagged' must NOT do is write something that decodes to another value,
+  -- so the unmatched case is @{}@ -- the one object 'Common.asTagged' rejects --
+  -- and the round trip fails loudly instead.
   Spec.it s "an unmatched value encodes as a document that will not decode" $ do
     Spec.assertEq s (Common.render (Codec.encode partialCodec (Sized 1))) (Text.pack "{}")
     Spec.assertBool
@@ -95,7 +106,18 @@ spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
     -- The arms it DOES name are unaffected.
     Common.assertCodec s partialCodec Plain " {\"type\":\"Plain\"} "
 
+  Spec.it s "encodes through the arm the tag function names, not the first arm that matches" $ do
+    Spec.assertEq s (Common.render (Codec.encode crossedCodec (Sized 1))) (Text.pack "{}")
+    -- Same arm list, right tag function: the value the scan would have found.
+    Common.assertCodec s codec (Sized 1) " {\"type\":\"Sized\",\"value\":1} "
+
   Spec.it s "enum has a schema" $ Common.assertHasSchema s flatCodec
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec
+
+tagOf :: Example -> String
+tagOf x = case x of
+  Plain {} -> "Plain"
+  Sized {} -> "Sized"
+  Loose {} -> "Loose"

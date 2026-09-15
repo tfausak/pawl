@@ -9,6 +9,12 @@ import qualified Pawl.Types.CostScale as CostScale
 codec :: Codec.Codec CostScale.CostScale
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Once" CostScale.Once,
       Arm.payload "PerColoredSymbol" Color.codec CostScale.PerColoredSymbol (\x -> case x of CostScale.PerColoredSymbol y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: CostScale.CostScale -> String
+tagOf x = case x of
+  CostScale.Once {} -> "Once"
+  CostScale.PerColoredSymbol {} -> "PerColoredSymbol"

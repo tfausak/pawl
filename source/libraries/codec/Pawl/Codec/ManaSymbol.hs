@@ -12,6 +12,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 codec :: Codec.Codec ManaSymbol.ManaSymbol
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Generic" Common.natural ManaSymbol.Generic (\x -> case x of ManaSymbol.Generic y -> Just y; _ -> Nothing),
       Arm.payload "OfType" ManaType.codec ManaSymbol.OfType (\x -> case x of ManaSymbol.OfType y -> Just y; _ -> Nothing),
       Arm.payload "Hybrid" Hybrid.codec ManaSymbol.Hybrid (\x -> case x of ManaSymbol.Hybrid y -> Just y; _ -> Nothing),
@@ -28,3 +29,14 @@ codec =
       Arm.nullary "Snow" ManaSymbol.Snow,
       Arm.nullary "Variable" ManaSymbol.Variable
     ]
+
+tagOf :: ManaSymbol.ManaSymbol -> String
+tagOf x = case x of
+  ManaSymbol.Generic {} -> "Generic"
+  ManaSymbol.OfType {} -> "OfType"
+  ManaSymbol.Hybrid {} -> "Hybrid"
+  ManaSymbol.MonocoloredHybrid {} -> "MonocoloredHybrid"
+  ManaSymbol.Phyrexian {} -> "Phyrexian"
+  ManaSymbol.HybridPhyrexian {} -> "HybridPhyrexian"
+  ManaSymbol.Snow {} -> "Snow"
+  ManaSymbol.Variable {} -> "Variable"

@@ -12,6 +12,7 @@ import qualified Pawl.Types.Recipient as Recipient
 codec :: Codec.Codec Recipient.Recipient
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "ToCreature" ObjectId.codec Recipient.ToCreature (\x -> case x of Recipient.ToCreature y -> Just y; _ -> Nothing),
       Arm.payload "ToPlaneswalker" ObjectId.codec Recipient.ToPlaneswalker (\x -> case x of Recipient.ToPlaneswalker y -> Just y; _ -> Nothing),
       Arm.payload "ToBattle" ObjectId.codec Recipient.ToBattle (\x -> case x of Recipient.ToBattle y -> Just y; _ -> Nothing),
@@ -19,3 +20,12 @@ codec =
       Arm.payload "ToObject" ObjectId.codec Recipient.ToObject (\x -> case x of Recipient.ToObject y -> Just y; _ -> Nothing),
       Arm.payload "ToPile" Pile.codec Recipient.ToPile (\x -> case x of Recipient.ToPile y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Recipient.Recipient -> String
+tagOf x = case x of
+  Recipient.ToCreature {} -> "ToCreature"
+  Recipient.ToPlaneswalker {} -> "ToPlaneswalker"
+  Recipient.ToBattle {} -> "ToBattle"
+  Recipient.ToPlayer {} -> "ToPlayer"
+  Recipient.ToObject {} -> "ToObject"
+  Recipient.ToPile {} -> "ToPile"

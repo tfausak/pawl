@@ -16,6 +16,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 codec :: Codec.Codec Optionality.Optionality
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Mandatory" Optionality.Mandatory,
       Arm.optionalPayload
         "Optional"
@@ -31,3 +32,8 @@ codec =
 -- otherwise.
 defaultAsker :: PlayerRef.Type.PlayerRef
 defaultAsker = PlayerRef.Type.Relative PlayerRelation.You
+
+tagOf :: Optionality.Optionality -> String
+tagOf x = case x of
+  Optionality.Mandatory {} -> "Mandatory"
+  Optionality.Optional {} -> "Optional"

@@ -11,6 +11,7 @@ import qualified Pawl.Types.Pool as Pool
 codec :: Codec.Codec Pool.Pool
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Creatures" Pool.Creatures,
       Arm.nullary "Players" Pool.Players,
       Arm.nullary "AnyTarget" Pool.AnyTarget,
@@ -25,3 +26,17 @@ codec =
       Arm.nullary "CardsInExile" Pool.CardsInExile,
       Arm.payload "CreaturesAndCardsInGraveyard" ZoneScope.codec Pool.CreaturesAndCardsInGraveyard (\x -> case x of Pool.CreaturesAndCardsInGraveyard y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Pool.Pool -> String
+tagOf x = case x of
+  Pool.Creatures {} -> "Creatures"
+  Pool.Players {} -> "Players"
+  Pool.AnyTarget {} -> "AnyTarget"
+  Pool.Permanents {} -> "Permanents"
+  Pool.Spells {} -> "Spells"
+  Pool.Abilities {} -> "Abilities"
+  Pool.SpellsAndPermanents {} -> "SpellsAndPermanents"
+  Pool.PlayersAndPlaneswalkers {} -> "PlayersAndPlaneswalkers"
+  Pool.CardsInGraveyard {} -> "CardsInGraveyard"
+  Pool.CardsInExile {} -> "CardsInExile"
+  Pool.CreaturesAndCardsInGraveyard {} -> "CreaturesAndCardsInGraveyard"

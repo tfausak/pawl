@@ -21,7 +21,14 @@ import qualified Pawl.Types.Condition as Condition
 codec :: Codec.Codec Condition.Condition
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Compares" Compares.codec Condition.Compares (\x -> case x of Condition.Compares y -> Just y; _ -> Nothing),
       Arm.payload "Any" (Common.list codec) Condition.Any (\x -> case x of Condition.Any y -> Just y; _ -> Nothing),
       Arm.payload "All" (Common.list codec) Condition.All (\x -> case x of Condition.All y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Condition.Condition -> String
+tagOf x = case x of
+  Condition.Compares {} -> "Compares"
+  Condition.Any {} -> "Any"
+  Condition.All {} -> "All"

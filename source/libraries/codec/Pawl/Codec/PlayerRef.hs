@@ -14,6 +14,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 codec :: Codec.Codec PlayerRef.PlayerRef
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "EachPlayer" PlayerRef.EachPlayer,
       -- The table minus one seat, which a card writes: Shahrazad's "each player
       -- who doesn't win the subgame".
@@ -38,3 +39,16 @@ codec =
       -- opponent attacking that player".
       Arm.payload "Attacking" AttackingPlayers.codec PlayerRef.Attacking (\x -> case x of PlayerRef.Attacking y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: PlayerRef.PlayerRef -> String
+tagOf x = case x of
+  PlayerRef.EachPlayer {} -> "EachPlayer"
+  PlayerRef.EachPlayerExcept {} -> "EachPlayerExcept"
+  PlayerRef.EachOpponentExcept {} -> "EachOpponentExcept"
+  PlayerRef.Relative {} -> "Relative"
+  PlayerRef.InSlot {} -> "InSlot"
+  PlayerRef.EachInSlot {} -> "EachInSlot"
+  PlayerRef.Specific {} -> "Specific"
+  PlayerRef.Candidate {} -> "Candidate"
+  PlayerRef.ControllerOfBound {} -> "ControllerOfBound"
+  PlayerRef.Attacking {} -> "Attacking"

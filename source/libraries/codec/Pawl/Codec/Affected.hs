@@ -14,6 +14,7 @@ codec :: Codec.Codec Affected.Affected
 codec =
   let filterCodec = Filter.codec Keyword.codec
    in Arm.tagged
+        tagOf
         [ Arm.payload "TheseObjects" (Common.set ObjectId.codec) Affected.TheseObjects (\x -> case x of Affected.TheseObjects y -> Just y; _ -> Nothing),
           Arm.payload "Matching" filterCodec Affected.Matching (\x -> case x of Affected.Matching y -> Just y; _ -> Nothing),
           Arm.payload "MatchingAnywhere" filterCodec Affected.MatchingAnywhere (\x -> case x of Affected.MatchingAnywhere y -> Just y; _ -> Nothing),
@@ -21,3 +22,12 @@ codec =
           Arm.nullary "Attached" Affected.Attached,
           Arm.payload "AttachedPlayerControls" filterCodec Affected.AttachedPlayerControls (\x -> case x of Affected.AttachedPlayerControls y -> Just y; _ -> Nothing)
         ]
+
+tagOf :: Affected.Affected -> String
+tagOf x = case x of
+  Affected.TheseObjects {} -> "TheseObjects"
+  Affected.Matching {} -> "Matching"
+  Affected.MatchingAnywhere {} -> "MatchingAnywhere"
+  Affected.MatchingOffBattlefield {} -> "MatchingOffBattlefield"
+  Affected.Attached {} -> "Attached"
+  Affected.AttachedPlayerControls {} -> "AttachedPlayerControls"

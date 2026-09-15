@@ -27,6 +27,7 @@ codec ::
   Codec.Codec (EntryRewrite.EntryRewrite ability effect)
 codec abilityCodec effectCodec =
   Arm.tagged
+    tagOf
     [ Arm.payload "AsCopy" (AsCopy.codec abilityCodec) EntryRewrite.AsCopy (\x -> case x of EntryRewrite.AsCopy y -> Just y; _ -> Nothing),
       Arm.payload "ChoiceOf" (Common.list EntryOption.codec) EntryRewrite.ChoiceOf (\x -> case x of EntryRewrite.ChoiceOf y -> Just y; _ -> Nothing),
       Arm.payload "ChoiceByCoinFlip" EntryFlip.codec EntryRewrite.ChoiceByCoinFlip (\x -> case x of EntryRewrite.ChoiceByCoinFlip y -> Just y; _ -> Nothing),
@@ -56,3 +57,32 @@ codec abilityCodec effectCodec =
       Arm.payload "ExileFromGraveyard" (Filter.codec Keyword.codec) EntryRewrite.ExileFromGraveyard (\x -> case x of EntryRewrite.ExileFromGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "RunEffects" (Common.seq effectCodec) EntryRewrite.RunEffects (\x -> case x of EntryRewrite.RunEffects y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: EntryRewrite.EntryRewrite ability effect -> String
+tagOf x = case x of
+  EntryRewrite.AsCopy {} -> "AsCopy"
+  EntryRewrite.ChoiceOf {} -> "ChoiceOf"
+  EntryRewrite.ChoiceByCoinFlip {} -> "ChoiceByCoinFlip"
+  EntryRewrite.WithCounters {} -> "WithCounters"
+  EntryRewrite.ChooseColor {} -> "ChooseColor"
+  EntryRewrite.ChooseBasicLandType {} -> "ChooseBasicLandType"
+  EntryRewrite.ChooseCreatureType {} -> "ChooseCreatureType"
+  EntryRewrite.ChoosePlayer {} -> "ChoosePlayer"
+  EntryRewrite.ChooseCardNames {} -> "ChooseCardNames"
+  EntryRewrite.ChooseCardName {} -> "ChooseCardName"
+  EntryRewrite.WithKeywords {} -> "WithKeywords"
+  EntryRewrite.UnderSourceControl {} -> "UnderSourceControl"
+  EntryRewrite.ReadAhead {} -> "ReadAhead"
+  EntryRewrite.Riot {} -> "Riot"
+  EntryRewrite.Unleash {} -> "Unleash"
+  EntryRewrite.Sunburst {} -> "Sunburst"
+  EntryRewrite.Bloodthirst {} -> "Bloodthirst"
+  EntryRewrite.Amplify {} -> "Amplify"
+  EntryRewrite.Compleated {} -> "Compleated"
+  EntryRewrite.Tapped {} -> "Tapped"
+  EntryRewrite.EntersTransformed {} -> "EntersTransformed"
+  EntryRewrite.PayLifeOrTapped {} -> "PayLifeOrTapped"
+  EntryRewrite.RevealOrTapped {} -> "RevealOrTapped"
+  EntryRewrite.SacrificeAnyNumber {} -> "SacrificeAnyNumber"
+  EntryRewrite.ExileFromGraveyard {} -> "ExileFromGraveyard"
+  EntryRewrite.RunEffects {} -> "RunEffects"

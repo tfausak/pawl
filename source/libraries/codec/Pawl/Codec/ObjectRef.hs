@@ -45,6 +45,7 @@ codec =
       -- about which keyword codec the filter carries.
       filterCodec = Filter.codec Keyword.codec
    in Arm.tagged
+        tagOf
         [ Arm.payload "InSlot" SlotName.codec ObjectRef.InSlot (\x -> case x of ObjectRef.InSlot y -> Just y; _ -> Nothing),
           Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching (\x -> case x of ObjectRef.EachMatching y -> Just y; _ -> Nothing),
           Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard (\x -> case x of ObjectRef.EachCardInGraveyard y -> Just y; _ -> Nothing),
@@ -76,3 +77,30 @@ codec =
           Arm.payload "ChosenPermanent" ChosenPermanent.codec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
           Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing)
         ]
+
+tagOf :: ObjectRef.ObjectRef -> String
+tagOf x = case x of
+  ObjectRef.InSlot {} -> "InSlot"
+  ObjectRef.EachMatching {} -> "EachMatching"
+  ObjectRef.EachCardInGraveyard {} -> "EachCardInGraveyard"
+  ObjectRef.EachCardInYourHand {} -> "EachCardInYourHand"
+  ObjectRef.EachCardInHand {} -> "EachCardInHand"
+  ObjectRef.EachCardInYourLibrary {} -> "EachCardInYourLibrary"
+  ObjectRef.EachCardExiledWithSource {} -> "EachCardExiledWithSource"
+  ObjectRef.EachSpell {} -> "EachSpell"
+  ObjectRef.EachOnStack {} -> "EachOnStack"
+  ObjectRef.EachPlayer {} -> "EachPlayer"
+  ObjectRef.EachOpponent {} -> "EachOpponent"
+  ObjectRef.ChosenPlayer {} -> "ChosenPlayer"
+  ObjectRef.Players {} -> "Players"
+  ObjectRef.TopOfLibrary {} -> "TopOfLibrary"
+  ObjectRef.TopOfLibraryUntil {} -> "TopOfLibraryUntil"
+  ObjectRef.TopOfGraveyard {} -> "TopOfGraveyard"
+  ObjectRef.ChosenCardInGraveyard {} -> "ChosenCardInGraveyard"
+  ObjectRef.ChosenCardInHand {} -> "ChosenCardInHand"
+  ObjectRef.ChosenCardFromAmong {} -> "ChosenCardFromAmong"
+  ObjectRef.EachCardFromAmong {} -> "EachCardFromAmong"
+  ObjectRef.RandomCardInHand {} -> "RandomCardInHand"
+  ObjectRef.AnyNumberMatching {} -> "AnyNumberMatching"
+  ObjectRef.ChosenPermanent {} -> "ChosenPermanent"
+  ObjectRef.SourceAndChosenPermanent {} -> "SourceAndChosenPermanent"

@@ -17,6 +17,7 @@ import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 codec :: Codec.Codec ActivationRestriction.ActivationRestriction
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "SorcerySpeed" ActivationRestriction.SorcerySpeed,
       Arm.payload "DuringPhase" DuringPhase.codec ActivationRestriction.DuringPhase (\x -> case x of ActivationRestriction.DuringPhase y -> Just y; _ -> Nothing),
       Arm.payload "DuringTurn" TurnScope.codec ActivationRestriction.DuringTurn (\x -> case x of ActivationRestriction.DuringTurn y -> Just y; _ -> Nothing),
@@ -27,3 +28,15 @@ codec =
       Arm.nullary "OnlyOnce" ActivationRestriction.OnlyOnce,
       Arm.nullary "OnlyOnceEachTurn" ActivationRestriction.OnlyOnceEachTurn
     ]
+
+tagOf :: ActivationRestriction.ActivationRestriction -> String
+tagOf x = case x of
+  ActivationRestriction.SorcerySpeed {} -> "SorcerySpeed"
+  ActivationRestriction.DuringPhase {} -> "DuringPhase"
+  ActivationRestriction.DuringTurn {} -> "DuringTurn"
+  ActivationRestriction.AttackedThisStep {} -> "AttackedThisStep"
+  ActivationRestriction.AfterBlockersDeclared {} -> "AfterBlockersDeclared"
+  ActivationRestriction.BeforeCombatDamage {} -> "BeforeCombatDamage"
+  ActivationRestriction.OnlyIf {} -> "OnlyIf"
+  ActivationRestriction.OnlyOnce {} -> "OnlyOnce"
+  ActivationRestriction.OnlyOnceEachTurn {} -> "OnlyOnceEachTurn"

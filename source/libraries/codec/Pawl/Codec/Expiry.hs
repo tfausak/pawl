@@ -16,6 +16,7 @@ import qualified Pawl.Types.Expiry as Expiry
 codec :: Codec.Codec Expiry.Expiry
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "AtCleanup" Expiry.AtCleanup,
       Arm.nullary "Never" Expiry.Never,
       Arm.nullary "Perpetual" Expiry.Perpetual,
@@ -26,3 +27,15 @@ codec =
       Arm.payload "WhenPaid" PaidExpiry.codec Expiry.WhenPaid (\x -> case x of Expiry.WhenPaid y -> Just y; _ -> Nothing),
       Arm.nullary "WhenUsed" Expiry.WhenUsed
     ]
+
+tagOf :: Expiry.Expiry -> String
+tagOf x = case x of
+  Expiry.AtCleanup {} -> "AtCleanup"
+  Expiry.Never {} -> "Never"
+  Expiry.Perpetual {} -> "Perpetual"
+  Expiry.While {} -> "While"
+  Expiry.AtTurnOf {} -> "AtTurnOf"
+  Expiry.AtEndOfTurnOf {} -> "AtEndOfTurnOf"
+  Expiry.AtEndOf {} -> "AtEndOf"
+  Expiry.WhenPaid {} -> "WhenPaid"
+  Expiry.WhenUsed {} -> "WhenUsed"

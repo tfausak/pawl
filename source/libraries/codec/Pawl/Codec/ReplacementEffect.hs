@@ -33,6 +33,7 @@ codec ::
   Codec.Codec (ReplacementEffect.ReplacementEffect card ability effect)
 codec cardCodec abilityCodec effectCodec =
   Arm.tagged
+    tagOf
     [ Arm.payload "ZoneChangeR" ZoneChangeR.codec ReplacementEffect.ZoneChangeR (\x -> case x of ReplacementEffect.ZoneChangeR y -> Just y; _ -> Nothing),
       Arm.payload "EntryR" (EntryR.codec abilityCodec effectCodec) ReplacementEffect.EntryR (\x -> case x of ReplacementEffect.EntryR y -> Just y; _ -> Nothing),
       Arm.payload "DamageR" (DamageR.codec effectCodec) ReplacementEffect.DamageR (\x -> case x of ReplacementEffect.DamageR y -> Just y; _ -> Nothing),
@@ -47,3 +48,19 @@ codec cardCodec abilityCodec effectCodec =
       Arm.payload "DrawCountR" DrawCountR.codec ReplacementEffect.DrawCountR (\x -> case x of ReplacementEffect.DrawCountR y -> Just y; _ -> Nothing),
       Arm.payload "PhaseR" PhasePattern.codec ReplacementEffect.PhaseR (\x -> case x of ReplacementEffect.PhaseR y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: ReplacementEffect.ReplacementEffect card ability effect -> String
+tagOf x = case x of
+  ReplacementEffect.ZoneChangeR {} -> "ZoneChangeR"
+  ReplacementEffect.EntryR {} -> "EntryR"
+  ReplacementEffect.DamageR {} -> "DamageR"
+  ReplacementEffect.DestructionR {} -> "DestructionR"
+  ReplacementEffect.CounterR {} -> "CounterR"
+  ReplacementEffect.TokenR {} -> "TokenR"
+  ReplacementEffect.TurnUpR {} -> "TurnUpR"
+  ReplacementEffect.UntapR {} -> "UntapR"
+  ReplacementEffect.LifeLossR {} -> "LifeLossR"
+  ReplacementEffect.LifeGainR {} -> "LifeGainR"
+  ReplacementEffect.DrawR {} -> "DrawR"
+  ReplacementEffect.DrawCountR {} -> "DrawCountR"
+  ReplacementEffect.PhaseR {} -> "PhaseR"

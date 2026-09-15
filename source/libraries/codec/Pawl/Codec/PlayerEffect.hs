@@ -28,6 +28,7 @@ codec :: Codec.Codec PlayerEffect.PlayerEffect
 codec =
   let filterCodec = Filter.codec Keyword.codec
    in Arm.tagged
+        tagOf
         [ Arm.nullary "CantCastSpells" PlayerEffect.CantCastSpells,
           Arm.nullary "CantActivateAbilities" PlayerEffect.CantActivateAbilities,
           Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan (\x -> case x of PlayerEffect.CantCastMoreThan y -> Just y; _ -> Nothing),
@@ -66,3 +67,43 @@ codec =
           Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing),
           Arm.payload "AdditionalVotes" Common.natural PlayerEffect.AdditionalVotes (\x -> case x of PlayerEffect.AdditionalVotes y -> Just y; _ -> Nothing)
         ]
+
+tagOf :: PlayerEffect.PlayerEffect -> String
+tagOf x = case x of
+  PlayerEffect.CantCastSpells {} -> "CantCastSpells"
+  PlayerEffect.CantActivateAbilities {} -> "CantActivateAbilities"
+  PlayerEffect.CantCastMoreThan {} -> "CantCastMoreThan"
+  PlayerEffect.CantCastChosenName {} -> "CantCastChosenName"
+  PlayerEffect.CantPlayLandChosenName {} -> "CantPlayLandChosenName"
+  PlayerEffect.IncreaseSpellCost {} -> "IncreaseSpellCost"
+  PlayerEffect.IncreaseActivationCost {} -> "IncreaseActivationCost"
+  PlayerEffect.ReduceSpellCost {} -> "ReduceSpellCost"
+  PlayerEffect.ReduceActivationCost {} -> "ReduceActivationCost"
+  PlayerEffect.AddActivationCost {} -> "AddActivationCost"
+  PlayerEffect.AddSpellCost {} -> "AddSpellCost"
+  PlayerEffect.PlayAdditionalLands {} -> "PlayAdditionalLands"
+  PlayerEffect.NoMaximumHandSize {} -> "NoMaximumHandSize"
+  PlayerEffect.SetMaximumHandSize {} -> "SetMaximumHandSize"
+  PlayerEffect.IncreaseMaximumHandSize {} -> "IncreaseMaximumHandSize"
+  PlayerEffect.ReduceMaximumHandSize {} -> "ReduceMaximumHandSize"
+  PlayerEffect.DontLoseUnspentMana {} -> "DontLoseUnspentMana"
+  PlayerEffect.SpendManaAsThough {} -> "SpendManaAsThough"
+  PlayerEffect.CantBeTargetedBy {} -> "CantBeTargetedBy"
+  PlayerEffect.CastAsThoughItHadFlash {} -> "CastAsThoughItHadFlash"
+  PlayerEffect.MayPlayAsThoughItHadFlash {} -> "MayPlayAsThoughItHadFlash"
+  PlayerEffect.CantBeCountered {} -> "CantBeCountered"
+  PlayerEffect.DamageCantBePrevented {} -> "DamageCantBePrevented"
+  PlayerEffect.DamageCantBeRedirected {} -> "DamageCantBeRedirected"
+  PlayerEffect.CantSearchLibraries {} -> "CantSearchLibraries"
+  PlayerEffect.HasProtectionFromChosenName {} -> "HasProtectionFromChosenName"
+  PlayerEffect.HasProtectionFrom {} -> "HasProtectionFrom"
+  PlayerEffect.CantBecomeMonarch {} -> "CantBecomeMonarch"
+  PlayerEffect.CantCastMatching {} -> "CantCastMatching"
+  PlayerEffect.CastOnlyAtSorcerySpeed {} -> "CastOnlyAtSorcerySpeed"
+  PlayerEffect.CantPlayLands {} -> "CantPlayLands"
+  PlayerEffect.CastFrom {} -> "CastFrom"
+  PlayerEffect.PlayLandsFrom {} -> "PlayLandsFrom"
+  PlayerEffect.CastFromHandWithoutPayingManaCost {} -> "CastFromHandWithoutPayingManaCost"
+  PlayerEffect.CantGetCounters {} -> "CantGetCounters"
+  PlayerEffect.StateCoinFlip {} -> "StateCoinFlip"
+  PlayerEffect.AdditionalVotes {} -> "AdditionalVotes"

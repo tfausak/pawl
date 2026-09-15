@@ -18,15 +18,15 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 -- payload-carrying constructors (PayLife, Sacrifice), so it is built from
 -- 'Arm.tagged' rather than delegated to a nullary-table helper -- which derives
 -- the encoder, the decoder and the schema from the list below, so a new arm is
--- one entry and nothing else. Note that the list is the ONLY thing that says an
--- arm exists: every extractor carries its own @_ -> Nothing@, so a constructor
--- with no entry here compiles, encodes as @{}@ and has no round-trip test
--- (#2262).
+-- one entry and nothing else. 'tagOf' below names every constructor, so a
+-- new one is a @-Wincomplete-patterns@ error here; what it does not force is the
+-- matching ARM, and a constructor whose tag has none encodes as @{}@.
 --
 -- The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
 codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (CostComponent.CostComponent keyword)
 codec keywordCodec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "TapThis" CostComponent.TapThis,
       Arm.nullary "UntapThis" CostComponent.UntapThis,
       Arm.nullary "SacrificeThis" CostComponent.SacrificeThis,
@@ -66,3 +66,35 @@ codec keywordCodec =
       Arm.payload "RevealCardFromHand" (Filter.codec keywordCodec) CostComponent.RevealCardFromHand (\x -> case x of CostComponent.RevealCardFromHand y -> Just y; _ -> Nothing),
       Arm.payload "MillCards" Common.natural CostComponent.MillCards (\x -> case x of CostComponent.MillCards y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: CostComponent.CostComponent keyword -> String
+tagOf x = case x of
+  CostComponent.TapThis {} -> "TapThis"
+  CostComponent.UntapThis {} -> "UntapThis"
+  CostComponent.SacrificeThis {} -> "SacrificeThis"
+  CostComponent.ReturnThis {} -> "ReturnThis"
+  CostComponent.PayLife {} -> "PayLife"
+  CostComponent.PayLifeX {} -> "PayLifeX"
+  CostComponent.Sacrifice {} -> "Sacrifice"
+  CostComponent.TapForTotalPower {} -> "TapForTotalPower"
+  CostComponent.TapPermanents {} -> "TapPermanents"
+  CostComponent.ReturnPermanents {} -> "ReturnPermanents"
+  CostComponent.DiscardCards {} -> "DiscardCards"
+  CostComponent.DiscardThis {} -> "DiscardThis"
+  CostComponent.PutCardFromHandOntoBattlefield {} -> "PutCardFromHandOntoBattlefield"
+  CostComponent.PayEnergy {} -> "PayEnergy"
+  CostComponent.PayEnergyX {} -> "PayEnergyX"
+  CostComponent.AddLoyaltyToThis {} -> "AddLoyaltyToThis"
+  CostComponent.RemoveLoyaltyFromThis {} -> "RemoveLoyaltyFromThis"
+  CostComponent.RemovePlusOneCountersFromThis {} -> "RemovePlusOneCountersFromThis"
+  CostComponent.PutPlusOneCountersOnThis {} -> "PutPlusOneCountersOnThis"
+  CostComponent.Blight {} -> "Blight"
+  CostComponent.BlightX {} -> "BlightX"
+  CostComponent.Forage {} -> "Forage"
+  CostComponent.ExileThisFromGraveyard {} -> "ExileThisFromGraveyard"
+  CostComponent.ExileThis {} -> "ExileThis"
+  CostComponent.ExileCardsFromGraveyard {} -> "ExileCardsFromGraveyard"
+  CostComponent.ExileTopFromGraveyard {} -> "ExileTopFromGraveyard"
+  CostComponent.ExileCardFromHand {} -> "ExileCardFromHand"
+  CostComponent.RevealCardFromHand {} -> "RevealCardFromHand"
+  CostComponent.MillCards {} -> "MillCards"

@@ -10,9 +10,18 @@ import qualified Pawl.Types.Phase as Phase
 codec :: Codec.Codec Phase.Phase
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Beginning" BeginningStep.codec Phase.Beginning (\x -> case x of Phase.Beginning y -> Just y; _ -> Nothing),
       Arm.nullary "PrecombatMain" Phase.PrecombatMain,
       Arm.payload "Combat" CombatStep.codec Phase.Combat (\x -> case x of Phase.Combat y -> Just y; _ -> Nothing),
       Arm.nullary "PostcombatMain" Phase.PostcombatMain,
       Arm.payload "Ending" EndingStep.codec Phase.Ending (\x -> case x of Phase.Ending y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Phase.Phase -> String
+tagOf x = case x of
+  Phase.Beginning {} -> "Beginning"
+  Phase.PrecombatMain {} -> "PrecombatMain"
+  Phase.Combat {} -> "Combat"
+  Phase.PostcombatMain {} -> "PostcombatMain"
+  Phase.Ending {} -> "Ending"

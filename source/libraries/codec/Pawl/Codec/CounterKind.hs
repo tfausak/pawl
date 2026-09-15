@@ -14,6 +14,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (CounterKind.CounterKind keyword)
 codec keywordCodec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "PlusOnePlusOne" CounterKind.PlusOnePlusOne,
       Arm.nullary "MinusOneMinusOne" CounterKind.MinusOneMinusOne,
       Arm.payload "Keyword" keywordCodec CounterKind.Keyword (\x -> case x of CounterKind.Keyword y -> Just y; _ -> Nothing),
@@ -30,3 +31,21 @@ codec keywordCodec =
       Arm.nullary "Hone" CounterKind.Hone,
       Arm.payload "Named" CounterName.codec CounterKind.Named (\x -> case x of CounterKind.Named y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: CounterKind.CounterKind keyword -> String
+tagOf x = case x of
+  CounterKind.PlusOnePlusOne {} -> "PlusOnePlusOne"
+  CounterKind.MinusOneMinusOne {} -> "MinusOneMinusOne"
+  CounterKind.Keyword {} -> "Keyword"
+  CounterKind.Loyalty {} -> "Loyalty"
+  CounterKind.Lore {} -> "Lore"
+  CounterKind.Defense {} -> "Defense"
+  CounterKind.Time {} -> "Time"
+  CounterKind.Age {} -> "Age"
+  CounterKind.Fade {} -> "Fade"
+  CounterKind.Shield {} -> "Shield"
+  CounterKind.Finality {} -> "Finality"
+  CounterKind.Stun {} -> "Stun"
+  CounterKind.Level {} -> "Level"
+  CounterKind.Hone {} -> "Hone"
+  CounterKind.Named {} -> "Named"

@@ -10,6 +10,12 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 codec :: Codec.Codec ExchangeSides.ExchangeSides
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "WithController" SlotName.codec ExchangeSides.WithController (\x -> case x of ExchangeSides.WithController y -> Just y; _ -> Nothing),
       Arm.payload "BetweenTargets" SlotName.codec ExchangeSides.BetweenTargets (\x -> case x of ExchangeSides.BetweenTargets y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: ExchangeSides.ExchangeSides -> String
+tagOf x = case x of
+  ExchangeSides.WithController {} -> "WithController"
+  ExchangeSides.BetweenTargets {} -> "BetweenTargets"

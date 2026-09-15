@@ -21,6 +21,12 @@ codec ::
   Codec.Codec (AffectedPlayers.AffectedPlayers player)
 codec playerCodec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Scoped" PlayerScope.codec AffectedPlayers.Scoped (\x -> case x of AffectedPlayers.Scoped y -> Just y; _ -> Nothing),
       Arm.payload "Named" playerCodec AffectedPlayers.Named (\x -> case x of AffectedPlayers.Named y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: AffectedPlayers.AffectedPlayers player -> String
+tagOf x = case x of
+  AffectedPlayers.Scoped {} -> "Scoped"
+  AffectedPlayers.Named {} -> "Named"

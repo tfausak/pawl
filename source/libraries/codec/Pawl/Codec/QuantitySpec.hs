@@ -381,8 +381,8 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- The same tally with no kind named at all (CR 122.1): a bare tag, since the sum
   -- is over every kind and the object is still whichever one the quantity is
   -- evaluated against. Round-tripped separately from the arm above because
-  -- Pawl.JsonCodec.Arm's tagged list carries its own fallthrough, so a missing arm
-  -- is a decode failure rather than a compile error (#2262).
+  -- Pawl.JsonCodec.Arm's tag function forces a constructor's TAG and not its arm,
+  -- so a missing arm is a decode failure rather than a compile error.
   Spec.it s "ObjectCountersOfAnyKind, a bare tag" $
     Common.assertCodec
       s

@@ -240,10 +240,11 @@ to agents as written. What it doesn't say:
     `overBoundSlots` (the slot-naming arms then `_ -> pure predicate`, and both
     `boundSlots` and `renameBound` are it), `Pawl.ZoneTriggerSpec`'s
     hand-kept `everyTriggerCondition` and `representativeEvents`, and
-    `Pawl.CardSpec`'s filter and keyword traversals. No `Arm.tagged` codec is
-    forced --- every such list carries its own `_ -> Nothing`, so a new
-    constructor compiles with no codec arm and no round-trip test (#2262). An
-    `Arm.enum` codec derives and needs neither; check which kind the type has.
+    `Pawl.CardSpec`'s filter and keyword traversals. An `Arm.tagged` codec's
+    `tagOf` is total, so a new constructor IS compile-forced there --- but only
+    its tag: the arm itself is not, and a tag with no arm encodes as `{}`, so
+    the constructor still owes a round-trip case. An `Arm.enum` codec derives
+    both and needs neither; check which kind the type has.
     Grep the sibling constructor, read every hit, and record in the PR which
     ones you read and why each is right as it stands.
 

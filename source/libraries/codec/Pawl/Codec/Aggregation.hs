@@ -18,8 +18,16 @@ import qualified Pawl.Types.Aggregation as Aggregation
 codec :: (Typeable.Typeable q, Eq q) => Codec.Codec q -> Codec.Codec (Aggregation.Aggregation q)
 codec quantityCodec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "Members" Aggregation.Members,
       Arm.nullary "DistinctCardTypes" Aggregation.DistinctCardTypes,
       Arm.payload "Greatest" quantityCodec Aggregation.Greatest (\x -> case x of Aggregation.Greatest y -> Just y; _ -> Nothing),
       Arm.payload "Total" quantityCodec Aggregation.Total (\x -> case x of Aggregation.Total y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Aggregation.Aggregation q -> String
+tagOf x = case x of
+  Aggregation.Members {} -> "Members"
+  Aggregation.DistinctCardTypes {} -> "DistinctCardTypes"
+  Aggregation.Greatest {} -> "Greatest"
+  Aggregation.Total {} -> "Total"

@@ -12,6 +12,7 @@ import qualified Pawl.Types.Duration as Duration
 codec :: Codec.Codec Duration.Duration
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "UntilEndOfTurn" Duration.UntilEndOfTurn,
       Arm.nullary "Indefinite" Duration.Indefinite,
       Arm.nullary "Perpetual" Duration.Perpetual,
@@ -22,3 +23,15 @@ codec =
       Arm.payload "UntilPaid" (Cost.codec Keyword.codec) Duration.UntilPaid (\x -> case x of Duration.UntilPaid y -> Just y; _ -> Nothing),
       Arm.nullary "UntilUsed" Duration.UntilUsed
     ]
+
+tagOf :: Duration.Duration -> String
+tagOf x = case x of
+  Duration.UntilEndOfTurn {} -> "UntilEndOfTurn"
+  Duration.Indefinite {} -> "Indefinite"
+  Duration.Perpetual {} -> "Perpetual"
+  Duration.UntilYourNextTurn {} -> "UntilYourNextTurn"
+  Duration.UntilEndOfYourNextTurn {} -> "UntilEndOfYourNextTurn"
+  Duration.ForAsLongAs {} -> "ForAsLongAs"
+  Duration.UntilEndOfCombat {} -> "UntilEndOfCombat"
+  Duration.UntilPaid {} -> "UntilPaid"
+  Duration.UntilUsed {} -> "UntilUsed"

@@ -19,7 +19,14 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 codec :: Codec.Codec LibraryPlacement.LibraryPlacement
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Stated" LibraryPosition.codec LibraryPlacement.Stated (\x -> case x of LibraryPlacement.Stated y -> Just y; _ -> Nothing),
       Arm.nullary "OwnerChooses" LibraryPlacement.OwnerChooses,
       Arm.payload "RandomOrder" LibraryPosition.codec LibraryPlacement.RandomOrder (\x -> case x of LibraryPlacement.RandomOrder y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: LibraryPlacement.LibraryPlacement -> String
+tagOf x = case x of
+  LibraryPlacement.Stated {} -> "Stated"
+  LibraryPlacement.OwnerChooses {} -> "OwnerChooses"
+  LibraryPlacement.RandomOrder {} -> "RandomOrder"

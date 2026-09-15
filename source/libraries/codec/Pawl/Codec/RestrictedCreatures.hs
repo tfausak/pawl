@@ -17,6 +17,12 @@ codec ::
   Codec.Codec (RestrictedCreatures.RestrictedCreatures named)
 codec namedCodec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Named" namedCodec RestrictedCreatures.Named (\x -> case x of RestrictedCreatures.Named y -> Just y; _ -> Nothing),
       Arm.payload "Matching" (Filter.codec Keyword.codec) RestrictedCreatures.Matching (\x -> case x of RestrictedCreatures.Matching y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: RestrictedCreatures.RestrictedCreatures named -> String
+tagOf x = case x of
+  RestrictedCreatures.Named {} -> "Named"
+  RestrictedCreatures.Matching {} -> "Matching"

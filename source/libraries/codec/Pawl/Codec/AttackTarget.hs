@@ -12,7 +12,14 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 codec :: Codec.Codec AttackTarget.AttackTarget
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "OfPlayer" PlayerId.codec AttackTarget.OfPlayer (\x -> case x of AttackTarget.OfPlayer y -> Just y; _ -> Nothing),
       Arm.payload "OfPlaneswalker" ObjectId.codec AttackTarget.OfPlaneswalker (\x -> case x of AttackTarget.OfPlaneswalker y -> Just y; _ -> Nothing),
       Arm.payload "OfBattle" ObjectId.codec AttackTarget.OfBattle (\x -> case x of AttackTarget.OfBattle y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: AttackTarget.AttackTarget -> String
+tagOf x = case x of
+  AttackTarget.OfPlayer {} -> "OfPlayer"
+  AttackTarget.OfPlaneswalker {} -> "OfPlaneswalker"
+  AttackTarget.OfBattle {} -> "OfBattle"

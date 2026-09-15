@@ -12,8 +12,16 @@ import qualified Pawl.Types.SlotCount as SlotCount
 codec :: Codec.Codec SlotCount.SlotCount
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Printed" TargetCount.codec SlotCount.Printed (\x -> case x of SlotCount.Printed y -> Just y; _ -> Nothing),
       Arm.nullary "AnnouncedX" SlotCount.AnnouncedX,
       Arm.nullary "UpToAnnouncedX" SlotCount.UpToAnnouncedX,
       Arm.payload "UpToComputed" Quantity.codec SlotCount.UpToComputed (\x -> case x of SlotCount.UpToComputed y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: SlotCount.SlotCount -> String
+tagOf x = case x of
+  SlotCount.Printed {} -> "Printed"
+  SlotCount.AnnouncedX {} -> "AnnouncedX"
+  SlotCount.UpToAnnouncedX {} -> "UpToAnnouncedX"
+  SlotCount.UpToComputed {} -> "UpToComputed"

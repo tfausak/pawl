@@ -591,8 +591,8 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       (Filter.Or [Filter.WasCastFrom Zone.Graveyard, Filter.WasCastFrom Zone.Exile])
       " {\"type\":\"Or\",\"value\":[{\"type\":\"WasCastFrom\",\"value\":{\"type\":\"Graveyard\"}},{\"type\":\"WasCastFrom\",\"value\":{\"type\":\"Exile\"}}]} "
   -- Shadow the Hedgehog's "if mana from an artifact was spent to cast it". No
-  -- Arm.tagged codec is forced, so a constructor with no arm here round trips
-  -- nowhere and a card naming it fails to parse (#2262).
+  -- Arm.tagged codec forces a constructor's ARM, only its tag, so a constructor
+  -- with no arm here round trips nowhere and a card naming it fails to parse.
   Spec.it s "TagWasSpent Artifact" $
     Common.assertCodec
       s

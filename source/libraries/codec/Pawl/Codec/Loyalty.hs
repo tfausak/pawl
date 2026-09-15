@@ -10,6 +10,12 @@ import qualified Pawl.Types.Loyalty as Loyalty
 codec :: Codec.Codec Loyalty.Loyalty
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Literal" Common.natural Loyalty.Literal (\x -> case x of Loyalty.Literal y -> Just y; _ -> Nothing),
       Arm.nullary "Variable" Loyalty.Variable
     ]
+
+tagOf :: Loyalty.Loyalty -> String
+tagOf x = case x of
+  Loyalty.Literal {} -> "Literal"
+  Loyalty.Variable {} -> "Variable"

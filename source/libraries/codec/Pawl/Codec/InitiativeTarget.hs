@@ -8,6 +8,12 @@ import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 codec :: Codec.Codec InitiativeTarget.InitiativeTarget
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "TheController" InitiativeTarget.TheController,
       Arm.nullary "ControllerOfSource" InitiativeTarget.ControllerOfSource
     ]
+
+tagOf :: InitiativeTarget.InitiativeTarget -> String
+tagOf x = case x of
+  InitiativeTarget.TheController {} -> "TheController"
+  InitiativeTarget.ControllerOfSource {} -> "ControllerOfSource"

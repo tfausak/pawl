@@ -31,9 +31,9 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
       (MovedKinds.Named (CounterKind.Keyword Keyword.Flying) (Quantity.Literal 2))
       " {\"type\":\"Named\",\"value\":{\"count\":{\"type\":\"Literal\",\"value\":2},\"kind\":{\"type\":\"Keyword\",\"value\":{\"type\":\"Flying\"}}}} "
   -- Spike Cannibal's "move all +1/+1 counters": the kind is all there is to say,
-  -- the count being the whole tally the first object bears. Arm.tagged compiles
-  -- with no arm for a constructor and answers Nothing on encode (#2262), so this
-  -- case is what forces one.
+  -- the count being the whole tally the first object bears. Arm.tagged's tag
+  -- function forces a constructor to be NAMED but not to have an arm, and an
+  -- unarmed one encodes as {}, so this case is what forces one.
   Spec.it s "EveryOfKind carries only its kind" $
     Common.assertCodec
       s
@@ -58,9 +58,9 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
     Common.assertCodec s MovedKinds.codec MovedKinds.AtLeastOne " {\"type\":\"AtLeastOne\"} "
   -- Scrounging Bandar's "move any number of +1/+1 counters": the kind is all the
   -- card settles, the count being the player's to pick, so the payload is
-  -- EveryOfKind's and the tag is what tells the two apart. Arm.tagged compiles
-  -- with no arm for a constructor and answers Nothing on encode (#2262), so this
-  -- case is what forces one.
+  -- EveryOfKind's and the tag is what tells the two apart. Arm.tagged's tag
+  -- function forces a constructor to be NAMED but not to have an arm, and an
+  -- unarmed one encodes as {}, so this case is what forces one.
   Spec.it s "AnyNumberOfKind carries only its kind" $
     Common.assertCodec
       s
@@ -69,14 +69,15 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
       " {\"type\":\"AnyNumberOfKind\",\"value\":{\"type\":\"PlusOnePlusOne\"}} "
   -- Goldberry, River-Daughter's "move a counter of each kind not on Goldberry":
   -- the destination settles the kinds and the wording settles the count, so the
-  -- tag is the whole of it. Arm.tagged compiles with no arm for a constructor
-  -- and answers Nothing on encode (#2262), so this case is what forces one.
+  -- tag is the whole of it. Arm.tagged's tag function forces a
+  -- constructor to be NAMED but not to have an arm, and an unarmed one encodes
+  -- as {}, so this case is what forces one.
   Spec.it s "EachAbsentKind" $
     Common.assertCodec s MovedKinds.codec MovedKinds.EachAbsentKind " {\"type\":\"EachAbsentKind\"} "
   -- Takesies' "move up to one counter from each permanent": the player picks the
-  -- kind and may pick none, so the tag is the whole of it. Arm.tagged compiles
-  -- with no arm for a constructor and answers Nothing on encode (#2262), so this
-  -- case is what forces one.
+  -- kind and may pick none, so the tag is the whole of it. Arm.tagged's tag
+  -- function forces a constructor to be NAMED but not to have an arm, and an
+  -- unarmed one encodes as {}, so this case is what forces one.
   Spec.it s "UpToOneChosen" $
     Common.assertCodec s MovedKinds.codec MovedKinds.UpToOneChosen " {\"type\":\"UpToOneChosen\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s MovedKinds.codec

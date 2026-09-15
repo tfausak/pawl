@@ -9,6 +9,12 @@ import qualified Pawl.Types.DrawRewrite as DrawRewrite
 codec :: Codec.Codec DrawRewrite.DrawRewrite
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "GainLife" Common.natural DrawRewrite.GainLife (\x -> case x of DrawRewrite.GainLife y -> Just y; _ -> Nothing),
       Arm.payload "FromOutsideTheGame" FromOutsideTheGame.codec DrawRewrite.FromOutsideTheGame (\x -> case x of DrawRewrite.FromOutsideTheGame y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: DrawRewrite.DrawRewrite -> String
+tagOf x = case x of
+  DrawRewrite.GainLife {} -> "GainLife"
+  DrawRewrite.FromOutsideTheGame {} -> "FromOutsideTheGame"

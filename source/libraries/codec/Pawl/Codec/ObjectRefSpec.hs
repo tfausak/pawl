@@ -338,7 +338,8 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       s
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"RandomCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}} ") >>= Codec.decode ObjectRef.codec))
       "a bare player reference is rejected"
-  -- The one Arm.tagged risk this file exists for (#2262): the arm's payload is a
+  -- The one Arm.tagged risk this file exists for -- a tag its tag function names
+  -- with no arm beside it: the arm's payload is a
   -- bare Filter, exactly EachMatching's above, so a MISSING codec arm would
   -- compile and only this case would notice. The distinct-tag case below is what
   -- catches the other half -- an arm copying EachMatching's tag, which would turn
@@ -349,7 +350,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature))
       " {\"type\":\"AnyNumberMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
-  -- The arm above's singular, and the same Arm.tagged risk (#2262): a missing
+  -- The arm above's singular, and the same Arm.tagged risk: a missing
   -- codec arm would compile and only this case would notice, and a tag copied
   -- from a sibling would turn one permanent into a sweep or into a subset.
   --
@@ -369,7 +370,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "opponent")))))
       " {\"type\":\"ChosenPermanent\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"chooser\":{\"type\":\"InSlot\",\"value\":\"opponent\"}}} "
   -- The arm above with the source named alongside the choice, and a fourth arm
-  -- whose payload is a bare Filter, so the same Arm.tagged risk (#2262): a
+  -- whose payload is a bare Filter, so the same Arm.tagged risk: a
   -- missing codec arm would compile, and a tag copied from any of the three would
   -- lose the source half without a decode error.
   Spec.it s "SourceAndChosenPermanent" $

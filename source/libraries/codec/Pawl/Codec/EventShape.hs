@@ -12,7 +12,14 @@ import qualified Pawl.Types.EventShape as EventShape
 codec :: Codec.Codec EventShape.EventShape
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "MovedBetween" MovedBetween.codec EventShape.MovedBetween (\x -> case x of EventShape.MovedBetween y -> Just y; _ -> Nothing),
       Arm.payload "CardArrivedIn" CardArrivedIn.codec EventShape.CardArrivedIn (\x -> case x of EventShape.CardArrivedIn y -> Just y; _ -> Nothing),
       Arm.nullary "SpellCast" EventShape.SpellCast
     ]
+
+tagOf :: EventShape.EventShape -> String
+tagOf x = case x of
+  EventShape.MovedBetween {} -> "MovedBetween"
+  EventShape.CardArrivedIn {} -> "CardArrivedIn"
+  EventShape.SpellCast {} -> "SpellCast"

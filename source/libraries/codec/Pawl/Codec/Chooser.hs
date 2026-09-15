@@ -11,7 +11,14 @@ import qualified Pawl.Types.Chooser as Chooser
 codec :: Codec.Codec Chooser.Chooser
 codec =
   Arm.tagged
+    tagOf
     [ Arm.nullary "TheController" Chooser.TheController,
       Arm.nullary "EachInScope" Chooser.EachInScope,
       Arm.payload "BoundInSlot" SlotName.codec Chooser.BoundInSlot (\x -> case x of Chooser.BoundInSlot y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Chooser.Chooser -> String
+tagOf x = case x of
+  Chooser.TheController {} -> "TheController"
+  Chooser.EachInScope {} -> "EachInScope"
+  Chooser.BoundInSlot {} -> "BoundInSlot"

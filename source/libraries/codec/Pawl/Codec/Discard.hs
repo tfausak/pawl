@@ -13,6 +13,12 @@ import qualified Pawl.Types.Discard as Discard
 codec :: Codec.Codec Discard.Discard
 codec =
   Arm.tagged
+    tagOf
     [ Arm.payload "Counted" CountedDiscard.codec Discard.Counted (\x -> case x of Discard.Counted y -> Just y; _ -> Nothing),
       Arm.payload "These" ObjectRef.codec Discard.These (\x -> case x of Discard.These y -> Just y; _ -> Nothing)
     ]
+
+tagOf :: Discard.Discard -> String
+tagOf x = case x of
+  Discard.Counted {} -> "Counted"
+  Discard.These {} -> "These"
