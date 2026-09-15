@@ -110,12 +110,15 @@ data GameState = MkGameState
     -- and CR 109.3 makes none of them a characteristic, so `lastKnown` has
     -- nowhere to keep them.
     --
-    -- Written where the copying effect is ARMED rather than by the zone-change
-    -- funnel, so what is filed is the object as that effect copies it: rule
-    -- 702.50a's epic files the spell without its own ability ("copy this spell
-    -- except for its epic ability") rather than making Effect.CopyStackObject
-    -- case on which keyword armed it. Pawl.Engine.Resolve.applyEpic is the one
-    -- writer today. Grows for the whole game, as `lastKnown` does.
+    -- TWO writers, and the ARMING one wins: an effect that arms a copier files
+    -- the object as that effect copies it -- rule 702.50a's epic files the spell
+    -- without its own ability ("copy this spell except for its epic ability")
+    -- rather than making Effect.CopyStackObject case on which keyword armed it
+    -- (Pawl.Engine.Resolve.applyEpic) -- and the zone-change funnel files
+    -- whatever is left unfiled as the object leaves the stack
+    -- (Pawl.Engine.Event.changeZoneAttaching), which is CR 608.2h for a trigger
+    -- whose spell was countered out from under it. Grows for the whole game, as
+    -- `lastKnown` does.
     stackArchive :: Map.Map ObjectId.ObjectId Object.Object,
     -- | CR 117.5: how far the trigger scan has consumed the event log.
     scannedThrough :: Natural.Natural,

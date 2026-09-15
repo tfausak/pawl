@@ -2197,6 +2197,49 @@ stormSpec s registry = Spec.describe s "Storm" $ do
     Spec.assertEqWith s "bob took two Bolts' 6, Grapeshot's 1 and TWO copies' 2" (S.lifeOf S.bob after) (Just 11)
     Spec.assertEqWith s "alice took bob's Bolt" (S.lifeOf S.alice after) (Just 17)
 
+  -- CR 608.2h's last known information, through CR 113.7a's "the ability exists
+  -- on the stack independently of its source": bob counters Grapeshot while its
+  -- storm trigger waits above it, and the trigger still copies the spell as it
+  -- last existed.
+  --
+  -- ONE spell before Grapeshot, so ONE copy: bob takes the Bolt's 3 and the
+  -- copy's 1 and nothing else, the original having been countered. Counting the
+  -- COUNTERSPELL -- cast after Grapeshot -- would make two copies and leave him at
+  -- 15, and copying nothing leaves him at 17.
+  Spec.it s "CR 608.2h a Grapeshot countered under its own storm trigger is still copied" $ do
+    grapeshot <- S.printingOf s registry "Grapeshot"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    cancel <- S.printingOf s registry "Cancel"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    let lands = S.landsFor island S.bob 3 (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
+        (firstBolt, g1) = S.addHandCard bolt S.alice lands
+        (grapeshotId, g2) = S.addHandCard grapeshot S.alice g1
+        (cancelId, g3) = S.addHandCard cancel S.bob g2
+        board =
+          g3
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain
+            }
+        atBob gs action = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) gs (action >> Engine.settleForPriority))
+        -- The one spell cast before Grapeshot, resolved out of the way.
+        opened = atBob (atBob board {GameState.priority = Just S.alice} (S.cast S.alice firstBolt)) Stack.resolveTop
+        -- Grapeshot at bob, with its storm trigger settled onto the stack above it.
+        cast_ = atBob opened {GameState.priority = Just S.alice} (S.cast S.alice grapeshotId)
+        -- CR 400.7's incarnation: the spell carries an id the hand card did not.
+        onStack = Maybe.listToMaybe (S.namedObjects (S.printingName grapeshot) cast_)
+        -- bob's Cancel, aimed at that id by FILTERING the offered set, so a pool
+        -- that stopped offering the spell counters nothing rather than quietly
+        -- finding something else.
+        countered = case onStack of
+          Nothing -> cast_
+          Just oid -> snd (Engine.runGamePure (pinObject oid) cast_ {GameState.priority = Just S.bob} (S.cast S.bob cancelId >> Engine.settleForPriority))
+        -- Cancel, the trigger, then the copy: down to an empty stack.
+        resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (atBob gs Stack.resolveTop)
+        after = resolveAll countered
+    Spec.assertEqWith s "bob took the Bolt's 3 and ONE copy of the countered Grapeshot" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "CR 701.6a the countered Grapeshot itself is in alice's graveyard" (length (filter (\oid -> S.soleFaceName oid after == S.printingName grapeshot) (Game.zoneMembers Zone.Graveyard S.alice after))) 1
+
 -- CR 702.56a's replicate: "As an additional cost to cast this spell, you may pay
 -- [cost] any number of times" and "When you cast this spell, if a replicate cost
 -- was paid for it, copy it for each time its replicate cost was paid."
@@ -2447,6 +2490,16 @@ paidTimesAt times recipient p = case p of
 pinTarget :: Recipient.Recipient -> Prompt.Prompt r -> r
 pinTarget recipient p = case p of
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
+  _ -> S.identityAnswer p
+
+-- pinTarget above, keyed on the OBJECT behind an offered recipient rather than on
+-- the recipient itself: which recipient a pool offers for one object is the
+-- pool's to spell, and a hand-built one of the same object is a different answer
+-- CR 608.2b drops. FILTERING the offered set is what makes a pool that no longer
+-- offers the object fail loudly instead.
+pinObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+pinObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) asked
   _ -> S.identityAnswer p
 
 -- alice casts the one spell her hand holds, takes CR 608.2g's offer, and rotates

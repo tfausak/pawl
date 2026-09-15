@@ -6906,6 +6906,11 @@ stackCopyTrigger keyword = case keyword of
 -- Shared rather than written out per keyword because the rules state one
 -- instruction and differ only in the COUNT and in the intervening "if" -- both of
 -- which are the caller's.
+--
+-- A spell that has LEFT the stack before the trigger resolves is still copied, off
+-- its last known information (CR 608.2h) and through CR 113.7a's ability that
+-- exists independently of its source. Proved by Pawl.KeywordTriggerSpec's "CR
+-- 608.2h a Grapeshot countered under its own storm trigger is still copied".
 copiesOf :: Quantity.Quantity -> Modal.Modal Card (GrantedAbility.GrantedAbility Card)
 copiesOf quantity =
   Modal.MkModal
@@ -6949,9 +6954,6 @@ copiesOf quantity =
 -- The intervening "if" is CR 603.4's, evoke's reading: Quantity.TimesPaid reads
 -- Object.paidCosts off the SPELL, which CR 601.2b stamped as it was announced,
 -- so a spell nobody paid the cost for never puts the ability on the stack.
---
--- Not implemented: copying a spell that has left the stack before the trigger
--- resolves (CR 608.2h); the trigger then copies nothing (#3618).
 paidSpellCopies :: Keyword -> Quantity.Quantity -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 paidSpellCopies keyword quantity =
   TriggeredAbility.MkTriggeredAbility
@@ -6968,9 +6970,6 @@ paidSpellCopies keyword quantity =
 --
 -- The instruction is `copiesOf`'s, which carries its reasons; what rule 702.40a
 -- states of its own is the count and the absence of an intervening "if".
---
--- Not implemented: copying a spell that has left the stack before the trigger
--- resolves (CR 608.2h); the trigger then copies nothing (#3618).
 storm :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 storm =
   TriggeredAbility.MkTriggeredAbility
@@ -6988,9 +6987,6 @@ storm =
 -- states differently from rule 702.40a: the count. A count of the WHOLE turn
 -- where rule 702.40a counts what came before the spell, so nothing here reads the
 -- spell's own place in the log.
---
--- Not implemented: copying a spell that has left the stack before the trigger
--- resolves (CR 608.2h); the trigger then copies nothing (#3618).
 gravestorm :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 gravestorm =
   TriggeredAbility.MkTriggeredAbility

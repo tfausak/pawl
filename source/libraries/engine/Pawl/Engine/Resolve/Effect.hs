@@ -2067,6 +2067,38 @@ copyStatedTargets controller resolving source legal original newRef = do
     [new] -> fmap snd (copyRetargets controller original gs [new])
     _ -> []
 
+-- The objects an Effect.CopyStackObject names: objectRefObjects' live answer,
+-- plus CR 608.2h's last known information for the ABILITY'S OWN SOURCE where the
+-- ref names it and it has left the stack. CR 702.40a's storm over a Grapeshot
+-- countered while its trigger waited is the board, and CR 113.7a is why the
+-- trigger still copies anything -- it "exists on the stack independently of its
+-- source".
+--
+-- The SOURCE alone, which is CR 608.2h's own scope ("a specific object,
+-- including the source of the ability itself"): every other object this opcode
+-- can name is a TARGET, which CR 608.2b re-checks and blanks, and a sweep names
+-- what is on the stack NOW. So no other ref gains an object here, and the two
+-- stack sweeps keep answering live for every other opcode.
+--
+-- The ref's own Filter decides, read off the last known view, so a ref naming
+-- anything but the source (Swift Silence's `Not IsSource`) still names nothing.
+-- EachSpell needs no CR 112.1 narrowing of its own: GameState.stackArchive holds
+-- spells only, an ability leaving the stack going through Pawl.Engine.Game.cease,
+-- which files nothing.
+copyStackSubjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
+copyStackSubjects legal resolving controller source gs ref =
+  let live = objectRefObjects legal resolving controller source gs ref
+      context = effectContext gs controller source legal (slotBindings resolving gs)
+      named filter_ =
+        if Map.member source (GameState.stackArchive gs) && Maybe.maybe False (\view -> Filter.matches context view filter_) (Projection.viewWithLastKnownAnywhere gs source)
+          then [source]
+          else []
+      stated = case ref of
+        ObjectRef.EachOnStack filter_ -> named filter_
+        ObjectRef.EachSpell filter_ -> named filter_
+        _ -> []
+   in if source `elem` live then live else stated <> live
+
 -- CR 707.10d: the copies' targets, one map per candidate, in the order their
 -- controller chose. Answers the empty list where nothing is copied at all.
 --
@@ -5326,7 +5358,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- counters the previous mint moved.
     -- Pawl.KeywordTriggerSpec's Storm group proves the count.
     let copies = maybe 0 Integer.toIntSaturating (Quantity.evaluateFor (effectViewOf source legal gs) (effectContext gs controller source legal (slotBindings resolving gs)) gs resolving source quantity)
-    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \original ->
+    Monad.forM_ (copyStackSubjects legal resolving controller source gs ref) $ \original ->
       -- CR 707.10's three nouns: a spell (Game.isSpell) and an activated or
       -- triggered ability (Game.isAbility), each classifying off the object's
       -- ZONE and its Source and never off which card it is. Every other LIVE
@@ -5335,19 +5367,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- battlefield is the CreateCopy and BecomeCopy opcodes' subject rather
       -- than this one's.
       --
-      -- CR 707.10 over an object that has LEFT the stack, second: an effect
-      -- armed while the spell was still there copies it afterwards (CR 702.50a's
-      -- epic ability, at each of its controller's upkeeps for the rest of the
-      -- game), so a departed spell filed in GameState.stackArchive answers where
-      -- the live board no longer can. What is filed is the object AS THE ARMING
-      -- EFFECT COPIES IT, so nothing here cases on which keyword armed it.
+      -- CR 707.10 over an object that has LEFT the stack, second: CR 608.2h's
+      -- last known information, which GameState.stackArchive keeps and the live
+      -- board cannot. An effect that ARMED a copier files its own reading there
+      -- (CR 702.50a's epic ability, at each of its controller's upkeeps for the
+      -- rest of the game), so nothing here cases on which keyword armed it.
       --
-      -- The archive holds only what Pawl.Engine.Resolve.applyEpic filed, and an
-      -- ObjectId is never reused, so no card's ref can name one: every
-      -- Effect.CopyStackObject in data/cards/ names a slot holding a spell or an
-      -- ability that is still on the stack (a target CR 608.2b re-checks, or the
-      -- spell a trigger fired on, which resolves first). This branch is epic's
-      -- alone today.
+      -- WHICH archived object a ref can name is copyStackSubjects' question, and
+      -- the answer is the ability's own source alone -- so the two roads here are
+      -- rule 702.50a's epic, whose delayed ability names a slot bound to the
+      -- archived id, and a copy-this-spell trigger whose spell left the stack
+      -- (CR 702.40a's storm over a countered Grapeshot).
       Monad.forM_ (if Game.isSpell original gs || Game.isAbility original gs then Game.lookupObject original gs else Map.lookup original (GameState.stackArchive gs)) $ \obj ->
         -- CR 707.10's "that player copies it": WHO puts the copy onto the stack,
         -- which is the copy's owner and controller and CR 707.10c's chooser --
@@ -5407,11 +5437,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- snapshot on an ability copy anyway left the suite green
                 -- (2026-09-03), an ability having no characteristic any board can
                 -- read it back off.
-                -- An ARCHIVED spell brings its own snapshot -- the one the
-                -- arming effect filed, rule 702.50a's "except for its epic
-                -- ability" written into it -- and there is no live object left
-                -- to take a fresh reading off, so that snapshot is what the
-                -- arm below re-stamps rather than a fresh reading.
+                -- An ARCHIVED spell brings its own snapshot -- filed as it left
+                -- the stack, or as an arming effect wrote it, rule 702.50a's
+                -- "except for its epic ability" included -- and there is no live
+                -- object left to take a fresh reading off, so that snapshot is
+                -- what the arm below re-stamps rather than a fresh reading.
                 --
                 -- CR 707.9's exceptions are folded into the snapshot on the way
                 -- in, exactly as the BecomeCopy arm above folds them, so Double
@@ -5423,9 +5453,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 stampCopiable = case kind of
                   StackObjectKind.Spell | Maybe.isJust (Game.lookupObject original gs) -> Binding.setCopy (except (Event.copiedSnapshot original gs))
                   -- An ARCHIVED spell's exceptions are re-folded over the snapshot
-                  -- the arming effect filed. A REGRESSION FENCE rather than a
-                  -- proved line: rule 702.50a's epic is the only arming effect,
-                  -- and it states no exception.
+                  -- GameState.stackArchive holds. A REGRESSION FENCE rather than a
+                  -- proved line: no road to the archive states an exception --
+                  -- rule 702.50a's epic does not, and neither does a copy-this-spell
+                  -- keyword trigger (Pawl.Engine.Keyword.copiesOf).
                   StackObjectKind.Spell -> maybe id (Binding.setCopy . except) (Binding.copyOf (Object.bindings obj))
                   StackObjectKind.ActivatedAbility -> id
                   StackObjectKind.TriggeredAbility -> id
