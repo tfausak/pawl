@@ -278,8 +278,8 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- CR 113.7a's source nothing to move -- a later part has to name the ARRIVAL
 -- instead (Pawl.Engine.Binding.became, or a slot the move itself minted, as
 -- Meandering Towershell's "exiled" is), and this caller gives
--- Pawl.Engine.EffectZone the reserved source slot alone. So first-answer-wins and
--- the rule's order-sensitive reading agree on every ability that can be
+-- Pawl.Engine.EffectZone the reserved source slot alone. So first-answer-wins
+-- and the rule's order-sensitive reading agree on every ability that can be
 -- written, and a card whose later part moved the reserved source slot out of a
 -- zone an earlier part put it into is what would refute that; see #2501.
 --

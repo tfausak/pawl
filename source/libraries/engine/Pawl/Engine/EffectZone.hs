@@ -48,10 +48,10 @@ import Pawl.Types.Zone (Zone)
 -- TWO conditions, and both are the rule's own words. The effect has to name the
 -- zone it moves the object out of, which is the origin Effect.MoveToZone
 -- carries; and the object moved has to be "THE OBJECT IT'S ON", which is the
--- `itself` set this carries. An effect that moves some
--- other object out of a graveyard -- Raise Dead's target -- says nothing about
--- where its own ability functions, and answering Just for it would strand every
--- such ability in the graveyard.
+-- `itself` set this carries. An effect that moves some other object out of a
+-- graveyard -- Raise Dead's target -- says nothing about where its own ability
+-- functions, and answering Just for it would strand every such ability in the
+-- graveyard.
 --
 -- A SET rather than Pawl.Engine.Binding.triggerSource alone, because CR 400.7
 -- gives one card two names: a bearer whose own departure is what triggered the
@@ -83,7 +83,7 @@ import Pawl.Types.Zone (Zone)
 -- union (#3083).
 zoneFunctionedFrom :: Set.Set SlotName.SlotName -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
 zoneFunctionedFrom itself delayed effect = case effect of
-  -- Only an InSlot naming the reserved source slot can be "the object it's on".
+  -- Only an InSlot naming one of the `itself` slots can be "the object it's on".
   -- A swept set is never one object, so no sweeping arm can be; a library's
   -- top card is one object, but it is named by POSITION rather than by that slot,
   -- so it cannot be one either, and a chosen card in a graveyard or a hand is

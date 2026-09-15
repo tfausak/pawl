@@ -3799,11 +3799,11 @@ ivoryGargoyleSpec s registry =
             "no zone is pinned once the exception is read"
             (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face)) (Face.triggeredAbilities face))
             [Nothing]
-        -- The proving leg for CR 400.7e's delayed reader: the card the Gargoyle became is on
-        -- the battlefield again when the end step has passed. The census runs
-        -- FIRST so no precondition can absorb a mutation, and it is the quantity
-        -- no partial fix reaches by another route -- an entry resolving against
-        -- the dead battlefield id moves nothing at all.
+        -- The proving leg for CR 400.7e's delayed reader: the card the Gargoyle
+        -- became is on the battlefield again when the end step has passed. The
+        -- census runs FIRST so no precondition can absorb a mutation, and it is
+        -- the quantity no partial fix reaches by another route -- an entry
+        -- resolving against the dead battlefield id moves nothing at all.
         Spec.it s "CR 400.7e the dies-armed delayed ability returns the card the Gargoyle became" $ do
           gargoyle <- S.printingOf s registry "Ivory Gargoyle"
           let (victim, armed) = armedBoard gargoyle
@@ -3815,14 +3815,14 @@ ivoryGargoyleSpec s registry =
           Spec.assertEqWith s "and the graveyard card it named is gone from the graveyard" (length (namedIn Zone.Graveyard after)) 0
           Spec.assertEqWith s "the board before the end step held none on the battlefield and one in the graveyard" (onBattlefield armed, length (namedIn Zone.Graveyard armed)) (0, 1)
           Spec.assertEqWith s "and the entry really fired, leaving the store empty" (Seq.length (GameState.delayedTriggers after)) 0
-          -- CR 614.10a's other clause of the same trigger, installed as a
+          -- CR 614.10's other clause of the same trigger, installed as a
           -- floating replacement: "you skip your next draw step". Read as the
           -- ROW rather than by advancing to alice's next draw step, which is two
           -- turns of steps away and is Pawl.TurnSpec's subject rather than this
           -- group's.
           Spec.assertEqWith
             s
-            "CR 614.10a and the skip of alice's next draw step is installed"
+            "CR 614.10 and the skip of alice's next draw step is installed"
             (fmap ActiveReplacement.effect (GameState.replacements after))
             [ ReplacementEffect.PhaseR
                 PhasePattern.MkPhasePattern
@@ -3835,6 +3835,13 @@ ivoryGargoyleSpec s registry =
         -- zone change makes a new object -- and CR 603.7c's "if that object is no
         -- longer in the zone it's expected to be in ... the ability won't affect
         -- it".
+        --
+        -- A FENCE rather than a proof of this group's own change: the payload
+        -- moves nothing here whichever slot it names, so no mutation of the card
+        -- reddens it. What it rules out is the other way the delayed ability
+        -- could have been given a route to the card -- chasing CR 400.7's
+        -- successors from the dead battlefield id, which would find the exiled
+        -- object and return it.
         Spec.it s "CR 603.7c a Gargoyle exiled out of the graveyard first is not returned" $ do
           gargoyle <- S.printingOf s registry "Ivory Gargoyle"
           let (_, armed) = armedBoard gargoyle

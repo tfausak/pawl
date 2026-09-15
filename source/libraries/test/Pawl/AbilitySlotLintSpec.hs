@@ -546,8 +546,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- is CR 603.7c's captured environment -- Ray of Command's third sentence), an
   -- event slot a TRIGGERED arming ability's condition stamped into that same
   -- environment (armingEventSlots -- Ivory Gargoyle's delayed return reading CR
-  -- 400.7e's `became`), or a
-  -- CR 603.2 event slot the entry's own condition binds as it fires
+  -- 400.7e's `became`), or a CR 603.2 event slot the entry's own condition binds as it fires
   -- (Event.eventBindingSlots -- False Cure's "that player ... they gained", which
   -- Event.delayedPending stamps on top of the captured environment exactly as
   -- eventTriggers does for an object's trigger). The
