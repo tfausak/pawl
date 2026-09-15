@@ -25,6 +25,10 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- `expiry` decides when a Pawl.Engine.Expiry sweep drops it (CR 514.2, 611.2a,
 -- 611.2b); "this turn" arms Expiry.AtCleanup.
 --
+-- CR 400.7 is answered by the id itself, Pawl.Types.ActiveActivationProhibition's
+-- reason and proof: a zone change mints a fresh ObjectId, so a bounced and
+-- replayed permanent is one this row never named.
+--
 -- `timestamp` is stored for ActiveBlockRequirement's reason: CR 613.11 orders by
 -- CR 613.7 timestamp, and nothing observes this one because two prohibitions
 -- cannot conflict -- CR 509.1b has no degrees.

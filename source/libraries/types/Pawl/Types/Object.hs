@@ -654,10 +654,9 @@ data Object = MkObject
     -- player named here.
     --
     -- On the VICTIM rather than in a GameState list, doesNotUntapNext below's
-    -- reason: an object keeps its ObjectId across a zone change, so a list keyed
-    -- by id would follow the card back onto the battlefield as a permanent CR
-    -- 400.7 makes a new object. As a field it is per-incarnation, and the
-    -- forgetting IS that rule.
+    -- reason: the mark names no source and carries no duration of its own (the
+    -- next paragraph), so there is no row for a list to hold. As a field it is
+    -- per-incarnation, and newIncarnation below is CR 400.7's forgetting.
     --
     -- A SET OF PLAYERS and not a Pawl.Types.Expiry, rule 701.35a fixing the
     -- duration itself, so the only thing to remember is WHOSE next turn (CR

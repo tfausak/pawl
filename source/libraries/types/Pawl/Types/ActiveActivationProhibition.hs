@@ -23,10 +23,12 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- read ONCE, as the ability resolves, and the objects it named are what the
 -- prohibition covers thereafter.
 --
--- Not implemented: CR 400.7's new object. The row names an ObjectId, which
--- survives a zone change, so a permanent bounced and replayed this turn comes
--- back still prohibited; the two combat carriers hold the same shape and the
--- same gap (#3298).
+-- CR 400.7 is answered by the id itself: Pawl.Engine.Event's placeObject mints a
+-- fresh ObjectId on every zone change, so a permanent bounced and replayed this
+-- turn is an object this row never named and the row merely dangles until its
+-- expiry sweeps it. Pawl.ActivationProhibitionSpec's "a Troll bounced by
+-- Unsummon and replayed the same turn is no longer prohibited" proves it, and
+-- the two combat carriers are right for the same reason.
 --
 -- `expiry` decides when a Pawl.Engine.Expiry sweep drops it (CR 514.2, 611.2a,
 -- 611.2b); "this turn" arms Expiry.AtCleanup and "until your next turn"
