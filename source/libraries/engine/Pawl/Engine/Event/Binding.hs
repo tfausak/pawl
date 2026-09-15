@@ -117,10 +117,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- happened. Given a match both are unconditional, which is what
   -- eventBindingSlots' per-condition promise needs: every GameEvent.DamageDealt
   -- carries a DamageEvent.amount.
-  -- The same two slots for the arm without CR 510.1's combat narrowing, and for
-  -- the same reasons: the recipient is "that player" and the amount is "that
-  -- much", both unconditional given a match.
-  (TriggerCondition.SelfDealsDamageToPlayer _, GameEvent.DamageDealt ev) ->
+  (TriggerCondition.SelfDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
     case DamageEvent.target ev of
       Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
       Recipient.ToCreature _ -> Map.empty
@@ -129,7 +126,10 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
       Recipient.ToObject _ -> Map.empty
       -- Unreachable, for the reason the DamageToPlayerPrevented arm above gives.
       Recipient.ToPile _ -> Map.empty
-  (TriggerCondition.SelfDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
+  -- The same two slots for the arm without CR 510.1's combat narrowing, and for
+  -- the same reasons: the recipient is "that player" and the amount is "that
+  -- much", both unconditional given a match.
+  (TriggerCondition.SelfDealsDamageToPlayer _, GameEvent.DamageDealt ev) ->
     case DamageEvent.target ev of
       Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
       Recipient.ToCreature _ -> Map.empty
