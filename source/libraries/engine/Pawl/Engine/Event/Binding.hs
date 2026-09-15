@@ -904,9 +904,10 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- winner is CR 109.5's "you", whom Binding.setYou already names, and Tavern
   -- Scoundrel's "create two Treasure tokens" reads nothing else off the flip.
   --
-  -- And so does SelfDiscarded, for SelfCycled's reason: CR 701.9a's discarded
-  -- card is the bearer, whom CR 113.7a's source slot already names, and its owner
-  -- is CR 113.8's controller, whom Binding.setYou already names.
+  -- And so do SelfDiscarded and SelfExiledForMadness, for SelfCycled's reason:
+  -- CR 701.9a's discarded card is the bearer, whom CR 113.7a's source slot
+  -- already names, and its owner is the controller CR 113.8 and CR 108.4a name,
+  -- whom Binding.setYou already names.
   --
   -- CR 603.12's Reflexive reaches it NECESSARILY rather than by choice: it
   -- admits no event at all, so delayedPending never calls this for one and there

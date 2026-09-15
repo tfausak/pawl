@@ -6985,16 +6985,21 @@ discardReturning cause pid oid = do
   -- in Peace, and an unredirected discard files nothing.
   --
   -- The MADNESS conjunct is what makes "the row was the card's own" and "the row
-  -- was rule 702.35a's" coincide rather than merely agree: the only other row a
-  -- card in a hand can be the source of is a printed one whose
-  -- PrintedReplacement.functionsFrom names the hand, and a card printing both
-  -- that and madness is what would tell the two apart. None does -- and none can
-  -- be built accidentally, since Pawl.Engine.Keyword.handReplacementsOf is the
-  -- one minter that reaches a hand at all.
+  -- was rule 702.35a's" coincide rather than merely agree. Rule 702.35a's is the
+  -- only row any rule MINTS onto a card in a hand (Keyword.handReplacementsOf),
+  -- so the other way a card in a hand is the source of one is a PRINTED row whose
+  -- PrintedReplacement.functionsFrom names the hand -- Progenitus and Nexus of
+  -- Fate print such a row, and each names a library rather than exile. The card
+  -- that would tell the two readings apart prints madness AND a row of its own
+  -- that redirects it into exile; none does.
   --
   -- The PRINTED face, Projection.replacementsAffecting's read at the matching
   -- mint point and for its reason: a madness ability granted to a card in a hand
   -- mints no row there either (gap #1859), so the two questions agree on it.
+  --
+  -- A REGRESSION FENCE rather than a proof: neutralizing the conjunct leaves the
+  -- suite green, since the card that would tell it from the exiledWith test alone
+  -- is the one printing both madness and a hand-functioning self-exiling row.
   let exiledForMadness newId = hasMadness && Map.lookup newId (GameState.exiledWith after) == Just oid
   -- One record per arrival: a card discarded is a card, so this loop runs once
   -- for every move the funnel makes. A melded permanent is never in a hand, so

@@ -3503,8 +3503,10 @@ handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts key
 -- its source is in a hand, which is what supplies the from-zone -- finality's
 -- argument in Pawl.Engine.Projection.finalityOf.
 --
--- The two readings part only on CR 701.9c's card -- one put into a graveyard
--- from a hand without being discarded -- and no printing writes that: Scryfall
+-- The two readings part only on a card put into a graveyard from a hand without
+-- being discarded -- rule 701.9a defines a discard as that move and nothing
+-- else, so an effect that made it some other way is not one -- and no printing
+-- writes such an effect: Scryfall
 -- `oracle:"your hand into your graveyard"` and `oracle:"their hand into their
 -- graveyard"`, 2026-09-15, answer nothing, and every hit for `oracle:"from
 -- your hand into"` and `oracle:"from their hand into"` names a library. A

@@ -2131,11 +2131,6 @@ zonesTriggeredFrom cond =
         -- the battlefield. No candidate source of its own is owed: `cycledCard`
         -- recovers the card the CYCLING cause named, which rule 702.29c makes narrower
         -- than this condition rather than a gap under it.
-        --
-        -- CR 702.35a's madness card is in EXILE when this same condition fires
-        -- for it, and this answer does not admit it: it comes through
-        -- eventTriggers' exile scan, which takes a card's keyword-minted list
-        -- without asking `functionsIn` at all.
         TriggerCondition.SelfDiscarded -> Set.singleton Zone.Graveyard
         -- CR 113.6k again: rule 702.35a's replacement has already put the card
         -- in EXILE by the time this condition is asked, so exile is the one zone
