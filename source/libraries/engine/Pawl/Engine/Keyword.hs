@@ -179,6 +179,7 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Ward as Ward
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -360,7 +361,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Vigilance -> []
   -- CR 702.21a's ability, one per instance for CR 603.2's general reason, so a
   -- spell targeting a doubly warded permanent is offered both costs.
-  Keyword.Ward cost -> List.genericReplicate count (ward cost)
+  Keyword.Ward w -> List.genericReplicate count (ward w)
   Keyword.Banding -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
@@ -5653,18 +5654,24 @@ training =
 -- would offer the cost to the wrong player. That slot is NOT a target slot: rule
 -- 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
 -- shroud-bearing spell is countered as readily as any other.
-ward :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-ward cost =
+--
+-- CR 702.21b's X rides PayGate.perEach, which Pawl.Engine.Resolve.payGatePaidBy
+-- evaluates against the RESOLUTION -- "not locked in as the ability triggers".
+-- The narrow tally the keyword stores is widened into a Quantity here, the one
+-- place the two namespaces meet; Pawl.Types.Ward.perEach says why it is stored
+-- narrow.
+ward :: Ward.Ward Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+ward w =
   let clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
       -- PayObligation.Optional and no offeredAt: rule 702.21a's "unless that
       -- player pays" is CR 118.12a's "may", and one clause makes its own offer.
       gate =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.ControllerOfBound Binding.targetingObject,
-            PayGate.cost = cost,
+            PayGate.cost = Ward.cost w,
             PayGate.branch = PayBranch.IfNotPaid,
             PayGate.obligation = PayObligation.Optional,
-            PayGate.perEach = Nothing,
+            PayGate.perEach = fmap Quantity.PlayerCounters (Ward.perEach w),
             PayGate.offeredAt = Nothing
           }
       effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing Nothing)

@@ -468,6 +468,7 @@ import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.VanguardSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
 import qualified Pawl.Codec.VoteSpec
+import qualified Pawl.Codec.WardSpec
 import qualified Pawl.Codec.WhileSpec
 import qualified Pawl.Codec.WithCountersSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
@@ -1120,6 +1121,7 @@ spec s registry = do
   Pawl.Codec.VanguardSpec.spec s
   Pawl.Codec.VentureMarkerEnteredSpec.spec s
   Pawl.Codec.VoteSpec.spec s
+  Pawl.Codec.WardSpec.spec s
   Pawl.Codec.WhileSpec.spec s
   Pawl.Codec.WithCountersSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s

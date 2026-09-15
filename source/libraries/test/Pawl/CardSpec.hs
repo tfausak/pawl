@@ -298,6 +298,7 @@ import qualified Pawl.Types.UntapRestriction as UntapRestriction
 import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
+import qualified Pawl.Types.Ward as Ward
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -2720,7 +2721,9 @@ keywordPayloadFilters keyword = case keyword of
   -- like the rest: Pawl.Engine.Companion.fulfilled matches it against a printed
   -- face through a bare Context, so no slot is in scope.
   Keyword.Companion predicate -> [predicate]
-  Keyword.Ward cost -> costFilters cost
+  -- CR 702.21a's cost. Rule 702.21b's perEach is a Pawl.Types.PlayerCounterTally,
+  -- which names a counter kind and a player and holds no Filter.
+  Keyword.Ward w -> costFilters (Ward.cost w)
   -- CR 702.94a's payload is a Cost too, so its filters are reached the same way.
   Keyword.Miracle cost -> costFilters cost
   -- CR 702.37a: the morph cost, whose components may hold a Filter exactly as

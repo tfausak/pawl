@@ -12,6 +12,7 @@ import qualified Pawl.Codec.Protection as Protection
 import qualified Pawl.Codec.Prototype as Prototype
 import qualified Pawl.Codec.Reinforce as Reinforce
 import qualified Pawl.Codec.Suspend as Suspend
+import qualified Pawl.Codec.Ward as Ward
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -54,7 +55,7 @@ codec =
       Arm.nullary "Trample" Keyword.Trample,
       Arm.nullary "TrampleOverPlaneswalkers" Keyword.TrampleOverPlaneswalkers,
       Arm.nullary "Vigilance" Keyword.Vigilance,
-      Arm.payload "Ward" (Cost.codec codec) Keyword.Ward (\x -> case x of Keyword.Ward y -> Just y; _ -> Nothing),
+      Arm.payload "Ward" (Ward.codec codec) Keyword.Ward (\x -> case x of Keyword.Ward y -> Just y; _ -> Nothing),
       Arm.nullary "Banding" Keyword.Banding,
       Arm.payload "Rampage" Common.natural Keyword.Rampage (\x -> case x of Keyword.Rampage y -> Just y; _ -> Nothing),
       Arm.payload "CumulativeUpkeep" (Cost.codec codec) Keyword.CumulativeUpkeep (\x -> case x of Keyword.CumulativeUpkeep y -> Just y; _ -> Nothing),

@@ -5,13 +5,15 @@
         {
           "type": "Ward",
           "value": {
-            "components": [
-              {
-                "type": "Blight",
-                "value": 2
-              }
-            ],
-            "mana": []
+            "cost": {
+              "components": [
+                {
+                  "type": "Blight",
+                  "value": 2
+                }
+              ],
+              "mana": []
+            }
           }
         }
       ],

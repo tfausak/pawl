@@ -41,6 +41,7 @@ import qualified Pawl.Types.Suspend as Suspend
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.Ward as Ward
 import qualified Pawl.Types.Zone as Zone
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
@@ -2365,7 +2366,12 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.21a states its cost as part of the keyword too, so CR 612.1 reaches it
   -- the same way -- a ward cost naming a basic land type is the unprinted case
   -- the arms below are also a fence for.
-  Keyword.Type.Ward cost -> Keyword.Type.Ward (rewriteCost pairs cost)
+  --
+  -- CR 702.21b's perEach is left alone HERE and swapped at the mint instead
+  -- (Pawl.Engine.Projection.mintedTriggeredAbilitiesOf, whose rewritePayGate
+  -- takes the gate's own perEach), soulshift's posture: this module is below
+  -- Pawl.Types.Quantity and has no quantity rewriter to call.
+  Keyword.Type.Ward w -> Keyword.Type.Ward w {Ward.cost = rewriteCost pairs (Ward.cost w)}
   -- CR 702.33a, CR 702.33c, CR 702.34a, CR 702.37a and CR 702.42a: each states a
   -- cost as part of the keyword, so rewriteCost carries CR 612.1 into it.
   Keyword.Type.Kicker cost -> Keyword.Type.Kicker (rewriteCost pairs cost)
