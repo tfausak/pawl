@@ -2810,7 +2810,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- leaves one permanent's ability unpayable a legal outcome rather than a
   -- licence to reorder around it. Observable wherever one land's mana pays for
   -- another's ability -- Mystic Gate after a Plains, which Pawl.ManaSpec's
-  -- "CR 605.3a the order is the targeted player's" case proves.
+  -- "CR 605.3a the order the batch is activated in is the targeted player's"
+  -- case proves.
   --
   -- Asked at two or more, ON THE COUNT ALONE, as Prompt.OrderTimestamps' caller
   -- is: whether two orders are distinguishable turns on choices this actor has

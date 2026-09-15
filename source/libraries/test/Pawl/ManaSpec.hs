@@ -3528,10 +3528,11 @@ drainPowerSpec s registry = Spec.describe s "Drain Power" $ do
   -- own sweep (battlefieldMatching, APNAP then ascending) is the order that
   -- loses the {W}{W}.
   --
-  -- The two runs differ in ONE answer, the ordering. A bob who instead taps the
-  -- Plains inside the Gate's own payment -- CR 605.3a's other window, which the
-  -- engine offers and this answerer declines -- reaches {W}{W} either way; what
-  -- the engine may not do is pick the order for him.
+  -- The two runs differ in ONE answer, the ordering: `activatingInOrder` shuts
+  -- CR 605.3a's payment window in both, so the Gate is paid for out of what the
+  -- SWEEP already put in bob's pool or not at all. A bob who opens that window
+  -- instead reaches {W}{W} from either order -- what the engine may not do is
+  -- pick the order for him.
   Spec.it s "CR 605.3a the order the batch is activated in is the targeted player's" $ do
     drainPower <- S.printingOf s registry "Drain Power"
     island <- S.printingOf s registry "Island"
@@ -3550,10 +3551,9 @@ drainPowerSpec s registry = Spec.describe s "Drain Power" $ do
     -- crosses to alice is the Gate's {W}{W} and nothing else.
     Spec.assertEqWith s "CR 605.3a bob's order pays for the Gate with the Plains" (poolTypes S.alice after) [ManaType.Colored Color.White, ManaType.Colored Color.White]
     -- The discriminating half: the SAME board and the same answer to every other
-    -- prompt, with the Gate taken first. Its {W/U} is then payable only out of
-    -- CR 605.3a's OTHER window, which this answerer declines as it declines
-    -- every optional source, so CR 609.3 leaves the activation doing nothing and
-    -- only the Plains' {W} crosses.
+    -- prompt, with the Gate taken first. Its {W/U} is unpayable out of an empty
+    -- pool, and CR 601.2h (reached by CR 602.2b) allows no partial payment, so
+    -- CR 609.3 leaves the Gate doing nothing and only the Plains' {W} crosses.
     Spec.assertEqWith s "CR 609.3 the Gate taken first adds nothing" (poolTypes S.alice gateFirst) [ManaType.Colored Color.White]
     -- CR 602.2: the order is the ACTIVATING player's, bob's, not the resolving
     -- controller's.
@@ -3603,9 +3603,16 @@ aimedAt victim color p = case p of
   _ -> pure (S.identityAnswer p)
 
 -- Targets bob, hands `answer` to the one CR 605.3a ordering prompt the
--- resolution raises, takes the {W}{W} yield wherever it is offered -- the Plains
--- and the Gate-with-no-mana both fall through to their only option -- and
--- records the player the ordering was asked of.
+-- resolution raises, takes the {W}{W} yield wherever the Gate offers it, opens
+-- NO mana ability of its own to pay with, and records the player the ordering
+-- was asked of.
+--
+-- The declined window is PINNED here rather than left to S.identityAnswer, which
+-- would tap the first source offered: CR 605.3a's payment window is a second way
+-- to reach the Plains' {W}, and a bob who uses it needs no ordering at all. What
+-- is under test is the order the SWEEP takes, so the window is shut in both
+-- runs and the ordering answer is the only difference between them. BOB's
+-- windows only -- alice still opens hers to pay for the spell itself.
 --
 -- Stateful rather than pure because WHOSE the order is is half the subject; a
 -- pure answerer could pick the permutation but never report who was asked.
@@ -3615,6 +3622,8 @@ activatingInOrder answer p = case p of
     State.modify' (<> [Decider.unwrap decider])
     pure answer
   Prompt.ChooseManaYield _ _ _ candidates -> pure (optionOfTypes [ManaType.Colored Color.White, ManaType.Colored Color.White] candidates)
+  Prompt.ChooseManaSource decider _ _ | Decider.unwrap decider == S.bob -> pure Nothing
+  Prompt.ChooseExtraManaSource decider _ _ | Decider.unwrap decider == S.bob -> pure Nothing
   Prompt.ChooseTargets _ _ _ offered -> pure (S.preferring (== Recipient.ToPlayer S.bob) offered)
   _ -> pure (S.identityAnswer p)
 
