@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
@@ -984,15 +985,22 @@ replaceWholeWord from to =
 -- so a Magical Hack naming Forest moves which land Dark Heart of the Wood's cost
 -- demands.
 --
--- Not implemented: CR 602.5's "activate only if" rider, which prints words like
--- any other text and is not in the update below -- Magical Hack on Nimbus Maze
--- (#3668).
+-- CR 602.5's "activate only if" rider is here too, being printed text like any
+-- other: Pawl.ManaSpec's "Nimbus Maze text change" is what proves it, a Magical
+-- Hack naming Island moving which land the {W} route's rider counts.
 rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteActivatedAbility pairs ability =
   ability
     { ActivatedAbility.modal = rewriteModal pairs (ActivatedAbility.modal ability),
       ActivatedAbility.condition = fmap (rewriteCondition pairs) (ActivatedAbility.condition ability),
-      ActivatedAbility.cost = Filter.rewriteCost pairs (ActivatedAbility.cost ability)
+      ActivatedAbility.cost = Filter.rewriteCost pairs (ActivatedAbility.cost ability),
+      ActivatedAbility.restrictions = fmap (rewriteRestriction pairs) (ActivatedAbility.restrictions ability),
+      -- CR 101.1's ceiling on this ability's X, exactly as Face.maximumX above
+      -- carries a spell's. A regression fence for that field's reason: no
+      -- printing pairs a bounded X on an activated ability with a Quantity
+      -- naming a land type word, so no board can tell this line from its
+      -- absence.
+      ActivatedAbility.maximumX = fmap (rewriteQuantity pairs) (ActivatedAbility.maximumX ability)
     }
 
 -- CR 612.1 over a GRANTED ability (CR 613.1f), whichever of CR 113.3's two kinds
@@ -1570,6 +1578,26 @@ rewriteCondition pairs condition = case condition of
         }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (rewriteCondition pairs) conditions)
   Condition.Type.All conditions -> Condition.Type.All (fmap (rewriteCondition pairs) conditions)
+
+-- CR 612.1 through ONE clause of an activated ability's CR 602.5 "activate only
+-- ..." rider, which is printed text like the rest of the ability.
+--
+-- Exhaustive rather than a wildcard, for rewriteTriggerCondition's reason: a new
+-- arm carrying a Condition or a Filter must break this build. Only the board
+-- condition holds a word -- every other arm names a phase, a turn, the combat
+-- record, or a count of activations, and CR 612.1's swap finds nothing in one to
+-- act on.
+rewriteRestriction :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivationRestriction.ActivationRestriction -> ActivationRestriction.ActivationRestriction
+rewriteRestriction pairs restriction = case restriction of
+  ActivationRestriction.OnlyIf condition -> ActivationRestriction.OnlyIf (rewriteCondition pairs condition)
+  ActivationRestriction.SorcerySpeed -> restriction
+  ActivationRestriction.DuringPhase _ -> restriction
+  ActivationRestriction.DuringTurn _ -> restriction
+  ActivationRestriction.AttackedThisStep -> restriction
+  ActivationRestriction.AfterBlockersDeclared -> restriction
+  ActivationRestriction.BeforeCombatDamage -> restriction
+  ActivationRestriction.OnlyOnce -> restriction
+  ActivationRestriction.OnlyOnceEachTurn -> restriction
 
 -- CR 612.1 through a Duration, which Pawl.Types.Duration holds as the card
 -- prints it: a CR 611.2b "for as long as ..." clause is rules text like any

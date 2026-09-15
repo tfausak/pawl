@@ -1404,6 +1404,63 @@ paysWithWhite p = case p of
       candidates
   _ -> S.identityAnswer p
 
+-- CR 612.1 over the CR 602.5 rider itself, which is printed text like the cost
+-- and the effect beside it. Magical Hack ({U}, "Change the text of target spell
+-- or permanent by replacing all instances of one basic land type with another",
+-- oracle checked on Scryfall 2026-09-15) on Nimbus Maze, whose {W} route prints
+-- "Activate only if you control an Island".
+--
+-- TWO LEGS ONE WORD APART: the same board, the same Hack aimed at the same Maze,
+-- and the only difference is which basic land type CR 608.2d's announcement
+-- names. Island -> Swamp moves the {W} rider onto a land alice does not control
+-- and the route dies; Plains -> Swamp moves the Maze's OTHER rider (the {U}
+-- route's) and leaves the {W} one still reading Island, which the Island she
+-- tapped for the Hack answers -- CR 602.5 asks what she CONTROLS, not what is
+-- untapped.
+--
+-- THE ISLAND IS HER ONLY {U} SOURCE -- the Maze's own {U} route is ridden on a
+-- Plains she does not control -- so casting the Hack taps it and leaves the Maze
+-- as the only untapped source Luminesce's {W} can come from. Luminesce's printed
+-- cost is exactly {W}, so the Maze's unridden {C} route pays nothing here.
+nimbusMazeTextChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nimbusMazeTextChangeSpec s registry = Spec.describe s "Nimbus Maze text change" $ do
+  Spec.it s "CR 612.1 a swap naming the rider's own word moves which land it counts" $ do
+    stuck <- strandedAfterHack s registry Subtype.Island Subtype.Swamp
+    Spec.assertBool s stuck "CR 602.5 the rider now reads Swamp, alice controls none, and Luminesce stays in her hand"
+  Spec.it s "CR 612.1 a swap naming a word the rider does not carry leaves the route live" $ do
+    stuck <- strandedAfterHack s registry Subtype.Plains Subtype.Swamp
+    Spec.assertBool s (not stuck) "CR 602.5 the rider still reads Island, the tapped Island answers it, and Luminesce leaves her hand"
+
+-- alice controls a Nimbus Maze and one Island, both untapped, and holds Magical
+-- Hack and Luminesce. She casts the Hack at the Maze with the swap under test,
+-- resolves it, then casts Luminesce. True when Luminesce is STILL IN HER HAND --
+-- CR 601.2h found no {W} to pay with, which on this board means the {W} route's
+-- rider refused.
+strandedAfterHack :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Subtype.Subtype -> Subtype.Subtype -> m Bool
+strandedAfterHack s registry from to = do
+  maze <- S.printingOf s registry "Nimbus Maze"
+  island <- S.printingOf s registry "Island"
+  hack <- S.printingOf s registry "Magical Hack"
+  luminesce <- S.printingOf s registry "Luminesce"
+  let (mazeId, g1) = S.addPermanent maze S.alice (S.landsInPlay island 1)
+      (hackId, g2) = S.addHandCard hack S.alice g1
+      (lumId, g3) = S.addHandCard luminesce S.alice g2
+      ready = g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+      after = snd (Engine.runGamePure (hackingMaze mazeId from to) ready (S.cast S.alice hackId >> Stack.resolveTop >> S.cast S.alice lumId))
+  pure (elem lumId (Game.zoneMembers Zone.Hand S.alice after))
+
+-- Magical Hack aimed at one permanent by FILTERING the offer rather than
+-- rebuilding it (CR 608.2b would drop a hand-built recipient of the wrong shape
+-- with no error), CR 608.2d's swap answered with the pair under test, and the two
+-- payments told apart by their sources: the {U} is paid by the one candidate that
+-- is not the Maze, and the {W} by the Maze, which is all that is left untapped.
+hackingMaze :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+hackingMaze mazeId from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just mazeId) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  Prompt.ChooseManaSource _ _ candidates -> Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (mazeId /=) (NonEmpty.toList candidates)))
+  _ -> paysWithWhite p
+
 isManaActivation :: Action.Type.Action -> Bool
 isManaActivation action = case action of
   Action.Type.ActivateManaAbility _ -> True
@@ -3610,6 +3667,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   translatorSpec s registry
   laviniaTurnRiderSpec s registry
   nimbusMazeSpec s registry
+  nimbusMazeTextChangeSpec s registry
   wellspringSpec s registry
   manaConfluenceSpec s registry
   phyrexianTowerSpec s registry
