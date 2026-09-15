@@ -64,6 +64,7 @@ substituteStar star quantity = case quantity of
   Quantity.WasToken -> quantity
   Quantity.WasAttacking -> quantity
   Quantity.WasBlocking -> quantity
+  Quantity.ControlGainedSinceLastUpkeep _ -> quantity
   Quantity.DamageDealtToThisTurn -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.AttackersDeclaredThisTurn _ -> quantity

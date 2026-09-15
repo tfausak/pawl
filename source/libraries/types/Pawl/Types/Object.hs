@@ -152,7 +152,9 @@ data Object = MkObject
     -- opens a seat's window wherever it finds the permanent has arrived under
     -- them, and Engine.advanceControlClock moves that seat's window on at the
     -- beginning of their upkeep. Its one reader is
-    -- Filter.ControlGainedSinceLastUpkeep.
+    -- Pawl.Engine.Quantity's ControlGainedSinceLastUpkeep arm, through
+    -- Quantity.controlClockOf, which falls back to the CR 608.2h record
+    -- (Pawl.Types.LastKnown.controlClock) for a permanent this one has left with.
     --
     -- Per-incarnation: reset by newIncarnation (CR 400.7), which is rule 702.30a
     -- read straight -- the permanent that comes back came under your control

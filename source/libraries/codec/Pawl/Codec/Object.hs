@@ -33,14 +33,12 @@ import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
-import qualified Pawl.Types.ControlClock as ControlClock.Type
 import qualified Pawl.Types.CounterKind as CounterKind.Type
 import qualified Pawl.Types.Designation as Designation.Type
 import qualified Pawl.Types.Facing as Facing.Type
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.Object as Object
-import qualified Pawl.Types.PlayerId as PlayerId.Type
 import qualified Pawl.Types.TapState as TapState.Type
 import qualified Pawl.Types.Timestamp as Timestamp.Type
 
@@ -62,14 +60,6 @@ counterTimestamp = Fields.object $ do
   kind <- Fields.required "kind" (CounterKind.codec Keyword.codec) fst
   timestamp <- Fields.required "timestamp" Timestamp.codec snd
   pure (kind, timestamp)
-
--- | CR 702.30a's clock for one seat. A pair through 'Common.keyedList' for
--- `designationValue`'s reason, an object key having to be a string.
-controlClockEntry :: Codec.Codec (PlayerId.Type.PlayerId, ControlClock.Type.ControlClock)
-controlClockEntry = Fields.object $ do
-  player <- Fields.required "player" PlayerId.codec fst
-  clock <- Fields.required "clock" ControlClock.codec snd
-  pure (player, clock)
 
 -- | `owner`, `source`, `zone`, `timestamp` and `sickness` are 'Fields.required'
 -- -- none of them has a value that means "unset" -- and every other field is
@@ -99,7 +89,7 @@ codec = Fields.object $ do
   exiledFaceDown <- Fields.defaulted "exiledFaceDown" False Common.boolean Object.exiledFaceDown
   damage <- Fields.defaulted "damage" 0 Common.natural Object.damage
   sickness <- Fields.required "sickness" Sickness.codec Object.sickness
-  controlClock <- Fields.defaulted "controlClock" Map.empty (Common.keyedList controlClockEntry) Object.controlClock
+  controlClock <- Fields.defaulted "controlClock" Map.empty (Common.keyedList ControlClock.entry) Object.controlClock
   bindings <- Fields.defaulted "bindings" Map.empty Binding.codecMap Object.bindings
   counters <- Fields.defaulted "counters" Map.empty (Common.multiset (CounterKind.codec Keyword.codec)) Object.counters
   counterTimestamps <- Fields.defaulted "counterTimestamps" Map.empty (Common.keyedList counterTimestamp) Object.counterTimestamps

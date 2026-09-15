@@ -427,12 +427,6 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.ControlledSinceTurnBegan
       " {\"type\":\"ControlledSinceTurnBegan\"} "
-  Spec.it s "ControlGainedSinceLastUpkeep" $
-    Common.assertCodec
-      s
-      (Filter.codec Keyword.codec)
-      Filter.ControlGainedSinceLastUpkeep
-      " {\"type\":\"ControlGainedSinceLastUpkeep\"} "
   Spec.it s "AttachedTo" $
     Common.assertCodec
       s

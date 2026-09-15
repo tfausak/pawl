@@ -7782,28 +7782,24 @@ cumulativeUpkeep cost =
 --
 -- THE INTERVENING "IF" is rule 702.30a's own, so CR 603.4 keeps the ability off
 -- the stack when the clock has run out and CR 608.2a re-reads it at resolution.
--- Written as a count of the battlefield keeping Filter.IsSource, for
--- `cumulativeUpkeep`'s reason and one more: the clock is
--- Pawl.Types.Object.controlClock, which is per-incarnation, so only a permanent
--- still on the battlefield has one to read.
+-- NOT `cumulativeUpkeep`'s shape: that one counts the battlefield because rule
+-- 702.24a prints "if this permanent is on the battlefield", and rule 702.30a
+-- prints no such clause. So this asks about the ABILITY'S OWN state instead --
+-- Quantity.ControlGainedSinceLastUpkeep, read of CR 113.7a's source and of CR
+-- 603.3a's controller, neither of which a battlefield fold can name.
 --
--- Not implemented, both halves of one thing -- the count reads the LIVE
--- battlefield where the rule reads the ability's own state, so CR 608.2a's
--- re-check asks the wrong question twice over (#3675). Rule 702.30a prints no
--- "if this permanent is on the battlefield" -- that clause is rule 702.24a's,
--- not this one's -- so a permanent that leaves in response should still resolve
--- the ability and offer the payment, and here the count reads zero and the
--- ability is removed instead. And rule 702.30a's "your" is CR 603.3a's
--- controller of the ability, fixed when it triggered, where
--- Filter.ControlGainedSinceLastUpkeep asks about the candidate's controller NOW:
--- control moved in response makes the re-check read the thief's clock, and the
--- payment is elided there too.
+-- Both halves of that matter, and Pawl.KeywordTriggerSpec's Echo group proves
+-- each: a permanent killed in response still resolves its echo and still owes
+-- its controller the choice (CR 608.2h's record carries the clock CR 400.7
+-- deleted with the permanent), and control moving in response leaves rule
+-- 702.30a's "you" the player who controlled the source when it triggered, whose
+-- own window the clock still holds.
 echo :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 echo cost =
   let cameUnderYourControl =
         Condition.Compares
           ( Compares.MkCompares
-              (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) (Filter.And [Filter.IsSource, Filter.ControlGainedSinceLastUpkeep]) Aggregation.Members))
+              (Quantity.ControlGainedSinceLastUpkeep (PlayerRef.Relative PlayerRelation.You))
               Comparison.AtLeast
               (Quantity.Literal 1)
           )

@@ -84,7 +84,6 @@ blackCreature =
       Filter.crewedThisTurn = Set.empty,
       Filter.convokedThisTurn = Set.empty,
       Filter.controlledSinceTurnBegan = False,
-      Filter.controlGainedSinceLastUpkeep = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
@@ -156,7 +155,6 @@ devoidBigCreature =
       Filter.crewedThisTurn = Set.empty,
       Filter.convokedThisTurn = Set.empty,
       Filter.controlledSinceTurnBegan = False,
-      Filter.controlGainedSinceLastUpkeep = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
@@ -1613,26 +1611,6 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 302.6's subject is a creature a player CONTROLS, and a player is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.ControlledSinceTurnBegan)) "player"
-
-  Spec.describe s "ControlGainedSinceLastUpkeep" $ do
-    Spec.it s "matches a view whose controller took it since their last upkeep" $ do
-      Spec.assertBool s (Filter.matches self (blackCreature {Filter.controlGainedSinceLastUpkeep = True}) Filter.Type.ControlGainedSinceLastUpkeep) "in the window"
-
-    Spec.it s "does not match one they have had longer than that" $ do
-      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ControlGainedSinceLastUpkeep)) "out of it"
-
-    -- The neighbouring question and a DIFFERENT window: CR 302.6 measures from
-    -- the turn's beginning and CR 702.30a from the last upkeep's, so a creature
-    -- settled at this turn's untap step is still inside rule 702.30a's window
-    -- when it arrived during the previous turn.
-    Spec.it s "is not the same window as ControlledSinceTurnBegan" $ do
-      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.controlledSinceTurnBegan = True}) Filter.Type.ControlGainedSinceLastUpkeep)) "settled does not imply the echo window"
-      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.controlGainedSinceLastUpkeep = True}) Filter.Type.ControlledSinceTurnBegan)) "nor the other way round"
-
-    -- CR 702.30a is about a permanent a player came to control, and a player is
-    -- not one.
-    Spec.it s "a player candidate is vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.ControlGainedSinceLastUpkeep)) "player"
 
   Spec.describe s "AttachedTo" $ do
     -- Miracle Worker's "target Aura attached to a creature you control", which is

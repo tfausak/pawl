@@ -311,12 +311,6 @@ data View = MkView
     -- compared against the PROJECTED controller so that layer 2 moving the seat
     -- and Pawl.Engine.Engine.checkControlContinuity clearing the settle agree.
     controlledSinceTurnBegan :: Bool,
-    -- CR 702.30a: did this candidate come under its CURRENT controller's
-    -- control since the beginning of that player's last upkeep? Read from
-    -- Object.controlClock against the PROJECTED controller, the field above's
-    -- pairing, so layer 2 moving the seat and the clock agree about whose
-    -- upkeep the answer is about.
-    controlGainedSinceLastUpkeep :: Bool,
     -- CR 303.4 / 110.1 / 701.3a: the HOST this candidate is attached to, viewed
     -- as a candidate in its own right, so that AttachedTo's nested Filter has
     -- something to be evaluated against. Not a characteristic either (CR 109.3):
@@ -807,9 +801,6 @@ playerView pid =
       -- CR 302.6's continuity is about a creature a player CONTROLS, and a player
       -- is not one -- False is the answer here rather than a default.
       controlledSinceTurnBegan = False,
-      -- CR 702.30a is about a PERMANENT its controller came to control, and a
-      -- player is not one -- the field above's reason.
-      controlGainedSinceLastUpkeep = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything, because Object.attachedTo is
       -- a field of the ATTACHED permanent, and a player is not one. So there is
@@ -1862,10 +1853,6 @@ matches context view predicate = case predicate of
   -- Object.sickness, written at the untap step and cleared whenever control
   -- moves.
   Filter.ControlledSinceTurnBegan -> controlledSinceTurnBegan view
-  -- CR 702.30a: the sibling above's shape one clock over -- the engine keeps
-  -- the answer as Object.controlClock, sampled when control moves and
-  -- advanced at each of the seat's upkeeps.
-  Filter.ControlGainedSinceLastUpkeep -> controlGainedSinceLastUpkeep view
   -- CR 701.3a: a live read of Object.attachedTo and of the host's own projection,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
@@ -2132,8 +2119,6 @@ rewrite pairs predicate = case predicate of
   Filter.ConvokedSourceThisTurn -> predicate
   -- Untouched for AttackedThisTurn's reason: the atom names no subtype.
   Filter.ControlledSinceTurnBegan -> predicate
-  -- Untouched for the atom above's reason: it names no subtype either.
-  Filter.ControlGainedSinceLastUpkeep -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: the nested filter describes
   -- the HOST ("attached to a Swamp"), so CR 612.1's word swap reaches it exactly
   -- as it reaches the same description written at the top level.
@@ -2781,8 +2766,6 @@ bakeBound players predicate = case predicate of
   Filter.ConvokedSourceThisTurn -> predicate
   -- Untouched: the atom names no slot for CR 603.2's map to substitute into.
   Filter.ControlledSinceTurnBegan -> predicate
-  -- Untouched for the atom above's reason: it names no slot either.
-  Filter.ControlGainedSinceLastUpkeep -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: a ControlledByBound written
   -- into the HOST's description is baked exactly as the same atom written at the
   -- top level would be. Pawl.Engine.Filter.boundSlots descends to match, which is
@@ -2942,7 +2925,6 @@ manaValueThresholds predicate = case predicate of
   Filter.CrewedSourceThisTurn -> []
   Filter.ConvokedSourceThisTurn -> []
   Filter.ControlledSinceTurnBegan -> []
-  Filter.ControlGainedSinceLastUpkeep -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
   -- literals inside bound the HOST's mana value and never the candidate's. Only
   -- widening CR 601.3a's sample is the safe direction.
@@ -3107,7 +3089,6 @@ statesAQuality predicate = case predicate of
   Filter.CrewedSourceThisTurn -> True
   Filter.ConvokedSourceThisTurn -> True
   Filter.ControlledSinceTurnBegan -> True
-  Filter.ControlGainedSinceLastUpkeep -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to
   -- something" is itself a stated quality under CR 701.23b, so even the trivial
   -- nest `And []` leaves this atom stating one and no descent could change it.

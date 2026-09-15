@@ -108,6 +108,7 @@ codec =
       Arm.nullary "WasToken" Quantity.WasToken,
       Arm.nullary "WasAttacking" Quantity.WasAttacking,
       Arm.nullary "WasBlocking" Quantity.WasBlocking,
+      Arm.payload "ControlGainedSinceLastUpkeep" PlayerRef.codec Quantity.ControlGainedSinceLastUpkeep (\x -> case x of Quantity.ControlGainedSinceLastUpkeep y -> Just y; _ -> Nothing),
       Arm.nullary "ClassLevel" Quantity.ClassLevel,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
       -- comes from the combat record rather than from anything the card names.
@@ -218,6 +219,7 @@ tagOf x = case x of
   Quantity.WasToken {} -> "WasToken"
   Quantity.WasAttacking {} -> "WasAttacking"
   Quantity.WasBlocking {} -> "WasBlocking"
+  Quantity.ControlGainedSinceLastUpkeep {} -> "ControlGainedSinceLastUpkeep"
   Quantity.ClassLevel {} -> "ClassLevel"
   Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
   Quantity.AttackersDeclaredThisTurn {} -> "AttackersDeclaredThisTurn"
