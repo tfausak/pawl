@@ -310,6 +310,11 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- comparison is written into a COST's criterion
             -- (Pawl.Engine.Cost.tapCandidates fills it), never into a target slot.
             Filter.sourceColors = Set.empty,
+            -- Empty for sourceColors' reason one field up: CR 702.60a's
+            -- comparison is written into a resolution's own references
+            -- (Pawl.Engine.Resolve.Slots.effectContext fills it), never into a
+            -- target slot.
+            Filter.sourceNames = Set.empty,
             -- Nothing HERE and filled below: CR 202.3's computed bound is the slot's
             -- own Quantity, and evaluating one takes a Filter.Context -- so this
             -- record is the context the evaluation runs in, and the answer is laid

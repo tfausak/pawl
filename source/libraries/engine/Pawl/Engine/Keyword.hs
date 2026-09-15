@@ -145,6 +145,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
@@ -258,6 +259,9 @@ abilitiesFor keyword count = case keyword of
   -- themselves, as rule 702.40a does.
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  -- CR 702.60a's trigger functions on the STACK too, so
+  -- stackTriggeredAbilitiesOf mints it and this roster stays empty.
+  Keyword.Ripple _ -> []
   -- CR 702.56a's and CR 702.153a's triggers function on the STACK too, so
   -- stackTriggeredAbilitiesOf mints them and this roster stays empty.
   Keyword.Replicate _ -> []
@@ -578,6 +582,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -1063,6 +1068,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -1667,6 +1673,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -2282,6 +2289,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -3806,6 +3814,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -4130,6 +4139,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -4411,6 +4421,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
@@ -4614,6 +4625,7 @@ familyOf keyword = case keyword of
   Keyword.Squad _ -> Just KeywordFamily.Squad
   Keyword.Offspring _ -> Just KeywordFamily.Offspring
   Keyword.Replicate _ -> Just KeywordFamily.Replicate
+  Keyword.Ripple _ -> Just KeywordFamily.Ripple
   Keyword.Casualty _ -> Just KeywordFamily.Casualty
   -- CR 702.166a carries no parameter, so there is no family to name it by.
   Keyword.Bargain -> Nothing
@@ -6822,7 +6834,8 @@ exileTriggeredAbilitiesOf keywords =
     <> fmap madnessCast (madnessCosts keywords)
 
 -- CR 702.85a's ability, "a triggered ability that functions only while the spell
--- with cascade is on the stack", and CR 702.40a's storm and CR 702.69a's
+-- with cascade is on the stack", CR 702.60a's ripple, which functions "only while
+-- the card with ripple is on the stack", and CR 702.40a's storm and CR 702.69a's
 -- gravestorm, each of which "functions on the stack" -- the roster the cast scan
 -- in Pawl.Engine.Event.Trigger mints, `exileTriggeredAbilitiesOf`'s sibling one
 -- zone over and ungated by CR 113.6 for that function's reason: each rule states
@@ -6830,8 +6843,8 @@ exileTriggeredAbilitiesOf keywords =
 -- condition (a cast) that says nothing about the stack.
 --
 -- COUNTED, where `exileTriggeredAbilitiesOf` next door takes a set: CR 702.85c,
--- CR 702.40b, CR 702.69b, CR 702.78b, CR 702.56b and CR 702.153b each say the
--- instances trigger separately, so Apex Devastator's four printed cascades are
+-- CR 702.60b, CR 702.40b, CR 702.69b, CR 702.78b, CR 702.56b and CR 702.153b each
+-- say the instances trigger separately, so Apex Devastator's four printed cascades are
 -- four abilities (Pawl.KeywordTriggerSpec's Cascade group). The PARAMETERIZED
 -- members already got one trigger per distinct PAYLOAD, which is CR 702.56b's
 -- and CR 702.153b's "each is paid separately and triggers based on the payments
@@ -6846,6 +6859,7 @@ stackTriggeredAbilitiesOf counts =
 stackAbilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 stackAbilitiesFor keyword count = case keyword of
   Keyword.Cascade -> List.genericReplicate count cascade
+  Keyword.Ripple n -> List.genericReplicate count (ripple n)
   Keyword.Storm -> List.genericReplicate count storm
   Keyword.Gravestorm -> List.genericReplicate count gravestorm
   _ -> List.genericReplicate count =<< Maybe.maybeToList (stackCopyTrigger keyword)
@@ -7075,6 +7089,121 @@ cascade =
 -- for what goes to the bottom.
 cascadeExiled :: SlotName.SlotName
 cascadeExiled = SlotName.MkSlotName (Text.pack "cascaded")
+
+-- CR 702.60a: "When you cast this spell, you may reveal the top N cards of your
+-- library, or, if there are fewer than N cards in your library, you may reveal
+-- all the cards in your library. If you reveal cards from your library this way,
+-- you may cast any of those cards with the same name as this spell without
+-- paying their mana costs, then put all revealed cards not cast this way on the
+-- bottom of your library in any order."
+--
+-- THREE CLAUSES, `cascade` above's shape with each of its three opcodes one step
+-- milder: the walk is a COUNT rather than a match (ObjectRef.TopOfLibrary, which
+-- CR 609.3 clamps to a shorter library -- the rule's own second sentence, so it
+-- needs no arm), the offer casts ANY NUMBER rather than one
+-- (CastRepetition.AnyNumber, CR 608.2g's "which may include casting other spells
+-- this way"), and the remainder goes to the bottom in a STATED order rather than
+-- a random one.
+--
+-- CR 401.4 is what makes that last difference: rule 702.60a says "in any order"
+-- and states no randomness, so the arrangement is the owner's and
+-- Pawl.Engine.Resolve.Effect asks them for it. Rule 702.85a's printed "in a
+-- random order" is what takes that back, which is why cascade writes
+-- LibraryPlacement.RandomOrder where this writes Stated.
+--
+-- THE "MAY" IS THE REVEAL's alone (CR 603.5), and the two clauses after it hang
+-- off the slot it binds rather than off a Clause.ifTaken ordinal: a declined
+-- reveal binds nothing, so the offer names no card and the remainder moves none.
+-- That is rule 702.60a's "if you reveal cards from your library this way" read
+-- through CR 608.2c, and it is the posture cascade's third clause already takes
+-- towards its own second.
+--
+-- NO CastOffer.restriction, where cascade carries one: rule 702.85a states a
+-- second condition about the RESULTING spell and rule 702.60a states none -- the
+-- whole of what it asks is a property of the card, which the offer's own
+-- EachCardFromAmong filter already asks.
+--
+-- Filter.SameNameAsSource and not a slot comparison, because
+-- TriggerCondition.SelfCast binds nothing: "this spell" is CR 113.7's source.
+-- The atom is read TWICE over in one sense and once here -- unlike cascade's
+-- filter, which ends the walk as well, this one only picks the offer's cards
+-- back out of the revealed batch, the reveal itself being a count.
+ripple :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+ripple n =
+  let plain =
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Untapped,
+            EntryRiders.attacking = Nothing,
+            EntryRiders.blocking = Nothing,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.empty,
+            EntryRiders.underOwner = False,
+            EntryRiders.exiledFaceDown = False,
+            EntryRiders.faceDown = Nothing
+          }
+      show_ =
+        Effect.Reveal
+          ( Reveal.MkReveal
+              (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal (toInteger n))))
+              (Just rippleRevealed)
+          )
+      offer =
+        Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.ref = ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong rippleRevealed Filter.SameNameAsSource),
+              -- Rule 702.60a's "YOU may cast": the caster, who is the trigger's
+              -- controller.
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = CastObligation.Optional,
+              OfferCast.offer =
+                CastOffer.MkCastOffer
+                  { CastOffer.transformed = False,
+                    CastOffer.withoutPayingManaCost = True,
+                    CastOffer.payingInstead = Nothing,
+                    CastOffer.spending = ManaSpending.AsProduced,
+                    CastOffer.restriction = Nothing,
+                    CastOffer.offeredBy = Nothing
+                  },
+              -- Rule 702.60a's "cast ANY OF those cards".
+              OfferCast.repetition = CastRepetition.AnyNumber
+            }
+      rest =
+        Effect.MoveToZone
+          ( MoveToZone.MkMoveToZone
+              (ObjectRef.InSlot rippleRevealed)
+              Zone.Library
+              plain
+              Nothing
+              Nothing
+              (LibraryPlacement.Stated LibraryPosition.Bottom)
+              Nothing
+          )
+      clause optionality effect = Clause.MkClause Nothing Nothing Nothing optionality Nothing (Seq.singleton effect)
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfCast,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              ( Seq.singleton
+                  ( Mode.MkMode
+                      ( Seq.fromList
+                          [ clause (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) show_,
+                            clause Optionality.Mandatory offer,
+                            clause Optionality.Mandatory rest
+                          ]
+                      )
+                      Map.empty
+                  )
+              )
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slot rule 702.60a's reveal binds its N cards into -- cascadeExiled's
+-- position one zone over, read twice: once for the offer and once for what goes
+-- to the bottom.
+rippleRevealed :: SlotName.SlotName
+rippleRevealed = SlotName.MkSlotName (Text.pack "rippled")
 
 -- "At the beginning of your upkeep, if this card is suspended, remove a time
 -- counter from it."

@@ -593,6 +593,29 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "is False for a player" $
       Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.ManaValueEqualToSource)) "player"
 
+  -- CR 702.60a's "with the same name as this spell", the two arms above's shape
+  -- over a SET of NAMES: CR 201.2 makes the comparison an intersection, so an
+  -- object showing two names (CR 709.4a's split card) has the source's name if it
+  -- shows either.
+  Spec.describe s "SameNameAsSource" $ do
+    let sourced ns = self {Filter.sourceNames = Set.fromList (fmap (CardName.MkCardName . Text.pack) ns)}
+        namedCreature ns = blackCreature {Filter.names = Set.fromList (fmap (CardName.MkCardName . Text.pack) ns)}
+    Spec.it s "holds on any name in common and fails on none" $ do
+      Spec.assertBool s (Filter.matches (sourced ["Surging Dementia"]) (namedCreature ["Surging Dementia"]) Filter.Type.SameNameAsSource) "the same name"
+      Spec.assertBool s (not (Filter.matches (sourced ["Surging Dementia"]) (namedCreature ["Surging Might"]) Filter.Type.SameNameAsSource)) "a different name"
+      Spec.assertBool s (Filter.matches (sourced ["Surging Dementia"]) (namedCreature ["Surging Might", "Surging Dementia"]) Filter.Type.SameNameAsSource) "one of two names"
+
+    -- CR 708.2a's no-name object on either side, SharesColorWithSource's vacuity
+    -- posture one characteristic over: an empty set intersects nothing, including
+    -- another empty set.
+    Spec.it s "is False when either side has no name" $ do
+      Spec.assertBool s (not (Filter.matches (sourced ["Surging Dementia"]) blackCreature Filter.Type.SameNameAsSource)) "no candidate name"
+      Spec.assertBool s (not (Filter.matches self (namedCreature ["Surging Dementia"]) Filter.Type.SameNameAsSource)) "no source names"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.SameNameAsSource)) "neither"
+
+    Spec.it s "is False for a player" $
+      Spec.assertBool s (not (Filter.matches (sourced ["Surging Dementia"]) aPlayer Filter.Type.SameNameAsSource)) "player"
+
   -- CR 702.78a's comparison, the two arms above's shape over a SET: colour is a
   -- set (CR 105.2), so "shares a color" is a non-empty intersection rather than
   -- an ordering. blackCreature is mono-black.

@@ -2361,6 +2361,8 @@ filterReads f = case f of
   Filter.Type.IsBound _ -> Set.empty
   -- Reads NAMES at both ends, which no Modification writes.
   Filter.Type.SameNameAsBound _ -> Set.empty
+  -- Reads NAMES at both ends too, the source's arriving on the Context.
+  Filter.Type.SameNameAsSource -> Set.empty
   -- Reads the CANDIDATE's controller, where its sibling above reads names: the
   -- bound object's controller arrives on the Context, already projected.
   Filter.Type.SameControllerAsBound _ -> Set.singleton Controller
@@ -2666,6 +2668,7 @@ filterReadsPeers f = case f of
   Filter.Type.TargetsPlayer _ -> False
   Filter.Type.IsBound _ -> False
   Filter.Type.SameNameAsBound _ -> False
+  Filter.Type.SameNameAsSource -> False
   -- The bound object's controller arrives on the Context, filled by
   -- Pawl.Engine.Target.slotContext -- no peer projection is read here.
   Filter.Type.SameControllerAsBound _ -> False
