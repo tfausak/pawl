@@ -46,6 +46,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
@@ -408,9 +409,10 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
   -- names them and the chooser is CR 608.2c's resolving controller.
   ObjectRef.AnyNumberMatching _ -> Map.empty
-  -- The arm above's answer, for its reason: the candidates come off the
-  -- battlefield, so no slot names them and the chooser is CR 608.2c's resolving
-  -- controller.
+  -- The arm above's answer for the CANDIDATES, which come off the battlefield so
+  -- that no slot names them; the CHOOSER's slots are the generic playerRefSlots
+  -- fold this case is joined into, ChosenCardFromAmong's route above, which is
+  -- what makes Wormfang Crab's ChoosePlayer slot a read.
   ObjectRef.ChosenPermanent _ -> Map.empty
   -- The arm above's answer, for its reason: neither the source nor the
   -- candidates come out of a slot.
@@ -503,7 +505,14 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player _ _) -> [player]
   ObjectRef.AnyNumberMatching _ -> []
-  ObjectRef.ChosenPermanent _ -> []
+  -- The seat that picks one permanent off the battlefield -- Wormfang Crab's
+  -- opponent, and by default CR 608.2c's resolving controller. Reported for
+  -- ChosenCardFromAmong's reason above, and a regression fence for its reason too:
+  -- the only card whose chooser names a slot fills that slot with its own mode's
+  -- ChoosePlayer, which the D4 dataflow lint subtracts from both sides.
+  ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent _ chooser) -> [chooser]
+  -- No chooser to report: the arm below names the source alongside ONE permanent,
+  -- and CR 608.2c's resolving controller is the only seat that picks it.
   ObjectRef.SourceAndChosenPermanent _ -> []
 
 -- The refs a CR 707.10 answer names: rule 707.10d's candidates, and nothing for

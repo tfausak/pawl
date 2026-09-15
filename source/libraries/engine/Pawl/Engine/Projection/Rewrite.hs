@@ -39,6 +39,7 @@ import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
@@ -863,7 +864,7 @@ rewriteObjectRef pairs ref = case ref of
   -- printing changes the text of the ones that write this ref.
   ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand p f c) -> ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand p (Filter.rewrite pairs f) (rewriteQuantity pairs c))
   ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
-  ObjectRef.ChosenPermanent f -> ObjectRef.ChosenPermanent (Filter.rewrite pairs f)
+  ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f w) -> ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.rewrite pairs f) w)
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)
 
 -- CR 612.1 through CR 707.10d's description of the copies' candidates, which is

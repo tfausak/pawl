@@ -108,6 +108,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.Clause as Clause
@@ -3688,15 +3689,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 608.2d's singular choice, shared by the two arms that make it, so a
         -- card cannot find "a creature named Hanweir Garrison" offered one way
         -- when the source rides along and another way when it does not.
-        chosenPermanent filter_ = do
+        --
+        -- The CANDIDATES are the ability's own reading whoever chooses -- CR
+        -- 109.5's "you" in Wormfang Crab's "a permanent you control" is the Crab's
+        -- controller -- so the chooser reaches the ask and not battlefieldMatching.
+        -- A chooser naming anything but ONE seat names no permanent either, and
+        -- that share of the instruction is ignored (CR 101.3), chooseCardFromAmong's
+        -- reading; it is read AFTER the two elided cases, since neither asks
+        -- anybody anything.
+        chosenPermanent filter_ chooser = do
           gs <- State.get
           case battlefieldMatching legal resolving controller source gs filter_ of
             [] -> pure []
             [only] -> pure [only]
-            first : second : more -> do
-              let offered = first NonEmpty.:| (second : more)
-              answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
-              pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+            first : second : more -> case playerRefPlayers legal controller gs chooser of
+              [asked] -> do
+                let offered = first NonEmpty.:| (second : more)
+                answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor asked gs) asked source offered)
+                pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+              _ -> pure []
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
@@ -3934,7 +3945,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               --
               -- FILTERED, not trusted (#222), the hand arm's reason: an answer
               -- naming a permanent that was never offered would otherwise be moved.
-              ObjectRef.ChosenPermanent filter_ -> chosenPermanent filter_
+              ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanent filter_ chooser
               -- The arm above's choice with the SOURCE named alongside it: Hanweir
               -- Battlements' "exile them", where "them" is this land and the
               -- Garrison the Filter admits. One instruction over two objects, so
@@ -3955,8 +3966,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- makes the primary order APNAP, and both objects are the resolving
               -- controller's, so its secondary sentence is reached only when the
               -- action cannot be processed simultaneously -- and this one is.
+              --
+              -- CR 608.2c's default chooser, spelled here rather than carried on the
+              -- ref: this arm's own sentence prints no other seat, and no ref it
+              -- could is written.
               ObjectRef.SourceAndChosenPermanent filter_ -> do
-                counterpart <- chosenPermanent filter_
+                counterpart <- chosenPermanent filter_ (PlayerRef.Relative PlayerRelation.You)
                 gs <- State.get
                 pure (counterpart <> battlefieldMatching legal resolving controller source gs Filter.Type.IsSource)
             arrivals <- settleArrivals zone placement targets

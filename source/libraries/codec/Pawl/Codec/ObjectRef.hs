@@ -3,6 +3,7 @@ module Pawl.Codec.ObjectRef where
 import qualified Pawl.Codec.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Codec.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Codec.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Codec.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Codec.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Codec.EachCardInHand as EachCardInHand
@@ -29,8 +30,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- tags, emitted identically -- and what it adds is the schema.
 --
 -- 'EachCardInGraveyard', 'EachCardInHand', 'TopOfLibrary', 'TopOfLibraryUntil', 'ChosenCardInGraveyard',
--- 'ChosenCardInHand', 'ChosenCardFromAmong', 'EachCardFromAmong' and 'RandomCardInHand' each carry a
--- payload record of their own (#1464), so no arm here writes a positional array.
+-- 'ChosenCardInHand', 'ChosenCardFromAmong', 'EachCardFromAmong', 'RandomCardInHand' and
+-- 'ChosenPermanent' each carry a payload record of their own (#1464), so no arm here writes a
+-- positional array.
 --
 -- 'EachCardExiledWithSource' and 'EachCardInYourLibrary' take an OPTIONAL
 -- payload: the bare tag is the whole set -- the linked one (CR 607.3), the whole
@@ -71,6 +73,6 @@ codec =
           Arm.payload "EachCardFromAmong" EachCardFromAmong.codec ObjectRef.EachCardFromAmong (\x -> case x of ObjectRef.EachCardFromAmong y -> Just y; _ -> Nothing),
           Arm.payload "RandomCardInHand" RandomCardInHand.codec ObjectRef.RandomCardInHand (\x -> case x of ObjectRef.RandomCardInHand y -> Just y; _ -> Nothing),
           Arm.payload "AnyNumberMatching" filterCodec ObjectRef.AnyNumberMatching (\x -> case x of ObjectRef.AnyNumberMatching y -> Just y; _ -> Nothing),
-          Arm.payload "ChosenPermanent" filterCodec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
+          Arm.payload "ChosenPermanent" ChosenPermanent.codec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
           Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing)
         ]
