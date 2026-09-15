@@ -171,7 +171,7 @@ castOrdinal context predicate fromZone spell gs =
         Nothing -> False
         Just cast ->
           maybe True (\z -> SpellWasCast.zone cast == Just z) fromZone
-            && maybe False (\view -> Filter.matches context view predicate) (Count.snapshotView gs EventShape.SpellCast (LoggedEvent.event entry))
+            && maybe False (\view -> Filter.matches context view predicate) (Count.snapshotView (Projection.viewWithLastKnownAnywhere gs) gs EventShape.SpellCast (LoggedEvent.event entry))
    in 1 + Natural.length (Seq.filter counted earlier)
 
 -- CR 102.1: does this turn belong to the scope? `active` is "the player whose

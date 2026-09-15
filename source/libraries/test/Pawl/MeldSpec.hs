@@ -715,9 +715,10 @@ spec s registry = Spec.describe s "Meld" $ do
   -- the life total is the gameplay reading of the count. The pool's printed
   -- producers cannot stand here: Dimir Strandcatcher counts cards put into a
   -- graveyard "from anywhere other than the battlefield", which is the one origin
-  -- a melded permanent can leave from, and Case of the Gorgon's Kiss counts
-  -- CREATURE cards, which the pool's only meld pair cannot discriminate with --
-  -- Hanweir Battlements is a land card, so both readings answer 1 (#3152).
+  -- a melded permanent can leave from, and the pool's CREATURE-card counts cannot
+  -- discriminate with the only meld pair -- Hanweir Battlements is a land card,
+  -- so Raphael, Fiendish Savior's "a creature card" is met on either reading and
+  -- Case of the Gorgon's Kiss' three-or-more is met on neither (#3152).
   --
   -- The object half is read off the SAME board through the other shape, which is
   -- what makes the pair discriminating: an engine folding the arrivals under

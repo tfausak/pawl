@@ -555,7 +555,9 @@ data View = MkView
     -- Empty for every candidate with no counters to read: a printed card off the
     -- battlefield, a player, a spell that was cast. An event snapshot of a MOVE
     -- is not one of them -- CR 608.2i looks back at what the object HAD, which
-    -- Pawl.Engine.Count.snapshotView answers off the same CR 608.2h record.
+    -- Pawl.Engine.Count.snapshotView answers off the same CR 608.2h record. Its
+    -- CARD shape is the exception and reads the object that ARRIVED, whose
+    -- counters CR 122.2 has already emptied.
     counters :: Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural,
     -- CR 701.54a-b: which player this candidate is the Ring-bearer FOR, or Nothing
     -- for the overwhelming majority of permanents, which carry no such

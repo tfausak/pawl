@@ -56,6 +56,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -384,6 +385,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   tollOfTheSiegeSpec s registry
   priceOfKnowledgeSpec s registry
   strandcatcherSpec s registry
+  raphaelSpec s registry
+  graveCensusTokenSpec s registry
   ownershipLedgerSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
@@ -1633,3 +1636,168 @@ ownershipLedgerSpec s registry =
               Spec.assertEqWith s "setup: one spell on the stack, and alice owns it" (owners pending) [Just S.alice]
               Spec.assertEqWith s "setup: alice is at 26 from bob's Faith alone" (S.lifeOf S.alice pending) (Just 26)
             other -> Spec.assertFailure s ("expected exactly one exiled Faith, got " <> show (length other))
+
+-- CR 400.7 / CR 608.2i: a count whose unit is the CARD that ARRIVED reads the
+-- card lying in the graveyard, not the permanent that left the battlefield.
+--
+-- Raphael, Fiendish Savior, {3}{B}{R} Legendary Creature -- Devil Noble 4/4
+-- (Oracle verified 2026-09-15): "Flying. Other Demons, Devils, Imps, and
+-- Tieflings you control get +1/+1 and have lifelink. At the beginning of each
+-- end step, if a creature card was put into your graveyard from anywhere this
+-- turn, create a 1/1 red Devil creature token with 'When this token dies, it
+-- deals 1 damage to any target.'" GAMEPLAY LEVEL, unlike the stubbed fold this
+-- module opens with: what is under test is which object the fold looks at, so a
+-- stub with the answer written into it would prove nothing.
+--
+-- TWO boards differing in ONE thing -- which permanent alice kills -- and on
+-- both the victim is a CREATURE on the battlefield as it dies:
+--
+--   a crewed Consulate Dreadnought   CR 702.122a makes it an artifact creature
+--                                    until end of turn, and CR 400.7 makes what
+--                                    reaches the graveyard an artifact CARD, so
+--                                    no Devil
+--   a Hill Giant beside it           a creature card, so one Devil
+--
+-- A fold reading the departed permanent's CR 608.2h record answers "creature
+-- card" to both and hands alice a Devil on each board.
+--
+-- Every library is stocked (CR 104.3c): the priority loop each leg runs would
+-- otherwise deck alice before the end step the trigger reads.
+raphaelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+raphaelSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      library printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      -- The end step entered the way the trigger reads it: its
+      -- TriggerCondition.StepBegins matches the EVENT, so the fixture records one
+      -- beside setting the phase (strandcatcherSpec's endStepOf).
+      endStepOf gs =
+        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep, GameState.activePlayer = S.alice})
+            settled = S.runPure S.identityAnswer began Engine.settleForPriority
+         in S.runPure S.identityAnswer settled Engine.priorityLoop
+      -- The only route to a death here, so the graveyard arrival is the engine's
+      -- own (CR 704.5g) rather than a fixture write. The same 12 on both boards,
+      -- lethal to the Dreadnought's crewed 7/11 and to a 3/3 alike.
+      kill oid gs = S.runPure S.identityAnswer (S.markDamage oid 12 gs) Engine.priorityLoop
+      -- CR 702.122a's ability comes from the projection, not the card file
+      -- (Pawl.CrewSpec's crewAbility), and the Dreadnought prints no other.
+      crew vehicleId gs = case Projection.abilitiesOf vehicleId gs of
+        ability : _ -> S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice vehicleId ability)) Stack.resolveTop
+        [] -> gs
+      devils = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Devil Token")) S.alice
+      graveyard pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
+      isCreature oid gs = Set.member CardType.Creature (Projection.cardTypesOf oid gs)
+      -- CR 400.7 again, one move later: the arrived card leaves the graveyard, so
+      -- its id names nothing either and only the record filed under it says what
+      -- the card was.
+      exileGraveyard gs = case Game.zoneMembers Zone.Graveyard S.alice gs of
+        oid : _ -> S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Exile)
+        [] -> gs
+      board = do
+        raphael <- S.printingOf s registry "Raphael, Fiendish Savior"
+        dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+        hillGiant <- S.printingOf s registry "Hill Giant"
+        blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (_, withRaphael) = S.addPermanent raphael S.alice (Setup.emptyGame S.bothPlayers)
+            (vehicleId, withVehicle) = S.addPermanent dreadnought S.alice withRaphael
+            (giantId, withGiant) = S.addPermanent hillGiant S.alice withVehicle
+            (_, withCrewers) = S.addPermanent blindSpot S.alice withGiant
+            (tokenId, withToken) = S.addToken (Printing.card piker) S.alice withCrewers
+            stocked = library piker S.bob 5 (library piker S.alice 5 withToken)
+            ready = stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pure (vehicleId, giantId, tokenId, crew vehicleId ready)
+   in Spec.describe s "Raphael, Fiendish Savior" $ do
+        Spec.it s "CR 400.7 a crewed Vehicle that dies is an artifact card put into a graveyard, not a creature card" $ do
+          (vehicleId, _, _, crewed) <- board
+          let after = endStepOf (kill vehicleId crewed)
+          Spec.assertEqWith s "CR 400.7 the card in the graveyard is the Vehicle's, so alice gets no Devil" (devils after) 0
+          -- The proxies, after the behaviour: the victim really was a creature as
+          -- it died, so a fold reading the departed permanent would have made one,
+          -- and its card really did reach alice's graveyard for the fold to read.
+          Spec.assertBool s (isCreature vehicleId crewed) "setup: CR 702.122a the crewed Dreadnought was a creature on the battlefield"
+          Spec.assertEqWith s "setup: one card reached alice's graveyard" (graveyard S.alice after) 1
+        -- The same board, differing in ONE thing: the Hill Giant beside the
+        -- Dreadnought is what dies, and its card IS a creature card.
+        Spec.it s "CR 400.7 a creature card put into the same graveyard does make the Devil" $ do
+          (_, giantId, _, crewed) <- board
+          let after = endStepOf (kill giantId crewed)
+          Spec.assertEqWith s "CR 608.2i one creature card this turn, so alice gets one Devil" (devils after) 1
+          Spec.assertBool s (isCreature giantId crewed) "setup: the Hill Giant was a creature on the battlefield too"
+          Spec.assertEqWith s "setup: one card reached alice's graveyard here as well" (graveyard S.alice after) 1
+        -- CR 111.6 / 111.7, the arrival with no object left to read: a Goblin Piker
+        -- TOKEN dies on the same board, the priority loop's CR 704.5d removes it
+        -- from the graveyard, and what it WAS is all that can say it was no card.
+        -- The regression fence on arrivedView's Game.lookupObject guard, which is
+        -- what sends this arrival back to the departed record rather than to
+        -- Projection.fullView's blank view for an id naming nothing.
+        Spec.it s "CR 111.6 a creature token that dies is no card at all, so it makes no Devil" $ do
+          (_, _, tokenId, crewed) <- board
+          let after = endStepOf (kill tokenId crewed)
+          Spec.assertEqWith s "CR 111.6 a token is not a card, so alice gets no Devil" (devils after) 0
+          Spec.assertBool s (isCreature tokenId crewed) "setup: the token was a creature on the battlefield"
+          Spec.assertEqWith s "setup: CR 111.7 it ceased to exist, so nothing is left in alice's graveyard" (graveyard S.alice after) 0
+        -- CR 608.2h's record under the ARRIVED id, which is the only thing left to
+        -- read once the card has moved on again: the Vehicle's card is exiled out
+        -- of the graveyard before the end step, and the clause still counts what
+        -- was put there and not what left the battlefield.
+        Spec.it s "CR 608.2h a Vehicle card exiled out of the graveyard was still no creature card put there" $ do
+          (vehicleId, _, _, crewed) <- board
+          let after = endStepOf (exileGraveyard (kill vehicleId crewed))
+          Spec.assertEqWith s "CR 608.2h the record under the arrived id is the Vehicle's, so still no Devil" (devils after) 0
+          Spec.assertEqWith s "setup: the card really did leave alice's graveyard" (graveyard S.alice after) 0
+        -- The same board, differing in ONE thing: the exiled card is the Hill
+        -- Giant's, and the record under its id says creature card.
+        Spec.it s "CR 608.2h a creature card exiled out of the graveyard was still put there" $ do
+          (_, giantId, _, crewed) <- board
+          let after = endStepOf (exileGraveyard (kill giantId crewed))
+          Spec.assertEqWith s "CR 608.2h one creature card this turn, so alice still gets one Devil" (devils after) 1
+          Spec.assertEqWith s "setup: that card really did leave alice's graveyard too" (graveyard S.alice after) 0
+
+-- CR 111.7 / 608.2h: the arrival with no object left to read, on the road where
+-- the reader cannot answer for one either. Pawl.Engine.Resolve.Slots'
+-- effectViewOf hands a resolving effect Projection.viewWithLastKnown, whose
+-- answer for an id naming nothing is a BLANK view rather than Nothing -- and a
+-- blank view is not a token, so a fold that trusted it would count a dead token
+-- as a card. What sends this arrival back to CR 608.2h's departed record instead
+-- is arrivedView's own Game.lookupObject guard.
+--
+-- Synthetic Grave Census, {2}{B} Creature -- Zombie 1/3: "{T}: You gain X life,
+-- where X is the number of cards put into graveyards from anywhere this turn."
+-- Pawl.MeldSpec drives its melded-permanent half; what it cannot drive is this
+-- one, since the token there is still lying in the graveyard when the count runs.
+--
+-- TWO boards differing in ONE thing -- whether the Goblin Piker that dies is a
+-- token -- and on both the priority loop's CR 704.5g kills it and its CR 704.5d
+-- sweeps a dead token out of the graveyard before the count runs.
+graveCensusTokenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graveCensusTokenSpec s registry =
+  let library printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      kill oid gs = S.runPure S.identityAnswer (S.markDamage oid 12 gs) Engine.priorityLoop
+      tallied censusId gs = case Projection.abilitiesOf censusId gs of
+        ability : _ -> S.lifeOf S.alice (S.runPure S.identityAnswer gs (do Activate.activateAbility S.alice censusId ability; Stack.resolveTop))
+        [] -> Nothing
+      graveyard pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
+      board = do
+        census <- S.printingOf s registry "Synthetic Grave Census"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (censusId, withCensus) = S.addPermanent census S.alice (Setup.emptyGame S.bothPlayers)
+            (tokenId, withToken) = S.addToken (Printing.card piker) S.alice withCensus
+            (pikerId, withPiker) = S.addPermanent piker S.alice withToken
+            stocked = library piker S.bob 5 (library piker S.alice 5 withPiker)
+        pure (censusId, tokenId, pikerId, stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+   in Spec.describe s "Synthetic Grave Census" $ do
+        Spec.it s "CR 111.7 a token that died and ceased to exist is no card put into a graveyard" $ do
+          (censusId, tokenId, _, gs) <- board
+          let after = kill tokenId gs
+          Spec.assertEqWith s "CR 111.6 alice gains nothing: a token is not a card" (tallied censusId after) (Just 20)
+          -- The proxies, after the behaviour: the token really did leave, so the
+          -- fold had no object to read it off.
+          Spec.assertEqWith s "setup: CR 704.5d nothing is left in alice's graveyard" (graveyard S.alice after) 0
+          Spec.assertEqWith s "setup: and the token's id names nothing" (fmap Object.zone (Game.lookupObject tokenId after)) Nothing
+        -- The same board, differing in ONE thing: the Goblin Piker that dies is
+        -- the nontoken one, whose card stays in the graveyard to be counted.
+        Spec.it s "CR 608.2i the nontoken Goblin Piker beside it is one card put into a graveyard" $ do
+          (censusId, _, pikerId, gs) <- board
+          let after = kill pikerId gs
+          Spec.assertEqWith s "alice gains 1 for the one card" (tallied censusId after) (Just 21)
+          Spec.assertEqWith s "setup: its card really is in her graveyard" (graveyard S.alice after) 1

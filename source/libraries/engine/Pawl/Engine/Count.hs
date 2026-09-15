@@ -86,11 +86,14 @@ evaluate viewOf quantityOf context gs count =
           let ids = concatMap (\pid -> Game.zoneMembers zone pid gs) pids
               kept = Maybe.mapMaybe (\oid -> fmap ((,) (Just oid)) (keep predicate context (viewOf oid))) ids
           aggregate quantityOf aggregation kept
-        -- CR 608.2i: the event log. Views come from each event's stored snapshot
-        -- (CR 608.2h last-known information), never from a live object -- a token has
-        -- no printed card at all (CR 111.3) and an animated land died as a creature.
+        -- CR 608.2i: the event log. Views of the object that MOVED come from each
+        -- event's stored snapshot (CR 608.2h last-known information), never from a
+        -- live object -- a token has no printed card at all (CR 111.3) and an
+        -- animated land died as a creature. The shape whose unit is the CARD that
+        -- ARRIVED reads the arriving object instead (see arrivedView), which is why
+        -- the fold hands snapshotView the same reader the zone arm uses.
         Scope.InHistory shape ->
-          let views = Maybe.mapMaybe (snapshotView gs shape . LoggedEvent.event) (Foldable.toList (GameState.events gs))
+          let views = Maybe.mapMaybe (snapshotView viewOf gs shape . LoggedEvent.event) (Foldable.toList (GameState.events gs))
               kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
            in aggregate quantityOf aggregation kept
         -- CR 102.1: the players themselves. Candidates come from the same
@@ -684,8 +687,14 @@ slotPlayers context gs name = case Map.lookup name (Filter.slotPlayers context) 
 -- none can ride the snapshot. Each arm answers them for itself: CR 601.2a makes
 -- the player who cast a spell its controller, and a move reads CR 608.2h's
 -- record filed under the id it left behind.
-snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
-snapshotView gs shape event = case event of
+--
+-- `viewOf` is the reader the CARD shape needs and no other does: CR 400.7 makes
+-- the object that ARRIVED a new object of its own, so "a creature card was put
+-- into a graveyard" is a question about the card lying there and not about the
+-- permanent that left. Injected rather than imported, for the reason ViewOf
+-- itself is: Pawl.Engine.Projection imports this module.
+snapshotView :: ViewOf -> GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
+snapshotView viewOf gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot _) -> case shape of
     EventShape.MovedBetween (MovedBetween.MkMovedBetween from to) ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to then Just (departedView gs zc snapshot) else Nothing
@@ -698,7 +707,9 @@ snapshotView gs shape event = case event of
     -- The DESTINATION, per the constructor's own note, and the origin only where
     -- the shape excludes one.
     EventShape.CardArrivedIn arrival ->
-      if arrivalMatches arrival zc then Just (departedView gs zc snapshot) else Nothing
+      if arrivalMatches arrival zc
+        then Just (Maybe.fromMaybe (departedView gs zc snapshot) (arrivedView viewOf gs (ZoneChange.object zc)))
+        else Nothing
     EventShape.SpellCast -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   -- CR 615.13's record names two ids, a recipient and an amount, and snapshots no
@@ -825,21 +836,64 @@ snapshotView gs shape event = case event of
   -- the rest of the move goes where it was headed, and only the card that
   -- arrived in the named zone is counted (Pawl.MeldSpec).
   GameEvent.CardArrived zc -> case shape of
-    -- The CR 608.2h record filed under the DEPARTED id, which is the melded
-    -- permanent's and so the same record the Moved event beside this one reads.
-    -- Nothing where no record was filed, the honest answer for a card whose
-    -- characteristics as it moved cannot be recovered.
+    -- The ARRIVED card, which CR 712.21e is the whole point of here: each
+    -- component of a melded permanent is a card of its own, and reading the
+    -- record filed under the DEPARTED id would give both of them the melded
+    -- permanent's characteristics.
     --
-    -- Not implemented: a view of the CARD that arrived rather than of the
-    -- permanent it was part of, so a melded permanent's two components are
-    -- indistinguishable here and Case of the Gorgon's Kiss cannot yet ask
-    -- whether each was a creature card (#3152).
+    -- The departed record is still the fallback, for the arrival that has no
+    -- object to read: a token put into a graveyard ceases to exist (CR 111.7),
+    -- and what it WAS is all there is to count it by. Nothing where neither
+    -- answers, the honest blank for a card whose characteristics as it moved
+    -- cannot be recovered.
+    --
+    -- The melded half of that is not driven by a board that can tell the two
+    -- readings apart: the pool's Hanweir pair answers the same 2 cards either
+    -- way, and the count that would separate them is Case of the Gorgon's Kiss'
+    -- three-or-more CREATURE cards (#3152). Pawl.CountSpec's Raphael group proves
+    -- the reading itself.
     EventShape.CardArrivedIn arrival ->
       if arrivalMatches arrival zc
-        then fmap (departedView gs zc . LastKnown.characteristics) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
+        then case arrivedView viewOf gs (ZoneChange.object zc) of
+          Just view -> Just view
+          Nothing -> fmap (departedView gs zc . LastKnown.characteristics) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
         else Nothing
     EventShape.MovedBetween {} -> Nothing
     EventShape.SpellCast -> Nothing
+
+-- CR 400.7: the view of the object that ARRIVED, for the one shape whose unit is
+-- the CARD. A permanent's characteristics on the battlefield are not the card's:
+-- a crewed Vehicle is an artifact creature as it dies (CR 702.122a) and an
+-- artifact card in the graveyard, and a melded permanent's two components are
+-- two cards (CR 712.21e) where the departed record knows only the melded
+-- permanent.
+--
+-- The LIVE object first, through the caller's own reader so the answer is taken
+-- at the same layer depth every other candidate of the same count is; CR 608.2h's
+-- record filed under the ARRIVED id second, for the card that has since moved on
+-- again. Game.lookupObject rather than the reader's Nothing decides which,
+-- because Projection.fullView answers Just a blank view for an id naming nothing
+-- and a blank view is not a token.
+--
+-- Nothing when the id names nothing and nothing was filed -- a token that ceased
+-- to exist (CR 111.7) -- which sends the caller back to the departed record.
+arrivedView :: ViewOf -> GameState -> ObjectId -> Maybe Filter.View
+arrivedView viewOf gs arrived =
+  if Maybe.isJust (Game.lookupObject arrived gs)
+    then viewOf arrived
+    else fmap recordedView (Map.lookup arrived (GameState.lastKnown gs))
+
+-- CR 608.2h's record read as a view, the way departedView reads the one filed
+-- under the departing id -- the same four non-characteristic fields off the same
+-- record, over the characteristics the record itself carries.
+recordedView :: LastKnown.LastKnown -> Filter.View
+recordedView lastKnown =
+  viewOfSnapshot
+    (Just (LastKnown.controller lastKnown))
+    (Just (LastKnown.owner lastKnown))
+    (Game.sourceIsToken (LastKnown.source lastKnown))
+    (LastKnown.counters lastKnown)
+    (LastKnown.characteristics lastKnown)
 
 -- CR 712.21e's destination narrowed by the printed clause's origin: the arrival
 -- landed in the named zone, and it did not come from one this shape excludes. An
