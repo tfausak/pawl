@@ -97,17 +97,6 @@ data PlayerEffect
     DontLoseUnspentMana ManaFilter.ManaFilter
   | -- | CR 500.5 / 119.3 / Yurlok of Scorch Thrash: as this player loses unspent
     -- mana, they lose that much life.
-    --
-    -- NO payload, where the sibling above carries a ManaFilter: rule 500.5's
-    -- sweep takes the pool whole and Yurlok's sentence charges for all of it, so
-    -- there is nothing to narrow. A filter would also have to agree with the
-    -- retention filter above about which units were actually LOST, and the
-    -- amount is read off what the sweep removed rather than off the pool.
-    --
-    -- A BOOLEAN question (Pawl.Engine.PlayerEffect.losesLifeForUnspentMana), not
-    -- a count: "multiple Yurloks on the battlefield won't cause additional life
-    -- loss" is its own ruling, and a disjunction over the applicable effects is
-    -- what says so. CR 613.11 has nothing to order.
     LoseLifeForUnspentMana
   | -- | CR 609.4b / 613.11 / Celestial Dawn: this player may spend the mana the
     -- payload's filter names as though it were mana of the types it names.

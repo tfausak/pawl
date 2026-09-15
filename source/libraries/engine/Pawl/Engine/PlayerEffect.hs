@@ -2557,10 +2557,10 @@ keepsUnspentMana pid gs =
 -- asks, so the
 -- turn-based action of CR 703.4q never learns which effect answered it.
 --
--- A BOOL about the whole pool, where its neighbour is a per-unit predicate: the
--- printed sentence charges for "that much" and names no mana, so there is
--- nothing to ask a unit. HOW MUCH is what the sweep removed, which the caller
--- alone knows.
+-- A BOOL about the whole pool, where its neighbour is a per-unit predicate, and
+-- why the carrier takes no payload: the printed sentence charges for "that much"
+-- and names no mana, so there is nothing to ask a unit and nothing to narrow by.
+-- HOW MUCH is what the sweep removed, which the caller alone knows.
 --
 -- A DISJUNCTION, which is the card's own ruling -- "multiple Yurloks on the
 -- battlefield won't cause additional life loss" -- so a second applicable effect
