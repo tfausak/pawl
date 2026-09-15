@@ -3735,18 +3735,54 @@ equipmentTokenSpec s registry = Spec.describe s "EquipmentToken" $ do
     Spec.assertEqWith s "CR 701.3a: the Metamorph equips its OWN Germ, not the Husk's" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid settled)) metamorphIds) [Just (fmap Recipient.ToCreature (Maybe.listToMaybe secondGerm))]
     Spec.assertEqWith s "and the Husk's own Germ is still a 1/1 wearing the Husk" (fmap (\oid -> S.powerToughnessOf oid settled) firstGerm) [Just (1, 1)]
     Spec.assertEqWith s "the copy really happened: it is a Flayer Husk by name (CR 707.2)" (fmap (\oid -> Projection.namesOf oid settled) metamorphIds) [Set.singleton (CardName.MkCardName (Text.pack "Flayer Husk"))]
+  -- CR 614.16 doubles the create, so living weapon's "it" stands for two Germs
+  -- -- Pawl.Engine.Resolve.bindMinted binds BOTH, which is what the rulings on
+  -- Anointed Procession and Flamerush Rider require of every rider a creating
+  -- effect attaches. The attach is the one reader that cannot take them all:
+  -- CR 301.5c, "an Equipment can't equip more than one creature. If a spell or
+  -- ability would cause an Equipment to equip more than one creature, the
+  -- Equipment's controller chooses which creature it equips". Batterskull's own
+  -- ruling states the outcome -- the Equipment attaches to one of them and the
+  -- other dies.
+  --
+  -- Pinned to the LAST Germ offered rather than searched: the engine's own
+  -- fallback is the first, so answering last is what discriminates.
+  Spec.it s "CR 301.5c whole cards: under Doubling Season the Husk mints two Germs and its controller picks which one it equips" $ do
+    husk <- S.printingOf s registry "Flayer Husk"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    let (_, doubled) = S.addPermanent doublingSeason S.alice (Setup.emptyGame S.bothPlayers)
+        (equipmentId, staged) = S.entersWithTrigger husk S.alice doubled
+        placed = S.runPure equipLastOffered staged Engine.settleForPriority
+        resolved = S.runPure equipLastOffered placed Stack.resolveTop
+        settled = S.runPure equipLastOffered resolved Engine.settleForPriority
+        minted = List.sort (S.tokensOf resolved)
+    Spec.assertEqWith s "CR 614.16: the replacement really doubled living weapon's create" (length minted) 2
+    -- The gameplay-level assertion: the Germ the controller named is the one
+    -- wearing the Husk, so it is a 1/1, and the other 0/0 is buried (CR 704.5f).
+    Spec.assertEqWith s "CR 301.5c: the SECOND Germ was named, so only it survives as a 1/1" (fmap (\oid -> S.powerToughnessOf oid settled) minted) [Nothing, Just (1, 1)]
+    Spec.assertEqWith s "CR 701.3a: the Husk is attached to that same Germ" (fmap Object.attachedTo (Game.lookupObject equipmentId settled)) (Just (fmap Recipient.ToCreature (Maybe.listToMaybe (drop 1 minted))))
 
 -- Put the Equipment onto the battlefield with its CR 603.6a entry event, let CR
 -- 603.3 place the keyword trigger on the stack, resolve it, then settle
 -- state-based actions. S.identityAnswer throughout: none of these three keywords
--- asks anything, which is the point -- CR 111.2 names the creator and the rule
--- names the token, so there is no choice to make.
+-- asks anything on an ordinary board, which is the point -- CR 111.2 names the
+-- creator and the rule names the token, so there is no choice to make. A board
+-- carrying a token doubler does pose one (CR 301.5c), which is why the doubled
+-- case below builds its own run rather than going through here.
 enterAndTrigger :: GameState.GameState -> Printing.Printing -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 enterAndTrigger gs printing =
   let (equipmentId, staged) = S.entersWithTrigger printing S.alice gs
       placed = S.runPure S.identityAnswer staged Engine.settleForPriority
       resolved = S.runPure S.identityAnswer placed Stack.resolveTop
    in (equipmentId, S.tokensOf resolved, S.runPure S.identityAnswer resolved Engine.settleForPriority)
+
+-- CR 301.5c's choice of which of several minted Germs the Equipment equips,
+-- pinned to the LAST candidate offered: the engine's own fallback is the first,
+-- so a mutation cannot be repaired into the same answer.
+equipLastOffered :: Prompt.Prompt r -> r
+equipLastOffered p = case p of
+  Prompt.ChooseAttachment _ _ _ offered -> NonEmpty.last offered
+  _ -> S.identityAnswer p
 
 -- CR 707.5's as-enters copy choice, pinned to ONE object rather than searched,
 -- so a mutation cannot be repaired by the answerer finding another legal source

@@ -4943,11 +4943,6 @@ myriadExile =
 -- Not implemented: rule 702.116a's "you may" is PER OPPONENT, and this asks it
 -- ONCE over the whole loop, so at four or more seats a controller cannot take a
 -- token against one opponent and refuse another (#3663).
---
--- Not implemented: each iteration's copy names one token, so under a
--- token-doubling replacement the slot below binds one of the two and CR
--- 702.116a's exile at end of combat reaches only that one -- and the binding is
--- asked as a question the rules never pose (#3185).
 myriad :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 myriad =
   let copy =
@@ -6417,9 +6412,10 @@ attachToOwnToken token =
                     EntryRiders.exiledFaceDown = False,
                     EntryRiders.faceDown = Nothing
                   },
-              -- A Literal 1, so namesEveryToken is False and the slot holds the
-              -- ONE token the rule's "it" names -- or, where CR 614.16 doubled
-              -- the count, the one its controller picks.
+              -- The slot holds every token minted (Resolve.bindMinted), which
+              -- where CR 614.16 doubled the count is two Germs; CR 301.5c then
+              -- gives the Equipment's controller the choice of which one it
+              -- equips, and the Effect.Attach arm asks it.
               Create.slot = Just attachedTokenSlot,
               -- CR 111.2 under CR 109.5: the keyword ability's own controller.
               Create.creator = PlayerRef.Relative PlayerRelation.You

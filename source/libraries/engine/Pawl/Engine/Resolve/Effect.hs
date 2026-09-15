@@ -354,43 +354,30 @@ declaredDelayedAbility source name gs =
 -- CR 603.7c: bind the tokens a Create or a CreateCopy minted under the slot the
 -- effect names, so a later effect of this resolution or a delayed ability it
 -- arms can name them.
-bindMinted :: PlayerId -> ObjectId -> ObjectId -> Maybe SlotName -> Quantity.Type.Quantity -> [ObjectId] -> Game ()
-bindMinted controller source resolving mSlot quantity minted = case (mSlot, namesEveryToken quantity, minted) of
-  (Nothing, _, _) -> pure ()
+--
+-- EVERY token minted, whatever the card's printed count: the rulings on
+-- Anointed Procession and Flamerush Rider both say a rider the creating effect
+-- attached applies to each token CR 614.16 multiplied the count into, and Queen
+-- Allenal of Ruadach's say the same of a token a replacement APPENDED. So the
+-- word the card used -- "it" or "those tokens" -- changes nothing here and the
+-- printed quantity is not consulted.
+--
+-- The singular shape is kept for the single token, because that is the shape
+-- every reader sees: Resolve.slotOne and legalOne read Binding.targets, which a
+-- group never fills. A reader that must reduce a group to one object does it
+-- itself -- Effect.Attach through Attach.arbitrate, CR 301.5c.
+bindMinted :: ObjectId -> Maybe SlotName -> [ObjectId] -> Game ()
+bindMinted resolving mSlot minted = case (mSlot, minted) of
+  (Nothing, _) -> pure ()
   -- Nothing was minted, so no slot names anything: an unevaluable or
   -- non-positive count, a creator reference naming nobody (CR 101.3), a
   -- creator who has left the game (CR 800.4b), or CR 111.5's prohibited
   -- token, which createTokens refuses to mint at all.
-  (Just _, _, []) -> pure ()
-  -- The card says "those tokens", so the slot holds EVERY token this
-  -- effect minted (CR 111.1) and there is nothing to ask.
-  (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
-  -- One token is the whole candidate list, so there is nothing to ask.
-  (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
-  -- CR 614.16 got there first: a replacement multiplied the count, so
-  -- several tokens stand where the card's "it" names one, and this asks which.
-  -- FILTERED, NOT TRUSTED: an answer naming something not minted falls back to
-  -- the first.
-  --
-  -- Not implemented: binding every token minted, which is what the rulings
-  -- say -- Flamerush Rider under Doubling Season exiles each of its tokens, and
-  -- Doubling Season's own rulings say the same of a create-with-rider card
-  -- (#3185).
-  (Just slot, False, first : second : rest) -> do
-    gs1 <- State.get
-    let candidates = first NonEmpty.:| (second : rest)
-        decider = Decide.deciderFor controller gs1
-    answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
-    let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
-    State.modify' (bindSlot resolving slot named)
-
--- Does a Create's slot name EVERY token it minted rather than one particular one
--- (CR 603.7c's "it")? CR 111 gives the opcode no way to carry the word, and the
--- count at RESOLUTION cannot tell them apart -- CR 614.16 lets a replacement
--- multiply either -- so the PRINTED quantity decides. Nothing in card data
--- records the word, so the inference cannot be linted.
-namesEveryToken :: Quantity.Type.Quantity -> Bool
-namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
+  (Just _, []) -> pure ()
+  -- One token is the whole of what the effect created.
+  (Just slot, [only]) -> State.modify' (bindSlot resolving slot only)
+  -- CR 111.1: the slot holds every token this effect created.
+  (Just slot, several) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
 
 -- CR 111.3: the values the creating effect defines become the token's text, so a
 -- computed power or toughness is settled here and stamped as a literal. Left as a
@@ -5134,7 +5121,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\made2 -> Combat.putOntoBattlefieldBlocking made2 attacker) made)
               pure made
         _ -> pure []
-    bindMinted controller source resolving mSlot quantity minted
+    bindMinted resolving mSlot minted
   -- Alchemy's conjure keyword action. Digital-only, so there is no rule to cite;
   -- what the CR settles is that the result is a CARD and not CR 111.1's token,
   -- which is what Pawl.Engine.Event's conjure and conjureOntoBattlefield mint.
@@ -5290,7 +5277,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\token -> Combat.putOntoBattlefieldBlocking token attacker) made)
                 pure made
       _ -> pure []
-    bindMinted controller source resolving mSlot quantity minted
+    bindMinted resolving mSlot minted
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef duration exceptions) ->
     State.modify' $ \gs ->
       -- CR 707.1: each named subject becomes a copy of the named original, in
@@ -6404,7 +6391,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- attached elsewhere; AttachTarget below moves the slot's TARGET instead.
   -- Event.attach is the one funnel CR 701.3's move goes through, holding rule
   -- 701.3b, CR 701.3c's restamp and the GameEvent.BecameAttached.
-  Effect.Attach slot -> Foldable.for_ (legalOne slot legal) (Event.attach source)
+  --
+  -- CR 301.5c: a slot naming SEVERAL objects -- CR 614.16 having multiplied the
+  -- create that defined it, so living weapon's "it" stands for two Germs -- is a
+  -- spell or ability causing the Equipment to become attached to more than one
+  -- object, and the rule gives the choice to the Equipment's own controller.
+  -- Attach.arbitrate is that rule (CR 303.4d is its Aura twin). Ahead of the
+  -- target read for slotGroup's usual reason: a group binding is a definition,
+  -- never a target (CR 115.10a).
+  Effect.Attach slot -> do
+    gs <- State.get
+    case fmap Foldable.toList (slotGroup slot resolving gs) of
+      Just group@(_ : _) -> do
+        destination <- Attach.arbitrate source group
+        Foldable.for_ destination (Event.attach source . Recipient.ToObject)
+      _ -> Foldable.for_ (legalOne slot legal) (Event.attach source)
   -- CR 701.3a, the other direction: the SLOT's target moves, to a destination
   -- chosen now rather than targeted.
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot filter_) ->
