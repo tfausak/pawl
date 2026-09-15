@@ -2,8 +2,8 @@
 
 -- | Building a codec for a tagged sum from its arms.
 --
--- All THREE of a decoder, an encoder and a schema come off the arm list, so a
--- tag string, a payload codec and a payload's structure are each written once
+-- A decoder, an encoder and a schema all come off the arm list, so a tag
+-- string, a payload codec and a payload's structure are each written once
 -- (#1461). An arm carries a MATCHER for that -- @a -> Maybe payload@, the
 -- inverse of the injection beside it -- so each constructor is one
 -- self-contained bidirectional expression and a codec that disagrees with its
@@ -13,7 +13,7 @@
 -- TOTAL tag function beside it: a case over every constructor with no
 -- wildcard, which makes a constructor added with no arm a
 -- @-Wincomplete-patterns@ error in the codec module. That is the tripwire the
--- arm list does not have; 'Pawl.JsonCodec.ArmSpec'\'s "a tag with no arm
+-- arm list does not have; 'Pawl.JsonCodec.ArmSpec'\'s "an unmatched value
 -- encodes as a document that will not decode" is what pins the remaining gap,
 -- a tag function naming a tag the arm list does not carry.
 --
@@ -23,9 +23,9 @@
 -- the one shape 'Common.asTagged' cannot read, so that gap fails loudly at the
 -- first round trip instead of writing something plausible.
 --
--- 'enum' needs neither: an ALL-NULLARY type needs no projection at all, so both
--- directions come off @Bounded@ and @Show@ and a new constructor is picked up
--- automatically.
+-- 'enum' needs no tag function: an ALL-NULLARY type needs no projection at all,
+-- so both directions come off @Bounded@ and @Show@ and a new constructor is
+-- picked up automatically.
 module Pawl.JsonCodec.Arm where
 
 import qualified Data.Foldable as Foldable
