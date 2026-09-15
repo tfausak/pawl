@@ -7,6 +7,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -15,6 +16,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
+import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Card (Card)
@@ -1195,11 +1197,39 @@ flipPermanent oid gs
 flipsOver :: ObjectId -> GameState -> Bool
 flipsOver oid gs = Set.member oid (GameState.battlefield gs) && hasFlipHalf oid gs
 
+-- | CR 613.1a / 611.2: the copiable values a STORED copy effect (Mirrorweave's
+-- "until end of turn") is giving this object -- Nothing where no row covers it.
+-- The half of layer 1a a stamp cannot hold, since only a row carries the expiry
+-- Pawl.Engine.Expiry ends it by; the stamp underneath is what the object reverts
+-- to once the row is swept.
+--
+-- The LATEST row wins (CR 613.7), because a copy effect REPLACES copiable values
+-- rather than adding to them -- so nothing below the newest one is observable
+-- while it stands, and a row that ends first reveals an older one still running.
+--
+-- HERE rather than beside its main caller
+-- (Pawl.Engine.Projection.View.stampedSnapshotOf) so that `hasFlipHalf` below
+-- answers the same question the projection does. The two readers of
+-- Binding.copyOf that CANNOT ask it are halvesCardOf and prepareCardOf above,
+-- which hold an Object and no GameState: a permanent under a stored row answers
+-- its own stamp for CR 709.5's halves and CR 722.2b's prepare spell. No board in
+-- data/cards/ reaches that -- the one card that stores a row copies a CREATURE
+-- (Mirrorweave), a Room is an enchantment (CR 709.5), and no card in the pool
+-- prints a prepare spell. A creature printed with a prepare spell is what would
+-- refute it.
+storedCopyOf :: ObjectId -> GameState -> Maybe PC.ProjectedCharacteristics
+storedCopyOf oid gs =
+  fmap ActiveCopy.snapshot
+    . Maybe.listToMaybe
+    . List.sortOn (Ord.Down . ActiveCopy.timestamp)
+    $ filter (Set.member oid . ActiveCopy.objects) (GameState.copyEffects gs)
+
 -- | CR 710.1b / 707.3: do this object's COPIABLE values include a flip card's
 -- alternative half? Its copy snapshot's answer when it has one -- the merge's
 -- flipped reading (CR 730.2h) or the copy's (PC.flipped) -- and its printed
 -- card's otherwise, `halvesCardOf`'s posture. A copy of anything else has none
--- whatever card is printed underneath it.
+-- whatever card is printed underneath it. `storedCopyOf` above comes first, for
+-- its own reason: a permanent under a stored copy effect is a copy.
 --
 -- FACE UP only, halvesOf's fork: CR 708.2 leaves a face-down object only the
 -- characteristics its allower listed. Every zone, since Pawl.Engine.Event's
@@ -1209,7 +1239,10 @@ hasFlipHalf oid gs = case lookupObject oid gs of
   Just obj
     | Facing.FaceUp <- Object.facing obj ->
         let bindings = Object.bindings obj
-         in case Binding.copyOf bindings of
+            stamped = case storedCopyOf oid gs of
+              Just stored -> Just stored
+              Nothing -> Binding.copyOf bindings
+         in case stamped of
               Just snapshot -> Maybe.isJust (Binding.flippedCopyOf bindings) || Maybe.isJust (PC.flipped snapshot)
               Nothing -> maybe False (Maybe.isJust . Card.flippedFace) (cardOf oid gs)
   _ -> False

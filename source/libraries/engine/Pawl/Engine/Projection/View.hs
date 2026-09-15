@@ -32,7 +32,6 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
-import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
@@ -982,6 +981,12 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
 -- above call it; Pawl.Engine.Game.halvesCardOf makes the other read in the
 -- engine, off the object it already holds.
 --
+-- LAYER 1a IS NOT THE BINDING ALONE. A copy effect that stated a duration is
+-- stored rather than stamped (Pawl.Types.ActiveCopy), so Game.storedCopyOf is
+-- consulted first and the binding is what a swept row falls back to. Here rather
+-- than in any one reader, for the reason copiableSnapshotOf above gives: a
+-- per-reader fork is what that accessor exists to prevent.
+--
 -- CR 730.2h is the one fork: a FLIPPED merged permanent reads the flipped
 -- stamp its merge left beside the ordinary one, so each flip component
 -- contributes its alternative characteristics. CR 110.5a keeps status out of the
@@ -999,7 +1004,7 @@ stampedSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 stampedSnapshotOf oid gs = do
   object <- Game.lookupObject oid gs
   let bindings = Object.bindings object
-      stamped = case storedCopyOf oid gs of
+      stamped = case Game.storedCopyOf oid gs of
         Just stored -> Just stored
         Nothing -> Binding.copyOf bindings
   if Object.flipped object
@@ -1007,24 +1012,6 @@ stampedSnapshotOf oid gs = do
       Just flipped -> Just flipped
       Nothing -> fmap (\stamp -> Maybe.fromMaybe stamp (PC.flipped stamp)) stamped
     else stamped
-
--- CR 613.1a / 611.2: the copiable values a STORED copy effect (Mirrorweave's
--- "until end of turn") is giving this object -- Nothing where no row covers it.
--- The half of layer 1a a stamp cannot hold, since only a row carries the expiry
--- Pawl.Engine.Expiry ends it by; the stamp `stampedSnapshotOf` above falls back
--- to is what the object reverts to once the row is swept.
---
--- The LATEST row wins (CR 613.7), because a copy effect REPLACES copiable values
--- rather than adding to them -- so nothing below the newest one is observable
--- while it stands, and a row that ends first reveals an older one still running.
--- Pawl.CopySpec's "CR 707.2b the token copy keeps the values after the turn ends"
--- rides on the same read.
-storedCopyOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
-storedCopyOf oid gs =
-  fmap ActiveCopy.snapshot
-    . Maybe.listToMaybe
-    . List.sortOn (Ord.Down . ActiveCopy.timestamp)
-    $ filter (Set.member oid . ActiveCopy.objects) (GameState.copyEffects gs)
 
 -- CR 707.2a: the static abilities this object's copiable rules text gives it --
 -- its copy snapshot's when it has one, its printed face's otherwise. Equal to

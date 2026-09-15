@@ -44,7 +44,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- what layer 1a leaves, since a copy effect REPLACES copiable values rather than
 -- adding to them. Not implemented: ordering a row against the stamp underneath
 -- it, which has no timestamp -- a copy effect stating no duration that resolves
--- while a row stands loses to the row instead of outranking it, as CR 613.7a
+-- while a row stands loses to the row instead of outranking it, as CR 613.7
 -- would have it (#3755).
 data ActiveCopy = MkActiveCopy
   { source :: ObjectId.ObjectId,
