@@ -5029,6 +5029,12 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
           GameEvent.BecameUnattached {} -> False
+  -- CR 603.2c's batch reading of the arm above (Spirit Mascot's "whenever ONE OR
+  -- MORE cards leave your graveyard"), delegated for PermanentsReturnedToHand's
+  -- reason: which moves this condition admits is the arm above's answer, and
+  -- firing once for the batch is `batchScoped` plus eventTriggers' dedup, never
+  -- this arm.
+  TriggerCondition.CardsLeaveGraveyard p -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.CardLeavesGraveyard p) event
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -5042,12 +5048,6 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- spell, CR 613.11's on a permanent's static ability: a spell that can't be
   -- countered is not countered at all (CR 101.2), so `counter` records nothing
   -- and there is no event for this arm to see.
-  -- CR 603.2c's batch reading of the arm above (Spirit Mascot's "whenever ONE OR
-  -- MORE cards leave your graveyard"), delegated for PermanentsReturnedToHand's
-  -- reason: which moves this condition admits is the arm above's answer, and
-  -- firing once for the batch is `batchScoped` plus eventTriggers' dedup, never
-  -- this arm.
-  TriggerCondition.CardsLeaveGraveyard p -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.CardLeavesGraveyard p) event
   TriggerCondition.SpellOrAbilityCounters relation -> case event of
     GameEvent.SpellCountered c -> PlayerRelation.holds (Game.teams gs) relation you (Countering.controller c)
     -- CR 701.6a's other subject, and the fence Baral needs: his sentence says
