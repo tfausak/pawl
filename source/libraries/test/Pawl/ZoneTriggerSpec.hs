@@ -2003,10 +2003,16 @@ representativeEvents cond =
         -- event). Any event is therefore as representative as any other.
         TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
         TriggerCondition.SelfDealsCombatDamageToPlayer _ -> one combatDamage
+        -- TWO of them, for SelfIsDealtDamage's reason below: this arm admits
+        -- both of CR 120.3's damage kinds, so a floor claimed for combat alone
+        -- would come apart on the noncombat one.
+        TriggerCondition.SelfDealsDamageToPlayer _ ->
+          noTable combatDamage
+            NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat))]
         -- CR 120.3's event pointed the other way, at the BEARER -- so the pair
         -- really matches. TWO of them, combat and noncombat, because this
-        -- condition is the one damage arm that admits both: a floor claimed for
-        -- one kind and not the other would come apart here.
+        -- condition admits both, as the arm above does: a floor claimed for one
+        -- kind and not the other would come apart here.
         TriggerCondition.SelfIsDealtDamage ->
           noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 2 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat))
             NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 3 False False False 0 Nothing Nothing mempty False DamageKind.Combat))]
@@ -2524,6 +2530,8 @@ everyTriggerCondition =
     TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.EachTurn),
     TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
+    TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.AnyPlayer,
+    TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.Opponent,
     TriggerCondition.SelfIsDealtDamage,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.Type.And []),

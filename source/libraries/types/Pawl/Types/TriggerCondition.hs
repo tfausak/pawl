@@ -53,10 +53,16 @@ data TriggerCondition
     --
     -- The relation is written out rather than defaulted, PermanentSacrificed's
     -- posture: Longtusk Cub's "deals combat damage to a player" spells itself
-    -- AnyPlayer, where Akki Lavarunner's and Questing Beast's "to an opponent"
-    -- is Opponent, and the two are different triggers on a board where the
-    -- damage is redirected to the creature's own controller (CR 614.9).
+    -- AnyPlayer, where Questing Beast's "to an opponent" is Opponent, and the two
+    -- are different triggers on a board where the damage is redirected to the
+    -- creature's own controller (CR 614.9).
     SelfDealsCombatDamageToPlayer PlayerRelation.PlayerRelation
+  | -- | CR 603.2 / 120.1: the bearer dealt damage of ANY kind to a player the
+    -- PlayerRelation admits -- the arm above without CR 510.1's combat narrowing.
+    -- Akki Lavarunner's "whenever this creature deals damage to an opponent" is
+    -- the printed form, and Soul's Fire aiming it at a player is the noncombat
+    -- half no combat-only arm reaches.
+    SelfDealsDamageToPlayer PlayerRelation.PlayerRelation
   | -- | CR 120.3: the bearer was dealt damage -- the enrage trigger's event
     -- (Ripjaw Raptor).
     SelfIsDealtDamage

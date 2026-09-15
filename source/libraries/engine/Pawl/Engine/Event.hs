@@ -7163,6 +7163,7 @@ reactsToAbilityTriggering cond = case cond of
   -- game state is not an ability triggering.
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
+  TriggerCondition.SelfDealsDamageToPlayer _ -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
@@ -7442,6 +7443,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentSacrificed {} -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
+  TriggerCondition.SelfDealsDamageToPlayer _ -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False

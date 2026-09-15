@@ -79,9 +79,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       " {\"type\":\"StateIs\",\"value\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":0},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}} "
   -- CR 603.2 / 509-510: the bearer dealt combat damage to a player the relation
   -- admits. BOTH relations, since the pool prints one of each: CR 702.70a's
-  -- poisonous and Longtusk Cub say "a player", where Akki Lavarunner and
-  -- Questing Beast say "an opponent", and a collapsed encoding would make the
-  -- two one trigger.
+  -- poisonous and Longtusk Cub say "a player", where Questing Beast says "an
+  -- opponent", and a collapsed encoding would make the two one trigger.
   Spec.it s "SelfDealsCombatDamageToPlayer round-trips both relations" $ do
     Common.assertCodec
       s
@@ -93,6 +92,20 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.Opponent)
       " {\"type\":\"SelfDealsCombatDamageToPlayer\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 603.2 / 120.1: the same pair without the combat narrowing -- Akki
+  -- Lavarunner's own condition. A separate TAG and not a flag on the arm above,
+  -- so a card written for one can never decode as the other.
+  Spec.it s "SelfDealsDamageToPlayer round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.AnyPlayer)
+      " {\"type\":\"SelfDealsDamageToPlayer\",\"value\":{\"type\":\"AnyPlayer\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.Opponent)
+      " {\"type\":\"SelfDealsDamageToPlayer\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 120.3: the same history read the other way round -- the bearer was DEALT
   -- damage. Nullary, since enrage qualifies the damage in no way.
   Spec.it s "SelfIsDealtDamage" $
