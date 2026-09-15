@@ -1305,7 +1305,7 @@ data Context = MkContext
     -- Nothing in the other three positions rule 702.16 reads a quality in, and
     -- rightly: its damage clause names "sources controlled by the specified
     -- player", and its Aura, Equipment and blocking clauses name objects that
-    -- player controls, so all four of those judge the OBJECT the atom is matched
+    -- player controls, so each of those judges the OBJECT the atom is matched
     -- against -- which is what the atom's own arm reads when this is unfilled.
     --
     -- NESTED, because the two Maybes answer different questions: the outer says
