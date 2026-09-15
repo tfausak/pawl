@@ -130,13 +130,13 @@ plot perform pid oid = do
       -- `keyword:plot`, 2026-09-01, every plot cost generic or monocoloured
       -- -- so no prompt is raised today.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
-      payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
-        -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a mana
-        -- ability tapped in the window this payment opened may have shuffled
-        -- or revealed, and this reject-not-repair restore must not undo that
-        -- too.
-        Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
+        -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
+        -- special action IS the whole of what failed, so `before` goes to
+        -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
+        -- window included -- happens there.
+        Payment.Unpaid -> pure ()
         -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled and
         -- the later cast pays its own cost.
         Payment.Paid _ -> do
