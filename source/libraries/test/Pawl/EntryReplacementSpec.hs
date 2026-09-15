@@ -1802,11 +1802,9 @@ toolkitOrders seasonFirst seasonId p = case p of
 
 -- voidpouncerSpec's answerer: kick, then order the CR 616.1 pool by the row's
 -- SOURCE and count the orders. Keyed by source rather than by the call index the
--- way toolkitOrders is, because Voidpouncer's sentence puts a SECOND prompt in
--- front of the scalers' -- the choice between its own two rows -- and an
--- index-keyed answer would name the opposite scaler on the prompt that matters.
--- Both boards therefore order the card's own two rows identically, which is what
--- leaves the scaler order the only difference between them.
+-- way toolkitOrders is, so that a prompt the card's own sentence should not raise
+-- cannot shift which scaler the answer names: whatever else is offered, the
+-- scaler order is the only difference between the two boards.
 --
 -- The count is still the guard against a per-kind opportunity (toolkitSpec proves
 -- the same claim the other way, by answering inconsistently and reading whether
@@ -1837,20 +1835,16 @@ pounceOrders seasonFirst seasonId p = case p of
 -- spell.) / If this creature was kicked, it enters with two +1/+1 counters and a
 -- trample counter on it and with haste." (oracle checked on Scryfall 2026-09-05)
 --
--- The card Synthetic Uneven Toolkit stood in for while EntryRewrite.WithKeywords
--- was missing: a printing outranks a synthetic, so the synthetic is gone. Its
--- sentence is TWO rows the way Faerie Squadron's is -- the counters and the
--- keyword -- each on CR 604.2's "if this creature was kicked", so both reach CR
--- 616.1e together and every board below asks one order the synthetic's did not.
+-- The card Synthetic Uneven Toolkit stood in for while the keyword half of CR
+-- 614.1c's clause was missing: a printing outranks a synthetic, so the synthetic
+-- is gone.
 --
--- The measured sequence on the scaling board is three orders over pools of 2, 3
--- and 2: the card's own two rows first, then -- CR 616.1f reconsidering the
--- modified event once the counters row has been applied -- the row still unapplied
--- beside Doubling Season and Vorinclex, then the two of those three left. The
--- control board, with no scaler on it, asks the first of those and nothing else.
--- Those counts are pawl's and not the rules': one printed sentence is one
--- replacement effect, so CR 616.1 asks nothing on the control board and once on
--- the scaling one. The order prompt the split raises is #3288's.
+-- ONE ROW, counters and keyword together, because CR 616.1 counts replacement
+-- effects and the printed sentence is one -- written as two it asked an order
+-- nobody is owed, and asked it in front of the scalers' genuine one (see #3288).
+-- The ORDER COUNT is what reads that here: nothing to order on the control board,
+-- and exactly one order on the scaling board, toolkitSpec's counts against a card
+-- whose sentence also grants a keyword.
 --
 -- THE BOARD is toolkitSpec's with the mana changed: five Radiant Fountains and a
 -- Mountain pay {1}{R} and the kicker's {2}{C} exactly. Every case kicks; the
@@ -1887,7 +1881,7 @@ voidpouncerSpec s registry = Spec.describe s "Voidpouncer (CR 614.5)" $ do
       (asked, Just oid, after) -> do
         Spec.assertEqWith s "two +1/+1 counters and a trample counter" (kindsOn oid after) (2, 1)
         Spec.assertBool s (Projection.hasKeyword Keyword.Haste oid after) "CR 614.1c and the keyword half of the same sentence granted haste"
-        Spec.assertEqWith s "and with no scaling row in the CR 616.1 pool the only order was between the sentence's own two rows" asked 1
+        Spec.assertEqWith s "and with no scaling row in the CR 616.1 pool there was nothing to order" asked 0
       _ -> Spec.assertFailure s "the creature did not reach the battlefield"
   -- The rule, made observable per-kind. Both scaling rows are unconditional on
   -- kind, so BOTH apply in the chosen order (CR 616.1's loop reconsiders the
@@ -1904,7 +1898,7 @@ voidpouncerSpec s registry = Spec.describe s "Voidpouncer (CR 614.5)" $ do
       ((seasonAsked, Just seasoned, seasonBoard), (praetorAsked, Just halved, praetorBoard)) -> do
         Spec.assertEqWith s "Doubling Season first: doubling then halving is lossless, so both kinds are as printed" (kindsOn seasoned seasonBoard) (2, 1)
         Spec.assertEqWith s "the praetor first: the even +1/+1 count survives, the odd trample count rounds to zero" (kindsOn halved praetorBoard) (2, 0)
-        Spec.assertEqWith s "and each board asked three orders -- 2 rows, then 3, then 2 -- not one per kind" (seasonAsked, praetorAsked) (3, 3)
+        Spec.assertEqWith s "and each board asked for exactly ONE order, not one per kind and not one for the sentence's own halves" (seasonAsked, praetorAsked) (1, 1)
       _ -> Spec.assertFailure s "the creature did not reach the battlefield"
 
 -- Answer an entry's CR 616.1 orders and COUNT them. The first order taken is
@@ -2410,9 +2404,10 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
 -- CR 614.3's FLOATING row carrying CR 614.1c's counter rewrite, aimed at other
 -- permanents by Filter: Gather Specimens' shape with the rewrite swapped from
 -- EntryRewrite.UnderSourceControl to EntryRewrite.WithCounters. Every other
--- WithCounters in data/cards rides the entering permanent's own static ability
--- with Filter.IsSource -- Faerie Squadron's, Barkhide Troll's, and the ones
--- Pawl.Engine.Keyword mints for vanishing, fading and modular -- so this is the
+-- counter row in data/cards rides the entering permanent's own static ability
+-- with Filter.IsSource -- Barkhide Troll's, the counter half of Faerie Squadron's
+-- EntryRewrite.EntersWith, and the ones Pawl.Engine.Keyword mints for vanishing,
+-- fading and modular -- so this is the
 -- first row that reads the counter count for a permanent OTHER than the one the
 -- row came from.
 --

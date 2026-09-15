@@ -145,6 +145,7 @@ import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
@@ -4237,9 +4238,10 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- every KIND, the map's keys being CR 122.1b's, any of which may be a whole
   -- Keyword carrying a Filter; see #2728.
   EntryRewrite.WithCounters w -> withCountersFilters w
-  -- CR 614.1c's granted keywords, the option arms' payload without the choice
-  -- around it, and reached the same way.
-  EntryRewrite.WithKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
+  -- BOTH halves of CR 614.1c's keyword-bearing sentence: the counters take the
+  -- arm above's sweep, and the granted keywords are the option arms' payload
+  -- without the choice around it, reached the same way.
+  EntryRewrite.EntersWith e -> foldMap withCountersFilters (EntersWith.counters e) <> concatMap keywordFilters (Set.toList (EntersWith.keywords e))
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []
@@ -5886,6 +5888,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             -- counters on it" announces X on the spell and reads it at the entry.
             wc <- case rewrite of
               EntryRewrite.WithCounters w -> [w]
+              -- The counter half of a keyword-bearing sentence takes the same
+              -- funnel (Pawl.Engine.Event's placeEntryCounters), so an X in it is
+              -- read at the entry too.
+              EntryRewrite.EntersWith e -> Maybe.maybeToList (EntersWith.counters e)
               EntryRewrite.AsCopy asCopy -> Maybe.maybeToList (AsCopy.counters asCopy)
               _ -> []
             q <- Map.elems (WithCounters.counters wc)

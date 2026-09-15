@@ -63,51 +63,25 @@
                 "type": "IsSource"
               },
               "rewrite": {
-                "type": "WithCounters",
-                "value": [
-                  {
-                    "count": {
-                      "type": "Literal",
-                      "value": 2
-                    },
-                    "kind": {
-                      "type": "PlusOnePlusOne"
+                "type": "EntersWith",
+                "value": {
+                  "counters": [
+                    {
+                      "count": {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      "kind": {
+                        "type": "PlusOnePlusOne"
+                      }
                     }
-                  }
-                ]
-              }
-            }
-          }
-        },
-        {
-          "condition": {
-            "type": "Compares",
-            "value": {
-              "comparison": {
-                "type": "AtLeast"
-              },
-              "measured": {
-                "type": "WasKicked"
-              },
-              "threshold": {
-                "type": "Literal",
-                "value": 1
-              }
-            }
-          },
-          "effect": {
-            "type": "EntryR",
-            "value": {
-              "matching": {
-                "type": "IsSource"
-              },
-              "rewrite": {
-                "type": "WithKeywords",
-                "value": [
-                  {
-                    "type": "Flying"
-                  }
-                ]
+                  ],
+                  "keywords": [
+                    {
+                      "type": "Flying"
+                    }
+                  ]
+                }
               }
             }
           }
