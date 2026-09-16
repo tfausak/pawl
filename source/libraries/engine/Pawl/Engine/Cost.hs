@@ -2195,8 +2195,10 @@ claimOf slots pid oid component gs =
         -- divides this pool, so such a criterion UNDERSTATES how often the cost can
         -- be paid rather than overstating it: an already-tapped candidate spends no
         -- untapped-ness and so is payable again, where dividing counts it once.
-        -- Every printing in `data/cards/` writes "untapped" (Heritage Druid,
-        -- Springleaf Drum), for which the division is exact.
+        -- Every criterion in the tree writes "untapped" anyway, printed
+        -- (Heritage Druid, Springleaf Drum) and minted alike
+        -- (Pawl.Engine.Keyword's conspire and station), so the division is exact
+        -- for all of them.
         CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
           claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) n
         -- The battlefield pool SacrificeThis and ReturnThis draw on, on their axis

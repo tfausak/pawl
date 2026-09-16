@@ -2308,8 +2308,8 @@ workhorseBoard horse counters =
 -- the pool's first repeatable mana ability whose cost taps OTHER permanents: no
 -- {T} on the Druid for CR 107.5 to bar a second activation, so nine untapped
 -- Elves are three activations and nine mana. `uncountedCeiling` capped the
--- component at 1, so the nine were read as three and the cast was never offered
--- (#2173).
+-- component at 1, so nine Elves supplied three mana and a cast two further
+-- activations could have paid for was never offered (#2173).
 --
 -- Glistener Elf is the fuel throughout and makes no mana, so every mana on these
 -- boards comes through the Druid and no count below can be met any other way.
@@ -2325,9 +2325,8 @@ heritageDruidSpec s registry = Spec.describe s "Heritage Druid" $ do
     Spec.assertBool s (pays 9) "three activations pay {9}"
     Spec.assertBool s (not (pays 10)) "and three is all nine Elves buy, so not {10}"
 
-  -- The DIVISION rather than the pool's size: six Elves pay a third cost twice
-  -- and a fourth one not at all, which a ceiling reading the pool itself would
-  -- have called six.
+  -- The DIVISION rather than the pool's size: six Elves are two activations, not
+  -- the six a ceiling reading the pool itself would have counted.
   Spec.it s "CR 118.3 six untapped Elves are two activations" $ do
     board <- heritageDruidBoard s registry 6
     let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
@@ -2354,7 +2353,7 @@ heritageDruidSpec s registry = Spec.describe s "Heritage Druid" $ do
         countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
     Spec.assertEqWith s "the Winnower resolved" (countOf "Void Winnower" resolved) 1
     Spec.assertEqWith s "with six Elves there is no {9} and the cast fails" (countOf "Void Winnower" short) 0
-    Spec.assertEqWith s "CR 601.2f all nine Elves paid for it, the Winnower itself arriving untapped" (S.tappedCount S.alice resolved) 9
+    Spec.assertEqWith s "CR 601.2h all nine Elves paid for it, the Winnower itself arriving untapped" (S.tappedCount S.alice resolved) 9
     Spec.assertEqWith s "and CR 601.2h left the short board's Elves untapped" (S.tappedCount S.alice short) 0
 
 -- Alice's Heritage Druid and as many Glistener Elves as make `elves` untapped
