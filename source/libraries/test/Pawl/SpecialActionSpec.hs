@@ -58,6 +58,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -74,8 +75,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.BeginningStep as BeginningStep
-import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
@@ -85,7 +85,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
-import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -888,26 +887,16 @@ valkyrieAnswers loreId prompt = case prompt of
   Prompt.ChooseCardInHand _ _ _ candidates | elem loreId candidates -> loreId
   _ -> S.identityAnswer prompt
 
--- Tap one of alice's untapped Islands, and nothing else -- the one difference
--- between the two boards the cast's price is read off. Named rather than
+-- Tap one of alice's untapped lands OF THAT PRINTING, and nothing else -- the one
+-- difference between the boards each cast's price is read off. Named rather than
 -- `tapOne` above, which takes the first untapped permanent: the Valkyrie herself
--- is untapped on this board and tapping her moves no mana.
-tapOneIsland :: Printing.Printing -> GameState.GameState -> GameState.GameState
-tapOneIsland island gs =
+-- is untapped on these boards and tapping her moves no mana.
+tapOneNamed :: Printing.Printing -> GameState.GameState -> GameState.GameState
+tapOneNamed island gs =
   let untapped oid = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
    in case filter untapped (S.namedObjects (S.printingName island) gs) of
         oid : _ -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
         [] -> gs
-
--- CR 702.143d's foretell cost for the Weaver: its {3}{U} reduced by {2}. Written
--- out rather than computed, so a reduction applied the wrong way round has
--- something to disagree with.
-weaverForetellCost :: Cost.Cost Keyword.Keyword
-weaverForetellCost =
-  Cost.MkCost
-    { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Blue)]),
-      Cost.components = []
-    }
 
 makeForetold :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 makeForetold s registry = Spec.describe s "CR 702.143d Ethereal Valkyrie" $ do
@@ -935,13 +924,13 @@ makeForetold s registry = Spec.describe s "CR 702.143d Ethereal Valkyrie" $ do
         -- The control for the COST: the same foretold card on the same later
         -- turn with only what the effect gave it taken away. The Weaver prints
         -- no foretell, so nothing is left to cast it for.
-        ungranted = later {GameState.objects = Map.map (\o -> o {Object.foretellCost = Nothing}) (GameState.objects later)}
+        ungranted = later {GameState.objects = Map.map (\o -> o {Object.foretellCostReduction = Nothing}) (GameState.objects later)}
         -- The control for the STAMP, the Raven group's one rule over.
         unforetold = later {GameState.objects = Map.map (\o -> o {Object.foretold = Nothing}) (GameState.objects later)}
     Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the cases below are about a card in exile"
     Monad.forM_ (soleExile after) $ \exiledId -> do
       Spec.assertBool s (S.castable S.alice exiledId later) "CR 702.143d on a later turn it is castable, off the two Islands the granted {1}{U} asks for"
-      Spec.assertBool s (not (S.castable S.alice exiledId (tapOneIsland island later))) "one Island does not pay it: the granted cost took {2} off the Weaver's {3}{U} and no more"
+      Spec.assertBool s (not (S.castable S.alice exiledId (tapOneNamed island later))) "one Island does not pay it: the granted cost took {2} off the Weaver's {3}{U} and no more"
       Spec.assertBool s (not (S.castable S.alice exiledId ungranted)) "the control: the same foretold card with the granted cost cleared is castable by nobody, the Weaver printing no foretell of its own"
       Spec.assertBool s (not (S.castable S.alice exiledId unforetold)) "the control: the same card in the same exile, not foretold, is castable by nobody"
       Spec.assertBool s (not (S.castable S.alice exiledId withMana)) "CR 702.143d not on the turn it became foretold, off the same two Islands"
@@ -965,9 +954,9 @@ makeForetold s registry = Spec.describe s "CR 702.143d Ethereal Valkyrie" $ do
         (Just True)
       Spec.assertEqWith
         s
-        "and its foretell cost is its mana cost reduced by {2}"
-        (fmap Object.foretellCost (Game.lookupObject exiledId after))
-        (Just (Just weaverForetellCost))
+        "and the effect gave it CR 702.143d's {2} off its own mana cost"
+        (fmap Object.foretellCostReduction (Game.lookupObject exiledId after))
+        (Just (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])))
     Spec.assertEqWith s "the Valkyrie is on the battlefield" (S.countOnBattlefieldByName (S.printingName valkyrie) S.alice after) 1
     Spec.assertEqWith s "alice's hand is the drawn Traveler alone" (S.handSize S.alice after) 1
     Spec.assertEqWith s "six lands paid for the Valkyrie" (S.tappedCount S.alice after) 6
@@ -996,6 +985,118 @@ makeForetold s registry = Spec.describe s "CR 702.143d Ethereal Valkyrie" $ do
         1
       Spec.assertEqWith s "exile is empty" (length (GameState.exile resolved)) 0
       Spec.assertEqWith s "and all eight lands are tapped: six for the Valkyrie, {1}{U} for the cast" (S.tappedCount S.alice resolved) 8
+
+-- The Valkyrie's board again with a MODAL DOUBLE-FACED card in the hand for her
+-- to exile: Birgi, God of Storytelling ({2}{R}) // Harnfel, Horn of Bounty
+-- ({4}{R}), whose two faces print mana costs four apart -- checked against
+-- Scryfall, 2026-09-15.
+--
+-- That gap is the whole case. CR 712.11b lets either face be cast, and rule
+-- 702.143d's granted cost is the mana cost of the face CAST -- the Valkyrie's own
+-- ruling says so outright -- so the same exiled card owes {R} as Birgi and
+-- {2}{R} as Harnfel. An implementation settling ONE cost when the effect
+-- resolved can only have settled the front face's (CR 712.8a), and then Harnfel
+-- is offered Birgi's {R}.
+--
+-- THREE MOUNTAINS and no other untapped land: the Valkyrie's own six are spent to
+-- the last mana before these arrive, so three is exactly Harnfel's {2}{R}, one is
+-- exactly Birgi's {R}, and the boards between them are the only thing the cases
+-- below differ in.
+birgiBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, GameState.GameState)
+birgiBoard plains island mountain valkyrie birgi traveler =
+  let (valkyrieId, birgiId, gs) = valkyrieBoard plains island valkyrie birgi traveler
+      after = S.runPure (valkyrieAnswers birgiId) gs (S.cast S.alice valkyrieId >> Engine.priorityLoop)
+      later = S.landsFor mountain S.alice 3 (after {GameState.turnNumber = GameState.turnNumber after + 1})
+   in (after, later)
+
+makeForetoldPerFace :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+makeForetoldPerFace s registry = Spec.describe s "CR 702.143d Ethereal Valkyrie and a modal double-faced card" $ do
+  -- ONE assertion over all five boards rather than five: an implementation that
+  -- prices both faces off the front face answers True to Harnfel at one Mountain,
+  -- and a failure printing the whole vector says which face went wrong instead of
+  -- stopping at the first.
+  --
+  -- The BIRGI legs are what make the Harnfel refusals about the FACE: the same
+  -- card, in the same exile, on the same board, is castable as its front face off
+  -- the one Mountain that will not pay for its back face.
+  Spec.it s "CR 702.143d the granted cost is the mana cost of the face being cast" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    valkyrie <- S.printingOf s registry "Ethereal Valkyrie"
+    birgi <- S.printingOf s registry "Birgi, God of Storytelling"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (after, later) = birgiBoard plains island mountain valkyrie birgi traveler
+        twoMountains = tapOneNamed mountain later
+        oneMountain = tapOneNamed mountain twoMountains
+        castableAs name gs = case soleExile after of
+          Nothing -> False
+          Just exiledId -> Cast.castable S.alice exiledId name Facing.FaceUp gs
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the cases below are about a card in exile"
+    Spec.assertEqWith
+      s
+      "CR 702.143d Harnfel's granted cost is its own {4}{R} reduced by {2}, and Birgi's is its {2}{R} reduced by {2}"
+      [ ("Harnfel, three Mountains", castableAs harnfelName later),
+        ("Harnfel, two Mountains", castableAs harnfelName twoMountains),
+        ("Harnfel, one Mountain", castableAs harnfelName oneMountain),
+        ("Birgi, one Mountain", castableAs birgiName oneMountain),
+        ("Birgi, no Mountain", castableAs birgiName (tapOneNamed mountain oneMountain))
+      ]
+      [ ("Harnfel, three Mountains", True),
+        ("Harnfel, two Mountains", False),
+        ("Harnfel, one Mountain", False),
+        ("Birgi, one Mountain", True),
+        ("Birgi, no Mountain", False)
+      ]
+    -- The identity leg, AFTER the vector: the card the faces were asked about
+    -- really is the double-faced one, so the refusals are the face being priced
+    -- and not some other card in exile.
+    Monad.forM_ (soleExile after) $ \exiledId ->
+      Spec.assertEqWith
+        s
+        "the exiled card is Birgi // Harnfel"
+        (fmap S.nameOf (Game.cardOf exiledId after))
+        (Just (S.printingName birgi))
+  -- The back-face cast taken rather than merely asked about: Harnfel reaches the
+  -- battlefield and all three Mountains go down with it, which is the {2}{R}
+  -- observed. An implementation pricing it off the front face taps one.
+  Spec.it s "CR 712.11b casting the back face pays the back face's granted cost" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    valkyrie <- S.printingOf s registry "Ethereal Valkyrie"
+    birgi <- S.printingOf s registry "Birgi, God of Storytelling"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (after, later) = birgiBoard plains island mountain valkyrie birgi traveler
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the case below runs at all"
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      let resolved = S.runPure S.castAnswer later (Cast.castSpell S.manaPerformer S.alice exiledId harnfelName Facing.FaceUp >> Stack.resolveTop)
+      -- Read off Object.face, which is where CR 712.13 carries rule 712.11b's
+      -- choice: S.countOnBattlefieldByName asks Card.combined, and CR 712.8a
+      -- makes that the FRONT face for every incarnation of this card.
+      let facesUp = Maybe.mapMaybe (\oid -> Game.lookupObject oid resolved >>= Object.face) (Game.zoneMembers Zone.Battlefield S.alice resolved)
+      Spec.assertEqWith
+        s
+        "Harnfel is on the battlefield, the back face CR 712.13 put there"
+        (filter (== harnfelName) facesUp)
+        [harnfelName]
+      Spec.assertEqWith s "exile is empty" (length (GameState.exile resolved)) 0
+      Spec.assertEqWith s "and all nine lands are tapped: six for the Valkyrie, {2}{R} for the cast" (S.tappedCount S.alice resolved) 9
+
+-- The two halves of Birgi, God of Storytelling // Harnfel, Horn of Bounty, named
+-- rather than read off the card: CR 712.11b's choice is the test's to make.
+birgiName :: CardName.CardName
+birgiName = CardName.MkCardName (Text.pack "Birgi, God of Storytelling")
+
+harnfelName :: CardName.CardName
+harnfelName = CardName.MkCardName (Text.pack "Harnfel, Horn of Bounty")
 
 foretelling :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 foretelling s registry = Spec.describe s "CR 116.2h Augury Raven" $ do
@@ -1413,6 +1514,7 @@ spec s registry = do
   makePlotted s registry
   foretelling s registry
   makeForetold s registry
+  makeForetoldPerFace s registry
   suspending s registry
   suspendHaste s registry
 

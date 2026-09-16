@@ -10,7 +10,6 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ControlClock as ControlClock
-import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExileLooker as ExileLooker
@@ -19,6 +18,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
@@ -314,8 +314,9 @@ data Object = MkObject
     -- face down, but CR 702.143d makes a card foretold that was already in exile
     -- face up, so neither field implies the other.
     foretold :: Maybe Natural.Natural,
-    -- | CR 702.143d: the foretell cost an EFFECT gave this foretold card
-    -- (Ethereal Valkyrie), or Nothing when none did.
+    -- | CR 702.143d: the foretell cost an EFFECT gave this foretold card, as the
+    -- amount it takes off the card's own mana cost (Ethereal Valkyrie's {2}), or
+    -- Nothing when no effect gave it one.
     --
     -- Beside `foretold` above rather than inside it because the two halves of
     -- rule 702.143d come apart: an effect may make a card foretold and give it
@@ -324,12 +325,19 @@ data Object = MkObject
     -- keyword prints. Both roads are read together by Pawl.Engine.Cost.costsFor,
     -- which is rule 702.143d's "any foretell cost it has".
     --
-    -- SETTLED here rather than recomputed at the cast: rule 702.143d gives the
-    -- cost as the effect resolves, and rule 702.143e makes it a property of the
-    -- card in exile its owner must track ("any foretell costs other than their
-    -- printed foretell costs those cards may have"). Per-incarnation: cleared by
-    -- newIncarnation (CR 400.7), like the stamp it belongs to.
-    foretellCost :: Maybe (Cost.Cost Keyword.Keyword),
+    -- THE REDUCTION and not the cost it yields, because the cost is PER FACE: CR
+    -- 712.11b lets a modal double-faced card be cast as either face, and the
+    -- Valkyrie's own ruling says the foretell cost is based on the mana cost of
+    -- the face cast from exile. A single settled cost is face-agnostic where
+    -- Pawl.Engine.Cost prices per face, so it is settled there instead, against
+    -- the face being offered and ahead of CR 601.2f -- which is what keeps it an
+    -- alternative COST rather than a discount the board's increases outrun.
+    --
+    -- Per-incarnation: cleared by newIncarnation (CR 400.7), like the stamp it
+    -- belongs to. What rule 702.143e makes its owner track is this amount, "any
+    -- foretell costs other than their printed foretell costs those cards may
+    -- have" being one number per card here.
+    foretellCostReduction :: Maybe ManaCost.ManaCost,
     -- | CR 702.185b: this exiled card is a WARPED card, stamped with the turn the
     -- warp ability's delayed trigger exiled it on -- which is what rule 702.185a's
     -- "after the current turn has ended" is compared against.
@@ -806,7 +814,7 @@ newIncarnation object =
       playableFromExile = Nothing,
       plotted = Nothing,
       foretold = Nothing,
-      foretellCost = Nothing,
+      foretellCostReduction = Nothing,
       warped = Nothing,
       preparedCopyOf = Nothing,
       ringBearerFor = Nothing,

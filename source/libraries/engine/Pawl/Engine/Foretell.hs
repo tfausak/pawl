@@ -32,7 +32,6 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
-import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
@@ -207,60 +206,24 @@ riders =
 -- Effect.MakeForetold arm), which may. Both land here so neither can drift from
 -- the other.
 --
--- Takes an ObjectId and a REDUCTION, never a card: this module's invariant is
--- that it never asks which card is being foretold, so the opcode's arm hands it
--- CR 400.7's exiled incarnation exactly as the special action does.
+-- What is written is the REDUCTION the effect stated and never a cost: rule
+-- 702.143d's cost is per FACE (CR 712.11b), and the face is not known until the
+-- cast is proposed, so Pawl.Engine.Cost.grantedForetellCost settles it there.
+-- Object.foretellCostReduction says why this field is that shape.
+--
+-- Takes an ObjectId and an amount of mana, never a card: this module's invariant
+-- is that it never asks which card is being foretold, so the opcode's arm hands
+-- it CR 400.7's exiled incarnation exactly as the special action does.
 --
 -- No GameEvent rides along, where Plot.becomePlotted records one. Not
 -- implemented: CR 702.143c's "whenever you foretell a card" as a trigger
 -- condition, and with it any trigger on a card becoming foretold (#1486).
 becomeForetold :: Maybe ManaCost.ManaCost -> ObjectId -> GameState -> GameState
 becomeForetold reduction newId gs =
-  let granted = reduction >>= \amount -> grantedCost amount newId gs
-   in gs
-        { GameState.objects =
-            Map.adjust
-              (\o -> o {Object.foretold = Just (GameState.turnNumber gs), Object.foretellCost = granted})
-              newId
-              (GameState.objects gs)
-        }
-
--- CR 702.143d's "that effect may give the card a foretell cost", as every
--- printing states it: the card's own mana cost reduced by an amount (Ethereal
--- Valkyrie's {2}).
---
--- SETTLED here rather than recomputed at the cast, which is what makes it a cost
--- rather than a discount: CR 601.2f applies the board's own increases before its
--- reductions, so a {W}{U} card given "mana cost reduced by {2}" under a tax of
--- {3} costs {3}{W}{U} -- where a reduction carried to CR 601.2f would have taken
--- the {2} off the tax instead.
---
--- Read off the printed card (Card.combined) rather than the projection, which is
--- what Pawl.Engine.Cost's own exile arm reads when it prices this cast, and what
--- it must be: CR 406.3's face-down exiled card is given no characteristics by
--- Pawl.Engine.Projection.View, and rule 702.143d's card was just exiled face
--- down.
---
--- Nothing for a card with no mana cost -- a land (CR 202.1) -- which leaves the
--- card foretold with no foretell cost and so with no cast to price. That is rule
--- 702.143d's own "for any foretell cost it has" read at zero.
-grantedCost :: ManaCost.ManaCost -> ObjectId -> GameState -> Maybe (Cost Keyword)
-grantedCost amount oid gs = do
-  card <- Game.cardOf oid gs
-  manaCost <- Face.manaCost (Card.combined card)
-  pure
-    Cost.Type.MkCost
-      { Cost.Type.mana = Just (Cost.applyAdjustments (Cost.plusReductions [amount] noAdjustments) manaCost),
-        Cost.Type.components = []
-      }
-
--- CR 601.2f with nothing in it: the board's own increases and reductions are the
--- caster's business at the cast, and rule 702.143d's amount is the only thing
--- being applied here.
-noAdjustments :: CostAdjustments.CostAdjustments
-noAdjustments =
-  CostAdjustments.MkCostAdjustments
-    { CostAdjustments.increases = [],
-      CostAdjustments.reductions = [],
-      CostAdjustments.components = []
+  gs
+    { GameState.objects =
+        Map.adjust
+          (\o -> o {Object.foretold = Just (GameState.turnNumber gs), Object.foretellCostReduction = reduction})
+          newId
+          (GameState.objects gs)
     }

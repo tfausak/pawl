@@ -3343,7 +3343,8 @@ plotCost keywords =
 -- every printing, so Pawl.Engine.Foretell mints that itself.
 --
 -- Not the only cost a foretold card may be cast for: CR 702.143d lets an effect
--- give one (Object.foretellCost), and Pawl.Engine.Cost offers both.
+-- give one, which Pawl.Engine.Cost.grantedForetellCost settles per face off
+-- Object.foretellCostReduction, and that module offers both.
 --
 -- A wildcard, and ONE cost per card (the ascending-least), morphCost's shape.
 foretellCost :: Set Keyword -> Maybe (Cost Keyword)
