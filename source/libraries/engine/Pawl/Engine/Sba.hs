@@ -722,13 +722,14 @@ performStateBasedActions = Event.simultaneously $ do
       -- PERFORMED for such a Saga, so nothing is reported -- which is also what
       -- the rule says, since CR 101.2 stops the sacrifice from happening at all.
       --
-      -- No board in the pool reaches it, so this is argued rather than tested:
-      -- the pool's one prohibition (Garland, Royal Kidnapper) names CREATURES,
-      -- and no printing here is both a Saga and a creature. Nor does the layer
-      -- system get there: Synthetic Chronicle Weaving can make an enchantment
-      -- creature a Saga (CR 613.1d), but grants it no chapter ability, so
-      -- Saga.tracksLore stays False and rule 704.5s never names it. The guard
-      -- stands because the failure it prevents is a hang rather than a wrong
+      -- The pool DOES reach this line now: its one prohibition (Garland, Royal
+      -- Kidnapper) names CREATURES, and Summon: Choco/Mog is both a Saga and a
+      -- creature, so alice controlling bob's copy of it is a board that gets here
+      -- -- Pawl.SagaSpec's "CR 101.2 a finished Saga that cannot be sacrificed is
+      -- left where it stands". That case proves the OBSERVABLE and not this line:
+      -- neutering the subtraction left the suite green (2026-09-15), the sacrifice
+      -- funnel's own CR 101.2 gate refusing the move either way. The line stands
+      -- as the termination guard, whose failure is a hang rather than a wrong
       -- answer.
       told =
         filter

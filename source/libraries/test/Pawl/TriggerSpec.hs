@@ -41,6 +41,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -2659,9 +2660,10 @@ runToTurnStep turn phase answer gs0 =
 -- WHAT THIS ASSERTS AND WHAT IT DOES NOT. The resulting BOARD is the same either
 -- way -- chapter III pumps Knights alice controls and the Boon's token is an
 -- Angel -- so the assertion is on stack order and on what alice was asked, both
--- of which a player sees, and not on a board difference. A Saga whose final
--- chapter read "creatures you control" would give a stronger discriminator; none
--- is in the pool.
+-- of which a player sees, and not on a board difference. Summon: Choco/Mog, whose
+-- final chapter pumps the OTHER creatures its controller has, would make the
+-- Angel's own power the discriminator; this case keeps History of Benalia and
+-- reads the stack directly.
 --
 -- `orderReversing` is what keeps the stack assertion from passing for the wrong
 -- reason. Under a single APNAP pass alice controls both triggers and IS asked,
@@ -2796,6 +2798,133 @@ chronicleWardenSpec s registry =
           -- lore counter on, so chapter III really was the final chapter.
           Spec.assertEqWith s "the turn-based action put the third lore counter on" (S.counterOf CounterKind.Lore sagaId advanced) 3
 
+-- CR 608.2h read by CR 603.3b's second class: the Saga whose final chapter fired
+-- is already in the graveyard when CR 117.5 gathers the watcher's trigger.
+--
+-- CR 704.5s keeps a Saga on the battlefield while a chapter ability of its own is
+-- on the stack, so the only way out of that window is a Saga that is ALSO a
+-- creature -- CR 704.5g destroys it for lethal damage in the very state-based
+-- action batch that runs before the placement.
+--
+-- Summon: Choco/Mog, {2}{W} Enchantment Creature -- Saga Bird Moogle 3/3, "I, II,
+-- III, IV -- Stampede! -- Other creatures you control get +1/+0 until end of
+-- turn", standing on three lore counters; Volt Charge, {2}{R} Instant, "Volt
+-- Charge deals 3 damage to any target. Proliferate." One resolution marks lethal
+-- damage on the 3/3 and then proliferates the fourth lore counter, which fires
+-- chapter IV -- its final chapter (CR 714.2d). Historian's Boon watches that.
+--
+-- THE PAIR differs in exactly one thing, whom Volt Charge is aimed at. Aimed at
+-- the Saga it is gone by the scan and the Boon can only answer from last known
+-- information; aimed at bob the same proliferate fires the same chapter with the
+-- Saga standing. Alice gets her Angel either way, and that is the assertion.
+--
+-- A test-local answerer rather than Pawl.Support's Board: the harness has no
+-- vocabulary for Prompt.ChooseProliferate. Both choices FILTER the offered set
+-- rather than building a recipient, so a mutation cannot be repaired by an
+-- answerer that goes looking for a legal option.
+sagaDiesBeforeScanSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sagaDiesBeforeScanSpec s registry =
+  let angelToken = CardName.MkCardName (Text.pack "Angel Token")
+      aiming :: Recipient.Recipient -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      aiming victim sagaId p = case p of
+        Prompt.ChooseTargets _ _ _ slots -> S.preferring (== victim) slots
+        Prompt.ChooseProliferate _ _ oids _ -> (Set.fromList (filter (== sagaId) oids), Set.empty)
+        _ -> S.identityAnswer p
+      -- CR 707.5's as-enters choice, pinned to one named permanent so that a
+      -- mutation cannot be repaired by an answerer that finds another legal one.
+      copying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      copying wanted p = case p of
+        Prompt.ChooseCopyTarget {} -> Just wanted
+        _ -> S.identityAnswer p
+      -- The battlefield object whose PRINTED face carries this name -- which
+      -- copying never changes, so it is how a copy is found by the card it is not.
+      printedOnBattlefield name gs =
+        let isIt oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))
+         in List.find isIt (Set.toList (GameState.battlefield gs))
+      -- (the Saga's id, the board after Volt Charge resolved, the board after the
+      -- CR 117.5 scan, the board after everything resolved).
+      boardOf victimOf = do
+        choco <- S.printingOf s registry "Summon: Choco/Mog"
+        boon <- S.printingOf s registry "Historian's Boon"
+        volt <- S.printingOf s registry "Volt Charge"
+        mountain <- S.printingOf s registry "Mountain"
+        let (sagaId, base) = S.addPermanent choco S.alice (S.landsFor mountain S.alice 3 (Setup.emptyGame S.bothPlayers))
+            (_, withBoon) = S.addPermanent boon S.alice base
+            withCounters = S.addCounter CounterKind.Lore 3 sagaId withBoon
+            (voltId, withVolt) = S.addHandCard volt S.alice withCounters
+            ready =
+              withVolt
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            victim = victimOf sagaId
+            onStack = S.runPure (aiming victim sagaId) ready (S.cast S.alice voltId)
+            burned = S.runPure (aiming victim sagaId) onStack Stack.resolveTop
+            scanned = S.runPure (aiming victim sagaId) burned Engine.settleForPriority
+            finished = S.runPure (aiming victim sagaId) scanned Engine.priorityLoop
+        pure (sagaId, burned, scanned, finished)
+   in Spec.describe s "CR 603.3b a Saga that dies before its final chapter is gathered" $ do
+        Spec.it s "CR 608.2h the watcher reads the dead Saga's last known information" $ do
+          (sagaId, burned, scanned, finished) <- boardOf Recipient.ToCreature
+          -- THE BEHAVIOUR: the Boon's ability triggered off chapter IV triggering
+          -- and resolved, though the Saga it names was already in the graveyard
+          -- when CR 117.5 looked for it.
+          Spec.assertEqWith s "alice still gets the Boon's Angel" (S.countOnBattlefieldByName angelToken S.alice finished) 1
+          -- The precondition the behaviour rests on, read off the board the scan
+          -- actually saw: CR 704.5g had already destroyed the Saga.
+          Spec.assertBool s (not (S.onBattlefield sagaId scanned)) "CR 704.5g destroyed the Saga before the trigger was placed"
+          -- And the two halves of the one resolution that made that window, so
+          -- neither can drift: three damage on a 3/3, and the fourth lore counter.
+          Spec.assertEqWith s "Volt Charge marked lethal damage" (S.damageOf sagaId burned) (Just 3)
+          Spec.assertEqWith s "and proliferate put the fourth lore counter on" (S.counterOf CounterKind.Lore sagaId burned) 4
+        Spec.it s "CR 603.10 the same board with the Saga still standing gives the same Angel" $ do
+          (sagaId, burned, scanned, finished) <- boardOf (const (Recipient.ToPlayer S.bob))
+          Spec.assertEqWith s "alice gets the Boon's Angel" (S.countOnBattlefieldByName angelToken S.alice finished) 1
+          -- The one thing this board differs in: the Saga took no damage, so it
+          -- was still on the battlefield for the live read.
+          Spec.assertBool s (S.onBattlefield sagaId scanned) "the Saga was still on the battlefield at the scan"
+          Spec.assertEqWith s "bob took the 3 damage instead" (S.lifeOf S.bob finished) (Just 17)
+          Spec.assertEqWith s "and proliferate put the fourth lore counter on" (S.counterOf CounterKind.Lore sagaId burned) 4
+        -- The CLONE board: the dying Saga is a Copy Enchantment, whose PRINTED
+        -- card has no chapter ability at all. CR 707.2 puts Choco/Mog's four in
+        -- its copiable values, and Pawl.Types.LastKnown.characteristics is the
+        -- projection taken as it ceased -- so a reader that fell back to the
+        -- printed card would find no final chapter and stay silent. The original
+        -- keeps no lore counters, so the Angel can only be the copy's.
+        Spec.it s "CR 707.2 a COPY of the Saga answers with the copy's chapters" $ do
+          choco <- S.printingOf s registry "Summon: Choco/Mog"
+          boon <- S.printingOf s registry "Historian's Boon"
+          volt <- S.printingOf s registry "Volt Charge"
+          mountain <- S.printingOf s registry "Mountain"
+          copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+          let (originalId, base) = S.addPermanent choco S.alice (S.landsFor mountain S.alice 3 (Setup.emptyGame S.bothPlayers))
+              (_, withBoon) = S.addPermanent boon S.alice base
+              (voltId, withVolt) = S.addHandCard volt S.alice withBoon
+              (_, staged) = S.spellOnStack copyEnchantment S.alice withVolt
+              copied = S.runPure (copying originalId) staged (Stack.resolveTop >> Engine.settleForPriority)
+          case printedOnBattlefield "Copy Enchantment" copied of
+            Nothing -> Spec.assertFailure s "Copy Enchantment never reached the battlefield"
+            Just copyId -> do
+              let have = S.counterOf CounterKind.Lore copyId copied
+                  ready =
+                    (S.addCounter CounterKind.Lore (Natural.minusSaturating 3 have) copyId copied)
+                      { GameState.phase = Phase.PrecombatMain,
+                        GameState.activePlayer = S.alice,
+                        GameState.priority = Just S.alice
+                      }
+                  onStack = S.runPure (aiming (Recipient.ToCreature copyId) copyId) ready (S.cast S.alice voltId)
+                  burned = S.runPure (aiming (Recipient.ToCreature copyId) copyId) onStack Stack.resolveTop
+                  scanned = S.runPure (aiming (Recipient.ToCreature copyId) copyId) burned Engine.settleForPriority
+                  finished = S.runPure (aiming (Recipient.ToCreature copyId) copyId) scanned Engine.priorityLoop
+              Spec.assertEqWith s "alice still gets the Boon's Angel" (S.countOnBattlefieldByName angelToken S.alice finished) 1
+              Spec.assertBool s (not (S.onBattlefield copyId scanned)) "CR 704.5g destroyed the copy before the trigger was placed"
+              -- The copy really is the Saga and the original really is idle, so
+              -- neither half of "the copy's chapters" can be the original's.
+              Spec.assertBool s (Set.member Subtype.Saga (Projection.subtypesOf copyId copied)) "the Copy Enchantment really became a Saga"
+              Spec.assertEqWith s "and proliferate put the copy's fourth lore counter on" (S.counterOf CounterKind.Lore copyId burned) 4
+              Spec.assertEqWith s "while the original never took one" (S.counterOf CounterKind.Lore originalId burned) 0
+
 -- The chapter numbers of `oid`'s own chapter abilities currently on the stack (CR
 -- 714.2, CR 704.5s).
 chaptersOnStackFrom :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
@@ -2914,6 +3043,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   orderingSpec s registry
   secondPlacementPassSpec s registry
   chronicleWardenSpec s registry
+  sagaDiesBeforeScanSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
   enchantedHostTriggerSpec s registry

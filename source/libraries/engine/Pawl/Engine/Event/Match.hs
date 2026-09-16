@@ -7887,14 +7887,17 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- permanent, so the bearer contributes only CR 109.5's perspective through
   -- `you`, which the PlayerRelation reads the event's controller against.
   --
-  -- The source is read LIVE (Projection.project), which needs no CR 608.2h
-  -- fallback and is not a shortcut: CR 704.5s's exemption keeps a Saga on the
-  -- battlefield for exactly as long as a chapter ability of its own has triggered
-  -- and not yet left the stack, so the Saga whose final chapter fired this event
-  -- is still standing at the CR 117.5 boundary that scans for it. A Saga a
-  -- replacement or another player's effect took away in the same batch projects
-  -- as an object with no subtypes, which Saga.tracksLore declines -- the same
-  -- silence CR 603.10 would give a look-back that found nothing (#1028).
+  -- The source is read through CR 608.2h's fallback
+  -- (Projection.projectWithLastKnown), because CR 704.5s's exemption is not enough
+  -- on its own: it keeps a Saga off the SACRIFICE while a chapter ability of its
+  -- own is on the stack, but CR 704.5g still destroys a Saga that is also a
+  -- creature and has lethal damage, in the very state-based action batch that runs
+  -- before CR 117.5 places the trigger. A live read then projects an object with
+  -- no subtypes and Saga.tracksLore declines it. CR 603.10's first sentence wants
+  -- the objects as they were immediately after the event, and the record holds the
+  -- projection taken as the Saga ceased -- the copy's chapters for a Saga that was
+  -- a copy, not the printed card's. Pawl.TriggerSpec's "CR 608.2h the watcher
+  -- reads the dead Saga's last known information" is the pair that proves it.
   TriggerCondition.SagaFinalChapterTriggers relation -> case event of
     -- A SOURCELESS inherent ability (CR 725.2, CR 702.179d) is never a chapter
     -- ability of a Saga, there being no Saga behind it to read lore counters off.
@@ -7902,7 +7905,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       TriggerSource.Sourceless -> False
       TriggerSource.OfObject srcId ->
         PlayerRelation.holds (Game.teams gs) relation you (AbilityTriggered.controller record)
-          && ( let pc = Projection.project srcId gs
+          && ( let pc = Projection.projectWithLastKnown srcId gs
                 in Saga.tracksLore pc && Saga.chapterOf (AbilityTriggered.ability record) == Just (Saga.finalChapterOf pc)
              )
     GameEvent.PermanentSacrificed {} -> False
