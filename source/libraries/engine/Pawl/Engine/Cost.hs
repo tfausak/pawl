@@ -2276,16 +2276,22 @@ claimsOf slots pid oid components gs = Maybe.mapMaybe (\component -> claimOf slo
 -- behind either, so there is no binding a criterion could read (Pawl.CardSpec's
 -- SlotlessCostFramed). The gates that DO sit in front of an announcement take
 -- their slots as an argument (canPaySomeCompletion below).
-canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPay pid oid cost gs = case Cost.mana cost of
+--
+-- The SUBJECT is the caller's, `pay`'s reason: this gate and the payment behind
+-- it have to ask CR 106.6 the same question, or an action Overgrown Zealot's
+-- mana can pay for is never offered. Most callers are ForNeither; the two
+-- special actions a printed rider names -- CR 116.2m's unlock
+-- (Pawl.Engine.Room.canUnlock) and CR 116.2b's turn-up
+-- (Pawl.Engine.FaceDown.canTurnFaceUp) -- pass their own permanent.
+canPay :: PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPay subject pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
     -- CR 118.14's permission is a CAST's, and no caller of this one is casting --
     -- what reaches here is a special action's cost and CR 118.12's
-    -- resolution-time payment -- so the mana is spent as it is, and CR
-    -- 106.6-restricted mana is no supply for any of them: neither of CR 106.6's
-    -- two subjects is one of these payments (ForNeither).
-    Mana.canPayCommitting PaymentSubject.ForNeither (manaActivationsGiven (PlayerEffect.applying pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost gs
+    -- resolution-time payment -- so the mana is spent as it is. Which CR
+    -- 106.6-restricted mana is a supply is the subject's question.
+    Mana.canPayCommitting subject (manaActivationsGiven (PlayerEffect.applying pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost gs
       && all (\component -> canPayComponent Map.empty pid oid component gs) (Cost.components cost)
       && jointlyPayable Map.empty pid oid (Cost.components cost) gs
 
@@ -3338,11 +3344,12 @@ announceManaSubstitutions pid oid cost = case Cost.mana cost of
 --
 -- `subject` is WHAT this payment is for (Pawl.Types.PaymentSubject): CR 601.2h's
 -- spell at Pawl.Engine.Cast, CR 602.2b's ability source at Pawl.Engine.Activate,
--- and neither at the special actions and CR 118.12's resolution-time payment. It
--- is not `oid` under another name -- `oid` is whatever object the cost belongs
--- to, which for a special action is no spell and no ability -- and CR 106.6's
--- restrictions name one of the two subjects, so the two questions are different
--- ones. Mana.spendableFor is what reads it.
+-- the permanent being unlocked at Pawl.Engine.Room or turned face up at
+-- Pawl.Engine.FaceDown, and none of those at a combat toll and CR 118.12's
+-- resolution-time payment. It is not `oid` under another name -- `oid` is
+-- whatever object the cost belongs to -- and CR 106.6's restrictions name one of
+-- the subjects, so the two questions are different ones. Mana.spendableFor is
+-- what reads it.
 --
 -- `announced` is the object the announcement put on the stack -- CR 601.2a's
 -- spell, or CR 602.2a's ability object rather than the source `subject` carries
@@ -3487,9 +3494,10 @@ payToll perform pid charges = do
       paidMana <-
         if null (ManaCost.unwrap pooled)
           then pure True
-          -- Neither a cast nor an activation (ForNeither), so CR 106.6-restricted
-          -- mana cannot pay a combat toll. Exact: CR 106.6's restrictions name a
-          -- cast or an activation, and CR 508.1j's toll is neither.
+          -- No subject (ForNeither), so CR 106.6-restricted mana cannot pay a
+          -- combat toll. Exact: every printed restriction names a cast, an
+          -- activation or a special action, and CR 508.1j's toll is none of
+          -- those.
           else payMana perform PaymentSubject.ForNeither ManaSpending.AsProduced pid pooled
       if not paidMana
         then pure False

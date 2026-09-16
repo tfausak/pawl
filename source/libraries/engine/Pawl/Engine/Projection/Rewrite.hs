@@ -1007,14 +1007,16 @@ replaceWholeWord from to =
                       else go (done <> Text.take 1 match) (Text.drop 1 match)
    in go Text.empty
 
--- CR 612.1 through CR 106.6a's spending restriction: both halves are filters of
+-- CR 612.1 through CR 106.6a's spending restriction: every half is a filter of
 -- printed text. See the AddMana arm above for why this is a fence rather than a
 -- proof.
 rewriteManaRestriction :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ManaRestriction.ManaRestriction -> ManaRestriction.ManaRestriction
 rewriteManaRestriction pairs restriction =
   restriction
     { ManaRestriction.casts = fmap (Filter.rewrite pairs) (ManaRestriction.casts restriction),
-      ManaRestriction.activations = fmap (Filter.rewrite pairs) (ManaRestriction.activations restriction)
+      ManaRestriction.activations = fmap (Filter.rewrite pairs) (ManaRestriction.activations restriction),
+      ManaRestriction.unlocks = fmap (Filter.rewrite pairs) (ManaRestriction.unlocks restriction),
+      ManaRestriction.turnsFaceUp = fmap (Filter.rewrite pairs) (ManaRestriction.turnsFaceUp restriction)
     }
 
 -- CR 612.1 through CR 106.6a's other clause: the rider's condition says WHICH

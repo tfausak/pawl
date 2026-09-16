@@ -1117,7 +1117,7 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
               context = effectContext gs controller source legal (slotBindings resolving gs)
            in maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source quantity)
       cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate))
-  if not (Cost.canPay payer source cost gs)
+  if not (Cost.canPay PaymentSubject.ForNeither payer source cost gs)
     then pure False
     else do
       decision <- case PayGate.obligation gate of

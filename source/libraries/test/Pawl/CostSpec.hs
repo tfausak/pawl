@@ -198,13 +198,13 @@ doorSpec s registry =
       let gs = S.landsInPlay mountain 5
       Spec.assertBool
         s
-        (not (Cost.canPay S.alice S.noSource (Cost.Type.MkCost Nothing []) gs))
+        (not (Cost.canPay PaymentSubject.ForNeither S.alice S.noSource (Cost.Type.MkCost Nothing []) gs))
         "Nothing is unpayable"
     Spec.it s "CR 118.5a a {0} cost is payable" $
       let gs = Setup.emptyGame S.bothPlayers
        in Spec.assertBool
             s
-            (Cost.canPay S.alice S.noSource (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) gs)
+            (Cost.canPay PaymentSubject.ForNeither S.alice S.noSource (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) gs)
             "an empty ManaCost is {0}"
     -- CR 118.6a: "If an unpayable cost is increased by an effect or an
     -- additional cost is imposed, the cost is still unpayable." total maps over
@@ -1326,15 +1326,15 @@ asmorSpec s registry =
           Spec.assertEqWith s "the printed cost really is CR 118.6's unpayable one" (Cost.Type.mana printed) Nothing
           -- The assertion this case exists for, ahead of the counts that were
           -- already right: ZERO copies.
-          Spec.assertBool s (not (Cost.canPay S.alice asmor (Cost.repeated 0 printed) gs)) "CR 118.6 no copies of it is still unpayable, not {0}"
-          Spec.assertBool s (not (Cost.canPay S.alice asmor (Cost.repeated 1 printed) gs)) "one copy is unpayable"
-          Spec.assertBool s (not (Cost.canPay S.alice asmor (Cost.repeated 3 printed) gs)) "and three"
+          Spec.assertBool s (not (Cost.canPay PaymentSubject.ForNeither S.alice asmor (Cost.repeated 0 printed) gs)) "CR 118.6 no copies of it is still unpayable, not {0}"
+          Spec.assertBool s (not (Cost.canPay PaymentSubject.ForNeither S.alice asmor (Cost.repeated 1 printed) gs)) "one copy is unpayable"
+          Spec.assertBool s (not (Cost.canPay PaymentSubject.ForNeither S.alice asmor (Cost.repeated 3 printed) gs)) "and three"
           -- The pair that differs in exactly one thing: the same three counts
           -- over a cost whose mana part is Just, where rule 118.5 makes the empty
           -- one payable. Without this the fix could have made every count
           -- unpayable and still been green.
           let payable = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
-          Spec.assertBool s (Cost.canPay S.alice asmor (Cost.repeated 0 payable) gs) "CR 118.5 no copies of a PAYABLE cost is {0}, which is paid by doing nothing"
+          Spec.assertBool s (Cost.canPay PaymentSubject.ForNeither S.alice asmor (Cost.repeated 0 payable) gs) "CR 118.5 no copies of a PAYABLE cost is {0}, which is paid by doing nothing"
           Spec.assertEqWith s "and three copies is {1}{1}{1}" (Cost.Type.mana (Cost.repeated 3 payable)) (Just (ManaCost.MkManaCost (replicate 3 (ManaSymbol.Generic 1))))
 
 -- alice controls Asmoranomardicadaistinaculdacar and, beside it, `foods` Golden
@@ -1658,8 +1658,8 @@ jaradSpec s registry =
         s
         (all (\c -> Cost.canPayComponent Map.empty S.alice loneId c lone) (Cost.Type.components cost))
         "each component on its own is payable off the one Bayou"
-      Spec.assertBool s (not (Cost.canPay S.alice loneId cost lone)) "but the cost as a whole is not"
-      Spec.assertBool s (Cost.canPay S.alice pairId cost pair) "and a Forest beside the Bayou pays it"
+      Spec.assertBool s (not (Cost.canPay PaymentSubject.ForNeither S.alice loneId cost lone)) "but the cost as a whole is not"
+      Spec.assertBool s (Cost.canPay PaymentSubject.ForNeither S.alice pairId cost pair) "and a Forest beside the Bayou pays it"
     -- The prompt-side half (#112). It holds by CONSTRUCTION rather than by any
     -- guard: Cost.payComponents folds the components in the Game state monad and
     -- Cost.payComponent's Sacrifice arm reads the state afresh, so the second
@@ -1720,7 +1720,7 @@ jaradSpec s registry =
           names = fmap (CardName.MkCardName . Text.pack)
       -- The board is payable, so a leg that fails fails on the ORDER and not on
       -- resources CR 118.3 never had.
-      Spec.assertBool s (Cost.canPay S.alice jaradId cost gs) "the cost is payable on this board"
+      Spec.assertBool s (Cost.canPay PaymentSubject.ForNeither S.alice jaradId cost gs) "the cost is payable on this board"
       Spec.assertBool
         s
         (wasAskedForOrder (answersFor (payingInOrder [1, 0] bayouId) gs activating))
@@ -2732,7 +2732,7 @@ safeholdSentrySpec s registry =
       plains <- S.printingOf s registry "Plains"
       safeholdSentry <- S.printingOf s registry "Safehold Sentry"
       let (sentry, gs) = sentryBoard plains safeholdSentry False
-      Spec.assertBool s (not (Cost.canPay S.alice sentry (ActivatedAbility.cost (theAbility safeholdSentry)) gs)) "canPay says no"
+      Spec.assertBool s (not (Cost.canPay PaymentSubject.ForNeither S.alice sentry (ActivatedAbility.cost (theAbility safeholdSentry)) gs)) "canPay says no"
       Spec.assertBool s (not (any isActivateAction (Action.legalActions S.alice gs))) "and no Activate is offered"
     -- The issue itself (#204): CR 302.6 names the tap symbol AND the untap
     -- symbol, and only the first half had a producer. A summoning-sick Sentry
@@ -2742,7 +2742,7 @@ safeholdSentrySpec s registry =
       safeholdSentry <- S.printingOf s registry "Safehold Sentry"
       let (sentry, gs) = sentryBoard plains safeholdSentry True
           sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) sentry (GameState.objects gs)}
-      Spec.assertBool s (Cost.canPay S.alice sentry (ActivatedAbility.cost (theAbility safeholdSentry)) sick) "the cost itself is still payable -- it is tapped"
+      Spec.assertBool s (Cost.canPay PaymentSubject.ForNeither S.alice sentry (ActivatedAbility.cost (theAbility safeholdSentry)) sick) "the cost itself is still payable -- it is tapped"
       Spec.assertBool s (not (any isActivateAction (Action.legalActions S.alice sick))) "but CR 302.6 withholds the ability"
 
 isActivateAction :: Action.Type.Action -> Bool
@@ -2806,7 +2806,7 @@ catharticReunionSpec s registry =
       -- Read through costsFor, so the assertion is against the cost the engine
       -- would actually offer (mana cost plus the printed additional cost),
       -- never a hand-built one.
-      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice reunion c gs) (Cost.costsFor S.alice (S.printingName catharticReunion) reunion gs))) "no offered cost is payable"
+      Spec.assertBool s (not (any (\c -> Cost.canPay PaymentSubject.ForNeither S.alice reunion c gs) (Cost.costsFor S.alice (S.printingName catharticReunion) reunion gs))) "no offered cost is payable"
       Spec.assertBool s (not (any (S.isCastOf reunion) (Action.legalActions S.alice gs))) "and no Cast is offered"
     Spec.it s "CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid" $ do
       -- The COST path's reject-not-repair, and deliberately the opposite of what
@@ -2908,7 +2908,7 @@ magmaticInsightSpec s registry =
       magmaticInsight <- S.printingOf s registry "Magmatic Insight"
       let (insight, _, gs) = magmaticBoard mountain piker magmaticInsight piker
       Spec.assertEqWith s "the hand is the same size as the payable board's" (S.handSize S.alice gs) 3
-      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice insight c gs) (Cost.costsFor S.alice (S.printingName magmaticInsight) insight gs))) "no offered cost is payable"
+      Spec.assertBool s (not (any (\c -> Cost.canPay PaymentSubject.ForNeither S.alice insight c gs) (Cost.costsFor S.alice (S.printingName magmaticInsight) insight gs))) "no offered cost is payable"
       Spec.assertBool s (not (any (S.isCastOf insight) (Action.legalActions S.alice gs))) "and no Cast is offered"
 
 -- Springleaf Drum {1} Artifact: "{T}, Tap an untapped creature you control: Add
