@@ -52,12 +52,13 @@ data ObjectRef
     EachCardExiledWithSource (Maybe (Filter.Filter Keyword.Keyword))
   | -- | CR 109.2b / Swift Silence: every spell on the stack matching the Filter,
     -- abilities excluded (CR 113.9).
-    --
-    -- Not implemented: a set holding the abilities alone, which no card has needed
-    -- (gap #2032).
     EachSpell (Filter.Filter Keyword.Keyword)
+  | -- | CR 113.9 / Kadena's Silencer: every activated or triggered ability on the
+    -- stack matching the Filter, spells excluded (CR 112.1). The arm above's
+    -- mirror, over the other kind of object the zone holds.
+    EachAbility (Filter.Filter Keyword.Keyword)
   | -- | CR 405.1 / Glen Elendra's Answer: every object on the stack matching the
-    -- Filter, spells and abilities alike.
+    -- Filter, without either arm above's kind test.
     EachOnStack (Filter.Filter Keyword.Keyword)
   | -- | CR 120.3a / Molten Disaster: every player in the game, an ObjectRef because
     -- a damage clause's ref is one. Pawl.ReplacementSpec's Molten Disaster case

@@ -74,9 +74,17 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.EachSpell (Filter.Not Filter.IsSource))
       " {\"type\":\"EachSpell\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}} "
-  -- CR 405.1: the same zone with no kind test, so the abilities the arm above
-  -- leaves out are in. Glen Elendra's Answer's "all spells your opponents
-  -- control and all abilities your opponents control" is the filter.
+  -- CR 113.9: the same zone, the other kind. Kadena's Silencer's "all abilities
+  -- your opponents control" is the filter.
+  Spec.it s "EachAbility" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachAbility (Filter.ControlledBy PlayerRelation.Opponent))
+      " {\"type\":\"EachAbility\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"Opponent\"}}} "
+  -- CR 405.1: the same zone with no kind test, so both arms above are in. Glen
+  -- Elendra's Answer's "all spells your opponents control and all abilities your
+  -- opponents control" is the filter.
   Spec.it s "EachOnStack" $
     Common.assertCodec
       s
@@ -392,7 +400,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield, one chosen permanent and the source with one chosen permanent all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield, one chosen permanent and the source with one chosen permanent all encode differently"
       ( Set.size
           ( Set.fromList
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -403,6 +411,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInYourLibrary Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
+                Codec.encode ObjectRef.codec (ObjectRef.EachAbility (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachOnStack (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
                 Codec.encode ObjectRef.codec ObjectRef.EachOpponent,
@@ -422,7 +431,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
               ]
           )
       )
-      24
+      25
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

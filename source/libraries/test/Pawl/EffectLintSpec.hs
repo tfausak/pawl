@@ -1092,6 +1092,7 @@ chooserRef ref = case ref of
   ObjectRef.EachCardInYourLibrary {} -> False
   ObjectRef.EachCardExiledWithSource {} -> False
   ObjectRef.EachSpell {} -> False
+  ObjectRef.EachAbility {} -> False
   ObjectRef.EachOnStack {} -> False
   ObjectRef.EachPlayer -> False
   ObjectRef.EachOpponent -> False
@@ -1643,6 +1644,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- linked ability exiled several performs its action on each of them.
           ObjectRef.EachCardExiledWithSource {} -> False
           ObjectRef.EachSpell _ -> False
+          ObjectRef.EachAbility _ -> False
           ObjectRef.EachOnStack _ -> False
           ObjectRef.EachPlayer -> False
           ObjectRef.EachOpponent -> False

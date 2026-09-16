@@ -101,6 +101,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
     ObjectRef.EachCardInYourLibrary _ -> Nothing
     ObjectRef.EachCardExiledWithSource {} -> Nothing
     ObjectRef.EachSpell _ -> Nothing
+    ObjectRef.EachAbility _ -> Nothing
     ObjectRef.EachOnStack _ -> Nothing
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.EachOpponent -> Nothing

@@ -368,6 +368,7 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   ObjectRef.EachCardInYourLibrary _ -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
+  ObjectRef.EachAbility _ -> Map.empty
   ObjectRef.EachOnStack _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
   ObjectRef.EachOpponent -> Map.empty
@@ -442,6 +443,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardInYourLibrary _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
   ObjectRef.EachSpell _ -> []
+  ObjectRef.EachAbility _ -> []
   ObjectRef.EachOnStack _ -> []
   ObjectRef.EachPlayer -> []
   ObjectRef.EachOpponent -> []
@@ -487,6 +489,7 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.EachCardInYourLibrary _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
   ObjectRef.EachSpell _ -> []
+  ObjectRef.EachAbility _ -> []
   ObjectRef.EachOnStack _ -> []
   ObjectRef.EachPlayer -> []
   ObjectRef.EachOpponent -> []
@@ -2355,9 +2358,20 @@ objectRefObjects legal resolving controller source gs ref = case ref of
      in filter
           (\oid -> Game.isSpell oid gs && Filter.matches context (viewOf oid) filter_)
           (GameState.stack gs)
-  -- CR 405.1's whole zone: the arm above without Game.isSpell, since a sentence
-  -- naming spells AND abilities names everything the stack holds. Same order,
-  -- top first (CR 405.2), and read LIVE (CR 608.2c).
+  -- CR 113.9's second sentence, "effects that specifically counter abilities":
+  -- the arm above with Game.isAbility in place of Game.isSpell, the SIBLING
+  -- classification and never its complement. A mana ability is never here to be
+  -- swept (CR 605.3b), and a static ability never uses the stack at all (CR
+  -- 113.9). Same order, top first (CR 405.2), and read LIVE (CR 608.2c).
+  ObjectRef.EachAbility filter_ ->
+    let context = effectContext gs controller source legal (slotBindings resolving gs)
+        viewOf = Projection.viewsOf gs
+     in filter
+          (\oid -> Game.isAbility oid gs && Filter.matches context (viewOf oid) filter_)
+          (GameState.stack gs)
+  -- CR 405.1's whole zone: the two arms above without their classification, since
+  -- a sentence naming spells AND abilities names everything the stack holds. Same
+  -- order, top first (CR 405.2), and read LIVE (CR 608.2c).
   ObjectRef.EachOnStack filter_ ->
     let context = effectContext gs controller source legal (slotBindings resolving gs)
         viewOf = Projection.viewsOf gs
