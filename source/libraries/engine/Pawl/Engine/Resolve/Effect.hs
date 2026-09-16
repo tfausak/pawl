@@ -742,6 +742,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfGraveyard _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachSpell _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachAbility _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachOnStack _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
   -- Game.apnapOrder.
@@ -2079,7 +2080,8 @@ copyStatedTargets controller resolving source legal original newRef = do
 -- anything but the source (Swift Silence's `Not IsSource`) still names nothing.
 -- EachSpell needs no CR 112.1 narrowing of its own: GameState.stackArchive holds
 -- spells only, an ability leaving the stack going through Pawl.Engine.Game.cease,
--- which files nothing.
+-- which files nothing. That same archive is why EachAbility takes the wildcard
+-- below rather than an arm: nothing it could name is ever filed there.
 copyStackSubjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
 copyStackSubjects legal resolving controller source gs ref =
   let live = objectRefObjects legal resolving controller source gs ref
@@ -3862,6 +3864,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
               ObjectRef.EachSpell _ -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              ObjectRef.EachAbility _ -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
               ObjectRef.EachOnStack _ -> do

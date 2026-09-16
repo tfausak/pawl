@@ -665,6 +665,7 @@ refReachesLibrary ref = case ref of
   ObjectRef.EachCardInHand {} -> False
   ObjectRef.EachCardExiledWithSource {} -> False
   ObjectRef.EachSpell _ -> False
+  ObjectRef.EachAbility _ -> False
   ObjectRef.EachOnStack _ -> False
   ObjectRef.EachPlayer -> False
   ObjectRef.EachOpponent -> False

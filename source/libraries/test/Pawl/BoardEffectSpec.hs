@@ -18,9 +18,12 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
@@ -52,9 +55,12 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.Object as Object
@@ -82,6 +88,7 @@ import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
 -- The same arm with a CHOOSER other than the resolving controller:
@@ -2738,6 +2745,171 @@ echoSilencerSpec s registry = Spec.describe s "EchoSilencer" $ do
         Spec.assertEqWith s "CR 701.6a the countered spell reached alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
         Spec.assertBool s (not (S.onBattlefield victim resolved)) "the countered spell never resolved"
 
+-- Kadena's Silencer {1}{U} Creature - Snake Wizard 2/1: "When this creature is
+-- turned face up, counter all abilities your opponents control. / Megamorph
+-- {1}{U}". Oracle text checked against api.scryfall.com, 2026-09-16.
+--
+-- The proving case for ObjectRef.EachAbility: glenElendraBoard's sweep with CR
+-- 113.9's kind test switched back ON, so the spells sharing CR 405.1's zone are
+-- out and rule 113.9's activated and triggered abilities alone are in.
+--
+-- THREE SEATS, glenElendraBoard's reason: "your opponents control" and "you
+-- don't control" are the same set at two, so carol holds the second opponent
+-- ability. Waiting under the trigger are four objects, each there for a reason:
+--
+--   * alice's Ancestral Recall is the opponent SPELL the sweep must SPARE, and
+--     the stack is run down afterwards so that sparing it is read off the cards
+--     she DREW rather than off the stack alone;
+--   * alice's and carol's Prodigal Sorcerer activations are the opponent
+--     ABILITIES (CR 113.9) this card exists to counter;
+--   * bob's own Sorcerer activation is the control "your opponents" must spare.
+--
+-- alice also taps an Island for mana while the trigger waits. CR 605.3b keeps a
+-- mana ability off the stack entirely, so no reading of this arm could reach one;
+-- that pair of assertions is a REGRESSION FENCE rather than proven behaviour.
+--
+-- Six Islands for bob, one more than CR 702.37a's {3} for the face-down cast plus
+-- the megamorph {1}{U}, so no assertion turns on a payment that could only just
+-- be made. Every library is stocked, CR 104.3c otherwise deciding the game before
+-- Ancestral Recall's draw is read.
+--
+-- Kadena's Silencer is CAST face down rather than placed: CR 702.37a's own
+-- procedure is what leaves a permanent CR 702.37e can turn back over, and the
+-- trigger this case reads fires only on that turning. alice's spell is cast and
+-- the three activations are activated, for glenElendraBoard's reason: CR 601.2b's
+-- mode and target bindings are what a resolution reads, and only announcing an
+-- object writes them.
+--
+-- Returns the face-down Silencer, alice's spell, the two opponent abilities,
+-- bob's own ability, the stack sizes on either side of the mana ability, and the
+-- board.
+kadenaBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], (Int, Int), GameState.GameState)
+kadenaBoard island kadena recall sorcerer = case soleActivatedAbility sorcerer of
+  Nothing -> Nothing
+  Just ability ->
+    let lands = S.landsFor island S.alice 3 (S.landsFor island S.bob 6 S.threePlayerGame)
+        stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard island pid g)) gs [1 :: Int .. 5]
+        stocked = List.foldl' (flip stock) lands [S.alice, S.bob, S.carol]
+        -- CR 302.6: each Sorcerer must have settled under its own controller
+        -- before its {T} may be activated at all.
+        addSorcerer pid (ids, gs) = let (oid, g) = S.addPermanent sorcerer pid gs in (ids <> [(pid, oid)], g)
+        (sorcerers, withSorcerers) = List.foldl' (flip addSorcerer) ([], stocked) [S.alice, S.bob, S.carol]
+        settled = List.foldl' (\g pid -> S.runPure S.identityAnswer g (Engine.settleAll pid)) withSorcerers [S.alice, S.bob, S.carol]
+        (spell, inHand) = S.addHandCard kadena S.bob settled
+        -- CR 117.1a's sorcery timing: the face-down cast goes first, on an empty
+        -- stack, and everything the sweep will name is put there after it.
+        cast =
+          S.runPure
+            S.identityAnswer
+            (inHand {GameState.priority = Just S.bob})
+            (Cast.castSpell S.manaPerformer S.bob spell (S.printingName kadena) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
+        -- Each spell and activation names its own controller (CR 120.3a): the
+        -- damage no ability of this board resolves to deal, and the three cards
+        -- Ancestral Recall draws, which is the one thing an assertion reads.
+        atSelf :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+        atSelf pid p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer pid))) sets
+          _ -> S.identityAnswer p
+        -- An INSTANT, since CR 117.1a's sorcery timing was already spent on the
+        -- face-down cast above, and one that names a player so the draw it makes
+        -- is read off a seat rather than off its own controller.
+        (inAliceHand, withHers) =
+          let (oid, g) = S.addHandCard recall S.alice cast
+           in (g, S.runPure (atSelf S.alice) (g {GameState.priority = Just S.alice}) (S.cast S.alice oid))
+        activate (ids, gs) (pid, oid) =
+          let before = GameState.stack gs
+              after = S.runPure (atSelf pid) (gs {GameState.priority = Just pid}) (Activate.activateAbility pid oid ability)
+           in (ids <> fmap ((,) pid) (filter (`notElem` before) (GameState.stack after)), after)
+        (abilityIds, activated) = List.foldl' activate ([], withHers) sorcerers
+        -- CR 400.7 mints a fresh id at the destination, so the spell is the object
+        -- the cast ADDED to the stack rather than the card that was in hand.
+        mHers = List.find (`notElem` GameState.stack inAliceHand) (GameState.stack withHers)
+        -- CR 605.3b: alice's land taps for mana with the stack as it stands, and
+        -- the pair of stack sizes is what says the ability never joined it.
+        tapped = case aliceIsland activated of
+          Nothing -> activated
+          Just oid -> S.runPure S.identityAnswer activated (Cost.tapForMana S.manaPerformer oid)
+        sizes = (length (GameState.stack activated), length (GameState.stack tapped))
+        theirs = fmap snd (filter ((/= S.bob) . fst) abilityIds)
+        mine = fmap snd (filter ((== S.bob) . fst) abilityIds)
+        mHidden = List.find (`Set.notMember` GameState.battlefield inHand) (Set.toList (GameState.battlefield cast))
+     in case (mHidden, mHers) of
+          (Just hidden, Just hers) -> Just (hidden, hers, theirs, mine, sizes, tapped)
+          _ -> Nothing
+
+-- One UNTAPPED Island of alice's, by NAME and CONTROLLER: S.landsFor hands back
+-- no ids, and CR 108.3 files the battlefield under the OWNER, so control is what
+-- picks hers out. Untapped, because a tapped land cannot pay the {T} in its own
+-- mana ability's cost (CR 605.1a) and the tap would quietly do nothing.
+aliceIsland :: GameState.GameState -> Maybe ObjectId.ObjectId
+aliceIsland gs =
+  List.find
+    ( \oid ->
+        fmap S.nameOf (Game.cardOf oid gs) == Just (CardName.MkCardName (Text.pack "Island"))
+          && Projection.controllerOf oid gs == Just S.alice
+          && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
+    )
+    (Set.toList (GameState.battlefield gs))
+
+-- bob turns his Silencer face up for CR 702.37b's megamorph cost and settles, so
+-- CR 603.3's trigger reaches the stack, then resolves that trigger alone.
+kadenaRun :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+kadenaRun hidden gs =
+  let up = S.runPure S.identityAnswer (gs {GameState.priority = Just S.bob}) (FaceDown.turnFaceUp S.manaPerformer S.bob TurnUpProcedure.Morph hidden)
+      settled = S.runPure S.identityAnswer up Engine.settleForPriority
+   in S.runPure S.identityAnswer settled Stack.resolveTop
+
+kadenasSilencerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+kadenasSilencerSpec s registry = Spec.describe s "KadenasSilencer" $ do
+  -- Four objects wait under the trigger, and each reading of the sentence leaves
+  -- a different set standing:
+  --
+  --   * CR 405.1's whole zone, Glen Elendra's Answer's reading, takes alice's
+  --     spell as well and she draws nothing;
+  --   * CR 109.2b's spells, Swift Silence's reading, takes her spell and spares
+  --     both abilities;
+  --   * the relation dropped takes bob's own ability too;
+  --   * CR 113.9's abilities your opponents control takes exactly two.
+  Spec.it s "CR 113.9 an abilities-only sweep counters both opponents' abilities and lets their spell resolve" $ do
+    island <- S.printingOf s registry "Island"
+    kadena <- S.printingOf s registry "Kadena's Silencer"
+    recall <- S.printingOf s registry "Ancestral Recall"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    case kadenaBoard island kadena recall sorcerer of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (hidden, hers, theirs, mine, sizes, board) -> do
+        Spec.assertEqWith s "setup: the two opponents each activated one ability" (length theirs) 2
+        Spec.assertEqWith s "setup: bob activated one of his own" (length mine) 1
+        let held = length (Game.zoneMembers Zone.Hand S.alice board)
+            swept = kadenaRun hidden board
+            -- The WHOLE stack run down onto alice's spared spell, one resolve per
+            -- object standing: a spell still ON the stack cannot tell "spared"
+            -- from "not reached yet", and a fixed number of resolves would let a
+            -- sweep that countered nothing absorb this assertion instead of the
+            -- one below.
+            down = List.foldl' (\gs _ -> S.runPure S.identityAnswer gs Stack.resolveTop) swept (GameState.stack swept)
+        -- THE gameplay assertion, and it comes first: the opponent SPELL the
+        -- sweep passed over went on to resolve, which the wider CR 405.1 sweep
+        -- cannot produce.
+        Spec.assertEqWith s "CR 113.9 alice's spell was spared and resolved, so she drew three cards" (length (Game.zoneMembers Zone.Hand S.alice down) - held) 3
+        -- CR 608.2n: a countered ability ceases to exist, so a live object is one
+        -- the sweep spared.
+        Spec.assertBool s (all (\oid -> Maybe.isNothing (Game.lookupObject oid swept)) theirs) "CR 608.2n both opponents' abilities ceased to exist"
+        Spec.assertBool s (all (\oid -> Maybe.isJust (Game.lookupObject oid swept)) mine) "CR 102.1 bob's own ability was spared"
+        Spec.assertBool s (Maybe.isJust (Game.lookupObject hers swept)) "and alice's spell was still on the stack when the trigger had finished"
+        -- CR 702.37b's second clause, which is the whole of what Mega adds to
+        -- Plain: the card is transcribed as megamorph and not as morph.
+        Spec.assertEqWith s "CR 702.37b the megamorph cost put a +1/+1 counter on the Silencer" (S.counterOf CounterKind.PlusOnePlusOne hidden swept) 1
+        -- The fence. A mana ability never uses the stack, so the sweep has
+        -- nothing of the kind to reach however it is read.
+        Spec.assertEqWith s "CR 605.3b alice's mana ability never joined the stack" (snd sizes) (fst sizes)
+        Spec.assertEqWith s "and the one unit it made outlived the sweep" (fmap (length . Mana.unwrap) (Map.lookup S.alice (GameState.manaPool swept))) (Just 1)
+
 baneOfProgressSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
   -- The proving case for #380: a mass effect whose RIDER reads the sweep back.
@@ -3539,6 +3711,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   swiftSilenceSpec s registry
   glenElendrasAnswerSpec s registry
   echoSilencerSpec s registry
+  kadenasSilencerSpec s registry
   countOnLuckSpec s registry
   soldeviDiggerSpec s registry
   actOnImpulseSpec s registry
