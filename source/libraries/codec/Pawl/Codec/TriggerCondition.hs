@@ -88,6 +88,7 @@ codec =
           Arm.payload "PlayerDrawsNthCard" PlayerDrawsNthCard.codec TriggerCondition.PlayerDrawsNthCard (\x -> case x of TriggerCondition.PlayerDrawsNthCard y -> Just y; _ -> Nothing),
           Arm.nullary "SelfPutIntoGraveyardFromLibrary" TriggerCondition.SelfPutIntoGraveyardFromLibrary,
           Arm.nullary "SelfPutIntoGraveyardFromAnywhere" TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
+          Arm.nullary "SelfPutIntoGraveyardDuringResolution" TriggerCondition.SelfPutIntoGraveyardDuringResolution,
           Arm.nullary "SelfDies" TriggerCondition.SelfDies,
           Arm.payload "CardPutIntoGraveyard" filterCodec TriggerCondition.CardPutIntoGraveyard (\x -> case x of TriggerCondition.CardPutIntoGraveyard y -> Just y; _ -> Nothing),
           Arm.payload "PermanentDies" filterCodec TriggerCondition.PermanentDies (\x -> case x of TriggerCondition.PermanentDies y -> Just y; _ -> Nothing),
@@ -219,6 +220,7 @@ tagOf x = case x of
   TriggerCondition.PlayerDrawsNthCard {} -> "PlayerDrawsNthCard"
   TriggerCondition.SelfPutIntoGraveyardFromLibrary {} -> "SelfPutIntoGraveyardFromLibrary"
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere {} -> "SelfPutIntoGraveyardFromAnywhere"
+  TriggerCondition.SelfPutIntoGraveyardDuringResolution {} -> "SelfPutIntoGraveyardDuringResolution"
   TriggerCondition.SelfDies {} -> "SelfDies"
   TriggerCondition.CardPutIntoGraveyard {} -> "CardPutIntoGraveyard"
   TriggerCondition.PermanentDies {} -> "PermanentDies"

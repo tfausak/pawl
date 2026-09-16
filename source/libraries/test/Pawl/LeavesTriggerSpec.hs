@@ -415,7 +415,7 @@ permanentsReturnedToHandSpec s registry =
         Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
-                  GameEvent.Moved (Moved.MkMoved zc _ _) | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Hand -> Just (LoggedEvent.group logged)
+                  GameEvent.Moved (Moved.MkMoved zc _ _ _) | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Hand -> Just (LoggedEvent.group logged)
                   _ -> Nothing
               )
               (Foldable.toList (GameState.events gs))
@@ -701,7 +701,7 @@ warpedDevotionSpec s registry =
               moves =
                 Maybe.mapMaybe
                   ( \logged -> case LoggedEvent.event logged of
-                      ev@(GameEvent.Moved (Moved.MkMoved zc _ _)) | ZoneChange.departed zc == pikerId -> Just ev
+                      ev@(GameEvent.Moved (Moved.MkMoved zc _ _ _)) | ZoneChange.departed zc == pikerId -> Just ev
                       _ -> Nothing
                   )
                   (Foldable.toList (GameState.events gone))
@@ -2339,8 +2339,9 @@ isOptionalResponse response = case response of
 -- Blind Hunter, a Creature -- Bat: "Flying / Haunt (When this creature dies,
 -- exile it haunting target creature.) / When this creature enters or the
 -- creature it haunts dies, target player loses 2 life and you gain 2 life."
--- The pool's witness for an ability that functions FROM EXILE (CR 113.6k, CR
--- 702.55c), and the card rule 113.6k's own example is written about.
+-- A pool witness for an ability that functions FROM EXILE (CR 113.6k, CR
+-- 702.55c), and the card rule 113.6k's own example is written about; Cry of
+-- Contrition in hauntSpellSpec below is the other.
 --
 -- THREE SEATS, because the rule names three different players: alice owns the
 -- Blind Hunter and so controls both of its triggers (CR 603.3a on the
@@ -2452,6 +2453,110 @@ hauntSpec s registry =
           Spec.assertEqWith s "and still haunts the Piker" (Map.size (GameState.haunting moved)) 1
           Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack placed)) 0
           Spec.assertEqWith s "and no life total moved" (lives after) (Just 20, Just 20, Just 20)
+
+-- CR 702.55a's SECOND sentence: Cry of Contrition, {B} Sorcery, "Target player
+-- discards a card. / Haunt / When the creature this card haunts dies, target
+-- player discards a card." The pool's witness for haunt on an instant or sorcery
+-- spell, which CR 608.2n dates -- the spell is put into its owner's graveyard as
+-- the final part of its own resolution, and that move alone is what triggers it.
+--
+-- THREE SEATS for hauntSpec's reason: alice owns the Cry and controls both of
+-- its triggers, bob controls the creature it haunts and is the spell's own
+-- target, and carol is the rider's "target player". A two-player board would
+-- collapse the last two.
+--
+-- The NEGATIVE is the same board with the same mana, differing in one thing: bob
+-- counters the Cry (CR 701.6a) instead of letting it resolve. Both endings put
+-- the card into alice's graveyard from the stack, so the zone pair cannot tell
+-- them apart and the CAUSE is the whole of the difference.
+hauntSpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hauntSpellSpec s registry =
+  let -- hauntSpec's answerer: every target slot pinned at one recipient, since
+      -- two identical Pikers and three legal players would otherwise be settled
+      -- by sort order.
+      aimAt :: Recipient.Recipient -> Prompt.Prompt r -> r
+      aimAt r p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton r)) sets
+        _ -> S.identityAnswer p
+      board = do
+        swamp <- S.printingOf s registry "Swamp"
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        cry <- S.printingOf s registry "Cry of Contrition"
+        cancel <- S.printingOf s registry "Cancel"
+        bolt <- S.printingOf s registry "Lightning Bolt"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let g0 = S.landsFor island S.bob 3 (S.landsFor mountain S.alice 1 (S.landsFor swamp S.alice 1 S.threePlayerGame))
+            (victimId, g1) = S.addPermanent piker S.bob g0
+            -- An IDENTICAL second Piker under the same player, never haunted:
+            -- hauntSpec's pair, and what makes CR 702.55b's link observable.
+            (bystanderId, g2) = S.addPermanent piker S.bob g1
+            (cryId, g3) = S.addHandCard cry S.alice g2
+            (boltId, g4) = S.addHandCard bolt S.alice g3
+            (cancelId, g5) = S.addHandCard cancel S.bob g4
+            -- Distinct hand sizes, so "who discarded" is answerable without a
+            -- numeric coincidence: bob holds the Cancel plus one spare, carol two.
+            (_, g6) = S.addHandCard piker S.bob g5
+            (_, g7) = S.addHandCard piker S.carol g6
+            (_, g8) = S.addHandCard bolt S.carol g7
+            -- CR 104.3c: a stocked library for every seat the legs advance past.
+            stocked = List.foldl' (\g pid -> snd (S.addLibraryCard mountain pid g)) g8 [S.alice, S.bob, S.carol]
+        pure (victimId, bystanderId, cryId, boltId, cancelId, stocked)
+      handSizes gs = (length (Game.zoneMembers Zone.Hand S.alice gs), length (Game.zoneMembers Zone.Hand S.bob gs), length (Game.zoneMembers Zone.Hand S.carol gs))
+      -- hauntSpec's pair: CR 704 and CR 603.3 put the trigger on the stack,
+      -- choosing its targets under `answer`, and then it resolves.
+      settleAndResolve :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> (GameState.GameState, GameState.GameState)
+      settleAndResolve answer gs =
+        let settled = S.runPure answer gs Engine.settleForPriority
+         in (settled, S.runPure answer settled Stack.resolveTop)
+      -- alice casts the Cry at bob and lets it resolve, which is CR 608.2n's move.
+      castCry cryId gs = S.runPure (aimAt (Recipient.ToPlayer S.bob)) gs (S.cast S.alice cryId)
+      -- The whole first half: the Cry resolves, CR 608.2n buries it, and rule
+      -- 702.55a's trigger exiles it haunting bob's Piker.
+      hauntedBoard (victimId, _, cryId, _, _, gs) =
+        let resolved = S.runPure (aimAt (Recipient.ToPlayer S.bob)) (castCry cryId gs) Stack.resolveTop
+         in settleAndResolve (aimAt (Recipient.ToCreature victimId)) resolved
+   in Spec.describe s "CR 702.55a haunt on an instant or sorcery" $ do
+        -- The proving case for the whole unit.
+        Spec.it s "CR 702.55a/608.2n the resolved sorcery is exiled haunting the targeted creature" $ do
+          fixture@(victimId, _, _, _, _, _) <- board
+          let (_, after) = hauntedBoard fixture
+          Spec.assertEqWith s "CR 702.55b the card haunts bob's Piker and nothing else" (Map.elems (GameState.haunting after)) [victimId]
+          Spec.assertEqWith s "CR 702.55a it is in exile rather than the graveyard CR 608.2n sent it to" (Set.size (GameState.exile after), length (Game.zoneMembers Zone.Graveyard S.alice after)) (1, 0)
+          Spec.assertEqWith s "and the spell's own clause made bob discard" (handSizes after) (1, 1, 2)
+        -- The narrowness, on the same board with the same mana: CR 701.6a's
+        -- ending reaches the same graveyard from the same zone.
+        Spec.it s "CR 701.6a a countered Cry of Contrition reaches the graveyard and haunts nothing" $ do
+          (victimId, _, cryId, _, cancelId, gs) <- board
+          let onStack = castCry cryId gs
+              -- CR 117.3d's pass, written onto the board rather than played: CR
+              -- 117.3c leaves priority with alice after her own cast, and bob is
+              -- the next player in turn order. Answered by S.identityAnswer and
+              -- not `aimAt`: the Cry is the only spell on the stack, so the
+              -- Cancel's one target is forced rather than chosen -- which is also
+              -- why the answerer cannot BUILD the wrong recipient here.
+              countering = S.runPure S.identityAnswer onStack {GameState.priority = Just S.bob} (S.cast S.bob cancelId)
+              countered = S.runPure S.identityAnswer countering Stack.resolveTop
+              -- Aimed at the very Piker the positive board haunts, so a trigger
+              -- that fired here would exile the Cry and show up in the first
+              -- assertion rather than fizzling on an illegal target.
+              (placed, after) = settleAndResolve (aimAt (Recipient.ToCreature victimId)) countered
+          Spec.assertEqWith s "nothing haunts anything" (Map.toList (GameState.haunting after)) []
+          Spec.assertEqWith s "CR 701.6a the Cry is in alice's graveyard and not in exile" (length (Game.zoneMembers Zone.Graveyard S.alice after), Set.size (GameState.exile after)) (1, 0)
+          Spec.assertEqWith s "and no trigger reached the stack" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "the Cancel really did counter: it is in bob's graveyard and the stack is clear" (length (Game.zoneMembers Zone.Graveyard S.bob countered), length (GameState.stack countered)) (1, 0)
+        -- CR 702.55c: the exiled card's own printed ability, which is what makes
+        -- the haunt worth minting.
+        Spec.it s "CR 702.55b/702.55c the haunted creature dying fires the card's rider" $ do
+          fixture@(victimId, bystanderId, _, boltId, _, _) <- board
+          let (_, exiled) = hauntedBoard fixture
+              bolt target gs =
+                let cast = S.runPure (aimAt (Recipient.ToCreature target)) gs (S.cast S.alice boltId)
+                 in S.runPure (aimAt (Recipient.ToCreature target)) cast Stack.resolveTop
+              (_, after) = settleAndResolve (aimAt (Recipient.ToPlayer S.carol)) (bolt victimId exiled)
+              (bystanderPlaced, _) = settleAndResolve (aimAt (Recipient.ToPlayer S.carol)) (bolt bystanderId exiled)
+          Spec.assertEqWith s "CR 702.55c carol discarded to the ability in exile" (handSizes after) (0, 1, 1)
+          Spec.assertEqWith s "CR 702.55b the other Piker's death fires nothing" (length (GameState.stack bystanderPlaced)) 0
 
 -- CR 601.2c read by a BYSTANDER, batched by CR 603.2c and narrowed to CR
 -- 113.3b's half of CR 113.3: Professor Hojo, {1}{G} Legendary Creature -- Human
@@ -3881,6 +3986,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   professorHojoSpec s registry
   soulshiftSpec s registry
   hauntSpec s registry
+  hauntSpellSpec s registry
   screamsFromWithinSpec s registry
   widowedBladeSpec s registry
   skullclampSpec s registry

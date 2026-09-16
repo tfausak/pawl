@@ -35,14 +35,23 @@ data Moved = MkMoved
     -- CR 712.21a's arrangement where the owner was asked for one
     -- (Pawl.Engine.Event.arrangeComponents) and the order they melded in
     -- otherwise.
-    others :: Seq.Seq ObjectId.ObjectId
+    others :: Seq.Seq ObjectId.ObjectId,
+    -- | CR 608.2n: True only for the move that puts an instant or sorcery spell
+    -- into its owner's graveyard as the final part of its own resolution.
+    --
+    -- The one thing that tells that move apart from a COUNTERED spell's (CR
+    -- 701.6a) and a FIZZLED one's (CR 608.2b), which share its zone pair and
+    -- carry no cause of their own. Written by the single door
+    -- Pawl.Engine.Event.changeZoneResolvingReturning, and read by
+    -- TriggerCondition.SelfPutIntoGraveyardDuringResolution alone.
+    duringResolution :: Bool
   }
   deriving (Eq, Ord, Show)
 
 -- | The ordinary move: one departure, one arrival, no CR 712.21 split. Every
 -- construction site but Pawl.Engine.Event's zone-change funnel uses this.
 moved :: ZoneChange.ZoneChange -> ProjectedCharacteristics.ProjectedCharacteristics -> Moved
-moved zc pc = MkMoved {change = zc, characteristics = pc, others = Seq.empty}
+moved zc pc = MkMoved {change = zc, characteristics = pc, others = Seq.empty, duringResolution = False}
 
 -- | CR 400.7e's "the new object it became", in the plural CR 712.21c asks for:
 -- every incarnation this move minted, first arrival first. A singleton for every

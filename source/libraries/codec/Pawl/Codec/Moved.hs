@@ -18,9 +18,13 @@ codec = Fields.object $ do
   change <- Fields.required "change" ZoneChange.codec Moved.change
   characteristics <- Fields.required "characteristics" ProjectedCharacteristics.codec Moved.characteristics
   others <- Fields.required "others" (Common.seq ObjectId.codec) Moved.others
+  -- Defaulted rather than required, CR 608.2n's move being the only one that
+  -- sets it: an ordinary move's transcript keeps the shape it had.
+  duringResolution <- Fields.defaulted "duringResolution" False Common.boolean Moved.duringResolution
   pure
     Moved.MkMoved
       { Moved.change = change,
         Moved.characteristics = characteristics,
-        Moved.others = others
+        Moved.others = others,
+        Moved.duringResolution = duringResolution
       }

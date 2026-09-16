@@ -1368,7 +1368,7 @@ permanentsDieSpec s registry =
         Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
-                  GameEvent.Moved (Moved.MkMoved zc _ _)
+                  GameEvent.Moved (Moved.MkMoved zc _ _ _)
                     | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard -> Just (LoggedEvent.group logged)
                   _ -> Nothing
               )
@@ -1981,6 +1981,9 @@ representativeEvents cond =
   let departed = representativeDeparted
       arrived = ObjectId.MkObjectId 2
       moved from to = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics)
+      -- CR 608.2n's own move: the same shape with Moved.duringResolution set,
+      -- which is the only thing the condition one rule over reads.
+      resolvedIntoGraveyard = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Stack Zone.Graveyard) S.emptyCharacteristics) {Moved.duringResolution = True}
       combatDamage =
         GameEvent.DamageDealt
           (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)
@@ -2176,6 +2179,9 @@ representativeEvents cond =
         -- public, so CR 400.7e never withholds anything and one event says as
         -- much as any list would.
         TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> one (moved Zone.Hand Zone.Graveyard)
+        -- CR 702.55a's spell sentence binds nothing either, for the arm above's
+        -- reason: the bearer already is the arriving card.
+        TriggerCondition.SelfPutIntoGraveyardDuringResolution -> one resolvedIntoGraveyard
         -- BOTH events this condition admits, which is the whole reason it
         -- exists: CR 712.21's second card is announced by a CardArrived event
         -- rather than a Moved one, and the floor has to hold for each.
@@ -2583,6 +2589,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacksUnblocked,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
+    TriggerCondition.SelfPutIntoGraveyardDuringResolution,
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
     TriggerCondition.PermanentLeavesTheBattlefield Filter.Type.IsSource,

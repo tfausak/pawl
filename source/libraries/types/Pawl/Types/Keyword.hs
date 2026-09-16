@@ -268,12 +268,11 @@ data Keyword
     -- want: X is the total damage this permanent's controller's opponents were
     -- dealt this turn, so it names no printed number and states no condition.
     Bloodthirst (Maybe Natural.Natural)
-  | -- | 702.55a: when this permanent dies, exile it haunting target creature; CR
-    -- 702.55b's haunted object is board state rather than a characteristic.
-    --
-    -- Not implemented: rule 702.55a's other sentence, haunt on an instant or
-    -- sorcery -- the mint is handed a keyword and a count, never a card type, so
-    -- the two sentences cannot be told apart there (#1404).
+  | -- | 702.55a: when this permanent dies -- or, on an instant or sorcery, when
+    -- that spell is put into a graveyard during its resolution -- exile it
+    -- haunting target creature; CR 702.55b's haunted object is board state rather
+    -- than a characteristic. Pawl.Engine.Keyword.graveyardTriggeredAbilitiesOf
+    -- mints the spell sentence and triggeredAbilitiesOf the permanent one.
     Haunt
   | -- | 702.56a: replicate [cost] -- an optional additional cost payable any
     -- number of times, and a cast trigger copying the spell once per payment,

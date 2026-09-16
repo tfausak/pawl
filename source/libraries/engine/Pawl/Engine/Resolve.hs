@@ -520,7 +520,7 @@ finishSpell oid face controller = do
   rebounds <- State.gets reboundApplies
   reboundRow <- rowWhen rebounds Replacement.installReboundExile
   adventureRow <- rowWhen (Card.isAdventure face) Replacement.installAdventureExile
-  landed <- Event.changeZoneReturning oid Zone.Graveyard
+  landed <- Event.changeZoneResolvingReturning oid Zone.Graveyard
   moved <- State.get
   let took = maybe False (\ts -> Replacement.rowApplied oid ts moved)
   Monad.forM_ landed $ \newId -> do
