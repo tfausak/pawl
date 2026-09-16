@@ -96,6 +96,7 @@ import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRider as ManaRider
@@ -693,6 +694,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Goad ref -> Effect.Goad (rewriteObjectRef pairs ref)
   Effect.GrantLookAtExiled grant -> Effect.GrantLookAtExiled grant {GrantLookAtExiled.cards = rewriteObjectRef pairs (GrantLookAtExiled.cards grant)}
   Effect.MakePlotted ref -> Effect.MakePlotted (rewriteObjectRef pairs ref)
+  Effect.MakeForetold (MakeForetold.MkMakeForetold ref reduction) ->
+    Effect.MakeForetold (MakeForetold.MkMakeForetold (rewriteObjectRef pairs ref) reduction)
   Effect.MakeWarped ref -> Effect.MakeWarped (rewriteObjectRef pairs ref)
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)

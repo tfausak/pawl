@@ -360,6 +360,7 @@ manaProduced effect = case effect of
   Effect.Goad _ -> Nothing
   Effect.GrantLookAtExiled _ -> Nothing
   Effect.MakePlotted _ -> Nothing
+  Effect.MakeForetold _ -> Nothing
   Effect.MakeWarped _ -> Nothing
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
@@ -572,6 +573,7 @@ movesLibraryCard effect = case effect of
   Effect.Goad _ -> False
   Effect.GrantLookAtExiled _ -> False
   Effect.MakePlotted _ -> False
+  Effect.MakeForetold _ -> False
   Effect.MakeWarped _ -> False
   Effect.DoesNotUntapNext _ -> False
   Effect.Transform _ -> False

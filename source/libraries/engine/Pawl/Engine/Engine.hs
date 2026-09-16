@@ -954,6 +954,7 @@ placeBorne srcId pending = do
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.foretellCostReduction = Nothing,
             Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
@@ -1453,7 +1454,7 @@ priorityLoop = do
                                 loop
                               -- CR 116.2h / 702.143b: a special action too.
                               Action.Type.Foretell oid -> do
-                                Foretell.foretell p oid
+                                Foretell.foretell Resolve.performManaAbility p oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

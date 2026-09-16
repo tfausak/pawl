@@ -42,6 +42,7 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
@@ -673,6 +674,15 @@ data Effect card ability
     -- (Kellan Joins Up). Not named Plot, CR 702.170e reserving that verb for CR
     -- 116.2k's special action; CR 702.170d fixes the beneficiary and the timing.
     MakePlotted ObjectRef.ObjectRef
+  | -- | CR 702.143d: the objects the payload names each become FORETOLD cards,
+    -- stamped with the current turn, and the payload's reduction is the foretell
+    -- cost the effect gives them (Ethereal Valkyrie). MakePlotted's shape one
+    -- designation over, carrying a cost because rule 702.143d's second sentence
+    -- states one where CR 702.170c has none.
+    --
+    -- Not named Foretell, CR 702.143c reserving that verb for CR 116.2h's
+    -- special action; rule 702.143d fixes the beneficiary and the timing.
+    MakeForetold MakeForetold.MakeForetold
   | -- | CR 702.185b: the objects the ObjectRef names each become WARPED cards,
     -- stamped with the current turn -- which is what rule 702.185a's "after the
     -- current turn has ended" is compared against. MakePlotted's shape one

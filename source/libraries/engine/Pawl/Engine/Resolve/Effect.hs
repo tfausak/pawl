@@ -39,6 +39,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Forage as Forage
+import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Initiative as Initiative
@@ -191,6 +192,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
@@ -2462,6 +2464,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.GrantPlayFromExile {} -> False
   Effect.GrantLookAtExiled {} -> False
   Effect.MakePlotted {} -> False
+  Effect.MakeForetold {} -> False
   Effect.MakeWarped {} -> False
   Effect.ForEach {} -> False
   where
@@ -4261,6 +4264,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MakePlotted ref ->
     State.modify' $ \gs ->
       foldr Plot.becomePlotted gs (objectRefObjects legal resolving controller source gs ref)
+  -- CR 702.143d's designation, MakePlotted's arm one rule over and every
+  -- argument of it unchanged -- the stamp and the cost together, through
+  -- Pawl.Engine.Foretell.becomeForetold, so this route and CR 116.2h's special
+  -- action say the same thing by construction.
+  --
+  -- The payload's reduction rides along because rule 702.143d's second sentence
+  -- states one where CR 702.170c has none; it is cashed against the exiled
+  -- card's own mana cost there, once, as this effect resolves.
+  Effect.MakeForetold (MakeForetold.MkMakeForetold ref reduction) ->
+    State.modify' $ \gs ->
+      foldr (Foretell.becomeForetold reduction) gs (objectRefObjects legal resolving controller source gs ref)
   -- CR 702.185b's designation, MakePlotted's arm one rule over and every
   -- argument of it unchanged, through Pawl.Engine.Warp.becomeWarped.
   Effect.MakeWarped ref ->

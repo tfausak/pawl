@@ -93,10 +93,13 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
@@ -1537,6 +1540,46 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.Indefinite (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "plotted"))) ManaSpending.AsProduced False))
       )
       "MakePlotted and GrantPlayFromExile of the same slot encode differently"
+  -- CR 702.143d's designation, MakePlotted's sibling with a cost. The two write
+  -- different fields of the same exiled object -- one permits a free cast (CR
+  -- 702.170d) and the other a cast for a foretell cost -- so a shared tag would
+  -- make a foretold card free. Ethereal Valkyrie is the producer of the arm that
+  -- states a cost.
+  Spec.it s "MakeForetold round-trips with and without CR 702.143d's cost, and is not MakePlotted" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.MakeForetold
+          MakeForetold.MkMakeForetold
+            { MakeForetold.cards = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "foretold")),
+              MakeForetold.manaCostReducedBy = Nothing
+            }
+      )
+      " {\"type\":\"MakeForetold\",\"value\":{\"cards\":{\"type\":\"InSlot\",\"value\":\"foretold\"}}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.MakeForetold
+          MakeForetold.MkMakeForetold
+            { MakeForetold.cards = ObjectRef.EachMatching (Filter.HasCardType CardType.Creature),
+              MakeForetold.manaCostReducedBy = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])
+            }
+      )
+      " {\"type\":\"MakeForetold\",\"value\":{\"cards\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"manaCostReducedBy\":[{\"type\":\"Generic\",\"value\":2}]}} "
+    Spec.assertBool
+      s
+      ( toJson
+          ( Effect.MakeForetold
+              MakeForetold.MkMakeForetold
+                { MakeForetold.cards = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "foretold")),
+                  MakeForetold.manaCostReducedBy = Nothing
+                }
+          )
+          /= toJson (Effect.MakePlotted (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "foretold"))))
+      )
+      "MakeForetold and MakePlotted of the same slot encode differently"
   -- CR 702.185b's designation, MakePlotted's sibling. The two write different
   -- fields of the same exiled object -- one permits a free cast (CR 702.170d) and
   -- the other a cast for the printed cost -- so a shared tag would make a warped

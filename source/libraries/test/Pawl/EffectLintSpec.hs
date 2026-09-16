@@ -105,6 +105,7 @@ import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
@@ -297,6 +298,7 @@ ownQuantities effect = case effect of
   Effect.Goad _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
+  Effect.MakeForetold _ -> []
   Effect.MakeWarped _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
@@ -1257,6 +1259,7 @@ effectObjectRefs effect =
         Effect.Goad ref -> read_ [ref]
         Effect.GrantLookAtExiled grant -> read_ [GrantLookAtExiled.cards grant]
         Effect.MakePlotted ref -> read_ [ref]
+        Effect.MakeForetold x -> read_ [MakeForetold.cards x]
         Effect.MakeWarped ref -> read_ [ref]
         Effect.DoesNotUntapNext ref -> read_ [ref]
         Effect.Transform ref -> [(AsksTransformGather, ref)]
