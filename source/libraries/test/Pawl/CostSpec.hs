@@ -3040,10 +3040,11 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
     Spec.assertBool s (isTapped giantId after) "the summoning-sick creature is tapped"
 
 -- High Perfect Morcant {2}{B}{G} 4/4 Legendary Creature -- Elf Noble: "Tap three
--- untapped Elves you control: Proliferate. Activate only as a sorcery." The
+-- untapped Elves you control: Proliferate. Activate only as a sorcery." A
 -- producer for CostComponent.TapPermanents that exercises a COUNT ABOVE ONE --
 -- Springleaf Drum's is one, and so is Hollow Warrior's, where 1 and "some"
--- cannot be told apart.
+-- cannot be told apart. Heritage Druid's is three as well, and is a MANA
+-- ability, which is what puts its case in Pawl.ManaSpec instead.
 --
 -- Morcant is itself an Elf and the cost does not say "another", so it is one of
 -- its own candidates. Four candidates against a count of three is what makes the
