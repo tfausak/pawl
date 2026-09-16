@@ -2816,7 +2816,9 @@ chronicleWardenSpec s registry =
 -- THE PAIR differs in exactly one thing, whom Volt Charge is aimed at. Aimed at
 -- the Saga it is gone by the scan and the Boon can only answer from last known
 -- information; aimed at bob the same proliferate fires the same chapter with the
--- Saga standing. Alice gets her Angel either way, and that is the assertion.
+-- Saga standing. Alice gets her Angel either way, and that is the assertion. A
+-- third board runs the first one again with the dying Saga a Copy Enchantment,
+-- which is what parts the projection the record holds from the printed card.
 --
 -- A test-local answerer rather than Pawl.Support's Board: the harness has no
 -- vocabulary for Prompt.ChooseProliferate. Both choices FILTER the offered set

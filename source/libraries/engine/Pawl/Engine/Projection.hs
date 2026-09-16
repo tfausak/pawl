@@ -888,7 +888,8 @@ subtypesWithLastKnown oid gs = case lastKnownOf oid gs of
 -- projection taken as the object ceased, so a Saga that was a COPY of another card
 -- answers with the copy's chapters rather than the printed card's. Proved by
 -- Pawl.TriggerSpec's "CR 608.2h the watcher reads the dead Saga's last known
--- information".
+-- information" and its "CR 707.2 a COPY of the Saga answers with the copy's
+-- chapters".
 projectWithLastKnown :: ObjectId -> GameState -> ProjectedCharacteristics
 projectWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> LastKnown.characteristics lk

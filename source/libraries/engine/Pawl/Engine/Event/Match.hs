@@ -7896,8 +7896,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- no subtypes and Saga.tracksLore declines it. CR 603.10's first sentence wants
   -- the objects as they were immediately after the event, and the record holds the
   -- projection taken as the Saga ceased -- the copy's chapters for a Saga that was
-  -- a copy, not the printed card's. Pawl.TriggerSpec's "CR 608.2h the watcher
-  -- reads the dead Saga's last known information" is the pair that proves it.
+  -- a copy, not the printed card's. Proved by Pawl.TriggerSpec's "CR 608.2h the
+  -- watcher reads the dead Saga's last known information" and, for the copy, its
+  -- "CR 707.2 a COPY of the Saga answers with the copy's chapters".
   TriggerCondition.SagaFinalChapterTriggers relation -> case event of
     -- A SOURCELESS inherent ability (CR 725.2, CR 702.179d) is never a chapter
     -- ability of a Saga, there being no Saga behind it to read lore counters off.
