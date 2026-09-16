@@ -2375,9 +2375,10 @@ designationGathered gs =
 -- became after it MOVED TO THE STACK" -- and Object.newIncarnation clears the
 -- field at the next move either way.
 --
--- CR 613.7a: the timestamp is the SPELL's, not the granting effect's, which
--- pawl does not carry across the move. The two orders differ only against
--- another layer-6 effect reaching the same spell -- a Humility for spells --
+-- CR 613.7b/613.7d: the timestamp here is the SPELL's (rule 613.7d), where the
+-- granting effect's own (rule 613.7b) is what rule 613.7 would order by; pawl
+-- does not carry that across CR 400.7's move. The two orders differ only against
+-- a second layer-6 effect reaching the same spell -- a Humility for spells --
 -- which no card in data/cards/ and no board in the suite produces.
 castGrantGathered :: GameState -> [Gathered]
 castGrantGathered gs =
