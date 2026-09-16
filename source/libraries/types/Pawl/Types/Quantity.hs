@@ -126,10 +126,17 @@ data Quantity
   | -- | CR 107.4h: 1 if mana carrying that production tag was spent to pay for
     -- the object this quantity is evaluated against, else 0.
     --
-    -- Not the spent mana's COLOUR. Boreal Outrider's "if {S} of any of that
-    -- spell's colors was spent to cast it" does ask that, which is a conjunction
-    -- over one unit rather than a tag this atom could name (#2008).
+    -- Not the spent mana's COLOUR; TagWasSpentOfOwnColor below is that question.
     TagWasSpent ProductionTag.ProductionTag
+  | -- | CR 107.4h \/ 202.2: 1 if mana carrying that production tag AND of one of
+    -- the colors the object this quantity is evaluated against is was spent to
+    -- pay for it, else 0 -- Boreal Outrider's "if {S} of any of that spell's
+    -- colors was spent to cast it".
+    --
+    -- The arm above's conjunction over ONE unit rather than two of its tests: a
+    -- colorless snow mana and a green non-snow mana satisfy TagWasSpent Snow and
+    -- HasColor Green between them, and this clause not at all.
+    TagWasSpentOfOwnColor ProductionTag.ProductionTag
   | -- | CR 202.1a \/ 702.191a: how many mana were spent to pay for the object this
     -- quantity is evaluated against -- rule 702.191a's "the amount of mana spent
     -- to cast that spell".

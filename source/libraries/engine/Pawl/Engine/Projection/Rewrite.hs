@@ -1727,6 +1727,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.TimesPaid _ -> quantity
   Quantity.Type.CastUsing _ -> quantity
   Quantity.Type.TagWasSpent {} -> quantity
+  Quantity.Type.TagWasSpentOfOwnColor {} -> quantity
   Quantity.Type.ManaSpent -> quantity
   Quantity.Type.WasToken -> quantity
   Quantity.Type.WasAttacking -> quantity

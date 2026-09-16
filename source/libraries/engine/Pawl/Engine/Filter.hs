@@ -639,21 +639,25 @@ data View = MkView
     -- cast the spell this candidate is, or was, or to activate the CR 602.2a
     -- ability it is -- read off Object.manaSpent, and empty where there is no
     -- object to read it off, both for the reasons `designations` above gives. Its
-    -- one reader is Pawl.Engine.Quantity's TagWasSpent arm, answering Berg
-    -- Strider's and Forsworn Paladin's clause conditions. `manaSpentAmount`
+    -- readers are Pawl.Engine.Quantity's TagWasSpent arm, answering Berg
+    -- Strider's and Forsworn Paladin's clause conditions, and its
+    -- TagWasSpentOfOwnColor arm, answering Boreal Outrider's. `manaSpentAmount`
     -- below is the same record's other question.
     --
-    -- The TAGS and not the units: Pawl.Types.ProductionTag is the closed half of
-    -- what a unit carries (see its header), so this field is a classification the
-    -- vocabulary can ask about rather than a pool to case over. A card asking
-    -- about the spent mana's COLOUR -- Boreal Outrider -- wants the types too,
-    -- and would widen this rather than read around it (#2008).
+    -- KEYED by tag, and the value is the colours (CR 202.2) of the units that
+    -- carried it: Pawl.Types.ProductionTag is the closed half of what a unit
+    -- carries (see its header), so the keys are a classification the vocabulary
+    -- can ask about rather than a pool to case over, and the colours are the one
+    -- further axis a card conjoins with a tag over ONE unit -- "{S} of any of
+    -- that spell's colors". A key is present for every tag spent, with an empty
+    -- colour set where every unit carrying it was colourless (CR 106.1b), so
+    -- membership is still TagWasSpent's whole question.
     --
     -- Non-empty for a permanent a spell paid with tagged mana became, which is CR
     -- 400.7d's exception to the forgetting (see Pawl.Types.Object.manaSpent).
-    manaSpentTags :: Set.Set ProductionTag.ProductionTag,
+    manaSpentTagColors :: Map.Map ProductionTag.ProductionTag (Set.Set Color.Color),
     -- | CR 202.1a: how many mana were spent to pay for this candidate -- the
-    -- COUNT of the units `manaSpentTags` above classifies, read off the same
+    -- COUNT of the units `manaSpentTagColors` above classifies, read off the same
     -- Object.manaSpent and 0 where there is no object to read it off. Its one
     -- reader is Pawl.Engine.Quantity's ManaSpent arm, answering rule 702.191a's
     -- "the amount of mana spent to cast that spell".
@@ -876,8 +880,8 @@ playerView pid =
       castUsing = Nothing,
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
-      manaSpentTags = Set.empty,
-      -- A player is no object to have been paid for -- `manaSpentTags` above,
+      manaSpentTagColors = Map.empty,
+      -- A player is no object to have been paid for -- `manaSpentTagColors` above,
       -- same sentence.
       manaSpentAmount = 0,
       -- CR 602.1: an activated ability is an ability OF AN OBJECT, and CR 109.1's
@@ -2014,8 +2018,8 @@ matches context view predicate = case predicate of
   -- CR 601.2h off Object.manaSpent, WasCastFrom's posture one record over: a
   -- STAMP written once the payment settled, so it goes on answering the same way
   -- for as long as the object lasts. Vacuously False for a player and for
-  -- everything nothing was ever paid for -- `manaSpentTags` is empty there.
-  Filter.TagWasSpent tag -> Set.member tag (manaSpentTags view)
+  -- everything nothing was ever paid for -- `manaSpentTagColors` is empty there.
+  Filter.TagWasSpent tag -> Map.member tag (manaSpentTagColors view)
   -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
   -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:
   -- CR 701.54a ends the designation when another creature takes it, and the next
