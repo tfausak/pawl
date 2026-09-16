@@ -5,21 +5,23 @@
         {
           "type": "Ward",
           "value": {
-            "components": [
-              {
-                "type": "Sacrifice",
-                "value": {
-                  "count": 1,
-                  "whichPermanents": {
-                    "type": "HasSubtype",
-                    "value": {
-                      "type": "Food"
+            "cost": {
+              "components": [
+                {
+                  "type": "Sacrifice",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Food"
+                      }
                     }
                   }
                 }
-              }
-            ],
-            "mana": []
+              ],
+              "mana": []
+            }
           }
         }
       ],

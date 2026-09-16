@@ -27,6 +27,7 @@ import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Suspend as Suspend
+import qualified Pawl.Types.Ward as Ward
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
@@ -243,13 +244,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- ward's is paid by an OPPONENT as the minted trigger resolves, where every
   -- other cost-bearing keyword names a cost its own controller pays.
   Spec.it s "Ward carries its cost, and is not Flashback" $ do
-    let ward n = Keyword.Ward (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    let ward n = Keyword.Ward (Ward.MkWard (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) Nothing)
         flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
     Common.assertCodec
       s
       Keyword.codec
       (ward 2)
-      " {\"type\":\"Ward\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+      " {\"type\":\"Ward\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}} "
     Spec.assertBool s (Codec.encode Keyword.codec (ward 2) /= Codec.encode Keyword.codec (flashbackOf 2)) "the same cost under two keywords encodes differently"
   -- CR 702.22: only the combat-damage-division halves are modeled; see the type.
   Spec.it s "Banding" $
@@ -913,7 +914,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (upkeep 1)
       " {\"type\":\"CumulativeUpkeep\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
-    Spec.assertBool s (Codec.encode Keyword.codec (upkeep 2) /= Codec.encode Keyword.codec (Keyword.Ward (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))) "and is not ward"
+    Spec.assertBool s (Codec.encode Keyword.codec (upkeep 2) /= Codec.encode Keyword.codec (Keyword.Ward (Ward.MkWard (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []) Nothing))) "and is not ward"
   -- CR 702.30a's payload is a Cost too, and the tag must not collide with the
   -- upkeep cost above: what a permanent owes at the first upkeep after it came
   -- under your control is not what it owes at every upkeep thereafter. No arm of

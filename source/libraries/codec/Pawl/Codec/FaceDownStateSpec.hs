@@ -30,6 +30,6 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownState" $ do
         { FaceDownState.reason = FaceDownReason.Disguised,
           FaceDownState.listed = FaceDownCharacteristics.disguisedValue
         }
-      " {\"reason\":{\"type\":\"Disguised\"},\"listed\":{\"keywords\":[{\"type\":\"Ward\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}]}} "
+      " {\"reason\":{\"type\":\"Disguised\"},\"listed\":{\"keywords\":[{\"type\":\"Ward\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}}]}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s FaceDownState.codec

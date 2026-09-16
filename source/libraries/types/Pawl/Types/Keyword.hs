@@ -13,6 +13,7 @@ import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.Suspend as Suspend
+import qualified Pawl.Types.Ward as Ward
 
 -- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302. So casing on this is NOT
@@ -110,11 +111,9 @@ data Keyword
     TrampleOverPlaneswalkers
   | Vigilance -- 702.20
   | -- | 702.21a: ward [cost], a triggered ability countering the targeting spell
-    -- or ability unless its controller pays.
-    --
-    -- Not implemented: CR 702.21b's X in a ward cost, which needs a value
-    -- determined as the ability RESOLVES (#1526).
-    Ward (Cost.Cost Keyword)
+    -- or ability unless its controller pays. CR 702.21b's X rides the payload's
+    -- second field; see Pawl.Types.Ward.
+    Ward (Ward.Ward Keyword)
   | -- | 702.22: banding, of which only the two combat-damage-division halves are
     -- modeled (CR 702.22j and CR 702.22k). CR 702.22c's band of attackers is a
     -- shape the declare-attackers step does not have.

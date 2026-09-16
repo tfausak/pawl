@@ -1121,9 +1121,9 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
 -- keyword resolves on a triggered ability that announced nothing, and reads 0
 -- here.
 --
--- Not implemented: CR 702.21b's ward {X}, whose value is determined as the
--- ability resolves rather than announced, needs a cost whose amount is a
--- Quantity and has no spelling at all (#1526).
+-- CR 702.21b's ward {X} is the value this reader is NOT: determined as the
+-- ability resolves rather than announced, it rides PayGate.perEach instead
+-- (Pawl.Types.Ward.perEach, Pawl.Engine.Keyword.ward).
 announcedXOn :: ObjectId -> GameState -> Natural
 announcedXOn oid gs =
   Maybe.fromMaybe

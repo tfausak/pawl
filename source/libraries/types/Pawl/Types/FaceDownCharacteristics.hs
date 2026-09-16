@@ -10,6 +10,7 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.Ward as Ward
 
 -- | CR 708.2: "face-down spells and face-down permanents have no
 -- characteristics other than those LISTED by the ability or rules that allowed
@@ -89,9 +90,13 @@ disguisedValue =
     { keywords =
         Set.singleton
           ( Keyword.Ward
-              Cost.MkCost
-                { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
-                  Cost.components = []
+              Ward.MkWard
+                { Ward.cost =
+                    Cost.MkCost
+                      { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
+                        Cost.components = []
+                      },
+                  Ward.perEach = Nothing
                 }
           )
     }

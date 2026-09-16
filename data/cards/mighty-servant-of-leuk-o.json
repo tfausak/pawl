@@ -8,19 +8,21 @@
         {
           "type": "Ward",
           "value": {
-            "components": [
-              {
-                "type": "DiscardCards",
-                "value": {
-                  "count": 1,
-                  "whichCards": {
-                    "type": "And",
-                    "value": []
+            "cost": {
+              "components": [
+                {
+                  "type": "DiscardCards",
+                  "value": {
+                    "count": 1,
+                    "whichCards": {
+                      "type": "And",
+                      "value": []
+                    }
                   }
                 }
-              }
-            ],
-            "mana": []
+              ],
+              "mana": []
+            }
           }
         },
         {
