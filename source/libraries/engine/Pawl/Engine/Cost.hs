@@ -2174,7 +2174,10 @@ claimOf slots pid oid component gs =
         -- taps is not settled until the payer picks them. A threshold above 0 needs
         -- some permanent of positive power (canPayComponent below), so one is a LOWER
         -- BOUND on what the payment taps and can never over-refuse; a threshold of 0 is
-        -- paid by the empty set, taps nothing and claims nothing.
+        -- paid by the empty set, taps nothing and claims nothing. It is the wrong
+        -- direction for `repeatsOf`, which DIVIDES a pool by the count, and that is
+        -- why `uncountedCeiling` caps this component at 1 where it lets the sibling
+        -- arm below through.
         --
         -- The pool is tapCandidates', TapPermanents' below: tapped candidates included,
         -- the same permissive reading and for its reason. CR 702.122a's own criterion
@@ -2188,8 +2191,14 @@ claimOf slots pid oid component gs =
         -- sacrificed" is the case that proves the axes stay apart.
         --
         -- The pool is every candidate the criterion admits, tapped ones included --
-        -- the PERMISSIVE reading where a criterion omits "untapped", unobservable
-        -- since an already-tapped candidate spends no untapped-ness.
+        -- the PERMISSIVE reading where a criterion omits "untapped". `repeatsOf`
+        -- divides this pool, so such a criterion UNDERSTATES how often the cost can
+        -- be paid rather than overstating it: an already-tapped candidate spends no
+        -- untapped-ness and so is payable again, where dividing counts it once.
+        -- Every criterion in the tree writes "untapped" anyway, printed
+        -- (Heritage Druid, Springleaf Drum) and minted alike
+        -- (Pawl.Engine.Keyword's conspire and station), so the division is exact
+        -- for all of them.
         CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
           claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) n
         -- The battlefield pool SacrificeThis and ReturnThis draw on, on their axis
@@ -2480,7 +2489,9 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
 -- The SMALLEST ceiling the cost's resources impose (CR 118.3's "fully"). Three
 -- are counted, each totalled over the WHOLE cost: OBJECTS, through
 -- Pawl.Engine.Claim.repeats, so two components drawing on one pool do not each
--- get it; LIFE, through CR 119.4, so the ceiling is the life total divided by
+-- get it -- untapped-ness is one such pool (ClaimAxis.Tapping), which is what
+-- makes Heritage Druid beside nine untapped Elves three activations and nine
+-- mana; LIFE, through CR 119.4, so the ceiling is the life total divided by
 -- `lifeOwedBy`; and the +1\/+1 COUNTERS on the source, CR 122.1's marker, so the
 -- ceiling is what it carries divided by `plusOneCountersOwedBy` -- Workhorse's
 -- four counters are four activations and four mana.
@@ -2527,13 +2538,12 @@ repeatsOf pid oid cost gs =
 -- for CR 107.5's {T}, CR 107.6's {Q} and CR 606.4's loyalty (CR 606.3 allows one
 -- loyalty ability per turn whatever the counters allow); an UNDERSTATEMENT for
 -- CR 107.14's energy, for a counter put on the source, for CR 701.68's blight,
--- and for the two components that tap OTHER permanents (#2173).
+-- and for TapForTotalPower (#2173).
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
 uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
 uncountedCeiling component = case component of
-  -- Counted by `objectCeiling`. TapPermanents states a claim too and is still
-  -- capped at 1 below, for the header's understatement reason.
+  -- Counted by `objectCeiling`.
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.ReturnThis -> Nothing
@@ -2558,8 +2568,19 @@ uncountedCeiling component = case component of
   CostComponent.PayEnergyX -> Just 0
   CostComponent.TapThis -> Just 1
   CostComponent.UntapThis -> Just 1
+  -- 1 even though `claimOf` states a claim, and NOT folded into `objectCeiling`:
+  -- that claim's count is ONE where the component's number is a THRESHOLD on an
+  -- aggregate, so dividing the pool by it would OVERSTATE -- four 1/1s pay a
+  -- threshold of 3 once, not four times -- and the header's direction is the
+  -- other way (#2173).
   CostComponent.TapForTotalPower {} -> Just 1
-  CostComponent.TapPermanents {} -> Just 1
+  -- Counted by `objectCeiling`, on ClaimAxis.Tapping: the count is exact, so the
+  -- pool of untapped candidates divided by it is how many times in a row the
+  -- component can be paid. Heritage Druid's nine Elves are three activations
+  -- (Pawl.ManaSpec).
+  CostComponent.TapPermanents {} -> Nothing
+  -- An UNDERSTATEMENT: CR 107.14's ceiling is the player's energy counters
+  -- divided by what this component owes, `lifeCeiling`'s shape (#2173).
   CostComponent.PayEnergy _ -> Just 1
   CostComponent.AddLoyaltyToThis _ -> Just 1
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1

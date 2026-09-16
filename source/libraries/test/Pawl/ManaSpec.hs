@@ -2301,6 +2301,69 @@ workhorseBoard horse counters =
   let (horseId, gs) = S.addPermanent horse S.alice (Setup.emptyGame S.bothPlayers)
    in (horseId, S.addCounter CounterKind.PlusOnePlusOne counters horseId gs)
 
+-- CR 118.3's "fully" over untapped-ness -- the resource CR 601.2f's "tapping
+-- permanents" spends, and neither an object leaving a zone nor life nor a
+-- counter. Heritage Druid ({G} Creature -- Elf Druid, Oracle text checked
+-- against Scryfall: "Tap three untapped Elves you control: Add {G}{G}{G}.") is
+-- the pool's first repeatable mana ability whose cost taps OTHER permanents: no
+-- {T} on the Druid for CR 107.5 to bar a second activation, so nine untapped
+-- Elves are three activations and nine mana. `uncountedCeiling` capped the
+-- component at 1, so nine Elves supplied three mana and a cast two further
+-- activations could have paid for was never offered (#2173).
+--
+-- Glistener Elf is the fuel throughout and makes no mana, so every mana on these
+-- boards comes through the Druid and no count below can be met any other way.
+-- The Druid is itself an untapped Elf, so it is one of the nine and may be one
+-- of the three its own cost taps.
+heritageDruidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+heritageDruidSpec s registry = Spec.describe s "Heritage Druid" $ do
+  -- ONE board for both halves, so what separates {9} from {10} is only how many
+  -- activations the supply model counted: three, and not one and not two.
+  Spec.it s "CR 118.3 nine untapped Elves supply nine mana" $ do
+    board <- heritageDruidBoard s registry 9
+    let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
+    Spec.assertBool s (pays 9) "three activations pay {9}"
+    Spec.assertBool s (not (pays 10)) "and three is all nine Elves buy, so not {10}"
+
+  -- The DIVISION rather than the pool's size: six Elves are two activations, not
+  -- the six a ceiling reading the pool itself would have counted.
+  Spec.it s "CR 118.3 six untapped Elves are two activations" $ do
+    board <- heritageDruidBoard s registry 6
+    let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
+    Spec.assertBool s (pays 6) "{6} is what two activations add"
+    Spec.assertBool s (not (pays 7)) "and two thirds of six leave no third activation, so not {7}"
+
+  Spec.it s "CR 118.3 three untapped Elves are one activation" $ do
+    board <- heritageDruidBoard s registry 3
+    let pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
+    Spec.assertBool s (pays 3) "{3} is what one activation adds"
+    Spec.assertBool s (not (pays 4)) "and nothing pays {4}"
+
+  -- The gameplay-level proof (design.md section 4). Void Winnower is {9}, all
+  -- generic, and targets nothing as it is cast, so the whole cast turns on the
+  -- component being counted three times. The two boards differ in the Elves and
+  -- in nothing else, so the short one fails for the Elves rather than for want
+  -- of anything else.
+  Spec.it s "CR 605.3a Void Winnower is cast off three activations of one Druid" $ do
+    winnower <- S.printingOf s registry "Void Winnower"
+    nine <- heritageDruidBoard s registry 9
+    six <- heritageDruidBoard s registry 6
+    let resolved = castFrom S.identityAnswer nine winnower
+        short = castFrom S.identityAnswer six winnower
+        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
+    Spec.assertEqWith s "the Winnower resolved" (countOf "Void Winnower" resolved) 1
+    Spec.assertEqWith s "with six Elves there is no {9} and the cast fails" (countOf "Void Winnower" short) 0
+    Spec.assertEqWith s "CR 601.2h all nine Elves paid for it, the Winnower itself arriving untapped" (S.tappedCount S.alice resolved) 9
+    Spec.assertEqWith s "and CR 601.2h left the short board's Elves untapped" (S.tappedCount S.alice short) 0
+
+-- Alice's Heritage Druid and as many Glistener Elves as make `elves` untapped
+-- Elves in all, the Druid counted among them, and nothing else on the board.
+heritageDruidBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+heritageDruidBoard s registry elves = do
+  druid <- S.printingOf s registry "Heritage Druid"
+  elf <- S.printingOf s registry "Glistener Elf"
+  pure (alicePermanents (druid : replicate (elves - 1) elf))
+
 -- The half #1128 gave up: WHICH mana each of a repeatable source's activations
 -- makes. Phyrexian Altar ({3} Artifact, "Sacrifice a creature: Add one mana of
 -- any color") is the pool's first mana ability that is both repeatable and offers
@@ -3741,6 +3804,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
   workhorseSpec s registry
+  heritageDruidSpec s registry
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
   grinningIgnusSpec s registry
