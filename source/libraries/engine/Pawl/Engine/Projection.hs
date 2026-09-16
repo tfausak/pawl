@@ -880,6 +880,21 @@ subtypesWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> PC.subtypes (LastKnown.characteristics lk)
   Nothing -> subtypesOf oid gs
 
+-- `project` with the same fallback, for a reader that wants the WHOLE fold of a
+-- gone object rather than one field of it: CR 603.3b's "the final chapter ability
+-- of a Saga you control" needs both the subtype and the chapter abilities of a
+-- Saga that may have left the battlefield before CR 117.5 gathered the trigger,
+-- and CR 608.2h is the authority for answering at all. The record holds the
+-- projection taken as the object ceased, so a Saga that was a COPY of another card
+-- answers with the copy's chapters rather than the printed card's. Proved by
+-- Pawl.TriggerSpec's "CR 608.2h the watcher reads the dead Saga's last known
+-- information" and its "CR 707.2 a COPY of the Saga answers with the copy's
+-- chapters".
+projectWithLastKnown :: ObjectId -> GameState -> ProjectedCharacteristics
+projectWithLastKnown oid gs = case lastKnownOf oid gs of
+  Just lk -> LastKnown.characteristics lk
+  Nothing -> project oid gs
+
 -- powerGiven with the same fallback, on CR 608.2b's own sentence about target
 -- re-validation -- so a mentor (CR 702.134a) killed in response leaves its
 -- trigger's target legal rather than fizzling it.
