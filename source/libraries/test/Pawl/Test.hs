@@ -318,6 +318,7 @@ import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
 import qualified Pawl.Codec.OrElseSpec
+import qualified Pawl.Codec.OutsideDestinationSpec
 import qualified Pawl.Codec.OutsideObjectSpec
 import qualified Pawl.Codec.PaidExpirySpec
 import qualified Pawl.Codec.PartnerTextSpec
@@ -970,6 +971,7 @@ spec s registry = do
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
   Pawl.Codec.OrElseSpec.spec s
+  Pawl.Codec.OutsideDestinationSpec.spec s
   Pawl.Codec.OutsideObjectSpec.spec s
   Pawl.Codec.PaidExpirySpec.spec s
   Pawl.Codec.PartnerTextSpec.spec s

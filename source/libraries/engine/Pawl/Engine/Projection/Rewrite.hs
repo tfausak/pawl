@@ -464,7 +464,7 @@ rewriteEffect pairs effect = case effect of
   -- same way. A REGRESSION FENCE rather than a proven behaviour -- no card in
   -- data/cards changes a word this filter names, so both readings leave the same
   -- board and mutating this line reddens nothing.
-  Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame predicate reveal) -> Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame (Filter.rewrite pairs predicate) reveal)
+  Effect.FromOutsideTheGame payload -> Effect.FromOutsideTheGame payload {FromOutsideTheGame.filter = Filter.rewrite pairs (FromOutsideTheGame.filter payload)}
   Effect.ExileThisSpell -> effect
   Effect.Bolster quantity -> Effect.Bolster (rewriteQuantity pairs quantity)
   -- CR 612.1 / 612.2a: amass's subtype is a printed word of CR 205.3m's family,

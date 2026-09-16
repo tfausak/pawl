@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.FromOutsideTheGame" $ do
@@ -16,22 +17,25 @@ spec s = Spec.describe s "Pawl.Codec.FromOutsideTheGame" $ do
       s
       FromOutsideTheGame.codec
       ( FromOutsideTheGame.MkFromOutsideTheGame
-          { FromOutsideTheGame.filter = Filter.HasCardType CardType.Sorcery,
+          { FromOutsideTheGame.destination = OutsideDestination.Hand,
+            FromOutsideTheGame.filter = Filter.HasCardType CardType.Sorcery,
             FromOutsideTheGame.reveal = True
           }
       )
-      " {\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}},\"reveal\":true} "
-  -- Death Wish's shape, and the pair is the point: both fields differ from the
-  -- case above, so neither a dropped reveal nor a dropped filter round-trips.
-  -- The empty And is CR 400.11c's "a card you own from outside the game" -- a
-  -- quality the card does not state, which admits everything.
-  Spec.it s "MkFromOutsideTheGame, no reveal and no stated quality" $
+      " {\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}},\"reveal\":true} "
+  -- The Raven's Warning's shape, and the pair is the point: all three fields
+  -- differ from the case above, so a dropped reveal, a dropped filter and a
+  -- dropped destination alike fail to round-trip. The empty And is CR 400.11c's
+  -- "a card you own from outside the game" -- a quality that card does not state
+  -- either, which admits everything.
+  Spec.it s "MkFromOutsideTheGame, no reveal, no stated quality, and a library destination" $
     Common.assertCodec
       s
       FromOutsideTheGame.codec
       ( FromOutsideTheGame.MkFromOutsideTheGame
-          { FromOutsideTheGame.filter = Filter.And [],
+          { FromOutsideTheGame.destination = OutsideDestination.LibraryTop,
+            FromOutsideTheGame.filter = Filter.And [],
             FromOutsideTheGame.reveal = False
           }
       )
-      " {\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false} "
+      " {\"destination\":{\"type\":\"LibraryTop\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false} "

@@ -689,6 +689,8 @@ library codec
     Pawl.Codec.OptionalitySpec
     Pawl.Codec.OrElse
     Pawl.Codec.OrElseSpec
+    Pawl.Codec.OutsideDestination
+    Pawl.Codec.OutsideDestinationSpec
     Pawl.Codec.OutsideObject
     Pawl.Codec.OutsideObjectSpec
     Pawl.Codec.PaidExpiry
@@ -1882,6 +1884,7 @@ library types
     Pawl.Types.Optionality
     Pawl.Types.OrElse
     Pawl.Types.OutsideCard
+    Pawl.Types.OutsideDestination
     Pawl.Types.OutsideObject
     Pawl.Types.PaidExpiry
     Pawl.Types.PartnerText
