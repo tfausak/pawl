@@ -3367,8 +3367,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- 705.2's last sentence keeps everyone else out of it -- so the PlayerId on
   -- the call is the same seat and no opponent is ever asked.
   --
-  -- CR 705.1's flip is also the event TriggerCondition.PlayerWinsCoinFlip
-  -- watches (Tavern Scoundrel), recorded under `controller` for the reason the
+  -- CR 705.1's flip is also the event TriggerCondition's PlayerWinsCoinFlip and
+  -- PlayerLosesCoinFlip watch (Tavern Scoundrel, Karplusan Minotaur), recorded
+  -- under `controller` for the reason the
   -- roll above gives: the instruction is aimed at a player, Pawl.Types.FlipCoin
   -- names none of its own, and CR 705.2's last sentence keeps every other seat
   -- out of it. EVERY coin is recorded, won or lost -- Pawl.Types.CoinFlipped
@@ -3376,11 +3377,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- one entry per coin, since the event is the log of flips rather than of
   -- instructions.
   --
-  -- TWO WRITERS, two roads. Pawl.Engine.Coin is also called by
-  -- Pawl.Engine.Event's ChoiceByCoinFlip arm, the flip made as a permanent
-  -- enters (Molten Sentry), which records its own CoinFlipped there. Every road
-  -- that flips records, which is what keeps this event the log of CR 705.1 flips
-  -- rather than the log of one opcode.
+  -- THREE WRITERS, three roads. Pawl.Engine.Event's ChoiceByCoinFlip arm is the
+  -- flip made as a permanent enters (Molten Sentry) and Pawl.Engine.Cost's
+  -- CostComponent.FlipCoin arm is the flip a COST names (Karplusan Minotaur),
+  -- each recording its own CoinFlipped. Every road that flips records, which is
+  -- what keeps this event the log of CR 705.1 flips rather than of one opcode.
   --
   -- Recorded per coin and so BEFORE the binding, where the roll above records
   -- after it: the tally is not settled until the last coin, and nothing observes
@@ -3410,45 +3411,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     statements <- Coin.statementsFor (Just controller)
     let flipOnce acc _ = do
           hit <- case FlipCoin.reading flipCoin of
-            -- CR 705.2's win/lose flip. TWO questions, in the rule's own order.
-            -- The CALL comes first and through Game.choose, because it is a
-            -- choice: the flipping player weighs heads against tails, and CR 723
-            -- lets a controller make it for them. The FACE comes second and
-            -- through Game.ask, because it is not: nobody decides how a coin
-            -- lands, so there is nothing to usurp and the question goes to the
-            -- INTERPRETER. Asking in the other order would let the call be made
-            -- with the face already known, which is a different game. No board
-            -- reaches the difference: both orders leave the same slot bound, so
-            -- Pawl.CoinSpec's "only the flipping player calls" case proves the
-            -- order by what the engine ASKED rather than by anything the board
-            -- shows.
-            --
-            -- The decider is re-read per coin rather than off the snapshot above,
-            -- since CR 723.1's control could in principle change between two
-            -- coins of one instruction.
-            CoinReading.Wins -> do
-              gsNow <- State.get
-              called <- Game.choose (Prompt.CallCoin (Decide.deciderFor controller gsNow) controller)
-              (face, stated) <- Event.flipOneCoin (Just controller) statements
-              let matched = stated || face == called
-              State.modify'
-                ( Event.recordEvent
-                    ( GameEvent.CoinFlipped
-                        CoinFlipped.MkCoinFlipped
-                          { CoinFlipped.flipper = controller,
-                            -- CR 705.2's win or loss, which this kind of flip
-                            -- always has -- the caller made the call.
-                            CoinFlipped.won = Just matched
-                          }
-                    )
-                )
-              pure matched
+            -- CR 705.2's win/lose flip, whole: the call, the flip, the
+            -- comparison and the CR 705.1 event all belong to
+            -- Event.flipWinLoseCoin, which is also the road a COST'S flip takes.
+            -- That module's haddock argues the order of the two questions, and
+            -- Pawl.CoinSpec's "only the flipping player calls" proves it by what
+            -- the engine ASKED rather than by anything the board shows.
+            CoinReading.Wins -> Event.flipWinLoseCoin controller statements
             -- CR 705.2's first sentence: the effect cares only about the face, so
             -- no Prompt.CallCoin is asked -- "no player wins or loses a coin flip
             -- for this kind of effect", so there is no call to make and nothing
             -- for a CR 723 controller to usurp. The flip is recorded with no
             -- outcome, which is what keeps rule 705.2's first sentence honest
-            -- against TriggerCondition.PlayerWinsCoinFlip; see
+            -- against TriggerCondition's two coin-flip conditions, neither of
+            -- which matches an outcome of Nothing; see
             -- Pawl.Types.CoinFlipped. CR 705.3's second clause is the exception
             -- the rule itself names, Pawl.Engine.Event's entry road verbatim: an
             -- effect may state that a player WINS a flip that would ordinarily

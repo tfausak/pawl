@@ -243,6 +243,7 @@ looksBack condition = case condition of
   -- no object at all, so CR 603.10's first sentence governs.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
+  TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- The same answer once more, and the most plainly: CR 701.43c can only exert a
   -- permanent that is ON the battlefield, so nothing has changed zones.
   TriggerCondition.SelfExerted -> False
@@ -511,6 +512,7 @@ batchScoped condition = case condition of
   -- differ is an event per DIE, which the printed words do not ask for.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
+  TriggerCondition.PlayerLosesCoinFlip _ -> False
   TriggerCondition.SelfExerted -> False
   TriggerCondition.SelfBecomesAttachedBy _ -> False
   TriggerCondition.SelfBecomesAttachedTo _ -> False
@@ -1993,6 +1995,7 @@ zonesTriggeredFrom cond =
         -- battlefield.
         TriggerCondition.PlayerRollsDice _ -> battlefield
         TriggerCondition.PlayerWinsCoinFlip _ -> battlefield
+        TriggerCondition.PlayerLosesCoinFlip _ -> battlefield
         -- CR 113.6's default, and CR 701.43c makes it the only possible answer rather
         -- than a default: an object that isn't on the battlefield can't be exerted, so
         -- the bearer is standing there when its own exert is recorded.
@@ -2420,6 +2423,7 @@ stateTriggers gs
               -- entry, never a CR 603.8 state that could be true standing still.
               TriggerCondition.PlayerRollsDice _ -> False
               TriggerCondition.PlayerWinsCoinFlip _ -> False
+              TriggerCondition.PlayerLosesCoinFlip _ -> False
               -- CR 603.2 again: being exerted is something that happens, with its
               -- own log entry, and CR 701.43b makes "already exerted" no bar to
               -- exerting again -- so there is no standing state to be true.

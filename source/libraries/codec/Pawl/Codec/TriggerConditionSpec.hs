@@ -1109,6 +1109,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerWinsCoinFlip PlayerRelation.Opponent)
       " {\"type\":\"PlayerWinsCoinFlip\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 705.2's other outcome, the arm above's shape: Karplusan Minotaur is the
+  -- You form.
+  Spec.it s "PlayerLosesCoinFlip round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerLosesCoinFlip PlayerRelation.You)
+      " {\"type\":\"PlayerLosesCoinFlip\",\"value\":{\"type\":\"You\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerLosesCoinFlip PlayerRelation.Opponent)
+      " {\"type\":\"PlayerLosesCoinFlip\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 702.170a. Nullary, SelfCycled's shape: the ability is printed on the card
   -- that becomes plotted, so there is nothing to select among.
   Spec.it s "SelfBecomesPlotted round-trips" $

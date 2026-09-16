@@ -1896,8 +1896,9 @@ apply batch candidate event =
       -- Pawl.Types.EntryFlip's two required faces keep separate anyway).
       --
       -- The flip is recorded as a CR 705.1 event with no outcome, which is what
-      -- keeps CR 705.2's first sentence honest against
-      -- TriggerCondition.PlayerWinsCoinFlip -- see Pawl.Types.CoinFlipped. CR
+      -- keeps CR 705.2's first sentence honest against TriggerCondition's
+      -- PlayerWinsCoinFlip and PlayerLosesCoinFlip alike, neither of which
+      -- matches it -- see Pawl.Types.CoinFlipped. CR
       -- 705.3's second clause is the exception the rule itself names: an effect
       -- may state that a player WINS this flip, and Edgar, King of Figaro's
       -- ruling says such an ability reaches even a flip that would ordinarily
@@ -4294,6 +4295,47 @@ flipOneCoin mFlipper stated = do
         gs <- State.get
         Game.choose (Prompt.ChooseCoinResult (Decide.deciderFor pid gs) pid (first NonEmpty.:| rest))
   pure (Maybe.fromMaybe actual (Coin.statedFace stated), any StatedFlip.wins stated)
+
+-- CR 705.2's win/lose flip, whole: the call, the flip, the comparison and the CR
+-- 705.1 event. The ONE road for the kind of flip a player wins or loses --
+-- Pawl.Engine.Resolve's Effect.FlipCoin arm takes it under CoinReading.Wins, and
+-- Pawl.Engine.Cost's CostComponent.FlipCoin arm takes it for the flip a COST
+-- names (Karplusan Minotaur's cumulative upkeep). Both record the same event, so
+-- TriggerCondition.PlayerWinsCoinFlip and PlayerLosesCoinFlip watch a cost's flip
+-- and an effect's flip alike.
+--
+-- TWO questions, in rule 705.2's own order. The CALL comes first and through
+-- Game.choose, because it is a choice CR 723 lets a controller usurp; the FACE
+-- comes second and through Game.ask inside `flipOneCoin`, because nobody decides
+-- how a coin lands. Asking in the other order would let the call be made with the
+-- face already known.
+--
+-- The decider is read HERE rather than by the caller, so CR 723.1's control is
+-- read at the moment of the call -- one instruction's second coin can be called
+-- by a different seat than its first.
+--
+-- CR 705.3's stated WIN is the `stated` half: the call and the face are both
+-- ignored when an effect states this player wins. Its stated FACE is applied
+-- inside `flipOneCoin`, before the comparison here sees the face, which is why a
+-- statement of heads alone still loses this flip against a call of tails.
+flipWinLoseCoin :: PlayerId -> [StatedFlip.StatedFlip] -> Game Bool
+flipWinLoseCoin pid statements = do
+  gs <- State.get
+  called <- Game.choose (Prompt.CallCoin (Decide.deciderFor pid gs) pid)
+  (face, stated) <- flipOneCoin (Just pid) statements
+  let matched = stated || face == called
+  State.modify'
+    ( recordEvent
+        ( GameEvent.CoinFlipped
+            CoinFlipped.MkCoinFlipped
+              { CoinFlipped.flipper = pid,
+                -- CR 705.2's win or loss, which this kind of flip always has --
+                -- the flipper made the call.
+                CoinFlipped.won = Just matched
+              }
+        )
+    )
+  pure matched
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
 resolveTokens :: PlayerId -> Seq.Seq TokenLot.TokenLot -> Game (Maybe (PlayerId, Seq.Seq TokenLot.TokenLot))
@@ -7342,6 +7384,7 @@ reactsToAbilityTriggering cond = case cond of
   -- never an ability triggering, so it takes CR 603.3b's first pass as well.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
+  TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- The same answer for the same reason: CR 701.43a's exert is a keyword action a
   -- PLAYER takes, and CR 508.1g puts it in a turn-based action rather than in a
   -- resolving ability.
@@ -7542,6 +7585,7 @@ controllerTurnScoped cond = case cond of
   -- CR 706.1 names no turn either.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
+  TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- False for the SelfAttacks arm's reason below, which is exactly this case one
   -- rule earlier: CR 508.1g exerts on the ACTIVE player's turn, and CR 109.5's
   -- "you" is the ability's controller, so a stolen Glory-Bound Initiate is

@@ -170,6 +170,15 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       CostComponent.Forage
       " {\"type\":\"Forage\"} "
+  -- CR 705.1 as a cost, nullary on the wire for the arm above's reason: the
+  -- rule fixes the whole flip -- Karplusan Minotaur's "Cumulative upkeep--Flip a
+  -- coin".
+  Spec.it s "FlipCoin" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.FlipCoin
+      " {\"type\":\"FlipCoin\"} "
   -- CR 406.2's halves: the two that name the object the cost is on, one per
   -- zone, and the one that names a count and a criterion.
   Spec.it s "ExileThisFromGraveyard" $

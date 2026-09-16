@@ -249,6 +249,9 @@ costMovesLibraryCard component = case component of
   -- neither of which is a library, so this cost leaves CR 605.1a's clause intact
   -- -- Thornvault Forager's "{T}, Forage: Add two mana" is a mana ability.
   CostComponent.Forage -> False
+  -- CR 705.1's coin is not a card and no zone is touched, so this cost leaves
+  -- CR 605.1a's clause intact too -- the arm above's answer.
+  CostComponent.FlipCoin -> False
 
 -- CR 605: does this effect add mana, and on what instruction? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by

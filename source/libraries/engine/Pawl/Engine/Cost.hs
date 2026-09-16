@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Blight as Blight
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Claim as Claim
+import qualified Pawl.Engine.Coin as Coin
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.CrewRestriction as CrewRestriction
@@ -1209,6 +1210,7 @@ substituteXInComponent x component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
   CostComponent.Forage -> component
+  CostComponent.FlipCoin -> component
   -- PayLifeX's rewrite one keyword action over: CR 107.3a gives ONE announced
   -- value to the whole cost, so Soul Immolation's "blight X" takes the same X a
   -- mana cost's {X} would have taken.
@@ -1271,6 +1273,7 @@ componentHasVariable component = case component of
   -- Nullary: CR 701.61a states no number at all, so there is nothing for CR
   -- 601.2b to announce.
   CostComponent.Forage -> False
+  CostComponent.FlipCoin -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1357,6 +1360,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.Forage -> False
+  CostComponent.FlipCoin -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1641,6 +1645,7 @@ loyaltyAmountOf component = case component of
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
   CostComponent.Forage -> Nothing
+  CostComponent.FlipCoin -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
@@ -1750,6 +1755,7 @@ zoneOfComponent component = case component of
   -- ExileCardsFromGraveyard arm above's answer, for its reason, and the Food half
   -- is Sacrifice's.
   CostComponent.Forage -> Nothing
+  CostComponent.FlipCoin -> Nothing
 
 -- CR 118.8c: does this cost include "actions involving cards with a stated
 -- quality in a hidden zone"? What Resolve.offerCast reads to decide whether a
@@ -1819,6 +1825,7 @@ componentStatesHiddenQuality component = case component of
   -- first conjunct fails -- the Sacrifice and ExileCardsFromGraveyard arms above,
   -- for their reason. Rule 701.61a states no quality either way.
   CostComponent.Forage -> False
+  CostComponent.FlipCoin -> False
   -- The other hidden zone (CR 400.2), and the FIRST conjunct is satisfied where
   -- no other arm's is -- but the second is not: CR 701.17a takes the cards off
   -- the top, so "mill a card" describes no quality for a player to fail to find.
@@ -2219,6 +2226,7 @@ claimOf slots pid oid component gs =
         -- no single claim describes the component. A FENCE, no card in `data/cards/`
         -- printing two forages in one cost.
         CostComponent.Forage -> Nothing
+        CostComponent.FlipCoin -> Nothing
         -- Nothing, Blight's arm above and for its reason one rule over: CR 701.20b
         -- leaves the revealed card in the hand, so nothing leaves any pool. CR
         -- 701.20c is what makes the shared-choice half right here too -- a card
@@ -2576,6 +2584,11 @@ uncountedCeiling component = case component of
   -- this component, so `objectCeiling` has no pool to divide. An UNDERSTATEMENT
   -- -- a graveyard of nine pays three forages -- and the header's safe direction.
   CostComponent.Forage -> Just 1
+  -- 1, and counted by none of the three totals -- Forage's answer just above.
+  -- An UNDERSTATEMENT and the header's safe direction: nothing in rule 705
+  -- bounds how many coins a player may flip, so this part alone would allow any
+  -- number of repeats.
+  CostComponent.FlipCoin -> Just 1
 
 -- This player's life total as an amount that could be PAID (CR 119.4), floored
 -- at zero: a player at or below 0 life can pay nothing but CR 119.4b's zero.
@@ -2760,6 +2773,7 @@ lifeOwedByComponent component = case component of
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
   CostComponent.Forage -> 0
+  CostComponent.FlipCoin -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -2804,6 +2818,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
   CostComponent.Forage -> 0
+  CostComponent.FlipCoin -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -3008,6 +3023,10 @@ canPayComponent slots pid oid component gs = case component of
   -- Nothing about `oid`: rule 701.61a's candidates are qualified by the FORAGER's
   -- own graveyard and control, the Blight arm above's shape.
   CostComponent.Forage -> Forage.canForage pid gs
+  -- Always payable: CR 705.1's coin is not a game resource, so there is no board
+  -- on which rule 608.2d refuses the flip. The OUTCOME does not enter into it --
+  -- a flip the payer goes on to lose pays the cost exactly as a won one does.
+  CostComponent.FlipCoin -> True
   -- CR 701.17b's last sentence, stated of costs in as many words: "the player
   -- can't pay a cost that includes milling a number of cards greater than the
   -- number of cards in their library". Not the general "as many as possible" of
@@ -3081,6 +3100,7 @@ criteriaOf component = case component of
   -- Rule 701.61a's two candidate sets are the rulebook's own and carry no card
   -- Filter, so there is no criterion for the lint to sweep.
   CostComponent.Forage -> []
+  CostComponent.FlipCoin -> []
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   CostComponent.MillCards _ -> []
@@ -3644,10 +3664,10 @@ payPass moment slots pid oid components =
 -- involve random elements or moving objects from the library to a public zone"
 -- being the first, and this the rest?
 --
--- The RANDOM half has no arm because it has no constructor: nothing in
--- Pawl.Types.CostComponent flips a coin or rolls a die, so every False below is
--- decided by the library half alone. One predicate for both, because rule
--- 601.2h's two criteria select one pass between them.
+-- CostComponent.FlipCoin is the RANDOM half's only arm; nothing in
+-- Pawl.Types.CostComponent rolls a die, so every other answer below is decided by
+-- the library half alone. One predicate for both, because rule 601.2h's two
+-- criteria select one pass between them.
 --
 -- EXHAUSTIVE with no wildcard, `orderSensitive`'s posture and for its reason.
 paidInSecondPass :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
@@ -3689,6 +3709,10 @@ paidInSecondPass component = case component of
   -- battlefield to a graveyard, and neither is a library, so the first pass holds
   -- it -- the header's reading.
   CostComponent.Forage -> False
+  -- CR 601.2h's RANDOM half, and the one part of this type that reaches it: a
+  -- coin flip is the rule's own example of a cost involving a random element, so
+  -- it is paid after every part that does not.
+  CostComponent.FlipCoin -> True
   -- CR 701.20b moves nothing out of any zone, so rule 601.2h's library half has
   -- nothing to ask of it.
   CostComponent.RevealCardFromHand _ -> False
@@ -3790,6 +3814,11 @@ orderSensitive component = case component of
   -- `data/cards/` printing this component, and its cost's other part is a {T},
   -- which answers True too, so `orderObservable` is False either way.
   CostComponent.Forage -> True
+  -- False: CR 705.1's flip spends nothing another part of the same cost could
+  -- have spent, the per-player scalars' answer. Alone in CR 601.2h's second pass
+  -- on this pool -- `paidInSecondPass` above puts it there and nothing else --
+  -- so `orderObservable` is False either way.
+  CostComponent.FlipCoin -> False
   -- CR 701.17a puts a card into a graveyard, which a graveyard-reading part of
   -- the same cost could then spend (Circling Vultures' "the top creature card of
   -- your graveyard"). Alone in CR 601.2h's second pass on this pool, so nothing
@@ -4788,6 +4817,21 @@ payComponent moment slots pid oid component = case component of
   CostComponent.Forage -> do
     did <- Forage.forage pid oid
     pure (if did then bindsNothing else Payment.Unpaid)
+  -- CR 705.1's flip as a payment, through Event.flipWinLoseCoin so a cost's coin
+  -- is the same CR 705.1 event an effect's coin is -- Karplusan Minotaur's own
+  -- two triggers watch the flip its cumulative upkeep pays.
+  --
+  -- CR 705.2's win/lose kind rather than the face-only kind: the cost names no
+  -- face and prints no consequence of its own, so the flip has a caller and the
+  -- outcome is the one rule 705.2's second sentence describes.
+  --
+  -- ALWAYS PAID. The outcome is not a payment condition -- `canPayComponent`
+  -- above says why -- and the flip BINDS NOTHING: rule 705.1 names nothing the
+  -- rest of the cost or a later clause could read.
+  CostComponent.FlipCoin -> do
+    statements <- Coin.statementsFor (Just pid)
+    _ <- Event.flipWinLoseCoin pid statements
+    pure bindsNothing
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.

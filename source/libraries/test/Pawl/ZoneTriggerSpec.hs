@@ -2491,6 +2491,10 @@ representativeEvents cond =
         -- at all -- and bob rather than the perspective player, on the
         -- PlayerScries arm's reasoning.
         TriggerCondition.PlayerWinsCoinFlip _ -> one (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.bob, CoinFlipped.won = Just True})
+        -- The mirror, and the only representative event its arm admits: a flip
+        -- bob called and missed. Just False rather than Nothing, which CR 705.2's
+        -- first sentence leaves unmatched by either condition.
+        TriggerCondition.PlayerLosesCoinFlip _ -> one (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.bob, CoinFlipped.won = Just False})
         -- CR 702.170a's own event, and the only one this condition admits. On
         -- `departed`, which is not the bearer on the board below -- so the pair
         -- does not match, which pins the floor for a matching pair too, this
@@ -2721,6 +2725,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerRollsDice PlayerRelation.Opponent,
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.You,
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.Opponent,
+    TriggerCondition.PlayerLosesCoinFlip PlayerRelation.You,
+    TriggerCondition.PlayerLosesCoinFlip PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesPlotted,
     TriggerCondition.PermanentExplores (Filter.Type.And []),
     TriggerCondition.PermanentConnives (Filter.Type.And []),

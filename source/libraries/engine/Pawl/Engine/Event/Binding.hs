@@ -1043,6 +1043,7 @@ eventBindingSlots cond = case cond of
   -- roller's own resolution, for a later effect of THAT ability to read.
   TriggerCondition.PlayerRollsDice _ -> Set.empty
   TriggerCondition.PlayerWinsCoinFlip _ -> Set.empty
+  TriggerCondition.PlayerLosesCoinFlip _ -> Set.empty
   -- Empty for the same reason, and CR 701.43d is what settles it: the linked
   -- trigger's "it" is the exerted permanent, which is already CR 113.7a's source
   -- slot, so a binding here would be a second name for one object. Glory-Bound
