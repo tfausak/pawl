@@ -5043,9 +5043,15 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
           -- object is never deleted and never re-minted (CR 400.7) and the graveyard
           -- card is the same object it always was.
           --
-          -- Not implemented: CR 303.4g's other branch, for an Aura whose current
-          -- zone is the stack or that is a token, and CR 303.4i's effect that names
-          -- an attachment the Aura can't legally enchant (gap #1734).
+          -- CR 303.4g's last sentence and CR 303.4i are createTokens', where the
+          -- effect names the host itself (EntryRiders.attachedTo) and a token with
+          -- none is refused rather than minted.
+          --
+          -- Not implemented: CR 303.4g's remaining branch, an Aura whose current
+          -- zone is the STACK, which that rule buries instead of leaving where it is
+          -- (gap #1734). No road in this pool reaches it: CR 303.4a makes a cast
+          -- Aura spell target, so Pawl.Engine.Stack's Aura branch always hands this
+          -- funnel a seed, and CR 608.2b counters the spell whose target has gone.
           settledSeed <-
             if dest == Zone.Battlefield && entryFacing == Facing.FaceUp && Maybe.isNothing seed && Set.member Subtype.Aura (Projection.subtypesOf oid gs)
               then do
@@ -6299,8 +6305,17 @@ sacrificeIn asOf victims = simultaneously $ do
 -- (CR 111.2 for `underOwner`, CR 508.4 for `attacking`, CR 712.14a's card-only
 -- scope for `transformed`), and handing this funnel the record would read as
 -- though it applied them.
-createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Game [ObjectId]
-createTokens controller card copy n tapped entering = do
+--
+-- `attached` is CR 303.4i's and CR 301.5e's "attached to", the same way round:
+-- the EntryRiders field names a slot, and the caller has already read it, so what
+-- arrives here is the answer. THREE-VALUED, because rule 303.4i separates two
+-- cases a bare Maybe would fuse -- Nothing where the effect said nothing about an
+-- attachment (every other token in the pool), Just the recipient where it named
+-- one, and Just Nothing for the rule's "an object ... that is undefined", which
+-- Preston Garvey, Minuteman reaches when the seat announces zero targets for its
+-- "up to one target land you control".
+createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe (Maybe Recipient.Recipient) -> Game [ObjectId]
+createTokens controller card copy n tapped entering attached = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
     then pure []
@@ -6418,11 +6433,42 @@ createTokens controller card copy n tapped entering = do
           -- library -- so it cannot reach a token, while one that names no zone
           -- carries the full set and does. Worms of the Earth's "lands can't enter
           -- the battlefield" is the pool's second kind.
-          if any (\tok -> EntryRestriction.prohibited tok Zone.Battlefield minted) ids
+          -- CR 303.4i, and CR 303.4g's last sentence with it: what the effect named
+          -- as this token's host, judged as rule 701.3a judges every attachment
+          -- (Attach.attachmentFor), which is also what re-tags the recipient into the
+          -- one the token's OWN enchant slot offers -- the pair Sba.stillLegalEnchant
+          -- compares against later.
+          --
+          -- ASKED OF `minted`, which is why it is asked here and not before a token
+          -- exists: the legality reading is about the token's subtypes and its enchant
+          -- ability, and Pawl.Engine.Projection answers for an object that is on the
+          -- board. So the token is minted, judged, and unmade again -- CR 111.5's
+          -- rollback above, to the same `unminted` and for the same reason, rule 303.4i
+          -- ending in the same words rule 111.5 does.
+          --
+          -- THE AURA TEST is the rule's own scope and not a card-identity read: CR
+          -- 303.4i refuses the token, while CR 301.5e one rule up says an Equipment in
+          -- the same position "is created and enters the battlefield unattached", which
+          -- is the fallthrough below. No printing in the pool names an Equipment
+          -- token's attachment -- living weapon and For Mirrodin! create the token and
+          -- then attach the EQUIPMENT to it (Pawl.Engine.Keyword.attachToOwnToken) --
+          -- so that arm is a regression fence rather than a proven road.
+          let hostFor tok = Monad.join attached >>= \destination -> Attach.attachmentFor tok destination minted
+              unhostable tok = Maybe.isNothing (hostFor tok) && Set.member Subtype.Aura (Projection.subtypesOf tok minted)
+          if any (\tok -> EntryRestriction.prohibited tok Zone.Battlefield minted) ids || (Maybe.isJust attached && any unhostable ids)
             then do
               State.put unminted
               pure []
             else do
+              -- CR 303.4: an Aura ENTERS attached, so the host is written before the
+              -- entry loop and before the CR 111.3 minted entry below -- no
+              -- BecameAttached event and no fresh timestamp, which are rule 701.3c's
+              -- and 701.3d's for a permanent that MOVES onto a host. The move funnel's
+              -- own door (changeZoneEntering's entrySeed) writes the same field the same
+              -- way, one incarnation earlier.
+              Monad.forM_ ids $ \tok ->
+                Monad.forM_ (hostFor tok) $ \host ->
+                  State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Just host}) tok (GameState.objects g)})
               -- CR 122.6a: the counters the EFFECT says these tokens enter with, gathered
               -- into the pending map -- so CR 614.16 applies inside each token's own entry
               -- loop and Vorinclex sees them -- exactly as changeZoneEntering's door does

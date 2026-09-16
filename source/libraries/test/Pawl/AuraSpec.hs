@@ -63,11 +63,13 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -90,6 +92,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -991,8 +994,9 @@ replenishSpec s registry =
         -- same zone on this board, so no zone assertion can tell them apart. A
         -- completed move deletes the old id and mints a new one (CR 400.7), so an
         -- Aura that entered and was buried has NO object under its original id while
-        -- one that never moved still does. CR 303.4g's other branch -- an Aura whose
-        -- current zone is the STACK -- has no producer and is not asked here
+        -- one that never moved still does. The rule's TOKEN clause is asked in the
+        -- AuraToken group below, over Preston Garvey, Minuteman. Not implemented:
+        -- CR 303.4g's remaining branch, an Aura whose current zone is the STACK
         -- (gap #1734).
         Spec.it s "CR 303.4g an Aura with nothing to enchant never leaves the graveyard" $ do
           plains <- S.printingOf s registry "Plains"
@@ -1124,6 +1128,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   auraTextChangeSpec s registry
   sigardasAidSpec s registry
   equipmentTokenSpec s registry
+  auraTokenSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -3798,3 +3803,95 @@ printedOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
 printedOnBattlefield name gs =
   let isIt oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))
    in filter isIt (Set.toList (GameState.battlefield gs))
+
+-- CR 601.2c then CR 115.6: announces ONE target for every slot and aims it at
+-- `oid`. Top level for aimedAtObject's reason -- the answerer must stay rank-1
+-- polymorphic in the prompt's result type.
+announcingOneAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+announcingOneAt oid p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just oid) . Recipient.objectOf) sets
+  _ -> S.identityAnswer p
+
+-- CR 115.6: declines every optional slot, announcing zero targets. The ONE thing
+-- that differs from announcingOneAt above, so the pair of boards below differ in
+-- exactly one decision.
+announcingNone :: Prompt.Prompt r -> r
+announcingNone p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 0) offers
+  _ -> S.identityAnswer p
+
+-- Preston Garvey, Minuteman {2}{R}{G}{W} Legendary Creature -- Human Soldier 4/4:
+-- "At the beginning of combat on your turn, create a green Aura enchantment token
+-- named Settlement attached to up to one target land you control. It has enchant
+-- land and 'Enchanted land has \"{T}: Add one mana of any color.\"' / Whenever
+-- Preston Garvey attacks, untap each enchanted permanent you control." (Oracle
+-- text checked 2026-09-16.)
+--
+-- The pool's producer of CR 303.4i: an effect that NAMES what the Aura it puts
+-- onto the battlefield arrives attached to (EntryRiders.attachedTo), which is
+-- what makes the rule's "an object ... that is undefined" reachable -- the slot
+-- is "up to one target", so a seat may announce none. CR 303.4i's last sentence
+-- and CR 303.4g's are the same sentence, and this is the board that reaches it:
+-- "If the Aura is a token, it isn't created."
+--
+-- TWO LANDS, so the attachment is a real choice: with one land, a token attached
+-- by CR 303.4f's entry choice and one attached by the effect's own target would
+-- land in the same place and no assertion could part them.
+--
+-- READ BEFORE THE STATE-BASED ACTIONS, which is the whole of what makes the
+-- negative case discriminate: an Aura token created unattached would be buried by
+-- CR 704.5m and cease to exist by CR 111.7 on the very next check, so a board read
+-- after that pass cannot tell "never created" from "created and buried". So the
+-- trigger is resolved with Stack.resolveTop alone and the tokens counted there;
+-- the settled board is read afterwards, where the attached token must still stand.
+auraTokenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+auraTokenSpec s registry =
+  let combatStep = Phase.Combat CombatStep.BeginningOfCombat
+      -- CR 603.2b's record this trigger matches, written by hand rather than by
+      -- walking a whole turn, historySpec's shape one phase over.
+      beginCombat gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan combatStep S.alice)) (gs {GameState.phase = combatStep, GameState.activePlayer = S.alice})
+      -- CR 603.3b / 601.2c: the trigger goes on the stack here, which is where the
+      -- announcement is made -- so the answerer that differs between the two cases
+      -- is this one's.
+      settle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      settle answer gs = snd (Engine.runGamePure answer gs Engine.settleForPriority)
+      -- CR 608.2 alone: no state-based actions, for the reason above.
+      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      settleSba gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      auraTokens gs = filter (\oid -> Set.member Subtype.Aura (Projection.subtypesOf oid gs)) (S.tokensOf gs)
+      board = do
+        preston <- S.printingOf s registry "Preston Garvey, Minuteman"
+        forest <- S.printingOf s registry "Forest"
+        mountain <- S.printingOf s registry "Mountain"
+        let (_, gs1) = S.addPermanent preston S.alice (Setup.emptyGame S.bothPlayers)
+            (forestId, gs2) = S.addPermanent forest S.alice gs1
+            (mountainId, gs3) = S.addPermanent mountain S.alice gs2
+        pure (forestId, mountainId, beginCombat gs3)
+   in Spec.describe s "AuraToken" $ do
+        -- CR 303.4i's other half, and the one that makes the rider worth having:
+        -- the effect names the host, so CR 303.4f's entry choice never runs.
+        Spec.it s "CR 303.4i whole card: the Aura token enters attached to the land the effect named" $ do
+          (forestId, mountainId, staged) <- board
+          let resolved = resolveTop (settle (announcingOneAt mountainId) staged)
+              settled = settleSba resolved
+          case auraTokens resolved of
+            [token] -> do
+              Spec.assertEqWith s "CR 303.4i: attached to the land the effect targeted, and not to the other one" (fmap Object.attachedTo (Game.lookupObject token settled)) (Just (Just (Recipient.ToObject mountainId)))
+              -- CR 613.1f: the token's own static ability reaches the land only
+              -- through the attachment, so this is the attachment read off the
+              -- board a player sees rather than off Object.attachedTo.
+              Spec.assertBool s (length (Projection.abilitiesOf mountainId settled) > length (Projection.abilitiesOf forestId settled)) "the enchanted land has an activated ability the other land has not"
+              Spec.assertBool s (Set.member token (GameState.battlefield settled)) "CR 704.5m: legally attached, so the token survives the state-based actions"
+            other -> Spec.assertFailure s ("expected exactly one Aura token, got " <> show (length other))
+        -- THE PROVING CASE. One decision different from the case above: the seat
+        -- announces zero targets for "up to one target land you control", which is
+        -- rule 303.4i's undefined object. CR 115.6 makes the trigger untargeted
+        -- rather than illegally targeted, so it resolves (Resolve.targetsAllIllegal
+        -- measures the targets CHOSEN) -- and creates nothing.
+        Spec.it s "CR 303.4i whole card: with no land named, the Aura token isn't created at all" $ do
+          (forestId, mountainId, staged) <- board
+          let resolved = resolveTop (settle announcingNone staged)
+          Spec.assertEqWith s "CR 303.4i: the Aura token isn't created" (auraTokens resolved) []
+          Spec.assertEqWith s "so nothing was minted at all, before any state-based action could bury it" (S.tokensOf resolved) []
+          Spec.assertEqWith s "and neither land gained the token's ability" (length (Projection.abilitiesOf mountainId resolved), length (Projection.abilitiesOf forestId resolved)) (length (Projection.abilitiesOf mountainId staged), length (Projection.abilitiesOf forestId staged))
