@@ -516,9 +516,17 @@ data TriggerCondition
   | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), reading the
     -- event's win where PlayerRollsDice ignores what the die showed.
     --
-    -- Not implemented: an outcome-blind "whenever you flip a coin", and a losing
-    -- one, each of which would be a sibling arm over the same event (gap #2306).
+    -- No third, outcome-blind arm: Scryfall o:"whenever you flip a coin" with
+    -- include_extras, 2026-09-16, returns nothing, so no printing watches the flip
+    -- without reading rule 705.2's outcome.
     PlayerWinsCoinFlip PlayerRelation.PlayerRelation
+  | -- | CR 705.2: "whenever you lose a coin flip" (Karplusan Minotaur), the
+    -- mirror of PlayerWinsCoinFlip over the same event.
+    --
+    -- The two are not exhaustive. CR 705.2's first sentence describes a flip
+    -- nobody wins or loses, which both answer False to -- proved by
+    -- Pawl.ReplacementSpec's "CR 705.2 nobody loses Molten Sentry's flip either".
+    PlayerLosesCoinFlip PlayerRelation.PlayerRelation
   | -- | CR 702.170a / 702.170c: "when this card becomes plotted" (Aloe
     -- Alchemist). Self-scoped, and watched for from exile.
     SelfBecomesPlotted

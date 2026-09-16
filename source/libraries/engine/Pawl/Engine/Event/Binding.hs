@@ -912,9 +912,10 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- names. eventBindingSlots claims nothing for any of them; see that function's
   -- arms.
   --
-  -- CR 705.2's PlayerWinsCoinFlip reaches it too, on the same reasoning: the
-  -- winner is CR 109.5's "you", whom Binding.setYou already names, and Tavern
-  -- Scoundrel's "create two Treasure tokens" reads nothing else off the flip.
+  -- CR 705.2's PlayerWinsCoinFlip and PlayerLosesCoinFlip reach it too, on the
+  -- same reasoning: the winner or loser is CR 109.5's "you", whom Binding.setYou
+  -- already names, and Tavern Scoundrel's "create two Treasure tokens" and
+  -- Karplusan Minotaur's targeted damage read nothing else off the flip.
   --
   -- And so do SelfDiscarded and SelfExiledForMadness, for SelfCycled's reason:
   -- CR 701.9a's discarded card is the bearer, whom CR 113.7a's source slot
@@ -1043,6 +1044,7 @@ eventBindingSlots cond = case cond of
   -- roller's own resolution, for a later effect of THAT ability to read.
   TriggerCondition.PlayerRollsDice _ -> Set.empty
   TriggerCondition.PlayerWinsCoinFlip _ -> Set.empty
+  TriggerCondition.PlayerLosesCoinFlip _ -> Set.empty
   -- Empty for the same reason, and CR 701.43d is what settles it: the linked
   -- trigger's "it" is the exerted permanent, which is already CR 113.7a's source
   -- slot, so a binding here would be a second name for one object. Glory-Bound

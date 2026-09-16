@@ -2,12 +2,13 @@
 -- are applied.
 --
 -- Its own module rather than a function in Pawl.Engine.Resolve, because there are
--- two writers and neither can hold the funnel: Resolve's Effect.FlipCoin arm is
+-- three writers and none can hold the funnel: Resolve's Effect.FlipCoin arm is
 -- CR 705's flip as an EFFECT, either of rule 705.2's two kinds (Winter Sky,
--- Odds), and Pawl.Engine.Event's EntryRewrite.ChoiceByCoinFlip arm is the flip
--- made as a permanent enters (Molten Sentry), which is an entry replacement and
--- so cannot live in Resolve. One road is what keeps rule 705.3 from having to be
--- written twice.
+-- Odds); Pawl.Engine.Event's EntryRewrite.ChoiceByCoinFlip arm is the flip made
+-- as a permanent enters (Molten Sentry), an entry replacement and so not
+-- Resolve's; and Pawl.Engine.Cost's CostComponent.FlipCoin arm is the flip a COST
+-- names (Karplusan Minotaur). One road is what keeps rule 705.3 from having to be
+-- written three times.
 --
 -- The FLIP itself is Pawl.Engine.Event.flipOneCoin, which reads the statements
 -- this module gathers and applies the face one of them states. It lives there

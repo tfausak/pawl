@@ -24,10 +24,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- that couldn't otherwise be won" -- proved by Pawl.CoinSpec's "CR 705.3 reaches
 -- the flip CR 705.2 leaves winnerless".
 --
--- NO BOARD TELLS Nothing FROM Just False TODAY.
--- TriggerCondition.PlayerWinsCoinFlip is the only reader of this field and
--- answers False to both. What would tell them apart is a "whenever you lose a
--- coin flip" condition, which does not exist (gap #2306, Karplusan Minotaur).
+-- Nothing IS TOLD FROM Just False by TriggerCondition.PlayerLosesCoinFlip, which
+-- matches the second and not the first where PlayerWinsCoinFlip matches neither
+-- -- proved by Pawl.CardTriggerSpec's "CR 705.2 a winnerless flip fires neither
+-- trigger", a Molten Sentry entering beside a Karplusan Minotaur.
 --
 -- The flipper is CR 109.5's "you" on the resolving object, which CR 705.2's last
 -- sentence ("no other players are involved") makes the only seat this event
@@ -36,8 +36,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- No FACE. CR 705.2 draws the line itself: an effect either cares about the
 -- win\/loss or cares about heads\/tails, and Pawl.Types.FlipCoin's haddock argues
 -- the two readings apart at length. Nothing in rule 603's vocabulary watches a
--- face -- TriggerCondition.PlayerWinsCoinFlip is the only condition over this
--- event -- and an effect that reads the face reads it off the tally
+-- face -- TriggerCondition's PlayerWinsCoinFlip and PlayerLosesCoinFlip are the
+-- only conditions over this event, and both read the outcome -- and an effect
+-- that reads the face reads it off the tally
 -- Pawl.Types.FlipCoin binds, never off the log.
 --
 -- Construct with BRACE syntax everywhere: positional construction absorbs a new
