@@ -732,6 +732,7 @@ handInPlay printing board =
             Object.announcedX = Nothing,
             Object.castFrom = Nothing,
             Object.castUsing = Nothing,
+            Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
@@ -2264,7 +2265,8 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
 -- is derived from the card as it lies in the graveyard and the other is anchored
 -- to that object's id, and the move mints a new one either way -- so only the
 -- carry across it (Pawl.Engine.Cast.keywordsBefore) can still arm rule 702.34a's
--- second static ability on the spell.
+-- second static ability on the spell, and only Pawl.Types.Object.castGrant can
+-- leave the spell the KEYWORD (the Altar of the Lost case below).
 --
 -- Viral Spawning {2}{G} Sorcery is the producer: "Create a 3/3 green Phyrexian
 -- Beast creature token with toxic 1." plus "Corrupted -- As long as an opponent
@@ -2405,6 +2407,58 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
       "the granted flashback cost is {X}{R}"
       (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName blaze) inGraveyard granted))
       [Just (ManaCost.MkManaCost [ManaSymbol.Variable, theRed])]
+  -- CR 400.7g's KEYWORD half, which the exile above cannot reach: "that ability
+  -- will continue to apply to the new object that card became", so a Bolt cast
+  -- under a GRANTED flashback is a spell with flashback while it is on the stack.
+  --
+  -- Altar of the Lost {3} Artifact: "{T}: Add two mana in any combination of
+  -- colors. Spend this mana only to cast spells with flashback from a graveyard."
+  -- CR 106.6's restriction is asked at CR 601.2h, of the SPELL, so the Altar is
+  -- the printing that reads the quality the grant has to carry.
+  --
+  -- The two spells cost the same {2} and draw on the same two mana, so the pair
+  -- differs in exactly what rule 106.6's clause names: the graveyard Bolt matches
+  -- it and the Coldsteel Heart in hand does not. The granted flashback cost is
+  -- {2} and not a coloured one so that the Altar's colour choice cannot decide
+  -- either answer.
+  Spec.it s "CR 400.7g/601.2h Altar of the Lost pays for a granted flashback and not for a hand cast" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    altar <- S.printingOf s registry "Altar of the Lost"
+    coldsteel <- S.printingOf s registry "Coldsteel Heart"
+    let flashbackTwo = Keyword.Flashback (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])
+        (inGraveyard, noMana) = inGraveyardWith mountain bolt 0
+        (_, withAltar) = S.addPermanent altar S.alice noMana
+        (inHand, withHand) = S.addHandCard coldsteel S.alice withAltar
+        board = S.withEffect inGraveyard (Modification.GainKeyword flashbackTwo) withHand
+        after = S.runPure S.identityAnswer board (do S.cast S.alice inGraveyard; Stack.resolveTop)
+    -- The gameplay assertion, ahead of every proxy: the Altar's two mana paid the
+    -- granted flashback, so the Bolt resolved and dealt its 3. Without the carry
+    -- the spell has no flashback at CR 601.2h, the payment fails, and CR 601.2's
+    -- rewind leaves every life total at 20.
+    Spec.assertEqWith s "alice took the flashed-back Bolt's 3 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "and the Altar paid for it" (S.tappedCount S.alice after) 1
+    -- The same two mana against a {2} artifact in hand, which rule 106.6's clause
+    -- does not name. The board below is this one plus two Mountains, and there
+    -- the Coldsteel Heart is castable -- so it is the restriction refusing it
+    -- here and not the timing, the stack or a missing permission.
+    Spec.assertBool s (not (S.castable S.alice inHand board)) "the Altar's mana does not pay a {2} cast from hand"
+    Spec.assertBool s (S.castable S.alice inHand (S.landsFor mountain S.alice 2 board)) "two Mountains do"
+    Spec.assertBool s (S.castable S.alice inGraveyard board) "and the graveyard Bolt is castable off the Altar alone"
+  -- The carry's other half, and why Cast.grantedCastKeyword asks whether the
+  -- keyword was granted at all: CR 613.1f counts INSTANCES, and a PRINTED
+  -- flashback is already in the seed of every projection of the spell. Firebolt
+  -- carries its own, so a stamp made unconditionally would report two of one
+  -- ability on the stack incarnation.
+  Spec.it s "CR 613.1f a PRINTED flashback is ONE instance on the spell it was cast for" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
+    let (inGraveyard, board) = inGraveyardWith mountain firebolt 5
+        cast = S.runPure S.identityAnswer board (S.cast S.alice inGraveyard)
+        printed = Keyword.Flashback (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed])) [])
+    case GameState.stack cast of
+      [] -> Spec.assertFailure s "the flashed-back Firebolt should be on the stack"
+      sid : _ -> Spec.assertEqWith s "one instance of the printed flashback, not two" (Map.lookup printed (Projection.keywordsOf sid cast)) (Just 1)
 
 -- CR 702.34a's OTHER conditional, the one on its second static ability: "IF THE
 -- FLASHBACK COST WAS PAID, exile this card instead of putting it anywhere else
