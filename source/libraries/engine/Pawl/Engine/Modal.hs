@@ -277,9 +277,10 @@ instanceZoneScope rename scope = case scope of
 --     reserved bindings (the source, "you", X, the chosen modes), CR 303.4a's
 --     enchant slot, and any slot this resolution has defined.
 --
--- Not implemented: a slot a mode DEFINES (MoveToZone's, Create's, Destroy's,
--- PlaySubgame's) is still written under its printed name, so two instances of one
--- repeated mode would write to one key (#996).
+-- A slot a mode DEFINES (MoveToZone's, Create's, Destroy's, PlaySubgame's) is
+-- kept apart by Pawl.Engine.Resolve.withDefinedSlots instead, which empties the
+-- printed name around each instance rather than projecting it here: those slots
+-- have readers that never come through this function.
 --
 -- Generic in the value so the legality map and the target map are projected by
 -- one function, which is what keeps them from disagreeing about which slot

@@ -854,8 +854,11 @@ sacrificerFor sacrificer controller gs oid = case sacrificer of
 -- slotGroup's singular: the ONE object bound at a slot, read live off the
 -- resolving object rather than out of `chosen`, which is a PROJECTION -- CR
 -- 601.2c's targets under CR 700.2d's names, gated on CR 608.2b legality. A
--- binding an earlier effect DEFINED is neither a target nor renameable. See
--- bindObjectsSlot's note, and CR 603.7c for why the binding exists.
+-- binding an earlier effect DEFINED is not a target, and is read here under the
+-- name the card prints: CR 700.2d keeps two instances of one repeated mode apart
+-- by emptying that name around each (Resolve.withDefinedSlots) rather than by a
+-- rename this reader would have to follow. See bindObjectsSlot's note, and CR
+-- 603.7c for why the binding exists.
 --
 -- Nothing when the slot is unbound, holds a group, names several targets, or
 -- names a player: both callers want one object or none.
