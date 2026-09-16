@@ -154,6 +154,14 @@ data Quantity
   | -- | CR 509.1g / 608.2h: 1 if the object this quantity is evaluated against
     -- was blocking, else 0.
     WasBlocking
+  | -- | CR 509.1h \/ 608.2i: 1 if the object this quantity is evaluated against
+    -- became a blocked creature this turn, else 0, folded from the turn-scoped
+    -- GameEvent.AttackerBlocked log.
+    --
+    -- Pawl.ConditionSpec's WasBlockedThisTurn group is what proves rule 509.1h's
+    -- last sentence here: the blocker leaving combat before the death does not
+    -- take the answer away.
+    WasBlockedThisTurn
   | -- | CR 702.30a / 608.2h: 1 if the player that reference names came to
     -- control the object this quantity is evaluated against since the beginning
     -- of that player's last upkeep, else 0.

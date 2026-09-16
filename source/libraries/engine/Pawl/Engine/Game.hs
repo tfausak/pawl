@@ -19,6 +19,7 @@ import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -2400,6 +2401,36 @@ attackersDeclaredThisTurn :: GameState -> PlayerId -> Natural
 attackersDeclaredThisTurn gs pid
   | GameState.activePlayer gs /= pid = 0
   | otherwise = Natural.length (filter (isAttackerDeclaration . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+
+-- CR 509.1h / 608.2i: did this OBJECT become a blocked creature this turn?
+-- attackersDeclaredThisTurn's footing over the other combat log, and its extent
+-- is the turn for the same reason: Pawl.Engine.Engine.beginTurnOf clears
+-- GameState.events at the handoff and nothing else does.
+--
+-- The LOG and not Combat.blockers, which rule 509.1h's last sentence is why: a
+-- creature remains blocked after every blocker leaves combat, and the combat
+-- record is emptied at the end of combat besides. The log also outlives the id CR
+-- 400.7 deletes as the creature dies, which is the case Fyndhorn Druid's
+-- intervening "if" asks from, through Pawl.Engine.Quantity's WasBlockedThisTurn
+-- arm.
+--
+-- Every road onto the blocked status records the event and CR 509.3c keeps it to
+-- one per combat, so an `any` is the whole question: CR 509.1a's declaration, CR
+-- 509.1h's effect, CR 509.4's blocker put onto the battlefield, and an effect's
+-- reassignment under CR 509.1b -- Pawl.Engine.Combat's declareBlockers,
+-- becomeBlocked, putOntoBattlefieldBlocking and switchBlockers.
+wasBlockedThisTurn :: GameState -> ObjectId -> Bool
+wasBlockedThisTurn gs oid = any ((== Just oid) . blockedAttacker . LoggedEvent.event) (GameState.events gs)
+
+-- The attacker an event records BECOMING blocked (CR 509.1h).
+--
+-- GameEvent.BecameBlocking is not a second arm: it names the creature that became
+-- BLOCKING (CR 509.1g), which is the other side of the same declaration and a
+-- different object.
+blockedAttacker :: GameEvent -> Maybe ObjectId
+blockedAttacker event = case event of
+  GameEvent.AttackerBlocked x -> Just (AttackerBlocked.attacker x)
+  _ -> Nothing
 
 -- Does this event record an attacker declaration (CR 508.1k)?
 isAttackerDeclaration :: GameEvent -> Bool

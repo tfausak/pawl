@@ -3,8 +3,8 @@
 
 -- Covers Pawl.Engine.Condition, Pawl.Types.Condition and Pawl.Types.Comparison,
 -- including what Condition.holds makes of Pawl.Engine.Quantity's IsMonarch,
--- EnteredThisTurn, EnteredFrom, WasCastFrom, WasToken, WasBlocking and
--- DamageDealtToThisTurn.
+-- EnteredThisTurn, EnteredFrom, WasCastFrom, WasToken, WasBlocking,
+-- DamageDealtToThisTurn and WasBlockedThisTurn.
 module Pawl.ConditionSpec where
 
 import qualified Data.List as List
@@ -29,6 +29,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -749,6 +750,85 @@ damageDealtToItSpec s registry =
             Spec.assertEqWith s "which died the same way" (Set.member zuberaId (GameState.battlefield killed)) False
             Spec.assertEqWith s "and nothing was gathered onto the stack" (length (GameState.stack onStack)) 0
 
+-- Attacks with `attacker` alone, and blocks it or not: the pair's ONE difference.
+-- aggressiveAnswer's head otherwise, so the two legs agree on every other prompt.
+attackAndBlock :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackAndBlock blocks attacker p = case p of
+  Prompt.DeclareAttackers _ _ ids -> List.filter (== attacker) ids
+  Prompt.DeclareBlockers {} -> if blocks then S.aggressiveAnswer p else Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- CR 509.1h / 608.2i read on CR 603.4's intervening "if", for a creature CR 400.7
+-- has already deleted.
+--
+-- Fyndhorn Druid {2}{G} 2/2 Elf Druid: "When this creature dies, if it was blocked
+-- this turn, you gain 4 life." (data/cards/fyndhorn-druid.json; Oracle text
+-- checked against api.scryfall.com, 2026-09-16.)
+--
+-- Filter.IsBlocked cannot answer it and neither can a Pawl.Types.LastKnown field:
+-- the question is asked of an object that is gone, and the printed clause says
+-- THIS TURN rather than "as it died". Only the turn's GameEvent.AttackerBlocked
+-- log still holds it.
+--
+-- The first two legs are one board differing in ONE thing, whether bob's Wall of
+-- Stone blocks. The Wall deals no damage, so in both of them the Druid survives
+-- combat and is killed in the postcombat main phase -- after CR 511.3 has taken
+-- every creature out of combat and Pawl.Engine.Combat.clearCombat has emptied the
+-- record, which is what makes the pair a proof about the TURN rather than about
+-- the combat. The third leg is the ordinary board, the Druid dying inside combat
+-- with the block still live.
+wasBlockedThisTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wasBlockedThisTurnSpec s registry =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      run druid blocker blocks afterCombat k = case S.combatBoardOf [druid] [blocker] of
+        (base, [druidId], [blockerId]) ->
+          let declared = S.runToStep (Phase.Combat CombatStep.CombatDamage) (attackAndBlock blocks druidId) base
+              fought = if afterCombat then S.runCombat (attackAndBlock blocks druidId) declared else declared
+              -- 2 damage marked on a 2/2, CR 704.5g's lethal, in all three legs.
+              killed = S.settleSba (S.markDamage druidId 2 fought)
+              onStack = settle killed
+           in k druidId blockerId declared fought killed onStack (S.runPure S.identityAnswer onStack Stack.resolveTop)
+        _ -> Spec.assertFailure s "combatBoardOf should place the Druid and one blocker"
+      unblockedIn gs druidId = Set.null (Map.findWithDefault Set.empty druidId (Combat.Type.blockers (GameState.combat gs)))
+   in Spec.describe s "WasBlockedThisTurn" $ do
+        -- THE PROVING TEST for #3037. Nothing on the board can be asked whether the
+        -- Druid was blocked: combat is over and its record emptied, and CR 400.7
+        -- then deleted the object the status was on.
+        Spec.it s "CR 608.2i a Druid blocked earlier in the turn gains alice 4 as it dies" $ do
+          druid <- S.printingOf s registry "Fyndhorn Druid"
+          wall <- S.printingOf s registry "Wall of Stone"
+          run druid wall True True $ \druidId _ declared fought killed onStack after -> do
+            Spec.assertEqWith s "alice gained the Druid's 4 life, so CR 603.4's clause was true" (S.lifeOf S.alice after) (Just 24)
+            -- The preconditions, after the behaviour so none of them can absorb a
+            -- mutation of the atom.
+            Spec.assertEqWith s "off a Druid the Wall really had blocked" (unblockedIn declared druidId) False
+            Spec.assertEqWith s "whose block CR 511.3 had since taken off the record" (unblockedIn fought druidId) True
+            Spec.assertEqWith s "and which really did die" (Set.member druidId (GameState.battlefield killed)) False
+            Spec.assertEqWith s "with its trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
+
+        -- The positive's twin, one difference: bob declines the block, so the Druid
+        -- dies unblocked and CR 603.4 never puts the trigger onto the stack.
+        Spec.it s "CR 603.4 the same Druid that was never blocked gains nothing" $ do
+          druid <- S.printingOf s registry "Fyndhorn Druid"
+          wall <- S.printingOf s registry "Wall of Stone"
+          run druid wall False True $ \druidId _ declared _ killed onStack after -> do
+            Spec.assertEqWith s "alice is untouched at 20" (S.lifeOf S.alice after) (Just 20)
+            Spec.assertEqWith s "off a Druid nothing had blocked" (unblockedIn declared druidId) True
+            Spec.assertEqWith s "which died the same way" (Set.member druidId (GameState.battlefield killed)) False
+            Spec.assertEqWith s "and nothing was gathered onto the stack" (length (GameState.stack onStack)) 0
+
+        -- The ordinary board: a Hill Giant blocks and the Druid dies in the combat
+        -- damage step, with CR 509.1h's status still live on the record.
+        Spec.it s "CR 509.1h a Druid that dies inside combat gains the 4 too" $ do
+          druid <- S.printingOf s registry "Fyndhorn Druid"
+          giant <- S.printingOf s registry "Hill Giant"
+          run druid giant True False $ \druidId giantId declared _ killed onStack after -> do
+            Spec.assertEqWith s "alice gained the 4 all the same" (S.lifeOf S.alice after) (Just 24)
+            Spec.assertEqWith s "off a Druid the Giant had blocked" (unblockedIn declared druidId) False
+            Spec.assertEqWith s "which died with the Giant still beside it" (Set.member giantId (GameState.battlefield killed)) True
+            Spec.assertEqWith s "and itself gone" (Set.member druidId (GameState.battlefield killed)) False
+            Spec.assertEqWith s "with its trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   Spec.describe s "Exactly" $ do
@@ -832,3 +912,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   lastKnownBlockingSpec s registry
   lastKnownAttackingSpec s registry
   damageDealtToItSpec s registry
+  wasBlockedThisTurnSpec s registry

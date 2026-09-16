@@ -109,6 +109,10 @@ codec =
       Arm.nullary "WasToken" Quantity.WasToken,
       Arm.nullary "WasAttacking" Quantity.WasAttacking,
       Arm.nullary "WasBlocking" Quantity.WasBlocking,
+      -- CR 509.1h's status read as a look-back, nullary for the same reason and
+      -- one zone wider: the object is the one the quantity is evaluated against,
+      -- and the answer comes off the log rather than off that object.
+      Arm.nullary "WasBlockedThisTurn" Quantity.WasBlockedThisTurn,
       Arm.payload "ControlGainedSinceLastUpkeep" PlayerRef.codec Quantity.ControlGainedSinceLastUpkeep (\x -> case x of Quantity.ControlGainedSinceLastUpkeep y -> Just y; _ -> Nothing),
       Arm.nullary "ClassLevel" Quantity.ClassLevel,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
@@ -221,6 +225,7 @@ tagOf x = case x of
   Quantity.WasToken {} -> "WasToken"
   Quantity.WasAttacking {} -> "WasAttacking"
   Quantity.WasBlocking {} -> "WasBlocking"
+  Quantity.WasBlockedThisTurn {} -> "WasBlockedThisTurn"
   Quantity.ControlGainedSinceLastUpkeep {} -> "ControlGainedSinceLastUpkeep"
   Quantity.ClassLevel {} -> "ClassLevel"
   Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
