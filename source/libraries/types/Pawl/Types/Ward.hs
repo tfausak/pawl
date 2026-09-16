@@ -17,7 +17,10 @@ data Ward keyword = MkWard
     -- what X is equal to", as a multiplier on the cost above rather than as an
     -- {X} symbol inside it: ward {X} is X copies of {1}, and one copy of a cost
     -- per thing counted is exactly Pawl.Types.PayGate's perEach, which
-    -- Pawl.Engine.Resolve.payGatePaidBy evaluates against the RESOLUTION. That
+    -- Pawl.Engine.Resolve.payGatePaidBy evaluates against the RESOLUTION. CR
+    -- 107.4b is why the two spellings are one charge -- every generic symbol is
+    -- payable with any type of mana, so X copies of {1} and a {X} standing for
+    -- the same number take the same mana. That
     -- is what rule 702.21b asks for -- "this value is determined at the time the
     -- ability resolves, not locked in as the ability triggers" -- and it is why
     -- the value cannot ride Cost's own {X}, whose value CR 107.3a fixes at what
@@ -35,7 +38,8 @@ data Ward keyword = MkWard
     --
     -- Nothing is every other printing: a ward whose cost is a printed number.
     --
-    -- Pawl.KeywordTriggerSpec's Minthara group proves the resolution-time read.
+    -- Pawl.LeavesTriggerSpec's "CR 702.21b ward {X}" group proves the
+    -- resolution-time read.
     perEach :: Maybe PlayerCounterTally.PlayerCounterTally
   }
   deriving (Eq, Ord, Show)

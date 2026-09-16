@@ -1974,8 +1974,8 @@ wardSpec s registry =
 -- intervening "if a permanent you controlled left the battlefield this turn"
 -- names only where the permanent LEFT, which no Pawl.Types.EventShape can say
 -- (gap #2991). The omission leaves pawl's Minthara STRICTER than printed -- alice
--- gains fewer experience counters, never more -- and every counter these cases
--- read comes from Ezuri instead.
+-- gains fewer experience counters, never more -- so the counter she starts with
+-- is placed by the fixture and the one she gains comes from Ezuri.
 --
 -- THE COUNTER ARRIVES WHILE THE TRIGGER IS ALREADY ON THE STACK, which is the
 -- whole of rule 702.21b: alice holds one experience counter as bob's Giant Growth
