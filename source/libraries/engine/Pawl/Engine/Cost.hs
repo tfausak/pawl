@@ -175,6 +175,53 @@ faceDownCost =
       Cost.components = []
     }
 
+-- CR 702.143d's "that effect may give the card a foretell cost", as every
+-- printing states it: the mana cost of the face being cast, reduced by the amount
+-- the effect stated (Ethereal Valkyrie's {2}). Nothing when no effect gave this
+-- foretold card a cost.
+--
+-- Settled HERE, at CR 601.2b where the candidate costs are named, rather than
+-- when the effect resolved. Two rules push it here and neither is about
+-- convenience:
+--
+--   * CR 712.11b chooses which face of a modal double-faced card is being cast,
+--     and rule 702.143d's cost is that face's mana cost reduced -- the Valkyrie's
+--     own ruling says the foretell cost is based on the mana cost of the face
+--     cast from exile. A cost settled when the card was exiled could only be one
+--     face's.
+--   * It is still a COST and never a CR 601.2f reduction, which is what settling
+--     it before that rule buys: rule 601.2f applies the board's increases before
+--     its reductions, so a {W}{U} card given "mana cost reduced by {2}" under a
+--     {3} tax costs {3}{W}{U} here, where a reduction carried into rule 601.2f
+--     would have taken the {2} off the tax and left {1}{W}{U}.
+--
+-- Nothing for a face with no mana cost -- a land (CR 202.1b) -- which leaves the
+-- card foretold with no foretell cost of its own and so with no cast to price
+-- here. That is rule 702.143d's "for any foretell cost it has" read at zero.
+--
+-- No additional costs ride along: the caller wraps this in `withAdditional`, CR
+-- 118.9d, exactly as it wraps a printed foretell cost.
+grantedForetellCost :: Face.Face card -> Object.Object -> Maybe (Cost Keyword.Type.Keyword)
+grantedForetellCost face obj = do
+  amount <- Object.foretellCostReduction obj
+  manaCost <- Face.manaCost face
+  pure
+    Cost.MkCost
+      { Cost.mana = Just (applyAdjustments (plusReductions [amount] noAdjustments) manaCost),
+        Cost.components = []
+      }
+
+-- CR 601.2f with nothing in it: the board's own increases and reductions are the
+-- caster's business further down this module, and rule 702.143d's amount is the
+-- only thing grantedForetellCost applies.
+noAdjustments :: CostAdjustments.CostAdjustments
+noAdjustments =
+  CostAdjustments.MkCostAdjustments
+    { CostAdjustments.increases = [],
+      CostAdjustments.reductions = [],
+      CostAdjustments.components = []
+    }
+
 -- The candidate costs for CASTING this object (CR 601.2b) -- from hand, the
 -- printed one first, then each alternative, and last any standing CR 118.9
 -- grant. Empty for anything that is not a card; a LAND yields one candidate whose
@@ -652,12 +699,25 @@ candidateCostsGiven permitted pid name oid gs =
                 -- 118.9's alternative cost, wrapped by withAdditional as flashback's
                 -- is. INSTEAD of the printed cost, the plotted arm's reason.
                 --
-                -- Not implemented: CR 702.143d's card foretold with NO foretell cost,
-                -- unreachable from this module's own writer since CR 116.2h exiles
-                -- only a card with foretell (#1486).
+                -- "ANY foretell cost it has" is plural, and CR 702.143d is why: an
+                -- effect may give a foretold card a cost of its own (Ethereal
+                -- Valkyrie), which grantedForetellCost settles from the reduction
+                -- that effect stated, beside whatever the card's own foretell
+                -- keyword prints. Both are offered, the granted one first. A card
+                -- foretold with NEITHER is offered nothing and is not castable,
+                -- which is that clause read at zero.
+                --
+                -- The granted cost is settled against THIS face, which is the whole
+                -- reason the object carries the reduction rather than a cost: CR
+                -- 712.11b lets a modal double-faced card be cast as either face, and
+                -- the two faces print different mana costs (Birgi, God of
+                -- Storytelling // Harnfel, Horn of Bounty). `face` is the face this
+                -- call was asked about.
                 Zone.Exile
                   | Maybe.isJust (Object.foretold obj) ->
-                      fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywordSet face)))
+                      fmap
+                        (untagged . withAdditional)
+                        (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (Keyword.foretellCost (Face.keywordSet face)))
                 -- CR 118.9: a CR 601.3 permission that says "without paying its
                 -- mana cost" (Extract Power) is an alternative cost of nothing,
                 -- and REPLACES the printed cost for the plotted arm's reason --
@@ -1490,8 +1550,11 @@ reductionHalvesOf symbol = case symbol of
   ManaSymbol.Phyrexian _ -> Nothing
   ManaSymbol.HybridPhyrexian _ -> Nothing
   ManaSymbol.Snow -> Nothing
-  -- Unreachable, applyAdjustments' Variable arms: CR 601.2b precedes CR 601.2f,
-  -- so no {X} survives into a total cost.
+  -- {X} offers no halves to choose between, CR 107.3 making it a value a player
+  -- announces rather than a way of paying one symbol. Reached with the symbol
+  -- still unsubstituted wherever a PRINTED cost is read ahead of any
+  -- announcement, which grantedForetellCost does; a cost being TOTALLED never
+  -- carries one, CR 601.2b preceding CR 601.2f.
   ManaSymbol.Variable -> Nothing
 
 -- CR 302.6: does paying this cost put the object's ability behind the
@@ -4854,8 +4917,13 @@ applyAdjustments adjustments cost =
         -- reducingGenericOf part company; the Adjustments case "CR 107.4h a
         -- generic reduction does not affect an {S} in the cost" proves this side.
         ManaSymbol.Snow -> 0
-        -- Unreachable: CR 601.2b precedes 601.2f, so every Variable is already
-        -- substituted.
+        -- {X} is no part of the generic component: CR 107.3 makes it a value a
+        -- player announces, and CR 601.2b's announcement precedes rule 601.2f, so
+        -- a cost being TOTALLED never carries one. LIVE rather than unreachable
+        -- all the same -- grantedForetellCost applies rule 702.143d's reduction
+        -- to a PRINTED mana cost ahead of any announcement, so an {X} card an
+        -- effect foretold (Blaze) carries its symbol through here untouched and
+        -- announces it at the cast.
         ManaSymbol.Variable -> 0
       -- The REDUCTION's generic amount, two functions rather than one because CR
       -- 118.7g makes the two sides read an {S} differently. Every other arm
@@ -4882,7 +4950,7 @@ applyAdjustments adjustments cost =
         -- CR 118.7g: a snow-symbol reduction is that much GENERIC mana. THE arm
         -- this side exists for; CR 107.4h is about the other side.
         ManaSymbol.Snow -> 1
-        -- Unreachable, costGenericOf's Variable arm.
+        -- {X} again, costGenericOf's Variable arm and for its reason.
         ManaSymbol.Variable -> 0
       -- "Typed" here means "not generic": everything but Generic survives and
       -- keeps its printed position, which is the only way an unreducible symbol
@@ -4922,7 +4990,7 @@ applyAdjustments adjustments cost =
         -- CR 107.4h: {S} is paid with one mana of ANY type, so it names none, and
         -- a reduction of one white mana cannot single it out.
         ManaSymbol.Snow -> Nothing
-        -- Unreachable, costGenericOf's Variable arm; {X} names no mana type.
+        -- {X} again, costGenericOf's Variable arm; {X} names no mana type.
         ManaSymbol.Variable -> Nothing
       reducingManaTypeOf symbol = case symbol of
         -- CR 118.7a's half, which reducingGenericOf above already counted.
@@ -4946,7 +5014,7 @@ applyAdjustments adjustments cost =
         -- CR 118.7g makes an {S} reduction GENERIC mana, so reducingGenericOf's
         -- Snow arm is where it lands.
         ManaSymbol.Snow -> Nothing
-        -- Unreachable, costGenericOf's Variable arm.
+        -- {X} again, costGenericOf's Variable arm and for its reason.
         ManaSymbol.Variable -> Nothing
       -- The canonical form point 5's header describes: the generic component as
       -- one leading symbol, then the typed symbols left.

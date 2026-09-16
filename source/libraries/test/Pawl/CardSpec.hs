@@ -181,6 +181,7 @@ import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
+import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
@@ -600,6 +601,7 @@ objectRefPositions =
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced False), [plantedRef "gp"]),
         ("grant-look-at-exiled", Effect.GrantLookAtExiled (GrantLookAtExiled.MkGrantLookAtExiled (plantedRef "gl") False), [plantedRef "gl"]),
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
+        ("make-foretold", Effect.MakeForetold (MakeForetold.MkMakeForetold (plantedRef "mf") Nothing), [plantedRef "mf"]),
         ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])
       ]
@@ -1169,6 +1171,7 @@ ownCounts effect = case effect of
   Effect.Goad _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
+  Effect.MakeForetold _ -> []
   Effect.MakeWarped _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
@@ -1486,6 +1489,7 @@ effectNestedEffects effect = case effect of
   Effect.Goad {} -> []
   Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
+  Effect.MakeForetold {} -> []
   Effect.MakeWarped {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
@@ -1939,6 +1943,7 @@ effectReplacements effect = case effect of
   Effect.Goad _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
+  Effect.MakeForetold _ -> []
   Effect.MakeWarped _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
@@ -2352,6 +2357,7 @@ effectMintedFaces effect = case effect of
   Effect.Goad _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
+  Effect.MakeForetold _ -> []
   Effect.MakeWarped _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
@@ -5060,6 +5066,7 @@ effectFilters effect = case effect of
   Effect.Goad ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.GrantLookAtExiled grant -> frame SourceHostFramed (objectRefFilters (GrantLookAtExiled.cards grant))
   Effect.MakePlotted ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.MakeForetold x -> frame SourceHostFramed (objectRefFilters (MakeForetold.cards x))
   Effect.MakeWarped ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Transform ref -> frame SourceHostFramed (objectRefFilters ref)

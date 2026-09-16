@@ -1,6 +1,10 @@
 -- Rule 702.143 in the one voice the rest of the engine cannot supply for itself:
 -- CR 116.2h's special action that pays {2} to exile a card with foretell from a
--- hand FACE DOWN, and the stamp that makes the exiled card a FORETOLD one.
+-- hand FACE DOWN, and the stamp that makes the exiled card a FORETOLD one. CR
+-- 702.143d's other route into that stamp -- a spell or ability that makes an
+-- exiled card foretold, and may give it a foretell cost -- is an Effect opcode
+-- and belongs to the open half, so its arm sits in Pawl.Engine.Resolve and calls
+-- becomeForetold here.
 --
 -- The rule's other half lives where every other casting question does. CR
 -- 702.143a's permission -- "they may cast that card after the current turn has
@@ -26,7 +30,6 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
-import qualified Pawl.Engine.Resolve.Effect as Resolve
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -36,6 +39,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -141,8 +145,8 @@ foretellable pid gs = filter (\oid -> canForetell pid oid gs) (Game.zoneMembers 
 -- player's several foretold cards. It hides nothing, because pawl conceals
 -- nothing from an answerer -- Pawl.Types.Asked hands over the whole GameState
 -- (#1412).
-foretell :: PlayerId -> ObjectId -> Game ()
-foretell pid oid = do
+foretell :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game ()
+foretell perform pid oid = do
   before <- State.get
   if not (canForetell pid oid before)
     then pure ()
@@ -151,7 +155,7 @@ foretell pid oid = do
       -- reasons. CR 116.2h fixes this cost at {2}, so no symbol here is ever
       -- payable in multiple ways and no prompt is ever raised.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure actionCost
-      payment <- Cost.pay Resolve.performManaAbility (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         -- CR 733.1's reversal, made inside the payment because this special
         -- action IS the whole of what failed: `before` is where it began, so
@@ -167,7 +171,7 @@ foretell pid oid = do
           -- with more than one only for a melded permanent leaving the
           -- battlefield (CR 712.21), and this action exiles a card from a hand.
           exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
-          Monad.forM_ exiled (State.modify' . stamp)
+          Monad.forM_ exiled (State.modify' . becomeForetold Nothing)
 
 -- CR 406.3's rider and nothing else: every other rider is battlefield-only, and
 -- this move names exile.
@@ -187,14 +191,39 @@ riders =
       EntryRiders.faceDown = Nothing
     }
 
--- CR 702.143a's foretold card, stamped with the turn the action was taken on --
--- which is what "after the current turn has ended" is compared against.
+-- "It becomes a foretold card" -- the stamp and CR 702.143d's granted cost
+-- together, which is the WHOLE of what becoming foretold is. Pawl.Engine.Plot's
+-- becomePlotted is this function one rule over.
 --
--- Read AFTER the move, for Plot.stamp's reason: nothing in a zone change ends a
--- turn, so the two numbers agree.
-stamp :: ObjectId -> GameState -> GameState
-stamp newId gs =
+-- The stamp is the TURN it became one, which is what CR 702.143a's "after the
+-- current turn has ended" is compared against, and it is read AFTER the move for
+-- Plot.stamp's reason: nothing in a zone change ends a turn, so the two numbers
+-- agree.
+--
+-- Two routes reach it and the rulebook gives them one meaning: CR 116.2h's
+-- special action above, which grants no cost, and CR 702.143d's "if an effect
+-- states that a card in exile becomes foretold" (Pawl.Engine.Resolve's
+-- Effect.MakeForetold arm), which may. Both land here so neither can drift from
+-- the other.
+--
+-- What is written is the REDUCTION the effect stated and never a cost: rule
+-- 702.143d's cost is per FACE (CR 712.11b), and the face is not known until the
+-- cast is proposed, so Pawl.Engine.Cost.grantedForetellCost settles it there.
+-- Object.foretellCostReduction says why this field is that shape.
+--
+-- Takes an ObjectId and an amount of mana, never a card: this module's invariant
+-- is that it never asks which card is being foretold, so the opcode's arm hands
+-- it CR 400.7's exiled incarnation exactly as the special action does.
+--
+-- No GameEvent rides along, where Plot.becomePlotted records one. Not
+-- implemented: CR 702.143c's "whenever you foretell a card" as a trigger
+-- condition, and with it any trigger on a card becoming foretold (#1486).
+becomeForetold :: Maybe ManaCost.ManaCost -> ObjectId -> GameState -> GameState
+becomeForetold reduction newId gs =
   gs
     { GameState.objects =
-        Map.adjust (\o -> o {Object.foretold = Just (GameState.turnNumber gs)}) newId (GameState.objects gs)
+        Map.adjust
+          (\o -> o {Object.foretold = Just (GameState.turnNumber gs), Object.foretellCostReduction = reduction})
+          newId
+          (GameState.objects gs)
     }

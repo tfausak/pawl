@@ -55,6 +55,7 @@ import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Codec.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Codec.LifeLoss as LifeLoss
 import qualified Pawl.Codec.LookAt as LookAt
+import qualified Pawl.Codec.MakeForetold as MakeForetold
 import qualified Pawl.Codec.ManaAddition as ManaAddition
 import qualified Pawl.Codec.Meld as Meld
 import qualified Pawl.Codec.Mill as Mill
@@ -231,6 +232,7 @@ codec cardCodec abilityCodec =
           Arm.payload "GrantPlayFromExile" GrantPlayFromExile.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
           Arm.payload "GrantLookAtExiled" GrantLookAtExiled.codec Effect.GrantLookAtExiled (\x -> case x of Effect.GrantLookAtExiled y -> Just y; _ -> Nothing),
           Arm.payload "MakePlotted" ObjectRef.codec Effect.MakePlotted (\x -> case x of Effect.MakePlotted y -> Just y; _ -> Nothing),
+          Arm.payload "MakeForetold" MakeForetold.codec Effect.MakeForetold (\x -> case x of Effect.MakeForetold y -> Just y; _ -> Nothing),
           Arm.payload "MakeWarped" ObjectRef.codec Effect.MakeWarped (\x -> case x of Effect.MakeWarped y -> Just y; _ -> Nothing),
           Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing)
         ]
@@ -358,5 +360,6 @@ tagOf x = case x of
   Effect.GrantPlayFromExile {} -> "GrantPlayFromExile"
   Effect.GrantLookAtExiled {} -> "GrantLookAtExiled"
   Effect.MakePlotted {} -> "MakePlotted"
+  Effect.MakeForetold {} -> "MakeForetold"
   Effect.MakeWarped {} -> "MakeWarped"
   Effect.ForEach {} -> "ForEach"

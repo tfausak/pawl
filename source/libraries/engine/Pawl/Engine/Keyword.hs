@@ -3337,10 +3337,14 @@ plotCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.143a: what a foretold card is CAST for, or Nothing when the card has no
--- foretell. The cost of the CAST and never of the special action, plotCost's
--- mirror: CR 116.2h fixes the action's cost at {2} for every printing, so
--- Pawl.Engine.Foretell mints that itself.
+-- CR 702.143a: what a card's own foretell keyword says it is CAST for, or
+-- Nothing when the card has no foretell. The cost of the CAST and never of the
+-- special action, plotCost's mirror: CR 116.2h fixes the action's cost at {2} for
+-- every printing, so Pawl.Engine.Foretell mints that itself.
+--
+-- Not the only cost a foretold card may be cast for: CR 702.143d lets an effect
+-- give one, which Pawl.Engine.Cost.grantedForetellCost settles per face off
+-- Object.foretellCostReduction, and that module offers both.
 --
 -- A wildcard, and ONE cost per card (the ascending-least), morphCost's shape.
 foretellCost :: Set Keyword -> Maybe (Cost Keyword)

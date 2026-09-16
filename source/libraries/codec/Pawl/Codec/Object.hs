@@ -20,6 +20,7 @@ import qualified Pawl.Codec.Facing as Facing
 import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Mana as Mana
+import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Recipient as Recipient
@@ -105,6 +106,7 @@ codec = Fields.object $ do
   playableFromExile <- Fields.defaulted "playableFromExile" Nothing (Common.maybe ExilePlayPermission.codec) Object.playableFromExile
   plotted <- Fields.defaulted "plotted" Nothing (Common.maybe Common.natural) Object.plotted
   foretold <- Fields.defaulted "foretold" Nothing (Common.maybe Common.natural) Object.foretold
+  foretellCostReduction <- Fields.defaulted "foretellCostReduction" Nothing (Common.maybe ManaCost.codec) Object.foretellCostReduction
   warped <- Fields.defaulted "warped" Nothing (Common.maybe Common.natural) Object.warped
   preparedCopyOf <- Fields.defaulted "preparedCopyOf" Nothing (Common.maybe ObjectId.codec) Object.preparedCopyOf
   ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
@@ -158,6 +160,7 @@ codec = Fields.object $ do
         Object.playableFromExile = playableFromExile,
         Object.plotted = plotted,
         Object.foretold = foretold,
+        Object.foretellCostReduction = foretellCostReduction,
         Object.warped = warped,
         Object.preparedCopyOf = preparedCopyOf,
         Object.ringBearerFor = ringBearerFor,

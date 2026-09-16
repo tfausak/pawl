@@ -296,6 +296,7 @@ createCard pid printingId = do
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.foretellCostReduction = Nothing,
             Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,

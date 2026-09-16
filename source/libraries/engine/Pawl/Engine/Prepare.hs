@@ -194,6 +194,7 @@ mint oid gs =
                 Object.playableFromExile = Nothing,
                 Object.plotted = Nothing,
                 Object.foretold = Nothing,
+                Object.foretellCostReduction = Nothing,
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Just oid,
                 Object.ringBearerFor = Nothing,
