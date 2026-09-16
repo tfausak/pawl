@@ -59,8 +59,9 @@ data ManaRestriction = MkManaRestriction
   }
   deriving (Eq, Ord, Show)
 
--- | Every field Nothing: the record no printing means on its own, and the base
--- the smart constructors below fill one field of.
+-- | Every field Nothing: the record no printing means on its own. THE one
+-- exhaustive construction site outside the codec, so a field added later is
+-- named here by -Werror rather than silently defaulted at each caller.
 none :: ManaRestriction
 none =
   MkManaRestriction
