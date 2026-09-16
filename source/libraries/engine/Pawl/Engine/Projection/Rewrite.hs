@@ -1602,6 +1602,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
+  TriggerCondition.PlayerLosesCoinFlip _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
   TriggerCondition.PermanentConnives f -> TriggerCondition.PermanentConnives (Filter.rewrite pairs f)

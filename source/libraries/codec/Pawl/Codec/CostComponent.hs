@@ -58,6 +58,7 @@ codec keywordCodec =
       Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "BlightX" CostComponent.BlightX,
       Arm.nullary "Forage" CostComponent.Forage,
+      Arm.nullary "FlipCoin" CostComponent.FlipCoin,
       Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
       Arm.nullary "ExileThis" CostComponent.ExileThis,
       Arm.payload "ExileCardsFromGraveyard" (ExileCardsFromGraveyard.codec keywordCodec) CostComponent.ExileCardsFromGraveyard (\x -> case x of CostComponent.ExileCardsFromGraveyard y -> Just y; _ -> Nothing),
@@ -91,6 +92,7 @@ tagOf x = case x of
   CostComponent.Blight {} -> "Blight"
   CostComponent.BlightX {} -> "BlightX"
   CostComponent.Forage {} -> "Forage"
+  CostComponent.FlipCoin {} -> "FlipCoin"
   CostComponent.ExileThisFromGraveyard {} -> "ExileThisFromGraveyard"
   CostComponent.ExileThis {} -> "ExileThis"
   CostComponent.ExileCardsFromGraveyard {} -> "ExileCardsFromGraveyard"

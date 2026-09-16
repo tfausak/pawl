@@ -98,6 +98,21 @@ data CostComponent keyword
     -- Pawl.Types.Effect's Forage arm is the same instruction from the other
     -- provenance, and Pawl.Engine.Forage.forage is the one procedure both reach.
     Forage
+  | -- | CR 705.1 as a cost / Karplusan Minotaur's "Cumulative upkeep--Flip a
+    -- coin": the paying player flips one coin of CR 705.2's win/lose kind, and
+    -- can always pay -- a coin is not one of CR 118.3's resources, so no board
+    -- lacks it.
+    --
+    -- The OUTCOME is not part of the payment. Rule 705.2's win or loss is a
+    -- property of the flip that other abilities watch (TriggerCondition's
+    -- PlayerWinsCoinFlip and PlayerLosesCoinFlip), not a condition on whether the
+    -- cost was paid; a lost flip pays the cost exactly as a won one does.
+    --
+    -- Nullary, rule 705.1 fixing everything but the flipper's call.
+    -- Pawl.Types.Effect's FlipCoin arm is the same instruction from the other
+    -- provenance and binds a tally for a later effect to read, where a cost binds
+    -- nothing; Pawl.Engine.Event.flipWinLoseCoin is the one procedure both reach.
+    FlipCoin
   | -- | CR 107.3a / 601.2b / Soul Immolation: X as a blight amount, announced by
     -- the caster and rewritten to a Blight by Pawl.Engine.Cost.substituteX. The
     -- printed ceiling on X rides Pawl.Types.Face.maximumX (CR 101.1).

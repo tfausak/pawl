@@ -37,6 +37,7 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
@@ -47,6 +48,7 @@ import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
@@ -56,6 +58,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -2373,8 +2376,9 @@ feywildTricksterSpec s registry =
 
 -- Tavern Scoundrel {1}{R} Creature -- Human Rogue 1/3, "Whenever you win a coin
 -- flip, create two Treasure tokens. / {1}, {T}, Sacrifice another permanent:
--- Flip a coin." -- the pool's producer for TriggerCondition.PlayerWinsCoinFlip
--- (CR 705.2).
+-- Flip a coin." -- one of the pool's two producers for
+-- TriggerCondition.PlayerWinsCoinFlip (CR 705.2); Karplusan Minotaur below
+-- prints the same condition beside its losing twin.
 --
 -- ONE CARD carries both halves, which is why no second producer is on the board:
 -- the activated ability is the only flipper and the triggered ability is the
@@ -2501,6 +2505,122 @@ tavernScoundrelSpec s registry =
                   (S.countOnBattlefieldByName treasure S.alice after)
                   0
             _ -> Spec.assertFailure s "expected a Scoundrel on each side"
+
+-- Karplusan Minotaur {2}{R}{R} Creature -- Minotaur Warrior 3/3, "Cumulative
+-- upkeep--Flip a coin. / Whenever you win a coin flip, this creature deals 1
+-- damage to any target. / Whenever you lose a coin flip, this creature deals 1
+-- damage to any target of an opponent's choice." -- the pool's only producer for
+-- TriggerCondition.PlayerLosesCoinFlip (CR 705.2) and for CostComponent.FlipCoin
+-- (CR 705.1 as a cost).
+--
+-- ONE CARD carries both halves again, Tavern Scoundrel's shape: its cumulative
+-- upkeep is the flipper and its two triggers are the watchers, so the flip a COST
+-- makes is what proves the cost road records rule 705.1's event at all.
+--
+-- THREE SEATS, because the losing trigger's slot is announced by an OPPONENT (CR
+-- 115.1, Pawl.Types.TargetSlot's chooser) and at two seats that collapses onto
+-- the one thing alice could have named herself. Every announcing seat names the
+-- seat BEFORE it -- alice names carol, bob names alice -- so WHICH seat announced
+-- is readable straight off a life total, and the won and lost legs land their
+-- damage on different players.
+--
+-- THE TWO LEGS differ in the FACE alone, against a call pinned to heads in both:
+--
+--   * WON (heads): alice announces, so carol takes 1.
+--   * LOST (tails): alice names an opponent, bob announces, so ALICE takes 1 --
+--     a seat she would never have named. A condition matching the flip rather
+--     than its outcome fires both triggers here and damages carol too.
+--
+-- CR 705.2's FIRST SENTENCE is the third leg, and the discriminating board this
+-- whole condition exists for: Molten Sentry's as-enters flip has no winner, so
+-- CoinFlipped.won is Nothing rather than Just False, and NEITHER trigger fires.
+-- Before PlayerLosesCoinFlip there was no board that told those two apart.
+--
+-- CR 603.3 IS THE SEQUENCING throughout: the flip happens while the cumulative
+-- upkeep ability or the entry replacement is being carried out, so the damage
+-- trigger reaches the stack only at the next priority.
+karplusanMinotaurSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+karplusanMinotaurSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- CounterKeywordTriggerSpec's cumulative upkeep device: one upkeep for
+      -- alice, run to the end of the priority loop so CR 603.3 gathers and
+      -- resolves both the keyword's ability and the damage trigger off its flip.
+      steppedTo pid gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+      board = do
+        minotaur <- S.printingOf s registry "Karplusan Minotaur"
+        pure (S.addPermanent minotaur S.alice (Setup.emptyGame S.threePlayers))
+      runUpkeep face gs =
+        let settled = snd (Engine.runGamePure (minotaurAnswer face) (steppedTo S.alice gs) Engine.settleForPriority)
+         in snd (Engine.runGamePure (minotaurAnswer face) settled Engine.priorityLoop)
+      flips gs = [flipped | GameEvent.CoinFlipped flipped <- S.eventsOf gs]
+   in Spec.describe s "PlayerLosesCoinFlip" $ do
+        -- CR 705.2: the call did not match the face, so alice lost the flip her
+        -- own cumulative upkeep paid, and only the losing trigger fires.
+        Spec.it s "CR 705.2 a lost flip damages the target an opponent names" $ do
+          (_, gs) <- board
+          let after = runUpkeep CoinFace.Tails gs
+          -- The behaviour, ahead of every proxy. bob announced and named alice;
+          -- alice announces only for the WINNING trigger, and would have named
+          -- carol.
+          Spec.assertEqWith s "CR 705.2 alice, whom bob named off her lost flip, took the damage" (S.lifeOf S.alice after) (Just 19)
+          Spec.assertEqWith s "CR 705.2 and carol, whom the winning trigger would have hit, took none" (S.lifeOf S.carol after) (Just 20)
+          Spec.assertEqWith s "nor did bob, who announced but named nobody" (S.lifeOf S.bob after) (Just 20)
+          -- The flip really happened, and rule 705.2 really lost it -- which is
+          -- what keeps the two totals above from passing for an upkeep that
+          -- flipped nothing.
+          Spec.assertEqWith s "CR 705.1 one flip, and CR 705.2 lost it" (flips after) [CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Just False}]
+        -- The SAME board and the same call, differing in the face alone: alice
+        -- won, so the other trigger fires and announces at her own seat.
+        Spec.it s "CR 705.2 the same call against heads fires the winning trigger instead" $ do
+          (_, gs) <- board
+          let after = runUpkeep CoinFace.Heads gs
+          Spec.assertEqWith s "CR 705.2 carol, whom alice named off her won flip, took the damage" (S.lifeOf S.carol after) (Just 19)
+          Spec.assertEqWith s "CR 705.2 and alice, whom the losing trigger would have hit, took none" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "CR 705.1 one flip, and CR 705.2 won it" (flips after) [CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Just True}]
+        -- CR 705.2's first sentence, the flip nobody wins or loses. Molten Sentry
+        -- {3}{R} enters under alice with the Minotaur already out; its as-enters
+        -- flip records CoinFlipped.won = Nothing, which is neither a win nor a
+        -- loss, so no damage is dealt at all.
+        Spec.it s "CR 705.2 a winnerless flip fires neither trigger" $ do
+          (_, gs) <- board
+          mountain <- S.printingOf s registry "Mountain"
+          sentry <- S.printingOf s registry "Molten Sentry"
+          let (held, staged) = S.addHandCard sentry S.alice (S.landsFor mountain S.alice 4 gs)
+              cast = S.runPure (minotaurAnswer CoinFace.Heads) (staged {GameState.priority = Just S.alice}) (S.cast S.alice held Monad.>> Stack.resolveTop)
+              after = snd (Engine.runGamePure (minotaurAnswer CoinFace.Heads) cast Engine.priorityLoop)
+          -- The behaviour first: a winnerless flip is not a lost one, so nobody
+          -- is damaged. A losing condition reading `won /= Just True` hits alice
+          -- here.
+          Spec.assertEqWith s "CR 705.2 alice took nothing off a flip she did not lose" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and carol took nothing off a flip alice did not win" (S.lifeOf S.carol after) (Just 20)
+          Spec.assertEqWith s "CR 705.1 the flip happened, and CR 705.2 left it with no outcome" (flips after) [CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Nothing}]
+          Spec.assertEqWith s "and the stack is empty, so nothing was left unresolved" (GameState.stack after) []
+
+-- alice pays rule 702.24a's cumulative upkeep and calls heads; the coin shows
+-- `face`. Both questions are pinned by CONSTANT so the engine cannot repair
+-- either after a mutation, and CR 705.2's two answers are deliberately different
+-- questions -- Prompt.CallCoin is the choice, Prompt.FlipCoin the flip.
+--
+-- Every announcing seat names the seat BEFORE it, Pawl.TargetSpec's rotation and
+-- for its reason: keyed on the ASKING seat, which the prompt carries, so a pure
+-- answerer cannot answer the two announcements alike. The answer is FILTERED out
+-- of the offer rather than built, so it is the recipient the pool produced (CR
+-- 608.2b).
+minotaurAnswer :: CoinFace.CoinFace -> Prompt.Prompt r -> r
+minotaurAnswer face p = case p of
+  Prompt.FlipCoin -> face
+  Prompt.CallCoin {} -> CoinFace.Heads
+  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+    | d == S.alice && player == S.alice -> PaymentDecision.Pays
+  Prompt.ChooseTargets _ asker _ asked -> fmap (\(_, offered) -> Set.filter ((Just (seatBeforeMinotaur asker) ==) . Recipient.playerOf) offered) asked
+  _ -> S.identityAnswer p
+
+-- The rotation minotaurAnswer names its victim by.
+seatBeforeMinotaur :: PlayerId.PlayerId -> PlayerId.PlayerId
+seatBeforeMinotaur pid
+  | pid == S.alice = S.carol
+  | pid == S.bob = S.alice
+  | otherwise = S.bob
 
 -- Aloe Alchemist {1}{G} Creature -- Plant Warlock 3/2, "Trample; When this card
 -- becomes plotted, target creature gets +3/+2 and gains trample until end of
@@ -3607,6 +3727,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   matoyaTriggerSpec s registry
   feywildTricksterSpec s registry
   tavernScoundrelSpec s registry
+  karplusanMinotaurSpec s registry
   aloeAlchemistSpec s registry
   wildgrowthWalkerSpec s registry
   raffinesInformantSpec s registry

@@ -2714,6 +2714,7 @@ rewriteComponent pairs component = case component of
   CostComponent.Blight _ -> component
   CostComponent.BlightX -> component
   CostComponent.Forage -> component
+  CostComponent.FlipCoin -> component
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileThis -> component
   CostComponent.MillCards _ -> component

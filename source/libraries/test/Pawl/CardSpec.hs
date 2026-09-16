@@ -979,6 +979,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
+  TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
   TriggerCondition.PermanentConnives _ -> []
@@ -3135,6 +3136,7 @@ costComponentFilters component = case component of
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
   CostComponent.Forage -> []
+  CostComponent.FlipCoin -> []
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   -- CR 701.17a takes the cards off the top, so this component carries no Filter
@@ -3694,6 +3696,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
+  TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   -- CR 701.68d's and CR 701.61a's each carry a PlayerRelation, which is no
   -- Filter.
@@ -3905,6 +3908,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
+  TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
   TriggerCondition.PermanentConnives _ -> []
