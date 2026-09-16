@@ -3,8 +3,10 @@
 module Pawl.DepartureSpec where
 
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -899,6 +901,71 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "carol both owns and controls the Soul Warden" (fmap Object.owner (Game.lookupObject wardenId board), Projection.controllerOf wardenId board) (Just S.carol, Just S.carol)
     Spec.assertEqWith s "carol gains 1 life: the trigger was hers all along" (S.lifeOf S.carol after) (Just 21)
     Spec.assertEqWith s "the same settle that took bob out of the game put her trigger on the stack" (length (GameState.stack settled), statusOf S.bob settled) (1, Just (Status.Departed Departure.Type.Lost))
+
+  -- CR 104.3e's own door, at gameplay level: "an effect may state that a player
+  -- loses the game". Door to Nothingness is the only printing that names another
+  -- player, so it is where the targeted form is proved.
+  --
+  -- The loss is NOT a state-based action -- CR 104.3b-d wait for the next
+  -- priority, this happens as the ability applies -- and lands in the same
+  -- departure the other four ways take (CR 104.3, CR 104.5).
+  Spec.it s "CR 104.3e/104.2a Door to Nothingness loses its target the game, and the survivor wins" $ do
+    after <- S.play s registry (doorBoard [S.battlefield S.bob []]) doorScript S.priorityGame
+    Spec.assertEqWith s "alice's opponents have all left, so she wins" (GameState.result after) (Just (Result.Won S.alice))
+    Spec.assertEqWith s "and bob left because he LOST, not because he conceded" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
+
+  -- The same ability at three seats, which is the only place CR 800.4a's road is
+  -- observable: at two, CR 104.2a ends the game before anything can read it.
+  -- bob's Child of Night is what shows the first clause running -- "all objects
+  -- owned by that player leave the game".
+  Spec.it s "CR 800.4a with a third seat the game continues and the loser's permanents leave with him" $ do
+    after <- S.play s registry (doorBoard [S.battlefield S.bob [S.settled "child" "Child of Night"], S.battlefield S.carol []]) doorScript S.priorityGame
+    Spec.assertEqWith s "bob lost the game" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
+    Spec.assertEqWith s "alice and carol play on, with nothing decided" (Game.stillPlaying after, GameState.result after) ([S.alice, S.carol], Nothing)
+    Spec.assertEqWith s "and his Child of Night left the game with him" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Child of Night")) S.bob after) 0
+
+-- alice with Door to Nothingness and one land per colored symbol of its
+-- activation cost, plus whatever other seats the case wants.
+doorBoard :: [S.PlayerSetup] -> S.Board
+doorBoard others =
+  S.board
+    (S.battlefield S.alice (S.settled "door" "Door to Nothingness" : fmap (uncurry S.settled) doorLands) NonEmpty.:| others)
+    S.alice
+    S.precombatMain
+
+-- "{W}{W}{U}{U}{B}{B}{R}{R}{G}{G}", in the cost's own order, which is the order
+-- the harness hands the sources back in.
+doorLands :: [(String, String)]
+doorLands =
+  [ ("w1", "Plains"),
+    ("w2", "Plains"),
+    ("u1", "Island"),
+    ("u2", "Island"),
+    ("b1", "Swamp"),
+    ("b2", "Swamp"),
+    ("r1", "Mountain"),
+    ("r2", "Mountain"),
+    ("g1", "Forest"),
+    ("g2", "Forest")
+  ]
+
+-- alice activates the Door targeting bob. Every board it runs on offers at least
+-- two players in the target pool, so the target is a real choice rather than the
+-- one option a prompt would short-circuit.
+doorScript :: Seq.Seq S.Timed
+doorScript =
+  S.turn
+    1
+    [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "door") $
+        S.noChoices
+          { S.choiceTargets = Just [S.MkPlayerTarget S.bob],
+            -- CR 601.2h: tap first, then sacrifice. The other order is a real
+            -- choice -- a sacrificed artifact is no longer there to tap -- which
+            -- is why Pawl.Engine.Cost asks.
+            S.choiceCostOrder = Just [0, 1],
+            S.choiceManaSources = Seq.fromList (fmap (Just . S.aliasRef . fst) doorLands)
+          }
+    ]
 
 -- bob at 1 life, active, with a Bitterblossom of his own and carol's Soul Warden
 -- either lent to him or not. Returns the Warden's id and the board with bob's
