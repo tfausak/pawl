@@ -375,9 +375,10 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 -- by Pawl.Engine.Activate as the activation's payment returns (CR 601.2h at the
 -- position CR 602.2b gives it), which is why the ability object holds it and its
 -- source permanent does not. Pawl.Engine.Cast stamps a SPELL's payment onto the
--- spell the same way; no printing in `data/cards/` sacrifices as an additional
--- cost and then reads what it sacrificed, so nothing reads this slot there
--- (Fling is the producer, #1872).
+-- spell the same way, which is how Fling's "the sacrificed creature's power"
+-- reads it off its own additional cost -- proved by Pawl.CostSpec's "CR 601.2h a
+-- creature sacrificed to pay a cast's additional cost is still readable when the
+-- spell resolves".
 --
 -- The permanent is in a graveyard by the time the ability resolves, so every
 -- read of it is CR 608.2h's last known information; Pawl.Engine.Resolve.Slots.effectViewOf

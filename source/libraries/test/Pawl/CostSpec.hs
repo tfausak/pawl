@@ -2071,6 +2071,113 @@ revealing which p = case p of
     | List.elem which (NonEmpty.toList candidates) -> which
   _ -> S.identityAnswer p
 
+-- CR 115.4's "any target" pointed at a PLAYER, FILTERED out of the offered
+-- recipients for `targeting`'s reason: a hand-built Recipient.ToPlayer is a
+-- different recipient from the one the engine offered, and CR 608.2b's re-read
+-- would drop it with no error.
+targetingPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+targetingPlayer who p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, legal) -> Set.filter ((== Just who) . Recipient.playerOf) legal) asked
+  _ -> S.identityAnswer p
+
+-- CR 706.2's as-enters copy choice pinned to one named permanent, everything
+-- else S.identityAnswer -- Pawl.CopySpec's copyNamed, kept local here so the
+-- Clone leg below reads the engine's own offer rather than a search.
+cloneCopying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+cloneCopying wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  _ -> S.identityAnswer p
+
+-- Fling {1}{R} Instant: "As an additional cost to cast this spell, sacrifice a
+-- creature. Fling deals damage equal to the sacrificed creature's power to any
+-- target." (Oracle checked against Scryfall 2026-09-15.)
+--
+-- The gate card for a SPELL reading Binding.sacrificedPermanent off its own
+-- additional cost. CR 601.2h pays that cost while the spell is still being cast,
+-- and CR 701.21a puts the creature in a graveyard as a new object (CR 400.7), so
+-- by the time the spell resolves CR 608.2h's last known information is the only
+-- reading of its power there is -- Pawl.Engine.Resolve.Slots.effectViewOf is what
+-- licenses it. Jarad, Golgari Lich Lord is the same read one carrier over, off an
+-- ACTIVATION cost.
+--
+-- alice holds Fling over exactly {1}{R} in two Mountains on every board here, so
+-- no leg's outcome can turn on affordability, and bob's life total is the read.
+flingBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> GameState.GameState -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+flingBoard fling mountain mine base =
+  let lands = S.landsFor mountain S.alice 2 base
+      add (ids, g) printing = let (oid, gN) = S.addPermanent printing S.alice g in (ids <> [oid], gN)
+      (mineIds, withMine) = List.foldl' add ([], lands) mine
+      (spellId, gs) = S.addHandCard fling S.alice withMine
+   in ( spellId,
+        mineIds,
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+flingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flingSpec s registry =
+  Spec.describe s "Fling" $ do
+    -- The base case: nothing modifies the Giant's power, so this separates "the
+    -- cast's payment binds the permanent at all" from "the slot is empty and the
+    -- quantity silently answers nothing" (which would leave bob at 20).
+    --
+    -- EXACTLY ONE creature under alice's control, so Cost.payComponent's Sacrifice
+    -- arm elides its prompt (candidates == count) and no answerer picks the
+    -- victim. The target is a real choice all the same: CR 601.2c chooses it
+    -- before CR 601.2h pays, so the Giant, alice and bob are all on offer.
+    Spec.it s "CR 601.2h a creature sacrificed to pay a cast's additional cost is still readable when the spell resolves" $ do
+      fling <- S.printingOf s registry "Fling"
+      mountain <- S.printingOf s registry "Mountain"
+      giant <- S.printingOf s registry "Hill Giant"
+      let (spell, mine, gs) = flingBoard fling mountain [giant] (Setup.emptyGame S.bothPlayers)
+          cast = S.runPure (targetingPlayer S.bob) gs (S.cast S.alice spell)
+          resolved = S.runPure (targetingPlayer S.bob) cast Stack.resolveTop
+      Spec.assertEqWith s "bob took the sacrificed Hill Giant's 3 power" (S.lifeOf S.bob resolved) (Just 17)
+      Spec.assertEqWith s "alice, who is not the target, took nothing" (S.lifeOf S.alice resolved) (Just 20)
+      Spec.assertEqWith s "the Giant really was sacrificed, and as a COST" (fmap (\oid -> Game.lookupObject oid cast) (Maybe.listToMaybe mine)) (Just Nothing)
+      Spec.assertEqWith s "so the spell was on the stack with the Giant already gone" (length (GameState.stack cast)) 1
+      Spec.assertBool s (any (S.isCastOf spell) (Action.legalActions S.alice gs)) "and CR 118.3 offered the cast on this board"
+    -- The discriminating leg, Jarad's: Night of Souls' Betrayal ("All creatures
+    -- get -1/-1") makes the Sentry's LAST KNOWN power 2 where its PRINTED power is
+    -- 3, so the two readings of CR 608.2h give bob 18 and 17 -- and an unbound slot
+    -- gives 20. Three implementations, three life totals.
+    Spec.it s "CR 608.2h the power read is the one it last had, not the one it printed" $ do
+      fling <- S.printingOf s registry "Fling"
+      mountain <- S.printingOf s registry "Mountain"
+      sentry <- S.printingOf s registry "Ogre Sentry"
+      betrayal <- S.printingOf s registry "Night of Souls' Betrayal"
+      let (spell, _, gs) = flingBoard fling mountain [sentry, betrayal] (Setup.emptyGame S.bothPlayers)
+          cast = S.runPure (targetingPlayer S.bob) gs (S.cast S.alice spell)
+          resolved = S.runPure (targetingPlayer S.bob) cast Stack.resolveTop
+      Spec.assertEqWith s "bob took 2 -- the Sentry's 3 printed power less the anthem's -1" (S.lifeOf S.bob resolved) (Just 18)
+      Spec.assertEqWith s "alice took nothing" (S.lifeOf S.alice resolved) (Just 20)
+    -- The copy leg, which the anthem above cannot reach: a Clone's PRINTED power
+    -- is nothing at all, so a read that went through the printed card rather than
+    -- the copiable values CR 707.2 stamped would deal no damage. bob owns the
+    -- Berserkers the Clone copies, so the 4 read here belongs to no permanent
+    -- alice printed.
+    Spec.it s "CR 707.2 the power read is the copy's, not the printed Clone's" $ do
+      fling <- S.printingOf s registry "Fling"
+      mountain <- S.printingOf s registry "Mountain"
+      clone <- S.printingOf s registry "Clone"
+      berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+      let empty = Setup.emptyGame S.bothPlayers
+          (berserkerId, withBerserkers) = S.addPermanent berserkers S.bob empty
+          (_, staged) = S.spellOnStack clone S.alice withBerserkers
+          entered = S.settleSba (S.runPure (cloneCopying berserkerId) staged Stack.resolveTop)
+      case Set.toList (Set.difference (GameState.battlefield entered) (GameState.battlefield withBerserkers)) of
+        [cloneId] -> do
+          let (spell, _, gs) = flingBoard fling mountain [] entered
+              cast = S.runPure (targetingPlayer S.bob) gs (S.cast S.alice spell)
+              resolved = S.runPure (targetingPlayer S.bob) cast Stack.resolveTop
+          Spec.assertEqWith s "the Clone is a 4/4 copy of bob's Berserkers" (S.powerToughnessOf cloneId gs) (Just (4, 4))
+          Spec.assertEqWith s "bob took the copied 4 power, not the printed Clone's nothing" (S.lifeOf S.bob resolved) (Just 16)
+          Spec.assertEqWith s "and the Berserkers the Clone copied is untouched" (S.powerToughnessOf berserkerId resolved) (Just (4, 4))
+        _ -> Spec.assertFailure s "the Clone did not enter as a single permanent"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
@@ -2084,6 +2191,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   headlessSkaabSpec s registry
   cadaverousBloomSpec s registry
   livingDestinySpec s registry
+  flingSpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry
   putridRaptorSpec s registry
