@@ -6736,8 +6736,7 @@ partnerWithTarget = SlotName.MkSlotName (Text.pack "partnered")
 -- CR 702.55a: haunt. Soulshift's shape -- the CR 700.4 dies event and one target
 -- slot -- with the clause mandatory, rule 702.55a stating no "may".
 --
--- ONLY the permanent sentence. Rule 702.55a's other one, haunt on an instant or
--- sorcery, is not minted (#1404).
+-- Rule 702.55a's PERMANENT sentence; `hauntSpell` below is its other one.
 --
 -- THE CARD, NOT THE PERMANENT (CR 400.7): rule 702.55a's "exile IT" is the
 -- graveyard incarnation the death minted, Binding.became, which is why this cannot
@@ -6752,6 +6751,32 @@ haunt =
       exile = Effect.ExileHaunting (ExileHaunting.MkExileHaunting Binding.became hauntTarget)
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfDies,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.55a's SECOND sentence: "when this spell is put into a graveyard during
+-- its resolution, exile it haunting target creature". `haunt` above one sentence
+-- over, and the same mandatory clause and single target slot; what differs is the
+-- condition, which CR 608.2n dates to the spell's own resolution so that a
+-- countered spell (CR 701.6a) and a fizzled one (CR 608.2b) haunt nothing.
+--
+-- THE CARD IN THE GRAVEYARD, read through Binding.triggerSource rather than
+-- Binding.became: this condition matches the ARRIVING incarnation, so the bearer
+-- already IS the card rule 702.55a's "exile it" names and `became` would be a
+-- second name for one object (Pawl.Engine.Event.Binding's boundSlots says so).
+-- That is the one line where this differs from `haunt`, whose CR 603.10a
+-- look-back leaves the source slot pointing at the dead permanent.
+hauntSpell :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+hauntSpell =
+  let slot = TargetSlot.required Pool.Creatures Nothing
+      exile = Effect.ExileHaunting (ExileHaunting.MkExileHaunting Binding.triggerSource hauntTarget)
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfPutIntoGraveyardDuringResolution,
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
@@ -6875,15 +6900,31 @@ exileTriggeredAbilitiesOf keywords =
 -- naming Zone.Graveyard as its origin (unearth's reading), so the two rules
 -- agree here and the ungated join is the one that does not depend on that.
 --
+-- CR 702.55a's second sentence joins it, and is why this roster is handed the
+-- card's TYPES: haunt on an instant or sorcery spell is a different ability from
+-- haunt on a permanent, and the keyword alone cannot tell them apart. Ungated
+-- for the same reason as recover -- CR 608.2n has already put the card in the
+-- graveyard by the time the ability is gathered, which is the one zone its
+-- condition can be checked from.
+--
 -- A SET rather than a count-carrying Map, `exileTriggeredAbilitiesOf`'s reading:
 -- rule 702.59 states no per-instance clause, and no card in data/cards/ prints
--- recover twice.
-graveyardTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-graveyardTriggeredAbilitiesOf keywords =
+-- recover twice. Rule 702.55 states none either, and CR 702.55b's link is to one
+-- creature, so a second printed haunt on one spell would be a second ability
+-- over the same card -- unreachable, no printing carrying two.
+graveyardTriggeredAbilitiesOf :: Set CardType.CardType -> Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+graveyardTriggeredAbilitiesOf types keywords =
   let costOf keyword = case keyword of
         Keyword.Recover cost -> Just cost
         _ -> Nothing
    in fmap recover (Maybe.mapMaybe costOf (Set.toAscList keywords))
+        <> [hauntSpell | Set.member Keyword.Haunt keywords, isSpellCard types]
+
+-- CR 702.55a's own division of its two sentences: the second governs an INSTANT
+-- OR SORCERY spell and the first every other object with haunt. A classification
+-- over card types, which rule 702.55a states itself.
+isSpellCard :: Set CardType.CardType -> Bool
+isSpellCard types = Set.member CardType.Instant types || Set.member CardType.Sorcery types
 
 -- CR 702.59a written out: "When a creature is put into your graveyard from the
 -- battlefield, you may pay [cost]. If you do, return this card from your

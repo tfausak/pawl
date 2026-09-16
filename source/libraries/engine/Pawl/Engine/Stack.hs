@@ -392,7 +392,7 @@ resolveCardBacked runSubgame oid rest printingId = do
           -- CR 608.3's ordinary permanent entry for a non-Aura, named so that
           -- the refusing mutate branch below can reach the same move rather than
           -- restating it.
-          entersOrdinarily = armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False CarryOver.Carried
+          entersOrdinarily = armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False CarryOver.Carried False
        in if not (Card.isPermanent face)
             then Resolve.resolveSpellWith runSubgame oid
             else
@@ -484,7 +484,7 @@ resolveCardBacked runSubgame oid rest printingId = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs1) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried
+                          armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs1) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried False
     _ -> State.put gs {GameState.stack = rest}
 
 -- What a spell's Object.castUsing record buys the permanent it becomes: CR

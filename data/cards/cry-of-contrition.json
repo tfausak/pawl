@@ -1,0 +1,101 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Haunt"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Cry of Contrition",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Discard",
+                    "value": {
+                      "type": "Counted",
+                      "value": {
+                        "quantity": {
+                          "type": "Literal",
+                          "value": 1
+                        },
+                        "slot": "target"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "pool": {
+                  "type": "Players"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "HauntedCreatureDies"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Discard",
+                        "value": {
+                          "type": "Counted",
+                          "value": {
+                            "quantity": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "slot": "target"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "pool": {
+                      "type": "Players"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

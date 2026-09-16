@@ -157,7 +157,7 @@ logSpec s registry =
           expected = Projection.project piker gs
           after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
       case S.eventsOf after of
-        GameEvent.Moved (Moved.MkMoved _ snapshot _) : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
+        GameEvent.Moved (Moved.MkMoved _ snapshot _ _) : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
         _ -> Spec.assertFailure s "expected exactly one Moved event"
     -- CR 704.5h's window is "since the last SBA check": the check CONSUMES by
     -- bumping a watermark, and the record survives.

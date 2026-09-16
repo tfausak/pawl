@@ -8256,7 +8256,7 @@ attachFound searcher host cardId = do
     Nothing -> pure ()
     Just seed ->
       Monad.void
-        (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried)
+        (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False)
 
 -- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
