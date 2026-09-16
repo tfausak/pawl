@@ -696,7 +696,7 @@ slotPlayers context gs name = case Map.lookup name (Filter.slotPlayers context) 
 -- itself is: Pawl.Engine.Projection imports this module.
 snapshotView :: ViewOf -> GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView viewOf gs shape event = case event of
-  GameEvent.Moved (Moved.MkMoved zc snapshot _) -> case shape of
+  GameEvent.Moved (Moved.MkMoved zc snapshot _ _) -> case shape of
     EventShape.MovedBetween (MovedBetween.MkMovedBetween from to) ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to then Just (departedView gs zc snapshot) else Nothing
     -- CR 712.21e's second half, whose unit is the CARD: this event announces the

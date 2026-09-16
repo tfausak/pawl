@@ -234,6 +234,12 @@ data TriggerCondition
   | -- | CR 603.6: "when this card is put into a graveyard from anywhere" (Serra
     -- Avatar). Self-scoped, and not a leaves-the-battlefield ability (CR 603.6c).
     SelfPutIntoGraveyardFromAnywhere
+  | -- | CR 702.55a's second sentence: "when this spell is put into a graveyard
+    -- during its resolution" (Cry of Contrition), which CR 608.2n makes the last
+    -- step of an instant or sorcery spell's own resolution. Narrower than the arm
+    -- above by CAUSE: a countered spell (CR 701.6a) and a fizzled one (CR 608.2b)
+    -- reach the same graveyard from the same zone and do not match.
+    SelfPutIntoGraveyardDuringResolution
   | -- | CR 603.6 read by a BYSTANDER: "whenever another card is put into a
     -- graveyard from anywhere" (Planar Void), filtered over the arriving card.
     -- CR 712.21's Example makes this the condition a melded permanent's death

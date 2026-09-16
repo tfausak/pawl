@@ -320,7 +320,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- RECEIVE what the payload does is the payload's question (CR 120.1a for
   -- damage), and a binding that existed only for creatures would make the slot's
   -- presence depend on the entrant, which eventBindingSlots cannot express.
-  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _ _)) ->
+  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _ _ _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
   -- CR 708.7's "that creature": the permanent that was turned face up, which Pine
   -- Walker untaps. The bearer is a bystander here -- CR 113.7a's source slot names
@@ -741,7 +741,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- a graveyard whose `departed` IS the bearer's host, so the id is always there.
   -- The event is therefore matched rather than wildcarded, unlike every other
   -- arm's use of the first argument.
-  (TriggerCondition.AttachedCreatureDies, GameEvent.Moved (Moved.MkMoved zc _ _)) ->
+  (TriggerCondition.AttachedCreatureDies, GameEvent.Moved (Moved.MkMoved zc _ _ _)) ->
     Binding.setDepartedPermanent (ZoneChange.departed zc) (maybe Map.empty (`Binding.setBecame` Map.empty) bearerBecame)
   -- Nothing at all, stated rather than left to the fallthrough below: the
   -- attachment link already names the permanent that became tapped, and CR 109.5
@@ -1282,6 +1282,10 @@ eventBindingSlots cond = case cond of
   -- `became` would be a second name for one object. Serra Avatar's "shuffle IT"
   -- reads the source slot.
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Set.empty
+  -- The same answer for the same reason, CR 608.2n's narrowing changing only
+  -- WHICH move matches: the bearer already is the arriving incarnation, so rule
+  -- 702.55a's "exile IT" reads the source slot.
+  TriggerCondition.SelfPutIntoGraveyardDuringResolution -> Set.empty
   -- CR 400.7e's arrival, and here it is the CARD the condition matched on rather
   -- than a second name for the bearer -- Planar Void's "exile THAT CARD". One
   -- object and never a group: this condition sees one arrival per event, the

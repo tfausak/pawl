@@ -4355,7 +4355,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       facing = if onto then maybe Facing.FaceUp Facing.FaceDown (EntryRiders.faceDown riders) else Facing.FaceUp
   if refused
     then pure Seq.empty
-    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under2 shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried
+    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under2 shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried False
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being
@@ -4394,7 +4394,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
 -- pass would have handed bob the permanent; see #2169. Identical wherever the two
 -- seats coincide, which is every other land play.
 changeZoneShowing :: Maybe PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
-changeZoneShowing under oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty under shown Facing.FaceUp False CarryOver.NotCarried
+changeZoneShowing under oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty under shown Facing.FaceUp False CarryOver.NotCarried False
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
 -- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.
@@ -4420,7 +4420,7 @@ changeZoneShowing under oid requestedDest shown = changeZoneAttaching Nothing Se
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
-changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False CarryOver.NotCarried
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False CarryOver.NotCarried False
 
 -- CR 601.2a's move: the card goes onto the stack and "that player becomes its
 -- controller". The caster is carried BY THE MOVE, for the reason CR 709.3a
@@ -4439,7 +4439,7 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.emp
 -- battlefield drops the stamp, exactly as it drops the face, because CR 109.4
 -- gives an object there no controller to record.
 changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Seq.Seq ObjectId)
-changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False CarryOver.NotCarried
+changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False CarryOver.NotCarried False
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -4464,7 +4464,7 @@ changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneInBatchReturnin
 -- empty when the move was cancelled or the id named no object. The destroy
 -- funnel is the one caller, for CR 701.8b's "put into a graveyard this way".
 changeZoneInBatchReturning :: GameState -> ObjectId -> Zone -> Game (Seq.Seq ObjectId)
-changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried
+changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
 
 -- changeZoneReturning's body, returning the destination incarnations' ids: one
 -- fresh id per arrival on a completed move (CR 400.7), which is one for every
@@ -4473,7 +4473,18 @@ changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just as
 -- cancelled the move (`resolved == Nothing`). changeZoneReturning itself is the
 -- `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
+
+-- changeZoneReturning for CR 608.2n's own move, "as the final part of an instant
+-- or sorcery spell's resolution". The ONE door that stamps
+-- Moved.duringResolution, which is the only thing telling that move apart from a
+-- countered spell's (CR 701.6a) or a fizzled one's (CR 608.2b): all three run
+-- stack-to-graveyard and the ZoneChange carries no cause.
+--
+-- A separate door rather than a parameter on changeZoneReturning, for the reason
+-- changeZoneInBatch is one: the caller is Pawl.Engine.Resolve.finishSpell alone.
+changeZoneResolvingReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
+changeZoneResolvingReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried True
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -4515,14 +4526,18 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oi
 -- below, which the body calls before the entry loop, under a `dest ==
 -- Battlefield` gate rather than a `dest == requestedDest` one: the rule is about
 -- the permanent the spell becomes, and only a battlefield destination makes one.
+-- `resolving` is CR 608.2n's own move, True for changeZoneResolvingReturning
+-- alone and stamped straight onto the Moved event; it is NOT gated on the
+-- destination, a CR 616.1 redirect away from the graveyard leaving the condition
+-- that reads it unmatched on its own `to` test.
 --
 -- `position` needs no `dest == requestedDest` gate, unlike `face` and `facing`
 -- below: it is inert everywhere but a library, so a CR 616.1 redirect AWAY from
 -- one drops it for free, and a redirect INTO one from a move that named no
 -- position carries the default -- which is the right answer, since nothing said
 -- top.
-changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Game (Seq.Seq ObjectId)
-changeZoneAttaching asOf batch oid requestedDest position seed tapped entering under shown facing concealed carrying = do
+changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Game (Seq.Seq ObjectId)
+changeZoneAttaching asOf batch oid requestedDest position seed tapped entering under shown facing concealed carrying resolving = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Seq.empty
@@ -5421,7 +5436,10 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 $ Moved.MkMoved
                   { Moved.change = ZoneChange.MkZoneChange oid newId fromZone dest,
                     Moved.characteristics = snapshot,
-                    Moved.others = trailingIds
+                    Moved.others = trailingIds,
+                    -- CR 608.2n's own move and no other: `resolving` is True only
+                    -- at changeZoneResolvingReturning's door.
+                    Moved.duringResolution = resolving
                   }
               -- CR 712.21's second clause: "two cards are put into the
               -- appropriate zone". One event per card AFTER the leading one,
@@ -7263,6 +7281,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+  TriggerCondition.SelfPutIntoGraveyardDuringResolution -> False
   TriggerCondition.CardPutIntoGraveyard _ -> False
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
@@ -7556,6 +7575,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+  TriggerCondition.SelfPutIntoGraveyardDuringResolution -> False
   -- CR 603.2b names no turn, so the bystander reading is unscoped like the
   -- self-scoped one above.
   TriggerCondition.CardPutIntoGraveyard _ -> False

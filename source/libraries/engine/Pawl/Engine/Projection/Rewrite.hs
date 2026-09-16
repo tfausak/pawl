@@ -1536,6 +1536,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfAttacksUnblocked -> condition
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition
+  TriggerCondition.SelfPutIntoGraveyardDuringResolution -> condition
   TriggerCondition.SelfDies -> condition
   TriggerCondition.SelfLeavesTheBattlefield -> condition
   TriggerCondition.HauntedCreatureDies -> condition

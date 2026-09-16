@@ -111,7 +111,7 @@ battlefieldAt group gs = Map.findWithDefault (battlefieldCandidates gs) group (G
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
 movedOf event = case event of
-  GameEvent.Moved (Moved.MkMoved zc _ _) -> Just zc
+  GameEvent.Moved (Moved.MkMoved zc _ _ _) -> Just zc
   -- CR 712.21 / CR 730.3: each component card after the leading one DID change
   -- zones, so the event that announces it answers with its zone change like any
   -- other. That is what puts it in front of the two graveyard candidate sources
@@ -325,6 +325,7 @@ looksBack condition = case condition of
   -- a graveyard from anywhere is not a leaves-the-battlefield ability, and CR
   -- 603.10's normal reading applies. The constructor's own Haddock argues it.
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+  TriggerCondition.SelfPutIntoGraveyardDuringResolution -> False
   -- The bystander reading of the arm above, and outside the family for the same
   -- sentence of CR 603.6c.
   TriggerCondition.CardPutIntoGraveyard _ -> False
@@ -566,6 +567,7 @@ batchScoped condition = case condition of
   -- card put into a graveyard is its own trigger event.
   TriggerCondition.CardPutIntoGraveyard _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+  TriggerCondition.SelfPutIntoGraveyardDuringResolution -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
@@ -926,7 +928,7 @@ eventTriggers events gs =
       -- not characteristics and so are reached through Game.delayedAbilitiesOf
       -- off the id.
       leftBattlefield event = case event of
-        GameEvent.Moved (Moved.MkMoved zc _ _)
+        GameEvent.Moved (Moved.MkMoved zc _ _ _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
               case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
@@ -1034,7 +1036,7 @@ eventTriggers events gs =
         Map.fromList
           ( Maybe.mapMaybe
               ( ( \event -> case event of
-                    GameEvent.Moved (Moved.MkMoved zc _ _)
+                    GameEvent.Moved (Moved.MkMoved zc _ _ _)
                       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
                           Just (ZoneChange.departed zc, ZoneChange.object zc)
                     _ -> Nothing
@@ -1267,10 +1269,11 @@ eventTriggers events gs =
       -- recover is in a player's graveyard" -- so rule 113.6's default has already
       -- been overridden by the rule that mints it.
       -- Pawl.Engine.Keyword.graveyardTriggeredAbilitiesOf is what decides which
-      -- keywords reach this: recover alone.
+      -- keywords reach this: recover, and CR 702.55a's haunt on an instant or
+      -- sorcery -- which is why it is handed the face's card TYPES as well.
       graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) <> Keyword.graveyardTriggeredAbilitiesOf (Face.keywordSet face) of
+          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) <> Keyword.graveyardTriggeredAbilitiesOf (TypeLine.types (Face.typeLine face)) (Face.keywordSet face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -1308,10 +1311,11 @@ eventTriggers events gs =
       -- to `inGraveyards`' printed read today, no pool effect changing the
       -- TRIGGERED abilities of a card in a graveyard (gap #1859). Not `abilitiesOf` either,
       -- and not `graveyardTriggeredAbilitiesOf`, which `inGraveyards` does consult:
-      -- the one keyword on that roster is CR 702.59a's recover, whose ability
-      -- returns or exiles the card it is on, and an id this source answers for has
-      -- already left the graveyard and ceased -- so the minted ability would have
-      -- nothing to move. Rule 310 mints nothing that functions from a graveyard.
+      -- both abilities on that roster -- CR 702.59a's recover and CR 702.55a's
+      -- haunt on an instant or sorcery -- move the card they are on, and an id
+      -- this source answers for has already left the graveyard and ceased, so
+      -- either would have nothing to move. Rule 310 mints nothing that functions
+      -- from a graveyard.
       --
       -- The controller is `LastKnown.controller`, which for a graveyard card is
       -- the OWNER and so agrees with `inGraveyards` -- CR 113.8's second clause,
@@ -1898,6 +1902,9 @@ conditionPutsSelfInto condition zone = case condition of
   -- CR 603.6's graveyard-arrival forms, either origin.
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> zone == Zone.Graveyard
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> zone == Zone.Graveyard
+  -- CR 608.2n narrows the arm above to one cause and leaves its destination
+  -- alone, so the answer is the same graveyard.
+  TriggerCondition.SelfPutIntoGraveyardDuringResolution -> zone == Zone.Graveyard
   TriggerCondition.AnyOf conditions -> any (`conditionPutsSelfInto` zone) conditions
   _ -> False
 
@@ -2207,6 +2214,9 @@ zonesTriggeredFrom cond =
         -- battlefield, so CR 113.6k puts it in every zone it can, and the graveyard is
         -- where the scan meets it whatever zone the card came from.
         TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Set.singleton Zone.Graveyard
+        -- The graveyard for that same reason: CR 608.2n has already put the card
+        -- there by the time the ability is gathered.
+        TriggerCondition.SelfPutIntoGraveyardDuringResolution -> Set.singleton Zone.Graveyard
         -- The bystander reading takes CR 113.6's default instead: the watcher is a
         -- permanent on the battlefield (Planar Void), and nothing about the condition
         -- says otherwise.
@@ -2468,6 +2478,7 @@ stateTriggers gs
               TriggerCondition.PlayerDrawsNthCard {} -> False
               TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
               TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+              TriggerCondition.SelfPutIntoGraveyardDuringResolution -> False
               TriggerCondition.CardPutIntoGraveyard _ -> False
               TriggerCondition.SelfDies -> False
               TriggerCondition.PermanentDies _ -> False

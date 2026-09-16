@@ -21,7 +21,8 @@ spec s = Spec.describe s "Pawl.Codec.Moved" $ do
       ( Moved.MkMoved
           { Moved.change = ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard,
             Moved.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
-            Moved.others = Seq.empty
+            Moved.others = Seq.empty,
+            Moved.duringResolution = False
           }
       )
       ( "{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
@@ -37,11 +38,29 @@ spec s = Spec.describe s "Pawl.Codec.Moved" $ do
       ( Moved.MkMoved
           { Moved.change = ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard,
             Moved.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
-            Moved.others = Seq.fromList [ObjectId.MkObjectId 3]
+            Moved.others = Seq.fromList [ObjectId.MkObjectId 3],
+            Moved.duringResolution = False
           }
       )
       ( "{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> ",\"others\":[3]}"
+      )
+  -- CR 608.2n's own move: the one Moved event that carries the flag, which is
+  -- also the one shape the defaulted key appears in.
+  Spec.it s "MkMoved, CR 608.2n's move during a spell's own resolution" $
+    Common.assertCodec
+      s
+      Moved.codec
+      ( Moved.MkMoved
+          { Moved.change = ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Stack Zone.Graveyard,
+            Moved.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
+            Moved.others = Seq.empty,
+            Moved.duringResolution = True
+          }
+      )
+      ( "{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Stack\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
+          <> ProjectedCharacteristicsSpec.testCharacteristicsJson
+          <> ",\"others\":[],\"duringResolution\":true}"
       )
   Spec.it s "has a schema" $ Common.assertHasSchema s Moved.codec

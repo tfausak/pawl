@@ -446,6 +446,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfPutIntoGraveyardFromAnywhere
       " {\"type\":\"SelfPutIntoGraveyardFromAnywhere\"} "
+  -- CR 702.55a's second sentence, a third tag over the same destination: rule
+  -- 608.2n's cause is what it adds, so it must never decode to either above.
+  Spec.it s "SelfPutIntoGraveyardDuringResolution" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfPutIntoGraveyardDuringResolution
+      " {\"type\":\"SelfPutIntoGraveyardDuringResolution\"} "
   -- CR 603.6c's second written form, abbreviated by CR 700.4 to "dies".
   Spec.it s "SelfDies" $
     Common.assertCodec
