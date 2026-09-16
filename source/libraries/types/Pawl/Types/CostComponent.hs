@@ -100,8 +100,8 @@ data CostComponent keyword
     Forage
   | -- | CR 705.1 as a cost / Karplusan Minotaur's "Cumulative upkeep--Flip a
     -- coin": the paying player flips one coin of CR 705.2's win/lose kind, and
-    -- can always pay -- a coin is always there to flip, so there is no board on
-    -- which rule 608.2d refuses this.
+    -- can always pay -- a coin is not one of CR 118.3's resources, so no board
+    -- lacks it.
     --
     -- The OUTCOME is not part of the payment. Rule 705.2's win or loss is a
     -- property of the flip that other abilities watch (TriggerCondition's

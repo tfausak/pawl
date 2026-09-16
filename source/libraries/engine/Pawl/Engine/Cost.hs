@@ -3023,8 +3023,8 @@ canPayComponent slots pid oid component gs = case component of
   -- Nothing about `oid`: rule 701.61a's candidates are qualified by the FORAGER's
   -- own graveyard and control, the Blight arm above's shape.
   CostComponent.Forage -> Forage.canForage pid gs
-  -- Always payable: CR 705.1's coin is not a game resource, so there is no board
-  -- on which rule 608.2d refuses the flip. The OUTCOME does not enter into it --
+  -- Always payable: CR 705.1's coin is not one of CR 118.3's resources, so there
+  -- is no board on which a player lacks it. The OUTCOME does not enter into it --
   -- a flip the payer goes on to lose pays the cost exactly as a won one does.
   CostComponent.FlipCoin -> True
   -- CR 701.17b's last sentence, stated of costs in as many words: "the player
