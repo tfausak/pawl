@@ -952,8 +952,9 @@ serves supply demand =
 --
 -- `subject` is WHAT the payment is for (Pawl.Types.PaymentSubject), which is the
 -- question CR 106.6's restrictions ask: Mishra's Workshop's mana admits CR
--- 601.2h's cast and Omen Hawker's admits CR 602.2b's activation, each under its
--- own predicate. A payment that is neither -- a special action's cost, a combat
+-- 601.2h's cast, Omen Hawker's admits CR 602.2b's activation and Overgrown
+-- Zealot's admits CR 116.2b's turn-face-up, each under its own predicate. A
+-- payment that is none of those -- a special action no rider names, a combat
 -- toll, CR 118.12's resolution-time payment -- can spend no restricted mana at
 -- all, since no clause in the vocabulary names it.
 --
@@ -1002,6 +1003,8 @@ admitsUnder subject pid gs =
         PaymentSubject.ForNeither -> Nothing
         PaymentSubject.Casting oid -> Just (ManaRestriction.casts, oid)
         PaymentSubject.Activating oid -> Just (ManaRestriction.activations, oid)
+        PaymentSubject.Unlocking oid -> Just (ManaRestriction.unlocks, oid)
+        PaymentSubject.TurningFaceUp oid -> Just (ManaRestriction.turnsFaceUp, oid)
       asked = fmap (\(half, oid) -> (half, Filter.contextFor (Game.teams gs) (Just pid) Nothing, Projection.viewOfObject oid gs)) paidFor
    in \unit -> case ManaUnit.restriction unit of
         Nothing -> True
@@ -1718,10 +1721,10 @@ hybridHalves a b = if a == b then [a] else [a, b]
 -- nothing claimed and no CR 118.14 permission, which is the spending rule every
 -- cost takes when no effect has spoken about it.
 --
--- NEITHER A CAST NOR AN ACTIVATION either, so CR 106.6-restricted mana is no
--- supply for it (spendableFor). Every caller is asking about a cost that is
--- neither -- Pawl.Engine.Cost.canPay's own callers, and the specs -- and a
--- caller that WAS one would want canPayCommitting with its subject.
+-- NO SUBJECT either (ForNeither), so CR 106.6-restricted mana is no supply for
+-- it (spendableFor). Every caller is a spec asking about a bare mana cost, and a
+-- caller with a subject wants canPayCommitting below, which is what
+-- Pawl.Engine.Cost.canPay takes.
 canPay :: Capacity -> PlayerId -> ManaCost -> GameState -> Bool
 canPay capacity pid = canPayCommitting PaymentSubject.ForNeither capacity ManaSpending.AsProduced pid 0 []
 

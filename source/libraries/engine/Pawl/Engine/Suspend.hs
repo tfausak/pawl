@@ -84,7 +84,7 @@ canSuspend pid oid gs = case suspendOf oid gs of
   Just ability ->
     elem oid (Game.zoneMembers Zone.Hand pid gs)
       && maybe False (\card -> Cast.couldBeginToCast pid oid (Face.name (Card.combined card)) gs) (Game.cardOfHandMember oid gs)
-      && Cost.canPay pid oid (Suspend.cost ability) gs
+      && Cost.canPay PaymentSubject.ForNeither pid oid (Suspend.cost ability) gs
 
 -- Every card this player may suspend right now -- what Action.Suspend is built
 -- from, and the shape Plot.plottable and Foretell.foretellable have.

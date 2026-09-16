@@ -109,7 +109,7 @@ canForetell pid oid gs =
   Maybe.isJust (foretellCostOf oid gs)
     && elem oid (Game.zoneMembers Zone.Hand pid gs)
     && GameState.activePlayer gs == pid
-    && Cost.canPay pid oid actionCost gs
+    && Cost.canPay PaymentSubject.ForNeither pid oid actionCost gs
 
 -- Every card this player may foretell right now -- what Action.Foretell is built
 -- from, and the shape Plot.plottable has.

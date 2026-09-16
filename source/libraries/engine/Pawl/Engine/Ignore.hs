@@ -108,7 +108,7 @@ ignoreCostOf oid name gs = case fmap snd (filter (\(n, _) -> n == name) (ignoreG
 canIgnore :: PlayerId -> ObjectId -> AbilityName.AbilityName -> GameState -> Bool
 canIgnore pid oid name gs = case ignoreCostOf oid name gs of
   Nothing -> False
-  Just cost -> (PlayerEffect.affectedBy pid oid name gs || affectedThrough pid oid name gs) && Cost.canPay pid oid cost gs
+  Just cost -> (PlayerEffect.affectedBy pid oid name gs || affectedThrough pid oid name gs) && Cost.canPay PaymentSubject.ForNeither pid oid cost gs
 
 -- CR 116.2d's WHO for an ability aimed at an OBJECT: does this player CONTROL a
 -- permanent the named ability restricts? That is "that creature's controller",

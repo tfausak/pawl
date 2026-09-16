@@ -85,7 +85,7 @@ canPlot pid oid gs = case plotCostOf oid gs of
   Just cost ->
     elem oid (Game.zoneMembers Zone.Hand pid gs)
       && Turn.sorcerySpeedWindow pid gs
-      && Cost.canPay pid oid cost gs
+      && Cost.canPay PaymentSubject.ForNeither pid oid cost gs
 
 -- Every card this player may plot right now -- what Action.Plot is built from,
 -- and the shape Room.unlockable and FaceDown.turnableFaceUp have.
