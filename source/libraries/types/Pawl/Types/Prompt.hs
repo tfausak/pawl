@@ -109,6 +109,16 @@ data Prompt r where
   -- | CR 705.2: the face the flipping player calls before the coin comes up;
   -- a face-only flip asks no call.
   CallCoin :: Decider.Decider -> PlayerId.PlayerId -> Prompt CoinFace.CoinFace
+  -- | CR 705.1 / 614.1a: which face the flipper keeps when a replacement settled
+  -- one flip out of several coins (Krark's Thumb's "ignore one"). A choice and
+  -- not a flip, so unlike FlipCoin above it carries a Decider and the seat.
+  --
+  -- The answer is a FACE where ChooseDieResult's indexes its results, because
+  -- rule 705.1 designates only two sides: two coins showing the same face are the
+  -- same answer, so the candidates are the DISTINCT faces that came up and every
+  -- face the prompt is raised with is one of them. Not raised where every coin
+  -- agrees, which no card can tell from either answer.
+  ChooseCoinResult :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty CoinFace.CoinFace -> Prompt CoinFace.CoinFace
   -- | CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 701.22a: the top cards of the scrying player's library, top-first;

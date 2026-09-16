@@ -1268,6 +1268,9 @@ replacementRowReads re = case re of
   -- A DrawCountR is one ControllerRelation, one threshold and one nullary rewrite.
   -- DrawR's answer, and for its reason.
   ReplacementEffect.DrawCountR {} -> ([], [])
+  -- One ControllerRelation and one nullary rewrite: no read at all, DrawCountR's
+  -- answer and for its reason.
+  ReplacementEffect.CoinFlipR {} -> ([], [])
   ReplacementEffect.PhaseR _ -> ([], [])
 
 -- A row's pattern Filter joined onto what its rewrite reads.
@@ -1400,6 +1403,7 @@ replacementRowEffects re = case re of
   ReplacementEffect.LifeGainR _ -> []
   ReplacementEffect.DrawR _ -> []
   ReplacementEffect.DrawCountR _ -> []
+  ReplacementEffect.CoinFlipR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The program an ENTRY rewrite runs. entryRewriteReads' discipline: no wildcard,

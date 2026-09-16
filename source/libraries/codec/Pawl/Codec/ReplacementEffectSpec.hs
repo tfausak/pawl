@@ -11,6 +11,8 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CoinFlipR as CoinFlipR
+import qualified Pawl.Types.CoinFlipRewrite as CoinFlipRewrite
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
@@ -209,6 +211,13 @@ spec s =
             codec
             (ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR ControllerRelation.Opponents 2 DrawCountRewrite.EachDrawOne))
             " {\"type\":\"DrawCountR\",\"value\":{\"whose\":{\"type\":\"Opponents\"},\"atLeast\":2,\"rewrite\":{\"type\":\"EachDrawOne\"}}} "
+        -- CR 705.1: Krark's Thumb, the one CoinFlipR producer.
+        Spec.it s "CoinFlipR (Krark's Thumb)" $
+          Common.assertCodec
+            s
+            codec
+            (ReplacementEffect.CoinFlipR (CoinFlipR.MkCoinFlipR ControllerRelation.Yours CoinFlipRewrite.Doubled))
+            " {\"type\":\"CoinFlipR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Doubled\"}}} "
         -- A fixed kind, a real filter, and CR 614.16's AddMore.
         Spec.it s "CounterR (Hardened Scales)" $
           Common.assertCodec

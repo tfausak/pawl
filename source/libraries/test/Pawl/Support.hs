@@ -2553,6 +2553,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseDieResult decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.FlipCoin {} -> Nothing
   Prompt.CallCoin decider _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseCoinResult decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDiscard decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseScry decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseSurveil decider _ _ -> Just (Decider.unwrap decider)
@@ -2680,6 +2681,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseDieResult {} -> "ChooseDieResult"
   Prompt.FlipCoin {} -> "FlipCoin"
   Prompt.CallCoin {} -> "CallCoin"
+  Prompt.ChooseCoinResult {} -> "ChooseCoinResult"
   Prompt.ChooseDiscard {} -> "ChooseDiscard"
   Prompt.ChooseScry {} -> "ChooseScry"
   Prompt.ChooseSurveil {} -> "ChooseSurveil"

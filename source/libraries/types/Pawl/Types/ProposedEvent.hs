@@ -113,7 +113,7 @@ data ProposedEvent
     -- action and Effect.TurnFaceUp both go through.
     WouldTurnFaceUp ObjectId.ObjectId (Maybe TurnUpProcedure.TurnUpProcedure)
   | -- | CR 701.26b / 122.1d: a permanent would become untapped. Raised by
-    -- Pawl.Engine.Event.resolveUntap, the one funnel CR 502.3's turn-based
+    -- Pawl.Engine.Event.proposeUntap, the one funnel CR 502.3's turn-based
     -- action, Effect.Untap and CR 107.6's untap symbol in a cost all go through.
     --
     -- The ObjectId and nothing else: rule 701.26b's action has no other content
@@ -188,4 +188,21 @@ data ProposedEvent
     -- instruction to draw multiple; the second runs before any replacement effect
     -- can exist, so the two readings are indistinguishable there.
     WouldDrawCards PlayerId.PlayerId Natural.Natural
+  | -- | CR 705.1 / 614.1a: this player would flip a coin, and this many coins
+    -- would be flipped to settle it. Raised by Pawl.Engine.Event.flipOneCoin,
+    -- the one funnel every flip in the engine goes through -- Effect.FlipCoin's
+    -- coins and the flip an EntryRewrite.ChoiceByCoinFlip makes as a permanent
+    -- enters.
+    --
+    -- ONE flip carrying a COUNT of coins, not a count of flips: rule 705.1's
+    -- flip has ONE result, and Krark's Thumb's own ruling scopes its replacement
+    -- to "each individual coin flip" rather than to an instruction's set of them
+    -- ("if an effect tells you to flip two coins, you don't flip four coins and
+    -- ignore any two"). So a row that resizes this field leaves one flip whose
+    -- result the flipper picks out of more coins, and an instruction flipping
+    -- five raises this event five times.
+    --
+    -- The PlayerId is CR 705.2's flipper, the only seat rule 705.2's last
+    -- sentence leaves involved.
+    WouldFlipCoin PlayerId.PlayerId Natural.Natural
   deriving (Eq, Ord, Show)

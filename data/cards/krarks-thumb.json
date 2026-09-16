@@ -1,0 +1,40 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Krark's Thumb",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "CoinFlipR",
+            "value": {
+              "rewrite": {
+                "type": "Doubled"
+              },
+              "whose": {
+                "type": "Yours"
+              }
+            }
+          }
+        }
+      ],
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

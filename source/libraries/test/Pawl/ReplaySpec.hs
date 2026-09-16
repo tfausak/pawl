@@ -869,6 +869,25 @@ combatReplaySpec s =
         Spec.it s "a call does not decode as a flip" $ do
           Spec.assertEqWith s "call for flip" (Replay.decode Prompt.FlipCoin (Response.CalledCoin CoinFace.Tails)) Nothing
           Spec.assertEqWith s "flip for call" (Replay.decode (Prompt.CallCoin decider S.alice) (Response.FlippedCoin CoinFace.Tails)) Nothing
+        -- CR 705.1 / 614.1a: which of a replaced flip's coins the flipper keeps
+        -- (Krark's Thumb). A choice like the call, and so its own Response
+        -- constructor for the call's reason.
+        Spec.it s "ChooseCoinResult round-trips through the transcript" $ do
+          let p = Prompt.ChooseCoinResult decider S.alice (CoinFace.Heads NonEmpty.:| [CoinFace.Tails])
+          Spec.assertEqWith s "tails round trips" (Replay.decode p (Replay.encode p CoinFace.Tails)) (Just CoinFace.Tails)
+          -- Discriminating: a decode that ignored the response and handed back
+          -- the first candidate would pass the tails leg by accident.
+          Spec.assertEqWith s "heads round trips" (Replay.decode p (Replay.encode p CoinFace.Heads)) (Just CoinFace.Heads)
+        Spec.it s "a kept coin does not decode as a flip or a call" $ do
+          let p = Prompt.ChooseCoinResult decider S.alice (CoinFace.Heads NonEmpty.:| [CoinFace.Tails])
+          Spec.assertEqWith s "flip for keep" (Replay.decode p (Response.FlippedCoin CoinFace.Tails)) Nothing
+          Spec.assertEqWith s "keep for flip" (Replay.decode Prompt.FlipCoin (Response.ChoseCoinResult CoinFace.Tails)) Nothing
+        Spec.it s "a short kept-coin transcript keeps the first coin flipped" $
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseCoinResult decider S.alice (CoinFace.Tails NonEmpty.:| [CoinFace.Heads])))
+            CoinFace.Tails
         -- CR 507.1 / 703.4h: the defending-player choice round-trips like every
         -- other prompt. NonEmpty because the action only runs when there is at
         -- least one candidate.
