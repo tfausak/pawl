@@ -6433,6 +6433,7 @@ createTokens controller card copy n tapped entering attached = do
           -- library -- so it cannot reach a token, while one that names no zone
           -- carries the full set and does. Worms of the Earth's "lands can't enter
           -- the battlefield" is the pool's second kind.
+
           -- CR 303.4i, and CR 303.4g's last sentence with it: what the effect named
           -- as this token's host, judged as rule 701.3a judges every attachment
           -- (Attach.attachmentFor), which is also what re-tags the recipient into the
@@ -6447,8 +6448,8 @@ createTokens controller card copy n tapped entering attached = do
           -- ending in the same words rule 111.5 does.
           --
           -- THE AURA TEST is the rule's own scope and not a card-identity read: CR
-          -- 303.4i refuses the token, while CR 301.5e one rule up says an Equipment in
-          -- the same position "is created and enters the battlefield unattached", which
+          -- 303.4i refuses the token, while CR 301.5e says an Equipment in the same
+          -- position "is created and enters the battlefield unattached", which
           -- is the fallthrough below. No printing in the pool names an Equipment
           -- token's attachment -- living weapon and For Mirrodin! create the token and
           -- then attach the EQUIPMENT to it (Pawl.Engine.Keyword.attachToOwnToken) --
