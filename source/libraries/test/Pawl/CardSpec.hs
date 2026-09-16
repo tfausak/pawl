@@ -1310,6 +1310,25 @@ revealsAsCost =
         _ -> False
    in any isReveal . Cost.Type.components
 
+-- Does this cost sacrifice a permanent the payer CHOOSES? revealsAsCost's shape
+-- exactly: CR 601.2h's payment binds Binding.sacrificedPermanent
+-- (Pawl.Engine.Cost.payComponent's Sacrifice arm), and both carriers fold it on --
+-- Pawl.Engine.Activate for Jarad, Golgari Lich Lord's activation cost and
+-- Pawl.Engine.Cast for Fling's additional cost -- so an object whose cost has such
+-- a component may read the slot and one whose cost has not may not. Asked of both
+-- halves of the lint, here for a spell and in AbilitySlotLintSpec for an
+-- activation.
+--
+-- CostComponent.SacrificeThis is deliberately not counted: it sacrifices the
+-- source, which CR 113.7's `triggerSource` already names and
+-- Projection.viewWithLastKnown already answers off its last known information.
+sacrificesAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+sacrificesAsCost =
+  let isSacrifice component = case component of
+        CostComponent.Sacrifice {} -> True
+        _ -> False
+   in any isSacrifice . Cost.Type.components
+
 -- The costs a SPELL can be announced against: the printed one -- mana cost plus
 -- CR 118.8's additional costs -- and each alternative cost the card offers, which
 -- is the candidate list Pawl.Engine.Cost.costsFor builds. Any one of them
@@ -5515,6 +5534,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         --     "the revealed card's mana value" is an ordinary slot read.
         --     activatedAbilityOffends offers no such exemption: no printing puts
         --     this component on an activation cost.
+        --   * Binding.sacrificedPermanent, and only when the cost sacrifices a
+        --     permanent the payer chooses, per `sacrificesAsCost`. CR 601.2h's
+        --     payment binds it and Pawl.Engine.Cast folds it onto the spell, so
+        --     Fling's "the sacrificed creature's power" is an ordinary slot read --
+        --     answered off CR 608.2h's last known information by
+        --     Pawl.Engine.Resolve.Slots.effectViewOf, the permanent being in a
+        --     graveyard by then. activatedAbilityOffends grants the same exemption
+        --     against the same `sacrificesAsCost` for Jarad, Golgari Lich Lord.
         cardOffends card =
           let announcedX =
                 if any declaresVariable (spellCostsOf card)
@@ -5524,7 +5551,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 if any revealsAsCost (spellCostsOf card)
                   then Set.singleton Binding.revealedCard
                   else Set.empty
-           in modalSlotsOffend (Set.unions [Set.singleton Binding.you, announcedX, revealed]) (Face.spell card)
+              sacrificed =
+                if any sacrificesAsCost (spellCostsOf card)
+                  then Set.singleton Binding.sacrificedPermanent
+                  else Set.empty
+           in modalSlotsOffend (Set.unions [Set.singleton Binding.you, announcedX, revealed, sacrificed]) (Face.spell card)
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

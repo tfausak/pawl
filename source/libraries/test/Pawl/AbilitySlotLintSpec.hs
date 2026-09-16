@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, triggerConditionSlots)
+import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, sacrificesAsCost, triggerConditionSlots)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -313,21 +313,6 @@ activatedAbilityOffends ability =
           else Set.empty
    in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal]) (ActivatedAbility.modal ability)
 
--- Does this cost sacrifice a permanent the payer CHOOSES? Binding.variableX's
--- shape exactly: CR 601.2h's payment binds the slot (Cost.payComponent's
--- Sacrifice arm, folded on by Activate), so an ability whose cost has such a
--- component may read it and one whose cost has not may not.
---
--- CostComponent.SacrificeThis is deliberately not counted: it sacrifices the
--- source, which CR 113.7's `triggerSource` already names and
--- Projection.viewWithLastKnown already answers off its last known information.
-sacrificesAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
-sacrificesAsCost =
-  let isSacrifice component = case component of
-        CostComponent.Sacrifice {} -> True
-        _ -> False
-   in any isSacrifice . Cost.Type.components
-
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
 -- (Cost.payComponent's TapPermanents arm, folded on by Activate), so Unerring
@@ -342,7 +327,7 @@ sacrificesAsCost =
 -- Not offered on the CAST side (cardOffends below), though Cast.castSpell now
 -- folds a payment's slots onto the spell: no printing in `data/cards/` taps as an
 -- additional cost to cast, so the exemption would fence nothing. Living Destiny's
--- reveal is the one cast-side payment slot that lint admits.
+-- reveal and Fling's sacrifice are the cast-side payment slots that lint admits.
 tapsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 tapsAsCost =
   let isTap component = case component of
