@@ -2151,8 +2151,9 @@ rimewoodHeraldSpec s registry = Spec.describe s "RimewoodHerald" $ do
 -- lands while her Synthetic Rimewood Herald watches. `greenLand` pays the {G} and
 -- `genericLand` the {1}; those two names decide NOTHING else about the board.
 --
--- The cast trigger is placed and resolved first and the spell second, which is
--- the order CR 603.3b puts them in.
+-- The cast trigger goes on the stack above the spell that fired it (CR 603.3)
+-- and so resolves first (CR 608.1), which is the order the two resolveTops run
+-- in.
 --
 -- Returns the Herald and the board its clause did or did not fire on.
 heraldBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> String -> m (ObjectId.ObjectId, GameState.GameState)

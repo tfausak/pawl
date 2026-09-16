@@ -129,7 +129,7 @@ data Quantity
     -- Not the spent mana's COLOUR; TagWasSpentOfOwnColor below is that question.
     TagWasSpent ProductionTag.ProductionTag
   | -- | CR 107.4h \/ 202.2: 1 if mana carrying that production tag AND of one of
-    -- the colors the object this quantity is evaluated against is was spent to
+    -- the colors of the object this quantity is evaluated against was spent to
     -- pay for it, else 0 -- Boreal Outrider's "if {S} of any of that spell's
     -- colors was spent to cast it".
     --
