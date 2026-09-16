@@ -2423,6 +2423,29 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any (anyFace (any creates . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a token that's blocking"
     Spec.assertBool s (any (anyFace (any moves . cardResolutionEffects) . Printing.card) ps) "the pool has a card moving a card onto the battlefield blocking"
     Spec.assertEqWith s "only the battlefield can be entered blocking (CR 509.4)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 303.4i's rider names what the entering permanent arrives attached to, and
+  -- Pawl.Engine.Resolve reads it on the CREATE alone: the Create arm hands the
+  -- host it names to Event.createTokens, while changeZoneEntering seeds its own
+  -- funnel from the effect's destination (CR 303.4a's target for a resolving Aura
+  -- spell, putFound's fixed host for a search) and never looks at this field. So a
+  -- MoveToZone or a CreateCopy naming one would say something nothing performs.
+  --
+  -- The CreateCopy half is the "no CreateCopy carries an entry rider but ..." lint
+  -- below, which fences every field this one does not.
+  Spec.it s "no effect names an attachment but a Create" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> Maybe.isJust (EntryRiders.attachedTo riders)
+          _ -> False
+        creates effect = case effect of
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> Maybe.isJust (EntryRiders.attachedTo riders)
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no attachment named in the pool at all
+    -- this would pass whatever a card said. Preston Garvey, Minuteman is the card
+    -- that names one.
+    Spec.assertBool s (any (anyFace (any creates . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a token attached to something"
+    Spec.assertEqWith s "only a Create names what a permanent enters attached to (CR 303.4i)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling lint for the OTHER face-down rider, one field over and pointed
   -- at the opposite zone: CR 708.3 is a rule about entering the BATTLEFIELD, so
   -- on any other destination it is inert card data. Inert on a Create outright,
@@ -2459,7 +2482,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- and `faceDown` are inert for the reason the two lints above give: a token is
   -- not a card (CR 111.1), and CR 707.8a decides a copy token's face by copy rules.
   -- `exiledFaceDown` is inert because a token is created onto the battlefield and
-  -- CR 111.7 would end one anywhere else.
+  -- CR 111.7 would end one anywhere else. `attachedTo` is unwired rather than
+  -- inert -- CR 303.4i speaks about any effect putting an Aura onto the
+  -- battlefield, and a copy token could be one -- and no printing writes it on a
+  -- CreateCopy, which is what the lint above says of the MoveToZone road too.
   Spec.it s "no CreateCopy carries an entry rider but counters, tapped, attacking and blocking" $ do
     ps <- S.allPrintings s
     let bare riders = riders == EntryRiders.defaultValue {EntryRiders.counters = EntryRiders.counters riders, EntryRiders.tapped = EntryRiders.tapped riders, EntryRiders.attacking = EntryRiders.attacking riders, EntryRiders.blocking = EntryRiders.blocking riders}

@@ -966,6 +966,7 @@ ninjutsu cost =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               -- Nothing looks back at the move, so it binds no slot.
@@ -1236,6 +1237,7 @@ unearth cost =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               MoveToZone.slot = Just unearthSlot,
@@ -1332,6 +1334,7 @@ unearthExile =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               MoveToZone.slot = Nothing,
@@ -1401,6 +1404,7 @@ graveyardTokenCopy exceptions cost =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               -- Nothing looks back at the token, so it binds no slot.
@@ -1524,6 +1528,7 @@ encore cost =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               CreateCopy.slot = Just encoreTokenSlot,
@@ -4858,6 +4863,7 @@ ingest =
                   EntryRiders.counters = Map.empty,
                   EntryRiders.underOwner = False,
                   EntryRiders.exiledFaceDown = False,
+                  EntryRiders.attachedTo = Nothing,
                   EntryRiders.faceDown = Nothing
                 }
               Nothing
@@ -4917,6 +4923,7 @@ myriadExile =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               MoveToZone.slot = Nothing,
@@ -4979,6 +4986,7 @@ myriad =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               CreateCopy.slot = Just myriadTokenSlot,
@@ -5065,6 +5073,7 @@ mobilize n =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               Create.slot = Just mobilizeTokenSlot,
@@ -5804,6 +5813,7 @@ dashReturn =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               MoveToZone.slot = Nothing,
@@ -5873,6 +5883,7 @@ warpExile =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               MoveToZone.slot = Just warpedSlot,
@@ -6043,6 +6054,7 @@ returns kind =
                   EntryRiders.counters = Map.singleton kind (Quantity.Literal 1),
                   EntryRiders.underOwner = True,
                   EntryRiders.exiledFaceDown = False,
+                  EntryRiders.attachedTo = Nothing,
                   EntryRiders.faceDown = Nothing
                 }
               Nothing
@@ -6125,6 +6137,7 @@ paidTokenCopies keyword quantity exceptions =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               CreateCopy.slot = Nothing,
@@ -6172,6 +6185,7 @@ afterlife n =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               Create.slot = Nothing,
@@ -6298,6 +6312,7 @@ fabricate n =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               Create.slot = Nothing,
@@ -6436,6 +6451,7 @@ attachToOwnToken token =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               -- The slot holds every token minted (Resolve.bindMinted), which
@@ -6571,6 +6587,7 @@ hideaway n =
             EntryRiders.counters = Map.empty,
             EntryRiders.underOwner = False,
             EntryRiders.exiledFaceDown = False,
+            EntryRiders.attachedTo = Nothing,
             EntryRiders.faceDown = Nothing
           }
       look =
@@ -6659,6 +6676,7 @@ soulshift n =
                   EntryRiders.counters = Map.empty,
                   EntryRiders.underOwner = False,
                   EntryRiders.exiledFaceDown = False,
+                  EntryRiders.attachedTo = Nothing,
                   EntryRiders.faceDown = Nothing
                 }
               Nothing
@@ -6979,6 +6997,7 @@ recover cost =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               MoveToZone.slot = Nothing,
@@ -7189,6 +7208,7 @@ cascade =
             EntryRiders.counters = Map.empty,
             EntryRiders.underOwner = False,
             EntryRiders.exiledFaceDown = False,
+            EntryRiders.attachedTo = Nothing,
             EntryRiders.faceDown = Nothing
           }
       match = Filter.And [Filter.Not (Filter.HasCardType CardType.Land), Filter.ManaValueLessThanSource]
@@ -7300,6 +7320,7 @@ ripple n =
             EntryRiders.counters = Map.empty,
             EntryRiders.underOwner = False,
             EntryRiders.exiledFaceDown = False,
+            EntryRiders.attachedTo = Nothing,
             EntryRiders.faceDown = Nothing
           }
       show_ =
@@ -7693,6 +7714,7 @@ madnessCast cost =
                     EntryRiders.counters = Map.empty,
                     EntryRiders.underOwner = False,
                     EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
                     EntryRiders.faceDown = Nothing
                   },
               MoveToZone.slot = Nothing,

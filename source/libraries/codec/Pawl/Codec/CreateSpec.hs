@@ -35,6 +35,7 @@ plain =
       EntryRiders.counters = Map.empty,
       EntryRiders.underOwner = False,
       EntryRiders.exiledFaceDown = False,
+      EntryRiders.attachedTo = Nothing,
       EntryRiders.faceDown = Nothing
     }
 

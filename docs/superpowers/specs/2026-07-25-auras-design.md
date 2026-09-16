@@ -570,7 +570,9 @@ Card-driven unless noted.
    Unreachable while resolution is the only door. *Landed since:* Replenish is a
    second door, so `Event.changeZoneAttaching` now asks CR 303.4f's host choice and
    answers `Nothing` for CR 303.4g's "remains in its current zone". CR 303.4g's
-   stack and token branches and CR 303.4i still have no producer (#1734).
+   token clause and CR 303.4i landed with Preston Garvey, Minuteman, whose Create
+   names the host its Aura token arrives attached to; CR 303.4g's stack branch
+   still has no producer (#1734).
 3. **CR 702.5c** — multiple `enchant` instances. `Card.enchant` is a `Maybe`, so
    the pool cannot express a second one.
 4. **CR 702.5d "enchant player"** — a *modelling* limit, not a missing producer.

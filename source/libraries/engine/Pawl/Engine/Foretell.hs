@@ -188,6 +188,7 @@ riders =
       EntryRiders.counters = Map.empty,
       EntryRiders.underOwner = False,
       EntryRiders.exiledFaceDown = True,
+      EntryRiders.attachedTo = Nothing,
       EntryRiders.faceDown = Nothing
     }
 
