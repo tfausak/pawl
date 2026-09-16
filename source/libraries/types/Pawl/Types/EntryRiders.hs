@@ -194,6 +194,26 @@ import qualified Pawl.Types.TapState as TapState
 -- Create arm does not read it and the same CardSpec lint holds that no Create in
 -- the pool sets it.
 --
+--
+-- `attachedTo` is CR 303.4i's and CR 301.5e's "an effect attempts to put an Aura
+-- onto the battlefield attached to" -- the object the EFFECT names as the
+-- entering permanent's host, where CR 303.4f would otherwise have the controller
+-- choose one. Preston Garvey, Minuteman's "create a green Aura enchantment token
+-- named Settlement attached to up to one target land you control" is the pool's
+-- producer, and its "up to one" is why the rule's undefined case is reachable at
+-- all: a seat that announces zero targets leaves the slot naming nothing.
+--
+-- A SLOT NAME, `blocking`'s shape and for its reason: every printing of this
+-- sentence names its host with the word "target", and CR 608.2b has already
+-- judged that slot by the time the effect is applied. So the effect has answered
+-- the question and the engine never asks -- which is the difference from CR
+-- 303.4f, whose whole content is that the effect did NOT name one.
+--
+-- Read by the CREATE alone (Pawl.Engine.Resolve's Create arm and
+-- Event.createTokens), which Pawl.EffectLintSpec fences: no MoveToZone in the
+-- pool names an attachment, and putFound carries CR 303.4a's fixed host down its
+-- own road instead.
+--
 -- CR 701.58a's cloak is one value of this rider: the 2/2 with ward {2} that
 -- FaceDownCharacteristics.disguisedValue is, listed under
 -- FaceDownReason.Disguised, which is the reason CR 701.58d makes a cloaked
@@ -206,6 +226,7 @@ data EntryRiders count = MkEntryRiders
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) count,
     underOwner :: Bool,
     exiledFaceDown :: Bool,
+    attachedTo :: Maybe SlotName.SlotName,
     faceDown :: Maybe FaceDownState.FaceDownState
   }
   deriving (Eq, Ord, Show)

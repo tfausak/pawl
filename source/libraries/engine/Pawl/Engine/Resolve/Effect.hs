@@ -5150,6 +5150,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         pure $ case named of
           [attacker] -> Just attacker
           _ -> Nothing
+    -- CR 303.4i's "attached to", read ONCE ahead of the minting loop for
+    -- mBlocked's reason and through the same reader. THREE-VALUED for
+    -- Event.createTokens, whose own note says why: Nothing where the effect named
+    -- no host at all, Just Nothing where it named a slot that names nothing --
+    -- rule 303.4i's undefined object, which Preston Garvey, Minuteman reaches at
+    -- zero targets -- and Just the recipient otherwise.
+    --
+    -- A HOST AND NOT SEVERAL: every printing of this sentence attaches to one
+    -- object, and a slot answering with more is the undefined case too rather than
+    -- a silent first-of-list.
+    mAttached <- case EntryRiders.attachedTo entry of
+      Nothing -> pure Nothing
+      Just slot -> do
+        named <- fromAmongMembers legal resolving chosen slot
+        pure . Just $ case named of
+          [host] -> Just (Recipient.ToObject host)
+          _ -> Nothing
     -- CR 508.4's rider, read ONCE ahead of the minting loop for mBlocked's
     -- reason.
     let mAttack = entryAttack legal resolving entry gs
@@ -5165,7 +5182,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- CR 122.6's counters ride along through that rule's own door, so a
               -- counter replacement reaches them, in the counts freezeRiders
               -- settled above.
-              made <- Event.createTokens creating (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen)
+              made <- Event.createTokens creating (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen) mAttached
               -- CR 508.4: a creature put onto the battlefield attacking has its
               -- defending player chosen in Pawl.Engine.Combat, and CR 508.3a's
               -- attack triggers see nothing. After the entry loops rather than
@@ -5326,7 +5343,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- Nothing for the subject's own copiable values: CR 707.9c's
                 -- retained original belongs to an object that already existed,
                 -- and a token minted by CR 707.1 did not.
-                made <- Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) Nothing exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen)
+                made <- Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) Nothing exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen) Nothing
                 -- CR 508.4, after the entry loop for Create's reason.
                 Monad.forM_ mAttack (\specified -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking specified) made)
                 -- CR 509.4, the blocking twin one rule over, in the same place

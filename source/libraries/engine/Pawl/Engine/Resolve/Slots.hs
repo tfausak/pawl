@@ -261,11 +261,16 @@ tokenBoxQuantities card =
     (\face -> foldMap (pure . Power.unwrap) (Face.power face) <> foldMap (pure . Toughness.unwrap) (Face.toughness face))
     (Card.Type.faces card)
 
--- The slots an entry rider READS: CR 509.4's blocking rider, CR 508.4's
+-- The slots an entry rider READS: CR 509.4's blocking rider, CR 303.4i's
+-- attachment, CR 508.4's
 -- specified attack (EntryAttack.SameAs) and CR 702.116a's narrowed one
 -- (EntryAttack.UnderPlayer); every other rider is a flag or a Quantity
 -- (riderQuantities above). Each read singly -- CR 509.4 names one attacking
--- creature, CR 702.49c one returned creature, CR 702.116a one player.
+-- creature, CR 303.4i one host, CR 702.49c one returned creature, CR 702.116a
+-- one player. The attachment at arity One even though its printing writes "up to
+-- one target" (Preston Garvey, Minuteman): the arity is how MANY the effect may
+-- read, and an empty answer is CR 303.4i's undefined object rather than a second
+-- reading.
 --
 -- ALL THREE opcodes reach it, and all three apply it: a Create hands its tokens
 -- to Pawl.Engine.Combat.putOntoBattlefieldBlocking from the minting loop (Flash
@@ -281,7 +286,7 @@ riderSlots riders =
         Just (EntryAttack.UnderPlayer slot) -> oneSlot slot
         Just EntryAttack.Chosen -> Map.empty
         Nothing -> Map.empty
-   in joinTwo attacked (maybe Map.empty oneSlot (EntryRiders.blocking riders))
+   in joinSlots [attacked, maybe Map.empty oneSlot (EntryRiders.blocking riders), maybe Map.empty oneSlot (EntryRiders.attachedTo riders)]
 
 -- The slots a PlayerRef reads. Six arms name one: EachPlayerExcept,
 -- EachOpponentExcept, InSlot, ControllerOfBound and Attacking at arity One,

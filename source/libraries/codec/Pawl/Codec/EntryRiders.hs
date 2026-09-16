@@ -47,6 +47,7 @@ codec = Fields.object $ do
   counters <- Fields.defaulted "counters" Map.empty (Common.keyedList counter) EntryRiders.counters
   underOwner <- Fields.defaulted "underOwner" False Common.boolean EntryRiders.underOwner
   exiledFaceDown <- Fields.defaulted "exiledFaceDown" False Common.boolean EntryRiders.exiledFaceDown
+  attachedTo <- Fields.defaulted "attachedTo" Nothing (Common.maybe SlotName.codec) EntryRiders.attachedTo
   faceDown <- Fields.defaulted "faceDown" Nothing (Common.maybe FaceDownState.codec) EntryRiders.faceDown
   pure
     EntryRiders.MkEntryRiders
@@ -57,13 +58,15 @@ codec = Fields.object $ do
         EntryRiders.counters = counters,
         EntryRiders.underOwner = underOwner,
         EntryRiders.exiledFaceDown = exiledFaceDown,
+        EntryRiders.attachedTo = attachedTo,
         EntryRiders.faceDown = faceDown
       }
 
 -- | The value every carrier elides: a card file carries riders only when the
 -- effect really does say otherwise (CR 110.5b for tapped, CR 508.4 for a
 -- creature put onto the battlefield attacking, CR 509.4 for one put onto the
--- battlefield blocking, CR 712.14 for the front face a
+-- battlefield blocking, CR 303.4i for the object it arrives attached to, CR
+-- 712.14 for the front face a
 -- double-faced card enters showing by default, CR 122.6 for the counters an
 -- object enters with, CR 110.2a for who it enters under, CR 406.3 for an exiled
 -- card being kept face up, CR 110.5b for a permanent entering face up).
@@ -77,5 +80,6 @@ defaultValue =
       EntryRiders.counters = Map.empty,
       EntryRiders.underOwner = False,
       EntryRiders.exiledFaceDown = False,
+      EntryRiders.attachedTo = Nothing,
       EntryRiders.faceDown = Nothing
     }
