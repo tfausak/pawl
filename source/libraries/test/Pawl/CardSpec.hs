@@ -632,6 +632,7 @@ playerRefPositions =
         ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect Nothing), [plantedPlayer "ll"]),
         ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
         ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
+        ("lose-game", Effect.LoseGame (plantedPlayer "lg"), [plantedPlayer "lg"]),
         ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
         ("decrease-speed", Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease (plantedPlayer "ds") one 0), [plantedPlayer "ds"]),
         ("create", Effect.Create (Create.MkCreate one () EntryRiders.defaultValue Nothing (plantedPlayer "cr")), [plantedPlayer "cr"]),
@@ -1112,6 +1113,7 @@ ownCounts effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   -- The floor beside it is a printed literal and holds no Count.
@@ -1485,6 +1487,7 @@ effectNestedEffects effect = case effect of
   Effect.GainLife {} -> []
   Effect.ExchangeLifeTotals {} -> []
   Effect.SetLifeTotal {} -> []
+  Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed {} -> []
   Effect.DecreaseSpeed {} -> []
@@ -1933,6 +1936,7 @@ effectReplacements effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.DecreaseSpeed _ -> []
@@ -2346,6 +2350,7 @@ effectMintedFaces effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.DecreaseSpeed _ -> []
@@ -5004,6 +5009,7 @@ effectFilters effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.DecreaseSpeed d -> frame Unframed (quantityFilters (SpeedDecrease.quantity d))

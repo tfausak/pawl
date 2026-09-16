@@ -621,6 +621,16 @@ outcomeAfterLeaving leaving gs = case Game.stillPlaying gs of
 -- and CR 104.2a's override describes the win itself, not a license to replace a
 -- result the game already has. Pawl.Engine.Sba's pass settles the same way.
 leaveGame :: Departure -> PlayerId -> Game ()
-leaveGame reason pid = do
-  depart reason pid
-  State.modify' (\departed -> departed {GameState.result = GameState.result departed <|> outcomeAfterLeaving [pid] departed})
+leaveGame reason pid = leaveGameTogether reason [pid]
+
+-- The same door for a SET of players leaving at once, which is what CR 104.3e's
+-- effect can name ("each player loses the game"). One departure at a time in the
+-- order given -- CR 800.4a's clauses are observable, so who goes first matters --
+-- and then ONE CR 104.2a settle over the whole set, which is what makes CR
+-- 104.4a's "if all the players remaining in a game lose simultaneously, the game
+-- is a draw" reachable: settling seat by seat would instead hand the
+-- second-to-last departure's survivor the win.
+leaveGameTogether :: Departure -> [PlayerId] -> Game ()
+leaveGameTogether reason pids = do
+  Monad.mapM_ (depart reason) pids
+  State.modify' (\departed -> departed {GameState.result = GameState.result departed <|> outcomeAfterLeaving pids departed})

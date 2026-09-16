@@ -31,6 +31,7 @@ import qualified Pawl.Engine.CounterRestriction as CounterRestriction
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Earthbend as Earthbend
@@ -142,6 +143,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
@@ -2347,6 +2349,10 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals {} -> False
   Effect.SetLifeTotal {} -> False
+  -- CR 608.2d: never impossible. Every player the reference can name is one
+  -- Game.stillPlaying answered, and a target who has already left the game is an
+  -- illegal target CR 608.2b drops before this is asked.
+  Effect.LoseGame {} -> False
   Effect.RedistributeLifeTotals {} -> False
   Effect.IncreaseSpeed {} -> False
   Effect.DecreaseSpeed {} -> False
@@ -4903,6 +4909,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- seat's unanswerable count says nothing about the others.
         Monad.forM_ (evaluateForRecipient viewOf context gs resolving source pid quantity) $ \total ->
           changeLifeByDelta pid (total - Player.life player)
+  -- CR 104.3e: the players the reference names lose the game. IMMEDIATELY, as the
+  -- effect applies, which is the whole distinction from CR 104.3b-d -- those are
+  -- state-based actions and wait for the next priority, this is not. CR 104.3
+  -- lists all of them together and CR 104.5 attaches ONE consequence to every
+  -- one, so the departure afterwards is the road Pawl.Engine.Sba's CR 704.5 pass
+  -- and CR 104.3a's concede already take rather than a second one.
+  --
+  -- ONE call over the whole set for CR 104.4a's sake: a seat-at-a-time loop would
+  -- settle the second-to-last departure as the last player's win instead of the
+  -- draw the rule states. APNAP (CR 608.2f) orders the departures, the Shuffle
+  -- arm's reason -- the order is a fact about the rules rather than about
+  -- PlayerId's Ord -- and apnapOrder is SEATING, so the survivors are filtered in
+  -- separately.
+  Effect.LoseGame ref -> do
+    gs <- State.get
+    let named = Set.fromList (playerRefPlayers legal controller gs ref)
+        alive = Set.fromList (Game.stillPlaying gs)
+    Departure.leaveGameTogether Departure.Type.Lost (filter (\pid -> Set.member pid named && Set.member pid alive) (Game.apnapOrder gs))
   -- CR 119.7 / 119.8: redistribute life totals, each new total being CR 119.5's
   -- gain or loss of the necessary amount. The roster is CR 102.1's players IN the
   -- game, not the keys of GameState.players, which keep a departed seat's row.

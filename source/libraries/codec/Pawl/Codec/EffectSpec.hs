@@ -1039,6 +1039,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Shuffle (PlayerRef.Relative PlayerRelation.You))
       " {\"type\":\"Shuffle\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+  -- CR 104.3e, a bare PlayerRef too. Door to Nothingness writes the targeted
+  -- spelling; this is the self one, which no card in the pool writes yet (#3792).
+  Spec.it s "LoseGame" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.LoseGame (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"LoseGame\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 608.2g, in the shape rule 310.12b's battles and rule 702's keywords mint
   -- in the engine (Pawl.Engine.Battle, Pawl.Engine.Keyword): both defaulted keys
   -- elided. Wild Evocation is the one card that writes them, and

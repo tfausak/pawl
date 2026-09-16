@@ -297,6 +297,10 @@ data ActionChoices = MkActionChoices
     choiceModes :: Maybe (Seq.Seq ModeIndex.ModeIndex),
     choiceX :: Maybe Natural,
     choiceCost :: Maybe ManaCost.ManaCost,
+    -- | CR 601.2h's permutation of the non-mana components' printed indices,
+    -- which Pawl.Engine.Cost raises only where the order is observable -- Door to
+    -- Nothingness's "{T}, Sacrifice this" is what needs it.
+    choiceCostOrder :: Maybe [Natural],
     choiceManaSources :: Seq.Seq (Maybe ObjectRef),
     choiceManaYields :: Seq.Seq Mana.Mana
   }
@@ -309,6 +313,7 @@ noChoices =
       choiceModes = Nothing,
       choiceX = Nothing,
       choiceCost = Nothing,
+      choiceCostOrder = Nothing,
       choiceManaSources = Seq.empty,
       choiceManaYields = Seq.empty
     }
@@ -1926,6 +1931,7 @@ subChoiceFor pid prompt = case prompt of
   Prompt.ChooseModes decider _ _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseX decider _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseCost decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.OrderCostComponents decider _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseManaSource decider _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseExtraManaSource decider _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseManaYield decider _ _ _ -> Decider.unwrap decider == pid
@@ -2124,6 +2130,15 @@ answerActionChoice key verb choices asked =
               pure cost
             _ -> unexpected
           Nothing -> unexpected
+        -- A PERMUTATION is the only legal answer, so the script's list is checked
+        -- against the printed indices rather than trusted: an order naming an
+        -- index twice would otherwise pay one component twice and skip another.
+        Prompt.OrderCostComponents _ _ _ components -> case choiceCostOrder choices of
+          Just order
+            | List.sort order == fmap fst (zip [0 ..] components) -> do
+                updateActionChoices (\current -> current {choiceCostOrder = Nothing})
+                pure order
+          _ -> unexpected
         Prompt.ChooseManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
         Prompt.ChooseExtraManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
         Prompt.ChooseManaYield _ _ _ candidates -> case Seq.viewl (choiceManaYields choices) of
