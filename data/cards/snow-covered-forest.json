@@ -1,0 +1,27 @@
+{
+  "faces": [
+    {
+      "name": "Snow-Covered Forest",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Forest"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Basic"
+          },
+          {
+            "type": "Snow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

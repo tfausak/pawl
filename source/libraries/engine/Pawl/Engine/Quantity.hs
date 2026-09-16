@@ -550,7 +550,17 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- A CLASSIFICATION of the mana and never an effect's identity: what the view
         -- reports is Pawl.Types.ProductionTag, the closed half of what a unit carries,
         -- and this arm asks it for one member.
-        Quantity.TagWasSpent tag -> fmap (\view -> if Set.member tag (Filter.manaSpentTags view) then 1 else 0) mView
+        Quantity.TagWasSpent tag -> fmap (\view -> if Map.member tag (Filter.manaSpentTagColors view) then 1 else 0) mView
+        -- CR 107.4h conjoined with CR 202.2 over ONE unit: Boreal Outrider's "if
+        -- {S} of any of that spell's colors was spent to cast it". The colours the
+        -- view reports beside the tag are the units that carried it, so a
+        -- non-empty intersection with the object's own colours is the rule read
+        -- straight; snow mana that is colourless (CR 106.1b) meets no colour and
+        -- answers 0, as does snow mana of a colour the object is not.
+        --
+        -- A CLASSIFICATION like the arm above, one axis wider: a production tag
+        -- and a colour, never an effect's identity.
+        Quantity.TagWasSpentOfOwnColor tag -> fmap (\view -> if Set.disjoint (Map.findWithDefault Set.empty tag (Filter.manaSpentTagColors view)) (Filter.colors view) then 0 else 1) mView
         -- CR 202.1a's amount, the arm above's read one field over and a COUNT
         -- rather than a 0/1: rule 702.191a's "the amount of mana spent to cast that
         -- spell". Zero for a spell cast for no mana, which is an ordinary answer.
@@ -1107,6 +1117,7 @@ objectSlots quantity = case quantity of
   Quantity.TimesPaid _ -> Set.empty
   Quantity.CastUsing _ -> Set.empty
   Quantity.TagWasSpent {} -> Set.empty
+  Quantity.TagWasSpentOfOwnColor {} -> Set.empty
   Quantity.ManaSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasAttacking -> Set.empty
@@ -1350,6 +1361,7 @@ readsX quantity = case quantity of
   Quantity.TimesPaid _ -> False
   Quantity.CastUsing _ -> False
   Quantity.TagWasSpent {} -> False
+  Quantity.TagWasSpentOfOwnColor {} -> False
   Quantity.ManaSpent -> False
   Quantity.WasToken -> False
   Quantity.WasAttacking -> False

@@ -611,8 +611,9 @@ data Object = MkObject
     -- activate this ability" are the readers.
     --
     -- THE UNITS and not the answer to one question, Pawl.Types.ManaUnit already
-    -- carrying everything a card can ask, which leaves "was it snow?" and "what
-    -- colour was it?" (Boreal Outrider, #2008) as reads rather than fields.
+    -- carrying everything a card can ask, which leaves "was it snow?" and "was it
+    -- snow of one of the spell's own colours?" as reads rather than fields --
+    -- Pawl.Engine.Filter.View.manaSpentTagColors is where the two are taken.
     --
     -- Written by Pawl.Engine.Cost.payMana, and only once the payment has
     -- settled: an unpaid cost is unwound to a state older than this write, even

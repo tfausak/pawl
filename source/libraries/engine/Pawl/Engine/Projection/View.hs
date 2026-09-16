@@ -262,8 +262,8 @@ viewOfCard face =
           Filter.castUsing = Nothing,
           -- CR 601.2h pays the cost of a SPELL, and this builder describes a
           -- printed face.
-          Filter.manaSpentTags = Set.empty,
-          -- CR 202.1a's mana cost is paid for a SPELL -- `manaSpentTags` above,
+          Filter.manaSpentTagColors = Map.empty,
+          -- CR 202.1a's mana cost is paid for a SPELL -- `manaSpentTagColors` above,
           -- same sentence.
           Filter.manaSpentAmount = 0,
           -- CR 602.1 / 605.1a off the PRINTED face: the card's printed abilities
@@ -779,11 +779,21 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 400.7d: read live off the object, with no last-known override.
       Filter.castUsing = Object.castUsing =<< Game.lookupObject oid gs,
       -- CR 400.7d / CR 107.4h: read live off the object like `castUsing`, and
-      -- flattened to the tags here because that is the whole of what the
-      -- vocabulary asks (see the field's own comment in Pawl.Engine.Filter). The
-      -- object may be a CR 602.2a ability on the stack as well as a spell or the
-      -- permanent one became; every one of them carries the field.
-      Filter.manaSpentTags = foldMap (foldMap ManaUnit.tags . Mana.unwrap . Object.manaSpent) (Game.lookupObject oid gs),
+      -- keyed by tag with CR 202.2's colours beside it, which is the whole of what
+      -- the vocabulary asks (see the field's own comment in Pawl.Engine.Filter).
+      -- The object may be a CR 602.2a ability on the stack as well as a spell or
+      -- the permanent one became; every one of them carries the field.
+      --
+      -- unionWith and not the Map monoid, which is left-biased: two units sharing
+      -- a tag must contribute BOTH their colours, or a spell paid with one snow
+      -- Forest and one snow Mountain answers for whichever came first.
+      Filter.manaSpentTagColors =
+        Map.unionsWith
+          Set.union
+          [ Map.fromSet (const (foldMap Set.singleton (Quantity.colorOfManaType (ManaUnit.manaType unit)))) (ManaUnit.tags unit)
+          | object <- Maybe.maybeToList (Game.lookupObject oid gs),
+            unit <- Mana.unwrap (Object.manaSpent object)
+          ],
       -- CR 202.1a off the same record one field over: how many units were spent,
       -- for rule 702.191a's increment.
       Filter.manaSpentAmount = maybe 0 (Natural.length . Mana.unwrap . Object.manaSpent) (Game.lookupObject oid gs),

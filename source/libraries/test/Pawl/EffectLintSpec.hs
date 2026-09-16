@@ -391,6 +391,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.TimesPaid {} -> False
   Quantity.Type.CastUsing {} -> False
   Quantity.Type.TagWasSpent {} -> False
+  Quantity.Type.TagWasSpentOfOwnColor {} -> False
   Quantity.Type.ManaSpent -> False
   Quantity.Type.WasToken -> False
   Quantity.Type.WasAttacking -> False

@@ -300,6 +300,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.TagWasSpent ProductionTag.Treasure)
       " {\"type\":\"TagWasSpent\",\"value\":{\"type\":\"Treasure\"}} "
+  -- CR 107.4h with CR 202.2, the arm above's tag on a different wire word.
+  Spec.it s "TagWasSpentOfOwnColor" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.TagWasSpentOfOwnColor ProductionTag.Snow)
+      " {\"type\":\"TagWasSpentOfOwnColor\",\"value\":{\"type\":\"Snow\"}} "
   -- CR 202.1a's amount, nothing on the wire for WasKicked's reason.
   Spec.it s "ManaSpent" $
     Common.assertCodec
