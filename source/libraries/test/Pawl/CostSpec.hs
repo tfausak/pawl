@@ -2080,7 +2080,7 @@ targetingPlayer who p = case p of
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, legal) -> Set.filter ((== Just who) . Recipient.playerOf) legal) asked
   _ -> S.identityAnswer p
 
--- CR 706.2's as-enters copy choice pinned to one named permanent, everything
+-- Clone's as-enters copy choice pinned to one named permanent, everything
 -- else S.identityAnswer -- Pawl.CopySpec's copyNamed, kept local here so the
 -- Clone leg below reads the engine's own offer rather than a search.
 cloneCopying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -2088,20 +2088,10 @@ cloneCopying wanted p = case p of
   Prompt.ChooseCopyTarget {} -> Just wanted
   _ -> S.identityAnswer p
 
--- Fling {1}{R} Instant: "As an additional cost to cast this spell, sacrifice a
--- creature. Fling deals damage equal to the sacrificed creature's power to any
--- target." (Oracle checked against Scryfall 2026-09-15.)
---
--- The gate card for a SPELL reading Binding.sacrificedPermanent off its own
--- additional cost. CR 601.2h pays that cost while the spell is still being cast,
--- and CR 701.21a puts the creature in a graveyard as a new object (CR 400.7), so
--- by the time the spell resolves CR 608.2h's last known information is the only
--- reading of its power there is -- Pawl.Engine.Resolve.Slots.effectViewOf is what
--- licenses it. Jarad, Golgari Lich Lord is the same read one carrier over, off an
--- ACTIVATION cost.
---
--- alice holds Fling over exactly {1}{R} in two Mountains on every board here, so
--- no leg's outcome can turn on affordability, and bob's life total is the read.
+-- alice holds Fling over exactly {1}{R} in two Mountains and controls the
+-- permanents `mine` names, on top of whatever board the caller hands in. The same
+-- mana on every leg, so no leg's outcome can turn on affordability, and bob --
+-- who controls nothing here -- is the target and the read.
 flingBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> GameState.GameState -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 flingBoard fling mountain mine base =
   let lands = S.landsFor mountain S.alice 2 base
@@ -2117,6 +2107,17 @@ flingBoard fling mountain mine base =
           }
       )
 
+-- Fling {1}{R} Instant: "As an additional cost to cast this spell, sacrifice a
+-- creature. Fling deals damage equal to the sacrificed creature's power to any
+-- target." (Oracle checked against Scryfall 2026-09-15.)
+--
+-- The gate card for a SPELL reading Binding.sacrificedPermanent off its own
+-- additional cost. CR 601.2h pays that cost while the spell is still being cast,
+-- and CR 701.21a puts the creature in a graveyard as a new object (CR 400.7), so
+-- by the time the spell resolves CR 608.2h's last known information is the only
+-- reading of its power there is -- Pawl.Engine.Resolve.Slots.effectViewOf is what
+-- licenses it. Jarad, Golgari Lich Lord is the same read one carrier over, off an
+-- ACTIVATION cost.
 flingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flingSpec s registry =
   Spec.describe s "Fling" $ do
@@ -2149,11 +2150,14 @@ flingSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       sentry <- S.printingOf s registry "Ogre Sentry"
       betrayal <- S.printingOf s registry "Night of Souls' Betrayal"
-      let (spell, _, gs) = flingBoard fling mountain [sentry, betrayal] (Setup.emptyGame S.bothPlayers)
+      let (spell, mine, gs) = flingBoard fling mountain [sentry, betrayal] (Setup.emptyGame S.bothPlayers)
           cast = S.runPure (targetingPlayer S.bob) gs (S.cast S.alice spell)
           resolved = S.runPure (targetingPlayer S.bob) cast Stack.resolveTop
       Spec.assertEqWith s "bob took 2 -- the Sentry's 3 printed power less the anthem's -1" (S.lifeOf S.bob resolved) (Just 18)
       Spec.assertEqWith s "alice took nothing" (S.lifeOf S.alice resolved) (Just 20)
+      -- After the behavioural assertion, never ahead of it: this is the guard that
+      -- the anthem was applying at all, which is what makes 18 differ from 17.
+      Spec.assertEqWith s "the Sentry is 2/2 under the Betrayal, not 3/3" (fmap (\oid -> S.powerToughnessOf oid gs) (Maybe.listToMaybe mine)) (Just (Just (2, 2)))
     -- The copy leg, which the anthem above cannot reach: a Clone's PRINTED power
     -- is nothing at all, so a read that went through the printed card rather than
     -- the copiable values CR 707.2 stamped would deal no damage. bob owns the
