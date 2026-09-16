@@ -577,6 +577,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- CR 509.1g's other half of the declaration, the arm above in every
         -- respect, reading Pawl.Types.LastKnown.blocking through the same view.
         Quantity.WasBlocking -> fmap (\view -> if Filter.blocking view then 1 else 0) mView
+        -- CR 509.1h's other side of that same declaration, and a LOOK-BACK rather
+        -- than the arm above's snapshot read: off the log for the object the
+        -- quantity is aimed at (Game.wasBlockedThisTurn), DamageDealtToThisTurn's
+        -- posture. Fyndhorn Druid is the reader.
+        --
+        -- Not Filter.blocked and not a Pawl.Types.LastKnown field, which is what
+        -- rule 509.1h's last sentence rules out: a creature stays blocked after
+        -- every blocker leaves combat, and a snapshot taken as it dies has lost the
+        -- blockers CR 400.7 already deleted along with it.
+        Quantity.WasBlockedThisTurn -> fmap (\oid -> if Game.wasBlockedThisTurn gs oid then 1 else 0) mOid
         -- CR 702.30a's window as a 0/1 -- echo's intervening "if", read of the
         -- ability's own source at both CR 603.4 and CR 608.2a.
         --
@@ -1122,6 +1132,7 @@ objectSlots quantity = case quantity of
   Quantity.WasToken -> Set.empty
   Quantity.WasAttacking -> Set.empty
   Quantity.WasBlocking -> Set.empty
+  Quantity.WasBlockedThisTurn -> Set.empty
   Quantity.ControlGainedSinceLastUpkeep _ -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
@@ -1366,6 +1377,7 @@ readsX quantity = case quantity of
   Quantity.WasToken -> False
   Quantity.WasAttacking -> False
   Quantity.WasBlocking -> False
+  Quantity.WasBlockedThisTurn -> False
   Quantity.ControlGainedSinceLastUpkeep _ -> False
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False

@@ -1735,6 +1735,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.WasToken -> quantity
   Quantity.Type.WasAttacking -> quantity
   Quantity.Type.WasBlocking -> quantity
+  Quantity.Type.WasBlockedThisTurn -> quantity
   Quantity.Type.ControlGainedSinceLastUpkeep _ -> quantity
   Quantity.Type.DamageDealtToThisTurn -> quantity
   Quantity.Type.PlayerCounters {} -> quantity

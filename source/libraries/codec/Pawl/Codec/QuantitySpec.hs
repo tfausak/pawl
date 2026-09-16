@@ -349,6 +349,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.DamageDealtToThisTurn
       " {\"type\":\"DamageDealtToThisTurn\"} "
+  -- CR 509.1h's status as a look-back, on the wire the same way again.
+  Spec.it s "WasBlockedThisTurn" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.WasBlockedThisTurn
+      " {\"type\":\"WasBlockedThisTurn\"} "
   -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
   -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
   Spec.it s "PlayerCounters, relative and from a slot" $ do

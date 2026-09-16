@@ -3055,6 +3055,7 @@ quantityReads q = case q of
   Quantity.Type.WasToken -> Set.empty
   Quantity.Type.WasAttacking -> Set.empty
   Quantity.Type.WasBlocking -> Set.empty
+  Quantity.Type.WasBlockedThisTurn -> Set.empty
   Quantity.Type.ControlGainedSinceLastUpkeep _ -> Set.empty
   Quantity.Type.DamageDealtToThisTurn -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
