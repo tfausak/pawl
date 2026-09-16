@@ -186,11 +186,15 @@ data GameEvent
     -- Natural is how many attacking creatures it was declared against, CR
     -- 509.3e's number.
     --
-    -- Not implemented: rule 509.3a's second sentence, an effect that causes a
-    -- creature to block, which no card in the pool states (#1146). A creature put
-    -- onto the battlefield blocking is not that shortfall but rule 509.3a's last
-    -- sentence: Combat.putOntoBattlefieldBlocking records BecameBlocking and
-    -- deliberately not this.
+    -- The declaration is the only producer, and rule 509.3a's other two sentences
+    -- are why rather than a shortfall. Its last: a creature put onto the
+    -- battlefield blocking never "blocked", so Combat.putOntoBattlefieldBlocking
+    -- records BecameBlocking and deliberately not this. Its second, an effect
+    -- that causes a creature to block: the guard there is "only if it wasn't a
+    -- blocking creature at that time", and the pool's one such effect
+    -- (Combat.switchBlockers, General Jarkeld) moves creatures that were all
+    -- blocking already. Pawl.CombatCostSpec's "CR 509.3a the Pride Guardian moved
+    -- onto the other attacker does not block again" is the proof.
     BlocksDeclared BlocksDeclared.BlocksDeclared
   | -- | CR 701.20a: a player revealed a card. The log is where it has to live, CR
     -- 701.20b moving nothing, and it carries the CARD's characteristics beside

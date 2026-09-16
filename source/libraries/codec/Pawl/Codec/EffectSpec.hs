@@ -1420,6 +1420,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.BecomesBlocked (SlotName.MkSlotName (Text.pack "target")))
       " {\"type\":\"BecomesBlocked\",\"value\":\"target\"} "
+  Spec.it s "SwitchBlockers" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.SwitchBlockers (SlotName.MkSlotName (Text.pack "attackers")))
+      " {\"type\":\"SwitchBlockers\",\"value\":\"attackers\"} "
   -- Both shapes in the pool: a pair, and a repeated phase.
   Spec.it s "AddPhases round-trips the pair and a repeated phase" $ do
     Common.assertJsonCodec

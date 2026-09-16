@@ -629,6 +629,8 @@ effectObjectRefs effect = case effect of
   Effect.TurnFaceUp {} -> []
   Effect.RemoveFromCombat ref -> [ref]
   Effect.BecomesBlocked {} -> []
+  -- The two attackers come out of a target SLOT, not an ObjectRef.
+  Effect.SwitchBlockers {} -> []
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
@@ -782,6 +784,7 @@ effectPlayerRefs effect = case effect of
   Effect.TurnFaceUp {} -> []
   Effect.RemoveFromCombat {} -> []
   Effect.BecomesBlocked {} -> []
+  Effect.SwitchBlockers {} -> []
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
@@ -939,6 +942,9 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.TurnFaceUp slot -> oneSlot slot
   Effect.RemoveFromCombat _ -> Map.empty
   Effect.BecomesBlocked slot -> oneSlot slot
+  -- SlotArity.Many, unlike the arm above: CR 601.2c gives this one instance of
+  -- the word "target" exactly two recipients and resolution reads both.
+  Effect.SwitchBlockers slot -> Map.singleton slot SlotArity.Many
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> joinTwo (joinSlots (fmap quantitySlots (riderQuantities riders))) (riderSlots riders)
   -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
   Effect.Draw (Draw.MkDraw _ quantity _) -> quantitySlots quantity
@@ -1516,6 +1522,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TurnFaceUp _ -> True
   Effect.RemoveFromCombat _ -> True
   Effect.BecomesBlocked _ -> True
+  Effect.SwitchBlockers _ -> True
   -- The entry rider nests a Quantity of its own, CR 122.6's count per kind; the
   -- ref's is effectObjectRefs' above.
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> all Quantity.slotsAreExhaustive (riderQuantities riders)
@@ -1734,6 +1741,7 @@ readsX =
         Effect.TurnFaceUp _ -> False
         Effect.RemoveFromCombat _ -> False
         Effect.BecomesBlocked _ -> False
+        Effect.SwitchBlockers _ -> False
         -- The entry rider is a nested position of its own, CR 122.6's count per
         -- kind, and no ObjectRef holds it.
         Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> any Quantity.readsX (riderQuantities riders)
@@ -1944,6 +1952,7 @@ boundSlots effect = case effect of
   Effect.TurnFaceUp _ -> Set.empty
   Effect.RemoveFromCombat _ -> Set.empty
   Effect.BecomesBlocked _ -> Set.empty
+  Effect.SwitchBlockers _ -> Set.empty
   -- CR 121.1's cards "drawn this way", as CR 400.7's incarnations in the hand
   -- they arrived in.
   Effect.Draw (Draw.MkDraw _ _ mSlot) -> foldMap Set.singleton mSlot

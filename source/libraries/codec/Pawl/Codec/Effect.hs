@@ -141,6 +141,7 @@ codec cardCodec abilityCodec =
           Arm.payload "TurnFaceUp" SlotName.codec Effect.TurnFaceUp (\x -> case x of Effect.TurnFaceUp y -> Just y; _ -> Nothing),
           Arm.payload "RemoveFromCombat" ObjectRef.codec Effect.RemoveFromCombat (\x -> case x of Effect.RemoveFromCombat y -> Just y; _ -> Nothing),
           Arm.payload "BecomesBlocked" SlotName.codec Effect.BecomesBlocked (\x -> case x of Effect.BecomesBlocked y -> Just y; _ -> Nothing),
+          Arm.payload "SwitchBlockers" SlotName.codec Effect.SwitchBlockers (\x -> case x of Effect.SwitchBlockers y -> Just y; _ -> Nothing),
           Arm.payload "Counter" Counter.codec Effect.Counter (\x -> case x of Effect.Counter y -> Just y; _ -> Nothing),
           Arm.payload "MoveToZone" MoveToZone.codec Effect.MoveToZone (\x -> case x of Effect.MoveToZone y -> Just y; _ -> Nothing),
           Arm.payload "Draw" Draw.codec Effect.Draw (\x -> case x of Effect.Draw y -> Just y; _ -> Nothing),
@@ -268,6 +269,7 @@ tagOf x = case x of
   Effect.TurnFaceUp {} -> "TurnFaceUp"
   Effect.RemoveFromCombat {} -> "RemoveFromCombat"
   Effect.BecomesBlocked {} -> "BecomesBlocked"
+  Effect.SwitchBlockers {} -> "SwitchBlockers"
   Effect.Counter {} -> "Counter"
   Effect.MoveToZone {} -> "MoveToZone"
   Effect.Draw {} -> "Draw"

@@ -28,6 +28,7 @@ import Pawl.PlaneswalkerCombatSpec (allTapped, allUntapped, announcesWay, atLife
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
@@ -2568,12 +2569,137 @@ declarationRetrySpec s registry = Spec.describe s "DeclarationRetry" $ do
         Spec.assertEqWith s "CR 509.1's preamble asked for a fresh declaration" asked 2
       _ -> Spec.assertFailure s "fixture should have one attacker"
 
+-- CR 509.3's THIRD road onto the blocking side, the one neither CR 509.1a's
+-- declaration nor CR 509.4's entry is: General Jarkeld (Ice Age) prints "{T}:
+-- Choose two target blocked attacking creatures. If each of those creatures
+-- could be blocked by all creatures that the other is blocked by, each creature
+-- that's blocking exactly one of those attacking creatures stops blocking it and
+-- is blocking the other attacking creature. Activate only during the declare
+-- blockers step."
+--
+-- All three cases run the priority loop through the declare blockers step, so the
+-- ability is activated the way a player would and its trigger goes onto the
+-- stack under CR 509.2a. They stop BEFORE the combat damage step, which is where
+-- Combat.blockers and the moved creature's power are still readable.
+switchBlockersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+switchBlockersSpec s registry = Spec.describe s "SwitchBlockers" $ do
+  -- CR 509.3b's "it will also trigger if an effect causes that creature to block
+  -- an attacking creature". Netcaster Spider ("Whenever Netcaster Spider blocks
+  -- a creature with flying, Netcaster Spider gets +2/+0 until end of turn") is
+  -- the bearer, and the FLYING half is what makes the two moments tell apart: it
+  -- is declared against the Goblin Piker, which fires nothing, and the switch
+  -- puts it on the Bird Maiden, which fires.
+  --
+  -- The Giant Spider is what makes CR 509.1b's hypothetical pass in both
+  -- directions -- reach, so the Maiden could be blocked by either spider -- and
+  -- it is the creature that comes back the other way.
+  Spec.it s "CR 509.3b whole card: General Jarkeld switches the spiders and the Netcaster's block trigger fires" $ do
+    maiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    netcaster <- S.printingOf s registry "Netcaster Spider"
+    giant <- S.printingOf s registry "Giant Spider"
+    jarkeld <- S.printingOf s registry "General Jarkeld"
+    case S.combatBoardOf [maiden, piker] [netcaster, giant, jarkeld] of
+      (gs0, [flier, ground], [net, giantId, jarkeldId]) -> do
+        let blocks = Map.fromList [(net, Set.singleton ground), (giantId, Set.singleton flier)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (switching blocks [flier, ground]) gs0
+            idle = S.runToStep (Phase.Combat CombatStep.CombatDamage) (declaring blocks) gs0
+        -- The gameplay assertion, and it is ahead of every proxy: the Netcaster
+        -- was declared against a creature WITHOUT flying, so the only thing that
+        -- can have fired its trigger is the block the ability made.
+        Spec.assertEqWith s "CR 509.3b: the effect-made block fired the Netcaster's trigger" (S.powerToughnessOf net used) (Just (4, 3))
+        Spec.assertEqWith s "and the Maiden is blocked by the Netcaster now" (Combat.blockersOf flier used) (Set.singleton net)
+        Spec.assertEqWith s "with the Giant Spider moved onto the Piker" (Combat.blockersOf ground used) (Set.singleton giantId)
+        Spec.assertEqWith s "and Jarkeld paid its {T}" (tapStateOf jarkeldId used) (Just TapState.Tapped)
+        -- The control differs in ONE thing: the ability is never activated.
+        Spec.assertEqWith s "control: without the switch the Netcaster is still blocking the Piker" (Combat.blockersOf ground idle) (Set.singleton net)
+        Spec.assertEqWith s "control: so its trigger never fired" (S.powerToughnessOf net idle) (Just (2, 3))
+      _ -> Spec.assertFailure s "fixture should have two attackers and three of bob's creatures"
+
+  -- CR 509.1b through General Jarkeld's own "if each of those creatures could be
+  -- blocked by all creatures that the other is blocked by". The pair differs from
+  -- the case above in EXACTLY one thing: the creature blocking the Piker is a
+  -- Cabal Evangel rather than a Netcaster Spider, so it could not block the Bird
+  -- Maiden, and the whole reassignment is off. The ability still resolves and
+  -- still costs its {T}.
+  Spec.it s "CR 509.1b a pair the hypothetical refuses moves nobody" $ do
+    maiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    giant <- S.printingOf s registry "Giant Spider"
+    jarkeld <- S.printingOf s registry "General Jarkeld"
+    case S.combatBoardOf [maiden, piker] [evangel, giant, jarkeld] of
+      (gs0, [flier, ground], [evangelId, giantId, jarkeldId]) -> do
+        let blocks = Map.fromList [(evangelId, Set.singleton ground), (giantId, Set.singleton flier)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (switching blocks [flier, ground]) gs0
+        Spec.assertEqWith s "CR 509.1b: the Evangel could not block the Maiden, so nothing moved" (Combat.blockersOf flier used) (Set.singleton giantId)
+        Spec.assertEqWith s "and the Evangel is still blocking the Piker" (Combat.blockersOf ground used) (Set.singleton evangelId)
+        Spec.assertEqWith s "though the ability resolved and paid its {T}" (tapStateOf jarkeldId used) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should have two attackers and three of bob's creatures"
+
+  -- CR 509.3a's guard on the same road -- "but only if it wasn't a blocking
+  -- creature at that time" -- against CR 509.3d's, which carries none. Every
+  -- creature this effect moves WAS a blocking creature, so Pride Guardian
+  -- ("Whenever Pride Guardian blocks, you gain 3 life") gains its 3 once, at the
+  -- declaration, while Benalish Cavalry's flanking (CR 702.25a, "whenever a
+  -- creature without flanking blocks this creature") fires on the switch that
+  -- puts the Guardian in front of it.
+  --
+  -- No evasion anywhere on this board, so CR 509.1b's hypothetical is vacuously
+  -- satisfied and the switch itself is never in doubt.
+  Spec.it s "CR 509.3a the Pride Guardian moved onto the other attacker does not block again" $ do
+    cavalry <- S.printingOf s registry "Benalish Cavalry"
+    giant <- S.printingOf s registry "Hill Giant"
+    guardian <- S.printingOf s registry "Pride Guardian"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    jarkeld <- S.printingOf s registry "General Jarkeld"
+    case S.combatBoardOf [cavalry, giant] [guardian, evangel, jarkeld] of
+      (gs0, [flanker, plain], [guardianId, evangelId, _]) -> do
+        let blocks = Map.fromList [(guardianId, Set.singleton plain), (evangelId, Set.singleton flanker)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (switching blocks [flanker, plain]) gs0
+            idle = S.runToStep (Phase.Combat CombatStep.CombatDamage) (declaring blocks) gs0
+        Spec.assertEqWith s "CR 509.3a: the Guardian blocked once, so bob gained 3 once" (S.lifeOf S.bob used) (Just 23)
+        Spec.assertEqWith s "CR 509.3d: but the Cavalry's flanking fired on the block the effect made" (S.powerToughnessOf guardianId used) (Just (-1, 2))
+        Spec.assertEqWith s "and the switch really happened" (Combat.blockersOf flanker used) (Set.singleton guardianId)
+        Spec.assertEqWith s "with the Evangel moved the other way" (Combat.blockersOf plain used) (Set.singleton evangelId)
+        Spec.assertEqWith s "control: the declaration alone gains the same 3" (S.lifeOf S.bob idle) (Just 23)
+        Spec.assertEqWith s "control: and never puts the Guardian in front of the Cavalry" (S.powerToughnessOf guardianId idle) (Just (0, 3))
+        Spec.assertEqWith s "control: leaving it where it was declared" (Combat.blockersOf plain idle) (Set.singleton guardianId)
+      _ -> Spec.assertFailure s "fixture should have two attackers and three of bob's creatures"
+
+-- Declare exactly `blocks` and otherwise answer as the aggressive interpreter
+-- does. Pinned rather than searched for: the two boards above both turn on WHICH
+-- attacker each blocker was declared against.
+declaring :: Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId) -> Prompt.Prompt r -> r
+declaring blocks p = case p of
+  Prompt.DeclareBlockers {} -> blocks
+  _ -> S.aggressiveAnswer p
+
+-- `declaring`, plus taking every activation offered and aiming it at the two
+-- attackers named. The targets are FILTERED out of the offered candidates rather
+-- than built, so a slot that stopped offering one of them leaves the ability
+-- unfillable instead of silently retargeted.
+switching :: Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId) -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+switching blocks victims p = case p of
+  Prompt.DeclareBlockers {} -> blocks
+  Prompt.ChooseTargets _ _ _ slots -> fmap (\(_, candidates) -> Set.filter (maybe False (`elem` victims) . Recipient.objectOf) candidates) slots
+  Prompt.ChooseAction _ _ options -> case filter isActivation options of
+    a : _ -> a
+    [] -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+isActivation :: A.Action -> Bool
+isActivation a = case a of
+  A.Activate _ _ -> True
+  _ -> False
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   landSubtypeStripSpec s registry
   becomesBlockedSpec s registry
   castingWindowSpec s registry
   putOntoBattlefieldBlockingSpec s registry
+  switchBlockersSpec s registry
   attackCostSpec s registry
   alluringSirenSpec s registry
   publicEnemySpec s registry

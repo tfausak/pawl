@@ -165,8 +165,10 @@ data TriggerCondition
   | -- | CR 509.3b: "whenever [a creature] blocks a creature" (Loyal Sentry) --
     -- SelfBlocks per attacker blocked, with the Filter over that attacker.
     --
-    -- Not implemented: rule 509.3b's other producer, an effect that causes the
-    -- bearer to block, records no event (#1146).
+    -- Rule 509.3b's other producer reaches it: an effect that causes the bearer
+    -- to block (Pawl.Engine.Combat.switchBlockers, General Jarkeld), which
+    -- records the same event with the flag clear. Pawl.CombatCostSpec's
+    -- SwitchBlockers group is the proof.
     SelfBlocksCreature (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e: "whenever [a creature] blocks two or more creatures"
     -- (Lairwatch Giant); the Natural is a floor, never an exact count.
@@ -176,7 +178,10 @@ data TriggerCondition
     -- on a quality instead.
     --
     -- Not implemented: rule 509.3e's "effects that add or remove blockers" reach
-    -- neither this nor SelfBlocksAtLeast (#1146).
+    -- neither this nor SelfBlocksAtLeast (#1146). The pool's one effect that
+    -- makes an already-blocking creature block (General Jarkeld) is not that
+    -- producer either: it moves a blocker between two attackers, leaving the
+    -- number of creatures each blocker blocks exactly where it was.
     SelfBlocksOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3c: "whenever [a creature] becomes blocked" (Sacred Prey) -- the
     -- attacking side of SelfBlocks, once per attacker that got a blocker.
@@ -194,8 +199,11 @@ data TriggerCondition
     -- pair, and Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking group is the
     -- proof.
     --
-    -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
-    -- creature to block, records no event (#1146).
+    -- Rule 509.3d's remaining producer reaches it too, and through the same arm:
+    -- an effect that causes a creature to block (General Jarkeld), which carries
+    -- that rule's own guard, "only if it wasn't already blocking that attacking
+    -- creature at that time". Pawl.CombatCostSpec's "CR 509.3d: but the Cavalry's
+    -- flanking fired on the block the effect made" is the proof.
     SelfBecomesBlockedBy (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e: "whenever [a creature] becomes blocked by one or more [F]
     -- creatures" (Serra Inquisitors' second half) -- SelfBlocksOneOrMore from
@@ -207,7 +215,9 @@ data TriggerCondition
     -- SelfBlocksOneOrMore group is the proof.
     --
     -- Not implemented: an effect that causes a creature already on the
-    -- battlefield to block records no event at all (#1146).
+    -- battlefield to block (General Jarkeld) records GameEvent.BecameBlocking
+    -- with putOntoBattlefield CLEAR, and this arm guards on that flag being set,
+    -- so it misses that road (#1146).
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e read by a bystander on the attacking side: "whenever a
     -- creature attacking one of your opponents becomes blocked by two or more
@@ -223,7 +233,9 @@ data TriggerCondition
     -- proof.
     --
     -- Not implemented: an effect that causes a creature already on the
-    -- battlefield to block, which records no event (#1146).
+    -- battlefield to block (General Jarkeld) records GameEvent.BecameBlocking
+    -- with putOntoBattlefield CLEAR, and this arm guards on that flag being set,
+    -- so it misses that road (#1146).
     CreatureBecomesBlockedByAtLeast CreatureBecomesBlockedByAtLeast.CreatureBecomesBlockedByAtLeast
   | -- | CR 509.1h: "whenever this creature attacks and isn't blocked" -- CR
     -- 702.68a's frenzy, with the status fixed at the declaration.
@@ -554,8 +566,8 @@ data TriggerCondition
     -- a creature", the Filter over the ATTACKER and the blocker bound under
     -- Pawl.Engine.Binding.blockingCreature (CR 701.54c's three-temptation tier).
     --
-    -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
-    -- creature to block, records no event (#1146).
+    -- Rule 509.3d's remaining producer, an effect that causes a creature to
+    -- block (General Jarkeld), reaches it through the same arm as the other two.
     PermanentBecomesBlockedBy (Filter.Filter Keyword.Keyword)
   | -- | CR 701.68d: "whenever a player blights"
     -- (data\/cards\/synthetic-blight-chronicler.json), against

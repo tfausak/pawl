@@ -422,6 +422,23 @@ data Effect card ability
     -- becomes unblocked (Scryfall `oracle:"becomes unblocked"`, 2026-08-14, no
     -- hit).
     BecomesBlocked SlotName.SlotName
+  | -- | CR 509.3b's third road onto the battlefield's blocking side: an effect
+    -- makes creatures ALREADY in combat block the other of two attacking
+    -- creatures (General Jarkeld). The slot holds both attackers, one instance
+    -- of the word "target" taking exactly two (CR 601.2c), as
+    -- Pawl.Types.ExchangeSides.BetweenTargets does.
+    --
+    -- Neither a declaration (CR 509.1a) nor an entry (CR 509.4), which is the
+    -- distinction Pawl.Types.BecameBlocking's putOntoBattlefield draws: this road
+    -- records that event with the flag CLEAR, so CR 509.3b and CR 509.3d both
+    -- fire off it.
+    --
+    -- CR 509.1b's hypothetical legality test rides inside
+    -- Pawl.Engine.Combat.switchBlockers rather than being a Condition here: the
+    -- printed "if each of those creatures could be blocked by all creatures that
+    -- the other is blocked by" asks a question about the reassignment this
+    -- opcode is, so no clause ahead of it can be handed the pairs to ask about.
+    SwitchBlockers SlotName.SlotName
   | -- | CR 500.8: add phases to a turn, directly after the specified phase, in
     -- written order (Aggravated Assault). Targetless.
     AddPhases [ExtraPhase.ExtraPhase]
