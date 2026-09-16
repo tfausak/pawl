@@ -26,6 +26,9 @@
                   {
                     "type": "FromOutsideTheGame",
                     "value": {
+                      "destination": {
+                        "type": "Hand"
+                      },
                       "filter": {
                         "type": "HasCardType",
                         "value": {

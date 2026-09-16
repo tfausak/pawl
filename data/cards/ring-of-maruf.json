@@ -37,6 +37,9 @@
                               "rewrite": {
                                 "type": "FromOutsideTheGame",
                                 "value": {
+                                  "destination": {
+                                    "type": "Hand"
+                                  },
                                   "filter": {
                                     "type": "And",
                                     "value": []

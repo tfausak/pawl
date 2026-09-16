@@ -97,6 +97,7 @@ import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
@@ -1524,7 +1525,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             (ModeSelection.ChooseExactly 1)
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.combinedFace piker
-        wished = base {Face.spell = spellOf [Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame buried True)]}
+        wished = base {Face.spell = spellOf [Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame OutsideDestination.Hand buried True)]}
     Spec.assertEqWith s "a planted atom in a wish's filter is an offence" (isBoundCounts wished) (1, 0)
     Spec.assertBool s (isBoundOffends wished) "and the lint says so"
     -- And the pair that differs in exactly one thing: the same face carrying the
