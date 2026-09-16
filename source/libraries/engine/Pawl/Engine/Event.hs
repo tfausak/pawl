@@ -4189,7 +4189,7 @@ resolvePlayerCounters cause pid kind n = do
 -- -- CR 614.6's "it never happens" -- which a caller cannot tell from a loss
 -- rewritten to nothing, and need not: either way no life moves.
 --
--- It does not WRITE the life total, unlike resolveUntap and the counter funnels
+-- It does not WRITE the life total, unlike proposeUntap and the counter funnels
 -- above: every caller already owns that write, and the damage one has to fold its
 -- answer back into a batch of simultaneous events (CR 510.2) that this module
 -- knows nothing about.
@@ -4243,7 +4243,7 @@ resolveLifeGain pid n =
 -- HERE rather than in Pawl.Engine.Coin, which holds the rest of rule 705, because
 -- the flip is a replaceable event: CR 614's loop lives in this module and this
 -- module imports Pawl.Engine.Coin, so the funnel has to sit on this side of that
--- edge -- resolveUntap, resolveLifeGain and drawCardReturning's position exactly.
+-- edge -- proposeUntap, resolveLifeGain and drawCardReturning's position exactly.
 --
 -- The FACE of each coin goes through Game.ask and never Game.choose: nobody
 -- decides how a coin lands. WHICH coin is kept goes through Game.choose, because

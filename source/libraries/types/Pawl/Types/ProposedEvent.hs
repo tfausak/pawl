@@ -113,7 +113,7 @@ data ProposedEvent
     -- action and Effect.TurnFaceUp both go through.
     WouldTurnFaceUp ObjectId.ObjectId (Maybe TurnUpProcedure.TurnUpProcedure)
   | -- | CR 701.26b / 122.1d: a permanent would become untapped. Raised by
-    -- Pawl.Engine.Event.resolveUntap, the one funnel CR 502.3's turn-based
+    -- Pawl.Engine.Event.proposeUntap, the one funnel CR 502.3's turn-based
     -- action, Effect.Untap and CR 107.6's untap symbol in a cost all go through.
     --
     -- The ObjectId and nothing else: rule 701.26b's action has no other content
