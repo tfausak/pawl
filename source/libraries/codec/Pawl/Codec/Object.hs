@@ -12,6 +12,7 @@ import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.ControlClock as ControlClock
+import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.ExileLooker as ExileLooker
@@ -105,6 +106,7 @@ codec = Fields.object $ do
   playableFromExile <- Fields.defaulted "playableFromExile" Nothing (Common.maybe ExilePlayPermission.codec) Object.playableFromExile
   plotted <- Fields.defaulted "plotted" Nothing (Common.maybe Common.natural) Object.plotted
   foretold <- Fields.defaulted "foretold" Nothing (Common.maybe Common.natural) Object.foretold
+  foretellCost <- Fields.defaulted "foretellCost" Nothing (Common.maybe (Cost.codec Keyword.codec)) Object.foretellCost
   warped <- Fields.defaulted "warped" Nothing (Common.maybe Common.natural) Object.warped
   preparedCopyOf <- Fields.defaulted "preparedCopyOf" Nothing (Common.maybe ObjectId.codec) Object.preparedCopyOf
   ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
@@ -158,6 +160,7 @@ codec = Fields.object $ do
         Object.playableFromExile = playableFromExile,
         Object.plotted = plotted,
         Object.foretold = foretold,
+        Object.foretellCost = foretellCost,
         Object.warped = warped,
         Object.preparedCopyOf = preparedCopyOf,
         Object.ringBearerFor = ringBearerFor,

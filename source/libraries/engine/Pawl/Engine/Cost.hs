@@ -652,12 +652,17 @@ candidateCostsGiven permitted pid name oid gs =
                 -- 118.9's alternative cost, wrapped by withAdditional as flashback's
                 -- is. INSTEAD of the printed cost, the plotted arm's reason.
                 --
-                -- Not implemented: CR 702.143d's card foretold with NO foretell cost,
-                -- unreachable from this module's own writer since CR 116.2h exiles
-                -- only a card with foretell (#1486).
+                -- "ANY foretell cost it has" is plural, and CR 702.143d is why: an
+                -- effect may give a foretold card a cost of its own (Ethereal
+                -- Valkyrie), which Object.foretellCost carries, beside whatever its
+                -- own foretell keyword prints. Both are offered, the granted one
+                -- first. A card foretold with NEITHER is offered nothing and is not
+                -- castable, which is that clause read at zero.
                 Zone.Exile
                   | Maybe.isJust (Object.foretold obj) ->
-                      fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywordSet face)))
+                      fmap
+                        (untagged . withAdditional)
+                        (Maybe.maybeToList (Object.foretellCost obj) <> Maybe.maybeToList (Keyword.foretellCost (Face.keywordSet face)))
                 -- CR 118.9: a CR 601.3 permission that says "without paying its
                 -- mana cost" (Extract Power) is an alternative cost of nothing,
                 -- and REPLACES the printed cost for the plotted arm's reason --

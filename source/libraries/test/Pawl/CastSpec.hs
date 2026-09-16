@@ -712,6 +712,7 @@ handInPlay printing board =
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.foretellCost = Nothing,
             Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,

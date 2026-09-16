@@ -1109,7 +1109,9 @@ permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
 --     card", meaning the one who took the special action -- who is the owner,
 --     because CR 400.1 makes a hand a per-player zone and the action exiles the
 --     card from the actor's own hand. The two words are the same player here and
---     the owner is the one that survives CR 400.7's new incarnation.
+--     the owner is the one that survives CR 400.7's new incarnation. Rule
+--     702.143d's route into the same stamp (Effect.MakeForetold) names the owner
+--     outright, so the conjunct reads for both.
 --   * the turn is a LATER one, "after the current turn has ended". A strict
 --     comparison on GameState.turnNumber, plotted's clause exactly.
 --

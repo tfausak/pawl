@@ -106,6 +106,7 @@ import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
@@ -688,6 +689,7 @@ effectObjectRefs effect = case effect of
   Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ ref _ _) -> [ref]
   Effect.GrantLookAtExiled grant -> [GrantLookAtExiled.cards grant]
   Effect.MakePlotted ref -> [ref]
+  Effect.MakeForetold x -> [MakeForetold.cards x]
   Effect.MakeWarped ref -> [ref]
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
   Effect.ForEach (ForEach.MkForEach ref _ _) -> [ref]
@@ -838,6 +840,7 @@ effectPlayerRefs effect = case effect of
   Effect.GrantPlayFromExile {} -> []
   Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
+  Effect.MakeForetold {} -> []
   Effect.MakeWarped {} -> []
   Effect.ForEach {} -> []
 
@@ -1067,6 +1070,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Goad _ -> Map.empty
   Effect.GrantLookAtExiled _ -> Map.empty
   Effect.MakePlotted _ -> Map.empty
+  Effect.MakeForetold _ -> Map.empty
   Effect.MakeWarped _ -> Map.empty
   Effect.DoesNotUntapNext _ -> Map.empty
   Effect.Transform _ -> Map.empty
@@ -1587,6 +1591,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Goad _ -> True
   Effect.GrantLookAtExiled _ -> True
   Effect.MakePlotted _ -> True
+  Effect.MakeForetold _ -> True
   Effect.MakeWarped _ -> True
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
@@ -1789,6 +1794,7 @@ readsX =
         Effect.Goad _ -> False
         Effect.GrantLookAtExiled _ -> False
         Effect.MakePlotted _ -> False
+        Effect.MakeForetold _ -> False
         Effect.MakeWarped _ -> False
         Effect.DoesNotUntapNext _ -> False
         Effect.Transform _ -> False
@@ -1996,6 +2002,7 @@ boundSlots effect = case effect of
   Effect.Goad _ -> Set.empty
   Effect.GrantLookAtExiled _ -> Set.empty
   Effect.MakePlotted _ -> Set.empty
+  Effect.MakeForetold _ -> Set.empty
   Effect.MakeWarped _ -> Set.empty
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty

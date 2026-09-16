@@ -84,6 +84,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.playableFromExile = Nothing,
           Object.plotted = Nothing,
           Object.foretold = Nothing,
+          Object.foretellCost = Nothing,
           Object.warped = Nothing,
           Object.preparedCopyOf = Nothing,
           Object.ringBearerFor = Nothing,
@@ -182,6 +183,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                 },
           Object.plotted = Just 0,
           Object.foretold = Just 15,
+          Object.foretellCost = Just Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 29]), Cost.components = []},
           Object.warped = Just 28,
           Object.preparedCopyOf = Just (ObjectId.MkObjectId 26),
           Object.ringBearerFor = Just (PlayerId.MkPlayerId 16),
@@ -238,7 +240,9 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"worldSince\":12"
           <> ",\"playableFromExile\":{\"player\":13,\"source\":14,\"expiry\":{\"type\":\"AtCleanup\"}"
           <> ",\"spending\":{\"type\":\"AnyType\"},\"withoutPayingManaCost\":true,\"origin\":{\"type\":\"Granted\"}}"
-          <> ",\"plotted\":0,\"foretold\":15,\"warped\":28,\"preparedCopyOf\":26"
+          <> ",\"plotted\":0,\"foretold\":15"
+          <> ",\"foretellCost\":{\"mana\":[{\"type\":\"Generic\",\"value\":29}]}"
+          <> ",\"warped\":28,\"preparedCopyOf\":26"
           <> ",\"ringBearerFor\":16,\"protector\":17"
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"

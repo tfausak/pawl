@@ -583,6 +583,8 @@ library codec
     Pawl.Codec.LoyaltyKind
     Pawl.Codec.LoyaltyKindSpec
     Pawl.Codec.LoyaltySpec
+    Pawl.Codec.MakeForetold
+    Pawl.Codec.MakeForetoldSpec
     Pawl.Codec.Mana
     Pawl.Codec.ManaAbilityResolved
     Pawl.Codec.ManaAbilityResolvedSpec
@@ -1815,6 +1817,7 @@ library types
     Pawl.Types.LookAt
     Pawl.Types.Loyalty
     Pawl.Types.LoyaltyKind
+    Pawl.Types.MakeForetold
     Pawl.Types.Mana
     Pawl.Types.ManaAbilityPerformer
     Pawl.Types.ManaAbilityResolved

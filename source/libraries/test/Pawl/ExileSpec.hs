@@ -308,8 +308,9 @@ spec s registry = Spec.describe s "Face-down exile" $ do
           Spec.assertEqWith s "and it is the Grist that Ignorant Bliss hid" (namesOf [downGrist] hidden) (Set.singleton (S.printingName grist))
         _ -> Spec.assertFailure s "the casting should hide exactly the Grist"
 
--- CR 702.143a's foretold card is the pool's one grant of CR 406.3's permission to
--- look at a card exiled face down, and CR 406.4 is what turns a permission to
+-- CR 702.143a's foretold card carries CR 406.3's permission to look at a card
+-- exiled face down off its stamp rather than off an opcode, and CR 406.4 is what
+-- turns a permission to
 -- LOOK into a permission to CHOOSE: "the player may choose a specific face-down
 -- card only if the player is allowed to look at that card".
 --
@@ -424,7 +425,7 @@ thaliaForetoldBoard s registry = do
             GameState.phase = Phase.PrecombatMain,
             GameState.priority = Just S.alice
           }
-      foretoldGs = S.runPure S.identityAnswer before (Foretell.foretell S.alice handRaven)
+      foretoldGs = S.runPure S.identityAnswer before (Foretell.foretell S.manaPerformer S.alice handRaven)
       later = foretoldGs {GameState.turnNumber = GameState.turnNumber foretoldGs + 1}
       ravenId = case faceDownExiled later of
         [only] -> only
@@ -459,7 +460,7 @@ foretoldBoard s registry = do
             GameState.phase = Phase.PrecombatMain,
             GameState.priority = Just S.alice
           }
-      board = S.runPure S.identityAnswer before (Foretell.foretell S.alice ravenId)
+      board = S.runPure S.identityAnswer before (Foretell.foretell S.manaPerformer S.alice ravenId)
       downId = case faceDownExiled board of
         [only] -> only
         _ -> S.noSource
