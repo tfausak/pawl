@@ -150,6 +150,7 @@ import Pawl.Types.Onset (Onset)
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideCard as OutsideCard
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
@@ -1103,12 +1104,13 @@ eligible predicate source pid gs =
    in fromPool <> fromOuter
 
 -- CR 400.11c: put a card this player owns from outside the game matching the
--- Filter into their hand, showing it first (CR 701.20a) where the payload's
--- reveal says the card prints one -- Burning Wish's sentence, and Death Wish's
--- without the reveal.
+-- Filter where the payload's destination says (CR 400.11b), showing it first
+-- (CR 701.20a) where the payload's reveal says the card prints one -- Burning
+-- Wish's sentence, Death Wish's without the reveal, and The Raven's Warning's
+-- naming the top of a library instead of the hand.
 --
 -- The card is MINTED, Pawl.Engine.Dungeon.enter's road: outside the game is not
--- a zone (CR 400.11), so no object stood for the card and the move into the hand
+-- a zone (CR 400.11), so no object stood for the card and its arrival
 -- is not a zone change. `mintCard` above is where that happens, and its haddock
 -- says why the insertion does not go through `changeZone`.
 --
@@ -1124,18 +1126,23 @@ eligible predicate source pid gs =
 -- printing this player does not own out there, or one the Filter does not admit,
 -- falls back to the first offered.
 --
--- A player with no eligible card reveals nothing and puts nothing into their
--- hand, which is CR 609.3's "if an effect attempts to do something impossible,
+-- A player with no eligible card reveals nothing and puts nothing anywhere,
+-- which is CR 609.3's "if an effect attempts to do something impossible,
 -- it does only as much as possible" -- and is why
 -- this returns unit rather than the id: nothing about Burning Wish's sentence
 -- reads the card back.
 --
--- Not implemented: where the reveal is printed it happens as the card ARRIVES in
--- the hand rather than before the move as the card prints it (#2450).
+-- Not implemented: a count other than one, every printing that names a larger
+-- one wanting something else the opcode cannot say -- Research's shuffle and
+-- Turtles Forever's search of a library and the pool together (gap #2449).
+--
+-- Not implemented: where the reveal is printed it happens as the card ARRIVES at
+-- its destination rather than before the move as the card prints it (#2450).
 bringInto :: FromOutsideTheGame.FromOutsideTheGame -> ObjectId -> PlayerId -> Game ()
 bringInto payload source pid = do
   gs0 <- State.get
   let predicate = FromOutsideTheGame.filter payload
+      arrival = FromOutsideTheGame.destination payload
       -- CR 701.20a is a keyword action of its own, so a card that does not print
       -- it moves the card and shows nobody anything.
       showIt oid = Monad.when (FromOutsideTheGame.reveal payload) (reveal RevealCause.Ordinary pid oid)
@@ -1152,25 +1159,37 @@ bringInto payload source pid = do
       -- the state from before the prompt would drop that.
       case chosen of
         OutsideCard.InPool printingId -> do
-          oid <- State.state (bringIn pid printingId)
+          oid <- State.state (bringIn arrival pid printingId)
           showIt oid
         OutsideCard.InAnotherGame outerId -> do
           gs1 <- State.get
-          case bringInFrom pid outerId gs1 of
+          case bringInFrom arrival pid outerId gs1 of
             (Nothing, _) -> pure ()
             (Just oid, gs2) -> do
               State.put gs2
               showIt oid
 
+-- CR 400.11b: the zone, and the end of it, an OutsideDestination names. The one
+-- place either road into the game reads that field, so a destination cannot mean
+-- one thing for a card in the pool and another for one in a game on hold.
+--
+-- No case on effect identity: the question is which destination a payload
+-- carries, not which opcode carried it.
+arrivalOf :: OutsideDestination.OutsideDestination -> (Zone.Zone, LibraryPosition.LibraryPosition)
+arrivalOf destination = case destination of
+  OutsideDestination.Hand -> (Zone.Hand, LibraryPosition.defaultValue)
+  OutsideDestination.LibraryTop -> (Zone.Library, LibraryPosition.Top)
+
 -- CR 400.11b: take one copy of this printing out of the player's pool and mint
--- the card into their hand. Split out from `bringInto` above because it is the half
--- every other road into the game will want -- CR 727.2's restart (#135) and CR
+-- the card where the destination says. Split out from `bringInto` above because
+-- it is the half every other road into the game will want -- CR 727.2's restart (#135) and CR
 -- 707.13's copy created outside the game (#888) -- and none of those reveals
 -- anything. The SPEND is the whole of what it adds over `mintCard`, which
 -- Alchemy's conjure reaches with nothing to spend.
-bringIn :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
-bringIn pid printingId gs =
-  let (oid, gs1) = mintCard pid Nothing printingId Zone.Hand LibraryPosition.defaultValue gs
+bringIn :: OutsideDestination.OutsideDestination -> PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
+bringIn destination pid printingId gs =
+  let (zone, position) = arrivalOf destination
+      (oid, gs1) = mintCard pid Nothing printingId zone position gs
       -- One copy, not the entry: CR 100.2a's four-card limit is applied to the
       -- combined deck and sideboard (CR 100.4a), so copies of a card are COUNTED
       -- and a player who set aside two can be brought the second one later.
@@ -1191,11 +1210,12 @@ bringIn pid printingId gs =
 -- permanent as it leaves the battlefield, and CR 400.7 makes what arrives here a
 -- new object; a wish that reaches a manifested card gets the card, not the 2/2
 -- `eligible` offered it as.
-bringInFrom :: PlayerId -> ObjectId -> GameState.GameState -> (Maybe ObjectId, GameState.GameState)
-bringInFrom pid outerId gs = case Map.lookup outerId (GameState.outsideObjects gs) of
+bringInFrom :: OutsideDestination.OutsideDestination -> PlayerId -> ObjectId -> GameState.GameState -> (Maybe ObjectId, GameState.GameState)
+bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outsideObjects gs) of
   Nothing -> (Nothing, gs)
   Just entry ->
-    let (oid, gs1) = mintCard pid Nothing (OutsideObject.printing entry) Zone.Hand LibraryPosition.defaultValue gs
+    let (zone, position) = arrivalOf destination
+        (oid, gs1) = mintCard pid Nothing (OutsideObject.printing entry) zone position gs
      in ( Just oid,
           gs1
             { GameState.outsideObjects = Map.delete outerId (GameState.outsideObjects gs1),

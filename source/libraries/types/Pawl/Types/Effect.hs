@@ -201,16 +201,15 @@ data Effect card ability
     -- as necessary", which pawl has nowhere to store (#1408).
     Reveal Reveal.Reveal
   | -- | CR 400.11c: the resolving controller puts a card they own from outside
-    -- the game into their hand, showing it first where the card prints CR
-    -- 701.20a's reveal (Burning Wish). The Filter is evaluated against the
-    -- printed face, no object existing out there to project.
+    -- the game where the payload's destination says, showing it first where the
+    -- card prints CR 701.20a's reveal (Burning Wish). The Filter is evaluated
+    -- against the printed face, no object existing out there to project.
     --
-    -- Not implemented: a destination other than the hand, and a count other than
-    -- one -- the two axes Pawl.Types.FromOutsideTheGame does not carry
-    -- (gap #2449).
+    -- Not implemented: a count other than one, the axis
+    -- Pawl.Types.FromOutsideTheGame still does not carry (gap #2449).
     --
     -- Not implemented: where the reveal is printed it happens as the card
-    -- arrives in the hand rather than before the move, GameEvent.Revealed being
+    -- arrives at its destination rather than before the move, GameEvent.Revealed being
     -- keyed on an ObjectId and outside the game having none to key it on
     -- (#2450).
     FromOutsideTheGame FromOutsideTheGame.FromOutsideTheGame

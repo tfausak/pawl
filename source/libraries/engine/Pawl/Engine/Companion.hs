@@ -42,6 +42,7 @@ import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
@@ -225,7 +226,10 @@ take perform pid = do
           -- ever rises -- and reversing puts it back with the rest.
           Payment.Unpaid -> pure ()
           Payment.Paid _ -> do
-            State.modify' (snd . Event.bringIn pid printingId)
+            -- CR 702.139a names the hand, which is the whole of what the
+            -- destination says here: this is the rulebook's own action, not a
+            -- card's sentence.
+            State.modify' (snd . Event.bringIn OutsideDestination.Hand pid printingId)
             State.modify' $ \gs ->
               gs
                 { GameState.players =

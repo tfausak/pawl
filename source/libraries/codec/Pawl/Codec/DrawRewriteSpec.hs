@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DrawRewrite" $ do
@@ -24,9 +25,10 @@ spec s = Spec.describe s "Pawl.Codec.DrawRewrite" $ do
       DrawRewrite.codec
       ( DrawRewrite.FromOutsideTheGame
           FromOutsideTheGame.MkFromOutsideTheGame
-            { FromOutsideTheGame.filter = Filter.And [],
+            { FromOutsideTheGame.destination = OutsideDestination.Hand,
+              FromOutsideTheGame.filter = Filter.And [],
               FromOutsideTheGame.reveal = False
             }
       )
-      " {\"type\":\"FromOutsideTheGame\",\"value\":{\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false}} "
+      " {\"type\":\"FromOutsideTheGame\",\"value\":{\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DrawRewrite.codec
