@@ -2846,8 +2846,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- count read, on the very same grouped event -- which is what makes rule
   -- 509.3e's "when blockers are declared" the moment this fires.
   --
-  -- Rule 509.3e's "effects that add or remove blockers" also cause it to trigger,
-  -- and no such effect is in the pool: the count is the declaration's (#1146).
+  -- Not implemented: rule 509.3e's "effects that add or remove blockers" also
+  -- cause it to trigger, and the count here is the declaration's (#1146). The
+  -- pool's one effect that makes an already-blocking creature block (General
+  -- Jarkeld) is not that producer: it moves a blocker between two attackers, so
+  -- the number of creatures each blocker blocks is unchanged.
   TriggerCondition.SelfBlocksAtLeast n -> case event of
     GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker count) -> blocker == bearer && count >= n
     GameEvent.BecameBlocking {} -> False
@@ -3332,7 +3335,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           -- once more per blocker.
           --
           -- Not implemented: an effect that causes a creature already on the
-          -- battlefield to block, which records no event at all (#1146).
+          -- battlefield to block (Combat.switchBlockers, General Jarkeld) records
+          -- this constructor with the flag CLEAR, which this conjunct refuses, so
+          -- rule 509.3e's added blocker does not reach this arm by that road
+          -- (#1146).
           GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = prior})
             | attacker == bearer -> admits blocker && not (any admits (Set.toList prior))
           GameEvent.BecameBlocking {} -> False

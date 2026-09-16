@@ -1345,6 +1345,92 @@ becomeBlocked oid gs =
                 -- and the answer here is none.
                 Just defending -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked oid defending 0)) blocked
 
+-- CR 509.3a's and CR 509.3b's THIRD road onto the blocking side, the one neither
+-- CR 509.1a's declaration nor CR 509.4's entry covers: an effect makes creatures
+-- already on the battlefield, and already in combat, block the other of two
+-- attacking creatures (General Jarkeld).
+--
+-- The GATE is CR 509.1b asked of the reassignment, in General Jarkeld's printed
+-- words -- "if each of those creatures could be blocked by all creatures that
+-- the other is blocked by" -- and it is all or nothing: the "if" governs the
+-- whole sentence, so a pair that fails it moves nobody. pairAllowed is the same
+-- predicate CR 509.1b's own check asks per pair, and per pair is what the
+-- printed words ask: "all creatures that the other is blocked by", one creature
+-- at a time. Rule 509.1b's SET-shaped restrictions (menace, CR 702.111b) are
+-- blockDeclarationAllowed's, and they constrain a declaration rather than this.
+--
+-- The DEPARTED attacker keeps its key, which is CR 509.1h: a creature remains
+-- blocked even when every creature blocking it is gone, and CR 510.1c then
+-- leaves it nothing to assign. Deleting the key would make it unblocked and
+-- send its damage at the player.
+--
+-- BecameBlocking with the flag CLEAR is the whole record on the blocking side.
+-- No GameEvent.BlocksDeclared beside it, and that is CR 509.3a's own guard
+-- rather than a shortfall: "only if it wasn't a blocking creature at that time",
+-- and every creature this moves was blocking one of the pair.
+-- Pawl.CombatCostSpec's "CR 509.3a the Pride Guardian moved onto the other
+-- attacker does not block again" is the proof.
+switchBlockers :: ObjectId -> ObjectId -> GameState -> GameState
+switchBlockers first second gs =
+  let c = GameState.combat gs
+      onFirst = blockersOf first gs
+      onSecond = blockersOf second gs
+      candidates = Set.toList (Set.union onFirst onSecond)
+      couldBlock blocker attacker = pairAllowed candidates [first, second] blocker attacker gs
+      allowed =
+        all (\b -> couldBlock b first) (Set.toList onSecond)
+          && all (\b -> couldBlock b second) (Set.toList onFirst)
+      -- "each creature that's blocking exactly one of those attacking
+      -- creatures": one blocking BOTH is blocking the other already and stays
+      -- where it is, which is also CR 509.3b's "only if it wasn't already
+      -- blocking that attacking creature at that time".
+      fromFirst = Set.difference onFirst onSecond
+      fromSecond = Set.difference onSecond onFirst
+      -- Written back rather than adjusted, so an attacker with no entry at all
+      -- gains one when it receives a blocker; and left alone where it neither
+      -- had a key nor takes one, since the KEY is CR 509.1h's status.
+      assign oid new m = if Set.null new && not (Map.member oid m) then m else Map.insert oid new m
+      moved =
+        assign
+          first
+          (Set.union (Set.intersection onFirst onSecond) fromSecond)
+          (assign second (Set.union (Set.intersection onFirst onSecond) fromFirst) (Combat.blockers c))
+      arrivals = fmap (\b -> (b, second)) (Set.toList fromFirst) <> fmap (\b -> (b, first)) (Set.toList fromSecond)
+   in if first == second
+        || not (Map.member first (Combat.attackers c))
+        || not (Map.member second (Combat.attackers c))
+        || not allowed
+        || null arrivals
+        then gs
+        else
+          let switched = gs {GameState.combat = c {Combat.blockers = moved}}
+              -- CR 608.2f: one action, so every arrival reads the board as it
+              -- stood BEFORE the switch -- the same reason declareBlockers reads
+              -- its flag and its set off the pre-declaration state.
+              record h (blocker, attacker) =
+                Event.recordEvent
+                  ( GameEvent.BecameBlocking
+                      ( BecameBlocking.MkBecameBlocking
+                          { BecameBlocking.blocker = blocker,
+                            BecameBlocking.attacker = attacker,
+                            BecameBlocking.putOntoBattlefield = False,
+                            BecameBlocking.attackerWasBlocked = isBlocked attacker gs,
+                            BecameBlocking.blockersBefore = blockersOf attacker gs
+                          }
+                      )
+                  )
+                  h
+              -- CR 509.3c's "only if the attacking creature was an unblocked
+              -- creature at that time". A REGRESSION FENCE rather than proved
+              -- behaviour: General Jarkeld targets blocked attacking creatures,
+              -- so on every board the pool can build both of the pair are
+              -- already blocked and this records nothing.
+              becameBlocked = filter (\oid -> not (isBlocked oid gs)) (ListUtils.nubOrd (fmap snd arrivals))
+              blocked h oid = case Defender.playerOfAttacker Projection.controllerWithLastKnown oid gs of
+                Nothing -> h
+                Just defending -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked oid defending (Natural.length (Map.findWithDefault Set.empty oid moved)))) h
+           in List.foldl' blocked (List.foldl' record switched arrivals) becameBlocked
+
 -- Every creature currently IN combat: the attackers, plus everything still
 -- blocking one of them. Not the keys of Combat.joinedUnder, which can outlive the
 -- record it was taken for.
