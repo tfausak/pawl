@@ -3233,9 +3233,11 @@ objectRefFilters ref = case ref of
   -- Swift Silence's "all other spells" states its own -- CR 109.2b's set is
   -- named by characteristics exactly as CR 109.2's battlefield sweep is.
   ObjectRef.EachSpell f -> unframed [f]
+  -- Kadena's Silencer's "all abilities your opponents control" states its own,
+  -- for the arm above's reason: what the set holds is said in characteristics.
+  ObjectRef.EachAbility f -> unframed [f]
   -- Glen Elendra's Answer's "all spells your opponents control and all
-  -- abilities your opponents control" states its own too, for the arm above's
-  -- reason: what the set holds is said in characteristics.
+  -- abilities your opponents control" states its own too, for the same reason.
   ObjectRef.EachOnStack f -> unframed [f]
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []

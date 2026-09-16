@@ -872,6 +872,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachCardInYourLibrary f -> ObjectRef.EachCardInYourLibrary (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachSpell f -> ObjectRef.EachSpell (Filter.rewrite pairs f)
+  ObjectRef.EachAbility f -> ObjectRef.EachAbility (Filter.rewrite pairs f)
   ObjectRef.EachOnStack f -> ObjectRef.EachOnStack (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
   ObjectRef.EachOpponent -> ref
