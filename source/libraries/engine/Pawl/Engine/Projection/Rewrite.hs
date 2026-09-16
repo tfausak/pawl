@@ -1126,6 +1126,9 @@ rewriteReplacementEffect pairs effect = case effect of
   -- CR 614.1a / 119.10: a LifeGainR is one CR 109.5 relation and one scaling.
   -- No printed word, so nothing to swap.
   ReplacementEffect.LifeGainR {} -> effect
+  -- CR 614.1a / 705.1: a CoinFlipR is one CR 109.5 relation and one nullary
+  -- rewrite. LifeGainR's answer, and for its reason.
+  ReplacementEffect.CoinFlipR {} -> effect
   -- A DrawR's pattern is one CR 109.5 relation, but the REWRITE can hold CR 400.11c's
   -- wish filter, which rewriteEffect's own Effect.FromOutsideTheGame arm swaps on
   -- the resolution road -- so it has to be swapped here too, or the same sentence

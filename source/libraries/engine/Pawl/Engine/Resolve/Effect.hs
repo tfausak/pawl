@@ -1434,6 +1434,7 @@ referentsOfReplacement re = case re of
   ReplacementEffect.LifeGainR _ -> []
   ReplacementEffect.DrawR _ -> []
   ReplacementEffect.DrawCountR _ -> []
+  ReplacementEffect.CoinFlipR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The recipients a damage REWRITE bakes, which is CR 614.9's redirect destination
@@ -3384,9 +3385,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- player WINS the flip, and then the call and the face are both ignored
   -- ("ignore the actual results of that flip and use the indicated results
   -- instead"). Its first clause -- the stated FACE -- is applied inside
-  -- Pawl.Engine.Coin, before the comparison here sees the face at all, which is
-  -- why a statement of heads alone still loses this flip against a call of
-  -- tails.
+  -- Pawl.Engine.Event.flipOneCoin, before the comparison here sees the face at
+  -- all, which is why a statement of heads alone still loses this flip against a
+  -- call of tails.
   Effect.FlipCoin flipCoin -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -3422,7 +3423,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             CoinReading.Wins -> do
               gsNow <- State.get
               called <- Game.choose (Prompt.CallCoin (Decide.deciderFor controller gsNow) controller)
-              (face, stated) <- Coin.flipOne statements
+              (face, stated) <- Event.flipOneCoin (Just controller) statements
               let matched = stated || face == called
               State.modify'
                 ( Event.recordEvent
@@ -3447,7 +3448,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- effect may state that a player WINS a flip that would ordinarily
             -- have no winner.
             CoinReading.Heads -> do
-              (face, stated) <- Coin.flipOne statements
+              (face, stated) <- Event.flipOneCoin (Just controller) statements
               State.modify'
                 ( Event.recordEvent
                     ( GameEvent.CoinFlipped

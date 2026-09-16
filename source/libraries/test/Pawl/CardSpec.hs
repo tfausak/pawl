@@ -1826,6 +1826,7 @@ replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
+  ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -1850,6 +1851,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
+  ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 111.1's token a replacement MINTS: TokenR's appended token (Queen Allenal
@@ -1872,6 +1874,7 @@ replacementMintedCards replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
+  ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -4374,6 +4377,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> outsideTheGameFramed [FromOutsideTheGame.filter payload]
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> []
   ReplacementEffect.DrawCountR {} -> []
+  ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 614.9's printed destination, the one Filter a damage REWRITE carries.

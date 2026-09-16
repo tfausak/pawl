@@ -1,5 +1,5 @@
--- CR 705: flipping a coin. The ONE road every flip in the engine takes, and the
--- only place CR 705.3's stated result is applied.
+-- CR 705: flipping a coin -- rule 705.3's stated results, and the only place they
+-- are applied.
 --
 -- Its own module rather than a function in Pawl.Engine.Resolve, because there are
 -- two writers and neither can hold the funnel: Resolve's Effect.FlipCoin arm is
@@ -8,6 +8,11 @@
 -- made as a permanent enters (Molten Sentry), which is an entry replacement and
 -- so cannot live in Resolve. One road is what keeps rule 705.3 from having to be
 -- written twice.
+--
+-- The FLIP itself is Pawl.Engine.Event.flipOneCoin, which reads the statements
+-- this module gathers and applies the face one of them states. It lives there
+-- rather than here because CR 614's loop does: a flip is a replaceable event
+-- (Krark's Thumb), and Pawl.Engine.Event imports this module.
 --
 -- Rule 705.2's COMPARISON is not here: matching the call against the face
 -- belongs to the effect that asked for a call. This module answers only the two
@@ -18,7 +23,6 @@ module Pawl.Engine.Coin where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.Maybe as Maybe
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
@@ -28,7 +32,6 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.StatedFlip as StatedFlip
 
 -- | The CR 705.3 statements in force for one INSTRUCTION's worth of flips, read
@@ -48,29 +51,6 @@ statementsFor :: Maybe PlayerId -> Game [StatedFlip.StatedFlip]
 statementsFor mFlipper = do
   gs <- State.get
   pure (foldMap (\pid -> statedFor pid gs) mFlipper)
-
--- | CR 705.1's flip of ONE coin, asked of the INTERPRETER: nobody decides how a
--- coin lands, so this goes through Game.ask and never Game.choose.
---
--- Answers what CR 705.3 lets an effect state about the flip: the face to use --
--- the actual one when no effect states another -- and whether the flipper is
--- stated to WIN it. The caller decides what a win means for its own kind of
--- flip; a flip that CR 705.2's first sentence leaves winnerless still takes the
--- stated win, since Edgar, King of Figaro's ruling says its ability "can cause
--- you to win coin flips that would ordinarily have no winner".
---
--- The coin is flipped even when a statement will discard the result: rule 705.3
--- says to ignore the actual result, not to skip the flip, and an interpreter
--- replaying a transcript must be asked the same questions either way.
---
--- Not implemented: CR 614's replacement over the flip, which Krark's Thumb wants
--- (#2253). The fence is HERE and not in a caller: this is the one road, so a
--- replacement is wired in once, and a fence sitting in Pawl.Engine.Resolve's
--- Effect.FlipCoin arm alone read as though the entry road were replaceable.
-flipOne :: [StatedFlip.StatedFlip] -> Game (CoinFace.CoinFace, Bool)
-flipOne stated = do
-  actual <- Game.ask Prompt.FlipCoin
-  pure (Maybe.fromMaybe actual (statedFace stated), any StatedFlip.wins stated)
 
 -- | The CR 705.3 statements that apply to the flips `pid` is about to make:
 -- every statement in force, less the ones Edgar's "the FIRST time you flip one

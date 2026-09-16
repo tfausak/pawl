@@ -1,6 +1,7 @@
 module Pawl.Codec.ReplacementEffect where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.CoinFlipR as CoinFlipR
 import qualified Pawl.Codec.CounterR as CounterR
 import qualified Pawl.Codec.DamageR as DamageR
 import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
@@ -46,6 +47,7 @@ codec cardCodec abilityCodec effectCodec =
       Arm.payload "LifeGainR" LifeGainR.codec ReplacementEffect.LifeGainR (\x -> case x of ReplacementEffect.LifeGainR y -> Just y; _ -> Nothing),
       Arm.payload "DrawR" DrawR.codec ReplacementEffect.DrawR (\x -> case x of ReplacementEffect.DrawR y -> Just y; _ -> Nothing),
       Arm.payload "DrawCountR" DrawCountR.codec ReplacementEffect.DrawCountR (\x -> case x of ReplacementEffect.DrawCountR y -> Just y; _ -> Nothing),
+      Arm.payload "CoinFlipR" CoinFlipR.codec ReplacementEffect.CoinFlipR (\x -> case x of ReplacementEffect.CoinFlipR y -> Just y; _ -> Nothing),
       Arm.payload "PhaseR" PhasePattern.codec ReplacementEffect.PhaseR (\x -> case x of ReplacementEffect.PhaseR y -> Just y; _ -> Nothing)
     ]
 
@@ -63,4 +65,5 @@ tagOf x = case x of
   ReplacementEffect.LifeGainR {} -> "LifeGainR"
   ReplacementEffect.DrawR {} -> "DrawR"
   ReplacementEffect.DrawCountR {} -> "DrawCountR"
+  ReplacementEffect.CoinFlipR {} -> "CoinFlipR"
   ReplacementEffect.PhaseR {} -> "PhaseR"

@@ -1,5 +1,6 @@
 module Pawl.Types.ReplacementEffect where
 
+import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
@@ -159,5 +160,14 @@ data ReplacementEffect card ability effect
     -- instruction is settled before any draw inside it -- so a board carrying
     -- both rows applies each once.
     DrawCountR DrawCountR.DrawCountR
+  | -- | CR 705.1 / 614.1a: "if you would flip a coin, instead flip two coins and
+    -- ignore one" (Krark's Thumb). Its own arm because rule 705.1's flip is its
+    -- own event class: nothing else in the rules asks for a random two-way
+    -- result, and CR 706's die roll is a different rule with a different
+    -- vocabulary (no call, no winner, and a size).
+    --
+    -- Carries no pattern beyond CR 109.5's relation, for LifeGainR's reason --
+    -- see Pawl.Types.CoinFlipR.
+    CoinFlipR CoinFlipR.CoinFlipR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

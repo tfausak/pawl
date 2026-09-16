@@ -110,6 +110,14 @@ data Response
   | -- | CR 705.2: the face the flipping player called -- FlippedCoin's opposite
     -- number, the announcement rather than the randomness.
     CalledCoin CoinFace.CoinFace
+  | -- | CR 705.1 / 614.1a: the face the flipper kept out of a replaced flip's
+    -- coins (Krark's Thumb).
+    --
+    -- Its own constructor rather than FlippedCoin or CalledCoin reused, though
+    -- all three carry one CoinFace: this type's rule at the top. A transcript of
+    -- a player CHOOSING must satisfy neither the prompt that asked randomness nor
+    -- the one that asked rule 705.2's call.
+    ChoseCoinResult CoinFace.CoinFace
   | ChoseDiscard [ObjectId.ObjectId]
   | -- | CR 701.22a: the ordered partition a scrying player chose -- the cards
     -- going to the bottom, then the ones staying on top, each in the order the

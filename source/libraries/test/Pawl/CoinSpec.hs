@@ -2,7 +2,8 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers: CR 705 FLIPPING A COIN -- Pawl.Types.FlipCoin (both of its tallies),
--- Pawl.Types.CoinReading, Pawl.Engine.Coin,
+-- Pawl.Types.CoinReading, Pawl.Engine.Coin, Pawl.Engine.Event.flipOneCoin and
+-- the CR 614.1a replacement over it (Pawl.Types.CoinFlipR, Krark's Thumb),
 -- Pawl.Types.StatedFlip, Effect.FlipCoin's arm in Pawl.Engine.Resolve, and the
 -- Pawl.Types.Prompt / Pawl.Types.Response pairs the call and the flip are
 -- externalised through. The transcript legs live in
@@ -15,7 +16,8 @@
 -- NOT rule 705.2's first sentence as an ENTRY REPLACEMENT (Molten Sentry), which
 -- is proved in Pawl.ReplacementSpec beside the rest of the CR 614.1c family. It
 -- appears here twice: in the CR 705.3 group, because rule 705.3 is the one rule
--- both roads have to obey and Pawl.Engine.Coin is the one road they share, and
+-- both roads have to obey and Pawl.Engine.Event.flipOneCoin is the one road they
+-- share, and
 -- as an EFFECT in the face-reading group below (Odds), which is the same
 -- sentence on the other road.
 --
@@ -104,6 +106,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Coin" $ do
   faceReadingSpec s registry
   missesSpec s registry
   statedFlipSpec s registry
+  krarkSpec s registry
 
 -- Set a seat's life directly, so the two seats start on different numbers and
 -- neither can be read for the other.
@@ -715,3 +718,104 @@ missesSpec s registry = Spec.describe s "FlipCoin tallies the flips lost (CR 705
       "CR 705.2: no flip lost, so no damage and two cards drawn"
       (let settled = afterMutalith [CoinFace.Heads, CoinFace.Heads] board in (S.lifeOf S.bob settled, S.lifeOf S.carol settled, S.handSize S.alice settled))
       (Just 20, Just 16, 2)
+
+-- CR 614.1a over CR 705.1: Krark's Thumb's "if you would flip a coin, instead
+-- flip two coins and ignore one", on the Winter Sky fixture at the top -- so the
+-- flip's outcome is read through the same seven gameplay columns the rest of this
+-- module reads, and the Thumb is the only thing that differs between the legs.
+--
+-- Winter Sky rather than a face-only flip because the kept coin has to MATTER: a
+-- flip alice calls tails wins on a kept tails and loses on a kept heads, and
+-- `won` and `lost` are two boards apart.
+--
+-- ONE Thumb and never two. The card is LEGENDARY, so CR 704.5j leaves no board on
+-- which one player controls a second, and rule 705.2's last sentence keeps an
+-- opponent's Thumb off this flip -- so the four-coin reading of CR 614.5 has no
+-- producer. What a single Thumb does prove of rule 614.5 is that the row is spent
+-- once: the flip is settled with TWO coins rather than doubling again off its own
+-- modified event.
+--
+-- A STATE-THREADED answerer, since the two coins of one flip are structurally
+-- identical Prompt.FlipCoin questions that must come up differently; a pure
+-- Prompt -> r answerer cannot tell them apart and would make the case green
+-- whatever the engine did.
+krarkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+krarkSpec s registry = Spec.describe s "CoinFlipR" $ do
+  Spec.it s "CR 614.1a Krark's Thumb settles the flip with two coins and the flipper keeps one" $ do
+    board <- thumbBoard s registry
+    let (settled, prompts) = thumbRun [CoinFace.Heads, CoinFace.Tails] CoinFace.Tails CoinFace.Tails board
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation: the coins disagreed, alice called tails and kept the tails, so
+    -- the call matches and Winter Sky's winning branch is what the board shows.
+    Spec.assertEqWith s "CR 705.2: the kept coin matches the call, so the flip is won" (reading settled) won
+    -- Supporting: CR 614.5 spends the Thumb once, so two coins and not four.
+    Spec.assertEqWith s "CR 614.5: two coins" (length (filter isFlip prompts)) 2
+    -- Supporting: the flipper was actually asked which coin to ignore.
+    Spec.assertEqWith s "CR 614.1a: one choice offered" (length (filter isKeep prompts)) 1
+  Spec.it s "CR 705.1 without the Thumb the one coin flipped settles the flip" $ do
+    -- The pair, one thing different: the same board, the same pinned answers,
+    -- and no Thumb -- so the second face is never reached and the first coin
+    -- loses the call.
+    board <- coinBoard s registry
+    let (settled, prompts) = thumbRun [CoinFace.Heads, CoinFace.Tails] CoinFace.Tails CoinFace.Tails board
+    Spec.assertEqWith s "CR 705.2: heads against a call of tails loses" (reading settled) lost
+    Spec.assertEqWith s "CR 705.1: one coin" (length (filter isFlip prompts)) 1
+    Spec.assertEqWith s "CR 705.1: nothing to keep" (length (filter isKeep prompts)) 0
+  Spec.it s "CR 705.1 two coins that came up the same leave nothing to choose" $ do
+    board <- thumbBoard s registry
+    let (settled, prompts) = thumbRun [CoinFace.Heads, CoinFace.Heads] CoinFace.Tails CoinFace.Tails board
+    -- Both coins are heads, so which one is ignored is indistinguishable and the
+    -- prompt is elided -- and the flip loses against a call of tails however the
+    -- answerer would have answered it.
+    Spec.assertEqWith s "CR 705.2: the agreed face loses the call" (reading settled) lost
+    Spec.assertEqWith s "CR 614.5: two coins" (length (filter isFlip prompts)) 2
+    Spec.assertEqWith s "CR 705.1: no choice offered" (length (filter isKeep prompts)) 0
+
+isFlip :: Text.Text -> Bool
+isFlip = (==) (Text.pack "FlipCoin")
+
+isKeep :: Text.Text -> Bool
+isKeep = (==) (Text.pack "ChooseCoinResult")
+
+-- The Winter Sky board with a Krark's Thumb under alice. Added as a permanent
+-- rather than cast, the fixture's own posture for everything but the spell under
+-- test: the Thumb's whole text is a static ability, which functions from the
+-- battlefield with nothing to announce.
+thumbBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+thumbBoard s registry = do
+  (skyId, gs) <- coinBoard s registry
+  thumb <- S.printingOf s registry "Krark's Thumb"
+  let (_, next) = S.addPermanent thumb S.alice gs
+  pure (skyId, next)
+
+-- Cast Winter Sky and resolve it, handing out the given faces IN ORDER to CR
+-- 705.1's flips and pinning CR 705.2's call and the kept coin by CONSTANT, so
+-- the engine cannot repair either after a mutation. Answers with the settled
+-- board and the prompts the run asked, in order.
+thumbRun ::
+  [CoinFace.CoinFace] ->
+  CoinFace.CoinFace ->
+  CoinFace.CoinFace ->
+  (ObjectId.ObjectId, GameState.GameState) ->
+  (GameState.GameState, [Text.Text])
+thumbRun faces called kept (skyId, board) =
+  let answering :: Prompt.Prompt r -> State.State ([CoinFace.CoinFace], [Text.Text]) r
+      answering p = do
+        (pending0, log0) <- State.get
+        State.put (pending0, S.promptKind p : log0)
+        case p of
+          Prompt.FlipCoin -> do
+            (pending, log_) <- State.get
+            case pending of
+              -- Running out means the engine flipped more coins than the leg
+              -- pinned, which the FlipCoin tally beside every assertion reports.
+              [] -> pure CoinFace.Heads
+              face : rest -> do
+                State.put (rest, log_)
+                pure face
+          Prompt.CallCoin {} -> pure called
+          Prompt.ChooseCoinResult {} -> pure kept
+          _ -> pure (S.identityAnswer p)
+      run = Engine.runGame answering board (S.cast S.alice skyId >> Stack.resolveTop)
+      ((_, settled), (_, prompts)) = State.runState run (faces, [])
+   in (S.settleSba settled, reverse prompts)

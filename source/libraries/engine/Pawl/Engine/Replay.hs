@@ -59,6 +59,7 @@ encode p answer = case p of
   Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
   Prompt.FlipCoin -> Response.FlippedCoin answer
   Prompt.CallCoin {} -> Response.CalledCoin answer
+  Prompt.ChooseCoinResult {} -> Response.ChoseCoinResult answer
   Prompt.ChooseAction {} -> Response.ChoseAction answer
   Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
@@ -211,6 +212,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.CallCoin {} -> case response of
     Response.CalledCoin face -> Just face
+    _ -> Nothing
+  Prompt.ChooseCoinResult {} -> case response of
+    Response.ChoseCoinResult face -> Just face
     _ -> Nothing
   Prompt.ChooseAction {} -> case response of
     Response.ChoseAction action -> Just action
@@ -597,6 +601,12 @@ defaultAnswer p = case p of
   -- above: a transcript that lost its coin answers replays a won flip. That is
   -- exactly the desync 'replay' reports.
   Prompt.CallCoin {} -> CoinFace.Heads
+  -- CR 705.1 / 614.1a: the prompt is raised only where the coins did not all
+  -- agree, and every face it offers is one a coin landed on. Keeping the FIRST
+  -- coin flipped is ChooseDieResult's posture, and unlike the two answers above
+  -- it is read off the candidates rather than fixed, so it cannot name a face
+  -- nothing came up.
+  Prompt.ChooseCoinResult _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAction _ _ actions -> case actions of
     h : _ -> h
     [] -> Action.Pass

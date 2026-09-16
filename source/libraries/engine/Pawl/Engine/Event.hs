@@ -23,6 +23,7 @@ module Pawl.Engine.Event where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -75,6 +76,8 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CarryOver as CarryOver
 import qualified Pawl.Types.CoinFace as CoinFace
+import qualified Pawl.Types.CoinFlipR as CoinFlipR
+import qualified Pawl.Types.CoinFlipRewrite as CoinFlipRewrite
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
@@ -181,6 +184,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
+import qualified Pawl.Types.StatedFlip as StatedFlip
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
@@ -1636,6 +1640,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
@@ -1878,7 +1883,7 @@ apply batch candidate event =
       -- shapes ChoiceOf offers a player. Written into the COPIABLE snapshot
       -- (applyEntryOption), ChoiceOf's road and for its reason.
       --
-      -- Pawl.Engine.Coin, never Game.ask directly, and NO Prompt.CallCoin: "no
+      -- `flipOneCoin` below, never Game.ask directly, and NO Prompt.CallCoin: "no
       -- player wins or loses a coin flip for this kind of effect", so there is no
       -- call to make and nothing for a CR 723 controller to usurp. Proved by
       -- Pawl.ReplacementSpec's "CR 705.2 nobody wins Molten Sentry's flip, so its
@@ -1906,7 +1911,7 @@ apply batch candidate event =
         before <- State.get
         let flipper = Projection.controllerOf oid before
         statements <- Coin.statementsFor flipper
-        (face, stated) <- Coin.flipOne statements
+        (face, stated) <- flipOneCoin flipper statements
         let picked = case face of
               CoinFace.Heads -> EntryFlip.heads entryFlip
               CoinFace.Tails -> EntryFlip.tails entryFlip
@@ -3318,6 +3323,23 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits DrawCountR only against WouldDrawCards.
     (ReplacementEffect.DrawCountR {}, _) -> pure (Just event)
+    -- CR 705.1 / 614.1a: Krark's Thumb's "instead flip two coins and ignore one".
+    -- The event is left STANDING at a doubled count rather than cancelled, the
+    -- resizing arms above for their reason: CR 616.2's next iteration re-collects
+    -- against it, so a second such row would double again -- and CR 614.5 is what
+    -- keeps THIS row off the modified event it just made.
+    --
+    -- Which coin is ignored is not decided here. The rewrite says how many coins
+    -- the flip is settled with; `flipOneCoin` below flips them all and asks the
+    -- flipper which face to keep, which is the order Krark's Thumb's own ruling
+    -- requires -- "you will know the results of all simultaneous flips before
+    -- choosing which to ignore".
+    (ReplacementEffect.CoinFlipR (CoinFlipR.MkCoinFlipR _ rewrite), ProposedEvent.WouldFlipCoin pid n) -> case rewrite of
+      CoinFlipRewrite.Doubled -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldFlipCoin pid (n * 2)))
+    -- Unreachable: `applies` admits CoinFlipR only against WouldFlipCoin.
+    (ReplacementEffect.CoinFlipR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
@@ -4212,6 +4234,66 @@ resolveLifeGain pid n =
     else do
       outcome <- applyReplacements (ProposedEvent.WouldGainLife pid n)
       pure (maybe 0 snd (outcome >>= Replacement.asLifeGain))
+
+-- CR 705.1's flip of ONE coin. The ONE road every flip in the engine takes:
+-- Pawl.Engine.Resolve's Effect.FlipCoin arm calls it once per coin its
+-- instruction names, and the EntryRewrite.ChoiceByCoinFlip arm above calls it for
+-- the flip a permanent makes as it enters (Molten Sentry).
+--
+-- HERE rather than in Pawl.Engine.Coin, which holds the rest of rule 705, because
+-- the flip is a replaceable event: CR 614's loop lives in this module and this
+-- module imports Pawl.Engine.Coin, so the funnel has to sit on this side of that
+-- edge -- resolveUntap, resolveLifeGain and drawCardReturning's position exactly.
+--
+-- The FACE of each coin goes through Game.ask and never Game.choose: nobody
+-- decides how a coin lands. WHICH coin is kept goes through Game.choose, because
+-- CR 614.1a's replacement does leave a decision -- Krark's Thumb's "ignore one".
+--
+-- Answers what CR 705.3 lets an effect state about the flip: the face to use --
+-- the kept one when no effect states another -- and whether the flipper is stated
+-- to WIN it. The caller decides what a win means for its own kind of flip; a flip
+-- that CR 705.2's first sentence leaves winnerless still takes the stated win,
+-- since Edgar, King of Figaro's ruling says its ability "can cause you to win coin
+-- flips that would ordinarily have no winner".
+--
+-- The coins are flipped even when a statement will discard the result: rule 705.3
+-- says to ignore the actual result, not to skip the flip, and an interpreter
+-- replaying a transcript must be asked the same questions either way.
+--
+-- Takes a Maybe seat because the entry road's flipper comes from
+-- Projection.controllerOf, which is a Maybe. No seat means no replacement can
+-- apply -- CR 614.1a's rows for this class are all about a particular player --
+-- so the flip is settled with the one coin rule 705.1 gives it.
+flipOneCoin :: Maybe PlayerId -> [StatedFlip.StatedFlip] -> Game (CoinFace.CoinFace, Bool)
+flipOneCoin mFlipper stated = do
+  coins <- case mFlipper of
+    Nothing -> pure 1
+    Just pid -> do
+      outcome <- applyReplacements (ProposedEvent.WouldFlipCoin pid 1)
+      -- A cancelled event is unreachable: no arm of Pawl.Types.CoinFlipRewrite
+      -- replaces the flip with nothing. Defensive, and in the direction rule
+      -- 705.1 leaves standing -- the flip still happens, on its own one coin.
+      pure (maybe 1 snd (outcome >>= Replacement.asCoinFlip))
+  faces <- Monad.replicateM (Natural.toIntSaturating coins) (Game.ask Prompt.FlipCoin)
+  -- CR 705.1 designates exactly two sides, so the coins that came up carry at
+  -- most two distinct answers and every face this prompt is raised with is one a
+  -- coin actually landed on -- which is why the answer needs no filtering back
+  -- against the candidates, where an object choice would.
+  actual <- case ListUtils.nubOrd faces of
+    -- Unreachable: `coins` is at least one and every rewrite only multiplies it.
+    -- Defensive: a flip with no face is no flip, so ask rule 705.1's one coin.
+    [] -> Game.ask Prompt.FlipCoin
+    -- One face is not a choice: with every coin agreeing, which one is ignored is
+    -- indistinguishable, so where the rules leave nothing to ask, don't prompt.
+    [face] -> pure face
+    first : rest -> case mFlipper of
+      -- Unreachable: a seatless flip is never replaced, so it has one coin.
+      -- Defensive: make no unprompted choice beyond the first coin flipped.
+      Nothing -> pure first
+      Just pid -> do
+        gs <- State.get
+        Game.choose (Prompt.ChooseCoinResult (Decide.deciderFor pid gs) pid (first NonEmpty.:| rest))
+  pure (Maybe.fromMaybe actual (Coin.statedFace stated), any StatedFlip.wins stated)
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
 resolveTokens :: PlayerId -> Seq.Seq TokenLot.TokenLot -> Game (Maybe (PlayerId, Seq.Seq TokenLot.TokenLot))
