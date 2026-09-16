@@ -27,10 +27,16 @@ data BecameBlocking = MkBecameBlocking
     -- blocked, so rule 509.4's denial does not reach it.
     --
     -- The flag names the PRODUCER rather than negating "declared", because the
-    -- rules' third producer -- an effect that causes a creature to block -- is
-    -- neither a declaration nor an entry, and CR 509.3b does trigger for it. No
-    -- such effect is in the pool (#1146); it would record this event with the
-    -- flag clear.
+    -- rules' third producer -- an effect that causes a creature to block
+    -- (Pawl.Engine.Combat.switchBlockers, General Jarkeld) -- is neither a
+    -- declaration nor an entry, and CR 509.3b does trigger for it. That road
+    -- records this event with the flag CLEAR, which is what puts it through the
+    -- same arm a declaration takes.
+    --
+    -- Not implemented: a Bool cannot then tell a declaration's pair from that
+    -- third road's, and CR 509.3e's two arms that guard on this flag being True
+    -- (Pawl.Engine.Event.Match's SelfBecomesBlockedByOneOrMore and
+    -- CreatureBecomesBlockedByAtLeast) therefore miss it (#1146).
     putOntoBattlefield :: Bool,
     -- | CR 509.1h: whether the ATTACKER was already a blocked creature
     -- immediately before this event, read before the write that made it.

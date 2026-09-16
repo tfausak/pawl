@@ -519,6 +519,7 @@ rewriteEffect pairs effect = case effect of
   Effect.TurnFaceUp _ -> effect
   Effect.RemoveFromCombat ref -> Effect.RemoveFromCombat (rewriteObjectRef pairs ref)
   Effect.BecomesBlocked _ -> effect
+  Effect.SwitchBlockers _ -> effect
   -- The riders' counter AMOUNTS are Quantities and take rewriteQuantity's
   -- descent, PutCounters' case below; their KEYS take rewriteEntryRiders' own,
   -- which is what Pawl.CounterspellSpec's Synthetic Warded Homecoming proves.

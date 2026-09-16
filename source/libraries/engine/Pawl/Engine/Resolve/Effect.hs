@@ -2393,6 +2393,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.TurnFaceUp {} -> False
   Effect.RemoveFromCombat {} -> False
   Effect.BecomesBlocked {} -> False
+  Effect.SwitchBlockers {} -> False
   Effect.AddPhases {} -> False
   Effect.EndTurn {} -> False
   Effect.EndCombatPhase {} -> False
@@ -3681,6 +3682,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- undirected: no creature blocks, so there is nothing to ask.
           Just target -> Combat.becomeBlocked target gs
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
+        _ -> gs
+  -- CR 509.3b's third producer, through Combat.switchBlockers, which owns the
+  -- whole reassignment: CR 509.1b's hypothetical legality test, CR 509.1h's
+  -- keeping of the departed attacker's blocked status, and the events.
+  -- Unprompted and undirected -- General Jarkeld's sentence names every creature
+  -- that moves and which attacker it moves to, leaving nothing to ask.
+  --
+  -- Exactly TWO recipients, which is the slot's printed count (CR 601.2c), read
+  -- with legalMany as Effect.ExchangeLifeTotals' BetweenTargets is. Anything
+  -- else is CR 608.2b having taken one of the pair away, and the sentence has no
+  -- half to carry out.
+  Effect.SwitchBlockers slot ->
+    State.modify' $ \gs ->
+      case Maybe.mapMaybe Recipient.objectOf (legalMany slot legal) of
+        [firstAttacker, secondAttacker] -> Combat.switchBlockers firstAttacker secondAttacker gs
         _ -> gs
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone entry mSlot _ placement duration) ->
     -- ONE object through CR 400.7's funnel, shared by the two arms below.
