@@ -994,6 +994,8 @@ library codec
     Pawl.Codec.VoteChoices
     Pawl.Codec.VoteObjects
     Pawl.Codec.VoteSpec
+    Pawl.Codec.Ward
+    Pawl.Codec.WardSpec
     Pawl.Codec.While
     Pawl.Codec.WhileSpec
     Pawl.Codec.WithCounters
@@ -2046,6 +2048,7 @@ library types
     Pawl.Types.Vote
     Pawl.Types.VoteChoices
     Pawl.Types.VoteObjects
+    Pawl.Types.Ward
     Pawl.Types.While
     Pawl.Types.WithCounters
     Pawl.Types.Zone

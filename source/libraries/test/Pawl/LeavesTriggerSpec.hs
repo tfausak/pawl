@@ -65,6 +65,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
@@ -86,6 +87,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.Ward as Ward
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import Pawl.ZoneTriggerSpec (everyTriggerCondition, gathered, paysFor, representativeDeparted, representativeEvents)
@@ -1956,9 +1958,110 @@ wardSpec s registry =
         -- two abilities for CR 603.2's general reason. Asserted of the MINT, as
         -- fabricate's multiplicity is: no printing carries ward twice.
         Spec.it s "CR 603.2 each instance of ward is its own ability" $ do
-          let cost n = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []
+          let cost n = Ward.MkWard (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) Nothing
           Spec.assertEqWith s "ward {2} held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Ward (cost 2)) 2)) [Keyword.ward (cost 2), Keyword.ward (cost 2)]
           Spec.assertBool s (Keyword.ward (cost 2) /= Keyword.ward (cost 3)) "and the cost reaches the minted ability"
+
+-- CR 702.21b: "some ward abilities include an X in their cost and state what X
+-- is equal to. This value is determined at the time the ability resolves, not
+-- locked in as the ability triggers."
+--
+-- Minthara, Merciless Soul, {2}{W}{B} Legendary Creature -- Elf Cleric 2/2:
+-- "Minthara has ward {X}, where X is the number of experience counters you
+-- have." Its anthem clause -- "creatures you control get +1/+0 for each
+-- experience counter you have" -- is transcribed too, and is what the pair below
+-- reads power through. Its middle clause is NOT: that end step trigger's
+-- intervening "if a permanent you controlled left the battlefield this turn"
+-- names only where the permanent LEFT, which no Pawl.Types.EventShape can say
+-- (gap #2991). The omission leaves pawl's Minthara STRICTER than printed -- alice
+-- gains fewer experience counters, never more -- so the counter she starts with
+-- is placed by the fixture and the one she gains comes from Ezuri.
+--
+-- THE COUNTER ARRIVES WHILE THE TRIGGER IS ALREADY ON THE STACK, which is the
+-- whole of rule 702.21b: alice holds one experience counter as bob's Giant Growth
+-- targets Minthara and the ward ability triggers, and two by the time it
+-- resolves. Ezuri, Claw of Progress ("whenever a creature you control with power
+-- 2 or less enters, you get an experience counter") plus a Selfless Squire
+-- flashed in over the trigger is what moves it. An engine reading X as the
+-- ability TRIGGERED charges {1}, which bob can afford; the rule charges {2},
+-- which he cannot.
+--
+-- TWO COUNTERS AND NOT ONE, deliberately: at X = 1 a cost of {1} multiplied by
+-- one experience counter and a cost of {1} multiplied by nothing at all are the
+-- same charge, so a board reaching only one counter cannot tell a ward that
+-- counts from a ward that does not.
+--
+-- THE PAIR differs in bob's FOREST COUNT and nothing else -- two, of which the
+-- Growth spends one, against three. Together the cases pin X at exactly two: the
+-- first says X > 1, the second X <= 2. Both boards hold the same cards, alice
+-- makes the same plays, and bob answers `paysFor S.bob` in both, so a spell that
+-- survived did so because he could pay rather than because nobody asked.
+--
+-- A test-local answerer rather than Pawl.Support's script: the harness has no
+-- vocabulary for Prompt.ChooseToPay, and the ward group above already answers it
+-- with `paysFor`.
+mintharaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mintharaSpec s registry =
+  let board plains forest minthara ezuri squire growth forests =
+        let withLands = S.landsFor forest S.bob forests (S.landsFor plains S.alice 4 S.threePlayerGame)
+            withCounter = S.addPlayerCounter PlayerCounterKind.Experience 1 S.alice withLands
+            (mintharaId, withMinthara) = S.addPermanent minthara S.alice withCounter
+            (_, withEzuri) = S.addPermanent ezuri S.alice withMinthara
+            (squireId, withSquire) = S.addHandCard squire S.alice withEzuri
+            (growthId, gs) = S.addHandCard growth S.bob withSquire
+         in ( mintharaId,
+              squireId,
+              growthId,
+              gs
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.bob,
+                  GameState.priority = Just S.bob
+                }
+            )
+      -- bob's Giant Growth is pinned onto Minthara: the board holds Ezuri too, so
+      -- nothing here lets an answerer search for the creature that makes the
+      -- assertion pass. Everything else is `paysFor S.bob`, so bob pays whenever
+      -- CR 118.3 says he can.
+      aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      aimedAt oid p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== Recipient.ToCreature oid) candidates) sets
+        _ -> paysFor S.bob p
+      boardOf forests = do
+        plains <- S.printingOf s registry "Plains"
+        forest <- S.printingOf s registry "Forest"
+        minthara <- S.printingOf s registry "Minthara, Merciless Soul"
+        ezuri <- S.printingOf s registry "Ezuri, Claw of Progress"
+        squire <- S.printingOf s registry "Selfless Squire"
+        growth <- S.printingOf s registry "Giant Growth"
+        pure (board plains forest minthara ezuri squire growth forests)
+   in Spec.describe s "CR 702.21b ward {X}" $ do
+        Spec.it s "CR 702.21b X counts the experience counters alice has when the ability RESOLVES, so bob cannot pay" $ do
+          (mintharaId, squireId, growthId, gs) <- boardOf 2
+          let answer :: Prompt.Prompt r -> r
+              answer = aimedAt mintharaId
+              onStack = S.runPure answer (S.runPure answer gs (S.cast S.bob growthId)) Engine.settleForPriority
+              flashed = S.runPure answer (S.runPure answer onStack (S.cast S.alice squireId)) Engine.settleForPriority
+              gained = S.runPure answer flashed (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+              ((_, after), transcript) = Replay.record answer gained (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+          Spec.assertEqWith s "setup: the Growth and the ward trigger are both on the stack" (length (GameState.stack onStack)) 2
+          Spec.assertEqWith s "setup: alice holds ONE experience counter as the ability triggers" (S.playerCounterOf PlayerCounterKind.Experience S.alice onStack) 1
+          Spec.assertEqWith s "setup: and TWO by the time it resolves, Ezuri having seen the Squire enter" (S.playerCounterOf PlayerCounterKind.Experience S.alice gained) 2
+          Spec.assertEqWith s "CR 702.21b: ward {2} was owed, bob could not pay it, and the Growth was countered -- Minthara is her 2/2 self plus the anthem's two" (S.powerToughnessOf mintharaId after) (Just (4, 2))
+          Spec.assertEqWith s "CR 118.3: an unpayable cost is never offered" (payResponses transcript) []
+          Spec.assertEqWith s "and the countered Growth is in bob's graveyard" (Seq.length (Map.findWithDefault Seq.empty S.bob (GameState.graveyard after))) 1
+        -- The same board and the same plays, differing in NOTHING but bob's
+        -- third Forest.
+        Spec.it s "CR 702.21b one more Forest pays the same ward {2} and the Growth resolves" $ do
+          (mintharaId, squireId, growthId, gs) <- boardOf 3
+          let answer :: Prompt.Prompt r -> r
+              answer = aimedAt mintharaId
+              onStack = S.runPure answer (S.runPure answer gs (S.cast S.bob growthId)) Engine.settleForPriority
+              flashed = S.runPure answer (S.runPure answer onStack (S.cast S.alice squireId)) Engine.settleForPriority
+              gained = S.runPure answer flashed (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+              ((_, after), transcript) = Replay.record answer gained (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+          Spec.assertEqWith s "CR 702.21b: bob paid ward {2}, so the Growth resolved onto a Minthara the anthem already made a 4/2" (S.powerToughnessOf mintharaId after) (Just (7, 5))
+          Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+          Spec.assertEqWith s "setup: alice still holds the two experience counters" (S.playerCounterOf PlayerCounterKind.Experience S.alice after) 2
 
 -- CR 118.12a over MORE THAN ONE PAYER: "[Do something] unless [a player does
 -- something else]" means "[A player may do something else]. If [that player
@@ -3875,6 +3978,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   afterlifeSpec s registry
   fabricateSpec s registry
   wardSpec s registry
+  mintharaSpec s registry
   cutpurseSpec s registry
   gomazoaSpec s registry
   amuletSpec s registry
