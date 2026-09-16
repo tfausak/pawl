@@ -1,0 +1,113 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "production": {
+                            "type": "AnyColor"
+                          },
+                          "restriction": {
+                            "casts": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasKeywordFamily",
+                                  "value": {
+                                    "type": "Flashback"
+                                  }
+                                },
+                                {
+                                  "type": "WasCastFrom",
+                                  "value": {
+                                    "type": "Graveyard"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "production": {
+                            "type": "AnyColor"
+                          },
+                          "restriction": {
+                            "casts": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasKeywordFamily",
+                                  "value": {
+                                    "type": "Flashback"
+                                  }
+                                },
+                                {
+                                  "type": "WasCastFrom",
+                                  "value": {
+                                    "type": "Graveyard"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "name": "Altar of the Lost",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "Tapped"
+              }
+            }
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

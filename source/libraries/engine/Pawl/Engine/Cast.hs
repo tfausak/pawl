@@ -70,6 +70,7 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
@@ -743,6 +744,46 @@ stampCastUsing castFor sid gs =
         Map.adjust (\o -> o {Object.castUsing = castFor}) sid (GameState.objects gs)
     }
 
+-- CR 400.7g: record on the spell the granted ability that ALLOWED it to be cast,
+-- so that ability "continues to apply to the new object that card became".
+-- stampCastUsing's shape above -- an idempotent write of a field no layer
+-- computes -- and its neighbour for a reason: the two answer different questions
+-- about one announcement, `castUsing` which cost was paid and this which ability
+-- the spell still has. Pawl.Engine.Projection.castGrantGathered turns it back
+-- into a layer-6 grant.
+stampCastGrant :: Maybe Keyword -> ObjectId -> GameState -> GameState
+stampCastGrant granted sid gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.castGrant = granted}) sid (GameState.objects gs)
+    }
+
+-- CR 400.7g's premise, asked of the keyword CR 601.2b's announcement settled on:
+-- does it ALLOW the card to be cast, and was it GRANTED rather than printed?
+--
+-- The first half is Keyword.permissionsFor's, over the card types the projection
+-- gives the object -- rule 400.7g is about an ability "that allows it to be
+-- cast", so an alternative cost that states no permission (evoke, dash) carries
+-- nothing. A REGRESSION FENCE and not a proved behaviour: dropping it leaves the
+-- whole suite green (2026-09-16), no card in data/cards/ reading the keywords of
+-- a spell cast for an alternative cost that grants no permission.
+--
+-- The second is the difference between the keywords the object HAS and its
+-- copiable ones (CR 707.2). A printed flashback is in the seed of every
+-- projection of the spell already, so carrying it would report CR 613.1f's two
+-- instances of one ability; only an effect's grant is missing on the far side of
+-- CR 400.7's move. Read through the projection and never off the face, so a card
+-- that is a copy of something else is measured against what it copies.
+-- Pawl.CastSpec's "CR 613.1f a PRINTED flashback is ONE instance on the spell it
+-- was cast for" proves that half.
+grantedCastKeyword :: Maybe Keyword -> ObjectId -> GameState -> Maybe Keyword
+grantedCastKeyword castFor oid gs = do
+  keyword <- castFor
+  let copiable = Projection.copiableCharacteristics oid gs
+  Monad.guard (not (null (Keyword.permissionsFor (PC.cardTypes copiable) keyword)))
+  Monad.guard (not (Map.member keyword (PC.keywords copiable)))
+  pure keyword
+
 -- CR 601.2a: record on the spell the zone it was moved to the stack from, which
 -- CR 400.7 otherwise leaves it no memory of. `asProposed` wrote the same value
 -- onto the card before the move, for the gate; this is the write CR 601.2f's
@@ -824,7 +865,15 @@ proposedFor oid castFor gs =
       -- target can be chosen at all, which CR 601.2e would otherwise take the
       -- whole cast back for.
       mutatingGs = if castMutating castFor then stampMutating oid bestowedGs else bestowedGs
-   in if castPrototyped castFor then stampPrototyped oid mutatingGs else mutatingGs
+      prototypedGs = if castPrototyped castFor then stampPrototyped oid mutatingGs else mutatingGs
+   in -- CR 400.7g joins the fold for the same reason the two stamps above are in
+      -- it: CR 601.2b's payability filter prices each candidate before the player
+      -- has chosen it, and a candidate offered by a GRANTED flashback is one whose
+      -- spell has flashback (CR 106.6, Altar of the Lost). Inert on a card still
+      -- lying in the zone it would be cast from -- castGrantGathered walks the
+      -- STACK, rule 400.7g's own scope -- where the grant itself is still in
+      -- force.
+      stampCastGrant (grantedCastKeyword castFor oid prototypedGs) oid prototypedGs
 
 -- CR 601.3a asked of ONE candidate, through the board rule 702.103d says to judge
 -- it on: Aether Storm's "creature spells can't be cast" stops Nyxborn Rollicker's
@@ -2347,6 +2396,15 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- CR 601.2b: which keyword's candidate this is, for CR 702.74a's
               -- "if its evoke cost was paid" and CR 702.138b's "escaped".
               State.modify' (stampCastUsing castFor sid)
+              -- CR 400.7g: and, where that keyword was GRANTED rather than
+              -- printed, the spell keeps the ability itself. Stamped HERE and not
+              -- beside armCastFromGraveyard's replacement below, because CR
+              -- 601.2h's payment is the reader that cannot wait: Altar of the
+              -- Lost's mana is spendable "only to cast spells with flashback from
+              -- a graveyard", and that question is asked of the spell as it is
+              -- paid for.
+              gsChosen <- State.get
+              State.modify' (stampCastGrant (grantedCastKeyword castFor sid gsChosen) sid)
               -- Re-read, because `gs` above predates the stamp and both CR 601.2c
               -- and CR 601.2f have to be judged on the spell as rule 702.103b
               -- left it -- CR 702.103d's "only its characteristics as modified by
@@ -2720,11 +2778,9 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
 -- That carry IS CR 400.7g -- "if an effect grants a nonland card an ability that
 -- allows it to be cast, that ability will continue to apply to the new object
 -- that card became after it moved to the stack as a result of being cast this
--- way" -- and it is the rule's whole observable consequence here: what the
--- granted ability still has to do on the stack is state rule 702.34a's second
--- static ability, which this arms. Not implemented: the granted keyword itself
--- is not carried onto the stack incarnation, so a projection of the spell
--- reports only what the card printed (#2427).
+-- way" -- for rule 702.34a's second static ability, which this arms. The KEYWORD
+-- half of the same carry is stampCastGrant's, stamped one step earlier so CR
+-- 601.2h's payment can read it.
 --
 -- ARMED HERE rather than re-derived from the card while the spell sits on the
 -- stack because CR 702.34a conditions the ability on "if the flashback cost was

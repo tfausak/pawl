@@ -677,6 +677,24 @@ data Object = MkObject
     -- and blitz's record and drops escape's (CR 702.138b) --
     -- Pawl.Engine.Keyword.copiedCastUsing.
     castUsing :: Maybe Keyword.Keyword,
+    -- | CR 400.7g: the ability an EFFECT granted this card that ALLOWED it to be
+    -- cast -- "that ability will continue to apply to the new object that card
+    -- became after it moved to the stack as a result of being cast this way".
+    -- Stamped by Pawl.Engine.Cast at CR 601.2b's announcement and turned back
+    -- into a layer-6 grant on every projection of the spell by
+    -- Pawl.Engine.Projection.castGrantGathered, so "a spell with flashback"
+    -- finds a Bolt cast under a granted flashback (CR 601.2h, Altar of the
+    -- Lost).
+    --
+    -- Only a GRANTED one: a printed permission projects off the face in every
+    -- zone, and stamping it here would report two instances of one keyword (CR
+    -- 613.1f). Cast.grantedCastKeyword is that test, and it is what makes this
+    -- rule 400.7g's field rather than a second castUsing above.
+    --
+    -- NOT a copiable value (CR 707.2), and not per-permanent either: rule 400.7g
+    -- carries the ability onto the STACK object, so newIncarnation below clears
+    -- it and Pawl.Engine.Event.changeZoneAttaching does not write it back.
+    castGrant :: Maybe Keyword.Keyword,
     -- | CR 701.35a: this permanent is DETAINED -- it "can't attack or block and
     -- its activated abilities can't be activated" -- until the next turn of each
     -- player named here.
@@ -856,6 +874,9 @@ newIncarnation object =
       -- CR 400.7d's exception is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
       castUsing = Nothing,
+      -- CR 400.7g's carry ends with the spell: the rule names the object the
+      -- card became ON THE STACK, and nothing writes it back.
+      castGrant = Nothing,
       -- CR 701.35a: the detained permanent that comes back is a new object, and
       -- nothing detained that one.
       detainedUntil = Set.empty,

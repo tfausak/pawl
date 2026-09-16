@@ -801,6 +801,7 @@ mintCard pid under printingId dest position gs =
             Object.announcedX = Nothing,
             Object.castFrom = Nothing,
             Object.castUsing = Nothing,
+            Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
@@ -997,6 +998,7 @@ createEmblem pid card = do
                 Object.announcedX = Nothing,
                 Object.castFrom = Nothing,
                 Object.castUsing = Nothing,
+                Object.castGrant = Nothing,
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,
@@ -5686,7 +5688,8 @@ arrangeComponents pid dest components =
 -- on every projection rather than stored, so there is no row here to re-key
 -- (#2425). CR 400.7i is unimplemented too, on a carrier this one never sees --
 -- the land-play path (gap #2398). CR 400.7g is implemented, on
--- Pawl.Engine.Cast.keywordsBefore rather than here.
+-- Pawl.Engine.Cast.keywordsBefore and Pawl.Types.Object.castGrant rather than
+-- here.
 carryOver :: CarryOver.CarryOver -> ObjectId -> ObjectId -> Game ()
 carryOver carrying oldId newId = case carrying of
   CarryOver.NotCarried -> pure ()
@@ -6544,6 +6547,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.announcedX = Nothing,
                       Object.castFrom = Nothing,
                       Object.castUsing = Nothing,
+                      Object.castGrant = Nothing,
                       Object.detainedUntil = Set.empty,
                       Object.goadedBy = Set.empty,
                       Object.doesNotUntapNext = False,
@@ -6773,6 +6777,7 @@ meld controller victims resultCard = do
                 Object.announcedX = Nothing,
                 Object.castFrom = Nothing,
                 Object.castUsing = Nothing,
+                Object.castGrant = Nothing,
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,
