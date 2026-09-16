@@ -104,6 +104,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.announcedX = Nothing,
           Object.castFrom = Nothing,
           Object.castUsing = Nothing,
+          Object.castGrant = Nothing,
           Object.detainedUntil = Set.empty,
           Object.goadedBy = Set.empty,
           Object.doesNotUntapNext = False,
@@ -216,6 +217,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.announcedX = Just 20,
           Object.castFrom = Just Zone.Graveyard,
           Object.castUsing = Just Keyword.JumpStart,
+          Object.castGrant = Just Keyword.Retrace,
           Object.exileLookers = Set.singleton (ExileLooker.ThePlayer (PlayerId.MkPlayerId 27)),
           Object.detainedUntil = Set.singleton (PlayerId.MkPlayerId 21),
           Object.goadedBy = Set.singleton (PlayerId.MkPlayerId 22),
@@ -257,6 +259,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChosenSubtype\":null}]"
           <> ",\"announcedX\":20,\"castFrom\":{\"type\":\"Graveyard\"}"
           <> ",\"castUsing\":{\"type\":\"JumpStart\"}"
+          <> ",\"castGrant\":{\"type\":\"Retrace\"}"
           <> ",\"exileLookers\":[{\"type\":\"ThePlayer\",\"value\":27}],\"detainedUntil\":[21],\"goadedBy\":[22]"
           <> ",\"doesNotUntapNext\":true,\"exertedBy\":[23]"
           <> ",\"activatedOnce\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}"

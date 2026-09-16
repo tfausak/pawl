@@ -1691,7 +1691,8 @@ gatherGiven stripped functioning seed gs =
       counters = counterGathered gs
       designations = designationGathered gs
       bestows = bestowGathered gs
-   in stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows
+      castGrants = castGrantGathered gs
+   in stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants
 
 -- CR 113.6b's stated set, without the empty-set default that
 -- functionsFromZone folds in: does this ability SAY it functions from `zone`?
@@ -2358,6 +2359,42 @@ designationGathered gs =
               ]
           | otherwise -> []
    in concatMap fromObject (Set.toList (GameState.battlefield gs))
+
+-- CR 400.7g / 613.1f: the ability an effect granted a card that ALLOWED it to be
+-- cast "continues to apply to the new object that card became after it moved to
+-- the stack", emitted as a layer-6 grant on the spell itself.
+--
+-- Read off Object.castGrant on every projection, designationGathered above's
+-- posture: the grant that wrote it is anchored to the GRAVEYARD object's id and
+-- CR 400.7 mints a fresh one on the stack, so there is no stored effect left to
+-- reach the spell -- the stamp Pawl.Engine.Cast.stampCastGrant makes at CR
+-- 601.2b is the only thing that crossed. Only a GRANTED keyword is stamped
+-- (Cast.grantedCastKeyword), so a printed flashback is not counted twice.
+--
+-- THE STACK only, which is rule 400.7g's own scope -- "the new object that card
+-- became after it MOVED TO THE STACK" -- and Object.newIncarnation clears the
+-- field at the next move either way.
+--
+-- CR 613.7a: the timestamp is the SPELL's, not the granting effect's, which
+-- pawl does not carry across the move. The two orders differ only against
+-- another layer-6 effect reaching the same spell -- a Humility for spells --
+-- which no card in data/cards/ and no board in the suite produces.
+castGrantGathered :: GameState -> [Gathered]
+castGrantGathered gs =
+  let fromObject oid = case Game.lookupObject oid gs >>= (\obj -> fmap ((,) obj) (Object.castGrant obj)) of
+        Nothing -> []
+        Just (obj, keyword) ->
+          [ MkGathered
+              { gEffect = Nothing,
+                gSource = oid,
+                gAffected = Affected.TheseObjects (Set.singleton oid),
+                gLayer = Layer.Ability,
+                gLowest = Layer.Ability,
+                gTimestamp = Object.timestamp obj,
+                gModification = Modification.GainKeyword keyword
+              }
+          ]
+   in concatMap fromObject (GameState.stack gs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
 -- question needs: applying one effect can only change what another applies to if

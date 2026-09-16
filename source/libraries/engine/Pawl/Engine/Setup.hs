@@ -316,6 +316,7 @@ createCard pid printingId = do
             Object.announcedX = Nothing,
             Object.castFrom = Nothing,
             Object.castUsing = Nothing,
+            Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
