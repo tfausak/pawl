@@ -1998,7 +1998,7 @@ greenOnly = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green
 -- reading, where the first sentence's is a payability one -- so what it needs is
 -- a record of the payment, which is Pawl.Types.Object.manaSpent, written by
 -- Pawl.Engine.Cost's mana window and read back through
--- Pawl.Engine.Filter.View.manaSpentTags by Quantity.TagWasSpent.
+-- Pawl.Engine.Filter.View.manaSpentTagColors by Quantity.TagWasSpent.
 --
 -- Berg Strider is the card: "When this creature enters, tap target artifact or
 -- creature an opponent controls. If {S} was spent to cast this spell, that
@@ -2087,6 +2087,105 @@ bergSpentTags = foldMap ManaUnit.tags . bergSpent
 
 bergSpentCount :: GameState.GameState -> Int
 bergSpentCount = length . bergSpent
+
+-- CR 107.4h's third sentence conjoined with CR 202.2: a card may ask not only
+-- whether snow mana was spent but what COLOR it was. That is one question about
+-- ONE unit -- snow-produced AND of a color the spell is -- so the record the arm
+-- above reads is keyed by tag with the colors beside it
+-- (Pawl.Engine.Filter.View.manaSpentTagColors), and
+-- Quantity.TagWasSpentOfOwnColor is the atom. Two tests of the tag and the color
+-- separately are a different and wider question: a colorless snow mana beside a
+-- green nonsnow one passes both and this clause neither.
+--
+-- Boreal Outrider prints the clause -- "Whenever you cast a creature spell, if
+-- {S} of any of that spell's colors was spent to cast it, that creature enters
+-- with an additional +1/+1 counter on it" -- and is not in data/cards/: its
+-- EFFECT names the permanent the triggering spell becomes, and CR 400.7 mints
+-- that permanent a fresh id no slot the trigger bound can reach (gap #3798). So the
+-- producer here is synthetic, carrying the printed clause verbatim over an effect
+-- that stays on the source.
+--
+-- Synthetic Rimewood Herald: "Whenever you cast a creature spell, if {S} of any
+-- of that spell's colors was spent to cast it, put a +1/+1 counter on this
+-- creature." The clause is an intervening "if" (CR 603.4) aimed by
+-- Quantity.AgainstSlot at Binding.castSpell, since it asks about the spell that
+-- triggered the ability and not about the Herald.
+--
+-- FOUR boards, differing in nothing but which of the two lands paying the spell
+-- is snow. Green snow mana pays a green spell's {G} on the first; RED snow mana
+-- pays the same spell's generic on the second, which satisfies TagWasSpent Snow
+-- and this clause not at all; neither land is snow on the third; both are on the
+-- fourth. Same seats, same Herald, same spell, two mana spent every time.
+rimewoodHeraldSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rimewoodHeraldSpec s registry = Spec.describe s "RimewoodHerald" $ do
+  -- The behavioural assertions first, and each can differ: an implementation that
+  -- never reads the colors leaves the first Herald a 2/2, and one that reads only
+  -- the tag makes the second a 3/3.
+  Spec.it s "CR 202.2 whole card: the clause fires only when the snow mana was one of the spell's own colors" $ do
+    (matching, matchingBoard) <- heraldBoard s registry "Snow-Covered Forest" "Mountain"
+    (offColor, offColorBoard) <- heraldBoard s registry "Forest" "Snow-Covered Mountain"
+    (noSnow, noSnowBoard) <- heraldBoard s registry "Forest" "Mountain"
+    Spec.assertEqWith s "green snow mana paid the green spell's {G}, so the 2/2 Herald takes a counter" (S.powerToughnessOf matching matchingBoard) (Just (3, 3))
+    Spec.assertEqWith s "red snow mana paid the same spell's generic, which is no color of it, so the Herald is unchanged" (S.powerToughnessOf offColor offColorBoard) (Just (2, 2))
+    Spec.assertEqWith s "and with no snow mana spent at all the Herald is unchanged too" (S.powerToughnessOf noSnow noSnowBoard) (Just (2, 2))
+    -- The fourth board spends TWO snow mana of two colors, one of them the
+    -- spell's, which is what makes the record's per-tag color set a UNION rather
+    -- than whichever unit was recorded first.
+    (bothSnow, bothSnowBoard) <- heraldBoard s registry "Snow-Covered Forest" "Snow-Covered Mountain"
+    Spec.assertEqWith s "and one snow mana of the spell's color beside one of another color still fires it" (S.powerToughnessOf bothSnow bothSnowBoard) (Just (3, 3))
+    -- The supporting check, insensitive to the clause by construction: the spell
+    -- resolves on all three boards whatever the "if" said, so this cannot be what
+    -- the assertions above are reading.
+    Spec.assertEqWith s "and every spell resolved" (fmap (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Tomakul Honor Guard") S.alice) [matchingBoard, offColorBoard, noSnowBoard, bothSnowBoard]) [1, 1, 1, 1]
+
+  -- The control on the discriminator: both snow boards record the SAME tag on the
+  -- spell, so what tells them apart is the color beside it and nothing else.
+  Spec.it s "CR 107.4h both snow boards spend one snow mana, and the clause parts them on color" $ do
+    (_, matchingBoard) <- heraldBoard s registry "Snow-Covered Forest" "Mountain"
+    (_, offColorBoard) <- heraldBoard s registry "Forest" "Snow-Covered Mountain"
+    Spec.assertEqWith s "the matching board's spell remembers a snow tag" (heraldSpentTags matchingBoard) (Set.singleton ProductionTag.Snow)
+    Spec.assertEqWith s "and so does the off-color board's" (heraldSpentTags offColorBoard) (Set.singleton ProductionTag.Snow)
+    Spec.assertEqWith s "and both spent two mana" (heraldSpentCount matchingBoard, heraldSpentCount offColorBoard) (2, 2)
+
+-- Alice casts Tomakul Honor Guard, a green 3/1 costing {1}{G}, off exactly two
+-- lands while her Synthetic Rimewood Herald watches. `greenLand` pays the {G} and
+-- `genericLand` the {1}; those two names decide NOTHING else about the board.
+--
+-- The cast trigger goes on the stack above the spell that fired it (CR 603.3)
+-- and so resolves first (CR 608.1), which is the order the two resolveTops run
+-- in.
+--
+-- Returns the Herald and the board its clause did or did not fire on.
+heraldBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> String -> m (ObjectId.ObjectId, GameState.GameState)
+heraldBoard s registry greenLand genericLand = do
+  green <- S.printingOf s registry greenLand
+  other <- S.printingOf s registry genericLand
+  herald <- S.printingOf s registry "Synthetic Rimewood Herald"
+  entrant <- S.printingOf s registry "Tomakul Honor Guard"
+  let (heraldId, board) = S.addPermanent herald S.alice (S.landsFor other S.alice 1 (S.landsInPlay green 1))
+      (gs, spellId) = S.handOne entrant board
+      resolved = S.runPure S.identityAnswer gs (S.cast S.alice spellId *> Engine.placePendingTriggers *> Stack.resolveTop *> Stack.resolveTop)
+  pure (heraldId, resolved)
+
+-- Alice's Tomakul Honor Guard on the battlefield, or a placeholder id that reads
+-- as nothing -- `bergStriderOn` above's posture, so a board where the spell never
+-- resolved answers empty rather than throwing. The PERMANENT and not the spell,
+-- which is CR 400.7d's exception the way Berg Strider needs it.
+honorGuardOn :: GameState.GameState -> ObjectId.ObjectId
+honorGuardOn gs =
+  let isGuard oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Tomakul Honor Guard")
+   in case filter isGuard (Set.toAscList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 0
+
+heraldSpent :: GameState.GameState -> [ManaUnit.ManaUnit]
+heraldSpent gs = foldMap (Mana.Type.unwrap . Object.manaSpent) (Game.lookupObject (honorGuardOn gs) gs)
+
+heraldSpentTags :: GameState.GameState -> Set.Set ProductionTag.ProductionTag
+heraldSpentTags = foldMap ManaUnit.tags . heraldSpent
+
+heraldSpentCount :: GameState.GameState -> Int
+heraldSpentCount = length . heraldSpent
 
 -- CR 602.2a's ability object as CR 400.7d's other record-keeper: "That ability is
 -- created on the stack as an object that's not a card." An ACTIVATION's mana is
@@ -2215,4 +2314,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   celestialDawnSpec s registry
   spendChoiceSpec s registry
   bergStriderSpec s registry
+  rimewoodHeraldSpec s registry
   forswornPaladinSpec s registry

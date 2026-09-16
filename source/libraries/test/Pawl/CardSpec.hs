@@ -3358,6 +3358,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.TimesPaid {} -> []
   Quantity.Type.CastUsing {} -> []
   Quantity.Type.TagWasSpent {} -> []
+  Quantity.Type.TagWasSpentOfOwnColor {} -> []
   Quantity.Type.ManaSpent -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasAttacking -> []

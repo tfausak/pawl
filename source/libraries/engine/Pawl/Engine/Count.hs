@@ -1137,8 +1137,8 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- CR 400.7d's mana record is a field of an OBJECT, which a
       -- ProjectedCharacteristics does not carry -- `designations` above, same
       -- sentence -- so a past event reports none.
-      Filter.manaSpentTags = Set.empty,
-      -- The same field one question over -- `manaSpentTags` above, same sentence.
+      Filter.manaSpentTagColors = Map.empty,
+      -- The same field one question over -- `manaSpentTagColors` above, same sentence.
       Filter.manaSpentAmount = 0,
       -- CR 602.1 / 605.1a off the snapshot, which is what it reads for `keywords`
       -- and `power` too -- so this answers what the object HAD at the event.

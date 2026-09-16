@@ -107,7 +107,7 @@ blackCreature =
       Filter.classLevel = Nothing,
       Filter.paidCosts = Map.empty,
       Filter.castUsing = Nothing,
-      Filter.manaSpentTags = Set.empty,
+      Filter.manaSpentTagColors = Map.empty,
       Filter.manaSpentAmount = 0,
       -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
       -- atom's own cases below say which view they want rather than inheriting it.
@@ -178,7 +178,7 @@ devoidBigCreature =
       Filter.classLevel = Nothing,
       Filter.paidCosts = Map.empty,
       Filter.castUsing = Nothing,
-      Filter.manaSpentTags = Set.empty,
+      Filter.manaSpentTagColors = Map.empty,
       Filter.manaSpentAmount = 0,
       Filter.nonManaActivatedAbility = False,
       Filter.hasActivatedAbility = False,
@@ -263,7 +263,7 @@ castFromGraveyard = blackCreature {Filter.zone = Just Zone.Stack, Filter.castFro
 -- else -- Shadow the Hedgehog's condition, and the one axis the TagWasSpent cases
 -- vary.
 paidWithArtifactMana :: Filter.View
-paidWithArtifactMana = blackCreature {Filter.zone = Just Zone.Stack, Filter.manaSpentTags = Set.singleton ProductionTag.Artifact, Filter.manaSpentAmount = 2}
+paidWithArtifactMana = blackCreature {Filter.zone = Just Zone.Stack, Filter.manaSpentTagColors = Map.singleton ProductionTag.Artifact Set.empty, Filter.manaSpentAmount = 2}
 
 -- A SPELL on the stack aimed at creature 9 and at player 1 -- `blackCreature`
 -- moved to the stack and given targets, which is what the two Targets cases
@@ -1975,7 +1975,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- The pair that makes the atom discriminating: two views differing in the
     -- recorded tag set alone, so neither answer can come from anything else.
     Spec.it s "a payment that carried no tag does not match" $
-      Spec.assertBool s (not (Filter.matches self (paidWithArtifactMana {Filter.manaSpentTags = Set.empty}) (Filter.Type.TagWasSpent ProductionTag.Artifact))) "the same spell, paid off an untagged source"
+      Spec.assertBool s (not (Filter.matches self (paidWithArtifactMana {Filter.manaSpentTagColors = Map.empty}) (Filter.Type.TagWasSpent ProductionTag.Artifact))) "the same spell, paid off an untagged source"
 
     -- Vacuously False with nothing to ask: a player is not an object (CR 109.1)
     -- and an object nothing was paid for carries an empty record.

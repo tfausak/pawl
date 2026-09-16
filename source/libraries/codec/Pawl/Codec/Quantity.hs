@@ -99,6 +99,7 @@ codec =
       -- the card names, and the object is whichever one the quantity is
       -- evaluated against.
       Arm.payload "TagWasSpent" ProductionTag.codec Quantity.TagWasSpent (\x -> case x of Quantity.TagWasSpent y -> Just y; _ -> Nothing),
+      Arm.payload "TagWasSpentOfOwnColor" ProductionTag.codec Quantity.TagWasSpentOfOwnColor (\x -> case x of Quantity.TagWasSpentOfOwnColor y -> Just y; _ -> Nothing),
       -- CR 202.1a's amount, nothing on the wire for the same reason: the object is
       -- whichever one the quantity is evaluated against.
       Arm.nullary "ManaSpent" Quantity.ManaSpent,
@@ -215,6 +216,7 @@ tagOf x = case x of
   Quantity.TimesPaid {} -> "TimesPaid"
   Quantity.CastUsing {} -> "CastUsing"
   Quantity.TagWasSpent {} -> "TagWasSpent"
+  Quantity.TagWasSpentOfOwnColor {} -> "TagWasSpentOfOwnColor"
   Quantity.ManaSpent {} -> "ManaSpent"
   Quantity.WasToken {} -> "WasToken"
   Quantity.WasAttacking {} -> "WasAttacking"
