@@ -587,6 +587,7 @@ effectObjectRefs effect = case effect of
   Effect.GainLife {} -> []
   Effect.ExchangeLifeTotals {} -> []
   Effect.SetLifeTotal {} -> []
+  Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed {} -> []
   Effect.DecreaseSpeed {} -> []
@@ -755,6 +756,7 @@ effectPlayerRefs effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.ExchangeLifeTotals {} -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.LoseGame ref -> [ref]
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease ref _ _) -> [ref]
@@ -979,6 +981,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  Effect.LoseGame {} -> Map.empty
   Effect.RedistributeLifeTotals -> Map.empty
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.DecreaseSpeed d -> quantitySlots (SpeedDecrease.quantity d)
@@ -1555,6 +1558,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.LoseGame {} -> True
   Effect.RedistributeLifeTotals -> True
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.DecreaseSpeed d -> Quantity.slotsAreExhaustive (SpeedDecrease.quantity d)
@@ -1775,6 +1779,7 @@ readsX =
         Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.ExchangeLifeTotals _ -> False
         Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.LoseGame {} -> False
         Effect.RedistributeLifeTotals -> False
         Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
@@ -1987,6 +1992,7 @@ boundSlots effect = case effect of
   Effect.GainLife {} -> Set.empty
   Effect.ExchangeLifeTotals _ -> Set.empty
   Effect.SetLifeTotal {} -> Set.empty
+  Effect.LoseGame {} -> Set.empty
   Effect.RedistributeLifeTotals -> Set.empty
   Effect.IncreaseSpeed {} -> Set.empty
   Effect.DecreaseSpeed {} -> Set.empty

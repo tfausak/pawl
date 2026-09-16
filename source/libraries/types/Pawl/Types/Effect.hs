@@ -262,6 +262,9 @@ data Effect card ability
   | -- | CR 119.5: the players the PlayerRef names each gain or lose the
     -- necessary amount to end up with this life total (Magister Sphinx).
     SetLifeTotal PlayerQuantity.PlayerQuantity
+  | -- | CR 104.3e: the players the PlayerRef names each lose the game (Door to
+    -- Nothingness).
+    LoseGame PlayerRef.PlayerRef
   | -- | Reverse the Sands' "redistribute any number of players' life totals":
     -- CR 119.7 / 119.8's assignment, each new total a CR 119.5 gain or loss.
     -- Choose, not target, so the permutation is picked on resolution.

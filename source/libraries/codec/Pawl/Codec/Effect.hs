@@ -159,6 +159,7 @@ codec cardCodec abilityCodec =
           Arm.payload "GainLife" PlayerQuantity.codec Effect.GainLife (\x -> case x of Effect.GainLife y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeLifeTotals" ExchangeSides.codec Effect.ExchangeLifeTotals (\x -> case x of Effect.ExchangeLifeTotals y -> Just y; _ -> Nothing),
           Arm.payload "SetLifeTotal" PlayerQuantity.codec Effect.SetLifeTotal (\x -> case x of Effect.SetLifeTotal y -> Just y; _ -> Nothing),
+          Arm.payload "LoseGame" PlayerRef.codec Effect.LoseGame (\x -> case x of Effect.LoseGame y -> Just y; _ -> Nothing),
           Arm.nullary "RedistributeLifeTotals" Effect.RedistributeLifeTotals,
           Arm.payload "IncreaseSpeed" PlayerQuantity.codec Effect.IncreaseSpeed (\x -> case x of Effect.IncreaseSpeed y -> Just y; _ -> Nothing),
           Arm.payload "DecreaseSpeed" SpeedDecrease.codec Effect.DecreaseSpeed (\x -> case x of Effect.DecreaseSpeed y -> Just y; _ -> Nothing),
@@ -288,6 +289,7 @@ tagOf x = case x of
   Effect.GainLife {} -> "GainLife"
   Effect.ExchangeLifeTotals {} -> "ExchangeLifeTotals"
   Effect.SetLifeTotal {} -> "SetLifeTotal"
+  Effect.LoseGame {} -> "LoseGame"
   Effect.RedistributeLifeTotals {} -> "RedistributeLifeTotals"
   Effect.IncreaseSpeed {} -> "IncreaseSpeed"
   Effect.DecreaseSpeed {} -> "DecreaseSpeed"

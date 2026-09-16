@@ -328,6 +328,7 @@ manaProduced effect = case effect of
   Effect.GainLife {} -> Nothing
   Effect.ExchangeLifeTotals _ -> Nothing
   Effect.SetLifeTotal {} -> Nothing
+  Effect.LoseGame {} -> Nothing
   Effect.RedistributeLifeTotals -> Nothing
   Effect.IncreaseSpeed {} -> Nothing
   Effect.DecreaseSpeed {} -> Nothing
@@ -519,6 +520,7 @@ movesLibraryCard effect = case effect of
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals _ -> False
   Effect.SetLifeTotal {} -> False
+  Effect.LoseGame {} -> False
   Effect.RedistributeLifeTotals -> False
   Effect.IncreaseSpeed {} -> False
   Effect.DecreaseSpeed {} -> False
