@@ -254,6 +254,61 @@ mayDefinedSlots mode
       Optionality.Mandatory -> False
       Optionality.Optional _ -> True
 
+-- CR 700.2d: run ONE chosen instance's clauses with its own namespace for the
+-- slots its mode DEFINES mid-resolution -- Effect.MoveToZone's CR 400.7
+-- incarnation, Effect.Create's minted tokens, Effect.Destroy's count, Effect
+-- .PlaySubgame's loser. Modal.instanceSlot keeps the slots a mode DECLARES
+-- apart; those are written under the name the card PRINTS, so a mode chosen
+-- twice would have its second write land on the first's key and "different
+-- targets may be chosen" would be unobservable for them.
+--
+-- A SWAP around the instance rather than a rename at each write, because only
+-- some readers of a defined slot come through Modal.instanceView: Resolve
+-- .Effect's slotOne and slotGroup, Filter.IsBound and the ObjectRef readers go
+-- to the live bindings by the printed name, and ArmDelayedTrigger captures them
+-- raw. Emptying the printed name first leaves every one of those reading this
+-- instance's own definition, and filing what it wrote under Modal.instanceSlot
+-- afterwards leaves the earlier occurrence's standing where it was.
+--
+-- Observable exactly where an instance's define is SKIPPED and its read still
+-- runs -- CR 400.7 having deleted the object that instance names, most simply
+-- because an earlier occurrence moved it -- since two instances that both
+-- define write in sequence and each then reads its own. Pawl.ModalSpec's "CR
+-- 700.2d the second copy of a mode whose target is gone defines no object of
+-- its own" is the proof.
+--
+-- The instance's own writes win over what was stashed (Map.union's left bias),
+-- which is what keeps occurrence 0 -- whose instanceSlot name IS the printed one
+-- -- writing where it always did.
+withDefinedSlots :: ObjectId -> ModeInstance -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game a -> Game a
+withDefinedSlots holder mi mode action =
+  let defined = definedSlots (Foldable.toList (Mode.allEffects mode))
+   in if Set.null defined
+        then action
+        else do
+          outer <- State.state (takeBindings holder defined)
+          result <- action
+          inner <- State.state (takeBindings holder defined)
+          State.modify' (putBindings holder (Map.union (Map.mapKeys (Modal.instanceSlot mi) inner) outer))
+          pure result
+
+-- withDefinedSlots' first half: lift `names` off `holder`'s bindings, answering
+-- what was under them. A holder that has ceased carries nothing to lift and
+-- takes nothing back (Map.adjust is silent on a missing key), which is the same
+-- answer CR 729.5's detached bindings give the rest of this module.
+takeBindings :: ObjectId -> Set SlotName -> GameState -> (Map SlotName Binding.Type.Binding, GameState)
+takeBindings holder names gs =
+  let taken = maybe Map.empty (flip Map.restrictKeys names . Object.bindings) (Game.lookupObject holder gs)
+      put obj = obj {Object.bindings = Map.withoutKeys (Object.bindings obj) names}
+   in (taken, gs {GameState.objects = Map.adjust put holder (GameState.objects gs)})
+
+-- takeBindings' inverse: put `bindings` back onto `holder`, preferring them to
+-- whatever shares a key.
+putBindings :: ObjectId -> Map SlotName Binding.Type.Binding -> GameState -> GameState
+putBindings holder bindings gs =
+  let put obj = obj {Object.bindings = Map.union bindings (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+
 -- A resolving spell's PROJECTED modes: only its chosen ones (CR 608.2c/700.2),
 -- with every text change affecting it applied (CR 612). Modes rather than a flat
 -- effect list because CR 603.5's "may" belongs to a clause within a mode.
@@ -340,7 +395,7 @@ resolveSpellWith runSubgame oid = do
               then Event.changeZone oid Zone.Graveyard
               else do
                 let effectController = spellController obj oid gs
-                Monad.forM_ (modesOf oid gs) $ \(mi, mode) -> do
+                Monad.forM_ (modesOf oid gs) $ \(mi, mode) -> withDefinedSlots oid mi mode $ do
                   let idx = ModeInstance.index mi
                       -- CR 608.2c's printed order, and the lookup CR 608.2d's
                       -- either-or reads its SIBLING back out of.
@@ -635,73 +690,74 @@ resolveModesWith runSubgame stackId srcId modes = do
           -- not override it.
           effectController = Object.owner obj
           resolveOne (mi, mode) =
-            let idx = ModeInstance.index mi
-                -- CR 700.2d: this instance's slots under the names its mode
-                -- prints, applied to both maps so they cannot disagree.
-                instanceView = Modal.instanceView slots mi (Mode.targetSlots mode)
-                -- CR 608.2c's printed order, and the lookup CR 608.2d's
-                -- either-or reads its SIBLING back out of.
-                indexedClauses = zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))
-                applyOne eff = do
-                  -- Re-read the LIVE bindings for THIS effect (CR 608.2c). Both
-                  -- maps come from the SAME bindings: `legalNow` is `chosenNow`
-                  -- with CR 608.2b's illegal recipients dropped, so re-reading one
-                  -- without the other would lose the bindings it just gained.
-                  bindingsNow <- State.gets (liveBindings obj stackId)
-                  let chosenNow = Binding.targetsOf bindingsNow
-                      legalNow = Map.mapWithKey legalSlot chosenNow
-                  applyEffectWith runSubgame stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
-             in -- CR 608.2e's clause is what each gate covers. Run only when
-                -- `fizzles` is False.
-                Monad.foldM_
-                  ( \(answers, picked, ran) (cIdx, clause) -> do
-                      -- CR 608.2c's "If you do" first, off the same fold the
-                      -- spell path keeps. Proved on this path, not merely
-                      -- fenced: Aetherplasm's second clause hangs on its first,
-                      -- and Pawl.CombatEffectSpec's "declining to return
-                      -- Aetherplasm skips the clause its 'If you do' hangs on"
-                      -- reddens when this conjunct is defeated. What #1887 still
-                      -- covers on this loop is the OTHER gate -- an observable
-                      -- MANDATORY clause standing before a printed "may".
-                      let hangs = ifTakenHolds ran clause
-                      -- CR 701.46a's printed "if" next, read against `srcId` --
-                      -- the rule says "this permanent", which is also why
-                      -- `payGatePaid` is given `srcId`. Off the LIVE bindings of
-                      -- the STACK object (CR 608.2c), where this resolution's
-                      -- slots are bound (see bindSlot).
-                      gateBindings <- State.gets (liveBindings obj stackId)
-                      gated <- if hangs then gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings clause else pure False
-                      -- CR 603.5 / 608.2d: then the printed "may", against the
-                      -- SAME live bindings CR 608.2b's filter is applied to, so a
-                      -- clause whose every read is dead is not asked about.
-                      let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                          boundNowForMay = Map.keysSet (instanceView gateBindings)
-                      -- CR 608.2d's "or" next, and BEFORE the "may", off the same
-                      -- helper the spell path uses. Proved on THIS loop and not
-                      -- merely on the spell's twin: Teardrop Kami's "sacrifice
-                      -- this creature: you may tap or untap target creature" is
-                      -- Pawl.ResolveSpec's "CR 608.2d an untapped Piker leaves
-                      -- Teardrop Kami only its tap", which reddens when this
-                      -- conjunct is defeated.
-                      --
-                      -- The branches are FILTERED to the ones CR 608.2d leaves
-                      -- to choose, the spell loop's derivation and its fence.
-                      let eligible i = case lookup i indexedClauses of
-                            Nothing -> pure False
-                            Just sibling -> do
-                              held <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings sibling
-                              State.gets (\gsNow -> held && not (clauseIsImpossible stackId srcId effectController legalNowForMay gsNow sibling))
-                      (announced, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay eligible picked clause else pure (Just Set.empty, picked)
-                      let branch = maybe True (not . Set.null) announced
-                      taken <- if branch then exercises stackId srcId effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
-                      -- CR 118.12: then the cost paid on resolution, against the
-                      -- START-of-resolution slots.
-                      (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
-                      Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause)))
-                      pure (answers2, picked2, recordTaken admitted cIdx ran)
-                  )
-                  (Map.empty, Map.empty, Set.empty)
-                  indexedClauses
+            withDefinedSlots stackId mi mode $
+              let idx = ModeInstance.index mi
+                  -- CR 700.2d: this instance's slots under the names its mode
+                  -- prints, applied to both maps so they cannot disagree.
+                  instanceView = Modal.instanceView slots mi (Mode.targetSlots mode)
+                  -- CR 608.2c's printed order, and the lookup CR 608.2d's
+                  -- either-or reads its SIBLING back out of.
+                  indexedClauses = zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))
+                  applyOne eff = do
+                    -- Re-read the LIVE bindings for THIS effect (CR 608.2c). Both
+                    -- maps come from the SAME bindings: `legalNow` is `chosenNow`
+                    -- with CR 608.2b's illegal recipients dropped, so re-reading one
+                    -- without the other would lose the bindings it just gained.
+                    bindingsNow <- State.gets (liveBindings obj stackId)
+                    let chosenNow = Binding.targetsOf bindingsNow
+                        legalNow = Map.mapWithKey legalSlot chosenNow
+                    applyEffectWith runSubgame stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
+               in -- CR 608.2e's clause is what each gate covers. Run only when
+                  -- `fizzles` is False.
+                  Monad.foldM_
+                    ( \(answers, picked, ran) (cIdx, clause) -> do
+                        -- CR 608.2c's "If you do" first, off the same fold the
+                        -- spell path keeps. Proved on this path, not merely
+                        -- fenced: Aetherplasm's second clause hangs on its first,
+                        -- and Pawl.CombatEffectSpec's "declining to return
+                        -- Aetherplasm skips the clause its 'If you do' hangs on"
+                        -- reddens when this conjunct is defeated. What #1887 still
+                        -- covers on this loop is the OTHER gate -- an observable
+                        -- MANDATORY clause standing before a printed "may".
+                        let hangs = ifTakenHolds ran clause
+                        -- CR 701.46a's printed "if" next, read against `srcId` --
+                        -- the rule says "this permanent", which is also why
+                        -- `payGatePaid` is given `srcId`. Off the LIVE bindings of
+                        -- the STACK object (CR 608.2c), where this resolution's
+                        -- slots are bound (see bindSlot).
+                        gateBindings <- State.gets (liveBindings obj stackId)
+                        gated <- if hangs then gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings clause else pure False
+                        -- CR 603.5 / 608.2d: then the printed "may", against the
+                        -- SAME live bindings CR 608.2b's filter is applied to, so a
+                        -- clause whose every read is dead is not asked about.
+                        let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
+                            boundNowForMay = Map.keysSet (instanceView gateBindings)
+                        -- CR 608.2d's "or" next, and BEFORE the "may", off the same
+                        -- helper the spell path uses. Proved on THIS loop and not
+                        -- merely on the spell's twin: Teardrop Kami's "sacrifice
+                        -- this creature: you may tap or untap target creature" is
+                        -- Pawl.ResolveSpec's "CR 608.2d an untapped Piker leaves
+                        -- Teardrop Kami only its tap", which reddens when this
+                        -- conjunct is defeated.
+                        --
+                        -- The branches are FILTERED to the ones CR 608.2d leaves
+                        -- to choose, the spell loop's derivation and its fence.
+                        let eligible i = case lookup i indexedClauses of
+                              Nothing -> pure False
+                              Just sibling -> do
+                                held <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings sibling
+                                State.gets (\gsNow -> held && not (clauseIsImpossible stackId srcId effectController legalNowForMay gsNow sibling))
+                        (announced, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay eligible picked clause else pure (Just Set.empty, picked)
+                        let branch = maybe True (not . Set.null) announced
+                        taken <- if branch then exercises stackId srcId effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
+                        -- CR 118.12: then the cost paid on resolution, against the
+                        -- START-of-resolution slots.
+                        (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
+                        Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause)))
+                        pure (answers2, picked2, recordTaken admitted cIdx ran)
+                    )
+                    (Map.empty, Map.empty, Set.empty)
+                    indexedClauses
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
