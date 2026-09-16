@@ -2641,9 +2641,9 @@ switchBlockersSpec s registry = Spec.describe s "SwitchBlockers" $ do
   -- creature at that time" -- against CR 509.3d's, which carries none. Every
   -- creature this effect moves WAS a blocking creature, so Pride Guardian
   -- ("Whenever Pride Guardian blocks, you gain 3 life") gains its 3 once, at the
-  -- declaration, while Benalish Cavalry's flanking (CR 702.25a, "whenever a
-  -- creature without flanking blocks this creature") fires on the switch that
-  -- puts the Guardian in front of it.
+  -- declaration, while Benalish Cavalry's flanking (CR 702.25a, "whenever this
+  -- creature becomes blocked by a creature without flanking") fires on the
+  -- switch that puts the Guardian in front of it.
   --
   -- No evasion anywhere on this board, so CR 509.1b's hypothetical is vacuously
   -- satisfied and the switch itself is never in doubt.
