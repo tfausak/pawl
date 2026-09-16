@@ -903,8 +903,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "the same settle that took bob out of the game put her trigger on the stack" (length (GameState.stack settled), statusOf S.bob settled) (1, Just (Status.Departed Departure.Type.Lost))
 
   -- CR 104.3e's own door, at gameplay level: "an effect may state that a player
-  -- loses the game". Door to Nothingness is the only printing that names another
-  -- player, so it is where the targeted form is proved.
+  -- loses the game". Scryfall o:/target player loses the game/ -is:digital,
+  -- 2026-09-16, one hit: Door to Nothingness, so it is where the targeted form is
+  -- proved.
   --
   -- The loss is NOT a state-based action -- CR 104.3b-d wait for the next
   -- priority, this happens as the ability applies -- and lands in the same

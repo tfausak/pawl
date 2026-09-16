@@ -1040,7 +1040,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       (Effect.Shuffle (PlayerRef.Relative PlayerRelation.You))
       " {\"type\":\"Shuffle\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 104.3e, a bare PlayerRef too. Door to Nothingness writes the targeted
-  -- spelling; this is the self one Final Fortune's delayed trigger writes.
+  -- spelling; this is the self one, which no card in the pool writes yet (#3792).
   Spec.it s "LoseGame" $
     Common.assertJsonCodec
       s

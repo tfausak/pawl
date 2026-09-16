@@ -298,8 +298,8 @@ data ActionChoices = MkActionChoices
     choiceX :: Maybe Natural,
     choiceCost :: Maybe ManaCost.ManaCost,
     -- | CR 601.2h's permutation of the non-mana components' printed indices,
-    -- which Pawl.Engine.Cost raises only where the order is observable -- a
-    -- "{T}, Sacrifice this" cost is the pool's case (Door to Nothingness).
+    -- which Pawl.Engine.Cost raises only where the order is observable -- Door to
+    -- Nothingness's "{T}, Sacrifice this" is what needs it.
     choiceCostOrder :: Maybe [Natural],
     choiceManaSources :: Seq.Seq (Maybe ObjectRef),
     choiceManaYields :: Seq.Seq Mana.Mana
@@ -2135,7 +2135,7 @@ answerActionChoice key verb choices asked =
         -- index twice would otherwise pay one component twice and skip another.
         Prompt.OrderCostComponents _ _ _ components -> case choiceCostOrder choices of
           Just order
-            | List.sort order == [0 .. Natural.length components - 1] -> do
+            | List.sort order == fmap fst (zip [0 ..] components) -> do
                 updateActionChoices (\current -> current {choiceCostOrder = Nothing})
                 pure order
           _ -> unexpected

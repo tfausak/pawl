@@ -263,10 +263,7 @@ data Effect card ability
     -- necessary amount to end up with this life total (Magister Sphinx).
     SetLifeTotal PlayerQuantity.PlayerQuantity
   | -- | CR 104.3e: the players the PlayerRef names each lose the game (Door to
-    -- Nothingness, Final Fortune). Not a state-based action -- CR 104.3b-d wait
-    -- for the next priority, this happens as the effect applies -- but the same
-    -- departure afterwards, CR 104.3 listing all five ways together and CR 104.5
-    -- attaching one consequence to every one of them.
+    -- Nothingness).
     LoseGame PlayerRef.PlayerRef
   | -- | Reverse the Sands' "redistribute any number of players' life totals":
     -- CR 119.7 / 119.8's assignment, each new total a CR 119.5 gain or loss.
