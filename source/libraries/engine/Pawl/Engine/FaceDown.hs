@@ -191,7 +191,7 @@ canTurnFaceUp pid procedure oid gs =
         && eligible
         && case costOf procedure oid gs of
           Nothing -> False
-          Just cost -> Cost.canPay pid oid cost gs
+          Just cost -> Cost.canPay (PaymentSubject.TurningFaceUp oid) pid oid cost gs
 
 -- Every way this player may turn a permanent face up right now, in battlefield
 -- order -- what Action.TurnFaceUp is built from.
@@ -254,8 +254,8 @@ turnFaceUp perform pid procedure oid = do
         -- the cost that will be paid and this offer stays exactly as permissive as
         -- the payability gate above. Discarded, Pawl.Engine.Activate's reason: rule
         -- 702.150a asks about the player who CAST the object.
-        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
-        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+        (announced, _) <- Cost.announce (PaymentSubject.TurningFaceUp oid) ManaSpending.AsProduced pid oid pure cost
+        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution (PaymentSubject.TurningFaceUp oid) Nothing ManaSpending.AsProduced pid oid announced
         case payment of
           -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
           -- special action IS the whole of what failed, so `before` goes to

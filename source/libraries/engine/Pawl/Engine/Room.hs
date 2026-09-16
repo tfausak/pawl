@@ -140,7 +140,7 @@ canUnlock pid oid half gs =
     face : _ ->
       Projection.controllerOf oid gs == Just pid
         && Turn.sorcerySpeedWindow pid gs
-        && Cost.canPay pid oid (unlockCostOf face) gs
+        && Cost.canPay (PaymentSubject.Unlocking oid) pid oid (unlockCostOf face) gs
 
 -- Every door this player may unlock right now, in battlefield order and then
 -- printed order -- what Action.Unlock is built from, and the shape
@@ -180,8 +180,8 @@ unlock perform pid oid half = do
         -- reasons. CR 116.2m's unlock cost is a locked half's mana cost, and no
         -- printed Room half holds such a symbol -- Scryfall `t:room`,
         -- 2026-09-01 -- so no prompt is raised today.
-        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (unlockCostOf face)
-        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+        (announced, _) <- Cost.announce (PaymentSubject.Unlocking oid) ManaSpending.AsProduced pid oid pure (unlockCostOf face)
+        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution (PaymentSubject.Unlocking oid) Nothing ManaSpending.AsProduced pid oid announced
         case payment of
           -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
           -- special action IS the whole of what failed, so `before` goes to

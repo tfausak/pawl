@@ -180,7 +180,7 @@ canTake pid gs = case Map.lookup pid (GameState.players gs) of
       not (Player.companionTaken player)
         && Map.findWithDefault 0 printingId (Player.outsideTheGame player) > 0
         && Turn.sorcerySpeedWindow pid gs
-        && Cost.canPay pid (GameState.nextObjectId gs) actionCost gs
+        && Cost.canPay PaymentSubject.ForNeither pid (GameState.nextObjectId gs) actionCost gs
 
 -- CR 116.2g / 702.139a: pay {3} and put the companion into this player's hand.
 --

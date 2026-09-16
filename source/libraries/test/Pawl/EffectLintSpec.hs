@@ -1546,11 +1546,12 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 106.6 restricts how mana "can be spent"; it never forbids spending it
-  -- outright. A Pawl.Types.ManaRestriction with neither half set is mana no
-  -- payment may ever use, which is mana the card might as well not have added --
-  -- so it is card data that means nothing rather than a rule pawl implements.
-  -- Nothing in the codec can refuse it: both fields default to Nothing, which is
-  -- what lets Mishra's Workshop write one key and Omen Hawker the other.
+  -- outright. A Pawl.Types.ManaRestriction with no half set is mana no payment
+  -- may ever use, which is mana the card might as well not have added -- so it
+  -- is card data that means nothing rather than a rule pawl implements. Nothing
+  -- in the codec can refuse it: every field defaults to Nothing, which is what
+  -- lets Mishra's Workshop write one key, Omen Hawker another and Overgrown
+  -- Zealot a third.
   Spec.it s "no card adds mana no payment could spend (CR 106.6)" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
@@ -1559,7 +1560,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
             Nothing -> False
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
-    Spec.assertEqWith s "a restriction admitting neither casts nor activations is unspendable mana" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "a restriction admitting no kind of payment is unspendable mana" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 612.2's family gate lives on a modification's CONSTRUCTOR:
   -- Pawl.Engine.Projection.rewriteModificationWith swaps a land-type word only
   -- inside the two land arms and a creature-type word only inside the two creature

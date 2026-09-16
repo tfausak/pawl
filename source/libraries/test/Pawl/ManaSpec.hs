@@ -736,9 +736,10 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 -- this colour proves the ANSWER decides what is produced, rather than the order
 -- Mana.manaYieldsOf happens to return.
 --
--- One unit, because every candidate a colour choice reaches is one mana: a
--- source whose yield is longer offers it whole (Sol Ring), and no card in the
--- pool both chooses a colour and adds twice.
+-- One unit, because a source whose yield is longer offers it whole (Sol Ring).
+-- Overgrown Zealot's second ability both chooses a colour and adds twice, so this
+-- answerer does not reach it; Pawl.ManaSourceSpec's zealotPaying hands
+-- optionOfTypes the pair instead.
 prefersColor :: Color.Color -> Prompt.Prompt r -> r
 prefersColor wanted p = case p of
   Prompt.ChooseManaYield _ _ _ candidates -> optionOfTypes [ManaType.Colored wanted] candidates

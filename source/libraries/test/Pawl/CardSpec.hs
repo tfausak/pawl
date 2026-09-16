@@ -4869,13 +4869,16 @@ handSweepFramed = fmap ((,) HandSweepFramed)
 frame :: Framing -> [(Framing, Filter.Type.Filter Keyword.Keyword)] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 frame framing = fmap (\(inner, f) -> (if inner == Unframed then framing else inner, f))
 
--- Both predicates a CR 106.6 restriction can carry. Its own type has two fields
--- and no traversal, so a lint that reached only one of them would go quiet on
--- the other -- which is why this is a function and not an inlined selector.
+-- Every predicate a CR 106.6 restriction can carry. Its own type has a field per
+-- payment kind and no traversal, so a lint that reached only one of them would
+-- go quiet on the others -- which is why this is a function and not an inlined
+-- selector.
 restrictionFilters :: ManaRestriction.ManaRestriction -> [Filter.Type.Filter Keyword.Keyword]
 restrictionFilters restriction =
   Maybe.maybeToList (ManaRestriction.casts restriction)
     <> Maybe.maybeToList (ManaRestriction.activations restriction)
+    <> Maybe.maybeToList (ManaRestriction.unlocks restriction)
+    <> Maybe.maybeToList (ManaRestriction.turnsFaceUp restriction)
 
 -- The predicate a CR 106.6 rider carries. A function beside restrictionFilters
 -- for the same reason: the two clauses ride Pawl.Types.ManaAddition
@@ -4918,8 +4921,8 @@ effectFilters effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     frame Unframed (durationFilters duration) <> frame Unframed (modificationFilters modification) <> frame SourceHostFramed (objectRefFilters ref)
   Effect.ChangeText {} -> []
-  -- CR 106.6's two clauses, and every predicate in them: the restriction's cast
-  -- half, its activation half, and the rider's condition are each an ordinary
+  -- CR 106.6's two clauses, and every predicate in them: the restriction's half
+  -- per payment kind and the rider's condition are each an ordinary
   -- Filter, and collecting one of them would take every lint in this module off
   -- the others. UNFRAMED: each is evaluated against the object being paid for
   -- (Pawl.Engine.Mana.admitsUnder for the restriction,

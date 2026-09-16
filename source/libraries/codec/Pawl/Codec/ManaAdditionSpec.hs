@@ -101,7 +101,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.count = Quantity.Literal 1,
             ManaAddition.production = ManaProduction.OfType ManaType.Colorless,
             ManaAddition.retention = ManaRetention.Ordinary,
-            ManaAddition.restriction = Just (ManaRestriction.MkManaRestriction {ManaRestriction.casts = Nothing, ManaRestriction.activations = Just (Filter.And [])}),
+            ManaAddition.restriction = Just (ManaRestriction.none {ManaRestriction.activations = Just (Filter.And [])}),
             ManaAddition.rider = Nothing
           }
       )

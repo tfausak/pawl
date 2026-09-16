@@ -19,14 +19,17 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import Pawl.ManaSpec (alicePermanents, atLife, castFrom, isActivationOf, paysColors, poolSize, poolTypes, poolUnits, prefersSource, recordingManaSources, tapEverything, theAbility)
+import Pawl.ManaSpec (alicePermanents, atLife, castFrom, isActivationOf, optionOfTypes, paysColors, poolSize, poolTypes, poolUnits, prefersSource, recordingManaSources, tapEverything, theAbility)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -41,6 +44,8 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -68,6 +73,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 118.3 on the supply side again, for a repeatable ability whose cost spends no
@@ -420,7 +426,7 @@ villageRitesSpec s registry = Spec.describe s "A cost's own sacrifice and its so
     piker <- S.printingOf s registry "Goblin Piker"
     let pays victims =
           let (gs, oid) = S.handOne rites (alicePermanents (tower : replicate victims piker))
-           in any (\cost -> Cost.canPay S.alice oid cost gs) (Cost.costsFor S.alice (S.printingName rites) oid gs)
+           in any (\cost -> Cost.canPay PaymentSubject.ForNeither S.alice oid cost gs) (Cost.costsFor S.alice (S.printingName rites) oid gs)
     Spec.assertBool s (not (pays 1)) "one Piker is not enough"
     Spec.assertBool s (pays 2) "two are"
 
@@ -1622,11 +1628,7 @@ hawkerMana manaType =
       ManaUnit.tags = Set.empty,
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction =
-        Just
-          ManaRestriction.MkManaRestriction
-            { ManaRestriction.casts = Nothing,
-              ManaRestriction.activations = Just (Filter.And [])
-            },
+        Just ManaRestriction.none {ManaRestriction.activations = Just (Filter.And [])},
       ManaUnit.rider = Nothing,
       ManaUnit.sourceChosenSubtype = Nothing
     }
@@ -2199,6 +2201,152 @@ payable = Mana.canPay Cost.manaActivations
 plainRed :: ManaUnit.ManaUnit
 plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}
 
+-- CR 106.6 naming a SPECIAL ACTION rather than a cast or an activation. Overgrown
+-- Zealot ({1}{G} Creature -- Elf Druid 0/4, "{T}: Add one mana of any color." /
+-- "{T}: Add two mana of any one color. Spend this mana only to turn permanents
+-- face up.") is the printing, and its second ability is the sharp case: the whole
+-- rider is CR 116.2b's action, so there is no cast half to fall back on.
+--
+-- Nothing is omitted from the card, so pawl's Zealot is neither stricter nor
+-- weaker than printed.
+--
+-- THE BOARD, one permanent at a time:
+--
+--   * a face-down Kadena's Silencer, put there by a real morph cast (CR 702.37a)
+--     off three Islands, which the {3} taps. Its megamorph cost is {1}{U}, and
+--     the Zealot's two mana are exactly that.
+--   * the Zealot, added AFTER that cast so the cast's mana window cannot have
+--     tapped it.
+--   * a SECOND Kadena's Silencer in hand, whose mana cost is the same {1}{U}.
+--     The same price under a different payment kind is what makes the refusal CR
+--     106.6 and not arithmetic -- one board, two payments, and only one of them
+--     goes through.
+--
+-- The Zealot's FIRST ability is unrestricted and adds ONE mana, so there is no
+-- unrestricted route to {1}{U} on this board either way.
+overgrownZealotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+overgrownZealotSpec s registry = Spec.describe s "Overgrown Zealot" $ do
+  Spec.it s "CR 116.2b the Zealot's two mana turn a face-down creature face up" $ do
+    board <- zealotBoard s registry
+    case board of
+      Nothing -> Spec.assertFailure s "the morph cast of Kadena's Silencer did not reach the battlefield"
+      Just (before, zealot, permanent, _) -> do
+        -- The controls on the fixture: it really is face down beforehand, and the
+        -- three Islands really are spent, so nothing unrestricted is left to pay
+        -- with.
+        Spec.assertEqWith s "CR 708.2a face down before" (fmap Object.facing (Game.lookupObject permanent before)) (Just (Facing.faceDown FaceDownReason.Morphed))
+        Spec.assertEqWith s "and the three Islands paid the morph cast" (S.tappedCount S.alice before) 3
+        let after = S.runPure zealotPaying before (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph permanent)
+        Spec.assertEqWith s "CR 110.5 the restricted mana turned it face up" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
+        -- WHICH source paid: the Zealot's ability taps it, and it was the one
+        -- untapped permanent alice had.
+        Spec.assertEqWith s "CR 605.3b and the Zealot is what tapped for it" (fmap Object.tapped (Game.lookupObject zealot after)) (Just TapState.Tapped)
+        -- CR 106.6's gate and its payment have to agree, or the action is never
+        -- menued: this is the half Pawl.Engine.Cost.canPay answers.
+        Spec.assertEqWith s "CR 116.2b so the action is offered as well as payable" (FaceDown.turnableFaceUp S.alice before) [(permanent, TurnUpProcedure.Morph)]
+
+  Spec.it s "CR 106.6 the same two mana cast no spell" $ do
+    board <- zealotBoard s registry
+    case board of
+      Nothing -> Spec.assertFailure s "the morph cast of Kadena's Silencer did not reach the battlefield"
+      Just (before, _, _, spell) ->
+        -- {1}{U} in hand against {1}{U} of turn-up-only mana. The refusal is
+        -- neither the colour (the Zealot makes any) nor the amount (it makes
+        -- two), and the case above is the control that says this very board pays
+        -- that very price for the special action.
+        Spec.assertBool s (not (S.castable S.alice spell before)) "CR 601.2h a cast is not one of the payments the rider names"
+
+-- Answers the mana window with the Zealot's SECOND yield -- two blue -- wherever
+-- it is offered. `optionOfTypes` matches the whole yield, so the PAIR is what
+-- picks the restricted ability over the unrestricted one mana, and blue over the
+-- other four colours.
+zealotPaying :: Prompt.Prompt r -> r
+zealotPaying p = case p of
+  Prompt.ChooseManaYield _ _ _ candidates -> optionOfTypes (replicate 2 (ManaType.Colored Color.Blue)) candidates
+  _ -> S.identityAnswer p
+
+-- The shared board: the face-down permanent, the Zealot, and a second Kadena's
+-- Silencer in hand. Nothing else alice controls is untapped.
+zealotBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId))
+zealotBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  silencer <- S.printingOf s registry "Kadena's Silencer"
+  zealot <- S.printingOf s registry "Overgrown Zealot"
+  let (handed, morphCard) = S.handOne silencer (S.landsInPlay island 3)
+      down = S.runPure S.identityAnswer handed (Cast.castSpell S.manaPerformer S.alice morphCard (S.printingName silencer) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
+      entered = Set.toList (Set.difference (GameState.battlefield down) (GameState.battlefield handed))
+      build permanent =
+        let (zealotId, withZealot) = S.addPermanent zealot S.alice down
+            (spell, board) = S.addHandCard silencer S.alice withZealot
+         in (board, zealotId, permanent, spell)
+  pure $ case entered of
+    [permanent] -> Just (build permanent)
+    _ -> Nothing
+
+-- CR 106.6 naming THREE payment kinds in one clause. Creeping Peeper ({1}{U}
+-- Creature -- Eye 2/1, "{T}: Add {U}. Spend this mana only to cast an enchantment
+-- spell, unlock a door, or turn a permanent face up.") is the printing, and it is
+-- what says CR 116.2m's unlock and CR 116.2b's turn-up are two kinds rather than
+-- one "special action": a card that meant one would not have to name both.
+--
+-- Nothing is omitted from the card, so pawl's Peeper is neither stricter nor
+-- weaker than printed.
+--
+-- THE BOARD: two Peepers, three Reliquary Towers ("{T}: Add {C}", the pool's
+-- unrestricted colourless land) and a Roaring Furnace // Steaming Sauna with both
+-- doors shut. Steaming Sauna's unlock cost is {3}{U}{U} (CR 709.5e: the locked
+-- half's mana cost), which the three Towers and the two Peepers pay exactly --
+-- and Roaring Furnace's {1}{R} is unpayable on it, so the offered list is one
+-- door rather than two.
+creepingPeeperSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+creepingPeeperSpec s registry = Spec.describe s "Creeping Peeper" $ do
+  Spec.it s "CR 116.2m the Peeper's mana pays an unlock cost" $ do
+    (roomId, before) <- peeperBoard s registry
+    -- The control on the fixture: both doors really are shut, so the assertion
+    -- below is an unlock rather than a designation that was always there.
+    Spec.assertEqWith s "CR 709.5 both doors shut before" (fmap Object.unlockedHalves (Game.lookupObject roomId before)) (Just Set.empty)
+    -- CR 106.6's gate and its payment have to agree, or the action is never
+    -- menued: this is the half Pawl.Engine.Cost.canPay answers. The blue door
+    -- alone, the red one being unpayable on this board.
+    Spec.assertEqWith s "CR 709.5e so the blue door is on offer and the red one is not" (Room.unlockable S.alice before) [(roomId, steamingSauna)]
+    let after = S.runPure S.identityAnswer before (Room.unlock S.manaPerformer S.alice roomId steamingSauna)
+    Spec.assertEqWith s "CR 709.5e and the restricted mana opened it" (fmap Object.unlockedHalves (Game.lookupObject roomId after)) (Just (Set.singleton steamingSauna))
+
+  Spec.it s "CR 601.2h the same mana casts an enchantment spell and no creature spell" $ do
+    (_, before) <- peeperBoard s registry
+    mirage <- S.printingOf s registry "Convincing Mirage"
+    silencer <- S.printingOf s registry "Kadena's Silencer"
+    let (mirageId, withMirage) = S.addHandCard mirage S.alice before
+        (silencerId, board) = S.addHandCard silencer S.alice withMirage
+    -- ONE board and two {1}{U} spells: the Towers pay the {1} either way and a
+    -- Peeper's {U} is the only blue in the game, so the pair differs in the card
+    -- type its restriction names and in nothing else.
+    Spec.assertBool s (S.castable S.alice mirageId board) "CR 106.6 the enchantment half of the clause"
+    Spec.assertBool s (not (S.castable S.alice silencerId board)) "and a creature spell of the same cost is refused"
+
+steamingSauna :: CardName.CardName
+steamingSauna = CardName.MkCardName (Text.pack "Steaming Sauna")
+
+-- Two Creeping Peepers, three Reliquary Towers and a Room with both doors shut,
+-- in alice's precombat main phase with priority and an empty stack -- CR 709.5e's
+-- window, which Pawl.RoomSpec's own boards state the same way.
+peeperBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+peeperBoard s registry = do
+  peeper <- S.printingOf s registry "Creeping Peeper"
+  tower <- S.printingOf s registry "Reliquary Tower"
+  room <- S.printingOf s registry "Roaring Furnace"
+  let (_, one) = S.addPermanent peeper S.alice (S.landsFor tower S.alice 3 (Setup.emptyGame S.bothPlayers))
+      (_, two) = S.addPermanent peeper S.alice one
+      (roomId, withRoom) = S.addPermanent room S.alice two
+  pure
+    ( roomId,
+      withRoom
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   treasonousOgreSpec s registry
@@ -2223,4 +2371,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   generatorServantSpec s registry
   delightedHalflingSpec s registry
   quirionSpec s registry
+  overgrownZealotSpec s registry
+  creepingPeeperSpec s registry
   interchangeableSourcesSpec s registry

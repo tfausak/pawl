@@ -67,7 +67,7 @@ offerToEnd oid gs = List.lookup oid (Expiry.paidExpiries gs)
 canEnd :: PlayerId -> ObjectId -> GameState -> Bool
 canEnd pid oid gs = case offerToEnd oid gs of
   Nothing -> False
-  Just offer -> PaidExpiry.player offer == pid && Cost.canPay pid oid (PaidExpiry.cost offer) gs
+  Just offer -> PaidExpiry.player offer == pid && Cost.canPay PaymentSubject.ForNeither pid oid (PaidExpiry.cost offer) gs
 
 -- Every object whose effect this player may pay to end right now, in object
 -- order -- what Action.EndEffect is built from, Ignore.ignorable's shape.

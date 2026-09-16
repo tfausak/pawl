@@ -22,10 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaRestriction" $ do
     Common.assertCodec
       s
       ManaRestriction.codec
-      ManaRestriction.MkManaRestriction
-        { ManaRestriction.casts = Nothing,
-          ManaRestriction.activations = Just (Filter.And [])
-        }
+      ManaRestriction.none {ManaRestriction.activations = Just (Filter.And [])}
       " {\"activations\":{\"type\":\"And\",\"value\":[]}} "
   -- Dalakos, Crafter of Wonders' "spend this mana only to cast artifact spells
   -- or activate abilities of artifacts": both keys, with a predicate each.
@@ -33,9 +30,31 @@ spec s = Spec.describe s "Pawl.Codec.ManaRestriction" $ do
     Common.assertCodec
       s
       ManaRestriction.codec
-      ManaRestriction.MkManaRestriction
+      ManaRestriction.none
         { ManaRestriction.casts = Just (Filter.HasCardType CardType.Artifact),
           ManaRestriction.activations = Just (Filter.HasCardType CardType.Artifact)
         }
       " {\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},\"activations\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}} "
+  -- Overgrown Zealot's "spend this mana only to turn permanents face up": the
+  -- special-action key alone, with CR 116.2b saying nothing about WHICH
+  -- permanents.
+  Spec.it s "only turning permanents face up" $
+    Common.assertCodec
+      s
+      ManaRestriction.codec
+      ManaRestriction.none {ManaRestriction.turnsFaceUp = Just (Filter.And [])}
+      " {\"turnsFaceUp\":{\"type\":\"And\",\"value\":[]}} "
+  -- Creeping Peeper's "spend this mana only to cast an enchantment spell, unlock
+  -- a door, or turn a permanent face up": three kinds in one clause, which is
+  -- what says unlocking and turning face up are two keys and not one.
+  Spec.it s "a cast, an unlock and a turn-up at once" $
+    Common.assertCodec
+      s
+      ManaRestriction.codec
+      ManaRestriction.none
+        { ManaRestriction.casts = Just (Filter.HasCardType CardType.Enchantment),
+          ManaRestriction.unlocks = Just (Filter.And []),
+          ManaRestriction.turnsFaceUp = Just (Filter.And [])
+        }
+      " {\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},\"unlocks\":{\"type\":\"And\",\"value\":[]},\"turnsFaceUp\":{\"type\":\"And\",\"value\":[]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaRestriction.codec
