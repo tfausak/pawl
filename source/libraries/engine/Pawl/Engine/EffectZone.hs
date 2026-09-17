@@ -268,7 +268,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.AttachBound {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.ChoosePlayer _ -> Nothing
-  Effect.ChooseOpponentAtRandom _ -> Nothing
+  Effect.ChoosePlayerAtRandom _ -> Nothing
   Effect.RollDie {} -> Nothing
   Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing

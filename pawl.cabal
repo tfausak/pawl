@@ -241,6 +241,8 @@ library codec
     Pawl.Codec.ChooseBetweenSpec
     Pawl.Codec.ChooseCardName
     Pawl.Codec.ChoosePlayer
+    Pawl.Codec.ChoosePlayerAtRandom
+    Pawl.Codec.ChoosePlayerAtRandomSpec
     Pawl.Codec.ChoosePlayerSpec
     Pawl.Codec.Chooser
     Pawl.Codec.ChooserSpec
@@ -1634,6 +1636,7 @@ library types
     Pawl.Types.ChooseBetween
     Pawl.Types.ChooseCardName
     Pawl.Types.ChoosePlayer
+    Pawl.Types.ChoosePlayerAtRandom
     Pawl.Types.Chooser
     Pawl.Types.ChosenCardFromAmong
     Pawl.Types.ChosenCardInGraveyard

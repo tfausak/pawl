@@ -88,10 +88,18 @@ data Prompt r where
   -- RandomCard deliberately does not. Asked only for two or more candidates,
   -- and the caller filters the answer back to one.
   ChooseConjuredCard :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
-  -- | Which of the resolving controller's opponents randomness named
-  -- (Pawl.Types.Effect.ChooseOpponentAtRandom); RandomObject's shape, asked
-  -- only for two or more.
-  RandomOpponent :: NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
+  -- | Which player randomness named out of the offered set
+  -- (Pawl.Types.Effect.ChoosePlayerAtRandom); RandomObject's shape, asked only
+  -- for two or more.
+  --
+  -- ONE prompt where the deciding twin is two (ChooseOpponent beside
+  -- ChoosePlayer), because those two differ over an interpreter contract about
+  -- the CHOOSER -- whether the seat being asked is in the offer -- and this one
+  -- has no Decider to make that promise about. The offer is the whole question:
+  -- the payload's PlayerScope may put the resolving controller in it (Strax,
+  -- Sontaran Nurse) or leave them out (Ruhan of the Fomori), and Pawl.CardSpec's
+  -- Strax case proves the first.
+  RandomPlayer :: NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 706.1a: what an N-sided die came up -- CR 706.2's natural result, the
   -- instruction's modifier added afterwards. RandomObject's reasons for
   -- carrying neither Decider nor PlayerId.

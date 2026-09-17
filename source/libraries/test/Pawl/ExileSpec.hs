@@ -199,7 +199,7 @@ spec s registry = Spec.describe s "Face-down exile" $ do
         _ -> Spec.assertFailure s "the two castings should make two piles"
     -- CR 406.4's draw is answered by the interpreter, so the answer is FILTERED
     -- back against the pile rather than trusted -- the posture
-    -- Pawl.Engine.Resolve's RandomObject and RandomOpponent arms and
+    -- Pawl.Engine.Resolve's RandomObject and RandomPlayer arms and
     -- Pawl.Engine.Engine's RandomFirstPlayer all take.
     --
     -- The smuggled card is the OTHER pile's, which is the reading a legality
