@@ -2940,10 +2940,12 @@ delayedPending grouped gs =
 -- 608.2a re-check reads the same way, and the two must agree or a trigger would be
 -- placed and then removed for disagreeing with itself.
 --
--- The trigger's own bindings ride in as the context's slot objects, which is
--- what lets CR 702.100a's "if THAT CREATURE's power is greater" read the
--- entrant through Quantity.AgainstSlot rather than the bearer: an intervening
--- "if" may be about the event's object and not only about the source. Stack's
+-- The trigger's own bindings ride in as the context's slots, BOTH halves, which
+-- is what lets CR 702.100a's "if THAT CREATURE's power is greater" read the
+-- entrant through Quantity.AgainstSlot rather than the bearer, and CR 603.2's
+-- "if THAT PLAYER has seven or more cards in hand" read the seat the event
+-- stamped rather than the source's controller (Ebony Owl Netsuke): an
+-- intervening "if" may be about the event and not only about the source. Stack's
 -- re-check reads the same slots off the placed ability, for the reason the view
 -- above must match.
 --
@@ -2952,11 +2954,11 @@ delayedPending grouped gs =
 -- since left would otherwise be described as one with no characteristics.
 --
 -- Nothing OBSERVES that at this end of the rule, and scoping the view back to the
--- source here leaves the suite green: evolve and Breathless Knight are the two
--- abilities whose "if" reads a slot, and both entrants are on the battlefield by
--- construction while their own entry is being gathered. So this is a fence keeping
--- the two checks reading alike, not a proved behaviour -- the proved one is
--- Stack's re-check.
+-- source here leaves the suite green: every ability whose "if" reads an OBJECT
+-- slot (evolve, Breathless Knight) has its entrant on the battlefield by
+-- construction while its own entry is being gathered, and a PLAYER slot needs no
+-- view at all. So this is a fence keeping the two checks reading alike, not a
+-- proved behaviour -- the proved one is Stack's re-check.
 interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
   case (TriggeredAbility.intervening (PendingTrigger.ability pending), PendingTrigger.source pending) of
@@ -2969,7 +2971,7 @@ interveningHolds gs pending =
         -- Ray of Frost's "if enchanted creature is red" is about the SOURCE's
         -- attachment rather than about the event, and Stack's CR 608.2a re-check
         -- supplies the same field so the two checks cannot disagree.
-        ((Filter.contextWithSlots (Game.teams gs) (Just (PendingTrigger.controller pending)) (Just oid) (Binding.slotObjects (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs})
+        ((Filter.contextWithSlots (Game.teams gs) (Just (PendingTrigger.controller pending)) (Just oid) (Binding.slotObjects (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs, Filter.slotPlayers = Binding.slotPlayers (PendingTrigger.bindings pending)})
         gs
         oid
         cond

@@ -649,21 +649,22 @@ playersFor viewOf context gs ref =
 --
 -- TWO roads, and the first is why Filter.Context carries the map at all. A
 -- resolution supplies its own CR 608.2b-filtered slots
--- (Pawl.Engine.Resolve.Slots.effectContext), and that is the only read that answers for
--- an ABILITY: CR 113.7 makes Filter.source the ability's source permanent, while
--- its targets and its trigger's bindings are stamped on the ability object on the
--- stack (see #1783). The SOURCE's own bindings are the fallback, which is the
--- honest read for a caller with no announcement behind it at all -- a static
--- ability's projection -- and for a spell, whose source IS its stack object.
+-- (Pawl.Engine.Resolve.Slots.effectContext), a trigger's intervening "if" its own
+-- bindings (Pawl.Engine.Event.Trigger.interveningHolds and CR 608.2a's re-check
+-- in Pawl.Engine.Stack), and that is the only read that answers for an ABILITY:
+-- CR 113.7 makes Filter.source the ability's source permanent, while its targets
+-- and its trigger's bindings are stamped on the ability object on the stack (see
+-- #1783). Ebony Owl Netsuke's "if that player has seven or more cards in hand"
+-- is what proves the intervening road (Pawl.CountSpec). The SOURCE's own
+-- bindings are the fallback, which is the honest read for a caller with no
+-- announcement behind it at all -- a static ability's projection -- and for a
+-- spell, whose source IS its stack object.
 --
--- Not implemented: the fallback is what a trigger's INTERVENING-IF and a
--- replacement's condition get, and for them it is #1783's failure over again.
--- Pawl.Engine.Stack (CR 603.4 at trigger time and again at CR 608.2a),
--- Pawl.Engine.Event (off PendingTrigger.bindings) and Pawl.Engine.Replacement all
--- hold the binding map, pass its OBJECT half as Filter.slotObjects, and leave
--- Filter.slotPlayers empty -- so "if that player has three or more cards in hand"
--- reads the source permanent's bindings and is unanswered. Filling them is a line
--- apiece; no card in data/cards/ writes a player slot under either clause (#3212).
+-- Not implemented: a replacement's condition still takes the fallback, which for
+-- it is #1783's failure over again. Pawl.Engine.Replacement holds only the OBJECT
+-- half of the installing resolution's slots (Pawl.Types.ActiveReplacement.slots),
+-- so there is no player half to pass and filling it is a field rather than a line
+-- (#3212).
 slotPlayers :: Filter.Context -> GameState -> SlotName.SlotName -> Maybe [PlayerId]
 slotPlayers context gs name = case Map.lookup name (Filter.slotPlayers context) of
   Just pids -> Just (Set.toList pids)
