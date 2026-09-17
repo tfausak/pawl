@@ -5557,6 +5557,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         --     declares X" lint, now falling out of the ordinary comparison
         --     instead of needing its own pass. activatedAbilityOffends says the
         --     same thing about an activation cost.
+        --   * Binding.triggerSource, unconditionally, for Binding.you's reason
+        --     one rule over: CR 201.5's "text that refers to the object it's on
+        --     by name means just that particular object" covers a spell, and
+        --     Pawl.Engine.Cast.castSpell stamps CR 601.2a's stack incarnation for
+        --     EVERY spell at the same step -- so Chronomantic Escape's "exile
+        --     Chronomantic Escape with three time counters on it" is a slot read
+        --     on a spell exactly as a kinship card's "this creature" is on a
+        --     trigger.
         --   * Binding.revealedCard, and only when the cost reveals a card the
         --     payer chooses, per `revealsAsCost`. CR 601.2h's payment binds it
         --     and Pawl.Engine.Cast folds it onto the spell, so Living Destiny's
@@ -5584,7 +5592,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 if any sacrificesAsCost (spellCostsOf card)
                   then Set.singleton Binding.sacrificedPermanent
                   else Set.empty
-           in modalSlotsOffend (Set.unions [Set.singleton Binding.you, announcedX, revealed, sacrificed]) (Face.spell card)
+           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed]) (Face.spell card)
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

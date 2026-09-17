@@ -3292,8 +3292,11 @@ zadaSpec s registry =
         Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just zadaId) . Recipient.objectOf) offered) asked
         _ -> S.identityAnswer p
       -- What each object on the stack targets, top first, read live off its
-      -- bindings the way Pawl.Engine.Resolve.Effect.targetsOnStack does.
-      stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))))) (GameState.stack gs)
+      -- bindings the way Pawl.Engine.Resolve.Effect.targetsOnStack does, less CR
+      -- 201.5's reserved self slot, which every spell carries and which names the
+      -- object itself rather than anything it targets (CR 115.10b's posture for
+      -- `you`, which stays in because the assertions read objects alone).
+      stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Map.delete Binding.triggerSource (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs))))))) (GameState.stack gs)
    in Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.it s "CR 707.10d Zada copies the spell once per creature it could target, each copy on a different one" $ do
           (zadaId, pikerId, spiderId, wallId, mongooseId, growthId, board) <- boardOf
@@ -3450,8 +3453,9 @@ ivySpec s registry =
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
       -- What each object on the stack targets, top first, read live off its
-      -- bindings the way Pawl.Engine.Resolve.Effect.targetsOnStack does.
-      stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))))) (GameState.stack gs)
+      -- bindings the way Pawl.Engine.Resolve.Effect.targetsOnStack does, less CR
+      -- 201.5's reserved self slot, the sibling helper's reason.
+      stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Map.delete Binding.triggerSource (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs))))))) (GameState.stack gs)
       -- The board with bob's spell cast and CR 603.3b's trigger on the stack
       -- above it, then that trigger alone resolved -- the moment the copy either
       -- exists or does not.

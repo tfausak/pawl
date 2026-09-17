@@ -1309,7 +1309,15 @@ runEntryEffect pending =
 liveBindings :: Object.Object -> ObjectId -> GameState -> Map SlotName Binding.Type.Binding
 liveBindings obj oid gs = case Game.lookupObject oid gs of
   Just live -> Object.bindings live
-  Nothing -> Map.union (Map.findWithDefault Map.empty oid (GameState.detachedBindings gs)) (Object.bindings obj)
+  Nothing -> Map.union (Map.findWithDefault Map.empty oid (GameState.detachedBindings gs)) departed
+  where
+    -- GameState.stackArchive ahead of the pre-fold snapshot, and only for the
+    -- object's OWN departure: a spell that moved ITSELF (CR 201.5, Chronomantic
+    -- Escape) went through the CR 400.7 funnel, which filed its bindings as of the
+    -- move, while `obj` is the reading resolution BEGAN with and cannot hold a
+    -- slot a clause defined since. Pawl.Engine.Resolve.Slots.resolvingBindings is
+    -- the same preference for the readers that take no snapshot.
+    departed = maybe (Object.bindings obj) Object.bindings (Map.lookup oid (GameState.stackArchive gs))
 
 -- bindPlayerSlot's plural: bind SEVERAL players a resolution named into `slot` on
 -- `holder`. CR 118.12a's per-player gate is the one caller, and the set is
