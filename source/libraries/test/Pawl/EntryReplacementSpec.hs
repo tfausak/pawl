@@ -2411,10 +2411,10 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
 -- first row that reads the counter count for a permanent OTHER than the one the
 -- row came from.
 --
--- Not implemented: the second ability, whose "Remove a +1/+1 counter from a
--- creature you control" cost has no Pawl.Types.CostComponent -- the counter-
--- removing components all come off the object the cost is on (#3286). The face
--- is STRICTER than printed for it: alice loses a draw outlet, never gains one.
+-- The second ability is transcribed too, on
+-- CostComponent.RemovePlusOneCounters, and is Pawl.CostSpec's Zameck Guildmage
+-- group rather than this one's: nothing here activates it, so the boards below
+-- are unchanged by it.
 --
 -- THE BOARD: alice's Guildmage plus a Forest, an Island, a Mountain and a Plains
 -- -- the ability's {G}{U} and the Goblin Piker's {1}{R} with nothing over -- and

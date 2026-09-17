@@ -121,6 +121,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
@@ -1207,6 +1208,7 @@ substituteXInComponent x component = case component of
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
   CostComponent.RemovePlusOneCountersFromThis _ -> component
+  CostComponent.RemovePlusOneCounters {} -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
   CostComponent.Forage -> component
@@ -1267,6 +1269,7 @@ componentHasVariable component = case component of
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.RemovePlusOneCounters {} -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> True
@@ -1357,6 +1360,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.RemovePlusOneCounters {} -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.Forage -> False
@@ -1641,6 +1645,10 @@ loyaltyAmountOf component = case component of
   -- 606.5). Removing a +1\/+1 counter is none of that. Proven, not a fence:
   -- Pawl.CostSpec's Barkhide Troll cases both redden on a Just here.
   CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+  -- Nothing, the arm above's reason unchanged by the counters coming off
+  -- another permanent: CR 606.4's loyalty symbol is what makes a loyalty
+  -- ability, and this is a +1\/+1 counter.
+  CostComponent.RemovePlusOneCounters {} -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
@@ -1745,6 +1753,9 @@ zoneOfComponent component = case component of
   -- behaviour, as ReturnThis' answer above is: Barkhide Troll's ability functions
   -- on the battlefield under either answer, so nothing separates them.
   CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+  -- Nothing for the arm above's reason and one more: the counters come off
+  -- ANOTHER permanent, which CR 113.6m does not ask about either way.
+  CostComponent.RemovePlusOneCounters {} -> Nothing
   -- CR 122.6 puts counters on a permanent already where it is, so nothing moves
   -- out of any zone.
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
@@ -1818,6 +1829,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.RemovePlusOneCounters {} -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -2025,6 +2037,21 @@ tapCandidates slots pid oid criterion gs =
 returnCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 returnCandidates = tapCandidates
 
+-- The permanents this player may take `n` +1\/+1 counters off to pay a
+-- RemovePlusOneCounters component on `oid`: `tapCandidates`' pool narrowed to the
+-- ones CR 118.3 leaves payable, since a permanent carrying fewer than `n`
+-- counters cannot have `n` removed. The narrowing is HERE rather than at the
+-- prompt so that the gate and the payment ask one question, canPayComponent's
+-- posture for every other choosing component.
+--
+-- NOT narrowed to what the payer controls, `returnCandidates`' reading and for
+-- its reason: CR 118.1 asks only that the payer carry out the instruction, so a
+-- card that wants the restriction prints it (Zameck Guildmage's criterion carries
+-- `ControlledBy You`).
+counterRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Natural -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+counterRemovalCandidates slots pid oid n criterion gs =
+  filter (\candidate -> countersOn CounterKind.PlusOnePlusOne candidate gs >= n) (tapCandidates slots pid oid criterion gs)
+
 -- The power a candidate contributes to CR 702.122a's total. Zero for a permanent
 -- with no power at all, which after CR 208.3 is every noncreature one.
 tapPower :: ObjectId -> GameState -> Integer
@@ -2223,6 +2250,11 @@ claimOf slots pid oid component gs =
         -- FENCE, `repeatsOf` settling before any axis matters for a cost with one
         -- component and a mana part.
         CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+        -- Nothing, the arm above's rule 122.1 reason, though this one DOES pick
+        -- an object out of a pool: what it spends is the counters on that
+        -- object, which are markers rather than objects, so no pool shrinks --
+        -- the Blight arm below's shape.
+        CostComponent.RemovePlusOneCounters {} -> Nothing
         CostComponent.PutPlusOneCountersOnThis _ -> Nothing
         -- Nothing, though this one DOES pick an object out of a pool: CR 701.68a takes
         -- nothing out of a zone. Two blights in one cost may choose the same creature,
@@ -2592,6 +2624,12 @@ uncountedCeiling component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1
   -- Counted by `counterCeiling`, CR 122.1.
   CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+  -- 1, and NOT folded into `counterCeiling`: that ceiling divides the counters
+  -- on `oid`, and this component takes them off ANOTHER permanent, so the
+  -- division would measure the wrong pile. An UNDERSTATEMENT -- a creature with
+  -- nine counters pays Zameck Guildmage's cost nine times -- and the header's
+  -- safe direction (#2173).
+  CostComponent.RemovePlusOneCounters {} -> Just 1
   -- 1, and NOT folded into `counterCeiling`: this component PUTS counters on, so
   -- it spends none of the resource that ceiling divides. An understatement --
   -- repeating it is bounded by whatever else the cost spends, not by the
@@ -2796,6 +2834,7 @@ lifeOwedByComponent component = case component of
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.RemovePlusOneCountersFromThis _ -> 0
+  CostComponent.RemovePlusOneCounters {} -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
@@ -2824,6 +2863,10 @@ plusOneCountersOwedBy = sum . fmap plusOneCountersOwedByComponent
 plusOneCountersOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
 plusOneCountersOwedByComponent component = case component of
   CostComponent.RemovePlusOneCountersFromThis n -> n
+  -- Zero, and that is the header's "off the object it is on": this component
+  -- takes its counters off ANOTHER permanent, so `counterCeiling`'s division of
+  -- `oid`'s counters has nothing to learn from it.
+  CostComponent.RemovePlusOneCounters {} -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.PayLife _ -> 0
   CostComponent.PayLifeX -> 0
@@ -3032,6 +3075,23 @@ canPayComponent slots pid oid component gs = case component of
   CostComponent.RemovePlusOneCountersFromThis n ->
     Set.member oid (GameState.battlefield gs)
       && countersOn CounterKind.PlusOnePlusOne oid gs >= n
+  -- CR 118.3 again, asked of the payer's BOARD rather than of `oid`: payable
+  -- only while some permanent the criterion admits carries at least that many
+  -- +1\/+1 counters. What it decides is the OFFER -- an activated ability whose
+  -- cost includes one is never offered where no such permanent exists (CR
+  -- 601.2h's "unpayable costs can't be paid", reaching an activation through CR
+  -- 602.2b).
+  --
+  -- The count and the criterion are read TOGETHER, in
+  -- `counterRemovalCandidates`: a board of creatures each carrying one counter
+  -- cannot pay a cost that removes two, and asking the two questions separately
+  -- would offer it.
+  --
+  -- This component ALONE, Sacrifice's caveat -- but `claimOf` states no claim
+  -- for it, CR 122.1's counter being a marker, so `jointlyPayable` has nothing
+  -- to add and two such components of one cost can each see the same permanent.
+  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion) ->
+    not (null (counterRemovalCandidates slots pid oid n criterion gs))
   -- CR 701.63a puts the counters on "that permanent", so the only thing that can
   -- make this unpayable is the permanent no longer being there. Deliberately NOT
   -- gated on control, unlike the loyalty arms above: rule 701.63a fixes the payer
@@ -3107,6 +3167,7 @@ criteriaOf component = case component of
   CostComponent.RevealCardFromHand criterion -> [criterion]
   CostComponent.ExileCardsFromGraveyard exile -> [ExileCardsFromGraveyard.whichCards exile]
   CostComponent.ExileTopFromGraveyard criterion -> [criterion]
+  CostComponent.RemovePlusOneCounters remove -> [RemovePlusOneCounters.whichPermanent remove]
   -- The rest carry no criterion at all: each names either the source object or
   -- a bare amount.
   CostComponent.TapThis -> []
@@ -3731,6 +3792,7 @@ paidInSecondPass component = case component of
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.RemovePlusOneCounters {} -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -3831,6 +3893,11 @@ orderSensitive component = case component of
   -- second order-sensitive part, so `orderObservable` is False whichever way this
   -- answers.
   CostComponent.RemovePlusOneCountersFromThis _ -> True
+  -- True, the arm above's reading over another permanent: paying this takes the
+  -- counters a second part of the same cost could have taken. A FENCE rather
+  -- than proven behaviour -- Zameck Guildmage's cost's other part is mana, which
+  -- is not a component at all, so `orderObservable` is False either way.
+  CostComponent.RemovePlusOneCounters {} -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
   CostComponent.Blight _ -> True
@@ -4805,6 +4872,41 @@ payComponent moment slots pid oid component = case component of
   CostComponent.RemovePlusOneCountersFromThis n -> do
     Event.removeCounters oid CounterKind.PlusOnePlusOne n
     pure bindsNothing
+  -- The same removal aimed at ANOTHER permanent, so the payer chooses which one
+  -- and this is a prompt -- elided at exactly one candidate, where the rules
+  -- leave nothing to ask. Sacrifice's posture, read over one object rather than
+  -- a subset: the count is counters and not permanents, so what forcedness
+  -- measures is how many permanents the criterion and CR 118.3 leave.
+  --
+  -- Reject-not-repair, Sacrifice's posture again: an answer naming something
+  -- never offered makes the whole payment Unpaid, which `pay`'s restore turns
+  -- into a no-op.
+  --
+  -- Through Event.removeCounters, CR 122's removal funnel -- the arm above's
+  -- road and for its reason, so a counter-watching trigger reads the same
+  -- GameEvent.CountersRemoved whichever component spent it. Saturation is
+  -- unreachable through this door, `counterRemovalCandidates` having refused
+  -- every permanent short of `n`.
+  --
+  -- Binds NO slot: no printing of this cost goes on to name what it took the
+  -- counters off.
+  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion) -> do
+    gs <- State.get
+    let candidates = counterRemovalCandidates slots pid oid n criterion gs
+        decider = Decide.deciderFor pid gs
+    case candidates of
+      -- CR 118.3's board, which canPayComponent has already refused, so reaching
+      -- it means the counters left between the check and the payment.
+      [] -> pure Payment.Unpaid
+      first : rest -> do
+        chosen <- case rest of
+          [] -> pure first
+          second : more -> Game.choose (Prompt.ChooseCounterRemoval decider pid oid (first NonEmpty.:| (second : more)))
+        if List.elem chosen candidates
+          then do
+            Event.removeCounters chosen CounterKind.PlusOnePlusOne n
+            pure bindsNothing
+          else pure Payment.Unpaid
   -- CR 122.6's placement, through the Event.putCounters funnel -- the same call
   -- AddLoyaltyToThis above makes, and the difference is WHEN the cost is paid,
   -- which `counterCause` below reads off the moment rather than assuming.

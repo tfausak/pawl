@@ -2216,6 +2216,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   unerringSlingSpec s registry
   melokuSpec s registry
   barkhideTrollSpec s registry
+  zameckGuildmageCostSpec s registry
   millikinSpec s registry
   brittleEffigySpec s registry
   hanweirBattlementsSpec s registry
@@ -3576,6 +3577,126 @@ barkhideTrollSpec s registry =
           Spec.assertEqWith s "CR 613.4c a 3/3 on arrival, not the printed 2/2" (S.powerToughnessOf trollId resolved) (Just (3, 3))
           Spec.assertEqWith s "one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne trollId resolved) 1
         _ -> Spec.assertFailure s "Barkhide Troll should have resolved onto the battlefield"
+
+-- Zameck Guildmage {G}{U} Creature -- Elf Wizard 2/2 (Oracle text checked
+-- against Scryfall 2026-09-17): "{G}{U}: This turn, each creature you control
+-- enters with an additional +1/+1 counter on it. / {G}{U}, Remove a +1/+1
+-- counter from a creature you control: Draw a card."
+--
+-- The producer for CostComponent.RemovePlusOneCounters, CR 118.1's counter
+-- removal aimed at a permanent the PAYER CHOOSES rather than at the object the
+-- cost is on (Barkhide Troll's, above). The first ability is
+-- Pawl.EntryReplacementSpec's; only the second is read here.
+--
+-- THE BOARD: alice controls the Guildmage, a Forest and an Island -- exactly the
+-- {G}{U} the ability wants, so nothing below is an unaffordable refusal -- plus a
+-- Goblin Piker and a Hill Giant, two DIFFERENT printings so which one paid is
+-- visible by name. The Guildmage itself carries no counter and so is not a
+-- candidate. alice's library holds two cards, which keeps CR 104.3c out of the
+-- draw.
+zameckGuildmageCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+zameckGuildmageCostSpec s registry =
+  Spec.describe s "Zameck Guildmage" $ do
+    -- The gameplay-level assertions come FIRST: which creature lost the counter,
+    -- then that the other kept its own, then the draw the ability paid for. The
+    -- prompt record below them is a proxy -- a payment that ignored the answer
+    -- reddens it too, and it would report itself if it ran first.
+    Spec.it s "CR 601.2h the payer chooses which creature the +1/+1 counter comes off, and the ability then draws" $ do
+      mage <- S.printingOf s registry "Zameck Guildmage"
+      piker <- S.printingOf s registry "Goblin Piker"
+      giant <- S.printingOf s registry "Hill Giant"
+      forest <- S.printingOf s registry "Forest"
+      island <- S.printingOf s registry "Island"
+      let (mageId, pikerId, giantId, board) = zameckBoard mage piker giant forest island [1, 1]
+          ability = secondAbility mage
+          ((_, paid), asked) = State.runState (Engine.runGame (recordingCounterRemovals giantId) board (Activate.activateAbility S.alice mageId ability)) []
+          after = S.runPure S.identityAnswer paid Stack.resolveTop
+      Spec.assertEqWith s "CR 122.1 the counter came off the creature the payer named" (S.counterOf CounterKind.PlusOnePlusOne giantId after) 0
+      Spec.assertEqWith s "and the creature it was chosen over kept its own" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
+      Spec.assertEqWith s "CR 121.1 and the ability that cost paid for drew a card" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+      Spec.assertEqWith s "CR 122 the removal went through Event.removeCounters, 1 -> 0" (counterRemovalsOf after) [CounterChange.MkCounterChange giantId CounterKind.PlusOnePlusOne 1 0]
+      Spec.assertEqWith s "and the payer was asked exactly once, over both counter-bearing creatures" asked [List.sort [pikerId, giantId]]
+    -- The elision, on a board differing from the one above in ONE thing: the
+    -- Piker carries no counter, so CR 118.3 leaves a single candidate and
+    -- performing the payment decides nothing.
+    Spec.it s "CR 118.3 one candidate is not a choice, so nothing is asked" $ do
+      mage <- S.printingOf s registry "Zameck Guildmage"
+      piker <- S.printingOf s registry "Goblin Piker"
+      giant <- S.printingOf s registry "Hill Giant"
+      forest <- S.printingOf s registry "Forest"
+      island <- S.printingOf s registry "Island"
+      let (mageId, pikerId, giantId, board) = zameckBoard mage piker giant forest island [0, 1]
+          ((_, paid), asked) = State.runState (Engine.runGame (recordingCounterRemovals giantId) board (Activate.activateAbility S.alice mageId (secondAbility mage))) []
+      Spec.assertEqWith s "the one candidate paid" (S.counterOf CounterKind.PlusOnePlusOne giantId paid) 0
+      Spec.assertEqWith s "the Piker had none to lose either way" (S.counterOf CounterKind.PlusOnePlusOne pikerId paid) 0
+      Spec.assertEqWith s "and the payer was asked nothing" asked []
+    -- CR 118.3 / 601.2h, over the same board with the counters taken away: the
+    -- ability is not OFFERED at all. A PAIR differing in exactly one thing --
+    -- the counters -- with the first ability's own offer as the control, since
+    -- its {G}{U} is paid out of the same two lands.
+    Spec.it s "CR 118.3 with no +1/+1 counter anywhere the ability is not offered" $ do
+      mage <- S.printingOf s registry "Zameck Guildmage"
+      piker <- S.printingOf s registry "Goblin Piker"
+      giant <- S.printingOf s registry "Hill Giant"
+      forest <- S.printingOf s registry "Forest"
+      island <- S.printingOf s registry "Island"
+      let (mageId, _, _, withCounters) = zameckBoard mage piker giant forest island [1, 1]
+          (bareMageId, _, _, without) = zameckBoard mage piker giant forest island [0, 0]
+          offers oid ability gs = length (filter (isActivateOfAbility oid ability) (Action.legalActions S.alice gs))
+      Spec.assertEqWith s "CR 602.2b offered while a creature carries one" (offers mageId (secondAbility mage) withCounters) 1
+      Spec.assertEqWith s "and not offered with none" (offers bareMageId (secondAbility mage) without) 0
+      Spec.assertEqWith s "the control: the Guildmage's other {G}{U} ability is offered on BOTH boards, so the refusal is the counters' doing" (offers bareMageId (theAbility mage) without) 1
+
+-- The board zameckGuildmageCostSpec's three cases share: alice's Guildmage over
+-- a Forest and an Island, her Goblin Piker and Hill Giant carrying the two
+-- counter counts given, and two cards in her library. Answers the Guildmage, the
+-- Piker and the Giant.
+zameckBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> [Natural.Natural] -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+zameckBoard mage piker giant forest island counts =
+  let lands = S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 (Setup.emptyGame S.bothPlayers))
+      (mageId, withMage) = S.addPermanent mage S.alice lands
+      (pikerId, withPiker) = S.addPermanent piker S.alice withMage
+      (giantId, withGiant) = S.addPermanent giant S.alice withPiker
+      (_, stocked) = S.addLibraryCard forest S.alice (snd (S.addLibraryCard island S.alice withGiant))
+      counted = case counts of
+        [onPiker, onGiant] -> S.addCounter CounterKind.PlusOnePlusOne onGiant giantId (S.addCounter CounterKind.PlusOnePlusOne onPiker pikerId stocked)
+        _ -> stocked
+   in ( mageId,
+        pikerId,
+        giantId,
+        counted
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The SECOND activated ability of a printing, where `theAbility` above takes the
+-- first. Total for this group's fixtures; the fallback is unreachable.
+secondAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+secondAbility p = case Face.activatedAbilities (S.combinedFace p) of
+  _ : ab : _ -> ab
+  _ -> theAbility p
+
+-- An Activate of this source AND this ability, where `isActivateOf` above counts
+-- every ability of the source. Zameck Guildmage prints two, so the two have to
+-- be told apart.
+isActivateOfAbility :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Action.Type.Action -> Bool
+isActivateOfAbility oid ability action = case action of
+  Action.Type.Activate src ab -> src == oid && ab == ability
+  _ -> False
+
+-- Answers Prompt.ChooseCounterRemoval with the creature named, recording each
+-- prompt's candidates ascending. PINNED to one object rather than searching for
+-- a legal one, and filtered against the offer so the answer is one the engine
+-- put up: Replay.defaultAnswer would take the head, so a mutation that ignores
+-- the answer cannot come back green through this answerer.
+recordingCounterRemovals :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+recordingCounterRemovals wanted p = case p of
+  Prompt.ChooseCounterRemoval _ _ _ candidates -> do
+    State.modify' (<> [List.sort (NonEmpty.toList candidates)])
+    pure (if List.elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates)
+  _ -> pure (S.identityAnswer p)
 
 -- Millikin {2} Artifact Creature -- Construct 0/1, "{T}, Mill a card: Add {C}"
 -- (Oracle text checked against Scryfall): the pool's producer of a cost that

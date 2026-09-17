@@ -5,6 +5,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
@@ -82,6 +83,9 @@ data CostComponent keyword
   | -- | CR 118.1 as a cost / Barkhide Troll: remove this many +1\/+1 counters from
     -- the permanent the cost is on.
     RemovePlusOneCountersFromThis Natural.Natural
+  | -- | CR 118.1 as a cost / Zameck Guildmage: remove this many +1\/+1 counters
+    -- from one permanent matching the Filter, which the payer chooses.
+    RemovePlusOneCounters (RemovePlusOneCounters.RemovePlusOneCounters keyword)
   | -- | CR 118.12's counter-placing cost / CR 701.63a's endure, Fortress
     -- Kin-Guard: put this many +1\/+1 counters on the permanent the cost is on,
     -- paid as the spell or ability resolves.
