@@ -249,6 +249,7 @@ import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -3134,6 +3135,9 @@ costComponentFilters component = case component of
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
   CostComponent.RemovePlusOneCountersFromThis _ -> []
+  -- CR 118.1's removal aimed elsewhere: Zameck Guildmage's "a creature you
+  -- control".
+  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters _ f) -> [f]
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []

@@ -79,6 +79,7 @@ encode p answer = case p of
   Prompt.ChooseBolster {} -> Response.ChoseBolster answer
   Prompt.ChooseAmass {} -> Response.ChoseAmass answer
   Prompt.ChooseBlight {} -> Response.ChoseBlight answer
+  Prompt.ChooseCounterRemoval {} -> Response.ChoseCounterRemoval answer
   Prompt.ChooseVote {} -> Response.ChoseVote answer
   Prompt.ChooseVoteWord {} -> Response.ChoseVoteWord answer
   Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
@@ -272,6 +273,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseBlight {} -> case response of
     Response.ChoseBlight oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseCounterRemoval {} -> case response of
+    Response.ChoseCounterRemoval oid -> Just oid
     _ -> Nothing
   Prompt.ChooseVote {} -> case response of
     Response.ChoseVote oid -> Just oid
@@ -675,6 +679,9 @@ defaultAnswer p = case p of
   -- CR 701.68a: the prompt is only raised with two or more creatures the player
   -- controls, and every one of them is a legal choice.
   Prompt.ChooseBlight _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 118.1 as a cost: the prompt is only raised with two or more permanents
+  -- carrying enough +1\/+1 counters, and every one of them is a legal choice.
+  Prompt.ChooseCounterRemoval _ _ _ candidates -> NonEmpty.head candidates
   -- CR 701.38a: the prompt is only raised with two or more listed choices, and
   -- every one of them is a legal vote.
   Prompt.ChooseVote _ _ _ candidates -> NonEmpty.head candidates

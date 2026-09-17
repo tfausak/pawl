@@ -382,6 +382,7 @@ import qualified Pawl.Codec.ReduceSpellCostSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReinforceSpec
 import qualified Pawl.Codec.RemoveCountersSpec
+import qualified Pawl.Codec.RemovePlusOneCountersSpec
 import qualified Pawl.Codec.ReplaceSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
@@ -1040,6 +1041,7 @@ spec s registry = do
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ReinforceSpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
+  Pawl.Codec.RemovePlusOneCountersSpec.spec s
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s
