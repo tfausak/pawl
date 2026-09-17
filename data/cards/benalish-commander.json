@@ -1,0 +1,115 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "Members"
+          },
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Soldier"
+                }
+              },
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              }
+            ]
+          },
+          "scope": {
+            "type": "InZone",
+            "value": {
+              "player": {
+                "type": "EachPlayer"
+              },
+              "zone": {
+                "type": "Battlefield"
+              }
+            }
+          }
+        }
+      },
+      "keywords": [
+        {
+          "type": "Suspend",
+          "value": {
+            "cost": {
+              "mana": [
+                {
+                  "type": "Variable"
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "White"
+                    }
+                  }
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "White"
+                    }
+                  }
+                }
+              ]
+            },
+            "counters": {
+              "type": "Variable",
+              "value": 1
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Benalish Commander",
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Soldier"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
