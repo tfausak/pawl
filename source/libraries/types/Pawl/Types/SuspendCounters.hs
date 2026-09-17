@@ -16,8 +16,8 @@ data SuspendCounters
   = -- | CR 702.62a's printed numeral (Rift Bolt's "Suspend 1--{R}").
     Literal Natural.Natural
   | -- | CR 107.3d's chosen X, whose payload is the LEAST value the card's own
-    -- words allow -- 1 under "X can't be 0", which CR 101.2 lets beat rule
-    -- 107.3d's otherwise free choice.
+    -- words allow -- 1 under "X can't be 0", which CR 101.1 lets override rule
+    -- 107.3d's otherwise free choice and CR 101.2 gives its direction.
     Variable Natural.Natural
   deriving (Eq, Ord, Show)
 

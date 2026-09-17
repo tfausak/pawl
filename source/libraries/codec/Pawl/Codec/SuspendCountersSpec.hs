@@ -18,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.SuspendCounters" $ do
       (SuspendCounters.Literal 1)
       " {\"type\":\"Literal\",\"value\":1} "
 
-  -- CR 107.3d / CR 101.2: Benalish Commander's "Suspend X--{X}{W}{W}. X can't be
+  -- CR 107.3d / CR 101.1: Benalish Commander's "Suspend X--{X}{W}{W}. X can't be
   -- 0", whose floor is the payload.
   Spec.it s "Variable" $
     Common.assertCodec

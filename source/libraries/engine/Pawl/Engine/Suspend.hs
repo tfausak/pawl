@@ -75,7 +75,7 @@ suspendOf oid gs = do
 --
 -- The payability check is asked at the FLOOR of CR 107.3d's announcement -- 0 for
 -- a printed numeral, which declares no X, and the card's own least value for
--- "Suspend X" (CR 101.2's "X can't be 0"). Sound because the demand an X makes is
+-- "Suspend X" (CR 101.1's "X can't be 0"). Sound because the demand an X makes is
 -- monotone in it, Cost.greatestPayableX's own premise: a cost payable at no legal
 -- value is payable at none.
 --
@@ -138,7 +138,7 @@ suspendable pid gs = filter (\oid -> canSuspend pid oid gs) (Game.zoneMembers Zo
 -- the one value answers both halves of the printed line: rule 107.3i makes the N
 -- and the {X} in the cost the same number, so the card is exiled with as many
 -- time counters as the mana it cost. Reject-not-repair, Cast.castProposed's
--- posture: the answer is honoured and then measured, against CR 101.2's floor
+-- posture: the answer is honoured and then measured, against CR 101.1's floor
 -- ("X can't be 0") and against the board, and a value that fails either leaves
 -- the card in hand with nothing paid.
 --
@@ -172,17 +172,19 @@ suspend perform pid oid = do
           counters = case Suspend.counters ability of
             SuspendCounters.Literal n -> n
             SuspendCounters.Variable _ -> announcedX
-      -- CR 101.2 for the floor and CR 116.2f for the payment: an announcement
-      -- the card forbids or the board cannot pay takes the whole special action
-      -- away rather than being clamped to something the player did not choose.
-      -- Measured with the SAME predicate the gate above asked at the floor.
+      -- CR 101.1 for the floor and CR 101.2 for its direction, CR 116.2f for the
+      -- payment: an announcement the card forbids or the board cannot pay takes
+      -- the whole special action away rather than being clamped to something the
+      -- player did not choose. Measured with the SAME predicate the gate above
+      -- asked at the floor.
       if announcedX < SuspendCounters.leastX (Suspend.counters ability) || not (payableAtX announcedX pid oid ability before)
         then pure ()
         else do
           -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for
-          -- its reasons. No printed suspend cost holds such a symbol -- Scryfall
-          -- `keyword:suspend`, 2026-09-07, every suspend cost generic or
-          -- monocoloured -- so no prompt is raised today.
+          -- its reasons. No printed suspend cost holds a symbol payable in more
+          -- than one way -- Scryfall `keyword:suspend`, 2026-09-17, every suspend
+          -- cost generic, monocoloured or CR 107.4b's {X} -- so no prompt is
+          -- raised today.
           (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (Cost.substituteX announcedX printed)
           payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
           case payment of

@@ -1505,7 +1505,7 @@ suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
       )
       (1, 1)
 
--- Benalish Commander (TSP 6) {3}{W} Creature -- Human Soldier */*, "Benalish
+-- Benalish Commander (PLC 2) {3}{W} Creature -- Human Soldier */*, "Benalish
 -- Commander's power and toughness are each equal to the number of Soldiers you
 -- control. / Suspend X--{X}{W}{W}. X can't be 0." -- checked against Scryfall,
 -- 2026-09-17. CR 107.3d's announcement, which rule 107.3i makes one number: the
@@ -1519,10 +1519,12 @@ suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
 -- Commander makes no Soldiers, so nothing it does is anything the printing would
 -- not also do.
 --
--- SIX PLAINS, which is what makes each case below discriminating. {X}{W}{W} at
--- X=3 taps five of them and leaves one, so the count reads the announced value
--- back off the board rather than merely "some mana was spent"; X=4 is affordable
--- too, so a board that could only ever pay one value is not what is being read.
+-- SIX PLAINS, which is what makes the announcement cases below discriminating.
+-- {X}{W}{W} at X=3 taps five of them and leaves one, so the count reads the
+-- announced value back off the board rather than merely "some mana was spent";
+-- X=4 is affordable too, so a board that could only ever pay one value is not
+-- what is being read. The offer case takes fewer, being about a board that
+-- cannot pay the floor at all.
 benalishBoard :: Int -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 benalishBoard lands plains commander =
   let (commanderId, gs) = S.addHandCard commander S.alice (S.landsInPlay plains lands)
@@ -1565,17 +1567,17 @@ suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
     -- The same announcement on the cost half (CR 107.3i): {3}{W}{W} is five of
     -- the six Plains, and the sixth is still untapped.
     Spec.assertEqWith s "and five of the six Plains paid {3}{W}{W} for it" (S.tappedCount S.alice suspended) 5
-  -- CR 101.2: "X can't be 0" beats rule 107.3d's otherwise free choice, so the
+  -- CR 101.1 / 101.2: "X can't be 0" beats rule 107.3d's otherwise free choice, so the
   -- announcement is illegal and the special action does nothing. The pair is one
   -- board and one answer apart -- same hand, same six Plains, same action taken.
-  Spec.it s "CR 101.2 X can't be 0, so an announcement of zero takes nothing" $ do
+  Spec.it s "CR 101.1 X can't be 0, so an announcement of zero takes nothing" $ do
     plains <- S.printingOf s registry "Plains"
     commander <- S.printingOf s registry "Benalish Commander"
     let (commanderId, gs) = benalishBoard 6 plains commander
         taking x = S.runPure (suspendForX x commanderId) gs (Suspend.suspend S.manaPerformer S.alice commanderId)
         refused = taking 0
         allowed = taking 1
-    -- The action IS offered on this board, so the refusal below is rule 101.2's
+    -- The action IS offered on this board, so the refusal below is rule 101.1's
     -- and not a window the card was never in.
     Spec.assertBool s (List.elem (Action.Type.Suspend commanderId) (Action.legalActions S.alice gs)) "the control: the Commander may be suspended here"
     Spec.assertEqWith s "at X=0 the Commander is still in alice's hand" (List.elem commanderId (Game.zoneMembers Zone.Hand S.alice refused)) True
@@ -1590,7 +1592,7 @@ suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
       (Just (Just 1))
     Spec.assertEqWith s "and three Plains paid {1}{W}{W}" (S.tappedCount S.alice allowed) 3
   -- CR 116.2f offers an action only where the player could take it, and rule
-  -- 101.2's floor is part of what that costs: {1}{W}{W} is the cheapest this card
+  -- 101.1's floor is part of what that costs: {1}{W}{W} is the cheapest this card
   -- can be suspended for, so a board holding two Plains is not offered the action
   -- while one holding three is. The pair differs in a single land, and the
   -- Commander's own {3}{W} is unaffordable on both -- CR 116.2f asks whether the
