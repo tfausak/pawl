@@ -12,6 +12,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
@@ -140,6 +141,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.RemovePlusOneCountersFromThis 1)
       " {\"type\":\"RemovePlusOneCountersFromThis\",\"value\":1} "
+  -- The same removal aimed at a permanent the payer chooses, Zameck Guildmage's.
+  Spec.it s "RemovePlusOneCounters" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters 1 (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"RemovePlusOneCounters\",\"value\":{\"count\":1,\"whichPermanent\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- CR 118.12's counter-placing cost, CR 701.63a's endure.
   Spec.it s "PutPlusOneCountersOnThis" $
     Common.assertCodec

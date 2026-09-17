@@ -181,6 +181,13 @@ data Response
     -- (every creature its chooser controls), so nothing but a distinct
     -- constructor keeps a transcript of one from replaying as the other.
     ChoseBlight ObjectId.ObjectId
+  | -- | CR 118.1 as a cost: the permanent a paying player chose to take the
+    -- +1\/+1 counters off.
+    --
+    -- Its own constructor for ChoseBolster's reason: a cost's candidates are an
+    -- arbitrary Filter over the battlefield, which can coincide with any of the
+    -- object choices above.
+    ChoseCounterRemoval ObjectId.ObjectId
   | -- | CR 701.38a: the choice one player voted for.
     --
     -- Its own constructor for ChoseBolster's reason: a vote's candidates are an

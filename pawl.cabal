@@ -820,6 +820,8 @@ library codec
     Pawl.Codec.ReinforceSpec
     Pawl.Codec.RemoveCounters
     Pawl.Codec.RemoveCountersSpec
+    Pawl.Codec.RemovePlusOneCounters
+    Pawl.Codec.RemovePlusOneCountersSpec
     Pawl.Codec.Replace
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.ReplacementEffectSpec
@@ -1962,6 +1964,7 @@ library types
     Pawl.Types.Regenerability
     Pawl.Types.Reinforce
     Pawl.Types.RemoveCounters
+    Pawl.Types.RemovePlusOneCounters
     Pawl.Types.Replace
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate

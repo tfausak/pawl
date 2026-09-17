@@ -32,6 +32,7 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reinforce as Reinforce
+import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
@@ -2683,7 +2684,8 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
 -- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents,
--- ExileCardFromHand, RevealCardFromHand and PutCardFromHandOntoBattlefield arms
+-- ExileCardFromHand, RevealCardFromHand, RemovePlusOneCounters and
+-- PutCardFromHandOntoBattlefield arms
 -- are a regression
 -- fence: no printing pairs any of them with a basic land type, so no test can
 -- falsify them. Magmatic
@@ -2702,6 +2704,7 @@ rewriteComponent pairs component = case component of
   CostComponent.PutCardFromHandOntoBattlefield criterion -> CostComponent.PutCardFromHandOntoBattlefield (rewrite pairs criterion)
   CostComponent.ExileCardFromHand criterion -> CostComponent.ExileCardFromHand (rewrite pairs criterion)
   CostComponent.RevealCardFromHand criterion -> CostComponent.RevealCardFromHand (rewrite pairs criterion)
+  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion) -> CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n (rewrite pairs criterion))
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component

@@ -4,6 +4,7 @@ import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.DiscardCards as DiscardCards
 import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Codec.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Codec.Sacrifice as Sacrifice
 import qualified Pawl.Codec.TapForTotalPower as TapForTotalPower
@@ -54,6 +55,7 @@ codec keywordCodec =
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
       Arm.payload "RemovePlusOneCountersFromThis" Common.natural CostComponent.RemovePlusOneCountersFromThis (\x -> case x of CostComponent.RemovePlusOneCountersFromThis y -> Just y; _ -> Nothing),
+      Arm.payload "RemovePlusOneCounters" (RemovePlusOneCounters.codec keywordCodec) CostComponent.RemovePlusOneCounters (\x -> case x of CostComponent.RemovePlusOneCounters y -> Just y; _ -> Nothing),
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis (\x -> case x of CostComponent.PutPlusOneCountersOnThis y -> Just y; _ -> Nothing),
       Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "BlightX" CostComponent.BlightX,
@@ -88,6 +90,7 @@ tagOf x = case x of
   CostComponent.AddLoyaltyToThis {} -> "AddLoyaltyToThis"
   CostComponent.RemoveLoyaltyFromThis {} -> "RemoveLoyaltyFromThis"
   CostComponent.RemovePlusOneCountersFromThis {} -> "RemovePlusOneCountersFromThis"
+  CostComponent.RemovePlusOneCounters {} -> "RemovePlusOneCounters"
   CostComponent.PutPlusOneCountersOnThis {} -> "PutPlusOneCountersOnThis"
   CostComponent.Blight {} -> "Blight"
   CostComponent.BlightX {} -> "BlightX"

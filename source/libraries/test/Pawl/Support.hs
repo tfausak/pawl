@@ -2580,6 +2580,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseBolster decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseAmass decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBlight decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseCounterRemoval decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseVote decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseVoteWord decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCounter decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -2708,6 +2709,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseBolster {} -> "ChooseBolster"
   Prompt.ChooseAmass {} -> "ChooseAmass"
   Prompt.ChooseBlight {} -> "ChooseBlight"
+  Prompt.ChooseCounterRemoval {} -> "ChooseCounterRemoval"
   Prompt.ChooseVote {} -> "ChooseVote"
   Prompt.ChooseVoteWord {} -> "ChooseVoteWord"
   Prompt.ChooseMovedCounter {} -> "ChooseMovedCounter"
