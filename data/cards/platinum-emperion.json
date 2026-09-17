@@ -1,0 +1,54 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 8
+        }
+      ],
+      "name": "Platinum Emperion",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CantGainLife"
+          },
+          "scope": {
+            "type": "You"
+          }
+        },
+        {
+          "effect": {
+            "type": "CantLoseLife"
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "power": {
+        "type": "Literal",
+        "value": 8
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 8
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Golem"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

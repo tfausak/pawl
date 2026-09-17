@@ -484,4 +484,20 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.AdditionalVotes 1)
       " {\"type\":\"AdditionalVotes\",\"value\":1} "
+  -- CR 119.7 as Giant Cindermaw prints it, and the wire form
+  -- data/cards/giant-cindermaw.json writes.
+  Spec.it s "CantGainLife, Giant Cindermaw's restriction" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      PlayerEffect.CantGainLife
+      " {\"type\":\"CantGainLife\"} "
+  -- CR 119.8, the other half of Platinum Emperion's one printed sentence
+  -- (data/cards/platinum-emperion.json).
+  Spec.it s "CantLoseLife, Platinum Emperion's restriction" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      PlayerEffect.CantLoseLife
+      " {\"type\":\"CantLoseLife\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerEffect.codec

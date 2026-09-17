@@ -402,11 +402,24 @@ closeEventGroup gs =
 -- symbol and no PayLife component asks Pawl.Engine.Mana.payableResolutions' life
 -- clause about 0 and nothing else, so that clause cannot change any answer such a
 -- cost used to give.
+--
+-- CR 119.8's last sentence rides here rather than at the three call sites: a cost
+-- that involves having a player who can't lose life pay life can't be paid, and
+-- every reader of CR 119.4 already comes through this one door. Platinum
+-- Emperion's own reminder text is that reading in as many words, and
+-- Pawl.PlayerEffectSpec's GreedUnderEmperion group is the proof.
+--
+-- CR 119.7's matching clause -- a cost that involves having a player GAIN life
+-- can't be paid -- has no site: Pawl.Types.CostComponent has no life-gain
+-- component for one to be written with.
 canPayLife :: PlayerId -> Natural -> GameState -> Bool
 canPayLife pid n gs =
-  n == 0 || case Map.lookup pid (GameState.players gs) of
-    Nothing -> False
-    Just player -> Player.life player >= toInteger n
+  n == 0
+    || ( not (PlayerEffect.prohibitsLosingLife pid gs)
+           && case Map.lookup pid (GameState.players gs) of
+             Nothing -> False
+             Just player -> Player.life player >= toInteger n
+       )
 
 -- CR 119.4: the payment is subtracted from the player's life total. The CR 704.5a
 -- state-based action that may follow is the existing one in Pawl.Engine.Sba --
@@ -4219,13 +4232,23 @@ resolvePlayerCounters cause pid kind n = do
 --
 -- Zero proposes nothing, which is CR 119.9's posture on the gain side taken for
 -- the loss: no life loss event, so no row is spent on one.
+--
+-- CR 119.8's restriction is asked ahead of the proposal, resolveLifeGain's
+-- position and for CR 119.7's reason one direction over. It reaches DAMAGE
+-- through CR 120.3a: the damage is still dealt and its other results still
+-- happen, and only the life loss does not -- Pawl.PlayerEffectSpec's
+-- PlatinumEmperion group is the proof.
 resolveLifeLoss :: LifeLossCause.LifeLossCause -> PlayerId -> Natural -> Game Natural
 resolveLifeLoss cause pid n =
   if n == 0
     then pure 0
     else do
-      outcome <- applyReplacements (ProposedEvent.WouldLoseLife cause pid n)
-      pure (maybe 0 snd (outcome >>= Replacement.asLifeLoss))
+      gs <- State.get
+      if PlayerEffect.prohibitsLosingLife pid gs
+        then pure 0
+        else do
+          outcome <- applyReplacements (ProposedEvent.WouldLoseLife cause pid n)
+          pure (maybe 0 snd (outcome >>= Replacement.asLifeLoss))
 
 -- CR 119.3 / 119.10 / 120.3f: settle how much life a player actually gains, and
 -- answer with the settled amount. resolveLifeLoss the other direction, and the
@@ -4245,18 +4268,23 @@ resolveLifeLoss cause pid n =
 -- Zero proposes nothing, which is CR 119.10 in as many words: "if a player gains
 -- 0 life, no life gain event would occur, and these effects won't apply".
 --
--- Not implemented: CR 119.7's restriction on a player who CAN'T gain life --
--- under which no gain happens here at all and "a replacement effect that would
--- replace a life gain event affecting that player won't do anything", so the
--- gate belongs ahead of the proposal rather than among the rows. Vacuous:
--- Pawl.Types.PlayerEffect has no such arm to consult (#3078).
+-- CR 119.7's restriction is asked AHEAD of the proposal, not among the rows:
+-- under it no gain happens at all and "a replacement effect that would replace a
+-- life gain event affecting that player won't do anything", which a row CR 616.1
+-- has already ordered and spent could not produce. The classification question
+-- goes to Pawl.Engine.PlayerEffect.prohibitsGainingLife, so nothing here cases on
+-- an effect. Pawl.PlayerEffectSpec's GiantCindermaw group is the proof.
 resolveLifeGain :: PlayerId -> Natural -> Game Natural
 resolveLifeGain pid n =
   if n == 0
     then pure 0
     else do
-      outcome <- applyReplacements (ProposedEvent.WouldGainLife pid n)
-      pure (maybe 0 snd (outcome >>= Replacement.asLifeGain))
+      gs <- State.get
+      if PlayerEffect.prohibitsGainingLife pid gs
+        then pure 0
+        else do
+          outcome <- applyReplacements (ProposedEvent.WouldGainLife pid n)
+          pure (maybe 0 snd (outcome >>= Replacement.asLifeGain))
 
 -- CR 705.1's flip of ONE coin. The ONE road every flip in the engine takes:
 -- Pawl.Engine.Resolve's Effect.FlipCoin arm calls it once per coin its

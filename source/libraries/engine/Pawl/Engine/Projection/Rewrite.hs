@@ -409,6 +409,8 @@ rewritePlayerEffect pairs effect = case effect of
   -- Nor is a coin's face, or the two flags beside it.
   PlayerEffect.StateCoinFlip _ -> effect
   PlayerEffect.AdditionalVotes _ -> effect
+  PlayerEffect.CantGainLife -> effect
+  PlayerEffect.CantLoseLife -> effect
 
 -- CR 612's subtype word swap over an effect's AST. Cases on an effect's
 -- STRUCTURE -- does this arm carry a word a swap could reach -- never on which
