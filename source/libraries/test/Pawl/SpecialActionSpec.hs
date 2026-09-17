@@ -1523,9 +1523,9 @@ suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
 -- X=3 taps five of them and leaves one, so the count reads the announced value
 -- back off the board rather than merely "some mana was spent"; X=4 is affordable
 -- too, so a board that could only ever pay one value is not what is being read.
-benalishBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-benalishBoard plains commander =
-  let (commanderId, gs) = S.addHandCard commander S.alice (S.landsInPlay plains 6)
+benalishBoard :: Int -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+benalishBoard lands plains commander =
+  let (commanderId, gs) = S.addHandCard commander S.alice (S.landsInPlay plains lands)
    in ( commanderId,
         gs
           { GameState.activePlayer = S.alice,
@@ -1552,7 +1552,7 @@ suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
   Spec.it s "CR 107.3d the announced X is both the time counters and the mana" $ do
     plains <- S.printingOf s registry "Plains"
     commander <- S.printingOf s registry "Benalish Commander"
-    let (commanderId, gs) = benalishBoard plains commander
+    let (commanderId, gs) = benalishBoard 6 plains commander
         suspended = snd (Engine.runGamePure (suspendForX 3 commanderId) gs Engine.priorityLoop)
     -- CR 702.62a's "exile it with N time counters on it", where N is rule
     -- 107.3d's answer: three, not the one a fixed N would have written and not
@@ -1571,7 +1571,7 @@ suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
   Spec.it s "CR 101.2 X can't be 0, so an announcement of zero takes nothing" $ do
     plains <- S.printingOf s registry "Plains"
     commander <- S.printingOf s registry "Benalish Commander"
-    let (commanderId, gs) = benalishBoard plains commander
+    let (commanderId, gs) = benalishBoard 6 plains commander
         taking x = S.runPure (suspendForX x commanderId) gs (Suspend.suspend S.manaPerformer S.alice commanderId)
         refused = taking 0
         allowed = taking 1
@@ -1589,6 +1589,19 @@ suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
       (soleExileOf allowed >>= \oid -> fmap (Map.lookup CounterKind.Time . Object.counters) (Game.lookupObject oid allowed))
       (Just (Just 1))
     Spec.assertEqWith s "and three Plains paid {1}{W}{W}" (S.tappedCount S.alice allowed) 3
+  -- CR 116.2f offers an action only where the player could take it, and rule
+  -- 101.2's floor is part of what that costs: {1}{W}{W} is the cheapest this card
+  -- can be suspended for, so a board holding two Plains is not offered the action
+  -- while one holding three is. The pair differs in a single land, and the
+  -- Commander's own {3}{W} is unaffordable on both -- CR 116.2f asks whether the
+  -- card could BEGIN to be cast, not whether it could be paid for.
+  Spec.it s "CR 116.2f a board that cannot pay the least legal X is not offered the action" $ do
+    plains <- S.printingOf s registry "Plains"
+    commander <- S.printingOf s registry "Benalish Commander"
+    let (tooPoorId, tooPoor) = benalishBoard 2 plains commander
+        (enoughId, enough) = benalishBoard 3 plains commander
+    Spec.assertBool s (List.notElem (Action.Type.Suspend tooPoorId) (Action.legalActions S.alice tooPoor)) "two Plains cannot pay {1}{W}{W}, so the action is not offered"
+    Spec.assertBool s (List.elem (Action.Type.Suspend enoughId) (Action.legalActions S.alice enough)) "the control: three Plains can, and it is"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
