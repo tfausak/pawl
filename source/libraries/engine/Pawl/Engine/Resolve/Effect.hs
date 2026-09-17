@@ -1495,9 +1495,8 @@ sourceObjectOf src = case src of
 -- holds the activated ability's OWN id (CR 602.2a), which pawl stamps so a card can
 -- read the activation's own record -- the mana that paid for it, and how many times
 -- it has resolved this turn -- not because any printed text names the ability as
--- another object. Counting it would undo CR
--- 609.7a's second class, which admits "a spell on the stack" and deliberately stops
--- short of an ability.
+-- another object. Counting it would undo CR 609.7a's second class, which admits "a
+-- spell on the stack" and deliberately stops short of an ability.
 --
 -- HERE rather than at the carriers, because two of CR 609.7a's three read bindings
 -- and both were wrong: `referentsOfObject` for an ability still on the stack, and
@@ -6847,7 +6846,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Bound even where nothing came off, which is the answer "that much"
             -- wants: Ashling the Pilgrim with no counters deals 0 damage rather
             -- than leaving the clause unanswered.
-            Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot source tally (min before (Integer.toNaturalSaturating (max 0 n))))
+            Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot source tally (min before (Integer.toNaturalSaturating n)))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
   Effect.MoveCounters (MoveCounters.MkMoveCounters fromRef kinds mSlot toRef) -> do
     -- CR 122.5: move counters off one permanent and onto a second. WHICH kinds
