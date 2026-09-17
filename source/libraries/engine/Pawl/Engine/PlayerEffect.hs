@@ -1812,9 +1812,9 @@ opensZoneOf pid zone oid inZone gs =
 -- (Sen Triplets), and the owner conjunct moved here with it; see #2169. Yawgmoth's
 -- Will writes PlayerRef.Relative You and reaches no other graveyard for it.
 --
--- Says nothing about the TOP of a library, which stays zoneCandidates' half of
--- the question: that hands this the top card alone, so a permission worded "from
--- the top of your library" (Garruk's Horde) comes out of the two together. The
+-- Says nothing about the TOP of a library, which stays Pawl.Engine.Cast.pileCandidates'
+-- half of the question: that hands this the top card alone, so a permission worded
+-- "from the top of your library" (Garruk's Horde) comes out of the two together. The
 -- object-scoped Pawl.Types.CastingPermission.CastFromLibraryWhileSearching is
 -- emphatically NOT read here -- Panglacial Wurm's permission is scoped to a
 -- search in progress (Pawl.Engine.Cast.castableWhileSearching), and reading it
@@ -1993,8 +1993,9 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
 -- and Pawl.Engine.Action.playableLands nubs the ids it ends up with.
 --
 -- Asks nothing about WHICH land, where the cast side takes an ObjectId: the arm
--- carries no Filter (see the type), so a grant opens the whole pile or none of
--- it.
+-- carries no Filter (see the type), so a grant opens a named pile or none of it.
+-- How much of a pile that is stays the ZONE's answer -- a named library is its
+-- top card (Pawl.Engine.Cast.pileCandidates) -- and never this list's.
 playLandPiles :: PlayerId -> GameState -> [(Zone.Zone, PlayerId)]
 playLandPiles pid gs =
   let piles effect = case effect of

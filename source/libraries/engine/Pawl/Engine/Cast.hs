@@ -927,8 +927,9 @@ candidateFillable pid oid name proposed candidate =
 -- filters, so the two can never disagree about where to look.
 --
 -- The LIBRARY is in the list for one permission only: the standing "you may cast
--- creature spells from the top of your library" (Garruk's Horde), which
--- zoneCandidates narrows to the top card and castableZones' own arm permits.
+-- spells from the top of your library", which Garruk's Horde narrows to creature
+-- spells and Future Sight states unrestricted. pileCandidates narrows it to the
+-- top card and castableZones' own arm permits it.
 -- Panglacial Wurm is NOT that road -- its permission is scoped to a search in
 -- progress rather than to the whole game, and castableWhileSearching walks the
 -- library for it separately.
@@ -1247,19 +1248,32 @@ zoneCandidates zone pid gs = case zone of
   Zone.Exile -> Set.toList (GameState.exile gs)
   Zone.Hand -> everyPlayersCopyOf zone gs
   Zone.Graveyard -> everyPlayersCopyOf zone gs
-  -- THE TOP CARD ALONE, which is the other half of "you may cast creature spells
-  -- from the top of your library": every printing of that permission names the
-  -- top card, so the narrowing lives here rather than in a Filter no card would
-  -- state. Game.zoneMembers hands a library back in order, top first (CR 401.2's
-  -- ordered pile), so `take 1` is that card.
-  --
-  -- CR 401.2 keeps a library hidden, and pawl offers this card anyway: every
-  -- printing of the permission pairs it with a clause that makes the top card
-  -- visible (Garruk's Horde reveals it, Bolas's Citadel looks at it), so the offer
-  -- is the permission's own. What an ANSWERER sees is a separate matter, and pawl
-  -- hides nothing from one yet (#1412).
-  Zone.Library -> concatMap (\owner -> take 1 (Game.zoneMembers zone owner gs)) (Game.stillPlaying gs)
+  Zone.Library -> concatMap (\owner -> pileCandidates zone owner gs) (Game.stillPlaying gs)
   _ -> Game.zoneMembers zone pid gs
+
+-- What a permission naming ONE player's copy of a zone opens: every member of
+-- that pile, except a library, which is its top card alone.
+--
+-- THE TOP CARD ALONE, which is the other half of "you may cast creature spells
+-- from the top of your library": every printing of that permission names the top
+-- card, so the narrowing lives here rather than in a Filter no card would state.
+-- Game.zoneMembers hands a library back in order, top first (CR 401.2's ordered
+-- pile), so `take 1` is that card.
+--
+-- Shared with the PLAY side, which states the same narrowing of the same zone
+-- (Future Sight's one sentence says both): Pawl.Engine.Action.playableLands
+-- reads this where zoneCandidates above reads it for a cast, so CR 305.1's
+-- special action and CR 601.3's cast cannot disagree about which card is on top.
+--
+-- CR 401.2 keeps a library hidden, and pawl offers this card anyway: every
+-- printing of the permission pairs it with a clause that makes the top card
+-- visible (Garruk's Horde reveals it, Bolas's Citadel looks at it), so the offer
+-- is the permission's own. What an ANSWERER sees is a separate matter, and pawl
+-- hides nothing from one yet (#1412).
+pileCandidates :: Zone.Zone -> PlayerId -> GameState -> [ObjectId]
+pileCandidates zone owner gs = case zone of
+  Zone.Library -> take 1 (Game.zoneMembers zone owner gs)
+  _ -> Game.zoneMembers zone owner gs
 
 -- Every player's copy of a per-player zone (CR 400.1), in seat order.
 everyPlayersCopyOf :: Zone.Zone -> GameState -> [ObjectId]
