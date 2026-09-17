@@ -162,7 +162,7 @@ data PlayerEffect
     -- owner being the payload's (Pawl.Types.CastFromZone). The graveyard and the
     -- top of a library had an arm each, and the second was the first with a
     -- different zone written into its name: the narrowing to the TOP card is
-    -- Pawl.Engine.Cast.zoneCandidates' and never a Filter's, so nothing but the
+    -- Pawl.Engine.Cast.pileCandidates' and never a Filter's, so nothing but the
     -- zone told the two apart.
     --
     -- Read as a DISJUNCTION (Pawl.Engine.PlayerEffect.mayCastFrom): one
@@ -173,9 +173,9 @@ data PlayerEffect
     -- reference names -- the play half of CastFrom above, since a land is played
     -- and never cast.
     --
-    -- Not implemented: the top of a library, which the CAST half reaches and which
-    -- Future Sight's land clause needs -- the reference can say it, and
-    -- Pawl.Engine.Action.playableLands draws from no library (#3224).
+    -- A library reference means its TOP CARD, the narrowing
+    -- Pawl.Engine.Cast.pileCandidates states for both halves of Future Sight's
+    -- sentence; Pawl.CastPermissionSpec's FutureSight group proves it.
     PlayLandsFrom InZone.InZone
   | -- | CR 118.9 / Omniscience: this player may cast a matching spell from their
     -- hand without paying its mana cost.

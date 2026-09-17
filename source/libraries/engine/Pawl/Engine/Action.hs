@@ -49,11 +49,9 @@ import qualified Pawl.Types.Zone as Zone
 -- PLAYER, and exile is filed by owner, so a land somebody else owns has to be
 -- reachable.
 --
--- Not implemented: the top of a LIBRARY, which the CAST side reaches
--- (Pawl.Engine.Cast.castZones) and which Future Sight's land half would need
--- here. The grant can now say it -- PlayLandsFrom carries the zone -- so what is
--- missing is the narrowing to the top card, which on the cast side is
--- Cast.zoneCandidates' (#3224).
+-- A granted LIBRARY is its top card, Future Sight's land half: the narrowing is
+-- Cast.pileCandidates', the one the cast side reads for the other half of that
+-- sentence, so neither side can drift from the other about which card is on top.
 --
 -- Reading the OBJECT-BORNE permission with Cast.permitsPlayFromExile and not
 -- Cast.permitsCastFromExile is the whole of what makes this the PLAY side: the
@@ -96,14 +94,20 @@ playableLands pid gs =
             else fmap (\(mName, _) -> (oid, mName)) (Card.landFaces card)
       -- CR 305.1's own zone, which needs no permission.
       fromHand = Game.zoneMembers Zone.Hand pid gs
-      -- The whole pile or none of it: the grant narrows no land (see
+      -- The pile or none of it: the grant narrows no land (see
       -- Pawl.Types.PlayerEffect.PlayLandsFrom), so it is asked once per pile
       -- rather than per card, and WHOSE pile is the grant's own answer -- CR
-      -- 400.1's per-player zone being what its reference names.
+      -- 400.1's per-player zone being what its reference names. Which cards a
+      -- named pile amounts to is the ZONE's answer below and not the grant's.
       --
       -- Nubbed, because two grants naming one pile would otherwise offer every
       -- land in it twice.
-      fromGranted = ListUtils.nubOrd (concatMap (\(zone, owner) -> Game.zoneMembers zone owner gs) (PlayerEffect.playLandPiles pid gs))
+      --
+      -- Read through Cast.pileCandidates and never Game.zoneMembers, which is
+      -- what makes "from the top of your library" mean one card here as well:
+      -- Future Sight states the play half and the cast half in one sentence, so
+      -- the two sides share the narrowing rather than each keeping their own.
+      fromGranted = ListUtils.nubOrd (concatMap (\(zone, owner) -> Cast.pileCandidates zone owner gs) (PlayerEffect.playLandPiles pid gs))
       -- Per card instead, because CR 715.3d's permission is state on ONE exiled
       -- incarnation naming ONE player.
       fromExile = filter (\oid -> Cast.permitsPlayFromExile pid oid gs) (Cast.zoneCandidates Zone.Exile pid gs)

@@ -864,10 +864,10 @@ hordeBoard forest horde elves rampant top present =
 -- card of your library revealed. / You may cast creature spells from the top of
 -- your library."
 --
--- The producer of PlayerEffect.CastFromTopOfLibrary, and the LIBRARY's entry in
+-- A producer of PlayerEffect.CastFrom naming a library, and the LIBRARY's entry in
 -- Pawl.Engine.Cast.castZones: a CR 601.3 permission naming a zone the rules give
 -- nobody, where Yawgmoth's Will above names the graveyard. The narrowing to the
--- TOP card is Cast.zoneCandidates' and not the Filter's, so these cases prove
+-- TOP card is Cast.pileCandidates' and not the Filter's, so these cases prove
 -- the two halves separately -- the second creature one card down is the one that
 -- can tell them apart.
 --
@@ -922,7 +922,7 @@ garruksHordeSpec s registry =
 
         -- The zone half: "the TOP of your library". The second Llanowar Elves is
         -- a creature the permission matches, and it is one card down -- so this
-        -- is Cast.zoneCandidates' narrowing and nothing else.
+        -- is Cast.pileCandidates' narrowing and nothing else.
         Spec.it s "CR 601.3 only the top card is reached, not the creature beneath it" $ do
           (herTop, herDeep, _, _, _, gs) <- board "Llanowar Elves" True
           Spec.assertBool s (not (any (S.isCastOf herDeep) (Action.legalActions S.alice gs))) "the creature one card down is not offered"
@@ -960,6 +960,134 @@ garruksHordeSpec s registry =
           -- HOLDS the permission cannot reach anybody else's top card either.
           Spec.assertBool s (not (any (S.isCastOf hisTop) (Action.legalActions S.alice gs))) "and alice cannot cast bob's top card"
           Spec.assertBool s (not (S.castable S.alice hisTop gs)) "nor is it castable by her"
+
+-- alice, bob and carol each have a library whose top card is a land; alice's
+-- holds a SECOND land one card down and a third at the bottom, and her hand
+-- holds a Forest. `present` says whether Future Sight is on her battlefield, so
+-- every pair of boards below differs in that and in nothing else. It is alice's
+-- precombat main phase and nobody has played a land yet.
+--
+-- A DIFFERENT basic land in every slot an assertion names -- a Swamp on top, a
+-- Mountain beneath it, an Island and a Plains for the opponents -- so no two
+-- offers can be mistaken for each other; the Forest fills the slots nothing
+-- discriminates. The Forest in her HAND is what keeps every negative from
+-- passing vacuously: CR 305.1's own zone is offered on every board below, so a
+-- list that lacks the library card is never a list that is empty for want of a
+-- window.
+--
+-- Returns alice's top card, the land beneath it, bob's top card, carol's, the
+-- Forest in alice's hand and the board.
+futureSightBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+futureSightBoard swamp mountain forest island plains sight present =
+  let -- Three Forests under alice, which is the mana the cast half's case below
+      -- spends; no case here plays one, so CR 305.2a's tally starts at zero all
+      -- the same.
+      mana = S.landsFor forest S.alice 3 S.threePlayerGame
+      -- S.addLibraryCard puts each card ON TOP of the last, so the deepest goes
+      -- in first and the Swamp is what the permission can reach.
+      (_, g1) = S.addLibraryCard forest S.alice mana
+      (herDeep, g2) = S.addLibraryCard mountain S.alice g1
+      (herTop, g3) = S.addLibraryCard swamp S.alice g2
+      (hisTop, g4) = S.addLibraryCard island S.bob g3
+      (theirTop, g5) = S.addLibraryCard plains S.carol g4
+      (herHand, g6) = S.addHandCard forest S.alice g5
+      g7 = if present then snd (S.addPermanent sight S.alice g6) else g6
+   in ( herTop,
+        herDeep,
+        hisTop,
+        theirTop,
+        herHand,
+        g7
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Future Sight {2}{U}{U}{U} Enchantment: "Play with the top card of your library
+-- revealed. / You may play lands and cast spells from the top of your library."
+--
+-- The PLAY half's producer, and the play-side twin of Garruk's Horde above: a
+-- land is played by CR 305.1's special action and never cast, so the top-card
+-- narrowing Pawl.Engine.Cast.pileCandidates states has to be read by
+-- Pawl.Engine.Action.playableLands too. The land ONE CARD DOWN is what tells that
+-- narrowing from the permission itself.
+--
+-- Not implemented: "Play with the top card of your library revealed", which
+-- data/cards/future-sight.json omits -- pawl hands every answerer the whole game
+-- already, so a revealed card is indistinguishable from a hidden one (#1412).
+-- Neither stricter nor weaker than printed, and no case below rests on it.
+futureSightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+futureSightSpec s registry =
+  let board present = do
+        swamp <- S.printingOf s registry "Swamp"
+        mountain <- S.printingOf s registry "Mountain"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        plains <- S.printingOf s registry "Plains"
+        sight <- S.printingOf s registry "Future Sight"
+        pure (futureSightBoard swamp mountain forest island plains sight present)
+   in Spec.describe s "FutureSight" $ do
+        -- The whole play half, end to end: library -> battlefield. Driven
+        -- through Engine.priorityLoop, and the answerer is pinned to this id, so
+        -- a board where the play is never OFFERED plays nothing instead of
+        -- putting the Forest in her hand onto the battlefield.
+        Spec.it s "CR 305.1 the top card of the library is played and enters the battlefield" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          (herTop, _, _, _, _, with) <- board True
+          let after = S.runPure (playOnly herTop) with Engine.priorityLoop
+          Spec.assertEqWith s "the library's top Swamp is on the battlefield" (S.countOnBattlefieldByName (S.printingName swamp) S.alice after) 1
+          Spec.assertEqWith s "her library is one card shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+          Spec.assertEqWith s "and CR 305.2a's tally counted it" (Map.lookup S.alice (GameState.landsPlayed after)) (Just 1)
+
+        -- The pair. Two boards differing in Future Sight and in nothing else,
+        -- and the hand's Forest is offered on both -- so the Swamp appearing is
+        -- the grant and can be nothing else.
+        Spec.it s "CR 305.1 without Future Sight the same top card is not offered" $ do
+          (herTop, _, _, _, herHand, without) <- board False
+          (_, _, _, _, _, with) <- board True
+          Spec.assertEqWith s "without it only the hand is offered" (filter isPlay (Action.legalActions S.alice without)) [Action.Type.Play herHand Nothing]
+          Spec.assertEqWith
+            s
+            "with it the library's top Swamp joins the Forest"
+            (filter isPlay (Action.legalActions S.alice with))
+            [Action.Type.Play herHand Nothing, Action.Type.Play herTop Nothing]
+          Spec.assertBool s (notElem (Zone.Library, S.alice) (PlayerEffect.playLandPiles S.alice without)) "and the permission is absent on the board without it"
+
+        -- The zone half: "the TOP of your library". The Mountain one card down is
+        -- a land the grant's pile holds, and it is refused -- so this is
+        -- Cast.pileCandidates' narrowing and nothing else.
+        Spec.it s "CR 305.1 only the top card is reached, not the land beneath it" $ do
+          (herTop, herDeep, _, _, _, with) <- board True
+          Spec.assertBool s (notElem (Action.Type.Play herDeep Nothing) (Action.legalActions S.alice with)) "the land one card down is not offered"
+          Spec.assertBool s (elem (Action.Type.Play herTop Nothing) (Action.legalActions S.alice with)) "while the card above it is"
+          Spec.assertBool s (elem (Zone.Library, S.alice) (PlayerEffect.playLandPiles S.alice with)) "so the refusal is not the permission, which names her library"
+
+        -- CR 109.5 at three seats. Each opponent is asked in their OWN main
+        -- phase, so CR 305.1's window is open and the refusal is the scope. A
+        -- library is one player's (CR 400.1), so the seat that HOLDS the
+        -- permission cannot reach anybody else's top card either.
+        Spec.it s "CR 109.5 the You scope reaches neither opponent's library" $ do
+          (_, _, hisTop, theirTop, _, with) <- board True
+          let bobsTurn = with {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+              carolsTurn = with {GameState.activePlayer = S.carol, GameState.priority = Just S.carol}
+          Spec.assertBool s (notElem (Action.Type.Play hisTop Nothing) (Action.legalActions S.bob bobsTurn)) "bob is not offered his own top card"
+          Spec.assertBool s (notElem (Action.Type.Play theirTop Nothing) (Action.legalActions S.carol carolsTurn)) "nor carol hers"
+          Spec.assertBool s (notElem (Action.Type.Play hisTop Nothing) (Action.legalActions S.alice with)) "and alice cannot play bob's top card"
+          Spec.assertBool s (notElem (Zone.Library, S.bob) (PlayerEffect.playLandPiles S.alice with)) "her permission names her own library alone"
+
+        -- The CAST half of the same sentence, which Future Sight states
+        -- unrestricted where Garruk's Horde above narrows it to creature spells.
+        -- A Llanowar Elves put on top of the same library, on the pair of boards
+        -- the rest of this group uses, so the offer is the enchantment's.
+        Spec.it s "CR 601.3 the same sentence's cast half reaches the top card" $ do
+          elves <- S.printingOf s registry "Llanowar Elves"
+          (_, _, _, _, _, with) <- board True
+          (_, _, _, _, _, without) <- board False
+          let (withTop, withElves) = S.addLibraryCard elves S.alice with
+              (withoutTop, withoutElves) = S.addLibraryCard elves S.alice without
+          Spec.assertBool s (any (S.isCastOf withTop) (Action.legalActions S.alice withElves)) "the top card is offered as a cast"
+          Spec.assertBool s (not (any (S.isCastOf withoutTop) (Action.legalActions S.alice withoutElves))) "and is not offered on the board without Future Sight"
 
 -- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
 -- counteringBoard above, with a Goblin Piker as the victim spell.
@@ -1766,6 +1894,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   yawgmothsWillSpec s registry
   crucibleSpec s registry
   garruksHordeSpec s registry
+  futureSightSpec s registry
   voidWinnowerSpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
