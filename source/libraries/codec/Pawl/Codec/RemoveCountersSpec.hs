@@ -20,7 +20,8 @@ spec s = Spec.describe s "Pawl.Codec.RemoveCounters" $ do
       ( RemoveCounters.MkRemoveCounters
           { RemoveCounters.kind = CounterKind.PlusOnePlusOne,
             RemoveCounters.quantity = Quantity.Literal 1,
-            RemoveCounters.slot = SlotName.MkSlotName (Text.pack "target")
+            RemoveCounters.slot = SlotName.MkSlotName (Text.pack "target"),
+            RemoveCounters.tally = Nothing
           }
       )
       " {\"kind\":{\"type\":\"PlusOnePlusOne\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"slot\":\"target\"} "

@@ -4,13 +4,15 @@
 -- Covers Pawl.Engine.Condition, Pawl.Types.Condition and Pawl.Types.Comparison,
 -- including what Condition.holds makes of Pawl.Engine.Quantity's IsMonarch,
 -- EnteredThisTurn, EnteredFrom, WasCastFrom, WasToken, WasBlocking,
--- DamageDealtToThisTurn and WasBlockedThisTurn.
+-- DamageDealtToThisTurn, WasBlockedThisTurn and TimesResolvedThisTurn.
 module Pawl.ConditionSpec where
 
 import qualified Data.List as List
 import qualified Data.Map as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
@@ -26,8 +28,11 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -35,10 +40,12 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Moved as Moved
@@ -913,3 +920,84 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   lastKnownAttackingSpec s registry
   damageDealtToItSpec s registry
   wasBlockedThisTurnSpec s registry
+  ashlingSpec s registry
+
+-- CR 608.2n / 608.2i: how many times an ABILITY has resolved this turn, which
+-- Quantity.TimesResolvedThisTurn folds off GameEvent.ActivatedAbilityResolved.
+--
+-- Ashling the Pilgrim ({1}{R} Legendary Creature -- Elemental Shaman 1/1,
+-- "{1}{R}: Put a +1/+1 counter on Ashling. If this is the third time this
+-- ability has resolved this turn, remove all +1/+1 counters from Ashling, and it
+-- deals that much damage to each creature and each player.") is the fixture, and
+-- the only one the pool needs: the clause is a printed "if" over CR 602.2a's
+-- "this ability", read through Binding.thisAbility.
+--
+-- THE BOARD SHAPE that makes the cases discriminating. bob's Blind-Spot Giant is
+-- 4/3 and his Palace Guard 1/4, so 3 damage takes exactly one of them and the
+-- survivor is the proof the amount was 3 rather than "enough" -- and Ashling
+-- itself is 1/1 once its counters come off, so it dies to its own sweep, which is
+-- what CR 608.2c's printed order means and a damage-before-removal reading would
+-- not show. alice holds SIX Mountains, two per activation, so the third
+-- activation in the reset case below is paid for out of what turn one left.
+--
+-- Asserted on the BOARD rather than on the log: the counts, the life totals and
+-- who is left standing are what the card prints.
+ashlingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ashlingSpec s registry = Spec.describe s "Ashling the Pilgrim (CR 608.2n)" $ do
+  let giantName = CardName.MkCardName (Text.pack "Blind-Spot Giant")
+      guardName = CardName.MkCardName (Text.pack "Palace Guard")
+      ashlingName = CardName.MkCardName (Text.pack "Ashling the Pilgrim")
+      -- alice's Ashling and six untapped Mountains against bob's two creatures.
+      setUp = do
+        ashling <- S.printingOf s registry "Ashling the Pilgrim"
+        mountain <- S.printingOf s registry "Mountain"
+        giant <- S.printingOf s registry "Blind-Spot Giant"
+        guard_ <- S.printingOf s registry "Palace Guard"
+        let (ashlingId, withAshling) = S.addPermanent ashling S.alice (S.landsInPlay mountain 6)
+            (_, withGiant) = S.addPermanent giant S.bob withAshling
+            (_, withGuard) = S.addPermanent guard_ S.bob withGiant
+        pure (ashlingId, withGuard)
+  Spec.it s "CR 608.2n the third resolution this turn removes the counters and deals that much damage" $ do
+    (ashlingId, board) <- setUp
+    case Maybe.listToMaybe (Projection.abilitiesOf ashlingId board) of
+      Nothing -> Spec.assertFailure s "Ashling the Pilgrim should declare one activated ability"
+      Just pump -> do
+        let after = List.foldl' (\gs _ -> activateAshling ashlingId pump gs) board [1 .. (3 :: Int)]
+        Spec.assertEqWith s "CR 608.2n the 4/3 Blind-Spot Giant was dealt the 3 damage of the three counters removed" (S.countOnBattlefieldByName giantName S.bob after) 0
+        Spec.assertEqWith s "and the 1/4 Palace Guard survived it, so the amount was 3 rather than lethal to everything" (S.countOnBattlefieldByName guardName S.bob after) 1
+        Spec.assertEqWith s "CR 608.2c the counters came off first, so Ashling met its own 3 damage as a 1/1" (S.countOnBattlefieldByName ashlingName S.alice after) 0
+        Spec.assertEqWith s "and each player was dealt 3" (S.lifeOf S.bob after) (Just 17)
+        Spec.assertEqWith s "alice included, the sweep naming each player and not each opponent" (S.lifeOf S.alice after) (Just 17)
+  -- The negative, on the SAME board with one activation fewer: the clause reads
+  -- "the third time", so the second resolution is not it.
+  Spec.it s "CR 608.2n the second resolution this turn does not" $ do
+    (ashlingId, board) <- setUp
+    case Maybe.listToMaybe (Projection.abilitiesOf ashlingId board) of
+      Nothing -> Spec.assertFailure s "Ashling the Pilgrim should declare one activated ability"
+      Just pump -> do
+        let after = List.foldl' (\gs _ -> activateAshling ashlingId pump gs) board [1 .. (2 :: Int)]
+        Spec.assertEqWith s "nobody was dealt anything" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "and the Blind-Spot Giant is untouched" (S.countOnBattlefieldByName giantName S.bob after) 1
+        Spec.assertEqWith s "the counters are still on Ashling" (S.counterOf CounterKind.PlusOnePlusOne ashlingId after) 2
+  -- CR 608.2i's extent: GameState.events is cleared at the turn handoff, so the
+  -- tally is of THIS turn. Two resolutions, the handoff, then a third -- which a
+  -- game-long count would make the third time and a counters-on-Ashling reading
+  -- would too, Ashling carrying three of them by then.
+  Spec.it s "CR 608.2i the turn handoff resets the tally" $ do
+    (ashlingId, board) <- setUp
+    case Maybe.listToMaybe (Projection.abilitiesOf ashlingId board) of
+      Nothing -> Spec.assertFailure s "Ashling the Pilgrim should declare one activated ability"
+      Just pump -> do
+        let twice = List.foldl' (\gs _ -> activateAshling ashlingId pump gs) board [1 .. (2 :: Int)]
+            after = activateAshling ashlingId pump (Engine.beginTurnOf S.bob twice)
+        Spec.assertEqWith s "CR 608.2i the resolution on bob's turn is the first of it, so nothing was dealt" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "and the Blind-Spot Giant is untouched" (S.countOnBattlefieldByName giantName S.bob after) 1
+        Spec.assertEqWith s "Ashling carries all three counters, which is what a count of them rather than of resolutions would have read" (S.counterOf CounterKind.PlusOnePlusOne ashlingId after) 3
+
+-- One activation of Ashling's ability by alice, resolved and settled. alice is
+-- given priority because a board does not imply a window (S.priorityGame's
+-- sentence), and the mana comes off her untapped Mountains.
+activateAshling :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState.GameState -> GameState.GameState
+activateAshling ashlingId pump gs =
+  let activated = S.runPure S.identityAnswer gs {GameState.priority = Just S.alice} (Activate.activateAbility S.alice ashlingId pump)
+   in snd (Engine.runGamePure S.identityAnswer activated (Stack.resolveTop >> Engine.settleForPriority))

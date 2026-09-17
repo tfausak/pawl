@@ -1168,7 +1168,7 @@ ownCounts effect = case effect of
   -- and refCounts reaches it from effectCounts above -- an arm reading the kinds
   -- alone kept compiling (#2729).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantityCounts (MovedKinds.quantityOf kinds)
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.PayAnyEnergy _ -> []
@@ -3393,6 +3393,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> []
   Quantity.Type.SpellsCastLastTurn _ -> []
+  Quantity.Type.TimesResolvedThisTurn -> []
   Quantity.Type.SpellsCastBefore -> []
   Quantity.Type.PermanentsDiedThisTurn -> []
   Quantity.Type.DungeonsCompleted _ -> []
@@ -5116,7 +5117,7 @@ effectFilters effect = case effect of
   Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ to) -> frame Unframed (foldMap counterKindFilters (MovedKinds.kindOf kinds) <> foldMap quantityFilters (MovedKinds.quantityOf kinds)) <> frame SourceHostFramed (objectRefFilters from <> objectRefFilters to)
   -- The count and CR 122.1b's kind, PutCounters' two unframed positions: the
   -- slot beside them is a bare SlotName and carries no Filter.
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity)
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _ _) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []

@@ -1809,6 +1809,81 @@ castOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
+  GameEvent.CardArrived _ -> Nothing
+
+-- CR 608.2n: the ACTIVATED ABILITY an event describes RESOLVING, if it describes
+-- one -- the source object and the ability, which is the pair CR 707.10b counts
+-- by. castOf above's shape and placement, and its fold's twin:
+-- Pawl.Engine.Quantity's TimesResolvedThisTurn arm counts the entries this
+-- returns against the Source of the ability being asked about.
+activatedAbilityResolved :: GameEvent -> Maybe ActivatedAbilitySource.ActivatedAbilitySource
+activatedAbilityResolved event = case event of
+  GameEvent.SpellCast {} -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
+  GameEvent.Transformed {} -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
+  GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
+  GameEvent.Exploited {} -> Nothing
+  GameEvent.Trained _ -> Nothing
+  GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Convoked _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
+  GameEvent.Moved {} -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew {} -> Nothing
+  GameEvent.Revealed {} -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
+  GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
+  GameEvent.BecameUnattached {} -> Nothing
+  GameEvent.LeftTheGame _ -> Nothing
+  GameEvent.Milled {} -> Nothing
+  GameEvent.Scried _ -> Nothing
+  GameEvent.DungeonCompleted _ -> Nothing
+  GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
+  GameEvent.Plotted _ -> Nothing
+  GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
+  GameEvent.Exerted _ -> Nothing
+  GameEvent.BecameAttacked _ -> Nothing
+  GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
+  GameEvent.BecameUntapped _ -> Nothing
+  GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
+  GameEvent.ManaAbilityResolved _ -> Nothing
+  GameEvent.CoinFlipped {} -> Nothing
+  GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
+  GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved activated -> Just activated
   GameEvent.CardArrived _ -> Nothing
 
 -- The discarding player an event describes, if it is a discard (CR 701.9a).
@@ -1892,6 +1967,7 @@ discardOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The permanent an event describes ENTERING THE BATTLEFIELD, if it is one. CR
@@ -2003,6 +2079,7 @@ movedChange event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The RECIPIENT an event describes damage being dealt to, if it describes one --
@@ -2105,6 +2182,7 @@ damageDealt event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The PLAYER an event describes being dealt damage, if it describes one. CR
@@ -2371,6 +2449,7 @@ lifeGainOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- CR 119.3 / 608.2i: how much life this player has gained this turn. The log fold

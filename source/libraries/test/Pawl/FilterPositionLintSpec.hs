@@ -1778,7 +1778,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         walked =
           [ ("EntryRiders' kinds", holds (riderFilters riders)),
             ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
-            ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot)))),
+            ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot Nothing)))),
             ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing anywhere)))),
             ("Effect.PutCountersFrom' kind", holds (effectFilters (Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom slot (Just kind) anywhere)))),
             ("Quantity.ObjectCounters' kind", holds (quantityFilters (Quantity.Type.ObjectCounters kind))),
@@ -1825,7 +1825,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       s
       "a kind carrying no keyword contributes nothing"
       ( counterKindFilters plain,
-        effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters plain one slot)),
+        effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters plain one slot Nothing)),
         quantityFilters (Quantity.Type.ObjectCounters plain),
         triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved plain)
       )
