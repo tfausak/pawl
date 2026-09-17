@@ -655,8 +655,9 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 
 -- CR 602.2a: the reserved slot under which an ACTIVATED ABILITY'S OWN STACK
 -- OBJECT is bound -- the printed "this ability" in Forsworn Paladin's "if mana
--- from a Treasure was spent to activate this ability". Stamped by
--- Pawl.Engine.Activate as the ability is put on the stack, alongside
+-- from a Treasure was spent to activate this ability" and in Ashling the
+-- Pilgrim's "if this is the third time this ability has resolved this turn".
+-- Stamped by Pawl.Engine.Activate as the ability is put on the stack, alongside
 -- `triggerSource` and `you`.
 --
 -- Distinct from `triggerSource` (CR 113.7), which names the ability's SOURCE:
@@ -674,9 +675,10 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 --
 -- NOT a CR 609.7a referent, and Pawl.Engine.Resolve.Effect.referentsOfBindings drops it
 -- by name for every carrier that reads a binding environment: this slot exists so
--- a card can read the activation's payment record, not because printed text names
--- the ability as some other object, and counting it would undo rule 609.7a's stop
--- at "a spell on the stack".
+-- a card can read the activation's own record -- what paid for it, and how many
+-- times it has resolved this turn -- not because printed text names the ability as
+-- some other object, and counting it would undo rule 609.7a's stop at "a spell on
+-- the stack".
 thisAbility :: SlotName
 thisAbility = SlotName.MkSlotName (Text.pack "thisAbility")
 

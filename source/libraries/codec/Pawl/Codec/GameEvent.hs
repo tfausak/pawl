@@ -7,6 +7,7 @@
 module Pawl.Codec.GameEvent where
 
 import qualified Pawl.Codec.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Codec.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Codec.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Codec.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Codec.BecameAttached as BecameAttached
@@ -128,7 +129,11 @@ codec =
       Arm.payload "Blighted" PlayerId.codec GameEvent.Blighted (\x -> case x of GameEvent.Blighted y -> Just y; _ -> Nothing),
       -- CR 701.61a. One player id, the arm above's shape: the rule's two halves
       -- write their own Moved events, so the forager is all this carries.
-      Arm.payload "Foraged" PlayerId.codec GameEvent.Foraged (\x -> case x of GameEvent.Foraged y -> Just y; _ -> Nothing)
+      Arm.payload "Foraged" PlayerId.codec GameEvent.Foraged (\x -> case x of GameEvent.Foraged y -> Just y; _ -> Nothing),
+      -- CR 608.2n. The source object and the ability, which is the pair CR
+      -- 707.10b counts by, so the payload is the same record Pawl.Types.Source's
+      -- own OfAbility arm carries.
+      Arm.payload "ActivatedAbilityResolved" ActivatedAbilitySource.codec GameEvent.ActivatedAbilityResolved (\x -> case x of GameEvent.ActivatedAbilityResolved y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: GameEvent.GameEvent -> String
@@ -198,3 +203,4 @@ tagOf x = case x of
   GameEvent.RingTempted {} -> "RingTempted"
   GameEvent.Blighted {} -> "Blighted"
   GameEvent.Foraged {} -> "Foraged"
+  GameEvent.ActivatedAbilityResolved {} -> "ActivatedAbilityResolved"

@@ -193,6 +193,7 @@ movedOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
 
 -- CR 603.10a: is this one of the conditions the game "looks back in time" for?
 --
@@ -972,6 +973,7 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
         GameEvent.Moved {} -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
@@ -1241,6 +1243,7 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
       -- one ability those rules put there. The one source that widens the SCANNED
@@ -1498,6 +1501,7 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       -- CR 114.4 / CR 113.6p: "abilities of emblems function in the command zone".
       -- The third source that widens the SCANNED ZONE rather than recovering an
@@ -1646,6 +1650,7 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
         let -- The bearer's own slot environment, so a condition naming a slot

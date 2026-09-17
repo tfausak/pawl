@@ -3103,6 +3103,7 @@ quantityReads q = case q of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.Type.SpellsCastLastTurn _ -> Set.empty
+  Quantity.Type.TimesResolvedThisTurn -> Set.empty
   Quantity.Type.SpellsCastBefore -> Set.empty
   Quantity.Type.PermanentsDiedThisTurn -> Set.empty
   Quantity.Type.DungeonsCompleted _ -> Set.empty

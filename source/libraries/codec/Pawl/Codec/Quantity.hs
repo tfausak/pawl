@@ -151,6 +151,12 @@ codec =
       -- from. The thresholds that turn the count into "no spells were cast" and
       -- "a player cast two or more" are the Comparison's, not this arm's.
       Arm.payload "SpellsCastLastTurn" PlayerRef.codec Quantity.SpellsCastLastTurn (\x -> case x of Quantity.SpellsCastLastTurn y -> Just y; _ -> Nothing),
+      -- CR 608.2n with nothing on the wire: the ability is the one the quantity
+      -- is evaluated against, which a card names through AgainstSlot over CR
+      -- 602.2a's reserved "thisAbility" slot, and "this turn" is the event log's
+      -- own extent. The threshold that turns the count into "the third time" is
+      -- the Comparison's.
+      Arm.nullary "TimesResolvedThisTurn" Quantity.TimesResolvedThisTurn,
       Arm.nullary "SpellsCastBefore" Quantity.SpellsCastBefore,
       Arm.nullary "PermanentsDiedThisTurn" Quantity.PermanentsDiedThisTurn,
       -- CR 309.7's tally, with only a PlayerRef on the wire for
@@ -236,6 +242,7 @@ tagOf x = case x of
   Quantity.DamageDealtToPlayersThisTurn {} -> "DamageDealtToPlayersThisTurn"
   Quantity.DamageDealtToThisTurn {} -> "DamageDealtToThisTurn"
   Quantity.SpellsCastLastTurn {} -> "SpellsCastLastTurn"
+  Quantity.TimesResolvedThisTurn {} -> "TimesResolvedThisTurn"
   Quantity.SpellsCastBefore {} -> "SpellsCastBefore"
   Quantity.PermanentsDiedThisTurn {} -> "PermanentsDiedThisTurn"
   Quantity.DungeonsCompleted {} -> "DungeonsCompleted"

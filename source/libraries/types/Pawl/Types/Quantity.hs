@@ -208,6 +208,21 @@ data Quantity
   | -- | CR 601.2i / 608.2i: how many spells that player cast last turn, read off
     -- GameState.castsLastTurn (not CR 502.2's active-player scalar).
     SpellsCastLastTurn PlayerRef.PlayerRef
+  | -- | CR 608.2n \/ 608.2i: how many times the ACTIVATED ABILITY this quantity is
+    -- evaluated against has resolved this turn, folded from the turn-scoped
+    -- GameEvent.ActivatedAbilityResolved log and counting the resolution asking.
+    --
+    -- Aimed at the ability's own object on the stack, which a card reaches
+    -- through AgainstSlot over CR 602.2a's reserved "thisAbility" slot -- Ashling
+    -- the Pilgrim's "if this is the third time this ability has resolved this
+    -- turn". Aimed at anything else it reads 0, no other object's Source being a
+    -- key in that log.
+    --
+    -- Pawl.ConditionSpec's Ashling the Pilgrim group is what proves the count,
+    -- and Pawl.CopySpec's what proves rule 707.10b's third sentence here: a copy
+    -- of the ability counts toward the same total, the copy keeping the
+    -- original's Source.
+    TimesResolvedThisTurn
   | -- | CR 702.40a: how many spells, by any player, were cast this turn before the
     -- object this quantity is evaluated against -- storm's count.
     SpellsCastBefore

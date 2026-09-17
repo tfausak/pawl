@@ -1133,7 +1133,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "target"))))
+      (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "target")) Nothing))
       " {\"type\":\"RemoveCounters\",\"value\":{\"kind\":{\"type\":\"MinusOneMinusOne\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"slot\":\"target\"}} "
   -- Every PlayerRef shape the opcode accepts: the self-scoped one, and the slot
   -- read CR 702.70a needs.

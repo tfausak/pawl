@@ -189,7 +189,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) slot))
+            (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) slot Nothing))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "one of the two counters is gone" (fmap Object.counters (Game.lookupObject oid after)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
   -- CR 122 states no rule making the instruction fail when there are fewer
@@ -208,7 +208,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot))
+            (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot Nothing))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "the kind is gone, not negative" (fmap Object.counters (Game.lookupObject oid after)) (Just Map.empty)
   -- CR 608.2d over CR 608.2e's unit, on a whole card: Shed Weakness ({G} Instant,

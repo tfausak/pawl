@@ -289,7 +289,7 @@ ownQuantities effect = case effect of
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> [quantity]
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> Maybe.maybeToList (MovedKinds.quantityOf kinds)
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> [quantity]
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> [quantity]
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
   Effect.PayAnyEnergy _ -> []
@@ -406,6 +406,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False
   Quantity.Type.DamageDealtToPlayersThisTurn {} -> False
   Quantity.Type.SpellsCastLastTurn {} -> False
+  Quantity.Type.TimesResolvedThisTurn -> False
   Quantity.Type.SpellsCastBefore -> False
   Quantity.Type.PermanentsDiedThisTurn -> False
   Quantity.Type.DungeonsCompleted {} -> False
@@ -1864,7 +1865,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.ExileHaunting (ExileHaunting.MkExileHaunting card host) -> [card, host]
           -- CR 122.8's read.
           Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> [from]
-          Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ _ slot) -> [slot]
+          Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ _ slot _) -> [slot]
           -- CR 122.5 names NO slot read singly: both its sides are ObjectRefs and
           -- go through objectRefObjects, which reads slotGroup and moves counters
           -- off every member of one and onto every member of the other. Its third
@@ -1973,7 +1974,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
         destroyedSlot = SlotName.MkSlotName (Text.pack "destroyed")
         elsewhereSlot = SlotName.MkSlotName (Text.pack "elsewhere")
-        removal slot = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) slot)
+        removal slot = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) slot Nothing)
         destruction = Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing (Just destroyedSlot))
         -- An opcode whose ObjectRef carries a Filter, so effectFilters reports it
         -- (its Tap arm is `frame SourceHostFramed (objectRefFilters ref)`).

@@ -1493,10 +1493,10 @@ sourceObjectOf src = case src of
 --
 -- ONE SLOT IS DROPPED, and by NAME rather than by comparing ids: Binding.thisAbility
 -- holds the activated ability's OWN id (CR 602.2a), which pawl stamps so a card can
--- read the record of the mana that paid for the activation -- not because any
--- printed text names the ability as another object. Counting it would undo CR
--- 609.7a's second class, which admits "a spell on the stack" and deliberately stops
--- short of an ability.
+-- read the activation's own record -- the mana that paid for it, and how many times
+-- it has resolved this turn -- not because any printed text names the ability as
+-- another object. Counting it would undo CR 609.7a's second class, which admits "a
+-- spell on the stack" and deliberately stops short of an ability.
 --
 -- HERE rather than at the carriers, because two of CR 609.7a's three read bindings
 -- and both were wrong: `referentsOfObject` for an ability still on the stack, and
@@ -1920,10 +1920,11 @@ exileOrCease oid = do
 -- rule's second sentence -- an ability referring to its source by name refers to
 -- that same object -- and its third -- the copy counts as the same ability for
 -- effects counting resolutions -- both hold by construction rather than by
--- anything written here. Pawl.CopySpec's Longtusk Cub case proves the second.
---
--- Not implemented: the count the third sentence is about, so nothing observes
--- that half (gap #3135).
+-- anything written here: the OfAbility arm below answers with the very
+-- ActivatedAbilitySource it was handed, which is the key
+-- Pawl.Engine.Resolve.recordAbilityResolution files a resolution under.
+-- Pawl.CopySpec's Longtusk Cub case proves the second and its Ashling the
+-- Pilgrim case the third.
 --
 -- A copy of a copy answers with the copy's own printing: CR 707.2's copiable
 -- values are the ones the copied object reports, and its snapshot already carries
@@ -2374,7 +2375,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.PutCounters {} -> False
   -- CR 122.1 / 608.2d: a permanent bearing none of the kind has none of
   -- them to lose.
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> case legalOne slot legal >>= Recipient.objectOf of
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot _) -> case legalOne slot legal >>= Recipient.objectOf of
     Nothing -> False
     Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n | n > 0 -> maybe False ((== 0) . Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject target gs)
@@ -6824,7 +6825,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.when (Maybe.isJust (Game.faceOf resolving gs)) (Event.changeZone resolving Zone.Exile)
   -- CR 122: PutCounters' mirror, deliberately NOT through a CR 614.16 gate --
   -- nothing in CR 614 replaces a removal.
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> do
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot mTally) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -6833,7 +6834,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Nothing -> pure () -- a player recipient has no object counters
         Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
-          Just n -> Monad.when (n > 0) (Event.removeCounters target kind (Integer.toNaturalSaturating n))
+          Just n -> do
+            -- What the card's "that much" reads is the number that ACTUALLY came
+            -- off, so it is measured against what was there rather than against
+            -- the instruction's own number -- Event.removeCounters saturates at
+            -- the count on the object, and an "all" written as a stale reading
+            -- would otherwise bind more than it removed. Read BEFORE the removal,
+            -- there being nothing left to count after it.
+            before <- State.gets (maybe 0 (Map.findWithDefault 0 kind . Object.counters) . Game.lookupObject target)
+            Monad.when (n > 0) (Event.removeCounters target kind (Integer.toNaturalSaturating n))
+            -- Bound even where nothing came off, which is the answer "that much"
+            -- wants: Ashling the Pilgrim with no counters deals 0 damage rather
+            -- than leaving the clause unanswered.
+            Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot source tally (min before (Integer.toNaturalSaturating n)))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
   Effect.MoveCounters (MoveCounters.MkMoveCounters fromRef kinds mSlot toRef) -> do
     -- CR 122.5: move counters off one permanent and onto a second. WHICH kinds

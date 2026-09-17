@@ -3135,9 +3135,9 @@ handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 -- ability that names its own source, so the copy landing on the OTHER Cub is a
 -- readable wrong answer rather than an unobservable one.
 --
--- Not implemented: the THIRD sentence's count -- how many times an ability has
--- resolved during the turn -- which nothing in pawl keeps, so no board here can
--- show that a copy counts as the same ability (gap #3135).
+-- The THIRD -- "the copy is considered to be the same ability by effects that
+-- count how many times that ability has resolved during the turn" -- has a board
+-- of its own below, Ashling the Pilgrim being the pool's counter of resolutions.
 --
 -- CR 707.10's "a copy of an activated ability isn't activated" rides on the first
 -- case as alice's energy: the cost was paid once, by the activation, and the copy
@@ -3182,6 +3182,45 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             Spec.assertEqWith s "the copy resolved before the original, leaving one counter" (S.counterOf CounterKind.PlusOnePlusOne cubA afterCopy) 1
             Spec.assertEqWith s "and the stack is empty" (GameState.stack afterBoth) []
       _ -> Spec.assertFailure s "Longtusk Cub should declare one activated ability, and Lithoform Engine a {2} one"
+  -- CR 707.10b's THIRD sentence, which needs a counter of resolutions to be
+  -- observable at all: Ashling the Pilgrim's "if this is the third time this
+  -- ability has resolved this turn, remove all +1/+1 counters from Ashling, and
+  -- it deals that much damage to each creature and each player".
+  --
+  -- ONE activation resolves first, so the copy is the SECOND resolution and the
+  -- original the third. An engine filing the copy under a key of its own leaves
+  -- both of them short of three, and the board says so in two places: Ashling
+  -- alive with three counters, and bob at 20.
+  --
+  -- Four Mountains: two for the first activation, two for the second, and the
+  -- Engine's {2} off the two its own board leaves -- six in all.
+  Spec.it s "CR 707.10b a copy of an activated ability counts toward the same turn's total" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    engine <- S.printingOf s registry "Lithoform Engine"
+    ashling <- S.printingOf s registry "Ashling the Pilgrim"
+    let (engineId, withEngine) = S.addPermanent engine S.alice (S.landsInPlay mountain 6)
+        (ashlingId, board) = S.addPermanent ashling S.alice withEngine
+    case (Maybe.listToMaybe (Projection.abilitiesOf ashlingId board), engineAbilityCopyingAbilities engineId board) of
+      (Just pump, Just copier) -> do
+        let once = resolveOne S.identityAnswer (S.runPure S.identityAnswer board {GameState.priority = Just S.alice} (Activate.activateAbility S.alice ashlingId pump))
+            twice = S.runPure S.identityAnswer once {GameState.priority = Just S.alice} (Activate.activateAbility S.alice ashlingId pump)
+        case topOfStack twice of
+          Nothing -> Spec.assertFailure s "Ashling's second activation should be on the stack"
+          Just abilId -> do
+            let staged = S.runPure (pinTarget (Recipient.ToObject abilId)) twice {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId copier)
+                -- The Engine's ability, then the copy it minted, then Ashling's
+                -- own second activation.
+                afterEngine = resolveOne S.identityAnswer staged
+                afterCopy = resolveOne S.identityAnswer afterEngine
+                afterBoth = resolveOne S.identityAnswer afterCopy
+            Spec.assertEqWith s "CR 707.10b the original was the third resolution, counting the copy, so each player was dealt the 3 counters removed" (S.lifeOf S.bob afterBoth) (Just 17)
+            Spec.assertEqWith s "and Ashling met its own 3 damage as a 1/1 once they came off" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Ashling the Pilgrim")) S.alice afterBoth) 0
+            -- Supporting, and after the reads above so it can absorb no mutation
+            -- they should catch: the copy was the second resolution and dealt
+            -- nothing, leaving two counters standing.
+            Spec.assertEqWith s "the copy resolved before the original and was only the second time" (S.counterOf CounterKind.PlusOnePlusOne ashlingId afterCopy) 2
+            Spec.assertEqWith s "and bob was untouched at that point" (S.lifeOf S.bob afterCopy) (Just 20)
+      _ -> Spec.assertFailure s "Ashling the Pilgrim should declare one activated ability, and Lithoform Engine a {2} one"
   -- CR 707.10c on an ABILITY, where the offer is a real choice: the copy is aimed
   -- at alice and the original stays on bob, so the two seats' life totals are
   -- 19 and 19. An engine that ignored the offer leaves 20 and 18, and one that
