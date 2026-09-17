@@ -83,6 +83,35 @@
                         "type": "UntilYourNextTurn"
                       }
                     }
+                  },
+                  {
+                    "type": "MoveToZone",
+                    "value": {
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "self"
+                      },
+                      "slot": "exiled",
+                      "zone": {
+                        "type": "Exile"
+                      }
+                    }
+                  },
+                  {
+                    "type": "PutCounters",
+                    "value": {
+                      "kind": {
+                        "type": "Time"
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 3
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "exiled"
+                      }
+                    }
                   }
                 ]
               }

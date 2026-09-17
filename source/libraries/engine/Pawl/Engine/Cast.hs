@@ -2563,12 +2563,26 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                       -- activated-ability sentence and Engine.placeBorne for
                       -- its triggered-ability one. Char's "and 2 damage to
                       -- you" is what reads it (Pawl.CastSpec's Char case).
+                      --
+                      -- CR 201.5 alongside it: "text that refers to the object
+                      -- it's on by name means just that particular object", and
+                      -- CR 608.2 resolves a spell's instructions against the
+                      -- object on the stack -- so Chronomantic Escape's "exile
+                      -- Chronomantic Escape with three time counters on it" is a
+                      -- read of the same reserved slot CR 113.7a gives an
+                      -- ability. `sid` is CR 601.2a's incarnation, which is what
+                      -- resolves, so the slot names the spell itself rather than
+                      -- the card it was cast from (CR 400.7 having deleted that
+                      -- id). Stamped for EVERY spell, as `you` is: rule 201.5
+                      -- attaches no condition, and CardSpec's dataflow lint
+                      -- subtracts the reserved name rather than having a card
+                      -- declare it.
                       State.modify'
                         ( \g ->
                             g
                               { GameState.objects =
                                   Map.adjust
-                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.fromChoices chosen mAmount chosenModes)})
+                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.setTriggerSource sid (Binding.fromChoices chosen mAmount chosenModes))})
                                     sid
                                     (GameState.objects g)
                               }
