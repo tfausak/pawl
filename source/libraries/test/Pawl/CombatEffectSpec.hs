@@ -101,6 +101,25 @@ cursing curse who mine theirs =
   let (gs, ours, yours) = S.combatBoardOf mine theirs
    in (cursingBoard curse who gs, ours, yours)
 
+-- CR 802.2: alice active with `mine`, and BOTH of her opponents defending at
+-- once -- bob with `theirs` on his battlefield, carol with nothing. The board a
+-- seat-scoped bound (CR 802.3a) is observable on, and the only one: with one
+-- defending player every announcement names the same seat, so a bound scoped to
+-- that seat and a bound on the whole declaration answer alike.
+--
+-- Positioned at declare attackers with the defenders stated, which is what
+-- S.threePlayerCombat leaves to the caller: a direct-call test never runs CR
+-- 703.4h.
+bothAttackable :: [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId])
+bothAttackable mine theirs =
+  let (gs, ours, _, _) = S.threePlayerCombat mine theirs []
+   in ( gs
+          { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = (GameState.combat gs) {Combat.Type.defenders = [S.bob, S.carol]}
+          },
+        ours
+      )
+
 -- The same Curse, attached to a board that already exists. What `cursing` is
 -- built from, and what a board it cannot build -- `jaceBoard`'s, which needs its
 -- planeswalker's loyalty counters placed first -- reaches for instead.
@@ -309,6 +328,10 @@ attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
 -- The empty declaration is asserted LEGAL wherever no requirement is in force,
 -- because "no more than one" is a ceiling and not a quota: a reading of the bound
 -- as "exactly one" passes every other assertion in the first case.
+--
+-- The last two cases are CR 802.3a's OTHER sentence, through Crawlspace: a bound
+-- scoped to one seat, which every case before them is the unscoped counterpart
+-- of. They need three seats, and say why at the site.
 boundedDeclarationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
   Spec.it s "CR 508.1c a Silent Arbiter allows EITHER attacker but not both" $ do
@@ -508,6 +531,68 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
         -- attack and every proper subset is illegal.
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice mine control) "without the Caverns all three attack"
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [bers, first] control)) "and the pair no longer attains the maximum"
+      _ -> Spec.assertFailure s "fixture should have three creatures"
+  Spec.it s "CR 802.3a a Crawlspace bounds the creatures attacking BOB and leaves carol's alone" $ do
+    -- Crawlspace ("{3} Artifact, No more than two creatures can attack you each
+    -- combat") -- the bound CR 802.3a's second sentence scopes to one seat, where
+    -- every case above is the first sentence's whole-declaration one.
+    --
+    -- Three seats, because two cannot tell the two sentences apart: with bob the
+    -- only defending player, "no more than two attacking bob" and "no more than
+    -- two attacking" forbid the same declarations. Here the same three creatures
+    -- are legal or not according to WHERE the third one is announced, which is
+    -- the whole of what the scope does.
+    --
+    -- The Crawlspace is BOB's, so the sentence's "you" is the defending player
+    -- rather than the attacker: a reader that scoped it to alice would leave
+    -- bob unbounded and pass nothing below.
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine) = bothAttackable [piker, piker, piker] [crawlspace]
+        (control, theirs) = bothAttackable [piker, piker, piker] [piker]
+        (jaceId, withJace0) = S.addPermanent jace S.bob gs
+        withJace = S.addCounter CounterKind.Loyalty 3 jaceId withJace0
+        at defender = fmap (\oid -> (oid, AttackTarget.OfPlayer defender))
+    case (mine, theirs) of
+      ([first, second, third], _) -> do
+        Spec.assertEqWith s "all three are offered" (Combat.legalAttackers S.alice gs) mine
+        -- The proving assertion.
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice (at S.bob mine) gs)) "three creatures may not all attack bob"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice (at S.bob [first, second] <> at S.carol [third]) gs) "but two at bob with the third at carol is legal"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice (at S.carol mine) gs) "and all three at carol is legal, so the bound is scoped to bob's seat rather than to the declaration"
+        -- Crawlspace's own ruling: "your opponents can still attack
+        -- planeswalkers you control with any number of creatures each combat".
+        -- The two boards below differ in the third creature's announcement and
+        -- in nothing else, so the planeswalker is what the pair is about.
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice (at S.bob [first, second] <> [(third, AttackTarget.OfPlaneswalker jaceId)]) withJace) "the third at bob's PLANESWALKER is outside the bound, which is CR 802.3a's 'attacking that player'"
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice (at S.bob mine) withJace)) "while on that same board all three at bob is still refused"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice (at S.bob theirs) control) "and with a plain Piker there instead of the Crawlspace, all three may attack bob"
+      _ -> Spec.assertFailure s "fixture should have three attackers"
+  Spec.it s "CR 508.1d three required creatures under a Crawlspace: the maximum is TWO" $ do
+    -- CR 508.1d's maximization reading the SCOPED bound, which the case above
+    -- cannot see: there every weight is zero, so the ceiling is attained by every
+    -- declaration and only attackDeclarationAllowed is speaking.
+    --
+    -- Three Berserkers of Blood Ridge ("this creature attacks each combat if
+    -- able") against one defending player: the bound allows two of them at bob,
+    -- so the maximum is two requirements and not three. A ceiling blind to the
+    -- scoped bound answers three, which no declaration attains -- so every
+    -- declaration including the legal one goes illegal, and the first two
+    -- assertions below both bite.
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    let (gs, mine, _) = S.combatBoardOf [berserkers, berserkers, berserkers] [crawlspace]
+        (control, _, _) = S.combatBoardOf [berserkers, berserkers, berserkers] []
+    case mine of
+      [first, second, _] -> do
+        Spec.assertEqWith s "all three are offered" (Combat.legalAttackers S.alice gs) mine
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] gs) "two of the three attain the maximum"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice mine gs)) "all three is over the bound"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first] gs)) "one obeys a requirement fewer than two would"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "and declining obeys none of the three"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice mine control) "without the Crawlspace all three attack"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first, second] control)) "and the pair no longer attains the maximum"
       _ -> Spec.assertFailure s "fixture should have three creatures"
   Spec.it s "CR 509.1c a Lure under a bound of one: the maximum is ONE blocker" $ do
     -- The blocking twin of the case above, over blockCeiling's fold. Lure makes

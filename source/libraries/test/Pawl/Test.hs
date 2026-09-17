@@ -56,6 +56,7 @@ import qualified Pawl.Codec.AttachBoundSpec
 import qualified Pawl.Codec.AttachRestrictionSpec
 import qualified Pawl.Codec.AttachTargetSpec
 import qualified Pawl.Codec.AttackCostSpec
+import qualified Pawl.Codec.AttackLimitUnlessSpec
 import qualified Pawl.Codec.AttackOptionSpec
 import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.AttackTargetKindSpec
@@ -916,6 +917,7 @@ spec s registry = do
   Pawl.Codec.LifeGainRewriteSpec.spec s
   Pawl.Codec.LifeLossRSpec.spec s
   Pawl.Codec.LifeLossRewriteSpec.spec s
+  Pawl.Codec.AttackLimitUnlessSpec.spec s
   Pawl.Codec.LimitUnlessSpec.spec s
   Pawl.Codec.LoggedEventSpec.spec s
   Pawl.Codec.LookAtSpec.spec s

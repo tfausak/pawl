@@ -1,6 +1,7 @@
 module Pawl.Types.CombatRestriction where
 
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.LimitUnless as LimitUnless
@@ -218,6 +219,11 @@ data CombatRestriction
     -- attackers, unless the gate holds. Silent Arbiter's first sentence, and
     -- the board CR 508.1d's Example is written about.
     --
+    -- CR 802.3a lets the bound name a SEAT, which is the record's `defenders`:
+    -- Crawlspace's "no more than two creatures can attack you each combat"
+    -- bounds the creatures attacking that one player and leaves the rest of the
+    -- declaration alone.
+    --
     -- The card says "each combat" where this is asked of a DECLARATION, and the
     -- two name the same event by RULE rather than by coincidence: CR 506.1
     -- gives a combat phase exactly one declare attackers step, and CR 703.4i
@@ -234,7 +240,7 @@ data CombatRestriction
     -- so a creature joining combat outside the declaration is exempt by rule
     -- rather than by pawl's omission, and a per-phase tally would have had to
     -- exclude it anyway.
-    CantAttackMoreThan LimitUnless.LimitUnless
+    CantAttackMoreThan AttackLimitUnless.AttackLimitUnless
   | -- | CR 509.1b, the same bound on the other declaration. Silent Arbiter's
     -- second sentence, and the arm above's reasoning holds unchanged: CR 506.1
     -- gives a combat phase one declare blockers step, CR 703.4j makes

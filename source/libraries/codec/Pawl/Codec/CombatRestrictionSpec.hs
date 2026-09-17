@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
@@ -81,7 +82,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless 1 Nothing))
+      (CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless 1 Nothing Nothing))
       " {\"type\":\"CantAttackMoreThan\",\"value\":{\"limit\":1}} "
   -- CR 509.1b, the blocking counterpart. A DIFFERENT limit from the one above,
   -- so a codec that crossed the two arms' payloads cannot pass both.
@@ -91,6 +92,15 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.codec
       (CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless 2 Nothing))
       " {\"type\":\"CantBlockMoreThan\",\"value\":{\"limit\":2}} "
+  -- CR 802.3a: the attacking bound SCOPED to a seat, which is the one key the
+  -- two payloads above do not share. Crawlspace writes it; Silent Arbiter's
+  -- case above is the unscoped control beside it.
+  Spec.it s "CantAttackMoreThan carries its defenders" $
+    Common.assertCodec
+      s
+      CombatRestriction.codec
+      (CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless 3 (Just PlayerScope.You) Nothing))
+      " {\"type\":\"CantAttackMoreThan\",\"value\":{\"limit\":3,\"defenders\":{\"type\":\"You\"}}} "
   -- CR 508.1c's second clause: the gated form.
   Spec.it s "CantAttack carries its condition" $
     Common.assertCodec

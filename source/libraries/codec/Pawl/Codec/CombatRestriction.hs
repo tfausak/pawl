@@ -1,6 +1,7 @@
 module Pawl.Codec.CombatRestriction where
 
 import qualified Pawl.Codec.AffectedUnless as AffectedUnless
+import qualified Pawl.Codec.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Codec.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Codec.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Codec.LimitUnless as LimitUnless
@@ -15,10 +16,11 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 -- arm carries at least two things and the last is CR 508.1c's "unless" gate.
 -- Named keys and not a positional array, for Pawl.Codec.Condition's reason:
 -- "affected" and "unless" cannot be swapped by accident. The subject-carrying
--- arms share one record, the SIZE-BOUNDING ones share another, which spells its
--- first key "limit" instead of "affected", and the PAIRWISE one has its own,
--- which adds "blockers" -- so the tag plus the key set is the whole of what
--- distinguishes them.
+-- arms share one record, the two SIZE-BOUNDING ones have a record each, both
+-- spelling their first key "limit" instead of "affected", and the PAIRWISE one
+-- has its own, which adds "blockers" -- so the tag plus the key set is the whole
+-- of what distinguishes them. The attacking bound is the one with a second key,
+-- CR 802.3a's "defenders".
 --
 -- The wire format is unchanged by the conversion to a bundle: those three
 -- payloads were already named objects, and giving each a record only supplied
@@ -35,7 +37,7 @@ codec =
       Arm.payload "CantBeBlockedBy" CantBeBlockedBy.codec CombatRestriction.CantBeBlockedBy (\x -> case x of CombatRestriction.CantBeBlockedBy y -> Just y; _ -> Nothing),
       Arm.payload "CantAttackPlayer" CantAttackPlayer.codec CombatRestriction.CantAttackPlayer (\x -> case x of CombatRestriction.CantAttackPlayer y -> Just y; _ -> Nothing),
       Arm.payload "CantAttackAlone" AffectedUnless.codec CombatRestriction.CantAttackAlone (\x -> case x of CombatRestriction.CantAttackAlone y -> Just y; _ -> Nothing),
-      Arm.payload "CantAttackMoreThan" LimitUnless.codec CombatRestriction.CantAttackMoreThan (\x -> case x of CombatRestriction.CantAttackMoreThan y -> Just y; _ -> Nothing),
+      Arm.payload "CantAttackMoreThan" AttackLimitUnless.codec CombatRestriction.CantAttackMoreThan (\x -> case x of CombatRestriction.CantAttackMoreThan y -> Just y; _ -> Nothing),
       Arm.payload "CantBlockMoreThan" LimitUnless.codec CombatRestriction.CantBlockMoreThan (\x -> case x of CombatRestriction.CantBlockMoreThan y -> Just y; _ -> Nothing)
     ]
 
