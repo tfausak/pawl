@@ -969,6 +969,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.BoundDiesOrIsExiled _ -> []
+  TriggerCondition.BoundDies _ -> []
   TriggerCondition.RoomEntered _ -> []
   -- CR 309.7's condition carries a PlayerRelation, which is no Count.
   TriggerCondition.PlayerCompletesDungeon _ -> []
@@ -3691,6 +3692,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- the slot holds was selected by the arming spell's own target slot.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.BoundDiesOrIsExiled _ -> []
+  TriggerCondition.BoundDies _ -> []
   TriggerCondition.RoomEntered _ -> []
   -- CR 309.7's condition carries a PlayerRelation, which is no Filter.
   TriggerCondition.PlayerCompletesDungeon _ -> []
@@ -3895,15 +3897,18 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentSacrificed {} -> []
   TriggerCondition.SagaFinalChapterTriggers _ -> []
   TriggerCondition.PlayerBecomesMonarch _ -> []
-  -- CR 603.7's slot-named condition, the one arm with an answer: Ray of
-  -- Command's "when you lose control of the creature" watches the permanent its
-  -- own spell targeted.
+  -- CR 603.7's slot-named condition, the first of the three arms with an answer:
+  -- Ray of Command's "when you lose control of the creature" watches the
+  -- permanent its own spell targeted.
   TriggerCondition.LoseControlOfBound slot -> [slot]
-  -- Rule 701.66a's slot-named condition, the second arm with an answer. Never
-  -- reached from card data -- Pawl.Engine.Earthbend mints the only ability that
-  -- carries it -- but answered rather than defaulted, so the singularity above is
-  -- claimed for it too.
+  -- Rule 701.66a's slot-named condition. Never reached from card data --
+  -- Pawl.Engine.Earthbend mints the only ability that carries it -- but answered
+  -- rather than defaulted, so the singularity above is claimed for it too.
   TriggerCondition.BoundDiesOrIsExiled slot -> [slot]
+  -- CR 700.4's slot-named condition, the arm above narrowed to a death:
+  -- Whippoorwill's "when the creature dies this turn" watches the creature its
+  -- own ability targeted.
+  TriggerCondition.BoundDies slot -> [slot]
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []

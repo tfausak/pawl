@@ -232,6 +232,13 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- construction, matchesTrigger's arm having required the graveyard or exile.
   (TriggerCondition.BoundDiesOrIsExiled _, GameEvent.Moved m) ->
     Binding.setDepartedPermanent (ZoneChange.departed (Moved.change m)) (setBecameArrivals m Map.empty)
+  -- CR 700.4's narrowing of the arm above, and the same two slots for the same
+  -- reason: Whippoorwill's "exile the creature" means the card in the graveyard,
+  -- which is `became`, while CR 603.10a's departed permanent is the creature as it
+  -- last stood on the battlefield. CR 400.7e's public-zone proviso holds by
+  -- construction, matchesTrigger's arm having required the graveyard.
+  (TriggerCondition.BoundDies _, GameEvent.Moved m) ->
+    Binding.setDepartedPermanent (ZoneChange.departed (Moved.change m)) (setBecameArrivals m Map.empty)
   -- CR 400.7e off the CARD rather than off the move: Planar Void's "exile that
   -- card" acts on the one arrival its trigger matched, so this binds
   -- ZoneChange.object alone where the two arms above bind every arrival as a
@@ -1688,6 +1695,10 @@ eventBindingSlots cond = case cond of
   -- exile. Unconditional, CR 400.2 making both destinations public where
   -- SelfLeavesTheBattlefield's wider one needs a guard.
   TriggerCondition.BoundDiesOrIsExiled _ -> Set.fromList [Binding.became, Binding.departedPermanent]
+  -- The arm above's two slots, narrowed to CR 700.4's one destination and so
+  -- unconditional a fortiori: the graveyard is public (CR 400.2), and
+  -- Whippoorwill's "exile the creature" is what reads `became`.
+  TriggerCondition.BoundDies _ -> Set.fromList [Binding.became, Binding.departedPermanent]
   -- Empty NECESSARILY rather than by choice: this condition admits no event, so
   -- there is none to read a slot out of. What a reflexive knows about the
   -- resolution that made it comes from CR 603.7c's captured environment instead,

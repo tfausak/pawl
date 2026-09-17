@@ -1598,6 +1598,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- Rule 701.66a's slot name is engine text, not card text, so no CR 612.1 swap
   -- reaches it either.
   TriggerCondition.BoundDiesOrIsExiled _ -> condition
+  -- Whippoorwill's slot name is card data but not card TEXT, LoseControlOfBound's
+  -- reason above, so no CR 612.1 swap reaches it either.
+  TriggerCondition.BoundDies _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
   TriggerCondition.RingTemptsPlayer _ -> condition

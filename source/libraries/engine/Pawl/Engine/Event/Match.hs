@@ -301,14 +301,99 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.LifeLost {} -> Nothing
   GameEvent.LifeGained {} -> Nothing
 
--- The same question against a slot environment, for the one condition whose subject
--- is an object named EARLIER rather than the bearer or a class of objects
--- (TriggerCondition.LoseControlOfBound). Projection.controllerOf's `-Given` shape:
--- the plain name above defaults the extra argument, so a caller with nothing to say
--- says nothing.
+-- CR 603.7c's captured object leaving the battlefield for one of `destinations`,
+-- the shape TriggerCondition.BoundDies and TriggerCondition.BoundDiesOrIsExiled
+-- share: the subject is the object the arming resolution named, read out of
+-- `bindings` through Binding.objectSlots, and the two conditions differ only in
+-- which destinations they admit -- CR 700.4's graveyard alone, or rule 701.66a's
+-- pair.
 --
--- An empty map is not a special case -- it simply names no slot, so the one arm
--- that reads a slot finds none and answers False.
+-- Matched on `departed`, PermanentDies' field: CR 400.7 deleted that id on the
+-- way out and the captured binding still names it, where ZoneChange.object is
+-- the new incarnation the binding never saw.
+--
+-- NO Filter and so no CR 603.10a look-back: the rule identifies the object by
+-- WHICH OBJECT it is rather than by any characteristic, so nothing here has to
+-- be answered off a snapshot of a permanent that is gone.
+boundDeparts :: Map.Map SlotName.SlotName Binding -> Set.Set Zone -> SlotName.SlotName -> GameEvent -> Bool
+boundDeparts bindings destinations slot event = case event of
+  GameEvent.Moved (Moved.MkMoved zc _ _ _)
+    | ZoneChange.from zc == Zone.Battlefield && Set.member (ZoneChange.to zc) destinations ->
+        Map.lookup slot (Binding.objectSlots bindings) == Just (ZoneChange.departed zc)
+  GameEvent.Moved {} -> False
+  GameEvent.DamageDealt _ -> False
+  GameEvent.StepBegan {} -> False
+  GameEvent.SpellCast {} -> False
+  GameEvent.DamagePrevented {} -> False
+  GameEvent.BecameMonarch _ -> False
+  GameEvent.TookInitiative _ -> False
+  GameEvent.Discarded {} -> False
+  GameEvent.Drew {} -> False
+  GameEvent.Revealed {} -> False
+  GameEvent.AttackerDeclared {} -> False
+  GameEvent.BecameBlocking {} -> False
+  GameEvent.BlocksDeclared {} -> False
+  GameEvent.AttackerBlocked {} -> False
+  GameEvent.AttackerUnblocked _ -> False
+  GameEvent.SpellCountered _ -> False
+  GameEvent.AbilityCountered _ -> False
+  GameEvent.HalfUnlocked {} -> False
+  GameEvent.TurnedFaceUp _ -> False
+  GameEvent.TurnedFaceDown _ -> False
+  GameEvent.Transformed {} -> False
+  GameEvent.BecameDesignated {} -> False
+  GameEvent.Evolved _ -> False
+  GameEvent.Mutated _ -> False
+  GameEvent.Mentored {} -> False
+  GameEvent.Exploited {} -> False
+  GameEvent.Trained _ -> False
+  GameEvent.BecameCrewed _ -> False
+  GameEvent.Convoked _ -> False
+  GameEvent.Crewed _ -> False
+  GameEvent.PermanentSacrificed {} -> False
+  GameEvent.AbilityTriggered {} -> False
+  GameEvent.LoyaltyAbilityActivated _ -> False
+  GameEvent.LifeLost {} -> False
+  GameEvent.LifeGained {} -> False
+  GameEvent.CountersPut {} -> False
+  GameEvent.CountersRemoved {} -> False
+  GameEvent.ControlChanged {} -> False
+  GameEvent.VentureMarkerEntered {} -> False
+  GameEvent.BecameTarget {} -> False
+  GameEvent.BecameAttached {} -> False
+  GameEvent.BecameUnattached {} -> False
+  GameEvent.LeftTheGame _ -> False
+  GameEvent.Milled {} -> False
+  GameEvent.Scried _ -> False
+  GameEvent.DungeonCompleted _ -> False
+  GameEvent.Surveiled _ -> False
+  GameEvent.DiceRolled _ -> False
+  GameEvent.ClassLevelSet _ -> False
+  GameEvent.Plotted _ -> False
+  GameEvent.Explored _ -> False
+  GameEvent.Connived _ -> False
+  GameEvent.Exerted _ -> False
+  GameEvent.BecameAttacked _ -> False
+  GameEvent.AttackersDeclared _ -> False
+  GameEvent.BecameTapped _ -> False
+  GameEvent.BecameUntapped _ -> False
+  GameEvent.TappedForMana _ -> False
+  GameEvent.ManaAdded _ -> False
+  GameEvent.ManaAbilityResolved _ -> False
+  GameEvent.CoinFlipped {} -> False
+  GameEvent.RingTempted _ -> False
+  GameEvent.Blighted _ -> False
+  GameEvent.Foraged _ -> False
+  GameEvent.CardArrived _ -> False
+
+-- The same question against a slot environment, for the conditions whose subject
+-- is an object named EARLIER rather than the bearer or a class of objects
+-- (TriggerCondition.LoseControlOfBound, BoundDies and BoundDiesOrIsExiled).
+-- Projection.controllerOf's `-Given` shape: the plain name above defaults the extra
+-- argument, so a caller with nothing to say says nothing.
+--
+-- An empty map is not a special case -- it simply names no slot, so the arms
+-- that read a slot find none and answer False.
 matchesTriggerGiven :: Map.Map SlotName.SlotName Binding -> GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
 matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
@@ -4152,93 +4237,26 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
     GameEvent.CardArrived _ -> False
+  -- CR 700.4's "dies" against CR 603.7c's captured object: Whippoorwill's "when
+  -- the creature dies this turn, exile the creature", written on the card rather
+  -- than minted by the engine. The battlefield-to-graveyard half of the arm
+  -- below and no other destination -- an exile fires nothing, which is rule 700.4
+  -- read literally, and Pawl.PreventionSpec's whippoorwill group proves both
+  -- halves.
+  --
+  -- CR 400.2 makes the graveyard public, which is what lets eventBindingSlots
+  -- promise Binding.became for this condition unconditionally.
+  TriggerCondition.BoundDies slot -> boundDeparts bindings (Set.singleton Zone.Graveyard) slot event
   -- CR 701.66a's "when that land dies or is put into exile", the far end of
-  -- earthbend's delayed ability. LoseControlOfBound's shape one rule family over:
-  -- the subject is the object CR 603.7c's captured environment named, read out of
-  -- `bindings` through Binding.objectSlots, and Pawl.Engine.Resolve.Effect stamps
-  -- it under Binding.earthbentLand as the earthbend resolves.
-  --
-  -- Matched on `departed`, PermanentDies' field: CR 400.7 deleted that id on the
-  -- way out and the captured binding still names it, where ZoneChange.object is
-  -- the new incarnation the binding never saw.
-  --
-  -- NO Filter and so no CR 603.10a look-back: the rule identifies the land by
-  -- WHICH OBJECT it is rather than by any characteristic, so nothing here has to
-  -- be answered off a snapshot of a permanent that is gone.
+  -- earthbend's delayed ability, and the arm above widened by exactly the one
+  -- destination rule 701.66a adds. Minted by Pawl.Engine.Earthbend rather than
+  -- written by card data.
   --
   -- The two destinations rule 701.66a names and no other. CR 400.2 makes both
   -- public, which is what lets eventBindingSlots promise Binding.became for this
   -- condition unconditionally; a bounce to hand fires nothing, which is the rule
   -- read literally.
-  TriggerCondition.BoundDiesOrIsExiled slot -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _)
-      | ZoneChange.from zc == Zone.Battlefield && (ZoneChange.to zc == Zone.Graveyard || ZoneChange.to zc == Zone.Exile) ->
-          Map.lookup slot (Binding.objectSlots bindings) == Just (ZoneChange.departed zc)
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.TookInitiative _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.AbilityCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.TurnedFaceDown _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mutated _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Exploited {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.BecameCrewed _ -> False
-    GameEvent.Convoked _ -> False
-    GameEvent.Crewed _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.BecameUnattached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Connived _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
-    GameEvent.BecameUntapped _ -> False
-    GameEvent.TappedForMana _ -> False
-    GameEvent.ManaAdded _ -> False
-    GameEvent.ManaAbilityResolved _ -> False
-    GameEvent.CoinFlipped {} -> False
-    GameEvent.RingTempted _ -> False
-    GameEvent.Blighted _ -> False
-    GameEvent.Foraged _ -> False
-    GameEvent.CardArrived _ -> False
+  TriggerCondition.BoundDiesOrIsExiled slot -> boundDeparts bindings (Set.fromList [Zone.Graveyard, Zone.Exile]) slot event
   -- CR 603.2c's batch reading of the arm above (Vengeful Townsfolk's "whenever ONE
   -- OR MORE other creatures you control die"). Delegated rather than duplicated
   -- because the per-EVENT question is the same one: which deaths this condition
