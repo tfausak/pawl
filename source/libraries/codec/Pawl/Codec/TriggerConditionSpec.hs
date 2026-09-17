@@ -1037,6 +1037,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       s
       (TriggerCondition.BoundDiesOrIsExiled (SlotName.MkSlotName (Text.pack "target")) /= TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")))
       "BoundDiesOrIsExiled and LoseControlOfBound of the same slot are different conditions"
+  -- CR 700.4's slot-named condition, the arm above narrowed to a death, and the
+  -- one of the three card data writes (Whippoorwill). It shares the payload with
+  -- both of the others, so it must not collapse into either.
+  Spec.it s "BoundDies round-trips its slot, and is not BoundDiesOrIsExiled" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.BoundDies (SlotName.MkSlotName (Text.pack "target")))
+      " {\"type\":\"BoundDies\",\"value\":\"target\"} "
+    Spec.assertBool
+      s
+      (TriggerCondition.BoundDies (SlotName.MkSlotName (Text.pack "target")) /= TriggerCondition.BoundDiesOrIsExiled (SlotName.MkSlotName (Text.pack "target")))
+      "BoundDies and BoundDiesOrIsExiled of the same slot are different conditions"
   -- CR 309.4c. No dungeon card prints this condition -- Pawl.Engine.Dungeon mints
   -- one per room -- but it round-trips like every other arm.
   Spec.it s "RoomEntered round-trips its room" $

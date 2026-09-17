@@ -7415,6 +7415,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.LoseControlOfBound _ -> False
   -- CR 701.66a's event is a zone change, likewise rule 603.3b's first pass.
   TriggerCondition.BoundDiesOrIsExiled _ -> False
+  -- CR 700.4's death is that same zone change, narrowed, and so the same pass.
+  TriggerCondition.BoundDies _ -> False
   -- CR 309.4c's event is a venture marker moving, not an ability triggering.
   TriggerCondition.RoomEntered _ -> False
   -- CR 309.7's event is a dungeon card leaving the game, not an ability
@@ -7899,6 +7901,10 @@ controllerTurnScoped cond = case cond of
   -- Carries no TurnScope either: rule 701.66a's delayed ability watches for as
   -- long as it takes, on whoever's turn the land dies or is exiled.
   TriggerCondition.BoundDiesOrIsExiled _ -> False
+  -- Carries no TurnScope either. Whippoorwill's "this turn" is its delayed
+  -- entry's CR 603.7b duration rather than anything this condition states, and
+  -- the creature can die on an opponent's turn just the same.
+  TriggerCondition.BoundDies _ -> False
   -- Carries no TurnScope either, and CR 603.12 restricts a reflexive to no turn:
   -- it fires on whatever turn the ability that created it resolved on, which for
   -- an instant-speed creator is an opponent's as readily as its controller's.

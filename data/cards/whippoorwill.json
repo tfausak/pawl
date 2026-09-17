@@ -87,6 +87,15 @@
                             }
                           }
                         }
+                      },
+                      {
+                        "type": "ArmDelayedTrigger",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "name": "exile the creature"
+                        }
                       }
                     ]
                   }
@@ -103,6 +112,41 @@
           }
         }
       ],
+      "delayedAbilities": {
+        "exile the creature": {
+          "condition": {
+            "type": "BoundDies",
+            "value": "target"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "origin": {
+                            "type": "Graveyard"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "became"
+                          },
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
       "manaCost": [
         {
           "type": "OfType",
