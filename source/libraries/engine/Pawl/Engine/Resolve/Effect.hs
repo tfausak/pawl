@@ -8155,9 +8155,8 @@ bindSlot holder slot target = overHolderBindings holder (Map.insert slot (Bindin
 --
 -- Readable mid-fold without either path's per-effect re-read, because every
 -- reader goes through slotGroup, which reads the live board (resolvingBindings).
--- It has to: this
--- rides the binding's `objects` field, while `chosen` reads only `target`, where
--- bindSlot's SINGLE object lands.
+-- It has to: this rides the binding's `objects` field, while `chosen` reads only
+-- `target`, where bindSlot's SINGLE object lands.
 bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> GameState
 bindObjectsSlot holder slot targets = overHolderBindings holder (Map.insert slot (Binding.toObjects targets))
 

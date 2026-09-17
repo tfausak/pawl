@@ -2536,8 +2536,9 @@ slotGroup slot resolving gs = Binding.objectsOf slot (resolvingBindings resolvin
 -- stack, which is that object's bindings as of the move.
 --
 -- Map.adjust over BOTH maps is the writer's side of the same fact
--- (Pawl.Engine.Resolve.Effect's bindSlot and bindObjectsSlot): the object is in
--- exactly one of them by the time either runs, so the no-op half costs nothing.
+-- (Pawl.Engine.Resolve.Effect's overHolderBindings), so the two cannot drift; the
+-- READ prefers the live board, since rule 702.50a's epic files its archive entry
+-- while the spell is still on the stack and that entry must not answer for it.
 resolvingBindings :: ObjectId -> GameState -> Map.Map SlotName Binding.Type.Binding
 resolvingBindings resolving gs = case Game.lookupObject resolving gs of
   Just obj -> Object.bindings obj
