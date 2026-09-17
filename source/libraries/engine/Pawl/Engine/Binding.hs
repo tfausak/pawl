@@ -1082,6 +1082,19 @@ objectSlots = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne) . targetsOf
 playerSlots :: Map SlotName Binding -> Map SlotName PlayerId
 playerSlots = playersIn . targetsOf
 
+-- What Pawl.Engine.Filter.Context's slotPlayers holds: every PLAYER a slot
+-- names, slotObjects' twin the way playerSlots above is objectSlots' -- and
+-- kept apart from that one because a reader of the field takes the whole set
+-- and narrows it itself (Pawl.Engine.Count.slotPlayers), where playerSlots
+-- collapses to CR 601.2c's one recipient before its reader ever sees it.
+--
+-- ABSENT versus EMPTY is Filter.Context's own doctrine: a key for every slot
+-- the environment bound, so a slot bound only to an object is here with an
+-- empty set and Count.slotPlayers declines it rather than falling back to the
+-- source's bindings, which for an ability is #1783's read.
+slotPlayers :: Map SlotName Binding -> Map SlotName (Set PlayerId)
+slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) . targetsOf
+
 -- playerSlots' inner half, over the PROJECTED targets a resolution already holds
 -- rather than over a whole environment. Pawl.Engine.Resolve reads it that way:
 -- its arms carry CR 601.2c's chosen recipients (already filtered by CR 608.2b)

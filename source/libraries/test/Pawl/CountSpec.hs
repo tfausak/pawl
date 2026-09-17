@@ -384,6 +384,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   keeningStoneSpec s registry
   tollOfTheSiegeSpec s registry
   priceOfKnowledgeSpec s registry
+  ebonyOwlNetsukeSpec s registry
   strandcatcherSpec s registry
   raphaelSpec s registry
   graveCensusTokenSpec s registry
@@ -1483,6 +1484,65 @@ priceOfKnowledgeSpec s registry =
           gs <- board
           let after = upkeepOf S.alice gs
           Spec.assertEqWith s "nobody took damage" (lives after) (Just 20, Just 20, Just 20)
+
+-- CR 603.4 with CR 113.7: priceOfKnowledgeSpec's question asked of the
+-- INTERVENING "if" rather than of the resolution -- a condition whose count
+-- scopes over the hand of the player the trigger's own event bound. Both checks
+-- of the clause read it, CR 603.4's at trigger time
+-- (Pawl.Engine.Event.Trigger.interveningHolds) and CR 608.2a's re-check as the
+-- ability resolves (Pawl.Engine.Stack.interveningStillHolds), so a board that
+-- reaches resolution drives both.
+--
+-- Ebony Owl Netsuke, {2} Artifact: "At the beginning of each opponent's upkeep,
+-- if that player has seven or more cards in hand, this artifact deals 4 damage
+-- to that player."
+--
+-- THREE SEATS and TWO BOARDS differing only in the hands, because the reading
+-- this exists to exclude is the SOURCE's controller: the artifact is alice's,
+-- and on each board alice's hand and bob's answer the clause differently. The
+-- first holds bob over the threshold while alice is under it, the second the
+-- other way round, and the 4 damage lands on bob in the first and on nobody in
+-- the second. A read that never answered at all is a third reading, and it is
+-- the first board that excludes it.
+--
+-- Every library is stocked, priceOfKnowledgeSpec's CR 104.3c reason.
+ebonyOwlNetsukeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ebonyOwlNetsukeSpec s registry =
+  let stock printing pid n gs = List.foldl' (\g _ -> snd (S.addHandCard printing pid g)) gs [1 .. (n :: Int)]
+      library printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      boardWith aliceHand bobHand = do
+        netsuke <- S.printingOf s registry "Ebony Owl Netsuke"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (_, withNetsuke) = S.addPermanent netsuke S.alice S.threePlayerGame
+        pure
+          ( library piker S.carol 12
+              . library piker S.bob 12
+              . library piker S.alice 12
+              . stock piker S.carol 2
+              . stock piker S.bob bobHand
+              $ stock piker S.alice aliceHand withNetsuke
+          )
+      upkeepOf pid gs =
+        let upkeep = Phase.Beginning BeginningStep.Upkeep
+            began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+            settled = S.runPure S.identityAnswer began Engine.settleForPriority
+         in S.runPure S.identityAnswer settled Engine.priorityLoop
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+   in Spec.describe s "Ebony Owl Netsuke" $ do
+        Spec.it s "CR 603.4 the intervening if reads the hand of the player the TRIGGER bound" $ do
+          gs <- boardWith 3 9
+          let after = upkeepOf S.bob gs
+          Spec.assertEqWith s "bob took 4: his own nine cards cleared the threshold, though alice's three do not" (lives after) (Just 20, Just 16, Just 20)
+          Spec.assertEqWith s "bob still holds the nine the count read" (S.handSize S.bob after) 9
+          Spec.assertEqWith s "and alice the three that would have answered the other way" (S.handSize S.alice after) 3
+        -- The same board with the two hands swapped: bob is now under the
+        -- threshold and alice over it, so the clause is false and the reading
+        -- this excludes is the one that would deal the damage anyway.
+        Spec.it s "CR 603.4 and not the hand of the source's controller" $ do
+          gs <- boardWith 9 3
+          let after = upkeepOf S.bob gs
+          Spec.assertEqWith s "nobody took damage: bob's three are what the clause asks about" (lives after) (Just 20, Just 20, Just 20)
+          Spec.assertEqWith s "alice's nine are nobody's business here" (S.handSize S.alice after) 9
 
 -- CR 608.2i with an ORIGIN on the fold: a card count that reads where the cards
 -- came from as well as where they arrived. GAMEPLAY LEVEL for the

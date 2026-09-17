@@ -1164,10 +1164,16 @@ data Context = MkContext
     slotCreatureTypes :: Map.Map SlotName.SlotName (Set.Set Subtype.Subtype),
     -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
     -- `slotObjects` above's player half, filled from the same map by the same
-    -- caller (Pawl.Engine.Resolve.Slots.effectContext), and by
-    -- Pawl.Engine.Target.slotContext. Those two and no others: every other builder
-    -- of this record leaves it empty, which Pawl.Engine.Count.slotPlayers' elision
-    -- paragraph is about.
+    -- caller (Pawl.Engine.Resolve.Slots.effectContext), by
+    -- Pawl.Engine.Target.slotContext, and off a trigger's own bindings by CR
+    -- 603.4's two intervening-"if" checks (Pawl.Engine.Event.Trigger.interveningHolds
+    -- and CR 608.2a's re-check, Pawl.Engine.Stack.interveningStillHolds), which fill
+    -- it together for the reason they share a view: the two must not disagree about
+    -- what a slot names.
+    --
+    -- Not implemented: a replacement's condition still leaves it empty, because
+    -- Pawl.Types.ActiveReplacement captures only the object half of the installing
+    -- resolution's slots and there is no player half to pass (#3212).
     --
     -- NO atom in `matches` below reads it. It is a channel THROUGH this record to
     -- Pawl.Engine.Count.playersFor, which is handed CR 113.7's SOURCE and needs

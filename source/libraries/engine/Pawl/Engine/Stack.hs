@@ -235,7 +235,7 @@ interveningStillHolds :: GameState.GameState -> Object.Object -> ObjectId -> Con
 interveningStillHolds gs obj srcId =
   Condition.holds
     (Projection.viewWithLastKnownAnywhere gs)
-    ((Filter.contextWithSlots (Game.teams gs) (Just (Object.owner obj)) (Just srcId) (Binding.slotObjects (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs})
+    ((Filter.contextWithSlots (Game.teams gs) (Just (Object.owner obj)) (Just srcId) (Binding.slotObjects (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs, Filter.slotPlayers = Binding.slotPlayers (Object.bindings obj)})
     gs
     srcId
 
