@@ -599,10 +599,10 @@ mayhemDevilSpec s registry =
 -- carries is the battlefield permanent CR 400.7 deleted and the payload's "it"
 -- is the graveyard card it became.
 --
--- Not implemented: the card's second sentence, "if that creature was a token,
--- put a +1/+1 counter on this creature" -- CR 608.2h's last known information
--- about a permanent that has ceased to exist, which Count's OverBound scope
--- cannot reach (#3329). Stricter than printed: the counter is never put.
+-- Its second sentence, "if that creature was a token, put a +1/+1 counter on
+-- this creature", reads the OTHER object the same event names: CR 603.10a's
+-- departed permanent, whose graveyard incarnation CR 111.7 has already ended and
+-- which only CR 608.2h still answers for. The token/nontoken pair below proves it.
 prowlingGeistcatcherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 prowlingGeistcatcherSpec s registry =
   let -- alice's Geistcatcher, TWO same-named Pikers on the battlefield and a
@@ -631,6 +631,27 @@ prowlingGeistcatcherSpec s registry =
                   GameState.priority = Just S.alice
                 }
             )
+      -- The pair of boards for the card's SECOND sentence, differing in exactly
+      -- one atom: how the victim is placed. `S.addPermanent` gives a printed
+      -- Goblin Piker (Source.OfCard), `S.addToken` a token of the same card
+      -- (Source.OfToken), and nothing else about the two boards differs.
+      --
+      -- No exile assertion rides on these: CR 111.7 makes the token cease to
+      -- exist in the graveyard, so "exile it" has nothing to name on the token
+      -- side. The counter is the whole observation.
+      tokenBoard geistcatcher placeVictim =
+        let (geist, g1) = S.addPermanent geistcatcher S.alice S.threePlayerGame
+            (victim, g2) = placeVictim g1
+         in ( geist,
+              victim,
+              g2
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      -- The counters a permanent bears, kind for kind.
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
       -- CR 701.21a's funnel, then the loop that gathers and resolves what it
       -- fired -- mayhemDevilSpec's own driver.
       sacrificeThen pid oid = Event.sacrifice pid oid >> Engine.priorityLoop
@@ -713,6 +734,27 @@ prowlingGeistcatcherSpec s registry =
           Spec.assertBool s (not (S.onBattlefield victim exiled)) "the sacrificed Piker really left the battlefield"
           Spec.assertEqWith s "and nothing reached a graveyard for CR 400.7e to name" (departedInto Zone.Graveyard exiled) []
           Spec.assertEqWith s "leaving the graveyard as it was" (Game.zoneMembers Zone.Graveyard S.alice exiled) [buried]
+        -- THE CASE THIS UNIT EXISTS FOR. CR 603.10a's look-back: the id the
+        -- sacrifice event carries is the battlefield permanent, and CR 608.2h's
+        -- last known information is the only thing left that can say it was a
+        -- token -- CR 111.7 ended the graveyard incarnation before the trigger
+        -- resolved.
+        Spec.it s "CR 603.10a sacrificing a token puts a +1/+1 counter on the Geistcatcher" $ do
+          geistcatcher <- S.printingOf s registry "Prowling Geistcatcher"
+          piker <- S.cardOf s registry "Goblin Piker"
+          let (geist, victim, gs) = tokenBoard geistcatcher (S.addToken piker S.alice)
+              after = S.runPure S.identityAnswer gs (sacrificeThen S.alice victim)
+          Spec.assertEqWith s "CR 608.2h: the sacrificed token put a +1/+1 counter on the Geistcatcher" (countersOn geist after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+          Spec.assertBool s (not (S.onBattlefield victim after)) "and the token really was sacrificed"
+        -- The negative, one atom the other way: a printed Goblin Piker where the
+        -- case above put a token of it.
+        Spec.it s "CR 603.10a sacrificing a nontoken creature puts no counter on the Geistcatcher" $ do
+          geistcatcher <- S.printingOf s registry "Prowling Geistcatcher"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (geist, victim, gs) = tokenBoard geistcatcher (S.addPermanent piker S.alice)
+              after = S.runPure S.identityAnswer gs (sacrificeThen S.alice victim)
+          Spec.assertEqWith s "CR 111.1: the sacrificed card is no token, so the Geistcatcher bears no counter" (countersOn geist after) Map.empty
+          Spec.assertBool s (not (S.onBattlefield victim after)) "and the creature really was sacrificed"
 
 -- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2:
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example
