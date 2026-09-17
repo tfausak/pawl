@@ -566,7 +566,9 @@ manaSource = SlotName.MkSlotName (Text.pack "thatManaSource")
 -- PermanentReturnedToHand, its graveyard-pinned PermanentDies, where Cleopatra,
 -- Exiled Pharaoh's "draw a card for each counter on it" reads it, and, for CR
 -- 303.4b's enchanted creature, AttachedCreatureDies, where Banewasp Affliction's
--- "that creature's controller loses life equal to its toughness" reads it. Under
+-- "that creature's controller loses life equal to its toughness" reads it, and
+-- CR 701.21a's PermanentSacrificed, where Prowling Geistcatcher's "if that
+-- creature was a token" reads it. Under
 -- TriggerCondition.SelfLeavesTheBattlefield and SelfDies the departed id already
 -- IS CR 113.7a's `triggerSource`, so a second name for one object would be the
 -- redundancy SelfPutIntoGraveyardFromAnywhere's empty floor declines.
