@@ -193,4 +193,18 @@ data PlayerEffect
     -- beyond the one CR 701.38a gives every seat, cast at the same time they
     -- would otherwise have voted.
     AdditionalVotes Natural.Natural
+  | -- | CR 119.7 / Giant Cindermaw, Platinum Emperion: this player can't gain
+    -- life.
+    --
+    -- A STATIC restriction rather than a replacement, which is why
+    -- Pawl.Engine.Event.resolveLifeGain consults it AHEAD of the proposal;
+    -- Pawl.PlayerEffectSpec's GiantCindermaw group proves it.
+    CantGainLife
+  | -- | CR 119.8 / Platinum Emperion: this player can't lose life.
+    --
+    -- Damage is still DEALT to such a player -- CR 120.3a's RESULT is what does
+    -- not happen -- and CR 119.8's last sentence makes a pay-life cost
+    -- unpayable. Pawl.PlayerEffectSpec's PlatinumEmperion and GreedUnderEmperion
+    -- groups prove the two.
+    CantLoseLife
   deriving (Eq, Ord, Show)

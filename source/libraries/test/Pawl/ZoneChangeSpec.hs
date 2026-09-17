@@ -1494,6 +1494,35 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
         Spec.assertEqWith s "no loss" (lifeLosses after) []
       other -> Spec.assertFailure s ("expected exactly one activated ability on the Conduit, got " <> show (length other))
 
+  -- CR 701.12c's deferral to CR 119.7: bob is at 27 and carol at 13, so the
+  -- exchange would RAISE carol -- and carol can't gain life, because alice
+  -- controls a Giant Cindermaw ("Players can't gain life"). CR 119.7 says the
+  -- exchange won't happen, and the WHOLE exchange: bob's loss does not happen
+  -- either, which is the reading a per-side gate would get wrong.
+  Spec.it s "CR 119.7 an exchange that would raise a player who can't gain life doesn't happen at all" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    cindermaw <- S.printingOf s registry "Giant Cindermaw"
+    let (conduitId, plain) = soulConduitBoard conduit island 4 27 13
+        board = snd (S.addPermanent cindermaw S.alice plain)
+        after = S.runPure (conduitAnswer [S.bob, S.carol]) board Engine.runStep
+    Spec.assertEqWith s "carol, whom it would have raised, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+    Spec.assertEqWith s "and bob, whom it would have lowered, keeps his 27" (S.lifeOf S.bob after) (Just 27)
+    Spec.assertEqWith s "no gain" (lifeGains after) []
+    Spec.assertEqWith s "no loss" (lifeLosses after) []
+    -- The ability was really activated, so the assertions above cannot pass
+    -- because nothing happened at all.
+    Spec.assertEqWith s "and the Conduit paid its own {T}" (fmap Object.tapped (Game.lookupObject conduitId after)) (Just TapState.Tapped)
+
+  -- The paired control on the same board: the Cindermaw is the only difference,
+  -- so the case above is not passing for want of mana or a target.
+  Spec.it s "CR 701.12c without the Cindermaw the same exchange happens" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    let (_, board) = soulConduitBoard conduit island 4 27 13
+        after = S.runPure (conduitAnswer [S.bob, S.carol]) board Engine.runStep
+    Spec.assertEqWith s "carol took bob's 27" (S.lifeOf S.carol after) (Just 27)
+
 -- CR 119.5: "If an effect sets a player's life total to a specific number, the
 -- player gains or loses the necessary amount of life to end up with the new
 -- total." So a set is NOT a third kind of life event: it is a gain or a loss,
@@ -1823,6 +1852,19 @@ redistributeLifeTotalsSpec s registry =
           Spec.assertEqWith s "carol's stayed silent: her own total back is no gain" (countersOn carolMate after) (Just 0)
           -- 23 milled plus the spent sorcery, as in the case above.
           Spec.assertEqWith s "bob's Mindcrank milled alice for exactly what she lost" (graveyardSize S.alice after) 24
+        -- CR 119.7's own clause on a redistribution: "a player can't receive a
+        -- new life total such that the player's life total would become
+        -- higher". alice's Giant Cindermaw ("Players can't gain life") makes
+        -- carol's rise to 27 a total she can't receive, so the permutation is
+        -- not a legal answer and nothing happens -- assertUntouched's board,
+        -- the same one an ill-formed answer lands on. The assignment is the
+        -- first positive case's, so the Cindermaw is the only difference
+        -- between the two.
+        Spec.it s "CR 119.7 an assignment that would raise a player who can't gain life is not a legal answer" $ do
+          cindermaw <- S.printingOf s registry "Giant Cindermaw"
+          (_, _, _, spellId, gs) <- sandsBoard
+          let after = castAndTrigger (assigning [(S.alice, S.carol), (S.bob, S.bob), (S.carol, S.alice)]) spellId (snd (S.addPermanent cindermaw S.alice gs))
+          assertUntouched after
         -- A ROTATION, and the reason the two transpositions above are not enough
         -- on their own: a transposition is its own inverse, so reading the answer
         -- backwards -- giving each named player's total AWAY instead of handing it

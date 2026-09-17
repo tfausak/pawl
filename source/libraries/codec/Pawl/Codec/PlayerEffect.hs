@@ -66,7 +66,9 @@ codec =
           Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),
           Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing),
           Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing),
-          Arm.payload "AdditionalVotes" Common.natural PlayerEffect.AdditionalVotes (\x -> case x of PlayerEffect.AdditionalVotes y -> Just y; _ -> Nothing)
+          Arm.payload "AdditionalVotes" Common.natural PlayerEffect.AdditionalVotes (\x -> case x of PlayerEffect.AdditionalVotes y -> Just y; _ -> Nothing),
+          Arm.nullary "CantGainLife" PlayerEffect.CantGainLife,
+          Arm.nullary "CantLoseLife" PlayerEffect.CantLoseLife
         ]
 
 tagOf :: PlayerEffect.PlayerEffect -> String
@@ -109,3 +111,5 @@ tagOf x = case x of
   PlayerEffect.CantGetCounters {} -> "CantGetCounters"
   PlayerEffect.StateCoinFlip {} -> "StateCoinFlip"
   PlayerEffect.AdditionalVotes {} -> "AdditionalVotes"
+  PlayerEffect.CantGainLife {} -> "CantGainLife"
+  PlayerEffect.CantLoseLife {} -> "CantLoseLife"
