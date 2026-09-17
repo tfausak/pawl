@@ -4162,6 +4162,39 @@ crabSpec s registry =
           Spec.assertEqWith s "setup: alice controlled both candidates and the Crab, and exile was empty" (owned Zone.Exile entered, length (owned Zone.Battlefield entered)) ([], 3)
           Spec.assertEqWith s "setup: the entry trigger really went on the stack" (length (GameState.stack (S.runPure S.identityAnswer entered Engine.settleForPriority))) 1
 
+-- Vapor Snag ({U} Instant, Scryfall 2026-09-17): "Return target creature to its
+-- owner's hand. Its controller loses 1 life." Two clauses in CR 608.2c's printed
+-- order, so the second names a slot the first has already moved to a hidden zone
+-- -- CR 608.2h's last known information, since CR 108.4 leaves a card in a hand
+-- with no controller at all.
+--
+-- The PAIR is the board below it, differing only in who controlled the bounced
+-- creature: the sentence says "its controller", which two boards separate from
+-- "you" and from "each opponent".
+snagSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+snagSpec s registry = Spec.describe s "CR 608.2h a bounced target's controller" $ do
+  let snagAt owner = do
+        island <- S.printingOf s registry "Island"
+        piker <- S.printingOf s registry "Goblin Piker"
+        snag <- S.printingOf s registry "Vapor Snag"
+        let base = S.landsInPlay island 1
+            (_, withPiker) = S.addPermanent piker owner base
+            (gs, spellId) = S.handOne snag withPiker
+            cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+        pure (gs, snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+  Spec.it s "an opponent's creature: that opponent loses the life" $ do
+    (gs, after) <- snagAt S.bob
+    Spec.assertEqWith s "bob, who controlled the bounced creature, went 20 -> 19" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "and alice, who cast it, lost none" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "the creature is off the battlefield" (S.creaturesInPlay S.bob after) 0
+    Spec.assertEqWith s "and in bob's hand" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "setup: bob controlled a creature and started at 20" (S.creaturesInPlay S.bob gs, S.lifeOf S.bob gs) (1, Just 20)
+  Spec.it s "your own creature: you lose the life instead" $ do
+    (_, after) <- snagAt S.alice
+    Spec.assertEqWith s "alice, who controlled the bounced creature, went 20 -> 19" (S.lifeOf S.alice after) (Just 19)
+    Spec.assertEqWith s "and bob, who did nothing, lost none" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "the creature is off the battlefield" (S.creaturesInPlay S.alice after) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
@@ -4169,3 +4202,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   wormsSpec s registry
   sacrificerSpec s registry
   crabSpec s registry
+  snagSpec s registry

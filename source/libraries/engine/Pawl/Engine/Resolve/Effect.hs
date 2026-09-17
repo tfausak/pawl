@@ -4996,19 +4996,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- SPEED (CR 702.179b) stays that way, so the Maybe is traversed rather than
   -- defaulted.
   --
-  -- The REFERENCE is resolved against the CHOSEN slots where every sibling arm
-  -- reads the legal ones: this effect names the controller of a permanent an
-  -- earlier clause has already moved, which CR 608.2h rather than CR 608.2b
-  -- governs. The AMOUNT's context stays on the legal slots.
-  --
-  -- Not implemented: no other opcode passes the chosen slots, so a card writing
-  -- PlayerRef.ControllerOfBound in one of their references would lose the player
-  -- once the object moved (#3059).
+  -- The REFERENCE reads the LEGAL slots, as every sibling arm does. CR 608.2b's
+  -- filter is judged once against the state resolution BEGAN in (Resolve's
+  -- legalSlot closes over that snapshot), so a permanent an earlier clause of
+  -- this same resolution moved is still in `legal` and CR 608.2h's last known
+  -- information answers for it -- Pawl.ResolveSpec's "bob, who controlled the
+  -- bounced creature, went 20 -> 19" (Vapor Snag) is what proves it. This arm's
+  -- own board, Pawl.SpeedSpec's "bob's 4 became 3", cannot tell the two maps
+  -- apart: Spikeshell Harrier targets once, so a target already illegal when the
+  -- trigger began resolving fizzles it (CR 608.2b) instead.
   Effect.DecreaseSpeed d -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-        slowing = playerRefPlayers chosen controller gs (SpeedDecrease.player d)
+        slowing = playerRefPlayers legal controller gs (SpeedDecrease.player d)
         atLeast = toInteger (SpeedDecrease.floor d)
     Monad.forM_ slowing $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid (SpeedDecrease.quantity d) of
