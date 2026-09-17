@@ -268,10 +268,10 @@ data AttackLimits = MkAttackLimits
 -- scopes it. Silent Arbiter's first sentence, and Crawlspace's whole card.
 --
 -- Takes no candidate list, because a bound names no creature: it is not a fact
--- about anybody's creatures and it is not scoped to the controller of the card
--- stating it. Two Silent Arbiters still allow one attacker, and a "no more than
--- two" beside a "no more than one" binds at one, which is what makes each half a
--- minimum.
+-- about anybody's creatures, and what it may name instead is the seat being
+-- ATTACKED rather than the controller of the card stating it. Two Silent
+-- Arbiters still allow one attacker, and a "no more than two" beside a "no more
+-- than one" binds at one, which is what makes each half a minimum.
 --
 -- The SCOPE's perspective is CR 109.5's "you" -- the source's controller --
 -- which is `cantAttackPlayer`'s pairing and for its reason: the sentence names
@@ -282,6 +282,12 @@ data AttackLimits = MkAttackLimits
 -- one walk rather than two calls to `bounded`: a scoped row's gate is read at
 -- the seat it names (`cantAttackPlayer`'s posture), where the unscoped row has
 -- no seat to name and falls back on `defendingSeat`.
+--
+-- No CR 612.1 word swap, and none is owed on either half: the swap replaces one
+-- printed word with another, and what a bound prints beyond its gate is a number
+-- and a PlayerScope, neither of which is a word a text-changing effect reaches
+-- (`cantAttackPlayer` makes the second half of that argument). The gate itself
+-- was already rewritten and asked in `lifted`.
 attackLimit :: GameState -> AttackLimits
 attackLimit gs =
   let rows = gathered gs
@@ -972,10 +978,11 @@ cantAttackPlayer candidates players gs =
       forSeat player = concatMap (fromRestriction player) (filter (not . lifted (Just player) gs) rows)
    in Set.fromList (concatMap forSeat players <> concatMap stored (GameState.attackProhibitions gs))
 
--- The shared walk behind the two BOUNDS above, over the restrictions `select`
--- keeps: the tightest of them, or Nothing where none is in force.
+-- The walk behind `blockLimit`, over the restrictions `select` keeps: the
+-- tightest of them, or Nothing where none is in force. `attackLimit` spells its
+-- own out instead, CR 802.3a having given it two answers to a gather.
 --
--- A MINIMUM, because CR 508.1c's restrictions are cumulative -- a declaration
+-- A MINIMUM, because CR 509.1b's restrictions are cumulative -- a declaration
 -- must disobey none of them, so two bounds leave only the declarations both
 -- allow. Nothing of the source survives into the answer, which is the point:
 -- Pawl.Engine.Combat learns a number and never learns which card produced it.
