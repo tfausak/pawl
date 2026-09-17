@@ -482,8 +482,8 @@ data TriggerCondition
     -- however the crown was won.
     PlayerBecomesMonarch PlayerRelation.PlayerRelation
   | -- | CR 603.7: "when you lose control of the creature" (Ray of Command) --
-    -- the only condition naming a slot, its subject being an object CR 603.7c's
-    -- captured environment chose earlier.
+    -- the first of the three conditions naming a slot, its subject being an
+    -- object CR 603.7c's captured environment chose earlier.
     LoseControlOfBound SlotName.SlotName
   | -- | CR 701.66a: the object bound at this slot is put into a graveyard or
     -- into exile from the battlefield -- "when that land dies or is put into
@@ -492,6 +492,10 @@ data TriggerCondition
     -- condition after LoseControlOfBound above to name a slot, its subject being
     -- the object CR 603.7c's captured environment chose earlier.
     BoundDiesOrIsExiled SlotName.SlotName
+  | -- | CR 700.4: the object bound at this slot is put into a graveyard from the
+    -- battlefield -- "when the creature dies this turn" (Whippoorwill), the arm
+    -- above narrowed to the one destination rule 700.4 names.
+    BoundDies SlotName.SlotName
   | -- | CR 309.4c: "when you move your venture marker into this room".
     -- Self-scoped through the bearer and the room index; minted by
     -- Pawl.Engine.Dungeon rather than written by card data.

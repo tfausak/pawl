@@ -2458,6 +2458,10 @@ representativeEvents cond =
         -- read here at all -- the pin is about the SLOTS, and the match's own
         -- binding lookup is Pawl.EarthbendSpec's business.
         TriggerCondition.BoundDiesOrIsExiled _ -> one (moved Zone.Battlefield Zone.Graveyard)
+        -- CR 700.4's only destination, and the arm above's reasoning with the
+        -- choice taken away: this condition admits the graveyard and nothing
+        -- else, and eventBindings stamps the same two slots for it.
+        TriggerCondition.BoundDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- CR 309.4c's own event. The dungeon id and the room are arbitrary: this
         -- condition binds nothing from the log, which is what
         -- Event.eventBindingSlots claims for it.
@@ -2711,6 +2715,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent,
     TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")),
     TriggerCondition.BoundDiesOrIsExiled (SlotName.MkSlotName (Text.pack "target")),
+    TriggerCondition.BoundDies (SlotName.MkSlotName (Text.pack "target")),
     TriggerCondition.RoomEntered RoomIndex.topmost,
     -- BOTH relations for each of the two, on the PlayerBecomesMonarch pair's
     -- reasoning: an eventBindings arm that had cased on the relation and stamped

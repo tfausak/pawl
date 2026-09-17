@@ -146,6 +146,7 @@ codec =
           Arm.payload "PlayerBecomesMonarch" PlayerRelation.codec TriggerCondition.PlayerBecomesMonarch (\x -> case x of TriggerCondition.PlayerBecomesMonarch y -> Just y; _ -> Nothing),
           Arm.payload "LoseControlOfBound" SlotName.codec TriggerCondition.LoseControlOfBound (\x -> case x of TriggerCondition.LoseControlOfBound y -> Just y; _ -> Nothing),
           Arm.payload "BoundDiesOrIsExiled" SlotName.codec TriggerCondition.BoundDiesOrIsExiled (\x -> case x of TriggerCondition.BoundDiesOrIsExiled y -> Just y; _ -> Nothing),
+          Arm.payload "BoundDies" SlotName.codec TriggerCondition.BoundDies (\x -> case x of TriggerCondition.BoundDies y -> Just y; _ -> Nothing),
           Arm.payload "RoomEntered" RoomIndex.codec TriggerCondition.RoomEntered (\x -> case x of TriggerCondition.RoomEntered y -> Just y; _ -> Nothing),
           Arm.payload "PlayerScries" PlayerRelation.codec TriggerCondition.PlayerScries (\x -> case x of TriggerCondition.PlayerScries y -> Just y; _ -> Nothing),
           -- CR 309.7's "whenever you complete a dungeon", PlayerScries' shape above.
@@ -279,6 +280,7 @@ tagOf x = case x of
   TriggerCondition.PlayerBecomesMonarch {} -> "PlayerBecomesMonarch"
   TriggerCondition.LoseControlOfBound {} -> "LoseControlOfBound"
   TriggerCondition.BoundDiesOrIsExiled {} -> "BoundDiesOrIsExiled"
+  TriggerCondition.BoundDies {} -> "BoundDies"
   TriggerCondition.RoomEntered {} -> "RoomEntered"
   TriggerCondition.PlayerScries {} -> "PlayerScries"
   TriggerCondition.PlayerCompletesDungeon {} -> "PlayerCompletesDungeon"

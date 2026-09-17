@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
@@ -2800,11 +2801,11 @@ aimCreature oid p = case p of
 -- so this is the pool's only board where the clause has to reach one creature
 -- and stop.
 --
--- Not implemented: the card's third sentence, a CR 603.7 delayed trigger
--- watching the bound creature's death, which wants a trigger condition the tree
--- does not have (#3375). pawl's Whippoorwill is stricter than printed by
--- exactly that clause -- the exile is a benefit to the ability's controller, so
--- the omission costs them rather than the creature's controller.
+-- The card's third sentence is a CR 603.7 delayed trigger watching the bound
+-- creature's death, which the card writes as TriggerCondition.BoundDies over the
+-- same "target" slot -- CR 700.4's one destination, where rule 701.66a's
+-- earthbend sibling admits exile too. The last three cases below prove both
+-- halves and CR 603.7b's duration.
 whippoorwillSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 whippoorwillSpec s registry = Spec.describe s "Whippoorwill (CR 615.12)" $ do
   let hit src recipient n =
@@ -2903,6 +2904,81 @@ whippoorwillSpec s registry = Spec.describe s "Whippoorwill (CR 615.12)" $ do
     -- redirection at all.
     Spec.assertEqWith s "control: without the ability the 1 lands on the destination" (S.damageOf sink control) (Just 1)
     Spec.assertEqWith s "control: and the named creature takes none of it" (S.damageOf named control) (Just 0)
+  -- CR 603.7 / 700.4, the card's third sentence: "when the creature dies this
+  -- turn, exile the creature". Its own fixture rather than shieldedPair's, whose
+  -- two Mending Hands shields say nothing about a death.
+  --
+  -- CR 400.7 mints a fresh id for the graveyard card, so every census below goes
+  -- by NAME; Game.zoneMembers indexes by owner (CR 108.3), alice for all three
+  -- Pikers.
+  let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      pikersIn zone gs = length (filter (\oid -> S.soleFaceName oid gs == pikerName) (Game.zoneMembers zone S.alice gs))
+      -- alice's Bird, the Piker its ability names, and a second Piker beside it
+      -- so a condition that watched ANY death rather than the bound one would be
+      -- caught. Both 2/1, so one marked damage kills either.
+      deathBoard plains forest pikerPrinting whippoorwill =
+        let base = S.landsFor forest S.alice 2 (S.landsInPlay plains 2)
+            (bird, g1) = S.addPermanent whippoorwill S.alice base
+            (named, g2) = S.addPermanent pikerPrinting S.alice g1
+            (bystander, g3) = S.addPermanent pikerPrinting S.alice g2
+            aimed = S.runPure (aimCreature named) g3 (Activate.activateAbility S.alice bird (theAbility whippoorwill) Monad.>> Stack.resolveTop)
+         in (aimed, named, bystander)
+  -- THE PROVING CASE for the delayed half. The named Piker dies and its card is
+  -- exiled; the bystander dies on the same board and its card stays in the
+  -- graveyard, so the entry is bound to ONE object and not to the death event's
+  -- shape.
+  Spec.it s "CR 603.7 the creature the resolution named is exiled when it dies, and no other is" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    whippoorwill <- S.printingOf s registry "Whippoorwill"
+    let (aimed, named, bystander) = deathBoard plains forest pikerPrinting whippoorwill
+        killed = settle (S.markDamage bystander 1 (S.markDamage named 1 aimed))
+        after = resolveTop killed
+    Spec.assertEqWith s "CR 700.4 the named creature's card is in exile" (pikersIn Zone.Exile after) 1
+    Spec.assertEqWith s "and the bystander that died beside it stays in the graveyard" (pikersIn Zone.Graveyard after) 1
+    -- The preconditions those two rest on, read AFTER them so neither can absorb
+    -- a mutation aimed at the condition.
+    Spec.assertEqWith s "setup: the activation armed exactly one delayed ability" (Seq.length (GameState.delayedTriggers aimed)) 1
+    Spec.assertEqWith s "setup: both creatures really died" (Game.lookupObject named killed, Game.lookupObject bystander killed) (Nothing, Nothing)
+    Spec.assertEqWith s "setup: exactly one trigger reached the stack" (length (GameState.stack killed)) 1
+  -- CR 700.4 read literally, which is the whole of why this condition is not
+  -- TriggerCondition.BoundDiesOrIsExiled: the same creature removed to exile from
+  -- the battlefield fires nothing. Two boards differing in exactly one thing --
+  -- the destination -- off the same armed fixture.
+  Spec.it s "CR 700.4 the same creature exiled from the battlefield instead fires nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    whippoorwill <- S.printingOf s registry "Whippoorwill"
+    let (aimed, named, _) = deathBoard plains forest pikerPrinting whippoorwill
+        banished = settle (S.runPure S.identityAnswer aimed (Event.changeZone named Zone.Exile))
+        died = settle (S.markDamage named 1 aimed)
+    Spec.assertEqWith s "CR 700.4 an exile is not a death, so no trigger reached the stack" (length (GameState.stack banished)) 0
+    Spec.assertEqWith s "control: the same creature dying instead puts one there" (length (GameState.stack died)) 1
+    -- The precondition, after the two above: the creature really did leave the
+    -- battlefield for exile rather than staying put.
+    Spec.assertEqWith s "setup: the creature left the battlefield for exile" (Maybe.isNothing (Game.lookupObject named banished), pikersIn Zone.Exile banished) (True, 1)
+  -- CR 603.7b's stated duration, and CR 514.2 ending it: "this turn" is the whole
+  -- of how long the entry watches, so the same death one turn later exiles
+  -- nothing. The discriminating twin of the proving case, one turn on.
+  Spec.it s "CR 603.7b the entry is gone by the next turn, so the same death exiles nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    whippoorwill <- S.printingOf s registry "Whippoorwill"
+    let (aimed, named, _) = deathBoard plains forest pikerPrinting whippoorwill
+        -- Both libraries stocked, so the draw steps this case runs through never
+        -- reach CR 704.5b and decide the game before the assertion.
+        stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard plains pid h)) g [1 .. (5 :: Int)]
+        bobsTurn = nextTurn quiet (stock (stock aimed S.alice) S.bob)
+        after = resolveTop (settle (S.markDamage named 1 bobsTurn))
+    Spec.assertEqWith s "CR 514.2 the card stays in the graveyard, the entry having expired" (pikersIn Zone.Graveyard after, pikersIn Zone.Exile after) (1, 0)
+    -- The preconditions, after it: the turn handed off and the store really emptied.
+    Spec.assertEqWith s "setup: the turn really did hand off" (GameState.turnNumber bobsTurn /= GameState.turnNumber aimed) True
+    Spec.assertEqWith s "setup: no delayed entry survived the cleanup" (Seq.length (GameState.delayedTriggers bobsTurn)) 0
 
 -- Aim a two-slot spell by FILTERING each offered set rather than building a
 -- recipient: CR 608.2b re-reads the choice at resolution, so a recipient the

@@ -461,6 +461,9 @@ looksBack condition = case condition of
   -- time the ability triggers -- but the match reads the bound id rather than any
   -- characteristic of it, so nothing here needs a snapshot to answer from.
   TriggerCondition.BoundDiesOrIsExiled _ -> False
+  -- The arm above narrowed to CR 700.4's one destination, and its answer for its
+  -- reason: the match reads the bound id, never a characteristic of it.
+  TriggerCondition.BoundDies _ -> False
   -- CR 603.10a's look-back is a question about which event fired the ability, and
   -- a reflexive is fired by none. Its bearer is a CR 603.7 delayed entry too.
   TriggerCondition.Reflexive -> False
@@ -707,6 +710,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerBecomesMonarch _ -> False
   TriggerCondition.LoseControlOfBound _ -> False
   TriggerCondition.BoundDiesOrIsExiled _ -> False
+  TriggerCondition.BoundDies _ -> False
   TriggerCondition.Reflexive -> False
 
 -- The log cut into its CR 704.3 / CR 608.2f events: one block per
@@ -2324,6 +2328,9 @@ zonesTriggeredFrom cond =
         -- delayed ability is a GameState.delayedTriggers entry, gathered out of the
         -- store rather than out of a zone.
         TriggerCondition.BoundDiesOrIsExiled _ -> battlefield
+        -- Never consulted either, and for the same reason: Whippoorwill's delayed
+        -- ability is a GameState.delayedTriggers entry too.
+        TriggerCondition.BoundDies _ -> battlefield
         -- Never consulted either, and for the same reason: CR 603.12 routes a
         -- reflexive through rule 603.7, so its only carrier is a delayed entry
         -- Event.delayedPending gathers out of GameState.delayedTriggers. EMPTY rather
@@ -2516,6 +2523,10 @@ stateTriggers gs
               -- CR 603.2 event trigger too: it fires on the land BEING put into a
               -- graveyard or into exile, not on its being there.
               TriggerCondition.BoundDiesOrIsExiled _ -> False
+              -- CR 603.2 event trigger too, and for the arm above's reason: it
+              -- fires on the creature BEING put into a graveyard, not on its
+              -- lying there.
+              TriggerCondition.BoundDies _ -> False
               -- CR 603.12 sends a reflexive through rule 603.7, and CR 603.8's
               -- state triggers are a different family: nothing about "when you
               -- do" is a state that could be standing true.
