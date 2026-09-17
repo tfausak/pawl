@@ -2804,7 +2804,7 @@ aimCreature oid p = case p of
 -- The card's third sentence is a CR 603.7 delayed trigger watching the bound
 -- creature's death, which the card writes as TriggerCondition.BoundDies over the
 -- same "target" slot -- CR 700.4's one destination, where rule 701.66a's
--- earthbend sibling admits exile too. The "deathSpec" group below proves both
+-- earthbend sibling admits exile too. The last three cases below prove both
 -- halves and CR 603.7b's duration.
 whippoorwillSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 whippoorwillSpec s registry = Spec.describe s "Whippoorwill (CR 615.12)" $ do
