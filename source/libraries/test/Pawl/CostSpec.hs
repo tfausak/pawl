@@ -3651,16 +3651,23 @@ zameckGuildmageCostSpec s registry =
 -- a Forest and an Island, her Goblin Piker and Hill Giant carrying the two
 -- counter counts given, and two cards in her library. Answers the Guildmage, the
 -- Piker and the Giant.
+--
+-- bob's own Hill Giant carries a +1/+1 counter on EVERY board, and that is what
+-- makes the criterion's "you control" load-bearing rather than decorative: a
+-- pool read without the payer's perspective would offer it, and the case with
+-- alice's counters taken away would find a candidate anyway.
 zameckBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> [Natural.Natural] -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 zameckBoard mage piker giant forest island counts =
   let lands = S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 (Setup.emptyGame S.bothPlayers))
       (mageId, withMage) = S.addPermanent mage S.alice lands
       (pikerId, withPiker) = S.addPermanent piker S.alice withMage
       (giantId, withGiant) = S.addPermanent giant S.alice withPiker
-      (_, stocked) = S.addLibraryCard forest S.alice (snd (S.addLibraryCard island S.alice withGiant))
+      (bobsGiantId, withBobs) = S.addPermanent giant S.bob withGiant
+      (_, stocked) = S.addLibraryCard forest S.alice (snd (S.addLibraryCard island S.alice withBobs))
+      opposed = S.addCounter CounterKind.PlusOnePlusOne 1 bobsGiantId stocked
       counted = case counts of
-        [onPiker, onGiant] -> S.addCounter CounterKind.PlusOnePlusOne onGiant giantId (S.addCounter CounterKind.PlusOnePlusOne onPiker pikerId stocked)
-        _ -> stocked
+        [onPiker, onGiant] -> S.addCounter CounterKind.PlusOnePlusOne onGiant giantId (S.addCounter CounterKind.PlusOnePlusOne onPiker pikerId opposed)
+        _ -> opposed
    in ( mageId,
         pikerId,
         giantId,
