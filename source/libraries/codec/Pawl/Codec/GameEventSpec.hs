@@ -4,6 +4,7 @@ import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.ActivatedAbilitySourceSpec as ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.TriggeredAbilitySourceSpec as TriggeredAbilitySourceSpec
@@ -11,6 +12,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
@@ -694,3 +696,17 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Foraged (PlayerId.MkPlayerId 5))
       " {\"type\":\"Foraged\",\"value\":5} "
+  -- CR 608.2n. The source object and the ability, in that order, which is the
+  -- pair CR 707.10b counts by: a swap would file the resolution under the
+  -- ability's own id.
+  Spec.it s "ActivatedAbilityResolved" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      ( GameEvent.ActivatedAbilityResolved
+          ActivatedAbilitySource.MkActivatedAbilitySource
+            { ActivatedAbilitySource.source = ObjectId.MkObjectId 6,
+              ActivatedAbilitySource.ability = ActivatedAbilitySourceSpec.ability
+            }
+      )
+      " {\"type\":\"ActivatedAbilityResolved\",\"value\":{\"source\":6,\"ability\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{}]}}}} "

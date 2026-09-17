@@ -615,6 +615,7 @@ damageOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- Who revealed what, if the event is a reveal (CR 701.20a).
@@ -684,6 +685,7 @@ revealOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed, WITH the

@@ -88,6 +88,7 @@ import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
@@ -759,8 +760,34 @@ resolveModesWith runSubgame stackId srcId modes = do
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
        in do
-            Monad.unless fizzles (Monad.forM_ modes resolveOne)
+            Monad.unless fizzles $ do
+              recordAbilityResolution obj
+              Monad.forM_ modes resolveOne
             State.modify' (Game.cease stackId)
+
+-- CR 608.2n / 608.2i: file this resolution against the ability that is
+-- resolving, so a clause of that very ability can ask how many times it has
+-- resolved this turn (Quantity.TimesResolvedThisTurn). Ashling the Pilgrim's
+-- "if this is the third time this ability has resolved this turn" is the read.
+--
+-- BEFORE the clauses run and AFTER CR 608.2b's fizzle, which is what makes the
+-- count include the resolution asking: rule 608.2n removes the ability at the
+-- END of its resolution, and the clause asking is part of the same resolution.
+-- An ability CR 608.2b removed never resolved and is not filed.
+--
+-- A CLASSIFICATION off the object's Source and never which ability it is: an
+-- activated ability is filed, and rule 707.10b's copy of one carries the same
+-- ActivatedAbilitySource (Resolve.Effect.copyOnStackOf), so the copy and the
+-- original are one key.
+--
+-- Not implemented: a TRIGGERED ability's resolutions, which this arm leaves
+-- unrecorded because nothing can read them back -- CR 602.2a's
+-- Binding.thisAbility is the only slot naming an ability's own object and no
+-- borne trigger carries it (#3815).
+recordAbilityResolution :: Object.Object -> Game ()
+recordAbilityResolution obj = case Object.source obj of
+  Source.OfAbility activated -> State.modify' (Event.recordEvent (GameEvent.ActivatedAbilityResolved activated))
+  _ -> pure ()
 
 -- CR 608.2c: does this clause's printed "If you do" hold? A clause naming no
 -- earlier one always happens; one that names an earlier clause of this mode

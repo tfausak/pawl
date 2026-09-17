@@ -1,6 +1,7 @@
 module Pawl.Types.GameEvent where
 
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
@@ -561,4 +562,27 @@ data GameEvent
     -- both halves of rule 701.61a already write their own Moved events, and no
     -- printing reads which half a forage took.
     Foraged PlayerId.PlayerId
+  | -- | CR 608.2n: an ACTIVATED ability RESOLVED -- the source object and the
+    -- ability, which is the pair CR 707.10b's third sentence counts by. Appended
+    -- by Pawl.Engine.Resolve.resolveModesWith, the one loop every ability's
+    -- clauses run through.
+    --
+    -- Filed as the resolution BEGINS rather than at rule 608.2n's own cease, and
+    -- after CR 608.2b's fizzle: the clause that asks "if this is the third time
+    -- this ability has resolved this turn" is part of the resolution it counts,
+    -- so this one has to be in the log before its own clauses run. A countered or
+    -- fizzled ability never resolved and writes none.
+    --
+    -- A copy of the ability keeps the original's Source
+    -- (Pawl.Engine.Resolve.Effect.copyOnStackOf), so the two are one key here,
+    -- which is rule 707.10b's third sentence holding by construction.
+    --
+    -- Not implemented: a TRIGGERED ability's resolutions, which nothing records
+    -- and nothing can read -- CR 602.2a's Pawl.Engine.Binding.thisAbility is the
+    -- only slot naming an ability's own object and no borne trigger carries it
+    -- (#3815). CR 605.3b's mana ability never reaches this loop at all.
+    --
+    -- Distinct from ManaAbilityResolved above, which CR 605.3b's off-stack
+    -- resolution writes and which names the PERMANENT rather than the ability.
+    ActivatedAbilityResolved ActivatedAbilitySource.ActivatedAbilitySource
   deriving (Eq, Ord, Show)

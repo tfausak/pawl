@@ -7405,7 +7405,7 @@ rippleRevealed = SlotName.MkSlotName (Text.pack "rippled")
 -- one.
 suspendUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 suspendUpkeep =
-  let effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource)
+  let effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource Nothing)
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =
@@ -7795,7 +7795,7 @@ vanishing = [vanishingUpkeep, vanishingLastCounter]
 -- one, and CR 702.63c is what makes a second instance remove a second.
 vanishingUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 vanishingUpkeep =
-  let effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource)
+  let effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource Nothing)
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =
@@ -7860,7 +7860,7 @@ fading =
           Nothing
           Optionality.Mandatory
           Nothing
-          (Seq.singleton (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Fade (Quantity.Literal 1) Binding.triggerSource)))
+          (Seq.singleton (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Fade (Quantity.Literal 1) Binding.triggerSource Nothing)))
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =

@@ -1061,7 +1061,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- CR 122.8 reads its tally off ONE object, so `from` is read singly, where the
   -- destination is an ObjectRef and may sweep.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> oneSlot from
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot) -> insertOne slot (quantitySlots quantity)
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot _) -> insertOne slot (quantitySlots quantity)
   -- CR 122.5's pair: BOTH sides are ObjectRefs, joined at slotsOf's head with
   -- every other ref, so neither is read here. The count reads
   -- slots of its own -- Black Panther, Wakandan King's "all +1/+1 counters" is a
@@ -1599,7 +1599,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   -- No Quantity at all: CR 122.8 names neither a kind nor a count.
   Effect.PutCountersFrom {} -> True
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   -- The count the moved kinds may write. CR 122.5's GIVER carries the other one,
   -- through the ObjectRef it became when the first side was widened to a group,
   -- and it is effectObjectRefs' above -- an arm reading the kinds alone kept
@@ -1806,7 +1806,7 @@ readsX =
         Effect.Counter {} -> False
         Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
         Effect.PutCountersFrom {} -> False
-        Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
+        Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> Quantity.readsX quantity
         Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
         Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
         Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
@@ -2015,7 +2015,9 @@ boundSlots effect = case effect of
   Effect.Counter (Counter.MkCounter _ mSlot mSources) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources
   Effect.PutCounters {} -> Set.empty
   Effect.PutCountersFrom {} -> Set.empty
-  Effect.RemoveCounters {} -> Set.empty
+  -- CR 122.1: how many counters the removal actually took off, where the card
+  -- reads it back -- Destroy's count slot one opcode over.
+  Effect.RemoveCounters removeCounters -> foldMap Set.singleton (RemoveCounters.tally removeCounters)
   -- How many counters CR 122.5 ACTUALLY moved, for a "that much life".
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ mSlot _) -> foldMap Set.singleton mSlot
   Effect.GainPlayerCounters {} -> Set.empty

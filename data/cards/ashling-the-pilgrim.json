@@ -1,0 +1,171 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PutCounters",
+                        "value": {
+                          "kind": {
+                            "type": "PlusOnePlusOne"
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "condition": {
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "Exactly"
+                        },
+                        "measured": {
+                          "type": "AgainstSlot",
+                          "value": {
+                            "quantity": {
+                              "type": "TimesResolvedThisTurn"
+                            },
+                            "slot": "thisAbility"
+                          }
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 3
+                        }
+                      }
+                    },
+                    "effects": [
+                      {
+                        "type": "RemoveCounters",
+                        "value": {
+                          "kind": {
+                            "type": "PlusOnePlusOne"
+                          },
+                          "quantity": {
+                            "type": "ObjectCounters",
+                            "value": {
+                              "type": "PlusOnePlusOne"
+                            }
+                          },
+                          "slot": "self",
+                          "tally": "removed"
+                        }
+                      },
+                      {
+                        "type": "DealDamage",
+                        "value": {
+                          "parts": [
+                            {
+                              "quantity": {
+                                "type": "InSlot",
+                                "value": "removed"
+                              },
+                              "ref": {
+                                "type": "EachMatching",
+                                "value": {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "quantity": {
+                                "type": "InSlot",
+                                "value": "removed"
+                              },
+                              "ref": {
+                                "type": "EachPlayer"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Ashling the Pilgrim",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          },
+          {
+            "type": "Shaman"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
