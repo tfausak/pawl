@@ -931,6 +931,8 @@ library codec
     Pawl.Codec.Supertype
     Pawl.Codec.SupertypeSpec
     Pawl.Codec.Suspend
+    Pawl.Codec.SuspendCounters
+    Pawl.Codec.SuspendCountersSpec
     Pawl.Codec.SuspendSpec
     Pawl.Codec.TakeExtraTurn
     Pawl.Codec.TakeExtraTurnSpec
@@ -2025,6 +2027,7 @@ library types
     Pawl.Types.SubtypeFamily
     Pawl.Types.Supertype
     Pawl.Types.Suspend
+    Pawl.Types.SuspendCounters
     Pawl.Types.TakeExtraTurn
     Pawl.Types.TapForTotalPower
     Pawl.Types.TappedForMana

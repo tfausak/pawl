@@ -18,7 +18,10 @@
                 }
               ]
             },
-            "counters": 5
+            "counters": {
+              "type": "Literal",
+              "value": 5
+            }
           }
         }
       ],
