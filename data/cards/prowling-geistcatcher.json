@@ -71,6 +71,49 @@
                         }
                       }
                     ]
+                  },
+                  {
+                    "condition": {
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "AtLeast"
+                        },
+                        "measured": {
+                          "type": "AgainstSlot",
+                          "value": {
+                            "quantity": {
+                              "type": "WasToken"
+                            },
+                            "slot": "thatDepartedPermanent"
+                          }
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 1
+                        }
+                      }
+                    },
+                    "effects": [
+                      {
+                        "type": "PutCounters",
+                        "value": {
+                          "kind": {
+                            "type": "PlusOnePlusOne"
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "ref": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "IsSource"
+                            }
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               }

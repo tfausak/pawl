@@ -826,15 +826,20 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- above: this is a bystander condition and the permanent the event names is
   -- somebody else's -- Prowling Geistcatcher's "another creature".
   --
-  -- Not implemented: CR 603.10a's departed permanent, which the event carries
-  -- unconditionally and which a printed "if that creature was a token" would
-  -- read. Prowling Geistcatcher's second sentence is that card, and the slot
-  -- alone would not serve it (#3329).
+  -- CR 603.10a's departed permanent BESIDE both, the PermanentDies arm's second
+  -- slot for that arm's reason: one printed "it" is two objects, and which one a
+  -- card means is the card's business. Prowling Geistcatcher's "if that creature
+  -- was a token" is about the permanent as it last existed on the battlefield --
+  -- CR 111.7 has since made the token cease to exist -- while its "exile it" is
+  -- about the graveyard card. Unconditional, unlike the arrival above:
+  -- GameEvent.PermanentSacrificed carries the pre-move id outright, so no shape
+  -- of the event withholds it.
   (TriggerCondition.PermanentSacrificed {}, GameEvent.PermanentSacrificed ev) ->
     let arrival = case Map.lookup (PermanentWasSacrificed.permanent ev) becameInGraveyard of
           Nothing -> Map.empty
           Just arrived -> Binding.setBecame arrived Map.empty
-     in Binding.setTriggerPlayer (PermanentWasSacrificed.player ev) arrival
+     in Binding.setDepartedPermanent (PermanentWasSacrificed.permanent ev) $
+          Binding.setTriggerPlayer (PermanentWasSacrificed.player ev) arrival
   -- CR 603.3b's "that Saga" and "that player": GameEvent.AbilityTriggered names
   -- the object the chapter ability hangs on (CR 113.7) and the player who
   -- controls it (CR 603.3a), and the watcher is neither of them.
@@ -1603,9 +1608,10 @@ eventBindingSlots cond = case cond of
   -- claimed by eventBindingSlotsSometimes below, and the eventBindings arm says
   -- what withholds it.
   --
-  -- Not implemented: CR 603.10a's departed permanent, which the event does carry
-  -- unconditionally (#3329).
-  TriggerCondition.PermanentSacrificed {} -> Set.singleton Binding.triggerPlayer
+  -- CR 603.10a's departed permanent beside it, guaranteed the same way: the event
+  -- carries the pre-move id outright, which is what lets Prowling Geistcatcher's
+  -- "if that creature was a token" read a permanent CR 111.7 has already ended.
+  TriggerCondition.PermanentSacrificed {} -> Set.fromList [Binding.departedPermanent, Binding.triggerPlayer]
   -- CR 601.2i's spell, the object the event names and nobody the bearer already
   -- does. Guaranteed given a match for the reason CR 615.13's amount is:
   -- GameEvent.SpellCast carries an ObjectId unconditionally, so no shape of the
