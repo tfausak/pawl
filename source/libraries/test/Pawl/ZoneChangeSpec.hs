@@ -1494,6 +1494,35 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
         Spec.assertEqWith s "no loss" (lifeLosses after) []
       other -> Spec.assertFailure s ("expected exactly one activated ability on the Conduit, got " <> show (length other))
 
+  -- CR 701.12c's deferral to CR 119.7: bob is at 27 and carol at 13, so the
+  -- exchange would RAISE carol -- and carol can't gain life, because alice
+  -- controls a Giant Cindermaw ("Players can't gain life"). CR 119.7 says the
+  -- exchange won't happen, and the WHOLE exchange: bob's loss does not happen
+  -- either, which is the reading a per-side gate would get wrong.
+  Spec.it s "CR 119.7 an exchange that would raise a player who can't gain life doesn't happen at all" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    cindermaw <- S.printingOf s registry "Giant Cindermaw"
+    let (conduitId, plain) = soulConduitBoard conduit island 4 27 13
+        board = snd (S.addPermanent cindermaw S.alice plain)
+        after = S.runPure (conduitAnswer [S.bob, S.carol]) board Engine.runStep
+    Spec.assertEqWith s "carol, whom it would have raised, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+    Spec.assertEqWith s "and bob, whom it would have lowered, keeps his 27" (S.lifeOf S.bob after) (Just 27)
+    Spec.assertEqWith s "no gain" (lifeGains after) []
+    Spec.assertEqWith s "no loss" (lifeLosses after) []
+    -- The ability was really activated, so the assertions above cannot pass
+    -- because nothing happened at all.
+    Spec.assertEqWith s "and the Conduit paid its own {T}" (fmap Object.tapped (Game.lookupObject conduitId after)) (Just TapState.Tapped)
+
+  -- The paired control on the same board: the Cindermaw is the only difference,
+  -- so the case above is not passing for want of mana or a target.
+  Spec.it s "CR 701.12c without the Cindermaw the same exchange happens" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    let (_, board) = soulConduitBoard conduit island 4 27 13
+        after = S.runPure (conduitAnswer [S.bob, S.carol]) board Engine.runStep
+    Spec.assertEqWith s "carol took bob's 27" (S.lifeOf S.carol after) (Just 27)
+
 -- CR 119.5: "If an effect sets a player's life total to a specific number, the
 -- player gains or loses the necessary amount of life to end up with the new
 -- total." So a set is NOT a third kind of life event: it is a gain or a loss,

@@ -4838,9 +4838,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- "replacement effects may modify these gains and losses" is reachable;
   -- ReplacementSpec's Bloodletter group proves the loss half.
   --
-  -- Not implemented: CR 701.12c's deferral to CR 119.7-8, under which an
-  -- exchange that would raise a player who can't gain life doesn't happen.
-  -- Vacuous: Pawl.Types.PlayerEffect has no such arm to consult (#3078).
+  -- CR 701.12c's deferral to CR 119.7-8: a player who can't gain life can't be
+  -- given a higher total this way and a player who can't lose life can't be
+  -- given a lower one, and CR 119.7-8 both say what happens then -- "the
+  -- exchange won't happen", the WHOLE exchange, which is CR 701.12a's
+  -- all-or-nothing again. Asked through `barred` below, so nothing here cases on
+  -- an effect. Pawl.LifeSpec's Soul Conduit case is the proof.
   Effect.ExchangeLifeTotals sides -> do
     gs <- State.get
     let twoSides = case sides of
@@ -4855,13 +4858,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
             thisLife = lifeOf this
             thatLife = lifeOf that
+            -- CR 119.7 / 119.8: would this seat's new total be one a "can't"
+            -- forbids it reaching? Read off the same pre-exchange `gs` the
+            -- deltas are, so both sides are judged against the totals CR
+            -- 701.12c's "previous life total" names.
+            barred pid delta
+              | delta > 0 = PlayerEffect.prohibitsGainingLife pid gs
+              | delta < 0 = PlayerEffect.prohibitsLosingLife pid gs
+              | otherwise = False
         -- CR 608.2f's bracket: an exchange is ONE action taken on two players --
         -- CR 701.12a's "the entire exchange", which either happens or does not --
         -- so the gain and the loss it decomposes into share one
         -- Pawl.Types.EventGroup rather than reading as two events in sequence.
-        Event.simultaneously $ do
-          changeLifeByDelta this (thatLife - thisLife)
-          changeLifeByDelta that (thisLife - thatLife)
+        Monad.unless (barred this (thatLife - thisLife) || barred that (thisLife - thatLife))
+          . Event.simultaneously
+          $ do
+            changeLifeByDelta this (thatLife - thisLife)
+            changeLifeByDelta that (thisLife - thatLife)
       -- CR 701.12a: if the entire exchange can't be completed, no part of it
       -- occurs.
       Nothing -> pure ()
@@ -4922,9 +4935,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- road: rule 119.5's loss or gain, proposed so a replacement reaches it (CR
   -- 614.1).
   --
-  -- Not implemented: CR 119.7-8's own restrictions on a player who can't gain or
-  -- lose life (vacuous, as for ExchangeLifeTotals) (#3078), nor CR 810.9f's "not
-  -- more than one member of each team", which is a Two-Headed Giant rule (#2849).
+  -- CR 119.7-8's own restrictions ride in `isPermutation` below, both rules
+  -- saying a player "can't receive a new life total" that a "can't" forbids: an
+  -- assignment naming one is not a legal answer, so the existing all-or-nothing
+  -- filter is where it belongs.
+  --
+  -- Not implemented: CR 810.9f's "not more than one member of each team", which
+  -- is a Two-Headed Giant rule (#2849).
   Effect.RedistributeLifeTotals -> do
     gs <- State.get
     let candidates = Game.stillPlaying gs
@@ -4939,10 +4956,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Set equality also settles injectivity: a repeated giver makes
           -- `givers` smaller than `takers`.
           isPermutation = Set.isSubsetOf takers (Set.fromList candidates) && takers == givers
+          -- CR 119.7 / 119.8, read off the same pre-redistribution `gs` every
+          -- total is: a taker whose new total would rise while they can't gain
+          -- life, or fall while they can't lose it, is not a taker this
+          -- permutation may name.
+          reachable (taker, giver) = case compare (lifeOf giver) (lifeOf taker) of
+            GT -> not (PlayerEffect.prohibitsGainingLife taker gs)
+            LT -> not (PlayerEffect.prohibitsLosingLife taker gs)
+            EQ -> True
       -- CR 608.2f's bracket, the ExchangeLifeTotals arm's: one redistribution is
       -- one action taken on every seat it names, so the whole permutation's gains
       -- and losses share one Pawl.Types.EventGroup.
-      Monad.when isPermutation . Event.simultaneously . Monad.forM_ (Map.toList assignment) $ \(taker, giver) ->
+      Monad.when (isPermutation && all reachable (Map.toList assignment)) . Event.simultaneously . Monad.forM_ (Map.toList assignment) $ \(taker, giver) ->
         changeLifeByDelta taker (lifeOf giver - lifeOf taker)
   -- CR 702.179c: each named player's speed increases by this much. Its two
   -- readings -- a player who HAS speed goes up, a player with NONE has their

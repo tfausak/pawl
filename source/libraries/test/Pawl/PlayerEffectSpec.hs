@@ -96,6 +96,7 @@ module Pawl.PlayerEffectSpec where
 
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -124,6 +125,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
+import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Facing as Facing
@@ -131,6 +133,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -2678,6 +2681,206 @@ isSilenceActivate action = case action of
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
+-- Takes the first mana source offered, and otherwise S.identityAnswer -- which
+-- DECLINES a Prompt.ChooseManaSource, leaving a cast unpaid.
+payingAnswer :: Prompt.Prompt r -> r
+payingAnswer p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+-- payingAnswer with every target slot aimed at `who`, for a Lightning Bolt that
+-- must hit the PLAYER rather than the 8/8 standing beside them.
+boltingAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+boltingAnswer who p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
+  _ -> payingAnswer p
+
+-- CR 119.3's life events, by player and amount, as the whole run logged them:
+-- what a "whenever you gain life" trigger would read, and what a gain the engine
+-- settled to nothing must NOT leave behind (CR 119.10).
+lifeGainsOf :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
+lifeGainsOf gs = Maybe.mapMaybe (\ev -> case ev of GameEvent.LifeGained (LifeChange.MkLifeChange pid n) -> Just (pid, n); _ -> Nothing) (S.eventsOf gs)
+
+lifeLossesOf :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
+lifeLossesOf gs = Maybe.mapMaybe (\ev -> case ev of GameEvent.LifeLost (LifeChange.MkLifeChange pid n) -> Just (pid, n); _ -> Nothing) (S.eventsOf gs)
+
+-- Renewed Faith ({2}{W} Instant, "You gain 6 life") in alice's hand over three
+-- untapped Plains, with `mawSeats` naming who controls a Giant Cindermaw ({2}{R}
+-- Creature, "Trample. Players can't gain life."). The empty list is the paired
+-- control: two boards differing in exactly that permanent.
+faithBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId] -> (ObjectId.ObjectId, GameState.GameState)
+faithBoard plains faith cindermaw mawSeats =
+  let withMaws = List.foldl' (\gs pid -> snd (S.addPermanent cindermaw pid gs)) (S.landsInPlay plains 3) mawSeats
+      (gs1, oid) = S.handOne faith withMaws
+   in ( oid,
+        gs1
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+cindermawSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cindermawSpec s registry =
+  Spec.describe s "GiantCindermaw" $ do
+    -- The paired control, first: with no Cindermaw anywhere, Renewed Faith takes
+    -- alice from CR 103.3's 20 to 26. Every negative below is this board with one
+    -- permanent added, so a negative cannot pass because the cast failed.
+    Spec.it s "CR 119.3 with no restriction Renewed Faith's 6 lands" $ do
+      plains <- S.printingOf s registry "Plains"
+      faith <- S.printingOf s registry "Renewed Faith"
+      cindermaw <- S.printingOf s registry "Giant Cindermaw"
+      let (oid, board) = faithBoard plains faith cindermaw []
+          after = S.runPure payingAnswer board (do S.cast S.alice oid; Stack.resolveTop)
+      Spec.assertEqWith s "alice gained 6" (S.lifeOf S.alice after) (Just 26)
+      Spec.assertEqWith s "and logged the gain" (lifeGainsOf after) [(S.alice, 6)]
+
+    -- CR 119.7: the restriction is a STATIC one, so the gain does not happen at
+    -- all -- not a gain replaced by 0. alice is at 20 and no LifeGained event was
+    -- recorded, which is what a trigger watching CR 603.2c's batch would read.
+    Spec.it s "CR 119.7 bob's Giant Cindermaw stops alice gaining anything" $ do
+      plains <- S.printingOf s registry "Plains"
+      faith <- S.printingOf s registry "Renewed Faith"
+      cindermaw <- S.printingOf s registry "Giant Cindermaw"
+      let (oid, board) = faithBoard plains faith cindermaw [S.bob]
+          after = S.runPure payingAnswer board (do S.cast S.alice oid; Stack.resolveTop)
+      Spec.assertEqWith s "alice is still at 20" (S.lifeOf S.alice after) (Just 20)
+      Spec.assertEqWith s "no life gain event happened" (lifeGainsOf after) []
+      Spec.assertEqWith s "and the spell really resolved, out of alice's hand" (S.handSize S.alice after) 0
+
+    -- The printed scope is "PLAYERS", CR 613.11's EachPlayer, and the controller
+    -- is one of them: the same board with the Cindermaw on ALICE's side answers
+    -- the same way, where an Opponents reading would let her gain her 6.
+    Spec.it s "CR 613.11 the Cindermaw's controller can't gain either" $ do
+      plains <- S.printingOf s registry "Plains"
+      faith <- S.printingOf s registry "Renewed Faith"
+      cindermaw <- S.printingOf s registry "Giant Cindermaw"
+      let (oid, board) = faithBoard plains faith cindermaw [S.alice]
+          after = S.runPure payingAnswer board (do S.cast S.alice oid; Stack.resolveTop)
+      Spec.assertEqWith s "alice is still at 20" (S.lifeOf S.alice after) (Just 20)
+      Spec.assertEqWith s "no life gain event happened" (lifeGainsOf after) []
+
+-- Platinum Emperion ({8} Artifact Creature 8\/8, "Your life total can't change")
+-- under `emperionSeats`, with alice holding a Lightning Bolt over one Mountain.
+-- The empty list is the paired control.
+emperionBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId] -> (ObjectId.ObjectId, GameState.GameState)
+emperionBoard mountain bolt emperion emperionSeats =
+  let withEmperions = List.foldl' (\gs pid -> snd (S.addPermanent emperion pid gs)) (S.landsInPlay mountain 1) emperionSeats
+      (gs1, oid) = S.handOne bolt withEmperions
+   in ( oid,
+        gs1
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+emperionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+emperionSpec s registry =
+  Spec.describe s "PlatinumEmperion" $ do
+    -- The paired control: without the Emperion, CR 120.3a takes alice to 17.
+    Spec.it s "CR 120.3a with no restriction the Bolt's 3 damage costs 3 life" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      emperion <- S.printingOf s registry "Platinum Emperion"
+      let (oid, board) = emperionBoard mountain bolt emperion []
+          after = S.runPure (boltingAnswer S.alice) board (do S.cast S.alice oid; Stack.resolveTop)
+      Spec.assertEqWith s "alice fell to 17" (S.lifeOf S.alice after) (Just 17)
+      Spec.assertEqWith s "and lost 3 life" (lifeLossesOf after) [(S.alice, 3)]
+
+    -- CR 119.8 against CR 120.3a: the damage is still DEALT -- the event is in
+    -- the log, and a "whenever this is dealt damage" trigger would see it -- and
+    -- only its RESULT, the life loss, does not happen.
+    Spec.it s "CR 119.8 alice's Platinum Emperion takes the 3 damage without the 3 life" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      emperion <- S.printingOf s registry "Platinum Emperion"
+      let (oid, board) = emperionBoard mountain bolt emperion [S.alice]
+          after = S.runPure (boltingAnswer S.alice) board (do S.cast S.alice oid; Stack.resolveTop)
+      Spec.assertEqWith s "alice is still at 20" (S.lifeOf S.alice after) (Just 20)
+      Spec.assertEqWith s "no life loss event happened" (lifeLossesOf after) []
+      Spec.assertEqWith
+        s
+        "but CR 120.3's damage was dealt to her all the same"
+        (fmap (\ev -> (DamageEvent.target ev, DamageEvent.amount ev)) (S.damageEventsOf after))
+        [(Recipient.ToPlayer S.alice, 3)]
+
+    -- CR 109.5: "YOUR life total", so bob's Emperion protects bob and not alice.
+    -- The same board one seat over, which an unscoped reading would answer the
+    -- same way as the case above.
+    Spec.it s "CR 109.5 bob's Emperion does not stop alice losing life" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      emperion <- S.printingOf s registry "Platinum Emperion"
+      let (oid, board) = emperionBoard mountain bolt emperion [S.bob]
+          after = S.runPure (boltingAnswer S.alice) board (do S.cast S.alice oid; Stack.resolveTop)
+      Spec.assertEqWith s "alice fell to 17" (S.lifeOf S.alice after) (Just 17)
+
+-- Greed ({3}{B} Enchantment, "{B}, Pay 2 life: Draw a card") and one Swamp under
+-- alice, with a card in her library to draw and `emperionSeats` naming who
+-- controls a Platinum Emperion.
+greedBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId] -> GameState.GameState
+greedBoard swamp greed emperion emperionSeats =
+  let (_, withGreed) = S.addPermanent greed S.alice (S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers))
+      (_, stocked) = S.addLibraryCard swamp S.alice withGreed
+      withEmperions = List.foldl' (\gs pid -> snd (S.addPermanent emperion pid gs)) stocked emperionSeats
+   in withEmperions
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+
+-- Takes any Activate offered and passes otherwise, so an activation the engine
+-- never OFFERS is the only way the draw fails to happen.
+activatingAnswer :: Prompt.Prompt r -> r
+activatingAnswer p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter isActivate actions of
+    a : _ -> a
+    [] -> Action.Type.Pass
+  _ -> payingAnswer p
+
+isActivate :: Action.Type.Action -> Bool
+isActivate a = case a of
+  Action.Type.Activate {} -> True
+  Action.Type.Pass -> False
+  Action.Type.Play {} -> False
+  Action.Type.Cast {} -> False
+  Action.Type.TurnFaceUp {} -> False
+  Action.Type.Unlock {} -> False
+  Action.Type.DiscardFromHand {} -> False
+  Action.Type.Plot {} -> False
+  Action.Type.Foretell {} -> False
+  Action.Type.Suspend {} -> False
+  Action.Type.PutCompanionIntoHand -> False
+  Action.Type.ActivateManaAbility {} -> False
+  Action.Type.Ignore {} -> False
+  Action.Type.EndEffect {} -> False
+
+greedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+greedSpec s registry =
+  Spec.describe s "GreedUnderEmperion" $ do
+    -- The paired control: CR 119.4's payment is affordable at 20, so Greed's
+    -- ability is offered, activated and paid.
+    Spec.it s "CR 119.4 with no restriction Greed's 2 life buys a card" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      greed <- S.printingOf s registry "Greed"
+      emperion <- S.printingOf s registry "Platinum Emperion"
+      let after = S.runPure activatingAnswer (greedBoard swamp greed emperion []) Engine.priorityLoop
+      Spec.assertEqWith s "alice drew the card" (S.handSize S.alice after) 1
+      Spec.assertEqWith s "and paid 2 life for it" (S.lifeOf S.alice after) (Just 18)
+
+    -- CR 119.8's last sentence: a cost that involves having a player who can't
+    -- lose life pay life can't be paid, so the activation is never offered at
+    -- all. Platinum Emperion's own reminder text is that reading.
+    Spec.it s "CR 119.8 alice's Platinum Emperion makes Greed's cost unpayable" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      greed <- S.printingOf s registry "Greed"
+      emperion <- S.printingOf s registry "Platinum Emperion"
+      let after = S.runPure activatingAnswer (greedBoard swamp greed emperion [S.alice]) Engine.priorityLoop
+      Spec.assertEqWith s "alice drew nothing" (S.handSize S.alice after) 0
+      Spec.assertEqWith s "and is still at 20" (S.lifeOf S.alice after) (Just 20)
+      Spec.assertEqWith s "her Swamp was never tapped for the {B}" (S.tappedCount S.alice after) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -2699,3 +2902,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   minamoScrollkeeperSpec s registry
   gnatMiserSpec s registry
   storedSpec s registry
+  cindermawSpec s registry
+  emperionSpec s registry
+  greedSpec s registry
