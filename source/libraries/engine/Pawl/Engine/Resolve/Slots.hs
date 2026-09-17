@@ -2144,7 +2144,9 @@ playerRefPlayers legal controller gs ref =
         PlayerRef.Candidate -> []
         -- CR 608.2h: the controller of the object the slot names, through last known
         -- information -- the clause naming the player generally MOVED it first, and CR
-        -- 108.4 leaves a card in a hand with no controller at all.
+        -- 108.4 leaves a card in a hand with no controller at all. Pawl.ResolveSpec's
+        -- "bob, who controlled the bounced creature, went 20 -> 19" (Vapor Snag) is
+        -- what proves the last-known road rather than merely fencing it.
         PlayerRef.ControllerOfBound slot -> case legalOne slot legal of
           Just recipient -> case Recipient.objectOf recipient of
             Just oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
