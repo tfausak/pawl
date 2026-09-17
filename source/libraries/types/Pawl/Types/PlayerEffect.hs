@@ -194,19 +194,17 @@ data PlayerEffect
     -- would otherwise have voted.
     AdditionalVotes Natural.Natural
   | -- | CR 119.7 / Giant Cindermaw, Platinum Emperion: this player can't gain
-    -- life. A STATIC RESTRICTION and not a replacement: CR 119.7 says a
-    -- replacement that would replace this player's life gain "won't do
-    -- anything", which a replacement could not state about itself since CR
-    -- 616.1 would still order and spend it. So
-    -- Pawl.Engine.Event.resolveLifeGain consults it AHEAD of the proposal.
-    CantGainLife
-  | -- | CR 119.8 / Platinum Emperion: this player can't lose life -- the twin
-    -- above one direction over, consulted by Pawl.Engine.Event.resolveLifeLoss
-    -- ahead of its proposal and by Event.canPayLife, which CR 119.8's last
-    -- sentence makes unpayable for any amount but CR 119.4b's 0.
+    -- life.
     --
-    -- Damage is still DEALT to a player who can't lose life; CR 120.3a's
-    -- RESULT is what does not happen, which Pawl.DamageSpec's Platinum
-    -- Emperion case proves.
+    -- A STATIC restriction rather than a replacement, which is why
+    -- Pawl.Engine.Event.resolveLifeGain consults it AHEAD of the proposal;
+    -- Pawl.PlayerEffectSpec's GiantCindermaw group proves it.
+    CantGainLife
+  | -- | CR 119.8 / Platinum Emperion: this player can't lose life.
+    --
+    -- Damage is still DEALT to such a player -- CR 120.3a's RESULT is what does
+    -- not happen -- and CR 119.8's last sentence makes a pay-life cost
+    -- unpayable. Pawl.PlayerEffectSpec's PlatinumEmperion and GreedUnderEmperion
+    -- groups prove the two.
     CantLoseLife
   deriving (Eq, Ord, Show)

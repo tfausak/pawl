@@ -406,7 +406,12 @@ closeEventGroup gs =
 -- CR 119.8's last sentence rides here rather than at the three call sites: a cost
 -- that involves having a player who can't lose life pay life can't be paid, and
 -- every reader of CR 119.4 already comes through this one door. Platinum
--- Emperion's own reminder text is that reading in as many words.
+-- Emperion's own reminder text is that reading in as many words, and
+-- Pawl.PlayerEffectSpec's GreedUnderEmperion group is the proof.
+--
+-- CR 119.7's matching clause -- a cost that involves having a player GAIN life
+-- can't be paid -- has no site: Pawl.Types.CostComponent has no life-gain
+-- component for one to be written with.
 canPayLife :: PlayerId -> Natural -> GameState -> Bool
 canPayLife pid n gs =
   n == 0
@@ -4231,8 +4236,8 @@ resolvePlayerCounters cause pid kind n = do
 -- CR 119.8's restriction is asked ahead of the proposal, resolveLifeGain's
 -- position and for CR 119.7's reason one direction over. It reaches DAMAGE
 -- through CR 120.3a: the damage is still dealt and its other results still
--- happen, and only the life loss does not -- Pawl.DamageSpec's Platinum Emperion
--- case is the proof.
+-- happen, and only the life loss does not -- Pawl.PlayerEffectSpec's
+-- PlatinumEmperion group is the proof.
 resolveLifeLoss :: LifeLossCause.LifeLossCause -> PlayerId -> Natural -> Game Natural
 resolveLifeLoss cause pid n =
   if n == 0
@@ -4268,7 +4273,7 @@ resolveLifeLoss cause pid n =
 -- life gain event affecting that player won't do anything", which a row CR 616.1
 -- has already ordered and spent could not produce. The classification question
 -- goes to Pawl.Engine.PlayerEffect.prohibitsGainingLife, so nothing here cases on
--- an effect. Pawl.LifeSpec's Giant Cindermaw case is the proof.
+-- an effect. Pawl.PlayerEffectSpec's GiantCindermaw group is the proof.
 resolveLifeGain :: PlayerId -> Natural -> Game Natural
 resolveLifeGain pid n =
   if n == 0

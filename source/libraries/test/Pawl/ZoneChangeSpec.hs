@@ -1852,6 +1852,19 @@ redistributeLifeTotalsSpec s registry =
           Spec.assertEqWith s "carol's stayed silent: her own total back is no gain" (countersOn carolMate after) (Just 0)
           -- 23 milled plus the spent sorcery, as in the case above.
           Spec.assertEqWith s "bob's Mindcrank milled alice for exactly what she lost" (graveyardSize S.alice after) 24
+        -- CR 119.7's own clause on a redistribution: "a player can't receive a
+        -- new life total such that the player's life total would become
+        -- higher". alice's Giant Cindermaw ("Players can't gain life") makes
+        -- carol's rise to 27 a total she can't receive, so the permutation is
+        -- not a legal answer and nothing happens -- assertUntouched's board,
+        -- the same one an ill-formed answer lands on. The assignment is the
+        -- first positive case's, so the Cindermaw is the only difference
+        -- between the two.
+        Spec.it s "CR 119.7 an assignment that would raise a player who can't gain life is not a legal answer" $ do
+          cindermaw <- S.printingOf s registry "Giant Cindermaw"
+          (_, _, _, spellId, gs) <- sandsBoard
+          let after = castAndTrigger (assigning [(S.alice, S.carol), (S.bob, S.bob), (S.carol, S.alice)]) spellId (snd (S.addPermanent cindermaw S.alice gs))
+          assertUntouched after
         -- A ROTATION, and the reason the two transpositions above are not enough
         -- on their own: a transposition is its own inverse, so reading the answer
         -- backwards -- giving each named player's total AWAY instead of handing it

@@ -4843,7 +4843,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- given a lower one, and CR 119.7-8 both say what happens then -- "the
   -- exchange won't happen", the WHOLE exchange, which is CR 701.12a's
   -- all-or-nothing again. Asked through `barred` below, so nothing here cases on
-  -- an effect. Pawl.LifeSpec's Soul Conduit case is the proof.
+  -- an effect. Pawl.ZoneChangeSpec's ExchangeLifeTotals group is the proof.
   Effect.ExchangeLifeTotals sides -> do
     gs <- State.get
     let twoSides = case sides of
@@ -4935,10 +4935,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- road: rule 119.5's loss or gain, proposed so a replacement reaches it (CR
   -- 614.1).
   --
-  -- CR 119.7-8's own restrictions ride in `isPermutation` below, both rules
+  -- CR 119.7-8's own restrictions ride beside `isPermutation` below, both rules
   -- saying a player "can't receive a new life total" that a "can't" forbids: an
   -- assignment naming one is not a legal answer, so the existing all-or-nothing
-  -- filter is where it belongs.
+  -- filter is where it belongs. Pawl.ZoneChangeSpec's RedistributeLifeTotals
+  -- group is the proof.
   --
   -- Not implemented: CR 810.9f's "not more than one member of each team", which
   -- is a Two-Headed Giant rule (#2849).
