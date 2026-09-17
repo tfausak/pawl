@@ -5001,8 +5001,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- legalSlot closes over that snapshot), so a permanent an earlier clause of
   -- this same resolution moved is still in `legal` and CR 608.2h's last known
   -- information answers for it -- Pawl.ResolveSpec's "bob, who controlled the
-  -- bounced creature, went 20 -> 19" (Vapor Snag) and Pawl.SpeedSpec's "bob's 4
-  -- became 3" both prove it.
+  -- bounced creature, went 20 -> 19" (Vapor Snag) is what proves it. This arm's
+  -- own board, Pawl.SpeedSpec's "bob's 4 became 3", cannot tell the two maps
+  -- apart: Spikeshell Harrier targets once, so a target already illegal when the
+  -- trigger began resolving fizzles it (CR 608.2b) instead.
   Effect.DecreaseSpeed d -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
