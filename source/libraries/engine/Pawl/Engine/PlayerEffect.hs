@@ -1993,8 +1993,9 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
 -- and Pawl.Engine.Action.playableLands nubs the ids it ends up with.
 --
 -- Asks nothing about WHICH land, where the cast side takes an ObjectId: the arm
--- carries no Filter (see the type), so a grant opens the whole pile or none of
--- it.
+-- carries no Filter (see the type), so a grant opens a named pile or none of it.
+-- How much of a pile that is stays the ZONE's answer -- a named library is its
+-- top card (Pawl.Engine.Cast.pileCandidates) -- and never this list's.
 playLandPiles :: PlayerId -> GameState -> [(Zone.Zone, PlayerId)]
 playLandPiles pid gs =
   let piles effect = case effect of
