@@ -927,8 +927,9 @@ candidateFillable pid oid name proposed candidate =
 -- filters, so the two can never disagree about where to look.
 --
 -- The LIBRARY is in the list for one permission only: the standing "you may cast
--- creature spells from the top of your library" (Garruk's Horde), which
--- zoneCandidates narrows to the top card and castableZones' own arm permits.
+-- spells from the top of your library", which Garruk's Horde narrows to creature
+-- spells and Future Sight states unrestricted. pileCandidates narrows it to the
+-- top card and castableZones' own arm permits it.
 -- Panglacial Wurm is NOT that road -- its permission is scoped to a search in
 -- progress rather than to the whole game, and castableWhileSearching walks the
 -- library for it separately.

@@ -162,7 +162,7 @@ data PlayerEffect
     -- owner being the payload's (Pawl.Types.CastFromZone). The graveyard and the
     -- top of a library had an arm each, and the second was the first with a
     -- different zone written into its name: the narrowing to the TOP card is
-    -- Pawl.Engine.Cast.zoneCandidates' and never a Filter's, so nothing but the
+    -- Pawl.Engine.Cast.pileCandidates' and never a Filter's, so nothing but the
     -- zone told the two apart.
     --
     -- Read as a DISJUNCTION (Pawl.Engine.PlayerEffect.mayCastFrom): one

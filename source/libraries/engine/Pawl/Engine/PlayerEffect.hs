@@ -1812,9 +1812,9 @@ opensZoneOf pid zone oid inZone gs =
 -- (Sen Triplets), and the owner conjunct moved here with it; see #2169. Yawgmoth's
 -- Will writes PlayerRef.Relative You and reaches no other graveyard for it.
 --
--- Says nothing about the TOP of a library, which stays zoneCandidates' half of
--- the question: that hands this the top card alone, so a permission worded "from
--- the top of your library" (Garruk's Horde) comes out of the two together. The
+-- Says nothing about the TOP of a library, which stays Pawl.Engine.Cast.pileCandidates'
+-- half of the question: that hands this the top card alone, so a permission worded
+-- "from the top of your library" (Garruk's Horde) comes out of the two together. The
 -- object-scoped Pawl.Types.CastingPermission.CastFromLibraryWhileSearching is
 -- emphatically NOT read here -- Panglacial Wurm's permission is scoped to a
 -- search in progress (Pawl.Engine.Cast.castableWhileSearching), and reading it
