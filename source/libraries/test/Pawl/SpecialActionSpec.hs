@@ -57,6 +57,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -69,6 +70,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Suspend as Suspend
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -1503,6 +1505,91 @@ suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
       )
       (1, 1)
 
+-- Benalish Commander (TSP 6) {3}{W} Creature -- Human Soldier */*, "Benalish
+-- Commander's power and toughness are each equal to the number of Soldiers you
+-- control. / Suspend X--{X}{W}{W}. X can't be 0." -- checked against Scryfall,
+-- 2026-09-17. CR 107.3d's announcement, which rule 107.3i makes one number: the
+-- X the player names as the special action is taken is both the mana it charges
+-- and the time counters the card is exiled with.
+--
+-- Not implemented: the card's third ability, "Whenever a time counter is removed
+-- from this card while it's exiled, create a 1/1 white Soldier creature token" --
+-- TriggerCondition.SelfCountersRemoved functions only on the battlefield
+-- (gap #3819). That leaves pawl's card STRICTER than printed: the suspended
+-- Commander makes no Soldiers, so nothing it does is anything the printing would
+-- not also do.
+--
+-- SIX PLAINS, which is what makes each case below discriminating. {X}{W}{W} at
+-- X=3 taps five of them and leaves one, so the count reads the announced value
+-- back off the board rather than merely "some mana was spent"; X=4 is affordable
+-- too, so a board that could only ever pay one value is not what is being read.
+benalishBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+benalishBoard plains commander =
+  let (commanderId, gs) = S.addHandCard commander S.alice (S.landsInPlay plains 6)
+   in ( commanderId,
+        gs
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Takes the suspend action the moment it is offered, announces this X for it,
+-- and passes on every other priority. suspendAnswer's shape with rule 107.3d's
+-- answer pinned: the value is fixed by the caller rather than searched for, so a
+-- mutation cannot be repaired by an answerer that finds a legal value again.
+suspendForX :: Natural.Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+suspendForX x oid p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    if List.elem (Action.Type.Suspend oid) actions then Action.Type.Suspend oid else Action.Type.Pass
+  Prompt.ChooseX {} -> x
+  _ -> S.identityAnswer p
+
+suspendingForX :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
+  -- The whole of rule 107.3d in one run: the announcement is made as the special
+  -- action is taken, and both halves of "Suspend X--{X}{W}{W}" read it.
+  Spec.it s "CR 107.3d the announced X is both the time counters and the mana" $ do
+    plains <- S.printingOf s registry "Plains"
+    commander <- S.printingOf s registry "Benalish Commander"
+    let (commanderId, gs) = benalishBoard plains commander
+        suspended = snd (Engine.runGamePure (suspendForX 3 commanderId) gs Engine.priorityLoop)
+    -- CR 702.62a's "exile it with N time counters on it", where N is rule
+    -- 107.3d's answer: three, not the one a fixed N would have written and not
+    -- the zero an unread announcement would have.
+    Spec.assertEqWith
+      s
+      "the Commander is exiled with exactly three time counters"
+      (soleExileOf suspended >>= \oid -> fmap (Map.lookup CounterKind.Time . Object.counters) (Game.lookupObject oid suspended))
+      (Just (Just 3))
+    -- The same announcement on the cost half (CR 107.3i): {3}{W}{W} is five of
+    -- the six Plains, and the sixth is still untapped.
+    Spec.assertEqWith s "and five of the six Plains paid {3}{W}{W} for it" (S.tappedCount S.alice suspended) 5
+  -- CR 101.2: "X can't be 0" beats rule 107.3d's otherwise free choice, so the
+  -- announcement is illegal and the special action does nothing. The pair is one
+  -- board and one answer apart -- same hand, same six Plains, same action taken.
+  Spec.it s "CR 101.2 X can't be 0, so an announcement of zero takes nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    commander <- S.printingOf s registry "Benalish Commander"
+    let (commanderId, gs) = benalishBoard plains commander
+        taking x = S.runPure (suspendForX x commanderId) gs (Suspend.suspend S.manaPerformer S.alice commanderId)
+        refused = taking 0
+        allowed = taking 1
+    -- The action IS offered on this board, so the refusal below is rule 101.2's
+    -- and not a window the card was never in.
+    Spec.assertBool s (List.elem (Action.Type.Suspend commanderId) (Action.legalActions S.alice gs)) "the control: the Commander may be suspended here"
+    Spec.assertEqWith s "at X=0 the Commander is still in alice's hand" (List.elem commanderId (Game.zoneMembers Zone.Hand S.alice refused)) True
+    Spec.assertEqWith s "nothing was exiled" (length (GameState.exile refused)) 0
+    Spec.assertEqWith s "and no Plains paid for it" (S.tappedCount S.alice refused) 0
+    -- The one thing that differs: at X=1 the same call suspends, with one time
+    -- counter and {1}{W}{W} paid.
+    Spec.assertEqWith
+      s
+      "CR 107.3d at X=1 the same action exiles it with one time counter"
+      (soleExileOf allowed >>= \oid -> fmap (Map.lookup CounterKind.Time . Object.counters) (Game.lookupObject oid allowed))
+      (Just (Just 1))
+    Spec.assertEqWith s "and three Plains paid {1}{W}{W}" (S.tappedCount S.alice allowed) 3
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
@@ -1517,6 +1604,7 @@ spec s registry = do
   makeForetoldPerFace s registry
   suspending s registry
   suspendHaste s registry
+  suspendingForX s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
 -- offered to (its own scope is EachPlayer, so every seat is offered it) and how

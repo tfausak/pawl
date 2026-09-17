@@ -12,6 +12,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Suspend as Suspend
+import qualified Pawl.Types.SuspendCounters as SuspendCounters
 
 -- | Instantiated at 'Keyword.Keyword', the only concrete instantiation anywhere
 -- in the pool.
@@ -26,9 +27,9 @@ spec s = Spec.describe s "Pawl.Codec.Suspend" $ do
       s
       codec
       ( Suspend.MkSuspend
-          { Suspend.counters = 1,
+          { Suspend.counters = SuspendCounters.Literal 1,
             Suspend.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]), Cost.components = []}
           }
       )
-      " {\"counters\":1,\"cost\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}}]}} "
+      " {\"counters\":{\"type\":\"Literal\",\"value\":1},\"cost\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

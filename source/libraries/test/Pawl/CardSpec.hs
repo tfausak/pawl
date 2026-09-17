@@ -279,6 +279,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Suspend as Suspend
+import qualified Pawl.Types.SuspendCounters as SuspendCounters
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
@@ -6069,6 +6070,31 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (any (anyFace (any unrefusableAbility . Face.activatedAbilities) . Printing.card) ps)
       "and an activated ability whose X the board cannot refuse"
     Spec.assertEqWith s "every one of them states a maximum" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The lint above, one rule over: Pawl.Engine.Suspend climbs the same ascending
+  -- search for CR 107.3d's bound, and CR 702.62a's payload states no maximum for
+  -- it to stop at, so a suspend cost whose X the board cannot refuse would climb
+  -- forever. A card-data error rather than an engine one, caught here.
+  --
+  -- The pairing is the other half: a "Suspend X" line owes an X in its cost and
+  -- an X in its cost owes a variable N, since rule 107.3i makes the two one
+  -- number and Pawl.Engine.Suspend reads the announcement into both.
+  Spec.it s "CR 107.3d every suspend cost's X is one the board can refuse, and its N is the same X" $ do
+    ps <- S.allPrintings s
+    let suspendsOf p = Maybe.maybeToList (KeywordEngine.suspend (Face.keywordSet (S.combinedFace p)))
+        variableCounters ability = case Suspend.counters ability of
+          SuspendCounters.Literal _ -> False
+          SuspendCounters.Variable _ -> True
+        offends ability =
+          (declaresVariable (Suspend.cost ability) && not (Cost.demandGrowsWithX (Suspend.cost ability)))
+            || variableCounters ability /= declaresVariable (Suspend.cost ability)
+        offenders = filter (any offends . suspendsOf) ps
+    -- Guards the sweep against passing vacuously: the pool must hold a "Suspend
+    -- X" line at all (Benalish Commander).
+    Spec.assertBool
+      s
+      (any (any variableCounters . suspendsOf) ps)
+      "the pool has a suspend whose N is CR 107.3d's chosen X"
+    Spec.assertEqWith s "and every suspend cost agrees with its own N" (fmap (S.nameOf . Printing.card) offenders) []
   Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))

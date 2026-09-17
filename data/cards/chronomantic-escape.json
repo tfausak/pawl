@@ -22,7 +22,10 @@
                 }
               ]
             },
-            "counters": 3
+            "counters": {
+              "type": "Literal",
+              "value": 3
+            }
           }
         }
       ],
