@@ -31,7 +31,6 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Requirement as Requirement
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
-import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -416,21 +415,39 @@ aloneAllows alone declaration = case Set.toList declaration of
 -- the declaration check and the ceiling cannot judge different boards.
 --
 -- A FENCE, because nothing else is one: attackCeilingGiven's greedy search is
--- exact only while this answer is a cardinality cap plus the size-one exception,
--- reading the declaration's KEY SET and never its announcements. A third conjunct
--- naming WHICH creatures may attack together -- or widening the third argument
--- from Set ObjectId to the declaration -- would make that search answer CR
--- 508.1d with a number no player can attain, and -Werror would say nothing.
--- Re-derive the argument there before adding one.
+-- exact only while this answer is a family of cardinality caps plus the size-one
+-- exception. A third conjunct naming WHICH creatures may attack together would
+-- make that search answer CR 508.1d with a number no player can attain, and
+-- -Werror would say nothing. Re-derive the argument there before adding one.
+--
+-- The declaration and not its key set, which is CR 802.3a's doing: a bound
+-- naming a player is judged against the creatures attacking THAT player, so the
+-- announcements are part of the question. The caps stay caps -- neither conjunct
+-- asks which creatures are under them -- and ceilingOver reads the same
+-- announcements, so the search is exact in the number it reports while a
+-- creature's announcement is fixed; see #3807.
 --
 -- CR 508.1c's aimed-at restriction is NOT such a conjunct, which is why it is not
 -- here: it forbids (creature, target) pairs independently of every other creature,
 -- so the search stays exact by narrowing each creature's announcements instead
 -- (attackCeilingGiven's `announceable`).
-attackDeclarationAllowed :: Maybe Natural -> Set ObjectId -> Set ObjectId -> Bool
-attackDeclarationAllowed limit alone declaration =
-  aloneAllows alone declaration
-    && withinLimit limit (Set.size declaration)
+attackDeclarationAllowed :: CombatRestriction.AttackLimits -> Set ObjectId -> Map ObjectId AttackTarget.AttackTarget -> Bool
+attackDeclarationAllowed limits alone declaration =
+  aloneAllows alone (Map.keysSet declaration)
+    && withinLimit (CombatRestriction.whole limits) (Map.size declaration)
+    && all (\(pid, n) -> withinLimit (Just n) (declaredAgainst pid declaration)) (Map.toList (CombatRestriction.perDefender limits))
+
+-- CR 802.3a: how many of a declaration's creatures are attacking `pid` -- the
+-- count a seat-scoped bound is judged against. Crawlspace.
+--
+-- The announcements aimed at that player's PLANESWALKERS, and at the battles
+-- they protect, are not among them: rule 802.3a says "creatures attacking that
+-- player", and Crawlspace's own ruling spells that out -- "your opponents can
+-- still attack planeswalkers you control with any number of creatures each
+-- combat". So this is an equality on the announcement and not a targetDefender
+-- reading, which is the opposite of what barredAnnouncements' gated half does.
+declaredAgainst :: PlayerId -> Map ObjectId AttackTarget.AttackTarget -> Int
+declaredAgainst pid = length . filter (== AttackTarget.OfPlayer pid) . Map.elems
 
 -- CR 508.1c / CR 509.1b read through Silent Arbiter: is a declaration of this
 -- SIZE one the bound in force allows? "No more than one" is `<=`, so the empty
@@ -462,10 +479,10 @@ withinLimit limit size = case limit of
 -- answers exactly the same question, because THREE properties hold of pawl's
 -- attacking rules together:
 --
---   1. attackDeclarationAllowed reads only the declaration's KEY SET, and reads
---      it as a cardinality cap (withinLimit) plus one exception at size one
---      (aloneAllows). It never asks WHICH creatures beyond that exception, and
---      never asks what they were announced against.
+--   1. attackDeclarationAllowed reads the declaration as a family of cardinality
+--      caps (CR 802.3a's whole-declaration bound and its per-seat ones) plus one
+--      exception at size one (aloneAllows). It never asks WHICH creatures beyond
+--      that exception -- only how many, and at which seat.
 --   2. attackRequirementsMet's PAIR half is a sum of non-negative weights over
 --      independent (creature, target) pairs: Requirement.pairs is keyed by the
 --      pair, so no pair requirement spans two creatures. Its GROUP half is not,
@@ -476,6 +493,13 @@ withinLimit limit size = case limit of
 --      about that creature and that target alone -- an attack cost (CR 508.1d) or
 --      CR 508.1c's aimed-at restriction -- so each creature's best announcement
 --      is chosen alone (bestFor).
+--
+-- Not implemented: a seat-scoped bound (CR 802.3a, Crawlspace) breaks the third,
+-- since it couples two creatures' announcements. `ceilingOver` honours the bound
+-- over the announcements `bestFor` already chose, so every number it reports is
+-- attained by a legal declaration and none is ever too large; what it will not do
+-- is re-aim a creature off a seat the bound has filled, so the number can be too
+-- small (#3807).
 --
 -- Given those, a declaration's score is at most the sum over its creatures of
 -- their per-creature best, and any set of creatures attains that sum -- so CR
@@ -550,8 +574,8 @@ barredAnnouncements candidates gs =
 -- attackCeiling against the restrictions the caller already gathered: each caller
 -- also asks attackDeclarationAllowed of the player's own declaration, and the two
 -- must be judging the same board.
-attackCeilingGiven :: Maybe Natural -> Set ObjectId -> Set (ObjectId, AttackTarget.AttackTarget) -> [ObjectId] -> GameState -> (Requirement.Instances (ObjectId, AttackTarget.AttackTarget), Map ObjectId AttackTarget.AttackTarget)
-attackCeilingGiven limit alone barred candidates gs =
+attackCeilingGiven :: CombatRestriction.AttackLimits -> Set ObjectId -> Set (ObjectId, AttackTarget.AttackTarget) -> [ObjectId] -> GameState -> (Requirement.Instances (ObjectId, AttackTarget.AttackTarget), Map ObjectId AttackTarget.AttackTarget)
+attackCeilingGiven limits alone barred candidates gs =
   let targets = declarableTargets gs
       required = AttackRequirement.instances candidates targets gs
       weights = Requirement.pairs required
@@ -592,6 +616,34 @@ attackCeilingGiven limit alone barred candidates gs =
       -- rule's order, each carrying its announcement and its weight.
       eligible = Maybe.mapMaybe (\oid -> fmap ((,) oid) (bestFor oid)) candidates
       weightOf entry = snd (snd entry)
+      -- CR 802.3a: which seat's bound an announcement counts against, and
+      -- Nothing for the two of CR 506.3's things no bound is scoped to
+      -- (`declaredAgainst` has the rule and Crawlspace's ruling). Exhaustive, so
+      -- a fourth attackable thing has to decide here too.
+      seatOf entry = case fst (snd entry) of
+        AttackTarget.OfPlayer pid -> Just pid
+        AttackTarget.OfPlaneswalker {} -> Nothing
+        AttackTarget.OfBattle {} -> Nothing
+      -- Whether ONE more entry fits the room left, both caps asked at once. An
+      -- absent seat in `rooms` is a seat nothing bounds.
+      fits room rooms entry =
+        Maybe.maybe True (> 0) room
+          && Maybe.maybe True (\pid -> Maybe.maybe True (> 0) (Map.lookup pid rooms)) (seatOf entry)
+      -- The heaviest entries of `rest` the caps admit, in the order they were
+      -- taken, so the running sums below answer every SIZE at once.
+      --
+      -- Greedy, and exact: the caps are a whole-declaration one over disjoint
+      -- per-seat ones, which is a laminar family, so taking the heaviest entry
+      -- that still fits attains the maximum at every size. With no seat-scoped
+      -- bound in force this is the descending sort and prefix the closed form
+      -- always took.
+      admitted room rooms entries =
+        let step (left, rooms', acc) entry =
+              if fits left rooms' entry
+                then (fmap (subtract 1) left, Maybe.maybe rooms' (\pid -> Map.adjust (subtract 1) pid rooms') (seatOf entry), acc <> [weightOf entry])
+                else (left, rooms', acc)
+            (_, _, kept) = List.foldl' step (room, rooms, []) (List.sortBy (\a b -> compare (weightOf b) (weightOf a)) entries)
+         in kept
       -- CR 508.1d's maximum over every legal declaration that contains all of
       -- `taken` and any subset of `rest`, or Nothing when the restrictions admit
       -- none at all.
@@ -603,13 +655,14 @@ attackCeilingGiven limit alone barred candidates gs =
       ceilingOver taken rest =
         let held = length taken
             got = sum (fmap weightOf taken)
-            room = case limit of
-              Nothing -> length rest
-              -- Clamped through Integer rather than subtracted in Natural: the
-              -- prefix may already be longer than the bound allows, which is a
-              -- negative difference and no room at all.
-              Just n -> Integer.toIntSaturating (min (toInteger (length rest)) (max 0 (toInteger n - toInteger held)))
-            gains = take (room + 1) (List.scanl' (+) 0 (List.sortBy (flip compare) (fmap weightOf rest)))
+            -- Clamped through Integer rather than subtracted in Natural: the
+            -- prefix may already be longer than a bound allows, which is a
+            -- negative difference and no room at all.
+            left n used = max 0 (toInteger n - used)
+            globalRoom = fmap (\n -> left n (toInteger held)) (CombatRestriction.whole limits)
+            spent = Map.fromListWith (+) (Maybe.mapMaybe (fmap (\pid -> (pid, 1 :: Integer)) . seatOf) taken)
+            seatRooms = Map.mapWithKey (\pid n -> left n (Map.findWithDefault 0 pid spent)) (CombatRestriction.perDefender limits)
+            gains = List.scanl' (+) 0 (admitted globalRoom seatRooms rest)
             sized = fmap (\(_, gain) -> got + gain) (filter (\(more, _) -> held + more /= 1) (zip [0 :: Int ..] gains))
             -- CR 506.5's exception, the one size `sized` skips: a declaration of
             -- exactly one creature is illegal when that creature can't attack
@@ -620,7 +673,11 @@ attackCeilingGiven limit alone barred candidates gs =
             -- through ONE `alone` test, so no arm of it can go untested.
             solo
               | held == 1 = taken
-              | held == 0 && room >= 1 = rest
+              -- CR 802.3a: a lone attacker has to fit its own seat's bound as
+              -- well as the whole declaration's, which is what the filter is --
+              -- with no scoped bound in force every entry passes it and this is
+              -- the "room >= 1" it replaced.
+              | held == 0 = filter (fits globalRoom seatRooms) rest
               | otherwise = []
             singled = case fmap weightOf (filter (\entry -> not (Set.member (fst entry) alone)) solo) of
               [] -> []
@@ -762,7 +819,7 @@ legalAttackDeclarationGiven candidates chosen gs =
   -- Both gathered ONCE and shared with the ceiling: the restriction check and the
   -- maximization have to be judging one board.
   let alone = CombatRestriction.cantAttackAlone candidates gs
-      limit = CombatRestriction.attackLimit gs
+      limits = CombatRestriction.attackLimit gs
       barred = barredAnnouncements candidates gs
    in all (\oid -> List.elem oid candidates) (Map.keys chosen)
         -- CR 508.1b: an announcement outside the list is not a declaration at all.
@@ -774,8 +831,8 @@ legalAttackDeclarationGiven candidates chosen gs =
         -- with no legal announcement undeclarable, since every target it could
         -- have been given fails here.
         && all (uncurry (attackTargetAllowed barred)) (Map.toList chosen)
-        && attackDeclarationAllowed limit alone (Map.keysSet chosen)
-        && obeysAttackRequirements (attackCeilingGiven limit alone barred candidates gs) chosen
+        && attackDeclarationAllowed limits alone chosen
+        && obeysAttackRequirements (attackCeilingGiven limits alone barred candidates gs) chosen
 
 -- A declaration that is always legal: one attaining CR 508.1d's maximum, which
 -- with no requirement in force is the empty one (declining to attack). CR 508.1's
@@ -1706,8 +1763,8 @@ attemptAttackDeclaration perform pid rejected = do
         -- taken ONCE for all three questions below, so the ceiling and the
         -- check beside it cannot judge different boards.
         alone = CombatRestriction.cantAttackAlone candidates gs
-        limit = CombatRestriction.attackLimit gs
-        bound = attackCeilingGiven limit alone barred candidates gs
+        limits = CombatRestriction.attackLimit gs
+        bound = attackCeilingGiven limits alone barred candidates gs
         -- CR 508.1a-d's declaration, announcements included, as a map -- the
         -- key `rejected` is taken on, since it is the declaration the preamble
         -- rewinds rather than the interpreter's raw answer.
@@ -1715,7 +1772,7 @@ attemptAttackDeclaration perform pid rejected = do
         -- Declining to attack is NOT always legal: under a CR 508.1d
         -- requirement (Curse of the Nightly Hunt) "no attacks" can itself be
         -- the illegal answer.
-        allowed = attackDeclarationAllowed limit alone (Map.keysSet proposal) && obeysAttackRequirements bound proposal
+        allowed = attackDeclarationAllowed limits alone proposal && obeysAttackRequirements bound proposal
         -- Whether the preamble's rewind still has a fresh declaration to ask
         -- for. False once this exact declaration has already been rewound,
         -- which is what makes the recursion terminate.

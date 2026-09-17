@@ -13,8 +13,9 @@
 --
 -- The only module that may CASE on Pawl.Types.CombatRestriction.
 -- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
--- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF ROWS, or for a NUMBER,
--- and never learns which card, or which keyword, produced any of them. The rows
+-- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF ROWS, or for NUMBERS
+-- (CR 802.3a's bounds, keyed by the seat each is scoped to), and never learns
+-- which card, or which keyword, produced any of them. The rows
 -- are the two pairwise restrictions, which no set of creatures could state: CR
 -- 509.1b's (cantBeBlockedBy), a pair, and CR 508.1c's aimed-at one
 -- (cantAttackPlayer), a triple carrying CR 506.3's kind beside the seat. The
@@ -46,6 +47,7 @@ import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AimedAt as AimedAt
+import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
@@ -243,17 +245,61 @@ detained candidates gs = Set.fromList (filter (`Detain.detained` gs) candidates)
 cantAttackAlone :: [ObjectId] -> GameState -> Set ObjectId
 cantAttackAlone candidates gs = restricted attackingAlone (defendingSeat gs) candidates gs
 
+-- CR 508.1c through CR 802.3a: the bounds in force right now on how many
+-- creatures may be declared as attackers. That rule splits them in two and this
+-- record is the split -- a bound that names no player is judged against the
+-- whole declaration, and one that names a player is judged against the creatures
+-- attacking that player alone.
+--
+-- Nothing of the source survives into either half, which is the point:
+-- Pawl.Engine.Combat learns numbers and never learns which card produced them.
+data AttackLimits = MkAttackLimits
+  { -- | CR 802.3a's first sentence. Nothing when no unscoped bound is in force.
+    -- Silent Arbiter.
+    whole :: Maybe Natural,
+    -- | CR 802.3a's second sentence, keyed by the defending player the bound
+    -- names. A seat absent from the map is unbounded. Crawlspace.
+    perDefender :: Map.Map PlayerId Natural
+  }
+  deriving (Eq, Show)
+
 -- CR 508.1c: the TIGHTEST bound in force right now on how many creatures may be
--- declared as attackers, or Nothing when nothing bounds it. Silent Arbiter's
--- first sentence.
+-- declared as attackers, or Nothing when nothing bounds it, scoped as CR 802.3a
+-- scopes it. Silent Arbiter's first sentence, and Crawlspace's whole card.
 --
 -- Takes no candidate list, because a bound names no creature: it is not a fact
 -- about anybody's creatures and it is not scoped to the controller of the card
 -- stating it. Two Silent Arbiters still allow one attacker, and a "no more than
--- two" beside a "no more than one" binds at one, which is what makes the answer
--- a minimum.
-attackLimit :: GameState -> Maybe Natural
-attackLimit gs = bounded attackingMoreThan (defendingSeat gs) gs
+-- two" beside a "no more than one" binds at one, which is what makes each half a
+-- minimum.
+--
+-- The SCOPE's perspective is CR 109.5's "you" -- the source's controller --
+-- which is `cantAttackPlayer`'s pairing and for its reason: the sentence names
+-- players by their relation to the card printing it. A source whose controller
+-- cannot be found names nobody rather than everybody.
+--
+-- The two halves read their gates at DIFFERENT seats, which is what makes this
+-- one walk rather than two calls to `bounded`: a scoped row's gate is read at
+-- the seat it names (`cantAttackPlayer`'s posture), where the unscoped row has
+-- no seat to name and falls back on `defendingSeat`.
+attackLimit :: GameState -> AttackLimits
+attackLimit gs =
+  let rows = gathered gs
+      tighter acc n = Just (maybe n (min n) acc)
+      unscoped (_, _, restriction) = case attackingMoreThan restriction of
+        Just (n, Nothing) -> Just n
+        _ -> Nothing
+      scopedAt player (source, _, restriction) = case attackingMoreThan restriction of
+        Just (n, Just scope) -> case Projection.controllerOf source gs of
+          Nothing -> Nothing
+          Just you -> if PlayerEffect.inScope player you gs scope then Just n else Nothing
+        _ -> Nothing
+      tightest select = List.foldl' tighter Nothing . Maybe.mapMaybe select
+      forSeat player = tightest (scopedAt player) (filter (not . lifted (Just player) gs) rows)
+   in MkAttackLimits
+        { whole = tightest unscoped (filter (not . lifted (defendingSeat gs) gs) rows),
+          perDefender = Map.fromList (Maybe.mapMaybe (\player -> fmap ((,) player) (forSeat player)) (Defender.defendingPlayers gs))
+        }
 
 -- CR 509.1b, the blocking counterpart. Silent Arbiter's second sentence.
 blockLimit :: Maybe PlayerId -> GameState -> Maybe Natural
@@ -328,14 +374,18 @@ attackingPlayer cr = case cr of
 -- The bound selectors. A separate pair from the five above rather than a sixth
 -- and seventh of them, because what they answer is a NUMBER and no Affected can
 -- stand in for one -- which is the whole reason the arms exist.
-attackingMoreThan :: CombatRestriction.CombatRestriction -> Maybe Natural
+--
+-- The attacking one answers CR 802.3a's SCOPE beside the number, which the
+-- blocking one has no sentence for: the two are one pair for the same reason the
+-- five above are one family, and the pairing stops here.
+attackingMoreThan :: CombatRestriction.CombatRestriction -> Maybe (Natural, Maybe PlayerScope.PlayerScope)
 attackingMoreThan cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
   CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
-  CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless n _) -> Just n
+  CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless n scope _) -> Just (n, scope)
   CombatRestriction.CantBlockMoreThan {} -> Nothing
 
 blockingMoreThan :: CombatRestriction.CombatRestriction -> Maybe Natural
@@ -362,7 +412,7 @@ gate cr = case cr of
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ c _) -> c
   CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ c _) -> c
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ c _) -> c
-  CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ c) -> c
+  CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless _ _ c) -> c
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ c) -> c
 
 -- CR 116.2d: the name the source's face gives the ability stating this
@@ -638,11 +688,13 @@ inForce defending gs = filter (not . lifted defending gs) (gathered gs)
 -- CR 508.5a's "one specific defending player" where the reader has no attack
 -- target to derive one from -- the first defending player in turn order.
 --
--- Not implemented: CR 802.3a's split for the two WHOLE-DECLARATION restrictions,
--- `cantAttackAlone` and `attackLimit`. Those are facts about the declaration
--- rather than about one announcement, so there is no attack target to read a
--- defending player off, and a gate on either would be judged at this one seat.
--- Nothing in the pool gates either (#2894).
+-- Not implemented: CR 802.3a's split for the restrictions judged against the
+-- WHOLE declaration -- `cantAttackAlone`, and `attackLimit`'s unscoped half.
+-- Those are facts about the declaration rather than about one announcement, so
+-- there is no attack target to read a defending player off, and a gate on either
+-- would be judged at this one seat. A bound that DOES name a seat reads its gate
+-- there instead, `cantAttackPlayer`'s posture. Nothing in the pool gates any of
+-- them (#2894).
 defendingSeat :: GameState -> Maybe PlayerId
 defendingSeat gs = Maybe.listToMaybe (Defender.defendingPlayers gs)
 

@@ -72,6 +72,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
+import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
@@ -1372,7 +1373,7 @@ combatRestrictionCounts restriction = case restriction of
   -- The PlayerScope and the CR 506.3 kinds beside the gate hold no Count either.
   CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ condition _) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ condition _) -> foldMap conditionCounts condition
-  CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless _ _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
 
 -- Every Count reachable from a blocking permission: CR 604.2's "as long as" gate,
@@ -4468,7 +4469,7 @@ combatRestrictionFilters restriction = case restriction of
   -- so nothing stands in for either here, the size-bounding arms' posture.
   CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ _ condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
-  CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
+  CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless _ _ condition) -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
 
 -- ALL THREE of a blocking requirement's Filter positions -- CR 509.1c's subject
