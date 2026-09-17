@@ -408,16 +408,19 @@ castSpec s registry = Spec.describe s "Cast" $ do
         Nothing -> Spec.assertFailure s "stack id should resolve"
         Just obj -> do
           Spec.assertEqWith s "one Mountain tapped" (S.tappedCount S.alice gs) 1
-          -- The `you` entry alongside it is CR 109.5's, stamped for every spell
-          -- rather than chosen -- so these two are the whole of the recipients the
-          -- cast bound, and nothing was asked for to get the second.
+          -- The `you` entry alongside it is CR 109.5's and the `self` entry CR
+          -- 201.5's, both stamped for every spell rather than chosen -- so these
+          -- three are the whole of the recipients the cast bound, and nothing was
+          -- asked for to get the other two. `self` is the STACK object's own id,
+          -- which is what CR 608.2 resolves.
           Spec.assertEqWith
             s
-            "the Piker is the target, and alice is CR 109.5's you"
+            "the Piker is the target, alice is CR 109.5's you, and CR 201.5's self is the spell on the stack"
             (Binding.targetsOf (Object.bindings obj))
             ( Map.fromList
                 [ (SlotName.MkSlotName (Text.pack "target"), Set.singleton (Recipient.ToCreature (S.pikerOf base))),
-                  (Binding.you, Set.singleton (Recipient.ToPlayer S.alice))
+                  (Binding.you, Set.singleton (Recipient.ToPlayer S.alice)),
+                  (Binding.triggerSource, Set.singleton (Recipient.ToObject top))
                 ]
             )
   Spec.it s "casting a {X}{R} spell at X=3 stamps amount 3 and pays {3}{R}" $ do

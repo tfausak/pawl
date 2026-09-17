@@ -4195,6 +4195,94 @@ snagSpec s registry = Spec.describe s "CR 608.2h a bounced target's controller" 
     Spec.assertEqWith s "and bob, who did nothing, lost none" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "the creature is off the battlefield" (S.creaturesInPlay S.alice after) 0
 
+-- Chronomantic Escape ({4}{W}{W} Sorcery, Scryfall 2026-09-17): "Until your next
+-- turn, creatures can't attack you. Exile Chronomantic Escape with three time
+-- counters on it. / Suspend 3--{2}{W}". Its second sentence is CR 201.5 -- "text
+-- that refers to the object it's on by name means just that particular object" --
+-- and what CR 608.2 resolves it against is the spell on the stack, which
+-- Pawl.Engine.Cast.castSpell binds under the reserved self slot for every spell.
+-- CR 608.2n's graveyard move then finds nothing left to move, which is the pair
+-- of readings these cases separate: exile with three time counters, or the
+-- graveyard.
+--
+-- TWINCAST ({U}{U} Instant, Scryfall 2026-09-17: "Copy target instant or sorcery
+-- spell. You may choose new targets for the copy.") is the second board, and the
+-- one that separates CR 201.5 on a COPY. The copy "is itself a spell" (CR
+-- 707.10), so the text on it is text on the copy and the copy exiles ITSELF --
+-- which CR 707.10a then ceases to exist, leaving exile empty and the original
+-- still on the stack underneath. CR 707.10b's "the copy refers to that same
+-- object" is about an ability's source and not about this, so a copy that kept
+-- the original's slot would exile the ORIGINAL instead and there would be nothing
+-- left to resolve.
+--
+-- ALICE'S SIX PLAINS AND BOB'S TWO ISLANDS, each seat holding exactly its own
+-- cost: two seats so the Escape's {4} cannot eat the mana the Twincast needs, and
+-- so the copy's controller (CR 707.10) is not the Escape's.
+selfSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfSpec s registry = Spec.describe s "CR 201.5 a resolving spell naming itself" $ do
+  let boardOf = do
+        escape <- S.printingOf s registry "Chronomantic Escape"
+        twincast <- S.printingOf s registry "Twincast"
+        plains <- S.printingOf s registry "Plains"
+        island <- S.printingOf s registry "Island"
+        let base = S.landsFor plains S.alice 6 (S.landsFor island S.bob 2 (Setup.emptyGame S.bothPlayers))
+            (escapeId, withEscape) = S.addHandCard escape S.alice base
+            (twincastId, withBoth) = S.addHandCard twincast S.bob withEscape
+        pure
+          ( escapeId,
+            twincastId,
+            withBoth
+              { GameState.activePlayer = S.alice,
+                GameState.phase = Phase.PrecombatMain,
+                GameState.priority = Just S.alice
+              }
+          )
+      -- The time counters on the one card in exile, or Nothing where exile holds
+      -- anything but exactly one object.
+      exiledCounters gs = case Set.toList (GameState.exile gs) of
+        [oid] -> fmap (Map.findWithDefault 0 CounterKind.Time . Object.counters) (Game.lookupObject oid gs)
+        _ -> Nothing
+      -- Aims the Twincast at the spell the id names, PICKED OUT OF THE OFFERED SET
+      -- rather than built, so a recipient the engine did not offer cannot pass (CR
+      -- 608.2b). The id is the STACK incarnation's and not the hand card's, CR
+      -- 400.7 having minted a fresh one as the Escape was cast.
+      atSpell :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      atSpell spellId p = case p of
+        Prompt.ChooseTargets _ _ _ slots ->
+          Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find ((== Just spellId) . Recipient.objectOf) (Set.toList recipients))) slots
+        _ -> S.identityAnswer p
+  Spec.it s "CR 201.5 the Escape exiles itself with three time counters rather than reaching CR 608.2n's graveyard" $ do
+    (escapeId, _, board) <- boardOf
+    let after = S.runPure S.identityAnswer board (S.cast S.alice escapeId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 201.5 the Escape is the one card in exile, with three time counters on it" (exiledCounters after) (Just 3)
+    Spec.assertEqWith s "CR 608.2n's move found nothing left to move, so alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "and the spell left the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "setup: nothing was in exile or the graveyard before" (length (GameState.exile board), length (Game.zoneMembers Zone.Graveyard S.alice board)) (0, 0)
+  Spec.it s "CR 707.10 a copy of the Escape exiles the copy, which CR 707.10a then ceases to exist" $ do
+    (escapeId, twincastId, board) <- boardOf
+    -- The Escape first and alone, so the Twincast's answerer can name the stack id
+    -- CR 400.7 minted for it; each answerer carries its own signature, GADTs'
+    -- MonoLocalBinds making a let-bound one monomorphic otherwise.
+    let escapeCast = S.runPure S.identityAnswer board (S.cast S.alice escapeId)
+        spellId = Maybe.listToMaybe (GameState.stack escapeCast)
+        answer :: Prompt.Prompt r -> r
+        answer = maybe S.identityAnswer atSpell spellId
+        cast = S.runPure answer escapeCast (S.cast S.bob twincastId)
+        settle gs = S.runPure answer gs Engine.settleForPriority
+        copied = settle (S.runPure answer cast Stack.resolveTop)
+        afterCopy = settle (S.runPure answer copied Stack.resolveTop)
+        afterOriginal = settle (S.runPure answer afterCopy Stack.resolveTop)
+    Spec.assertEqWith s "setup: the Twincast sits on the Escape, two objects on the stack" (length (GameState.stack cast)) 2
+    Spec.assertEqWith s "CR 707.10 the Twincast made one copy, so the copy and the Escape are on the stack" (length (GameState.stack copied)) 2
+    Spec.assertEqWith s "CR 707.10a the copy exiled ITSELF and ceased to exist, so exile is empty" (length (GameState.exile afterCopy)) 0
+    Spec.assertEqWith s "and the original Escape is still on the stack, unexiled" (length (GameState.stack afterCopy)) 1
+    Spec.assertEqWith s "CR 201.5 the original then exiles itself with three time counters" (exiledCounters afterOriginal) (Just 3)
+    Spec.assertEqWith
+      s
+      "and CR 400.3 files the Twincast in bob's graveyard while alice's stays empty"
+      (length (Game.zoneMembers Zone.Graveyard S.bob afterOriginal), length (Game.zoneMembers Zone.Graveyard S.alice afterOriginal))
+      (1, 0)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
@@ -4203,3 +4291,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   sacrificerSpec s registry
   crabSpec s registry
   snagSpec s registry
+  selfSpec s registry

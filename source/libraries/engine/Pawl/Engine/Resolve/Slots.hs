@@ -2523,7 +2523,25 @@ handCardsOf context gs pid filter_ =
 -- ("no delayed ability declares a target slot under a name its card defines")
 -- rules the case out, so this arm never actually chooses.
 slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
-slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bindings (Game.lookupObject resolving gs))
+slotGroup slot resolving gs = Binding.objectsOf slot (resolvingBindings resolving gs)
+
+-- The bindings of the object whose own resolution this is, live while it is still
+-- on the stack and CR 608.2h's last known information once it is not.
+--
+-- A spell that MOVES ITSELF is the whole reason for the second half: CR 201.5 lets
+-- Chronomantic Escape's "exile Chronomantic Escape with three time counters on it"
+-- name the resolving spell, and CR 400.7 then deletes the id the clause after it
+-- would read its slots off -- including the slot the move itself just defined.
+-- GameState.stackArchive is the reading the funnel filed as the object left the
+-- stack, which is that object's bindings as of the move.
+--
+-- Map.adjust over BOTH maps is the writer's side of the same fact
+-- (Pawl.Engine.Resolve.Effect's bindSlot and bindObjectsSlot): the object is in
+-- exactly one of them by the time either runs, so the no-op half costs nothing.
+resolvingBindings :: ObjectId -> GameState -> Map.Map SlotName Binding.Type.Binding
+resolvingBindings resolving gs = case Game.lookupObject resolving gs of
+  Just obj -> Object.bindings obj
+  Nothing -> maybe Map.empty Object.bindings (Map.lookup resolving (GameState.stackArchive gs))
 
 -- The context every effect of a resolution evaluates its quantities and its
 -- ref-borne filters in: CR 109.5's "you" is the resolving controller, the source
@@ -2633,7 +2651,7 @@ effectSlotObjects = Map.mapMaybe Recipient.objectOf . Map.mapMaybe Binding.onlyO
 -- part of the state a later one is read against, which is exactly what "from
 -- among them" needs. By the name the effect wrote, as slotGroup above reads it.
 slotBindings :: ObjectId -> GameState -> Map.Map SlotName Binding.Type.Binding
-slotBindings resolving gs = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+slotBindings = resolvingBindings
 
 -- CR 608.2h's reader for one resolution: Projection.viewWithLastKnown, which
 -- answers the SOURCE off its last known information, widened to two reserved

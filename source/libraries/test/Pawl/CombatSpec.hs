@@ -4931,11 +4931,11 @@ facingBob gs =
 -- stores is read at Pawl.Engine.CombatRestriction.cantAttackPlayer beside the
 -- printed carrier's.
 --
--- Not implemented, and STRICTER than printed: the card's own "exile Chronomantic
--- Escape with three time counters on it", which needs the resolving SPELL to
--- name itself and no spell binds that slot (#3356) -- so pawl's card goes to the
--- graveyard as CR 608.2n says, never returning. Its suspend ability is printed
--- and works; neither clause reaches the restriction this group is about.
+-- The card's own "exile Chronomantic Escape with three time counters on it" is CR
+-- 201.5's self reference and resolves as printed; Pawl.ResolveSpec's "CR 201.5 a
+-- resolving spell naming itself" is what proves it. Its suspend ability is
+-- printed and works; neither clause reaches the restriction this group is about,
+-- so the boards below read the row and nothing else.
 --
 -- THREE SEATS with both opponents defending (CR 802.2), the only board on which
 -- "can't attack you" and a blanket "can't attack" come apart for a creature with

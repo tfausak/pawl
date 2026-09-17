@@ -59,6 +59,17 @@ turnedMergeSource = SlotName.MkSlotName (Text.pack "turnedMergeSource")
 -- self-referential opcode. No card's targetSlots may name it (lint-enforced): a
 -- source is not a target.
 --
+-- Stamped on a SPELL too, and by the same name, because CR 201.5 says the same
+-- thing about one: "text that refers to the object it's on by name means just
+-- that particular object", and what CR 608.2 resolves a spell's instructions
+-- against is the object on the stack. Pawl.Engine.Cast.castSpell writes CR
+-- 601.2a's incarnation here alongside `you` below, so Chronomantic Escape's
+-- "exile Chronomantic Escape with three time counters on it" is the read a
+-- kinship card's "this creature" is. A COPY of a spell re-stamps it with the
+-- copy's own id, where a copy of an ABILITY keeps the original's under CR
+-- 707.10b -- Pawl.Engine.Resolve.Effect's CopyStackObject arm draws that line,
+-- and Pawl.ResolveSpec's "CR 201.5 a resolving spell naming itself" proves both.
+--
 -- Hazard this comment used to only predict, and which #1043 then resolved.
 -- CardSpec.hs's "declared slots == read slots" equality lint now walks a card's
 -- ABILITY modes as well as its spell's, and it would indeed be unsatisfiable

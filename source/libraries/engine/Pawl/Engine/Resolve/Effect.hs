@@ -5560,6 +5560,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   StackObjectKind.Spell -> maybe id (Binding.setCopy . except) (Binding.copyOf (Object.bindings obj))
                   StackObjectKind.ActivatedAbility -> id
                   StackObjectKind.TriggeredAbility -> id
+                -- CR 201.5's slot, and the one place the two nouns CR 707.10
+                -- copies part company. A copy of an ABILITY keeps the original's
+                -- `self`: CR 707.10b says "if the ability refers to its source by
+                -- name, the copy refers to that same object". A copy of a SPELL is
+                -- "itself a spell", and the text on it is text on the COPY, so CR
+                -- 201.5's "the object it's on" is the copy -- a copy of
+                -- Chronomantic Escape exiles the copy, which CR 707.10a then
+                -- ceases to exist rather than the original on the stack below it.
+                stampSelf = case kind of
+                  StackObjectKind.Spell -> Binding.setTriggerSource copyId
+                  StackObjectKind.ActivatedAbility -> id
+                  StackObjectKind.TriggeredAbility -> id
                 copy =
                   obj
                     { Object.source = copySource,
@@ -5587,12 +5599,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- seat `copier` named instead. Every other binding is
                       -- a DECISION, which CR 707.10 copies verbatim -- including an
                       -- ability's self slot, so CR 707.10b's "the copy refers to
-                      -- that same object" needs no write of its own.
+                      -- that same object" needs no write of its own -- while a
+                      -- SPELL's is re-stamped, `stampSelf`'s sentence above.
                       -- CR 707.10d's and CR 707.10e's targets, where the effect
                       -- chose them, over the decisions CR 707.10 copied. Empty
                       -- for the other two answers, which leave every one of them
                       -- standing.
-                      Object.bindings = Binding.setYou copier (stampCopiable (Map.union (fmap Binding.toRecipients retarget) (Object.bindings obj)))
+                      Object.bindings = Binding.setYou copier (stampSelf (stampCopiable (Map.union (fmap Binding.toRecipients retarget) (Object.bindings obj))))
                     }
             State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue copier copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
             -- CR 707.10c's chooser is the COPY's controller and not the copying
@@ -8134,22 +8147,34 @@ performManaAbilityEffects source controller =
 -- resolveModes each re-read Object.bindings before EACH effect (CR 608.2c), while
 -- ArmDelayedTrigger and slotOne read live GameState rather than `chosen`.
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
-bindSlot holder slot target gs =
-  let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
-   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+bindSlot holder slot target = overHolderBindings holder (Map.insert slot (Binding.toObject target))
 
 -- bindSlot's plural: bind EVERY object one instruction produced into `slot`, for
 -- a card that refers back to all of them at once ("those tokens", "those cards",
 -- CR 400.7j). Same holder and same further reason (CR 603.7c).
 --
 -- Readable mid-fold without either path's per-effect re-read, because every
--- reader goes through slotGroup, which reads live GameState. It has to: this
+-- reader goes through slotGroup, which reads the live board (resolvingBindings).
+-- It has to: this
 -- rides the binding's `objects` field, while `chosen` reads only `target`, where
 -- bindSlot's SINGLE object lands.
 bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> GameState
-bindObjectsSlot holder slot targets gs =
-  let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}
-   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+bindObjectsSlot holder slot targets = overHolderBindings holder (Map.insert slot (Binding.toObjects targets))
+
+-- The one writer both binders above go through: rewrite the holder's bindings
+-- wherever the holder now is. GameState.objects while it is on the stack, and
+-- GameState.stackArchive once its own instruction has moved it off -- CR 201.5's
+-- self-exile (Chronomantic Escape), where the move DEFINES a slot the clause
+-- after it reads and CR 400.7 has already deleted the id it would sit on.
+-- Pawl.Engine.Resolve.Slots.resolvingBindings is the reading side of the same
+-- fact, and Map.adjust makes the half that does not hold the object a no-op.
+overHolderBindings :: ObjectId -> (Map.Map SlotName Binding.Type.Binding -> Map.Map SlotName Binding.Type.Binding) -> GameState -> GameState
+overHolderBindings holder f gs =
+  let put obj = obj {Object.bindings = f (Object.bindings obj)}
+   in gs
+        { GameState.objects = Map.adjust put holder (GameState.objects gs),
+          GameState.stackArchive = Map.adjust put holder (GameState.stackArchive gs)
+        }
 
 -- CR 701.8b's "put into a graveyard this way", asked of one CR 400.7 incarnation:
 -- is it a card, and is it in a graveyard? Both halves are questions about where
