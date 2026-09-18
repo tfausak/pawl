@@ -58,8 +58,8 @@ import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import Pawl.ZoneTriggerSpec (paysFor)
 
--- The CR 118.12 offers out of a recorded transcript, so a case can assert who
--- was asked whether to pay -- or, for CR 800.4f, that nobody was.
+-- CR 118.12's offers, picked out of a recorded transcript, so a case can assert
+-- who was asked whether to pay -- or, for CR 800.4f, that nobody was.
 payDecisions :: [Response.Response] -> [Response.Response]
 payDecisions = filter isPayDecision
 
@@ -956,8 +956,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- PlayerRef.ControllerOfBound still names bob through CR 608.2h. Mana Leak's
   -- gate reads the same reference over a slot that IS targeted, and fizzles.
   --
-  -- THREE SEATS, which CR 800.4 needs: CR 104.2a ends a two-player game outright
-  -- instead (continuesAfterDeparture).
+  -- THREE SEATS: CR 800.1 makes a game that begins with two players not a
+  -- multiplayer game, and CR 104.2a would end it the moment bob left, so
+  -- continuesAfterDeparture would skip the whole of CR 800.4a.
   Spec.it s "CR 800.4f a departed player is not offered a ward cost, and does not pay it" $ do
     forest <- S.printingOf s registry "Forest"
     shieldmage <- S.printingOf s registry "Owlin Shieldmage"

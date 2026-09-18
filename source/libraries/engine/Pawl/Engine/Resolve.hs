@@ -1161,8 +1161,10 @@ payGatePaid resolving source controller idx cIdx legal announced gate = do
 -- Pawl.DepartureSpec's "CR 800.4f a departed player is not offered a ward cost,
 -- and does not pay it" proves this arm.
 --
--- Not implemented: CR 800.4g, the same situation for a choice that is not a
--- payment, which the rule hands to another player rather than dropping (#3860).
+-- CR 800.4g is the same situation for a choice that is NOT a payment, and the
+-- opposite answer: the controller of the object picks another player to choose.
+-- Nothing in the engine reassigns a choice that way, here least of all -- a cost
+-- is the whole of what this function asks about (#3860).
 payGatePaidBy :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
 payGatePaidBy resolving source controller idx cIdx legal payer gate = do
   gs <- State.get
