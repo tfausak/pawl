@@ -120,6 +120,7 @@ codec =
       Arm.payload "Prowl" (Cost.codec codec) Keyword.Prowl (\x -> case x of Keyword.Prowl y -> Just y; _ -> Nothing),
       Arm.payload "Freerunning" (Cost.codec codec) Keyword.Freerunning (\x -> case x of Keyword.Freerunning y -> Just y; _ -> Nothing),
       Arm.payload "Spectacle" (Cost.codec codec) Keyword.Spectacle (\x -> case x of Keyword.Spectacle y -> Just y; _ -> Nothing),
+      Arm.nullary "Ravenous" Keyword.Ravenous,
       Arm.payload "Squad" (Cost.codec codec) Keyword.Squad (\x -> case x of Keyword.Squad y -> Just y; _ -> Nothing),
       Arm.payload "Offspring" (Cost.codec codec) Keyword.Offspring (\x -> case x of Keyword.Offspring y -> Just y; _ -> Nothing),
       Arm.payload "Replicate" (Cost.codec codec) Keyword.Replicate (\x -> case x of Keyword.Replicate y -> Just y; _ -> Nothing),
@@ -294,6 +295,7 @@ tagOf x = case x of
   Keyword.Prowl {} -> "Prowl"
   Keyword.Freerunning {} -> "Freerunning"
   Keyword.Spectacle {} -> "Spectacle"
+  Keyword.Ravenous {} -> "Ravenous"
   Keyword.Squad {} -> "Squad"
   Keyword.Offspring {} -> "Offspring"
   Keyword.Replicate {} -> "Replicate"

@@ -1302,7 +1302,7 @@ interveningOfTop gs = case GameState.stack gs of
     case Object.source obj of
       Source.OfTrigger borne -> do
         cond <- TriggeredAbility.intervening (TriggeredAbilitySource.ability borne)
-        pure (Stack.interveningStillHolds gs obj (TriggeredAbilitySource.source borne) cond)
+        pure (Stack.interveningStillHolds gs obj (TriggeredAbilitySource.source borne) (TriggeredAbility.condition (TriggeredAbilitySource.ability borne)) cond)
       _ -> Nothing
 
 -- Aims Pull from Eternity at the one exiled card, PICKED OUT OF THE OFFERED SET

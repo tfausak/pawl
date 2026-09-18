@@ -454,6 +454,10 @@ abilitiesFor keyword count = case keyword of
   --
   -- Not implemented: CR 702.157b's and CR 702.175b's identical instances, each
   -- paid separately and triggering on its own payments (#3635).
+  -- CR 702.156a's triggered half. Rule 702.156a states no redundancy clause,
+  -- so each instance is its own ability; no printing carries two, which makes
+  -- the count a regression fence rather than proved behaviour.
+  Keyword.Ravenous -> List.genericReplicate count ravenous
   Keyword.Squad cost -> List.genericReplicate (min 1 count) (squad cost)
   Keyword.Offspring cost -> List.genericReplicate (min 1 count) (offspring cost)
   Keyword.Foretell _ -> []
@@ -682,6 +686,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
@@ -1164,6 +1169,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
@@ -1781,6 +1787,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
@@ -2441,6 +2448,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- from EXILE belongs to the PLOTTED card and not to the keyword, so it is object
   -- state (Object.plotted) that Cast.permitsCastFromExile reads.
   Keyword.Plot _ -> []
+  Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
   -- CR 702.143a, the arm above's argument unchanged: CR 116.2h's special action in
@@ -3980,6 +3988,11 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  -- CR 702.156a's replacement half, CR 614.1c: Protean Hydra's printed row,
+  -- minted. The count is Quantity.InSlot Binding.variableX, which
+  -- Pawl.Engine.Event.placeEntryCounters substitutes CR 107.3m's announced X
+  -- into as the row applies. `abilitiesFor` above says why the count replicates.
+  Keyword.Ravenous -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.InSlot Binding.variableX)))))
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
@@ -4247,6 +4260,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
@@ -4528,6 +4542,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
+  Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
   Keyword.Foretell _ -> []
@@ -4662,6 +4677,7 @@ familyOf keyword = case keyword of
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Disguise _ -> Just KeywordFamily.Disguise
   Keyword.Plot _ -> Just KeywordFamily.Plot
+  Keyword.Ravenous -> Nothing
   Keyword.Squad _ -> Just KeywordFamily.Squad
   Keyword.Offspring _ -> Just KeywordFamily.Offspring
   Keyword.Replicate _ -> Just KeywordFamily.Replicate
@@ -6264,6 +6280,36 @@ spiritToken =
               Face.specialActions = []
             }
     }
+
+-- CR 702.156a's second half: "When this permanent enters, if X is 5 or more, draw
+-- a card." Fabricate's mint over CR 603.6a's entry event; Jacked Rabbit is the
+-- printing.
+--
+-- The "if" is CR 603.4's intervening one and not a Filter, so CR 608.2a re-checks
+-- it as the ability resolves. X is CR 107.3m's announced one, read as
+-- Quantity.InSlot Binding.variableX: the permanent carries no such binding (CR
+-- 400.7), so both checks answer it out of Filter.Context's boundAmounts, which
+-- Pawl.Engine.Condition.inheritedX fills on a SelfEnters trigger alone --
+-- rule 107.3m's own boundary, the one Pawl.Engine.Engine.placeBorne already draws
+-- for a trigger's target count.
+--
+-- Draw.slot is Nothing: rule 702.156a names no later clause that reads the card.
+ravenous :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+ravenous =
+  let effect = Effect.Draw Draw.MkDraw {Draw.player = PlayerRef.Relative PlayerRelation.You, Draw.quantity = Quantity.Literal 1, Draw.slot = Nothing}
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening =
+            Just
+              ( Condition.Compares
+                  (Compares.MkCompares (Quantity.InSlot Binding.variableX) Comparison.AtLeast (Quantity.Literal 5))
+              ),
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- CR 702.123a: fabricate N. "When this permanent enters, you may put N +1/+1
 -- counters on it. If you don't, create N 1/1 colorless Servo artifact creature

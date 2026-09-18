@@ -1204,9 +1204,14 @@ data Context = MkContext
     -- PowerIsAmountInSlot atom compares a candidate's power against, which is a
     -- read `matches` makes directly.
     --
-    -- TWO fillers with it: Pawl.Engine.Resolve.Slots.effectContext supplies the
+    -- The other fillers: Pawl.Engine.Resolve.Slots.effectContext supplies the
     -- resolving object's own stamped amounts, which is the position that atom is
-    -- written in.
+    -- written in, and CR 603.4's two intervening-"if" checks
+    -- (Pawl.Engine.Event.Trigger.interveningHolds and CR 608.2a's re-check,
+    -- Pawl.Engine.Stack.interveningStillHolds) supply CR 107.3m's announced X
+    -- through Pawl.Engine.Condition.inheritedX -- an enters-the-battlefield
+    -- trigger's alone, and off the entering PERMANENT, which CR 400.7 left with no
+    -- bindings to stamp it on.
     --
     -- Empty in contextFor and contextComparingPower below, so a bound evaluated
     -- outside a target slot and outside a resolution reads no announcement. What that unfilled read
@@ -2589,6 +2594,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.56a states a cost, so rewriteCost reaches it as flashback's does.
   Keyword.Type.Replicate cost -> Keyword.Type.Replicate (rewriteCost pairs cost)
   Keyword.Type.Recover cost -> Keyword.Type.Recover (rewriteCost pairs cost)
+  Keyword.Type.Ravenous -> keyword
   Keyword.Type.Squad cost -> Keyword.Type.Squad (rewriteCost pairs cost)
   Keyword.Type.Offspring cost -> Keyword.Type.Offspring (rewriteCost pairs cost)
   -- CR 702.143a states a cost too, so it is reached the same way.

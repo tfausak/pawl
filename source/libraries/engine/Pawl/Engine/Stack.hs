@@ -50,6 +50,7 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.Zone as Zone
@@ -154,7 +155,7 @@ resolveOneWith runSubgame = do
           -- pass one check and fail the other.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (interveningStillHolds gs obj srcId cond) ->
+              | not (interveningStillHolds gs obj srcId (TriggeredAbility.condition ability) cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
@@ -202,7 +203,7 @@ resolveOneWith runSubgame = do
           -- field would be Nothing however it was filled.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (interveningStillHolds gs obj oid cond) ->
+              | not (interveningStillHolds gs obj oid (TriggeredAbility.condition ability) cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
@@ -221,6 +222,11 @@ resolveOneWith runSubgame = do
 -- ability object, so the field is Nothing for the inherent arm however it is
 -- filled.
 --
+-- The TRIGGER CONDITION rides in beside them for CR 107.3m: it is what
+-- Pawl.Engine.Condition.inheritedX cases on to seed the announced X the clause may
+-- read, and Event.interveningHolds seeds it from the same function so the two
+-- checks cannot disagree.
+--
 -- `obj` is the ABILITY on the stack, whose Object.owner is CR 109.5's "you" and
 -- whose bindings supply the context's slots; `srcId` is what the condition's own
 -- Filter.IsSource means. The view is Projection.viewWithLastKnownAnywhere for the
@@ -231,11 +237,11 @@ resolveOneWith runSubgame = do
 -- Pawl.SpecialActionSpec's Rift Bolt pair is the caller that needs it, CR
 -- 702.62a's "if it's exiled" being a clause whose two readings agree on today's
 -- board (see Pawl.Engine.Keyword.stillExiled).
-interveningStillHolds :: GameState.GameState -> Object.Object -> ObjectId -> Condition.Type.Condition -> Bool
-interveningStillHolds gs obj srcId =
+interveningStillHolds :: GameState.GameState -> Object.Object -> ObjectId -> TriggerCondition.TriggerCondition -> Condition.Type.Condition -> Bool
+interveningStillHolds gs obj srcId trigger =
   Condition.holds
     (Projection.viewWithLastKnownAnywhere gs)
-    ((Filter.contextWithSlots (Game.teams gs) (Just (Object.owner obj)) (Just srcId) (Binding.slotObjects (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs, Filter.slotPlayers = Binding.slotPlayers (Object.bindings obj)})
+    ((Filter.contextWithSlots (Game.teams gs) (Just (Object.owner obj)) (Just srcId) (Binding.slotObjects (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs, Filter.slotPlayers = Binding.slotPlayers (Object.bindings obj), Filter.boundAmounts = Condition.inheritedX trigger srcId gs})
     gs
     srcId
 

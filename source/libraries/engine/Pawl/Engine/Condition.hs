@@ -31,16 +31,21 @@
 module Pawl.Engine.Condition where
 
 import qualified Data.Map.Strict as Map
+import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 
 holds :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Condition.Type.Condition -> Bool
 holds viewOf context gs oid condition =
@@ -65,6 +70,33 @@ holds viewOf context gs oid condition =
         -- than leaving it undetermined -- the same conservative reading the header
         -- gives one comparison. An empty list is True, the fold's unit.
         Condition.Type.All conditions -> all (holds viewOf context gs oid) conditions
+
+-- CR 107.3m: the amounts a triggered ability's condition may read off the spell
+-- that became its source. Seeded into Filter.Context's boundAmounts by CR 603.4's
+-- gather-time check (Pawl.Engine.Event.Trigger.interveningHolds) and CR 608.2a's
+-- re-check (Pawl.Engine.Stack.interveningStillHolds) alike, which is what keeps
+-- the two from disagreeing.
+--
+-- CASED ON THE TRIGGER'S CONDITION, rule 107.3m's own boundary and the one
+-- Pawl.Engine.Engine.placeBorne already draws for CR 601.2c's target count: an
+-- enters-the-battlefield ability reads the spell's X, "although the value of X for
+-- that permanent is 0", so every other ability of the same permanent keeps reading
+-- nothing.
+--
+-- The CHANNEL is boundAmounts rather than the object, for the reason
+-- Pawl.Engine.Quantity's InSlot arm gives: CR 400.7 mints the permanent with no
+-- bindings, so the announcement is off-object here. Object.announcedX is where it
+-- landed instead (Pawl.Engine.Event.changeZoneAttaching), and 0 where no cast X
+-- stands behind the permanent -- a token copy, or one an effect put onto the
+-- battlefield.
+--
+-- Pawl.KeywordSpec's ravenous group is what proves it: CR 702.156a's "if X is 5 or
+-- more" is the one condition in the pool that reads it.
+inheritedX :: TriggerCondition.TriggerCondition -> ObjectId -> GameState -> Map.Map SlotName Natural
+inheritedX condition oid gs = case condition of
+  TriggerCondition.SelfEnters ->
+    maybe Map.empty (Map.singleton Binding.variableX) (Object.announcedX =<< Game.lookupObject oid gs)
+  _ -> Map.empty
 
 -- CR 611.2b: the condition with every PlayerRef.InSlot inside it baked to the
 -- seat the resolution's bindings name (Quantity.bakeBound, which carries the
