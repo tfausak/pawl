@@ -754,14 +754,14 @@ combatReplaySpec s =
           -- Discriminating: a decode that ignored the response and handed back
           -- the head would pass the leg above by accident of the write order.
           Spec.assertEqWith s "bob round trips" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
-        Spec.it s "a short transcript takes the head of the offered opponents" $
+        Spec.it s "a short transcript takes the head of the offered players" $
           Spec.assertEqWith
             s
             "the head"
             (Replay.defaultAnswer (Prompt.RandomPlayer (S.bob NonEmpty.:| [S.carol])))
             S.bob
         -- The assertion that fails if RandomPlayer reuses Response.ChoseOpponent
-        -- rather than getting its own constructor: both name one opponent, so the
+        -- rather than getting its own constructor: both name one player, so the
         -- types would not object, and a player's DECISION replaying as randomness
         -- is what Pawl.Types.Response's own rule forbids (CR 701.9b).
         Spec.it s "an opponent CHOICE does not decode as a random selection" $ do
