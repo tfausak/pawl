@@ -389,8 +389,8 @@ candidateCostsGiven permitted pid name oid gs =
               -- reduction is word for word rule 702.119a's "an amount of generic
               -- mana equal to the sacrificed permanent's mana value", so the same
               -- offer serves both. Proved by Pawl.CastSpec's "CR 702.119b the
-              -- artifact, and not the creature of the same mana value beside it,
-              -- is what Crabomination's emerge cost sacrificed".
+              -- emerge cost sacrifices a permanent of the stated quality, not a
+              -- creature".
               --
               -- ONE CANDIDATE PER SACRIFICEABLE VICTIM, each naming that one
               -- permanent outright (Filter.IsObject): CR 702.119c chooses the

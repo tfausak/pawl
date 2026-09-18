@@ -387,10 +387,11 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (Keyword.Awaken (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 6])) []))
       " {\"type\":\"Awaken\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":6}]}} "
-  -- CR 702.119a's payload is a whole Cost, cleave's shape -- Drownyard
-  -- Behemoth's {7}{U}. The SACRIFICE rule 702.119a states is not in the payload:
-  -- it is appended at the offer, by Pawl.Engine.Cost.candidateCostsGiven.
-  Spec.it s "Emerge carries its cost" $
+  -- CR 702.119a's payload is a whole Cost and CR 702.119b's optional quality
+  -- beside it, Equip's shape -- Drownyard Behemoth's {7}{U} and no quality. The
+  -- SACRIFICE rule 702.119a states is not in the payload: it is appended at the
+  -- offer, by Pawl.Engine.Cost.candidateCostsGiven.
+  Spec.it s "Emerge carries its cost and its quality" $
     Common.assertCodec
       s
       Keyword.codec
