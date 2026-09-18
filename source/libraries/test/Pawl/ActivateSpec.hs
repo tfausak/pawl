@@ -548,6 +548,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
   cyclingSpec s registry
   equipSpec s registry
   exhaustSpec s registry
+  boastSpec s registry
   reinforceSpec s registry
   ninjutsuSpec s registry
   authoredHandAbilitySpec s registry
@@ -1261,6 +1262,104 @@ exhaustSpec s registry = Spec.describe s "Exhaust (CR 702.177)" $ do
     -- offered, and the stamp the card wrote is what the criterion reads.
     Spec.assertEqWith s "CR 702.177a the card writes the keyword on the ability it printed" (fmap ActivatedAbility.keyword exhaustAbility) (Just (Just Keyword.Exhaust))
     Spec.assertBool s (not (null (Projection.abilitiesOf pantherId withIt))) "and the Panther has an ability to withhold"
+
+-- The offer carrying CR 702.142a's keyword, told from the same board's other
+-- activations by the stamp the CARD wrote rather than by an index into a face.
+isBoast :: A.Action -> Bool
+isBoast a = case a of
+  A.Activate _ ability -> ActivatedAbility.keyword ability == Just Keyword.Boast
+  _ -> False
+
+-- Takes the boast activation whenever the engine offers it and passes otherwise,
+-- so a second one is refused by CR 702.142a's rider rather than declined by the
+-- interpreter -- and the Prodigal Sorcerer's unrestricted {T} is never taken,
+-- which is what leaves the tapped count reading the riders alone.
+boastAnswer :: Prompt.Prompt r -> r
+boastAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isBoast options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+-- alice's board in the declare attackers step, returned twice: once before CR
+-- 508.1's declaration and once after it, which is the ONE thing the pair differs
+-- in. Two Swamps, so a refused second activation is rule 702.142a's rider and not
+-- the mana, and a Prodigal Sorcerer as the unrestricted {T} offered on both legs.
+--
+-- Only the Duskwielder attacks. S.aggressiveAnswer would attack with the Sorcerer
+-- too, which CR 508.1f taps -- and the control ability would then be missing from
+-- the second leg for a reason boast has nothing to do with.
+--
+-- GameState.remaining is emptied so Engine.priorityLoop stops at the end of this
+-- step: CR 510.2's combat damage would otherwise move bob's life, which is what
+-- the whole-card case reads.
+boastBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+boastBoard duskwielder swamp sorcerer =
+  let (gs0, ours, _) = S.combatBoardOf [duskwielder, swamp, swamp, sorcerer] []
+      idle = gs0 {GameState.priority = Just S.alice, GameState.remaining = Seq.empty}
+   in case ours of
+        [duskwielderId, _, _, sorcererId] ->
+          let onlyDuskwielder :: Prompt.Prompt r -> r
+              onlyDuskwielder p = case p of
+                Prompt.DeclareAttackers _ _ ids -> filter (== duskwielderId) ids
+                _ -> S.identityAnswer p
+              attacked = (S.runPure onlyDuskwielder idle (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.alice}
+           in (duskwielderId, sorcererId, idle, attacked)
+        -- combatBoardOf returns one id per printing given, so this is
+        -- unreachable; bogus ids fail the assertions rather than the suite.
+        _ -> (S.noSource, S.noSource, idle, idle)
+
+-- CR 702.142: boast, rule 702.177a's shape one keyword over -- "Boast -- [Cost]:
+-- [Effect]" means "[Cost]: [Effect]. Activate only if this creature attacked this
+-- turn and only once each turn" (CR 702.142a). The ability is PRINTED rather than
+-- minted, so Duskwielder's card file carries the stamp on the ability itself and
+-- rule 702.142a's two riders beside it: an ActivationRestriction.OnlyIf counting
+-- the source under Filter.AttackedThisTurn (CR 608.2i's look-back, which outlives
+-- CR 511.3's wipe of Combat.attackers), and ActivationRestriction.OnlyOnceEachTurn.
+--
+-- Not implemented: the rewriting, so the card states those two riders itself
+-- rather than having the keyword add them (#3044).
+--
+-- Duskwielder (Kaldheim) is the producer: a {B} 1\/2 Elf Berserker, "Boast --
+-- {1}: Target opponent loses 1 life and you gain 1 life."
+boastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boastSpec s registry = Spec.describe s "Boast (CR 702.142)" $ do
+  -- One board, two readings, differing only in whether CR 508.1's declaration
+  -- has happened.
+  Spec.it s "CR 702.142a the boast ability is offered only once this creature has attacked" $ do
+    duskwielder <- S.printingOf s registry "Duskwielder"
+    swamp <- S.printingOf s registry "Swamp"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (duskwielderId, sorcererId, idle, attacked) = boastBoard duskwielder swamp sorcerer
+        offeredOn = Action.legalActions S.alice
+    -- The gameplay assertion this group exists to prove, and it is FIRST.
+    Spec.assertEqWith s "not offered before this creature attacked" (activationsOf duskwielderId (offeredOn idle)) []
+    Spec.assertEqWith s "and offered once it has attacked this turn" (length (activationsOf duskwielderId (offeredOn attacked))) 1
+    -- Anti-vacuity: the attack is real, and the unrestricted {T} on the same
+    -- board is offered on BOTH legs -- so the first leg is withholding this one
+    -- ability rather than offering nothing at all.
+    Spec.assertBool s (Map.member duskwielderId (Combat.Type.attackers (GameState.combat attacked))) "the attack is real"
+    Spec.assertEqWith s "alice's unrestricted {T} is offered on both legs" (fmap (length . activationsOf sorcererId . offeredOn) [idle, attacked]) [1, 1]
+    Spec.assertEqWith s "CR 702.142a the card writes the keyword on the ability it printed" (fmap ActivatedAbility.keyword (Maybe.listToMaybe (Projection.abilitiesOf duskwielderId attacked))) (Just (Just Keyword.Boast))
+
+  -- The gameplay-level proof (design.md section 4), driven through the priority
+  -- loop rather than by calling Activate.activateAbility, which does not gate.
+  -- alice takes the boast activation every time it is offered; bob's life moving
+  -- by ONE and not two is the whole assertion, and the second Swamp is what says
+  -- the rider refused the repeat rather than the mana.
+  Spec.it s "CR 702.142a whole card: Duskwielder's boast drains once and is refused for the rest of the turn" $ do
+    duskwielder <- S.printingOf s registry "Duskwielder"
+    swamp <- S.printingOf s registry "Swamp"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (duskwielderId, _, _, attacked) = boastBoard duskwielder swamp sorcerer
+        after = S.runPure boastAnswer attacked Engine.priorityLoop
+    Spec.assertEqWith s "bob lost one life and not two, so the second activation was refused" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "and alice gained the matching one" (S.lifeOf S.alice after) (Just 21)
+    Spec.assertEqWith s "the boast ability is not offered again this turn" (activationsOf duskwielderId (Action.legalActions S.alice after)) []
+    -- The attacking Duskwielder (CR 508.1f) plus exactly one Swamp: the other
+    -- Swamp is untapped, so a second {1} was there to be paid.
+    Spec.assertEqWith s "one Swamp is still untapped, so the mana is not what refused it" (S.tappedCount S.alice after) 2
 
 equipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 equipSpec s registry = Spec.describe s "Equip" $ do

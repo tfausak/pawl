@@ -712,6 +712,18 @@ data Keyword
     -- (#3044). Not implemented either: CR 702.177b's "as long as you haven't
     -- activated an exhaust ability this turn" (#3044).
     Exhaust
+  | -- | 702.142a: boast adds rules to the activated ability printed AFTER it --
+    -- "Boast -- [Cost]: [Effect]" means "[Cost]: [Effect]. Activate only if this
+    -- creature attacked this turn and only once each turn". Exhaust's shape one
+    -- rule over: PRINTED rather than minted, so the card writes this on the
+    -- ability through Pawl.Types.ActivatedAbility.keyword, which is what CR
+    -- 702.142b's "a creature boasting" would name.
+    --
+    -- Not implemented: the rewriting itself, so Varragoth, Bloodsky Sire writes
+    -- rule 702.142a's two riders as its own ActivationRestriction.OnlyIf and
+    -- ActivationRestriction.OnlyOnceEachTurn rather than having the keyword add
+    -- them (#3044).
+    Boast
   | -- | 702.179a: a static ability whose whole content is CR 704.5aa's
     -- state-based action, read off the projection by Pawl.Engine.Sba rather than
     -- minted.

@@ -1334,6 +1334,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Exhaust
       " {\"type\":\"Exhaust\"} "
+  -- CR 702.142a. Nullary for exhaust's reason: the rider boast adds belongs to
+  -- the ability printed after it, not to this value.
+  Spec.it s "Boast" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Boast
+      " {\"type\":\"Boast\"} "
   -- CR 702.179a. Nullary, and the tag is the whole encoding.
   Spec.it s "StartYourEngines" $
     Common.assertCodec
