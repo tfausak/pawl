@@ -127,6 +127,7 @@ encode p answer = case p of
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.ChooseRiot {} -> Response.ChoseRiot answer
   Prompt.ChooseUnleash {} -> Response.ChoseUnleash answer
+  Prompt.ChooseDredge {} -> Response.ChoseDredge answer
   Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
   Prompt.ChooseRevealOnEntry {} -> Response.ChoseRevealOnEntry answer
   Prompt.ChooseEnlist {} -> Response.ChoseEnlist answer
@@ -392,6 +393,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseUnleash {} -> case response of
     Response.ChoseUnleash d -> Just d
+    _ -> Nothing
+  Prompt.ChooseDredge {} -> case response of
+    Response.ChoseDredge d -> Just d
     _ -> Nothing
   Prompt.ChoosePayLifeOnEntry {} -> case response of
     Response.ChosePayLifeOnEntry d -> Just d
@@ -846,6 +850,9 @@ defaultAnswer p = case p of
   -- CR 702.98a: declining, for ChooseRiot's reason -- it is the half that puts no
   -- counter on the board.
   Prompt.ChooseUnleash {} -> OptionalDecision.Declines
+  -- CR 702.52a: declining, for ChooseRiot's reason -- it is the half that moves
+  -- nothing, so a transcript that ran out mills nobody's library.
+  Prompt.ChooseDredge {} -> OptionalDecision.Declines
   -- CR 614.1c: declining, for ChooseRiot's reason above and one more. Declining
   -- is the branch the card itself states as the default -- "if you don't, it
   -- enters tapped" -- and it is the half that spends nothing, so a transcript

@@ -2899,6 +2899,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.46a names no quality either: "Spirit card with mana value N or less"
   -- is written into the ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Soulshift _ -> []
+  Keyword.Dredge _ -> []
   -- CR 702.54a names no quality either: "an opponent" is a player and the +1/+1
   -- counters are the rule's own noun, so neither reaches a Filter.
   Keyword.Bloodthirst _ -> []
@@ -4451,6 +4452,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   -- does.
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> outsideTheGameFramed [FromOutsideTheGame.filter payload]
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> []
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> []
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []

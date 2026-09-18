@@ -405,6 +405,11 @@ data Response
     -- ChoseRiot and ChosePayLifeOnEntry for their reason: a transcript that
     -- answered one as-enters "may" must not silently answer a different one.
     ChoseUnleash OptionalDecision.OptionalDecision
+  | -- | CR 702.52a: whether a draw was replaced by dredge (Exercises) or left
+    -- standing (Declines). Distinct from the as-enters answers above for their
+    -- reason: a transcript that answered one "may" must not silently answer a
+    -- different one.
+    ChoseDredge OptionalDecision.OptionalDecision
   | -- | CR 733.1: whether the payer of an action that could not be legally
     -- completed also reversed the mana abilities they activated while making it
     -- (Exercises) or kept them and the mana they made (Declines). Distinct from

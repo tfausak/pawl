@@ -4350,9 +4350,22 @@ replacementsAffecting gs =
       mintedInHand oid = case Game.faceOf oid gs of
         Nothing -> []
         Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (Face.keywordSet face))
+      -- CR 702.52a's replacement, minted for a card in a GRAVEYARD --
+      -- `mintedInHand`'s sibling one zone over, and read the same way, off the
+      -- PRINTED face (gap #1859). Pawl.Engine.Keyword.graveyardReplacementsOf is
+      -- what decides which keywords reach it, and dredge is the only one.
+      --
+      -- No mayStateZoneOfRow prefilter beside it, `mintedInHand`'s posture: a
+      -- MINTED row is not printed in a face's list, so there is no
+      -- functions-from set on it to consult -- rule 702.52a states the zone
+      -- itself, and this walk is the zone.
+      mintedInGraveyard oid = case Game.faceOf oid gs of
+        Nothing -> []
+        Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.graveyardReplacementsOf (Face.keywordSet face))
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
+          <> concatMap mintedInGraveyard (graveyardCards gs)
           <> foldZoneCards GameState.hand (statedFrom Zone.Hand) gs
           <> foldZoneCards GameState.hand mintedInHand gs
           <> foldZoneCards GameState.library (statedFrom Zone.Library) gs

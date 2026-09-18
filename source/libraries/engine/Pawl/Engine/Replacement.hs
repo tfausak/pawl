@@ -786,9 +786,11 @@ applies gs event candidate =
             && resizes rewrite n
         -- CR 121.6 / 614.11: whose card draws the row watches (CR 109.5's "you").
         -- The whole of the pattern, there being nothing else about a draw to
-        -- narrow by, and no `admits` beside it: rule 614.11's first sentence
-        -- makes the row apply even when the library is empty, so there is no
-        -- board on which the rewrite would change nothing.
+        -- narrow by. The `stocked` conjunct beside it is rule 702.52a's own
+        -- condition and NOT a general applicability test: rule 614.11's first
+        -- sentence makes a draw replacement apply even when the library is
+        -- empty, which is why `stocked` answers True for every rewrite but
+        -- dredge.
         --
         -- Read off the CANDIDATE, the ZoneChangeR arm's posture and not the
         -- src-derived arms below it: both producers install a FLOATING row from an
@@ -797,6 +799,7 @@ applies gs event candidate =
         -- Ring of Ma'rûf's own cost makes it do. See matchesCandidatePlayer (#2662).
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
           matchesCandidatePlayer gs src (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
+            && stocked gs (DrawR.rewrite pat) pid
         -- CR 121.2a: whose draw INSTRUCTIONS the row watches (CR 109.5's "you"),
         -- and the number it names. Alms Collector's "two or more" is a condition on
         -- the event rather than a rewrite that changes nothing, LifeLossR's third
@@ -858,6 +861,22 @@ applies gs event candidate =
 -- condition a Pawl.Types.PrintedReplacement carries, because no
 -- Pawl.Types.Condition can see it: a condition is asked of the BOARD, and "at
 -- least that many" is asked of the event.
+-- CR 702.52a / 702.52b: does this draw rewrite's own condition hold? Dredge is
+-- the one arm with such a condition -- "as long as you have at least N cards in
+-- your library" -- and rule 702.52b is the same sentence read the other way, so a
+-- library short of N keeps the row out of CR 616.1's offer entirely rather than
+-- offering a dredge that mills nothing.
+--
+-- The COUNT of the milling player's library, `breaches`'s
+-- ExileFromTopOfYourLibrary arm and for its reason. The player asked is the one
+-- the EVENT named, which is who rule 702.52a mills; the row reaches this only
+-- once ControllerRelation.Yours has made that seat the card's own owner.
+stocked :: GameState -> DrawRewrite.DrawRewrite -> PlayerId -> Bool
+stocked gs rewrite pid = case rewrite of
+  DrawRewrite.Dredge n -> Natural.length (Game.zoneMembers Zone.Library pid gs) >= n
+  DrawRewrite.GainLife _ -> True
+  DrawRewrite.FromOutsideTheGame _ -> True
+
 breaches :: GameState -> Maybe PlayerId -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
 breaches gs you rewrite pid n = case rewrite of
   -- Read off the LIVE board rather than off the event, because the event carries
@@ -1920,6 +1939,11 @@ readsApplier re = case re of
   -- `distinguishing` below folds `source` in nowhere, so the choice between them
   -- is elided (#3215).
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame _)) -> False
+  -- The miller is the seat the EVENT named and the count is the effect's own
+  -- field, so GainLife's answer above carries over. The card returned rides the
+  -- CANDIDATE rather than the effect, which is `readsSource`'s question and not
+  -- this one.
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> False
   -- CR 121.2a: "you and that player each draw a card" -- the "you" is the row's
   -- own controller, so two rows alike in `effect` and unlike in `you` hand the
   -- extra card to different seats. LifeLossRewrite.ExileFromTopOfYourLibrary's
@@ -1938,6 +1962,43 @@ readsApplier re = case re of
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
+  ReplacementEffect.PhaseR _ -> False
+
+-- Does applying this effect read the candidate's SOURCE -- the object the row
+-- was minted onto -- so that two rows alike in `effect` leave different boards?
+--
+-- readsApplier's twin one field over, the same genre and the same sole consumer:
+-- `choose` folds `source` into its indistinguishability test exactly for the
+-- arms that answer True.
+--
+-- Only rule 702.52a's dredge answers True today, and it answers True outright:
+-- "return THIS CARD from your graveyard to your hand" names the row's own
+-- source, so two dredgers in one graveyard return different cards and the
+-- drawer must be asked which. Every other arm's use of `source` is a test run
+-- BEFORE Event.apply -- `applies`, `scopes`, a Filter.Context -- which is the
+-- argument the elision at #3215 rests on.
+--
+-- One arm per CONSTRUCTOR, with only DrawR's inner sum split: a new
+-- constructor breaks the build here, and a new REWRITE under an existing
+-- constructor is covered by that same argument until one of them names its own
+-- source (#3215).
+readsSource :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Bool
+readsSource effect = case effect of
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> True
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame _)) -> False
+  ReplacementEffect.ZoneChangeR {} -> False
+  ReplacementEffect.EntryR {} -> False
+  ReplacementEffect.DamageR {} -> False
+  ReplacementEffect.DestructionR _ -> False
+  ReplacementEffect.CounterR {} -> False
+  ReplacementEffect.TokenR {} -> False
+  ReplacementEffect.TurnUpR {} -> False
+  ReplacementEffect.UntapR _ -> False
+  ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.LifeGainR {} -> False
+  ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 616.1: the affected object's controller (or its owner if it has none), or
@@ -1973,10 +2034,11 @@ readsApplier re = case re of
 -- Folding `controller` in UNCONDITIONALLY would be sound as well, and wrong the
 -- other way: two Rest in Peace under different controllers exile the same card
 -- to the same zone whichever applies, so asking about them would raise a
--- question the rules leave nothing to decide. `source` is folded in nowhere for
--- the same reason -- every use of it above is a test run BEFORE Event.apply, save
--- the one arm that hands it on as a Filter.Context, which readsApplier's own
--- comment argues (#3215).
+-- question the rules leave nothing to decide.
+--
+-- `source` is folded in CONDITIONALLY, by `readsSource` above, for the reason
+-- `controller` is: unconditionally would ask about two Rest in Peace that exile
+-- the same card to the same zone whichever applies.
 --
 -- `origin` is NOT such a hole: highestBucket has already partitioned by bucket,
 -- and CR 616.1a's bucket is exactly an origin of SelfReplacement, so every
@@ -1989,6 +2051,12 @@ choose gs event candidates =
           ReplacementCandidate.lifetime c,
           if readsApplier (ReplacementCandidate.effect c)
             then ReplacementCandidate.controller c
+            else Nothing,
+          -- `readsSource`'s half of the same test: CR 702.52a's dredge returns
+          -- the row's own source, so two dredgers in one graveyard are two
+          -- different boards and the drawer is asked which.
+          if readsSource (ReplacementCandidate.effect c)
+            then Just (ReplacementCandidate.source c)
             else Nothing
         )
    in case candidates of
