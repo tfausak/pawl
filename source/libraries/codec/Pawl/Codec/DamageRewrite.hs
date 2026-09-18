@@ -31,6 +31,7 @@ codec effectCodec =
       Arm.nullary "PreventRemovingShieldCounter" DamageRewrite.PreventRemovingShieldCounter,
       Arm.payload "PreventNext" Common.natural DamageRewrite.PreventNext (\x -> case x of DamageRewrite.PreventNext y -> Just y; _ -> Nothing),
       Arm.payload "PreventAllBut" Common.natural DamageRewrite.PreventAllBut (\x -> case x of DamageRewrite.PreventAllBut y -> Just y; _ -> Nothing),
+      Arm.payload "PreventUpTo" Common.natural DamageRewrite.PreventUpTo (\x -> case x of DamageRewrite.PreventUpTo y -> Just y; _ -> Nothing),
       Arm.payload "SetAmount" Common.natural DamageRewrite.SetAmount (\x -> case x of DamageRewrite.SetAmount y -> Just y; _ -> Nothing),
       Arm.payload "Scale" Scaling.codec DamageRewrite.Scale (\x -> case x of DamageRewrite.Scale y -> Just y; _ -> Nothing),
       Arm.payload "Redirect" Recipient.codec DamageRewrite.Redirect (\x -> case x of DamageRewrite.Redirect y -> Just y; _ -> Nothing),
@@ -54,6 +55,7 @@ tagOf x = case x of
   DamageRewrite.PreventRemovingShieldCounter {} -> "PreventRemovingShieldCounter"
   DamageRewrite.PreventNext {} -> "PreventNext"
   DamageRewrite.PreventAllBut {} -> "PreventAllBut"
+  DamageRewrite.PreventUpTo {} -> "PreventUpTo"
   DamageRewrite.SetAmount {} -> "SetAmount"
   DamageRewrite.Scale {} -> "Scale"
   DamageRewrite.Redirect {} -> "Redirect"

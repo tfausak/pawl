@@ -1194,6 +1194,7 @@ rewriteDamageRewrite pairs rewrite = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> rewrite
   DamageRewrite.PreventNext _ -> rewrite
   DamageRewrite.PreventAllBut _ -> rewrite
+  DamageRewrite.PreventUpTo _ -> rewrite
   DamageRewrite.SetAmount _ -> rewrite
   DamageRewrite.Scale _ -> rewrite
   -- CR 614.1a's "instead [do something]", the payload shared with an ability's

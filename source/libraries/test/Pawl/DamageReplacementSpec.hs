@@ -724,6 +724,99 @@ templeAltisaurSpec s registry = Spec.describe s "Temple Altisaur (CR 615.10)" $ 
     Spec.assertEqWith s "the Excruciator's whole 3 is marked" (S.damageOf raptor (from avatar)) (Just 3)
     Spec.assertEqWith s "where the Piker's same 3 is cut to 1" (S.damageOf raptor (from piker)) (Just 1)
 
+-- CR 702.64 absorb, which is CR 615.10's static shield read from the other end:
+-- rule 702.64a's "prevent N of that damage" is a CEILING on what is stopped where
+-- Temple Altisaur's is a FLOOR on what survives.
+--
+-- Lymph Sliver {4}{W} Creature -- Sliver 3/3 prints "All Sliver creatures have
+-- absorb 1." and nothing else (name, cost, type line, P\/T and Oracle text
+-- checked against api.scryfall.com 2026-09-17), so nothing else on the card can
+-- be what these assertions read. It is the only paper printing of the keyword,
+-- which makes absorb a GRANTED ability here in every case: the row is minted off
+-- Pawl.Engine.Projection's characteristics rather than off a printed keyword, and
+-- "All Sliver creatures" reaches the Lymph Sliver itself.
+--
+-- Each case below moves exactly one thing off one board:
+--
+--   * the RECIPIENT, over the grant's quality -- the Goblin Piker is no Sliver
+--     and its damage lands whole;
+--   * the AMOUNT, an event at or under the ceiling being prevented whole (CR
+--     615.6) rather than shrunk;
+--   * the SOURCE, CR 702.64b's "it will apply separately to damage from other
+--     sources" -- a second source's event is cut by the full 1 again, where a CR
+--     615.7 countdown of 1 would have been spent by the first.
+--
+-- Numbers all distinct: the ceiling is 1, the first hit 3, the second 4, and both
+-- Slivers are 3/3, so damage is settled through Damage.applyDamage with no
+-- priority in between and CR 704.3 never runs.
+absorbSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+absorbSpec s registry = Spec.describe s "Absorb (CR 702.64)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
+      withBoard act = do
+        plains <- S.printingOf s registry "Plains"
+        lymphPrinting <- S.printingOf s registry "Lymph Sliver"
+        venserPrinting <- S.printingOf s registry "Venser's Sliver"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        giantPrinting <- S.printingOf s registry "Hill Giant"
+        let base = S.landsInPlay plains 1
+            (lymph, g1) = S.addPermanent lymphPrinting S.alice base
+            (venser, g2) = S.addPermanent venserPrinting S.alice g1
+            (piker, g3) = S.addPermanent pikerPrinting S.alice g2
+            (source, g4) = S.addPermanent pikerPrinting S.bob g3
+            (other, g5) = S.addPermanent giantPrinting S.bob g4
+        act lymph venser piker source other g5
+  -- The behaviour and the grant's quality, off ONE board: the only difference
+  -- between the three readings is which permanent the same 3 is aimed at.
+  Spec.it s "CR 702.64a 1 of the 3 is prevented, and only for a Sliver"
+    . withBoard
+    $ \lymph venser piker source _ board -> do
+      let at victim = settleDamage S.identityAnswer board [hit source (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "2 of the 3 is marked on the other Sliver" (S.damageOf venser (at venser)) (Just 2)
+      Spec.assertEqWith s "and on the Lymph Sliver itself, which \"all Sliver creatures\" reaches" (S.damageOf lymph (at lymph)) (Just 2)
+      Spec.assertEqWith s "the Goblin Piker is no Sliver, so its 3 lands whole" (S.damageOf piker (at piker)) (Just 3)
+  -- The AMOUNT, one field of the event over: an event at the ceiling is prevented
+  -- WHOLE (CR 615.6) rather than handed back at 0, which is the half a
+  -- "prevent all but N" reading gets backwards.
+  Spec.it s "CR 702.64a an event at the ceiling never happens"
+    . withBoard
+    $ \_ venser _ source _ board -> do
+      let after = settleDamage S.identityAnswer board [hit source (Recipient.ToCreature venser) 1]
+      Spec.assertEqWith s "nothing is marked" (S.damageOf venser after) (Just 0)
+      Spec.assertEqWith s "and no damage event happened at all" (fmap DamageEvent.amount (S.damageEventsOf after)) []
+  -- CR 702.64b's own sentence -- "it will apply separately to damage from other
+  -- sources" -- read over two events one after the other in the same turn: the
+  -- second source's 4 loses the full 1 again.
+  --
+  -- What this case does NOT tell apart is the CR 615.7 reading: a keyword's row is
+  -- re-minted off the projection for each application, so a countdown would be
+  -- whole again by the second settlement and cut it to 3 as well. The case below,
+  -- where both events are in ONE batch, is the one that discriminates, and the
+  -- mutation to PreventNext reddens it alone.
+  Spec.it s "CR 702.64b a second source in the same turn is cut by the full 1 again"
+    . withBoard
+    $ \_ venser _ source other board -> do
+      let first_ = settleDamage S.identityAnswer board [hit source (Recipient.ToCreature venser) 3]
+          after = settleDamage S.identityAnswer first_ [hit other (Recipient.ToCreature venser) 4]
+      Spec.assertEqWith s "the first source's 3 was cut to 2" (S.damageOf venser first_) (Just 2)
+      Spec.assertEqWith s "and the second's 4 to 3, so 5 in all rather than 6" (S.damageOf venser after) (Just 5)
+  -- CR 702.64b's other half read across ONE batch, and the case that tells CR
+  -- 615.7 apart from rule 702.64b: two simultaneous events from different sources
+  -- each lose their own 1, where a countdown of 1 would be spent on the first and
+  -- let the second through whole -- 5 marked against 6. Nobody is asked which the
+  -- shield covers either, `contestedResource` giving absorb no supply to divide.
+  Spec.it s "CR 702.64b two simultaneous events each lose 1, and nothing is asked"
+    . withBoard
+    $ \_ venser _ source other board -> do
+      let batch = [hit source (Recipient.ToCreature venser) 3, hit other (Recipient.ToCreature venser) 4]
+          after = settleDamage S.identityAnswer board batch
+      Spec.assertEqWith s "2 and 3 are marked, so 5 in all" (S.damageOf venser after) (Just 5)
+      Spec.assertEqWith s "and both events happened, cut to 2 and 3" (fmap DamageEvent.amount (S.damageEventsOf after)) [2, 3]
+      Spec.assertBool
+        s
+        (not (wasAskedToAllocateDamage (answersFor S.identityAnswer board (Damage.applyDamage batch))))
+        "no AllocateDamage was raised: a per-event ceiling allocates nothing across a batch"
+
 -- Ajani Steadfast {3}{W} Legendary Planeswalker -- Ajani, loyalty 4. "+1: Until
 -- end of turn, up to one target creature gets +1/+1 and gains first strike,
 -- vigilance, and lifelink. -2: Put a +1/+1 counter on each creature you control
@@ -3599,6 +3692,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   inkshieldSpec s registry
   stormwildCapridorSpec s registry
   templeAltisaurSpec s registry
+  absorbSpec s registry
   ajaniSteadfastSpec s registry
   proteanHydraSpec s registry
   jaredCarthalionSpec s registry

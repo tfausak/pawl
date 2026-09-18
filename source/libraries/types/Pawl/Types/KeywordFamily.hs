@@ -116,6 +116,12 @@ data KeywordFamily
     Suspend
   | -- | CR 702.63a: vanishing N.
     Vanishing
+  | -- | CR 702.58a: graft N. No card in the pool asks yet, and it is owed at the
+    -- keyword rather than at the first asker.
+    Graft
+  | -- | CR 702.64a: absorb N. No card in the pool asks yet, and it is owed at
+    -- the keyword rather than at the first asker.
+    Absorb
   | -- | CR 702.67a: fortify [cost]. Equip's family one rule over; no card in the
     -- pool asks yet, and it is owed at the keyword rather than at the first
     -- asker.

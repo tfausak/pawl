@@ -3038,6 +3038,11 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.68a names no quality: the payload is a NUMBER, and the +N/+0 is
   -- written into the ability Pawl.Engine.Keyword.frenzy mints.
   Keyword.Frenzy _ -> []
+  -- CR 702.58a and CR 702.64a name no quality either, for the arm above's reason:
+  -- each payload is a NUMBER, and what it counts is written into what
+  -- Pawl.Engine.Keyword mints.
+  Keyword.Graft _ -> []
+  Keyword.Absorb _ -> []
   -- CR 718.1's inset frame is a mana cost and a printed box; neither reaches a
   -- Filter, and rule 702.160a's ability names no quality.
   Keyword.Prototype _ -> []
@@ -4428,6 +4433,7 @@ damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> []
   DamageRewrite.PreventNext _ -> []
   DamageRewrite.PreventAllBut _ -> []
+  DamageRewrite.PreventUpTo _ -> []
   DamageRewrite.SetAmount _ -> []
   DamageRewrite.Scale _ -> []
   -- CR 614.1a's instead-effects hold no Filter of their own; the ones inside

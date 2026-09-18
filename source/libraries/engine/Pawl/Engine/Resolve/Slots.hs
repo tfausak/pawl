@@ -1450,6 +1450,7 @@ damageRewriteEffects rewrite = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> []
   DamageRewrite.PreventNext _ -> []
   DamageRewrite.PreventAllBut _ -> []
+  DamageRewrite.PreventUpTo _ -> []
   DamageRewrite.SetAmount _ -> []
   DamageRewrite.Scale _ -> []
   DamageRewrite.Redirect _ -> []
@@ -1469,6 +1470,7 @@ damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> []
   DamageRewrite.PreventNext _ -> []
   DamageRewrite.PreventAllBut _ -> []
+  DamageRewrite.PreventUpTo _ -> []
   DamageRewrite.SetAmount _ -> []
   DamageRewrite.Scale _ -> []
   -- The nested effects are replacementRowEffects' answer above, not a Filter of
