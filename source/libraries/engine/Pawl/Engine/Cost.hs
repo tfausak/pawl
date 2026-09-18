@@ -3551,8 +3551,8 @@ paySubstituting perform reversible moment subject announced spending pid oid sub
 -- older snapshot still when the toll goes unpaid (#3119).
 --
 -- The bound slots ride out unread. A component of a combat toll binds what
--- payComponent binds it (Sacrifice, TapPermanents and TapForTotalPower each
--- reserve a name), and
+-- payComponent binds it (Sacrifice, TapPermanents, TapForTotalPower, ExileThis
+-- and ExileThisFromGraveyard each reserve a name), and
 -- there is no resolving ability holding a binding environment to write them
 -- into -- CR 508.1j and CR 509.1f name a payment and no effect, where CR
 -- 601.2f's components are paid for a spell that goes on to resolve.
@@ -3860,6 +3860,19 @@ mergeBound bound outcome = case outcome of
 -- TapPermanents and TapForTotalPower.
 bindsNothing :: Payment.Payment
 bindsNothing = Payment.Paid Map.empty
+
+-- The payment an ExileThis or ExileThisFromGraveyard component makes: CR 601.2h
+-- pays it, and Binding.exiledCard names what CR 400.7 put into exile.
+--
+-- An empty arrival binds NOTHING rather than an empty set, a replacement effect
+-- having sent the object somewhere other than exile: the two spellings read
+-- differently where a slot's PRESENCE is the question, and
+-- Pawl.Engine.Resolve.clauseIsInert asks exactly that -- a present key naming
+-- nobody would make the clause look answerable and raise its CR 603.5 offer.
+bindExiled :: Seq.Seq ObjectId -> Payment.Payment
+bindExiled arrived = case Foldable.toList arrived of
+  [] -> bindsNothing
+  ids -> Payment.Paid (Map.singleton Binding.exiledCard (Set.fromList (fmap Recipient.ToObject ids)))
 
 -- CR 601.2h: can this cost's payer tell one order from another? Two conditions,
 -- and the prompt above is asked only when both hold.
@@ -4628,9 +4641,9 @@ payComponent moment slots pid oid component = case component of
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
         -- CR 608.2h: the permanents are gone by the time anything this cost paid
         -- for resolves, so an effect that reads one ("the sacrificed creature's
-        -- power") needs a name for it. One of the two components that bind a
-        -- slot, TapPermanents below being the other; every other returns
-        -- bindsNothing.
+        -- power") needs a name for it. One of the components that bind a slot
+        -- -- TapPermanents and TapForTotalPower below, and the two exiling
+        -- components through `bindExiled`; every other returns bindsNothing.
         --
         -- Bound under the id it had on the battlefield, which is the id
         -- Event.changeZone files its last known information under -- the graveyard
@@ -4678,9 +4691,8 @@ payComponent moment slots pid oid component = case component of
   -- Reject-not-repair, Sacrifice's posture again; the tap goes through tapObject,
   -- TapThis' route.
   --
-  -- Binds Binding.tappedPermanent, the second component to bind a slot at all
-  -- (CR 601.2h): Unerring Sling's "damage equal to the tapped creature's power"
-  -- needs a name for what its own cost tapped. Unlike Sacrifice's arm the object
+  -- Binds Binding.tappedPermanent (CR 601.2h): Unerring Sling's "damage equal
+  -- to the tapped creature's power" needs a name for what its own cost tapped. Unlike Sacrifice's arm the object
   -- is still on the battlefield, so the read is CR 608.2h's CURRENT information
   -- rather than last known.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> do
@@ -5039,19 +5051,28 @@ payComponent moment slots pid oid component = case component of
   -- The card is in EXILE by the time the ability resolves, which is what makes CR
   -- 113.7a load-bearing here -- Loxodon Surveyor's draw resolves off a source
   -- that has already left the graveyard the cost read.
+  --
+  -- Binds Binding.exiledCard off what ARRIVED, ExileThis' binding below and for
+  -- its reason.
   CostComponent.ExileThisFromGraveyard -> do
-    Event.changeZone oid Zone.Exile
-    pure bindsNothing
+    arrived <- Event.changeZoneReturning oid Zone.Exile
+    pure (bindExiled arrived)
   -- CR 406.2's move off the BATTLEFIELD, through the same funnel and with no
   -- prompt for the same reason: the cost names this permanent. CR 118.3 asked
   -- again, SacrificeThis' reason above; Pawl.CostSpec's "CR 118.3 the Altar eats
   -- the Executioner before its own exile is paid" is the proof.
+  --
+  -- Binds Binding.exiledCard, so that a later clause of the same ability can name
+  -- the card this payment put into exile -- CR 702.167a's "Return this card to
+  -- the battlefield" after craft's "Exile this permanent". The card CR 400.7
+  -- made, not the permanent that left, which is why the binding is taken off what
+  -- arrived; see that slot.
   CostComponent.ExileThis -> do
     gs <- State.get
     if canPayComponent slots pid oid component gs
       then do
-        Event.changeZone oid Zone.Exile
-        pure bindsNothing
+        arrived <- Event.changeZoneReturning oid Zone.Exile
+        pure (bindExiled arrived)
       else pure Payment.Unpaid
   -- CR 406.2's move again, for CHOSEN cards: the payer picks which, so this is a
   -- prompt. Elided only when forced, Sacrifice's elision.

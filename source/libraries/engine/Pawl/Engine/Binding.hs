@@ -415,6 +415,30 @@ sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 returnedPermanent :: SlotName
 returnedPermanent = SlotName.MkSlotName (Text.pack "thatReturnedPermanent")
 
+-- CR 601.2h: the reserved slot under which the card a COST payment exiled the
+-- object the cost is on is bound -- what CR 702.167a's "Return this card to the
+-- battlefield" names after craft's "Exile this permanent".
+-- sacrificedPermanent's route: Pawl.Engine.Activate folds the payment's bound
+-- slots onto the ability object, so the later clause reads it like any other
+-- slot.
+--
+-- The EXILE incarnation rather than the id the object had before the move, which
+-- is the other way round from sacrificedPermanent: CR 400.7 makes the exiled
+-- card a new object, and it is that object the printed sentence goes on to move,
+-- so every read is CURRENT information (CR 608.2h's first clause) and
+-- Pawl.Engine.Resolve.Slots.effectViewOf needs no arm.
+--
+-- Bound by Pawl.Engine.Cost.payComponent's ExileThis and ExileThisFromGraveyard
+-- arms alike, the two components that exile the object the cost is on, and left
+-- UNBOUND where nothing arrived in exile -- a replacement effect may have sent
+-- the object elsewhere, and a slot naming the object that did not arrive would
+-- be read as CR 608.2h information the rules never granted.
+--
+-- Not a target, so the same CR 608.2b posture and the same "no card's
+-- targetSlots may name it" sweep as sacrificedPermanent above.
+exiledCard :: SlotName
+exiledCard = SlotName.MkSlotName (Text.pack "thatExiledCard")
+
 -- CR 601.2f: the reserved slot under which the permanents a COST payment TAPPED
 -- are bound -- "the tapped creature" in Unerring Sling's "deals damage equal to
 -- the tapped creature's power". Stamped by Pawl.Engine.Activate off the payment
