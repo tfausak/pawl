@@ -129,6 +129,8 @@ codec cardCodec abilityCodec =
           Arm.payload "Blight" Blight.codec Effect.Blight (\x -> case x of Effect.Blight y -> Just y; _ -> Nothing),
           Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
           Arm.nullary "Forage" Effect.Forage,
+          Arm.nullary "Populate" Effect.Populate,
+          Arm.nullary "Learn" Effect.Learn,
           Arm.optionalPayload "Venture" Subtype.codec Effect.Venture (\x -> case x of Effect.Venture y -> Just y; _ -> Nothing),
           Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,
           Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices (\x -> case x of Effect.PlayerSacrifices y -> Just y; _ -> Nothing),
@@ -261,6 +263,8 @@ tagOf x = case x of
   Effect.Blight {} -> "Blight"
   Effect.TemptWithTheRing {} -> "TemptWithTheRing"
   Effect.Forage {} -> "Forage"
+  Effect.Populate {} -> "Populate"
+  Effect.Learn {} -> "Learn"
   Effect.Venture {} -> "Venture"
   Effect.ExileHandThenDraw {} -> "ExileHandThenDraw"
   Effect.PlayerSacrifices {} -> "PlayerSacrifices"

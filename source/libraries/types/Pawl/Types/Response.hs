@@ -21,6 +21,7 @@ import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.LearnMode as LearnMode
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
@@ -656,4 +657,7 @@ data Response
     ChoseMutateSide MutateSide.MutateSide
   | -- | CR 701.61a's answer: which half of forage the forager took.
     ChoseForage ForageMode.ForageMode
+  | -- | CR 701.48a's answer: which branch of learning the learner took, or
+    -- Nothing for neither.
+    ChoseLearn (Maybe LearnMode.LearnMode)
   deriving (Eq, Ord, Show)

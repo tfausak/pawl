@@ -115,6 +115,7 @@ encode p answer = case p of
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseMutateSide {} -> Response.ChoseMutateSide answer
   Prompt.ChooseForage {} -> Response.ChoseForage answer
+  Prompt.ChooseLearn {} -> Response.ChoseLearn answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseKicker {} -> Response.AnnouncedKicker answer
   Prompt.ChooseBuyback {} -> Response.AnnouncedBuyback answer
@@ -546,6 +547,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseForage {} -> case response of
     Response.ChoseForage mode -> Just mode
+    _ -> Nothing
+  Prompt.ChooseLearn {} -> case response of
+    Response.ChoseLearn mode -> Just mode
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -1034,6 +1038,9 @@ defaultAnswer p = case p of
   -- CR 701.61a: a two-way choice raised only where both halves can be carried
   -- out, so a short transcript takes the half the rule names first.
   Prompt.ChooseForage {} -> ForageMode.ExileCards
+  -- CR 701.48a is two "you may"s, so declining both is always legal and is what
+  -- a short transcript takes.
+  Prompt.ChooseLearn {} -> Nothing
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.
