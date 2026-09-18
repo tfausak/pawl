@@ -104,6 +104,7 @@ codec =
       Arm.payload "Ninjutsu" (Cost.codec codec) Keyword.Ninjutsu (\x -> case x of Keyword.Ninjutsu y -> Just y; _ -> Nothing),
       Arm.payload "Frenzy" Common.natural Keyword.Frenzy (\x -> case x of Keyword.Frenzy y -> Just y; _ -> Nothing),
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous (\x -> case x of Keyword.Poisonous y -> Just y; _ -> Nothing),
+      Arm.payload "Champion" (Filter.codec codec) Keyword.Champion (\x -> case x of Keyword.Champion y -> Just y; _ -> Nothing),
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator (\x -> case x of Keyword.Annihilator y -> Just y; _ -> Nothing),
       Arm.nullary "Cascade" Keyword.Cascade,
       Arm.nullary "Storm" Keyword.Storm,
@@ -280,6 +281,7 @@ tagOf x = case x of
   Keyword.Ninjutsu {} -> "Ninjutsu"
   Keyword.Frenzy {} -> "Frenzy"
   Keyword.Poisonous {} -> "Poisonous"
+  Keyword.Champion {} -> "Champion"
   Keyword.Annihilator {} -> "Annihilator"
   Keyword.Cascade {} -> "Cascade"
   Keyword.Storm {} -> "Storm"
