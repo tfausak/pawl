@@ -865,6 +865,21 @@ combatDamager = SlotName.MkSlotName (Text.pack "thatDamager")
 mentoredCreature :: SlotName
 mentoredCreature = SlotName.MkSlotName (Text.pack "thatMentoredCreature")
 
+-- CR 702.110b's "a creature": the creature the BEARER exploited, which Profaner
+-- of the Dead's "the exploited creature's toughness" reads. Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered.
+--
+-- Distinct from `triggerSource` (CR 113.7a) for `mentoredCreature`'s reason: the
+-- bearer is the exploiter, so the creature it sacrificed is a second object.
+--
+-- One object, never a group: rule 702.110b's ability sacrifices one creature, and
+-- two exploits are two events. Not a target (nothing was chosen), so the same CR
+-- 608.2b posture and the same "no card's targetSlots may name it" sweep as
+-- `blockingCreature`; the object is in a graveyard by the time the trigger
+-- resolves, and CR 608.2h's last-known reader is what answers for it.
+exploitedCreature :: SlotName
+exploitedCreature = SlotName.MkSlotName (Text.pack "thatExploitedCreature")
+
 -- CR 701.3a's "that creature": the object the BEARER became attached to, which
 -- Enormous Energy Blade's "tap that creature" reads. Stamped by
 -- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered.
@@ -1019,6 +1034,10 @@ setCombatDamager oid = Map.insert combatDamager (toObject oid)
 -- Bind an object under the reserved mentoredCreature slot (CR 702.134c).
 setMentoredCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setMentoredCreature oid = Map.insert mentoredCreature (toObject oid)
+
+-- Bind an object under the reserved exploitedCreature slot (CR 702.110b).
+setExploitedCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setExploitedCreature oid = Map.insert exploitedCreature (toObject oid)
 
 -- Bind an object under the reserved crewedVehicle slot (CR 702.122b).
 setCrewedVehicle :: ObjectId -> Map SlotName Binding -> Map SlotName Binding

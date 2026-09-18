@@ -454,11 +454,11 @@ data TriggerCondition
     -- recorded only where a counter actually went on.
     SelfTrains
   | -- | CR 702.110b: the bearer exploited a creature (Qarsi Sadist). Self-scoped,
-    -- SelfTrains' shape.
-    --
-    -- Not implemented: binding the creature that was exploited, which rule
-    -- 702.110b's "a creature" names and GameEvent.Exploited carries -- Profaner of
-    -- the Dead's "the exploited creature's toughness" needs it (#3692).
+    -- AttachedCreatureMentors' shape: rule 702.110b's "a creature" is a second
+    -- object, bound under Pawl.Engine.Binding.exploitedCreature.
+    -- Pawl.CardTriggerSpec's "CR 702.110b Profaner of the Dead bounces the
+    -- creatures under the exploited creature's toughness" is what proves that slot
+    -- is readable.
     SelfExploits
   | -- | CR 702.122e: "whenever this Vehicle becomes crewed" (Mobilizer Mech),
     -- which that rule defines as a crew ability of the bearer RESOLVING.

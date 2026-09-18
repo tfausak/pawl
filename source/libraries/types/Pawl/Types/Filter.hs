@@ -240,6 +240,14 @@ data Filter keyword
     SameControllerAsBound SlotName.SlotName
   | -- | CR 205.3m: the candidate shares a creature type with the object this slot holds.
     SharesCreatureTypeWithBound SlotName.SlotName
+  | -- | CR 208.1 compared against a BOUND OBJECT rather than the source or a
+    -- literal: the candidate's toughness is strictly less than the toughness of
+    -- the object this slot holds -- Profaner of the Dead's "toughness less than
+    -- the exploited creature's toughness". PowerLessThanSource's comparison
+    -- aimed at a slot, read off Pawl.Engine.Filter.Context's slotToughnesses and
+    -- vacuously False where either toughness is absent or the slot names more
+    -- than one object.
+    ToughnessLessThanBound SlotName.SlotName
   | -- | CR 201.4: the candidate has a name the SOURCE has chosen earlier in the
     -- same resolution (CR 608.2c) -- Ancient Vendetta's "cards with that name".
     -- Set intersection, for CR 201.4g's interchangeable names as much as CR

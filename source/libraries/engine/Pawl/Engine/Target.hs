@@ -394,6 +394,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- own positions, and Pawl.FilterPositionLintSpec's lint refuses a
             -- card that writes it in a target slot.
             Filter.slotCreatureTypes = Map.empty,
+            Filter.slotToughnesses = Map.empty,
             -- CR 601.2c's PLAYERS out of the same environment, slotObjects' half
             -- one recipient kind over. Filled here for the symmetry rather than
             -- for a reader in this module: no Filter atom asks it, and the one

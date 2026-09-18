@@ -1162,6 +1162,20 @@ data Context = MkContext
     -- SharesCreatureTypeWithBound outside a resolution's own positions" keeps a
     -- card out of those.
     slotCreatureTypes :: Map.Map SlotName.SlotName (Set.Set Subtype.Subtype),
+    -- CR 208.1: the TOUGHNESS of the object a resolution's slot holds, for the one
+    -- atom that compares a candidate's against it (ToughnessLessThanBound --
+    -- Profaner of the Dead's "the exploited creature's toughness").
+    -- `slotCreatureTypes` above in every respect but one -- the same single filler
+    -- (Pawl.Engine.Resolve.Slots.effectContext), the same CR 608.2h last-known
+    -- reader so the sacrificed creature is still answerable, the same laziness, the
+    -- same vacuous False elsewhere, and Pawl.FilterPositionLintSpec's "CR 208.1 no
+    -- card asks ToughnessLessThanBound outside a resolution's own positions" to keep
+    -- a card out of those positions.
+    --
+    -- ONE number per slot rather than a set, and a slot naming several objects has
+    -- no key at all: CR 115.10a's group binding is read by "those cards" payloads,
+    -- and no printed comparison asks a group for a single toughness.
+    slotToughnesses :: Map.Map SlotName.SlotName Integer,
     -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
     -- `slotObjects` above's player half, filled from the same map by the same
     -- caller (Pawl.Engine.Resolve.Slots.effectContext), by
@@ -1457,7 +1471,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1495,7 +1509,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1772,6 +1786,12 @@ matches context view predicate = case predicate of
   -- only the bound objects' creature types, so a shared land type (Dryad Arbor's
   -- Forest) is not a match, and an unfilled slot answers False.
   Filter.SharesCreatureTypeWithBound slot -> not (Set.disjoint (subtypes view) (Map.findWithDefault Set.empty slot (slotCreatureTypes context)))
+  -- CR 208.1 against the toughness the context read off the bound object, the
+  -- atom above's shape one characteristic over. STRICT, and vacuously False if
+  -- either side is absent -- PowerLessThanSource's pair of postures.
+  Filter.ToughnessLessThanBound slot -> case (toughness view, Map.lookup slot (slotToughnesses context)) of
+    (Just t, Just n) -> t < n
+    _ -> False
   -- CR 201.4 at both ends, the arm above's INTERSECTION for CR 201.4g's reason as
   -- much as CR 709.4a's: choosing one of a set of interchangeable names chooses
   -- each of them, so a candidate showing either matches. A source that has chosen
@@ -2169,6 +2189,7 @@ rewrite pairs predicate = case predicate of
   Filter.SameOwnerAsSource -> predicate
   Filter.SameControllerAsBound _ -> predicate
   Filter.SharesCreatureTypeWithBound _ -> predicate
+  Filter.ToughnessLessThanBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.HasChosenColor -> predicate
   Filter.HasChosenSubtype -> predicate
@@ -2846,6 +2867,7 @@ bakeBound players predicate = case predicate of
   Filter.SameOwnerAsSource -> predicate
   Filter.SameControllerAsBound _ -> predicate
   Filter.SharesCreatureTypeWithBound _ -> predicate
+  Filter.ToughnessLessThanBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.HasChosenColor -> predicate
   Filter.HasChosenSubtype -> predicate
@@ -3010,6 +3032,7 @@ manaValueThresholds predicate = case predicate of
   Filter.SameOwnerAsSource -> []
   Filter.SameControllerAsBound _ -> []
   Filter.SharesCreatureTypeWithBound _ -> []
+  Filter.ToughnessLessThanBound _ -> []
   Filter.HasChosenName -> []
   Filter.HasChosenColor -> []
   Filter.HasChosenSubtype -> []
@@ -3165,6 +3188,7 @@ statesAQuality predicate = case predicate of
   Filter.SameOwnerAsSource -> True
   Filter.SameControllerAsBound _ -> True
   Filter.SharesCreatureTypeWithBound _ -> True
+  Filter.ToughnessLessThanBound _ -> True
   -- CR 701.23b's "stated quality" for HasName's reason, one indirection along: the
   -- description is a card name whichever way the name was arrived at, so a search
   -- whose filter is this one may decline to find what it can see.
@@ -3288,6 +3312,9 @@ overBoundSlots f predicate = case predicate of
   -- a creature type with it" would: the reserved slots it names today are
   -- neither renamed nor dataflow-linted.
   Filter.SharesCreatureTypeWithBound slot -> fmap Filter.SharesCreatureTypeWithBound (f slot)
+  -- Named for the arm above's reason: the slot names an OBJECT, whose toughness
+  -- the context reads.
+  Filter.ToughnessLessThanBound slot -> fmap Filter.ToughnessLessThanBound (f slot)
   -- Named for IsBound's reason and answerable one field along again
   -- (boundAmounts). The dataflow lint is what this report is for -- a card whose
   -- filter reads an amount no clause of the mode ever bound is then a failing

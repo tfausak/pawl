@@ -28,6 +28,7 @@ import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Discarded as Discarded
+import qualified Pawl.Types.Exploited as Exploited
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -685,6 +686,15 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- promise needs: every GameEvent.Mentored carries both ids.
   (TriggerCondition.AttachedCreatureMentors, GameEvent.Mentored (Mentored.MkMentored _ mentored)) ->
     Binding.setMentoredCreature mentored Map.empty
+  -- CR 702.110b's "a creature": the creature that was exploited, the event's
+  -- second id -- Profaner of the Dead's "the exploited creature's toughness"
+  -- reads it. The EXPLOITER gets no slot: matchesTrigger has just proved it is
+  -- the bearer, which Binding.triggerSource already answers.
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.Exploited carries both ids.
+  (TriggerCondition.SelfExploits, GameEvent.Exploited (Exploited.MkExploited _ exploited)) ->
+    Binding.setExploitedCreature exploited Map.empty
   -- CR 702.122b's "that Vehicle": the Vehicle the bearer just crewed, which
   -- Gearshift Ace's "that Vehicle gains first strike until end of turn" reads.
   -- The CREWERS get no slot -- matchesTrigger has just proved the bearer is one
@@ -1599,13 +1609,12 @@ eventBindingSlots cond = case cond of
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
   TriggerCondition.SelfTrains -> Set.empty
-  -- Empty for SelfTrains' reason and not for AttachedCreatureMentors': rule
-  -- 702.110b's event names the exploiter, which is already Binding.triggerSource.
-  --
-  -- Not implemented: a slot for the creature that was EXPLOITED, the event's
-  -- second id -- Profaner of the Dead's "the exploited creature's toughness" is
-  -- the printed payload that reads it (#3692).
-  TriggerCondition.SelfExploits -> Set.empty
+  -- NOT empty, for AttachedCreatureMentors' reason and not SelfTrains': rule
+  -- 702.110b's event names the exploiter, which Binding.triggerSource already
+  -- answers, and a SECOND creature besides -- Profaner of the Dead's "the
+  -- exploited creature's toughness". Guaranteed given a match, every
+  -- GameEvent.Exploited carrying both ids.
+  TriggerCondition.SelfExploits -> Set.singleton Binding.exploitedCreature
   -- NOT empty, unlike SelfEvolves above: rule 702.122e's event names the Vehicle,
   -- which Binding.triggerSource already answers, but its rider makes the CREWERS
   -- a subject of their own -- Mighty Servant of Leuk-o's "if it was crewed by

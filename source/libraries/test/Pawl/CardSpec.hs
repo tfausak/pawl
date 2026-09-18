@@ -2234,6 +2234,7 @@ reservedSlots =
       Binding.attackingPlayer,
       Binding.combatDamager,
       Binding.mentoredCreature,
+      Binding.exploitedCreature,
       Binding.attachedHost,
       Binding.unattachedHost
     ]
@@ -4054,6 +4055,10 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.SameControllerAsBound _ -> []
   -- Reads the whole set too, off its own field.
   Filter.Type.SharesCreatureTypeWithBound _ -> []
+  -- The second arm with an answer, IsControllerOfBound's below: CR 208.1's
+  -- comparison wants ONE toughness, and Pawl.Engine.Resolve.Slots.oneToughness
+  -- declines a slot that names a group.
+  Filter.Type.ToughnessLessThanBound slot -> [slot]
   Filter.Type.HasChosenName -> []
   -- Reads no slot either: CR 105.2's colour arrives on Filter.Context.
   Filter.Type.HasChosenColor -> []

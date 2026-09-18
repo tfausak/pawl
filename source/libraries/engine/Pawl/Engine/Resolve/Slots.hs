@@ -2617,6 +2617,12 @@ effectContext gs controller source legal bindings =
           -- read as it last existed (CR 603.10a), and a face-down one has none
           -- (CR 708.2a).
           Filter.slotCreatureTypes = fmap (foldMap (foldMap (Set.filter Subtype.isCreatureType . Filter.subtypes) . Projection.viewWithLastKnownAnywhere gs)) objects,
+          -- CR 208.1's toughness off the same objects and the same reader, for
+          -- slotNames' reason once more: Profaner of the Dead's exploited creature
+          -- is in a graveyard by the time the trigger resolves, and CR 608.2h is
+          -- what still answers for it. Only where the slot names exactly ONE
+          -- object, which the field's own note is about.
+          Filter.slotToughnesses = Map.mapMaybe (oneToughness gs) objects,
           -- CR 601.2c's PLAYERS out of the same CR 608.2b-filtered map
           -- effectSlotObjects takes the objects from, and the reason the
           -- resolution has to hand them over at all: CR 113.7 makes
@@ -2659,6 +2665,15 @@ effectContext gs controller source legal bindings =
           -- left, and "this spell" is a reference the trigger already made.
           Filter.sourceNames = foldMap Filter.names (Projection.viewWithLastKnownAnywhere gs source)
         }
+
+-- CR 208.1 off the ONE object a slot names, for effectContext's slotToughnesses
+-- above. Nothing for a slot naming a group or nothing at all -- CR 115.10a's
+-- group binding has no single toughness -- and nothing for an object that has no
+-- toughness, which leaves Filter.ToughnessLessThanBound vacuously False either way.
+oneToughness :: GameState -> Set ObjectId -> Maybe Integer
+oneToughness gs objects = case Set.toList objects of
+  [oid] -> Filter.toughness =<< Projection.viewWithLastKnownAnywhere gs oid
+  _ -> Nothing
 
 -- The ONE object each of a resolution's TARGET slots names, shared by
 -- effectContext above and effectViewOf below so the two cannot disagree about
