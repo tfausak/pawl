@@ -253,6 +253,8 @@ costMovesLibraryCard component = case component of
   -- CR 705.1's coin is not a card and no zone is touched, so this cost leaves
   -- CR 605.1a's clause intact too -- the arm above's answer.
   CostComponent.FlipCoin -> False
+  -- CR 702.174a names a player and no card, the arm above's answer.
+  CostComponent.ChooseOpponent -> False
 
 -- CR 605: does this effect add mana, and on what instruction? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by

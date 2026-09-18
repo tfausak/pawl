@@ -308,6 +308,9 @@ playerRefSlots ref = case ref of
   PlayerRef.Candidate -> Map.empty
   -- Read at arity one: a slot naming several objects names no one controller.
   PlayerRef.ControllerOfBound slot -> Map.singleton slot SlotArity.One
+  -- Read at arity one for that arm's reason: a slot naming several objects names
+  -- no one chooser.
+  PlayerRef.ChosenPlayerOfBound slot -> Map.singleton slot SlotArity.One
   -- Read at arity one for that arm's reason: a slot naming several players names
   -- no one player to have been attacked.
   PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers _ slot) -> Map.singleton slot SlotArity.One
@@ -2156,6 +2159,16 @@ playerRefPlayers legal controller gs ref =
           Just recipient -> case Recipient.objectOf recipient of
             Just oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
             Nothing -> []
+          Nothing -> []
+        -- CR 614.1c / CR 702.174b: the player that object CHOSE -- "the chosen
+        -- player" of the gift ability Pawl.Engine.Keyword mints, read off CR
+        -- 113.7a's source slot. The arm above's read one record over.
+        --
+        -- NO last-known look-back, where the arm above has one: CR 608.2h's
+        -- record carries no chosen player, so a permanent that has left names
+        -- nobody and CR 101.3 ignores that share (Pawl.Types.PlayerRef).
+        PlayerRef.ChosenPlayerOfBound slot -> case legalOne slot legal >>= Recipient.objectOf of
+          Just oid -> Maybe.maybeToList (Game.lookupObject oid gs >>= Object.chosenPlayer)
           Nothing -> []
         -- CR 508.6: the players controlling a creature that is attacking the player the
         -- slot names, narrowed by the relation the card printed -- Curse of Vitality's

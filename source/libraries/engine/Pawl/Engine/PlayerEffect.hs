@@ -1784,6 +1784,7 @@ zoneOwners pid ref gs = case ref of
   PlayerRef.EachOpponentExcept _ -> []
   PlayerRef.Candidate -> []
   PlayerRef.ControllerOfBound _ -> []
+  PlayerRef.ChosenPlayerOfBound _ -> []
   PlayerRef.Attacking _ -> []
 
 -- Does this permission's zone reference name the zone `oid` lies in, and the

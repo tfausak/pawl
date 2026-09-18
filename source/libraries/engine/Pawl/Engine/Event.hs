@@ -5172,7 +5172,21 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- CR 702.74a's "if its evoke cost was paid" and CR 702.138b's
                     -- "escaped" ask of the permanent. BATTLEFIELD ONLY, `paidCosts`'
                     -- gate and for its reason.
-                    Object.castUsing = if dest == Zone.Battlefield then Object.castUsing obj else Nothing
+                    Object.castUsing = if dest == Zone.Battlefield then Object.castUsing obj else Nothing,
+                    -- CR 400.7d a sixth time, and CR 702.174b is the ability that
+                    -- references it: the opponent the caster chose to pay rule
+                    -- 702.174a's gift cost, which "the chosen player" then names on
+                    -- the permanent the spell became.
+                    --
+                    -- The field's OTHER writer stamps the permanent itself as it
+                    -- enters (CR 614.1c, Stuffy Doll), and this carry cannot reach
+                    -- that one: a spell that chose nobody carries Nothing, which
+                    -- leaves whatever the entry rewrite wrote.
+                    --
+                    -- BATTLEFIELD ONLY, `paidCosts`' gate and for its reason: rule
+                    -- 400.7d speaks about a permanent, and a countered gift spell
+                    -- becomes a card whose enters trigger never fires.
+                    Object.chosenPlayer = if dest == Zone.Battlefield then Object.chosenPlayer obj else Nothing
                   }
               -- CR 604.2's override, handed over as the permanent leaves the
               -- battlefield. lingeringHandover below is the whole of it; this

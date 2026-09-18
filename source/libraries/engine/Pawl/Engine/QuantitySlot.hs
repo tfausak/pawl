@@ -511,6 +511,8 @@ overPlayerRefSlots f ref = case ref of
   -- same way.
   PlayerRef.EachOpponentExcept slot -> fmap PlayerRef.EachOpponentExcept (f slot)
   PlayerRef.ControllerOfBound slot -> fmap PlayerRef.ControllerOfBound (f slot)
+  -- The arm above's namespace, one record over.
+  PlayerRef.ChosenPlayerOfBound slot -> fmap PlayerRef.ChosenPlayerOfBound (f slot)
   PlayerRef.Attacking attacking -> fmap (\slot -> PlayerRef.Attacking attacking {AttackingPlayers.attacked = slot}) (f (AttackingPlayers.attacked attacking))
   -- The four that name no slot at all: the table, CR 109.5's relation, a baked
   -- seat, and the candidate whichever fold is running supplies.

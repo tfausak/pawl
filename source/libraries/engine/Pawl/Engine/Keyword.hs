@@ -85,6 +85,7 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
@@ -480,6 +481,14 @@ abilitiesFor keyword count = case keyword of
   Keyword.Ravenous -> List.genericReplicate count ravenous
   Keyword.Squad cost -> List.genericReplicate (min 1 count) (squad cost)
   Keyword.Offspring cost -> List.genericReplicate (min 1 count) (offspring cost)
+  -- CR 702.174b's enters trigger, one per distinct keyword for squad's and
+  -- offspring's reason above: Object.paidCosts keys a payment by the keyword.
+  -- Rule 702.174 states no redundancy clause and no printing carries two gift
+  -- abilities, which makes the collapse a fence rather than proved behaviour.
+  --
+  -- Not implemented: rule 702.174b's INSTANT AND SORCERY half, a spell ability
+  -- rather than a triggered one (#3834).
+  Keyword.Gift something -> List.genericReplicate (min 1 count) (gift something)
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   -- CR 702.94a's linked triggered half, one per instance for CR 603.2's general
@@ -714,6 +723,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
+  Keyword.Gift _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   -- CR 702.94a's hand ability is TRIGGERED rather than activated, so it is
@@ -1202,6 +1212,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
+  Keyword.Gift _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
@@ -1825,6 +1836,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
+  Keyword.Gift _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
@@ -2491,6 +2503,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
+  Keyword.Gift _ -> []
   -- CR 702.143a, the arm above's argument unchanged: CR 116.2h's special action in
   -- a hand, and CR 702.143d's permission belonging to the FORETOLD card
   -- (Object.foretold) rather than the keyword.
@@ -3180,6 +3193,10 @@ optionalCost keyword = case keyword of
   Keyword.Multikicker cost -> Just (cost, Nothing)
   Keyword.Squad cost -> Just (cost, Nothing)
   Keyword.Offspring cost -> Just (cost, Just 1)
+  -- Minted rather than printed, bargain's and conspire's reason: rule 702.174a
+  -- writes this cost's every word in the rulebook and the card prints only the
+  -- [something].
+  Keyword.Gift _ -> Just (giftCost, Just 1)
   Keyword.Replicate cost -> Just (cost, Nothing)
   -- The one arm whose cost is MINTED rather than printed: rule 702.153a writes
   -- the sacrifice out in the rulebook and the card prints only the N.
@@ -3226,6 +3243,18 @@ bargainCost =
   Cost.MkCost
     { Cost.mana = Just (ManaCost.MkManaCost []),
       Cost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Enchantment, Filter.IsToken]))]
+    }
+
+-- CR 702.174a's additional cost: "you may choose an opponent". No mana and one
+-- component, bargainCost's shape -- the card prints gift with its [something]
+-- alone, and rule 702.174a states the cost.
+--
+-- An EMPTY mana part, casualtyCost's reason.
+giftCost :: Cost Keyword
+giftCost =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost []),
+      Cost.components = [CostComponent.ChooseOpponent]
     }
 
 -- CR 702.194a's additional cost: "you may tap any number of creatures you
@@ -4077,6 +4106,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Ravenous -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.InSlot Binding.variableX)))))
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
+  Keyword.Gift _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   -- CR 702.94a's static half is a PERMISSION to reveal, not a replacement: CR
@@ -4350,6 +4380,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
+  Keyword.Gift _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
@@ -4637,6 +4668,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Ravenous -> []
   Keyword.Squad _ -> []
   Keyword.Offspring _ -> []
+  Keyword.Gift _ -> []
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
@@ -4777,6 +4809,7 @@ familyOf keyword = case keyword of
   Keyword.Ravenous -> Nothing
   Keyword.Squad _ -> Just KeywordFamily.Squad
   Keyword.Offspring _ -> Just KeywordFamily.Offspring
+  Keyword.Gift _ -> Just KeywordFamily.Gift
   Keyword.Replicate _ -> Just KeywordFamily.Replicate
   Keyword.Recover _ -> Just KeywordFamily.Recover
   Keyword.Ripple _ -> Just KeywordFamily.Ripple
@@ -6268,6 +6301,36 @@ squad cost = paidTokenCopies (Keyword.Squad cost) (Quantity.TimesPaid (Keyword.S
 -- makes the 1/1 part of the token's copiable values.
 offspring :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 offspring cost = paidTokenCopies (Keyword.Offspring cost) (Quantity.Literal 1) [CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 1 1)]
+
+-- CR 702.174b's triggered ability on a permanent: "When this permanent enters,
+-- if its gift cost was paid, [effect]", the effect being whatever rule 702.174d-i
+-- writes for the [something] -- CR 702.174e's card, so "the chosen player draws a
+-- card".
+--
+-- The intervening "if" is CR 603.4's, evoke's and paidTokenCopies' reading:
+-- Quantity.TimesPaid reads Object.paidCosts, which CR 707.2 does not copy and CR
+-- 400.7 clears on every move but rule 400.7d's -- so a Clone of the permanent and
+-- one that re-enters promised nobody anything and do not trigger.
+--
+-- "The chosen player" is PlayerRef.ChosenPlayerOfBound over CR 113.7a's source
+-- slot, which reads Object.chosenPlayer off the permanent. Rule 702.174a's cost
+-- wrote that field on the SPELL and CR 400.7d carries it to the permanent
+-- (Pawl.Engine.Event.changeZoneAttaching), which is why the seat survives a move
+-- that clears the spell's bindings.
+gift :: Gift.Gift -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+gift something =
+  let effect = case something of
+        Gift.Card -> Effect.Draw Draw.MkDraw {Draw.player = PlayerRef.ChosenPlayerOfBound Binding.triggerSource, Draw.quantity = Quantity.Literal 1, Draw.slot = Nothing}
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening =
+            Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (Keyword.Gift something)) Comparison.AtLeast (Quantity.Literal 1))),
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- The ability CR 702.157a and CR 702.175a share: when this enters, if the
 -- additional cost that keyword offers was paid (CR 601.2b), create `quantity`

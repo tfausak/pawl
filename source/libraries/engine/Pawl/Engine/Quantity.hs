@@ -136,6 +136,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- permanent its own earlier clause has already bounced, and a last-known
         -- aware view is what still names them.
         PlayerRef.ControllerOfBound _ -> Count.playersFor viewOf context gs ref
+        -- The arm above's route: Count.playersFor reads the slot the same way.
+        PlayerRef.ChosenPlayerOfBound _ -> Count.playersFor viewOf context gs ref
         PlayerRef.EachPlayer -> Count.playersFor viewOf context gs ref
         PlayerRef.EachPlayerExcept _ -> Count.playersFor viewOf context gs ref
         PlayerRef.EachOpponentExcept _ -> Count.playersFor viewOf context gs ref
@@ -1226,6 +1228,8 @@ playerRefIsSlotless ref = case ref of
   -- InSlot's answer, and for its reason: the slot is a TARGET slot, which
   -- Resolve.Slots.quantitySlots reports by folding nestedRefs.
   PlayerRef.ControllerOfBound _ -> False
+  -- The arm above's answer: the object is named by a slot.
+  PlayerRef.ChosenPlayerOfBound _ -> False
   -- InSlot's answer again: the player attacked is named by a slot.
   PlayerRef.Attacking _ -> False
 
@@ -1292,6 +1296,7 @@ forCandidate pid =
         PlayerRef.EachInSlot _ -> ref
         PlayerRef.Specific _ -> ref
         PlayerRef.ControllerOfBound _ -> ref
+        PlayerRef.ChosenPlayerOfBound _ -> ref
         PlayerRef.Attacking _ -> ref
    in QuantitySlot.mapPlayerRefs substitute (\c -> c {Count.Type.scope = QuantitySlot.mapScope substitute (Count.Type.scope c)})
 
@@ -1328,6 +1333,9 @@ bakePlayerRef players ref = case ref of
   -- goes unanswered and ends, which is Pawl.Engine.Condition.holds' stated
   -- collapse; no card in the pool stores one (#3058).
   PlayerRef.ControllerOfBound _ -> ref
+  -- LEFT STANDING for the arm above's reason: this map holds the PLAYERS a
+  -- resolution's slots name, and this reference names a slot holding an OBJECT.
+  PlayerRef.ChosenPlayerOfBound _ -> ref
   -- LEFT STANDING for ControllerOfBound's reason, plus one of its own: the slot
   -- this names holds a PLAYER, but what the reference reads is the live combat
   -- record, which no baking can fix in place.

@@ -1754,6 +1754,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Candidate -> True
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
+          -- One seat -- the arm above's answer, one record over.
+          PlayerRef.ChosenPlayerOfBound _ -> True
           -- A SET -- Relative Opponent's answer, and for its reason: CR 508.6 is
           -- a predicate over the table rather than a name for one seat.
           PlayerRef.Attacking _ -> False

@@ -252,6 +252,11 @@ data KeywordFamily
   | -- | CR 702.175a: offspring [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Offspring
+  | -- | CR 702.174a: gift a [something]. The family a card writing "a spell with
+    -- gift" would name, as against one card's own [something]; no card in the
+    -- pool asks yet, and it is owed at the keyword rather than at the first
+    -- asker.
+    Gift
   | -- | CR 702.56a: replicate [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Replicate

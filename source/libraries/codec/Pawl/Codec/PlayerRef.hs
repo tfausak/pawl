@@ -35,6 +35,7 @@ codec =
       -- CR 608.2h's reference, which a card writes: Spikeshell Harrier names the
       -- controller of the permanent its trigger targeted.
       Arm.payload "ControllerOfBound" SlotName.codec PlayerRef.ControllerOfBound (\x -> case x of PlayerRef.ControllerOfBound y -> Just y; _ -> Nothing),
+      Arm.payload "ChosenPlayerOfBound" SlotName.codec PlayerRef.ChosenPlayerOfBound (\x -> case x of PlayerRef.ChosenPlayerOfBound y -> Just y; _ -> Nothing),
       -- CR 508.6's set, which a card writes: Curse of Vitality names "each
       -- opponent attacking that player".
       Arm.payload "Attacking" AttackingPlayers.codec PlayerRef.Attacking (\x -> case x of PlayerRef.Attacking y -> Just y; _ -> Nothing)
@@ -51,4 +52,5 @@ tagOf x = case x of
   PlayerRef.Specific {} -> "Specific"
   PlayerRef.Candidate {} -> "Candidate"
   PlayerRef.ControllerOfBound {} -> "ControllerOfBound"
+  PlayerRef.ChosenPlayerOfBound {} -> "ChosenPlayerOfBound"
   PlayerRef.Attacking {} -> "Attacking"

@@ -242,5 +242,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.MillCards 1)
       " {\"type\":\"MillCards\",\"value\":1} "
+  -- CR 702.174a as a cost, nullary on the wire for FlipCoin's reason above: the
+  -- rule fixes every word but the payer's own call -- Scrapshooter's gift.
+  Spec.it s "ChooseOpponent" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.ChooseOpponent
+      " {\"type\":\"ChooseOpponent\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec
