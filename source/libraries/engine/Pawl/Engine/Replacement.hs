@@ -1936,8 +1936,9 @@ readsApplier re = case re of
   --
   -- Not implemented: two such rows alike in `effect` and unlike in `source` would
   -- offer different cards if the card's filter named its own source, and
-  -- `distinguishing` below folds `source` in nowhere, so the choice between them
-  -- is elided (#3215).
+  -- `readsSource` below answers False for this arm -- the one printing's filter
+  -- is `And []`, which names no source -- so the choice between them is elided
+  -- (#3215).
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame _)) -> False
   -- The miller is the seat the EVENT named and the count is the effect's own
   -- field, so GainLife's answer above carries over. The card returned rides the
@@ -1986,6 +1987,9 @@ readsSource :: ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effe
 readsSource effect = case effect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> True
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
+  -- Not implemented: the wish filter IS scanned under a Filter.Context naming
+  -- this candidate's source, so a filter that named it would make two such rows
+  -- differ; the one printing's is `And []` (#3215).
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame _)) -> False
   ReplacementEffect.ZoneChangeR {} -> False
   ReplacementEffect.EntryR {} -> False

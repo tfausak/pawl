@@ -4297,8 +4297,9 @@ replacementsAffecting gs =
       -- MINTED rows are deliberately absent from THIS arm: CR 122.1's counters do
       -- not survive the trip off the battlefield (CR 122.2), and every other
       -- minted row a projection carries is CR 614.1c's entry rewrite, which a
-      -- card that is not entering cannot use. The one rule that mints a row into
-      -- a hidden zone is CR 702.35a, and `mintedInHand` below is its own arm.
+      -- card that is not entering cannot use. Two rules mint a row into a zone
+      -- this arm reads -- CR 702.35a into a hand and CR 702.52a into a graveyard
+      -- -- and `mintedInHand` and `mintedInGraveyard` below are their own arms.
       --
       -- CR 406.3a: a card exiled face down has no characteristics, so it carries
       -- no row to state anything. Object.exiledFaceDown is CR 406.3's status,
@@ -4336,10 +4337,11 @@ replacementsAffecting gs =
                   (\pr -> (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr))
                   (filter (\pr -> keeps pr && printedRowLives oid gs pr) (Face.replacementEffects face))
       -- CR 702.35a's replacement, minted for a card in a HAND rather than read
-      -- off its printed list -- `statedFrom`'s sibling, and the one place a
-      -- rule mints a row into a zone the two projecting walks above do not
-      -- reach. Pawl.Engine.Keyword.handReplacementsOf is what decides which
-      -- keywords reach it, and madness is the only one.
+      -- off its printed list -- `statedFrom`'s sibling, and one of the two
+      -- places a rule mints a row into a zone the two projecting walks above do
+      -- not reach (`mintedInGraveyard` below is the other).
+      -- Pawl.Engine.Keyword.handReplacementsOf is what decides which keywords
+      -- reach it, and madness is the only one.
       --
       -- The PRINTED face, `statedFrom`'s read and for its reason: `project` is
       -- what the short-circuit exists to skip, so a madness ability an effect

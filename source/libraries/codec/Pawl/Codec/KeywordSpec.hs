@@ -852,6 +852,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.46a's N is written like the rest, and it is a MANA VALUE BOUND rather
   -- than a count, so a collision with a same-numbered keyword would be a real
   -- misread.
+  Spec.it s "Dredge carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Dredge 3)
+      " {\"type\":\"Dredge\",\"value\":3} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Dredge 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
+      "dredge 3 is not bushido 3"
   Spec.it s "Soulshift carries its N" $ do
     Common.assertCodec
       s

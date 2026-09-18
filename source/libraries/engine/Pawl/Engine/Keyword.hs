@@ -3694,12 +3694,17 @@ handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts key
 -- walk, so a dredge an effect granted to a card in a graveyard mints nothing
 -- (gap #1859).
 --
--- ONE ROW PER dredge ability rather than one however many, unlike madness
--- above: each states its own N, so two of them are two distinguishable CR 616.1
--- candidates and the player picks which to dredge for.
+-- ONE ROW PER DISTINCT dredge ability, which is what a keyword SET gives and
+-- what rule 702.52 asks for: each ability states its own N, so two unlike ones
+-- are two distinguishable CR 616.1 candidates, and rule 702.52 states no
+-- multiplicity clause for two alike. Scryfall `keyword:dredge`, 2026-09-18,
+-- answers no card printing two dredge abilities; a printing with two would be
+-- what tells the two readings apart.
+--
+-- A wildcard rather than an exhaustive case, `madnessCosts` above's reason.
 --
 -- ControllerRelation.Yours is rule 702.52a's "you": the card is in a graveyard,
--- where CR 108.4 leaves its owner the only seat, and
+-- where CR 108.4 gives it no controller and CR 108.4a substitutes its owner, and
 -- Pawl.Engine.Replacement.applies reads the relation off the candidate's
 -- controller, which for a graveyard card is that owner.
 graveyardReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]

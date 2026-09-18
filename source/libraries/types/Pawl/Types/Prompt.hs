@@ -483,12 +483,10 @@ data Prompt r where
   -- Replacement.readsApplier, in CR 109.5's "you".
   ChooseReplacement :: Decider.Decider -> PlayerId.PlayerId -> [ReplacementEntry.ReplacementEntry] -> Prompt Natural.Natural
   -- | CR 702.52a: whether a draw is replaced by dredge -- Exercises mills the
-  -- payload's N and returns the card, Declines leaves the draw standing. The
-  -- ObjectId is the card in the graveyard, which is what tells two dredgers
-  -- apart. Its own constructor rather than a shared "may", the as-enters
-  -- answers' reason: a transcript must not answer one optional replacement as
-  -- another. Never elided -- CR 702.52a's "you may" is a real choice whenever
-  -- Pawl.Engine.Replacement.applies offers the row.
+  -- payload's N and returns the card in the graveyard the ObjectId names,
+  -- Declines leaves the draw standing. Its own constructor for the as-enters
+  -- answers' reason. Never elided: rule 702.52a's "you may" is a real choice
+  -- wherever Pawl.Engine.Replacement.applies offers the row.
   ChooseDredge :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt OptionalDecision.OptionalDecision
   -- | CR 701.21a: which of the payer's matching permanents are sacrificed to
   -- pay a cost, the Natural how many; asked only with more candidates than the

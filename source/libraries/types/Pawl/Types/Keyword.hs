@@ -262,8 +262,8 @@ data Keyword
     Convoke
   | -- | 702.52a: dredge N -- a static ability functioning only from a graveyard,
     -- replacing a draw with "mill N cards and return this card from your
-    -- graveyard to your hand" when the library holds at least N cards.
-    -- Pawl.Engine.Keyword.graveyardReplacementsOf mints the row.
+    -- graveyard to your hand"; Pawl.Engine.Keyword.graveyardReplacementsOf
+    -- mints the row.
     Dredge Natural.Natural
   | -- | 702.54a: bloodthirst N -- if an opponent was dealt damage this turn, this
     -- permanent enters with N +1/+1 counters on it; a CR 614.1c entry replacement
