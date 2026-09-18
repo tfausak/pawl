@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Blight as Blight
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cloak as Cloak
 import qualified Pawl.Engine.Coin as Coin
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
@@ -2443,6 +2444,10 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- CR 701.48a is two "you may"s, and declining both is an outcome the rule
   -- states rather than an impossibility, so nothing here refuses the offer.
   Effect.Learn -> False
+  -- CR 701.58a names the top card of a library, and a player whose library is
+  -- empty simply has none: CR 609.3 leaves the rest of the effect to do as much
+  -- as it can rather than CR 608.2d refusing the instruction.
+  Effect.Cloak {} -> False
   Effect.Venture {} -> False
   -- CR 608.2d's own worked example: a player who controls nothing the edict
   -- matches cannot sacrifice one. Through Replacement.sacrificeCandidates, so CR
@@ -7590,6 +7595,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Learn.learn's, prompts and all. `source` is the object the
   -- card brought in from outside the game is credited to (CR 400.11c).
   Effect.Learn -> Learn.learn controller resolving source
+  -- CR 701.58a: the named players each cloak the top card of their library; the
+  -- keyword action is Pawl.Engine.Cloak.cloak's, listing and all. APNAP (CR
+  -- 608.2f) orders the several, which is Effect.Shuffle's posture and for its
+  -- reason: the order is a fact about the rules rather than about PlayerId's Ord.
+  Effect.Cloak ref -> do
+    gs <- State.get
+    let named = Set.fromList (playerRefPlayers legal controller gs ref)
+    Monad.mapM_ Cloak.cloak (filter (`Set.member` named) (Game.apnapOrder gs))
   -- CR 701.49: the whole keyword action, which Pawl.Engine.Dungeon owns.
   Effect.Venture quality -> Dungeon.venture controller quality
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do

@@ -21,6 +21,7 @@ import qualified Pawl.CastProhibitionSpec
 import qualified Pawl.CastRestrictionSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.ClassSpec
+import qualified Pawl.CloakSpec
 import qualified Pawl.Codec.AbilityAddsManaSpec
 import qualified Pawl.Codec.AbilityKindSpec
 import qualified Pawl.Codec.AbilityNameSpec
@@ -1153,6 +1154,7 @@ spec s registry = do
   Pawl.Codec.ZoneScopeSpec.spec s
   Pawl.Codec.ZoneSpec.spec s
   Pawl.CodecIntegrationSpec.spec s registry
+  Pawl.CloakSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatEffectSpec.spec s registry
   Pawl.PlaneswalkerCombatSpec.spec s registry

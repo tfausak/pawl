@@ -214,10 +214,12 @@ import qualified Pawl.Types.TapState as TapState
 -- pool names an attachment, and putFound carries CR 303.4a's fixed host down its
 -- own road instead.
 --
--- CR 701.58a's cloak is one value of this rider: the 2/2 with ward {2} that
--- FaceDownCharacteristics.disguisedValue is, listed under
--- FaceDownReason.Disguised, which is the reason CR 701.58d makes a cloaked
--- permanent turnable by. That pairing is the one a Bool could not say at all.
+-- NOT the road CR 701.58a's cloak takes, though the pairing it needs -- the 2/2
+-- with ward {2} FaceDownCharacteristics.disguisedValue is, under
+-- FaceDownReason.Cloaked -- is one this rider could carry, and is the one a Bool
+-- could not say at all. The keyword action mints it in the engine instead
+-- (Pawl.Engine.Cloak), rule 701.58a fixing the listing so that no printing has
+-- anything to say about it.
 data EntryRiders count = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Maybe EntryAttack.EntryAttack,

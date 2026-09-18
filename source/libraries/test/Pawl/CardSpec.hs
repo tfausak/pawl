@@ -650,6 +650,7 @@ playerRefPositions =
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
+        ("cloak", Effect.Cloak (plantedPlayer "ck"), [plantedPlayer "ck"]),
         ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue CastRepetition.Once), [plantedPlayer "oc-caster"]),
         -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
@@ -1096,6 +1097,7 @@ ownCounts effect = case effect of
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.Learn -> []
+  Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
@@ -1480,6 +1482,7 @@ effectNestedEffects effect = case effect of
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.Learn -> []
+  Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
@@ -1936,6 +1939,7 @@ effectReplacements effect = case effect of
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.Learn -> []
+  Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
@@ -2357,6 +2361,7 @@ effectMintedFaces effect = case effect of
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.Learn -> []
+  Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
@@ -5046,6 +5051,7 @@ effectFilters effect = case effect of
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.Learn -> []
+  Effect.Cloak {} -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed [f] <> frame Unframed (quantityFilters quantity)

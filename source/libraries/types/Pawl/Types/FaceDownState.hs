@@ -6,8 +6,8 @@ import qualified Pawl.Types.FaceDownReason as FaceDownReason
 -- | CR 708.2: the whole of what the game knows about a face-down object -- the
 -- ability or rules that ALLOWED it to be face down (CR 708.6), and the
 -- characteristics that allower LISTED for it. Morph, manifest and Backslide
--- list nothing and carry 'FaceDownCharacteristics.defaultValue'; disguise and an
--- entry rider that lists its own carry something else.
+-- list nothing and carry 'FaceDownCharacteristics.defaultValue'; disguise, cloak
+-- and an entry rider that lists its own carry something else.
 --
 -- The reason is first because CR 708.2's own sentence puts it first: the listed
 -- characteristics are "those listed by the ability or rules that allowed the
@@ -21,8 +21,8 @@ data FaceDownState = MkFaceDownState
 
 -- | CR 708.2a's list, named by the rule that allowed it: what a producer that
 -- specifies no characteristics of its own carries. Morph, manifest and
--- Effect.TurnFaceDown's Backslide all take this; the two that do not are
--- disguise ('FaceDownCharacteristics.disguisedValue') and an entry that lists
--- its own (Pawl.Types.EntryRiders' faceDown).
+-- Effect.TurnFaceDown's Backslide all take this; the ones that do not are
+-- disguise and cloak ('FaceDownCharacteristics.disguisedValue') and an entry
+-- that lists its own (Pawl.Types.EntryRiders' faceDown).
 defaultFor :: FaceDownReason.FaceDownReason -> FaceDownState
 defaultFor r = MkFaceDownState {reason = r, listed = FaceDownCharacteristics.defaultValue}

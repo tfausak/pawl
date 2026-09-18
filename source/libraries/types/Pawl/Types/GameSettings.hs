@@ -12,8 +12,8 @@ import qualified Pawl.Types.Teams as Teams
 -- CR factors itself: a named format is a preset over these fields, and CR
 -- 903.12a says so outright for the Brawl field ("Brawl is an option for a
 -- different style of Commander game"). Each further option -- CR 804's deploy
--- creatures (#2850), CR 801.2a's range of influence -- is one more field
--- rather than one more name (#175). CR 802's and CR 803's three attack options
+-- creatures (#2850), CR 801.2a's range of influence (#2831) -- is one more
+-- field rather than one more name. CR 802's and CR 803's three attack options
 -- share ONE field, because CR 806.2b makes them alternatives rather than
 -- independent switches (Pawl.Types.AttackOption).
 --

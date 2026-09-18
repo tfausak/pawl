@@ -308,6 +308,7 @@ manaProduced effect = case effect of
   Effect.Forage -> Nothing
   Effect.Populate -> Nothing
   Effect.Learn -> Nothing
+  Effect.Cloak {} -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
@@ -516,6 +517,9 @@ movesLibraryCard effect = case effect of
   -- CR 701.48a's middle sentence is a draw, which Effect.Draw's arm above
   -- already makes a library move; an ability that learns is no mana ability.
   Effect.Learn -> True
+  -- CR 701.58a takes the top card of a library and puts it onto the
+  -- battlefield, so an ability that cloaks is no mana ability.
+  Effect.Cloak {} -> True
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
   Effect.Vote {} -> False
