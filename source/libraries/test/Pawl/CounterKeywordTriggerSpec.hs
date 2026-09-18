@@ -915,10 +915,12 @@ cumulativeUpkeepSpec s registry =
 -- Pawl.ZoneTriggerSpec's counterLookBackSpec proves the same record answering
 -- an intervening "if"; this is the first read of it at RESOLUTION.
 --
--- Two printings, so no number below can be read two ways:
+-- Printings at distinct N, so no number below can be read two ways:
 --
 --   * Arcbound Hybrid {4} Artifact Creature -- Beast 0/0, haste and modular 2.
 --   * Arcbound Worker {1} Artifact Creature -- Construct 0/0, modular 1.
+--   * Arcbound Overseer {8} Artifact Creature -- Golem 0/0, modular 6, for the
+--     family case at the end.
 --
 -- The dying Hybrid is SEEDED to three counters against its printed modular 2,
 -- which is the discriminator that matters: an implementation reading the
@@ -982,6 +984,38 @@ modularSpec s registry =
             entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
             named oid = fmap Face.name (Game.faceOf oid entered) == Just (CardName.MkCardName (Text.pack name))
         pure (List.find named (Set.toList (GameState.battlefield entered)), entered)
+      -- One upkeep for alice, run to the end of the priority loop, so the
+      -- trigger is gathered (CR 603.3) and resolved. vanishingSpec's helper.
+      upkeepOf gs =
+        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)) (gs {GameState.phase = Phase.Beginning BeginningStep.Upkeep, GameState.activePlayer = S.alice})
+            settled = snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
+         in snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop)
+      -- The board Arcbound Overseer's "each creature you control with modular"
+      -- reads: four creatures over that filter's three conjuncts. The Overseer
+      -- itself (modular 6); alice's Worker (modular 1, the discriminator); an
+      -- Icehide Golem alice controls, an artifact creature of the Overseer's own
+      -- subtype differing from it in nothing the filter reads but the modular;
+      -- and a Worker BOB controls. PLACED rather than cast, so rule 702.43a's
+      -- entry replacement never runs and every pile below is this fixture's;
+      -- each carries a distinct seeded pile, so a printed 0/0 survives CR 704.5f
+      -- and no two numbers can be read for one another.
+      familyBoard = do
+        swamp <- S.printingOf s registry "Swamp"
+        overseer <- S.printingOf s registry "Arcbound Overseer"
+        worker <- S.printingOf s registry "Arcbound Worker"
+        golem <- S.printingOf s registry "Icehide Golem"
+        let (overseerId, g1) = S.addPermanent overseer S.alice (S.landsInPlay swamp 3)
+            g2 = S.addCounter CounterKind.PlusOnePlusOne 3 overseerId g1
+            (workerId, g3) = S.addPermanent worker S.alice g2
+            g4 = S.addCounter CounterKind.PlusOnePlusOne 1 workerId g3
+            (golemId, g5) = S.addPermanent golem S.alice g4
+            g6 = S.addCounter CounterKind.PlusOnePlusOne 7 golemId g5
+            (theirsId, g7) = S.addPermanent worker S.bob g6
+            g8 = S.addCounter CounterKind.PlusOnePlusOne 5 theirsId g7
+            -- CR 104.3c: the loop below runs past the upkeep, so both seats need
+            -- more library than they draw.
+            stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard swamp pid h)) g [1 .. 5 :: Int]
+        pure (overseerId, workerId, golemId, theirsId, stock S.bob (stock S.alice g8))
    in Spec.describe s "Modular" $ do
         -- Rule 702.43a's FIRST ability, at both printed values: the N is the
         -- card's and not the rule's, so one leg alone could not tell a mint that
@@ -1047,6 +1081,21 @@ modularSpec s registry =
           let (settled, after) = murderIt exercising gs
           Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
           Spec.assertEqWith s "and the Piker is still on the one it started with" (plusOnes pikerId after) 1
+        -- The FAMILY, rule 702.43a's N dropped: Arcbound Overseer {8} Artifact
+        -- Creature -- Golem 0/0, "At the beginning of your upkeep, put a +1/+1
+        -- counter on each creature you control with modular. / Modular 6"
+        -- (Oracle verified 2026-09-18), whose filter is Filter.HasKeywordFamily
+        -- rather than Filter.HasKeyword. The Worker's modular 1 is the
+        -- discriminator: an implementation matching the WRITTEN keyword reaches
+        -- only the Overseer's own modular 6.
+        Spec.it s "CR 702.43a whole card: Arcbound Overseer's upkeep trigger reads modular as a family, not as a number" $ do
+          (overseerId, workerId, golemId, theirsId, gs) <- familyBoard
+          let after = upkeepOf gs
+          Spec.assertEqWith s "the Worker's modular 1 is modular all the same, so it is up to two" (plusOnes workerId after) 2
+          Spec.assertEqWith s "and a 2/2" (S.powerToughnessOf workerId after) (Just (2, 2))
+          Spec.assertEqWith s "the Overseer's own modular 6 matches too, four from three" (plusOnes overseerId after) 4
+          Spec.assertEqWith s "the Icehide Golem has no modular, so it keeps its seven" (plusOnes golemId after) 7
+          Spec.assertEqWith s "and bob's Worker is no creature alice controls" (plusOnes theirsId after) 5
         -- CR 702.43b: each instance works separately. Asserted of BOTH mints,
         -- vanishing's position, no printing in the pool carrying modular twice.
         -- Spelled out rather than compared against Keyword.modular itself, for

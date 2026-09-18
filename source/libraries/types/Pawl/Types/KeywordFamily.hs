@@ -94,7 +94,8 @@ data KeywordFamily
   | -- | CR 702.42a: entwine [cost].
     Entwine
   | -- | CR 702.43a: modular N. Arcbound Overseer's "each creature you control
-    -- with modular" is the card asking (#3548).
+    -- with modular" is the card asking, over an Arcbound Worker whose modular 1
+    -- is not the Overseer's 6.
     Modular
   | -- | CR 702.45a: bushido N.
     Bushido
