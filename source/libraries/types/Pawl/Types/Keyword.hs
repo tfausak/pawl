@@ -481,12 +481,11 @@ data Keyword
     -- that runs only if that cost was paid, putting N +1/+1 counters on a target
     -- land you control and animating it.
     --
-    -- THE COST ALONE is the payload, Cleave's shape: the spell ability rides the
-    -- CARD as a clause gated on Quantity.CastUsing, so rule 702.113a's N is
-    -- written where the counters are put and nothing here would read a copy of
-    -- it. Nothing in pawl mints a SPELL ability from a keyword, and no printing
-    -- grants awaken to another object, so the two spellings are observably the
-    -- same.
+    -- THE COST ALONE is the payload, Cleave's shape: nothing in pawl mints a
+    -- SPELL ability from a keyword, so the card states that half itself, as a
+    -- clause gated on Quantity.CastUsing, and rule 702.113a's N is written where
+    -- the counters are put rather than copied here. No printing grants awaken to
+    -- another object, which is what makes the two spellings observably the same.
     --
     -- Not implemented: rule 702.113b's "the spell is cast as if it didn't have
     -- that target" -- the land is targeted on an unawakened cast too (#2833).

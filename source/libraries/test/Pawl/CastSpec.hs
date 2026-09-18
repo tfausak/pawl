@@ -3774,9 +3774,8 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
 --
 -- ONE board for both cases, so the negative cannot be a shortage: nine Islands
 -- pay either cost, and the case that leaves the Forest a plain land had the
--- awaken cost available and declined it. The Forest is a land alice controls
--- that pays for nothing, so the reading is of rule 702.113a's target and not of
--- a land that happened to be tapped for mana.
+-- awaken cost available and declined it. The target is a tenth land of a name
+-- of its own, so it is pinned by id and not confused with the nine paying it.
 --
 -- The spell ability rule 702.113a's second half states rides the CARD as a
 -- clause gated on Quantity.CastUsing, cleave's shape; Pawl.Types.Keyword's
@@ -3785,9 +3784,10 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
 -- (#2833) -- which is why both casts here are given a land to aim at.
 --
 -- That clause is written ABOVE the card's own "Exile Part the Waterveil" rather
--- than in printed order, because CR 400.7 clears Object.castUsing as the spell
--- reaches exile and a clause below the move then reads the condition as false.
--- Nothing happens between the two, so the orders are observably the same.
+-- than in printed order: CR 400.7 makes the exiled card a new object with no
+-- memory of the spell, so Object.castUsing is gone by the time a clause below
+-- the move reads it, and the gate answers false. Nothing happens between the
+-- two, so the orders are observably the same.
 awakenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 awakenSpec s registry = Spec.describe s "Awaken" $ do
   Spec.it s "CR 702.113a awakened, the Forest becomes a 6/6 Elemental creature land with haste; cast for {4}{U}{U} it stays a plain land" $ do
