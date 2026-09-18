@@ -1049,8 +1049,9 @@ clauseIsInert bound legal clause =
 -- that same slot -- Mana Leak's Counter, Amulet of Safekeeping's. The rest read
 -- `you`, which is stamped for every carrier (Binding.you).
 --
--- FOUR ways one player's answer comes out, of which exactly one is "paid": the
--- reference names them but they CANNOT pay (CR 118.3), asked on neither limb;
+-- FIVE ways one player's answer comes out, of which exactly one is "paid": the
+-- reference names them but they have LEFT the game (CR 800.4f) or they CANNOT
+-- pay (CR 118.3), asked on neither limb;
 -- they decline, which only an OPTIONAL cost reaches; they chose to pay -- the
 -- one place the answer is not the raw choice, since Pawl.Engine.Cost.pay
 -- restores the payments an incomplete attempt made and an Unpaid result buys
@@ -1108,12 +1109,8 @@ branchTaken branch wasPaid = case branch of
 -- against the board it left. Each payer spends only their own resources, so the
 -- sequencing is not observable as an ordering of the ACTIONS.
 --
--- Not implemented: CR 800.4f, which drops a cost a player who has left the game
--- would be asked to pay. Neither step of the payer list filters for survival --
--- apnapPlayersOf intersects with Game.apnapOrder, which is SEATING and says so,
--- and Slots.playerRefPlayers guards only its stillPlaying arms, where
--- PlayerRef.ControllerOfBound reaches a departed player through CR 608.2h by
--- design. Whether a board can reach the prompt is the open question (#3859).
+-- A player the reference names who has LEFT the game stays in this list and is
+-- answered False by payGatePaidBy, CR 800.4f.
 payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
 payGatePaid resolving source controller idx cIdx legal announced gate = do
   gs <- State.get
@@ -1148,6 +1145,24 @@ payGatePaid resolving source controller idx cIdx legal announced gate = do
 -- be offering anything at all is its own text's business: rule 702.24a's
 -- intervening "if" is what stops it (CR 603.4), proved at
 -- Pawl.KeywordTriggerSpec's "a Unicorn murdered in response".
+--
+-- CR 800.4f, asked BEFORE CR 118.3 and before the offer: a payer who has left
+-- the game does not pay, and is not asked whether to. That is an answer of False
+-- and not a removal from payGatePaid's map, because CR 118.12a's rewriting makes
+-- "unless" mean "if they don't, [do something]" and an unpaid cost is exactly
+-- what selects that limb -- rule 702.21a's ward counters the spell.
+--
+-- It cannot ride the CR 118.3 test beneath it. A departed player keeps their
+-- CR 102.1 row, so an affordability question asked of their life total or their
+-- last known board can still answer yes. Ward is the reachable case: rule
+-- 702.21a targets nothing, so CR 608.2b never empties Binding.targetingObject
+-- and the trigger resolves after the targeter has gone, with
+-- PlayerRef.ControllerOfBound naming them through CR 608.2h.
+-- Pawl.DepartureSpec's "CR 800.4f a departed player is not offered a ward cost,
+-- and does not pay it" proves this arm.
+--
+-- Not implemented: CR 800.4g, the same situation for a choice that is not a
+-- payment, which the rule hands to another player rather than dropping (#3860).
 payGatePaidBy :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
 payGatePaidBy resolving source controller idx cIdx legal payer gate = do
   gs <- State.get
@@ -1158,7 +1173,7 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
               context = effectContext gs controller source legal (slotBindings resolving gs)
            in maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source quantity)
       cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate))
-  if not (Cost.canPay PaymentSubject.ForNeither payer source cost gs)
+  if notElem payer (Game.stillPlaying gs) || not (Cost.canPay PaymentSubject.ForNeither payer source cost gs)
     then pure False
     else do
       decision <- case PayGate.obligation gate of
