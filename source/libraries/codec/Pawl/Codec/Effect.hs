@@ -25,6 +25,7 @@ import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
+import qualified Pawl.Codec.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Codec.Conjure as Conjure
 import qualified Pawl.Codec.Connive as Connive
 import qualified Pawl.Codec.ControlPlayer as ControlPlayer
@@ -224,7 +225,7 @@ codec cardCodec abilityCodec =
           Arm.payload "AttachBound" AttachBound.codec Effect.AttachBound (\x -> case x of Effect.AttachBound y -> Just y; _ -> Nothing),
           Arm.payload "PlaySubgame" SlotName.codec Effect.PlaySubgame (\x -> case x of Effect.PlaySubgame y -> Just y; _ -> Nothing),
           Arm.payload "ChoosePlayer" ChoosePlayer.codec Effect.ChoosePlayer (\x -> case x of Effect.ChoosePlayer y -> Just y; _ -> Nothing),
-          Arm.payload "ChooseOpponentAtRandom" SlotName.codec Effect.ChooseOpponentAtRandom (\x -> case x of Effect.ChooseOpponentAtRandom y -> Just y; _ -> Nothing),
+          Arm.payload "ChoosePlayerAtRandom" ChoosePlayerAtRandom.codec Effect.ChoosePlayerAtRandom (\x -> case x of Effect.ChoosePlayerAtRandom y -> Just y; _ -> Nothing),
           Arm.payload "RollDie" RollDie.codec Effect.RollDie (\x -> case x of Effect.RollDie y -> Just y; _ -> Nothing),
           Arm.payload "FlipCoin" FlipCoin.codec Effect.FlipCoin (\x -> case x of Effect.FlipCoin y -> Just y; _ -> Nothing),
           Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
@@ -354,7 +355,7 @@ tagOf x = case x of
   Effect.AttachBound {} -> "AttachBound"
   Effect.PlaySubgame {} -> "PlaySubgame"
   Effect.ChoosePlayer {} -> "ChoosePlayer"
-  Effect.ChooseOpponentAtRandom {} -> "ChooseOpponentAtRandom"
+  Effect.ChoosePlayerAtRandom {} -> "ChoosePlayerAtRandom"
   Effect.RollDie {} -> "RollDie"
   Effect.FlipCoin {} -> "FlipCoin"
   Effect.TakeExtraTurn {} -> "TakeExtraTurn"

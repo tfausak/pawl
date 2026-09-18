@@ -54,7 +54,7 @@ encode p answer = case p of
   Prompt.RandomObject _ -> Response.SelectedAtRandom answer
   Prompt.RandomCard _ -> Response.SelectedCardAtRandom answer
   Prompt.ChooseConjuredCard {} -> Response.ChoseConjuredCard answer
-  Prompt.RandomOpponent _ -> Response.SelectedOpponentAtRandom answer
+  Prompt.RandomPlayer _ -> Response.SelectedPlayerAtRandom answer
   Prompt.RollDie _ -> Response.RolledDie answer
   Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
   Prompt.FlipCoin -> Response.FlippedCoin answer
@@ -199,8 +199,8 @@ decode p response = case p of
   Prompt.ChooseConjuredCard {} -> case response of
     Response.ChoseConjuredCard name -> Just name
     _ -> Nothing
-  Prompt.RandomOpponent _ -> case response of
-    Response.SelectedOpponentAtRandom pid -> Just pid
+  Prompt.RandomPlayer _ -> case response of
+    Response.SelectedPlayerAtRandom pid -> Just pid
     _ -> Nothing
   Prompt.RollDie _ -> case response of
     Response.RolledDie n -> Just n
@@ -577,9 +577,9 @@ defaultAnswer p = case p of
   -- answerer, or it proves nothing about an engine that reveals the first card
   -- unasked (Pawl.ResolveSpec's "RandomReveal" pair).
   Prompt.RandomObject candidates -> NonEmpty.head candidates
-  -- The head of the offer is always one of the offered opponents, and FIXED for
+  -- The head of the offer is always one of the offered players, and FIXED for
   -- the reason RandomObject gives just above.
-  Prompt.RandomOpponent candidates -> NonEmpty.head candidates
+  Prompt.RandomPlayer candidates -> NonEmpty.head candidates
   -- The head of the offer is always one of the offered cards, and FIXED for the
   -- reason RandomObject gives just above.
   Prompt.RandomCard candidates -> NonEmpty.head candidates

@@ -706,7 +706,7 @@ combatReplaySpec s =
             printed
         -- #136 / CR 729.2: "Randomly determine which player goes first." The
         -- determination is randomness, not a choice, so the prompt carries NO
-        -- Decider -- Shuffle, RandomObject, RandomOpponent and RandomCard below
+        -- Decider -- Shuffle, RandomObject, RandomPlayer and RandomCard below
         -- are the others. Recording it is what keeps a subgame replayable: the
         -- randomness lives in the interpreter, and the transcript carries what
         -- it rolled.
@@ -748,24 +748,24 @@ combatReplaySpec s =
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseCardInHand (ObjectId.MkObjectId 7))) Nothing
         -- The fourth Decider-less prompt: Ruhan of the Fomori's "choose an
         -- opponent at random". RandomObject's reasons, one type over.
-        Spec.it s "RandomOpponent round-trips through the transcript" $ do
-          let p = Prompt.RandomOpponent (S.bob NonEmpty.:| [S.carol])
+        Spec.it s "RandomPlayer round-trips through the transcript" $ do
+          let p = Prompt.RandomPlayer (S.bob NonEmpty.:| [S.carol])
           Spec.assertEqWith s "carol round trips" (Replay.decode p (Replay.encode p S.carol)) (Just S.carol)
           -- Discriminating: a decode that ignored the response and handed back
           -- the head would pass the leg above by accident of the write order.
           Spec.assertEqWith s "bob round trips" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
-        Spec.it s "a short transcript takes the head of the offered opponents" $
+        Spec.it s "a short transcript takes the head of the offered players" $
           Spec.assertEqWith
             s
             "the head"
-            (Replay.defaultAnswer (Prompt.RandomOpponent (S.bob NonEmpty.:| [S.carol])))
+            (Replay.defaultAnswer (Prompt.RandomPlayer (S.bob NonEmpty.:| [S.carol])))
             S.bob
-        -- The assertion that fails if RandomOpponent reuses Response.ChoseOpponent
-        -- rather than getting its own constructor: both name one opponent, so the
+        -- The assertion that fails if RandomPlayer reuses Response.ChoseOpponent
+        -- rather than getting its own constructor: both name one player, so the
         -- types would not object, and a player's DECISION replaying as randomness
         -- is what Pawl.Types.Response's own rule forbids (CR 701.9b).
         Spec.it s "an opponent CHOICE does not decode as a random selection" $ do
-          let p = Prompt.RandomOpponent (S.bob NonEmpty.:| [S.carol])
+          let p = Prompt.RandomPlayer (S.bob NonEmpty.:| [S.carol])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOpponent S.bob)) Nothing
         -- The fifth Decider-less prompt: Tome of the Infinite's "conjure a
         -- random card from Tome of the Infinite's spellbook". RandomObject's
@@ -813,7 +813,7 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseConjuredCard decider S.alice (CardName.MkCardName (Text.pack "Lightning Bolt") NonEmpty.:| [CardName.MkCardName (Text.pack "Ponder")])))
             (CardName.MkCardName (Text.pack "Lightning Bolt"))
-        -- Another Decider-less prompt: CR 706.1a's die. RandomOpponent's
+        -- Another Decider-less prompt: CR 706.1a's die. RandomPlayer's
         -- reasons, over a RANGE rather than a candidate list.
         Spec.it s "RollDie round-trips through the transcript" $ do
           let p = Prompt.RollDie 20

@@ -107,6 +107,7 @@ import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
+import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -2437,7 +2438,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.ExileHaunting {} -> False
   Effect.PlaySubgame {} -> False
   Effect.ChoosePlayer {} -> False
-  Effect.ChooseOpponentAtRandom {} -> False
+  Effect.ChoosePlayerAtRandom {} -> False
   Effect.RollDie {} -> False
   Effect.FlipCoin {} -> False
   Effect.ExileHandThenDraw {} -> False
@@ -3217,28 +3218,40 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
     Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
   -- ChoosePlayer's twin with the decision replaced by randomness (Ruhan of the
-  -- Fomori): the same filter, the same bind, and the same CR 608.2d moment --
-  -- the question changes, and so does the offer, which is CR 102.3's opponents
-  -- with no scope beside the slot to widen them (#3230). CR 701.9b's distinction
-  -- between "at random" and "the player chooses" is why it is a separate opcode
-  -- and a separate prompt.
+  -- Fomori's "choose an opponent at random", Strax, Sontaran Nurse's "choose a
+  -- player at random"): the same fold, the same bind, and the same CR 608.2d
+  -- moment -- only the question changes. CR 701.9b's distinction between "at
+  -- random" and "the player chooses" is why it is a separate opcode and a
+  -- separate prompt.
+  --
+  -- WHICH players are offered is the payload's PlayerScope, read through the
+  -- same PlayerEffect.playersInScope the deciding twin above reads, against CR
+  -- 109.5's "you" -- so the offer can hold the resolving controller
+  -- (PlayerScope.EachPlayer) and this arm still classifies rather than naming a
+  -- card. Nobody in scope binds nothing (CR 101.3); CR 102.2 leaves
+  -- PlayerScope.Opponents nothing to pick at two seats.
+  --
+  -- ONE prompt where the deciding twin picks between two: Prompt.RandomPlayer
+  -- carries no Decider, so there is no promise about the chooser for a second
+  -- constructor to make.
   --
   -- Game.ask and not Game.choose, since randomness is not CR 104.4b's optional
   -- action. The question goes to the INTERPRETER: the engine does not roll and no
   -- player picks. Filtered rather than trusted, so an answer naming somebody
   -- never offered falls back to the first candidate, the instruction being
   -- mandatory.
-  Effect.ChooseOpponentAtRandom slot -> do
+  Effect.ChoosePlayerAtRandom choice -> do
     gs <- State.get
-    let opponents = Game.opponentsOf controller gs
-    chosenOpponent <- case opponents of
+    let slot = ChoosePlayerAtRandom.slot choice
+        candidates = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayerAtRandom.scope choice))
+    chosenPlayer <- case candidates of
       [] -> pure Nothing
       [sole] -> pure (Just sole)
       first : second : rest -> do
         let offered = first NonEmpty.:| (second : rest)
-        answer <- Game.ask (Prompt.RandomOpponent offered)
+        answer <- Game.ask (Prompt.RandomPlayer offered)
         pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
-    Monad.forM_ chosenOpponent $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
+    Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
   -- CR 706.1: roll a die of the stated kind, and bind CR 706.4's result at the
   -- slot for a later effect of this same resolution to read (Ancient Copper
   -- Dragon's "roll a d20. You create a number of Treasure tokens equal to the

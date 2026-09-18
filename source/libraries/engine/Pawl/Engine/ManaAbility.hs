@@ -406,7 +406,7 @@ manaProduced effect = case effect of
   Effect.AttachBound {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.ChoosePlayer _ -> Nothing
-  Effect.ChooseOpponentAtRandom _ -> Nothing
+  Effect.ChoosePlayerAtRandom _ -> Nothing
   Effect.RollDie {} -> Nothing
   Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
@@ -626,7 +626,7 @@ movesLibraryCard effect = case effect of
   Effect.AttachTargetToEach {} -> False
   Effect.AttachBound {} -> False
   Effect.ChoosePlayer _ -> False
-  Effect.ChooseOpponentAtRandom _ -> False
+  Effect.ChoosePlayerAtRandom _ -> False
   Effect.RollDie {} -> False
   Effect.FlipCoin {} -> False
   -- The card is wherever the slot bound it, which the opcode itself never

@@ -1223,7 +1223,7 @@ ownCounts effect = case effect of
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
-  Effect.ChooseOpponentAtRandom _ -> []
+  Effect.ChoosePlayerAtRandom _ -> []
   -- CR 706.2's modifier and CR 706.1's count are Quantities, so their Counts
   -- are reachable here.
   Effect.RollDie rollDie -> quantityCounts (RollDie.count rollDie) <> foldMap quantityCounts (RollDie.modifier rollDie)
@@ -1547,7 +1547,7 @@ effectNestedEffects effect = case effect of
   Effect.AttachBound {} -> []
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
-  Effect.ChooseOpponentAtRandom {} -> []
+  Effect.ChoosePlayerAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ArmDelayedTrigger {} -> []
@@ -2018,7 +2018,7 @@ effectReplacements effect = case effect of
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
-  Effect.ChooseOpponentAtRandom _ -> []
+  Effect.ChoosePlayerAtRandom _ -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
@@ -2434,7 +2434,7 @@ effectMintedFaces effect = case effect of
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
-  Effect.ChooseOpponentAtRandom _ -> []
+  Effect.ChoosePlayerAtRandom _ -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
@@ -5182,7 +5182,7 @@ effectFilters effect = case effect of
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
-  Effect.ChooseOpponentAtRandom _ -> []
+  Effect.ChoosePlayerAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
   Effect.RollDie rollDie -> frame Unframed (quantityFilters (RollDie.count rollDie) <> foldMap quantityFilters (RollDie.modifier rollDie))
   -- CR 705.1's number of coins is a Quantity, so its filters are reachable here.

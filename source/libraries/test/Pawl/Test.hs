@@ -96,6 +96,7 @@ import qualified Pawl.Codec.ChangeSubtypeWordSpec
 import qualified Pawl.Codec.ChangeTextSpec
 import qualified Pawl.Codec.CharacteristicPTSpec
 import qualified Pawl.Codec.ChooseBetweenSpec
+import qualified Pawl.Codec.ChoosePlayerAtRandomSpec
 import qualified Pawl.Codec.ChoosePlayerSpec
 import qualified Pawl.Codec.ChooserSpec
 import qualified Pawl.Codec.ChosenCardFromAmongSpec
@@ -757,6 +758,7 @@ spec s registry = do
   Pawl.Codec.ChangeTextSpec.spec s
   Pawl.Codec.CharacteristicPTSpec.spec s
   Pawl.Codec.ChooseBetweenSpec.spec s
+  Pawl.Codec.ChoosePlayerAtRandomSpec.spec s
   Pawl.Codec.ChoosePlayerSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
   Pawl.Codec.ChosenCardFromAmongSpec.spec s

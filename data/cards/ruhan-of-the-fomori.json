@@ -66,8 +66,13 @@
                   {
                     "effects": [
                       {
-                        "type": "ChooseOpponentAtRandom",
-                        "value": "opponent"
+                        "type": "ChoosePlayerAtRandom",
+                        "value": {
+                          "scope": {
+                            "type": "Opponents"
+                          },
+                          "slot": "opponent"
+                        }
                       },
                       {
                         "type": "RequireAttack",
