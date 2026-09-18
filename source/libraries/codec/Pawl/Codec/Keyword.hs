@@ -192,6 +192,7 @@ codec =
       Arm.nullary "Ascend" Keyword.Ascend,
       Arm.nullary "Storied" Keyword.Storied,
       Arm.nullary "Exhaust" Keyword.Exhaust,
+      Arm.nullary "Boast" Keyword.Boast,
       Arm.payload "Mobilize" Common.natural Keyword.Mobilize (\x -> case x of Keyword.Mobilize y -> Just y; _ -> Nothing),
       Arm.payload "Firebending" Common.natural Keyword.Firebending (\x -> case x of Keyword.Firebending y -> Just y; _ -> Nothing),
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines,
@@ -367,6 +368,7 @@ tagOf x = case x of
   Keyword.Ascend {} -> "Ascend"
   Keyword.Storied {} -> "Storied"
   Keyword.Exhaust {} -> "Exhaust"
+  Keyword.Boast {} -> "Boast"
   Keyword.Mobilize {} -> "Mobilize"
   Keyword.Firebending {} -> "Firebending"
   Keyword.StartYourEngines {} -> "StartYourEngines"

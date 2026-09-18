@@ -3009,6 +3009,9 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.177a is payload-free: the rider it adds is the rules', and the ability
   -- it modifies is the CARD's own, so any Filter in it is swept there.
   Keyword.Exhaust -> []
+  -- CR 702.142a is payload-free for rule 702.177a's reason: the two riders it
+  -- adds are the rules', and the ability it modifies is the CARD's own.
+  Keyword.Boast -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
   -- TriggeredAbility, so any Filter in it is swept there rather than here.

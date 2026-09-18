@@ -470,6 +470,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Ascend -> []
   Keyword.Storied -> []
   Keyword.Exhaust -> []
+  Keyword.Boast -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
@@ -698,6 +699,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ascend -> []
   Keyword.Storied -> []
   Keyword.Exhaust -> []
+  Keyword.Boast -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1179,6 +1181,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Ascend -> []
   Keyword.Storied -> []
   Keyword.Exhaust -> []
+  Keyword.Boast -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1797,6 +1800,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Ascend -> []
   Keyword.Storied -> []
   Keyword.Exhaust -> []
+  Keyword.Boast -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
   -- rather than the stack.
   Keyword.Exert -> []
@@ -2465,6 +2469,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Ascend -> []
   Keyword.Storied -> []
   Keyword.Exhaust -> []
+  Keyword.Boast -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -4005,6 +4010,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Ascend -> []
   Keyword.Storied -> []
   Keyword.Exhaust -> []
+  Keyword.Boast -> []
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
   -- writes Object.exertedBy directly.
   Keyword.Exert -> []
@@ -4270,6 +4276,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Ascend -> []
   Keyword.Storied -> []
   Keyword.Exhaust -> []
+  Keyword.Boast -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
   -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
@@ -4552,6 +4559,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Ascend -> []
   Keyword.Storied -> []
   Keyword.Exhaust -> []
+  Keyword.Boast -> []
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -4588,11 +4596,12 @@ mintedAttachRestrictionsFor keyword = case keyword of
 -- the lint reject the first card that writes it, which is where it would be
 -- noticed.
 --
--- CR 702.142a's boast and CR 702.193a's power-up are the rule's other two of this
--- shape, and neither has a Pawl.Types.Keyword constructor yet (#3044).
+-- CR 702.193a's power-up is the rule's other keyword of this shape, and it has no
+-- Pawl.Types.Keyword constructor yet (#3044).
 addsRulesToPrintedAbility :: Keyword -> Bool
 addsRulesToPrintedAbility keyword = case keyword of
   Keyword.Exhaust -> True
+  Keyword.Boast -> True
   _ -> False
 
 -- CR 702: does a card's designator name the keyword whose rules this ability is
@@ -4801,6 +4810,7 @@ familyOf keyword = case keyword of
   -- CR 702.177a's exhaust is NULLARY, so it has no family: the keyword itself
   -- is what Pawl.Types.KeywordDesignator.OfNullary names.
   Keyword.Exhaust -> Nothing
+  Keyword.Boast -> Nothing
   Keyword.Exert -> Nothing
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing
