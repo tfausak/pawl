@@ -2274,8 +2274,8 @@ fortifyTarget = SlotName.MkSlotName (Text.pack "fortified")
 -- the RULE rather than on the card, and about CR 608.2b re-asking control at
 -- resolution holds here word for word.
 --
--- "ANOTHER" is @Filter.Not Filter.IsSource@, the spelling CR 601.2c's "another"
--- takes everywhere. It bites on this keyword and on no other attach ability: a
+-- "ANOTHER" is @Filter.Not Filter.IsSource@, the spelling that relation takes
+-- everywhere. It bites on this keyword and on no other attach ability: a
 -- reconfigure Equipment is itself a creature, so its own pool admits it, where an
 -- Equipment with plain equip is not a creature and CR 301.5b keeps it out
 -- already. Pawl.Engine.Attach.attachmentFor's first guard refuses the same move,
