@@ -665,6 +665,13 @@ data Keyword
     -- EntryRewrite row, so it can be ordered against CR 614.16's multipliers
     -- under CR 616.1e.
     Compleated
+  | -- | 702.151a: reconfigure [cost] -- an activated ability attaching this
+    -- Equipment to another target creature you control, plus CR 702.151b's
+    -- layer-4 suppression of its own creature type while it is attached.
+    --
+    -- Not implemented: rule 702.151a's SECOND ability, "[Cost]: Unattach this
+    -- permanent", which has no effect opcode to resolve into (#3849).
+    Reconfigure (Cost.Cost Keyword)
   | -- | 702.152a: blitz [cost] -- an alternative cost; the permanent has haste
     -- and a dies-draw, and is sacrificed at the next end step.
     Blitz (Cost.Cost Keyword)

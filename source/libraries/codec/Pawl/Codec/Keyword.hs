@@ -185,6 +185,7 @@ codec =
       Arm.nullary "Decayed" Keyword.Decayed,
       Arm.nullary "Training" Keyword.Training,
       Arm.nullary "Compleated" Keyword.Compleated,
+      Arm.payload "Reconfigure" (Cost.codec codec) Keyword.Reconfigure (\x -> case x of Keyword.Reconfigure y -> Just y; _ -> Nothing),
       Arm.payload "Miracle" (Cost.codec codec) Keyword.Miracle (\x -> case x of Keyword.Miracle y -> Just y; _ -> Nothing),
       Arm.nullary "ReadAhead" Keyword.ReadAhead,
       Arm.payload "Prototype" Prototype.codec Keyword.Prototype (\x -> case x of Keyword.Prototype y -> Just y; _ -> Nothing),
@@ -368,6 +369,7 @@ tagOf x = case x of
   Keyword.Decayed {} -> "Decayed"
   Keyword.Training {} -> "Training"
   Keyword.Compleated {} -> "Compleated"
+  Keyword.Reconfigure {} -> "Reconfigure"
   Keyword.Miracle {} -> "Miracle"
   Keyword.ReadAhead {} -> "ReadAhead"
   Keyword.Prototype {} -> "Prototype"

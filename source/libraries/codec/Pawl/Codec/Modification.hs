@@ -50,6 +50,7 @@ codec abilityCodec =
           Arm.payload "AddSubtype" Subtype.codec Modification.AddSubtype (\x -> case x of Modification.AddSubtype y -> Just y; _ -> Nothing),
           Arm.payload "AddCardType" CardType.codec Modification.AddCardType (\x -> case x of Modification.AddCardType y -> Just y; _ -> Nothing),
           Arm.payload "SetCardType" CardType.codec Modification.SetCardType (\x -> case x of Modification.SetCardType y -> Just y; _ -> Nothing),
+          Arm.payload "LoseCardType" CardType.codec Modification.LoseCardType (\x -> case x of Modification.LoseCardType y -> Just y; _ -> Nothing),
           Arm.payload "AddSupertype" Supertype.codec Modification.AddSupertype (\x -> case x of Modification.AddSupertype y -> Just y; _ -> Nothing),
           Arm.payload "RemoveSupertype" Supertype.codec Modification.RemoveSupertype (\x -> case x of Modification.RemoveSupertype y -> Just y; _ -> Nothing),
           Arm.payload "ChangeSubtypeWord" ChangeSubtypeWord.codec Modification.ChangeSubtypeWord (\x -> case x of Modification.ChangeSubtypeWord y -> Just y; _ -> Nothing),
@@ -86,6 +87,7 @@ tagOf x = case x of
   Modification.AddSubtype {} -> "AddSubtype"
   Modification.AddCardType {} -> "AddCardType"
   Modification.SetCardType {} -> "SetCardType"
+  Modification.LoseCardType {} -> "LoseCardType"
   Modification.AddSupertype {} -> "AddSupertype"
   Modification.RemoveSupertype {} -> "RemoveSupertype"
   Modification.ChangeSubtypeWord {} -> "ChangeSubtypeWord"

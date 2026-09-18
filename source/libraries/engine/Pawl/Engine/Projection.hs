@@ -140,6 +140,7 @@ layer m = case m of
   Modification.AddSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.SetCardType _ -> Layer.Type
+  Modification.LoseCardType _ -> Layer.Type
   Modification.AddSupertype _ -> Layer.Type
   Modification.RemoveSupertype _ -> Layer.Type
   Modification.ChangeSubtypeWord {} -> Layer.Text
@@ -326,6 +327,14 @@ applyModification viewOf src gs oid unitTypes affected m pc =
             { PC.cardTypes = cardTypesAfter m (PC.cardTypes pc),
               PC.subtypes = Set.filter (correspondsTo unitTypes) (PC.subtypes pc)
             }
+        -- CR 205.1a's removal, which carries the SAME subtype consequence as the
+        -- set above and so is written the same way: the type goes, and a subtype
+        -- left correlating with no card type the object still has goes with it.
+        Modification.LoseCardType _ ->
+          pc
+            { PC.cardTypes = cardTypesAfter m (PC.cardTypes pc),
+              PC.subtypes = Set.filter (correspondsTo unitTypes) (PC.subtypes pc)
+            }
         -- CR 205.4b: a gain inserts into the supertype set. CR 205.4 gives an
         -- object a SET of supertypes, so a second grant does not stack.
         Modification.AddSupertype t ->
@@ -489,6 +498,9 @@ cardTypesAfter m types = case m of
   -- CR 205.1a's set: the new type replaces the existing ones bar the two named
   -- exceptions.
   Modification.SetCardType t -> Set.insert t (Set.filter retainedThroughCardTypeSet types)
+  -- CR 205.1a's removal: this one type goes and the rest stay. No instant/sorcery
+  -- exception, which rule 205.1a states of the SET alone.
+  Modification.LoseCardType t -> Set.delete t types
   Modification.GainKeyword _ -> types
   Modification.GainFlashbackAtManaCost -> types
   Modification.GainEnchant _ -> types
@@ -1072,6 +1084,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.AddSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
         Modification.SetCardType _ -> Just m
+        Modification.LoseCardType _ -> Just m
         Modification.AddSupertype _ -> Just m
         Modification.RemoveSupertype _ -> Just m
         Modification.ChangeSubtypeWord {} -> Just m
@@ -1116,6 +1129,7 @@ quantitiesOf m = case m of
   Modification.AddSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.SetCardType _ -> []
+  Modification.LoseCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
   Modification.ChangeSubtypeWord {} -> []
@@ -1162,6 +1176,9 @@ setsLandSubtype m = case m of
   -- The CARD-TYPE set: CR 305.7 fires on setting a land's SUBTYPE, so making an
   -- object a land does not strip its rules text.
   Modification.SetCardType _ -> False
+  -- The card-type REMOVAL, for the set's reason: CR 305.7 fires on a land's
+  -- SUBTYPE being set, and taking a card type away is not that.
+  Modification.LoseCardType _ -> False
   Modification.AddCardType _ -> False
   -- CR 205.4b changes a supertype and says nothing about subtypes.
   Modification.AddSupertype _ -> False
@@ -1974,6 +1991,8 @@ removesAbilities m = case m of
   -- CR 205.1a's card-type set has no ability clause: Song of the Dryads strips
   -- rules text through the SetLandSubtype it carries beside this.
   Modification.SetCardType _ -> False
+  -- CR 205.1a's removal has no ability clause either.
+  Modification.LoseCardType _ -> False
   -- CR 205.4b changes a supertype and says nothing about abilities.
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False
@@ -2971,6 +2990,9 @@ modificationWrites m = case m of
   -- CR 205.1a's set writes BOTH: the card types it replaces, and the subtypes it
   -- strips along with the types that carried them.
   Modification.SetCardType _ -> Set.fromList [Types, Subtypes]
+  -- The removal writes both for the set's reason, CR 205.1a giving the two one
+  -- subtype consequence.
+  Modification.LoseCardType _ -> Set.fromList [Types, Subtypes]
   Modification.AddSupertype _ -> Set.singleton Supertypes
   Modification.RemoveSupertype _ -> Set.singleton Supertypes
   Modification.SetColor _ -> Set.singleton Colors
@@ -3033,6 +3055,7 @@ modificationReads m = case m of
   Modification.ChangeSubtypeWord {} -> Set.empty
   Modification.AddCardType _ -> Set.empty
   Modification.SetCardType _ -> Set.empty
+  Modification.LoseCardType _ -> Set.empty
   Modification.AddSupertype _ -> Set.empty
   Modification.RemoveSupertype _ -> Set.empty
   Modification.SetColor _ -> Set.empty
@@ -4450,6 +4473,7 @@ grantsKeywordWhere p m = case m of
   Modification.AddSubtype _ -> False
   Modification.AddCardType _ -> False
   Modification.SetCardType _ -> False
+  Modification.LoseCardType _ -> False
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False
   Modification.ChangeSubtypeWord {} -> False
@@ -4498,6 +4522,9 @@ grantsMintingType m = case m of
   Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord _ to) -> to == Subtype.Type.Saga
   Modification.AddCardType cardType -> mintingCardType cardType
   Modification.SetCardType cardType -> mintingCardType cardType
+  -- The REMOVAL grants nothing, so it mints no CR 614.1c row however minting the
+  -- type it takes away is.
+  Modification.LoseCardType _ -> False
   Modification.GainKeyword _ -> False
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False

@@ -354,6 +354,7 @@ abilitiesFor keyword count = case keyword of
   -- instances are two abilities all the same, each asking its own cost.
   Keyword.Echo cost -> List.genericReplicate count (echo cost)
   Keyword.Compleated -> []
+  Keyword.Reconfigure _ -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> List.genericReplicate count training
   Keyword.Renown n -> List.genericReplicate count (renown n)
@@ -726,6 +727,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
+  Keyword.Reconfigure _ -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Prototype _ -> []
@@ -1217,6 +1219,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
+  Keyword.Reconfigure _ -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Prototype _ -> []
@@ -1843,6 +1846,10 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
+  -- CR 702.151a states TWO abilities; only the attach one is minted, the
+  -- unattach half having no opcode to resolve into (#3849). One per instance,
+  -- equip's reading above.
+  Keyword.Reconfigure cost -> List.genericReplicate count (reconfigure cost)
   Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Prototype _ -> []
@@ -2261,6 +2268,55 @@ fortify cost =
 fortifyTarget :: SlotName.SlotName
 fortifyTarget = SlotName.MkSlotName (Text.pack "fortified")
 
+-- CR 702.151a's FIRST ability: "[Cost]: Attach this permanent to another target
+-- creature you control. Activate only as a sorcery." `equip` above with rule
+-- 702.151a's "another" added, and everything that function's haddock says about
+-- the unchanged cost, about CR 115.1e putting "target creature you control" in
+-- the RULE rather than on the card, and about CR 608.2b re-asking control at
+-- resolution holds here word for word.
+--
+-- "ANOTHER" is @Filter.Not Filter.IsSource@, the spelling that relation takes
+-- everywhere. It bites on this keyword and on no other attach ability: a
+-- reconfigure Equipment is itself a creature, so its own pool admits it, where an
+-- Equipment with plain equip is not a creature and CR 301.5b keeps it out
+-- already. Pawl.Engine.Attach.attachmentFor's first guard refuses the same move,
+-- so this is the TARGETING half of one restriction whose attach half is already
+-- written.
+--
+-- CR 702.151b's "stops being a creature" is not here: it is a static ability,
+-- minted by mintedStaticAbilitiesOf below.
+--
+-- Not implemented: rule 702.151a's SECOND ability, "[Cost]: Unattach this
+-- permanent. Activate only if this permanent is attached to a creature and only
+-- as a sorcery", which has no effect opcode to resolve into (#3849).
+reconfigure :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+reconfigure cost =
+  let slot =
+        TargetSlot.required
+          Pool.Creatures
+          (Just (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsSource]))
+      effect = Effect.Attach reconfigureTarget
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = cost,
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reconfigureTarget slot)))
+              (ModeSelection.ChooseExactly 1),
+          -- CR 702.151a's "Activate only as a sorcery", which CR 307.5 spells out.
+          ActivatedAbility.maximumX = [],
+          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          ActivatedAbility.name = Nothing,
+          -- Nothing here and written by `mintedBy` at the roster, the one place that
+          -- knows the keyword by identity rather than by reconstructing it.
+          ActivatedAbility.keyword = Nothing
+        }
+
+-- The slot rule 702.151a's one target is chosen into, equipTarget's position.
+reconfigureTarget :: SlotName.SlotName
+reconfigureTarget = SlotName.MkSlotName (Text.pack "reconfigured")
+
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions are a separate, additive list.
 --
@@ -2502,6 +2558,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
+  Keyword.Reconfigure _ -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Prototype _ -> []
@@ -3674,6 +3731,7 @@ mintedStaticAbilitiesOf =
         Keyword.LivingMetal -> [livingMetal]
         Keyword.Dash _ -> [whilePaid KeywordFamily.Dash (NonEmpty.singleton (Modification.GainKeyword Keyword.Haste))]
         Keyword.Blitz _ -> [whilePaid KeywordFamily.Blitz (Modification.GainKeyword Keyword.Haste NonEmpty.:| [Modification.GainAbility (GrantedAbility.Triggered blitzDraw)])]
+        Keyword.Reconfigure _ -> [reconfigured]
         _ -> []
    in foldMap staticsOf . Set.toAscList
 
@@ -3743,6 +3801,39 @@ livingMetal =
       StaticAbility.modifications =
         Modification.AddCardType CardType.Artifact
           NonEmpty.:| [Modification.AddCardType CardType.Creature]
+    }
+
+-- CR 702.151b: "attaching an Equipment with reconfigure to another creature
+-- causes the Equipment to stop being a creature until it becomes unattached from
+-- that creature" -- a layer-4 card-type REMOVAL (CR 613.1d), which
+-- Pawl.Engine.Projection.layer reads off the modification.
+--
+-- WHILE ATTACHED is written as the affected SET rather than as a condition, which
+-- livingMetal above takes the other way: rule 702.151b's span starts at the
+-- attach and ends at the unattach, and Object.attachedTo is exactly that span, so
+-- @Filter.AttachedTo@ re-asks it on every projection (CR 613.5) with nothing to
+-- expire. Its nested filter is empty rather than "a creature": that atom is False
+-- for a permanent attached to nothing and for one attached to a PLAYER, which is
+-- the whole of the rule's "to another creature" here -- CR 301.5 admits no other
+-- host for an Equipment, and Pawl.Engine.Sba.becomesUnattached detaches it the
+-- moment its host stops being one. An empty nest also asks nothing of the HOST's
+-- own characteristics, which a nest naming a card type would, and so cannot
+-- reach a second object's layers from inside this one's.
+--
+-- CR 205.1a's subtype consequence rides on Modification.LoseCardType, so an
+-- attached Rabbit Battery is an Equipment and no longer a Rabbit.
+--
+-- No functionsFrom, leaving CR 113.6's battlefield default standing: rule
+-- 702.151b speaks of an Equipment that is attached, which only the battlefield
+-- has.
+reconfigured :: StaticAbility.StaticAbility Card
+reconfigured =
+  StaticAbility.MkStaticAbility
+    { StaticAbility.affected = Affected.Matching (Filter.And [Filter.IsSource, Filter.AttachedTo (Filter.And [])]),
+      StaticAbility.condition = Nothing,
+      StaticAbility.functionsFrom = Set.empty,
+      StaticAbility.lingers = Nothing,
+      StaticAbility.modifications = NonEmpty.singleton (Modification.LoseCardType CardType.Creature)
     }
 
 -- CR 702.136a: the AS-ENTERS REPLACEMENT rule 702 gives a permanent for holding
@@ -4104,6 +4195,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- its own, so Pawl.Engine.Projection.intrinsicReplacementsOf reads it off
   -- the same projection this list is minted from.
   Keyword.Compleated -> []
+  Keyword.Reconfigure _ -> []
   -- CR 702.155b's two intrinsic abilities are NOT minted here, and CR 714.3b is
   -- why: rule 714.3b REPLACES rule 714.3a's "enters with a lore counter"
   -- ability rather than adding to it, and that one is minted from the finished
@@ -4393,6 +4485,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- counter clause removed, rule 702.147a stating the restriction flat.
   Keyword.Decayed -> [CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.IsSource) Nothing Nothing)]
   Keyword.Compleated -> []
+  Keyword.Reconfigure _ -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Prototype _ -> []
@@ -4684,6 +4777,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
+  Keyword.Reconfigure _ -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Prototype _ -> []
@@ -4951,6 +5045,7 @@ familyOf keyword = case keyword of
   Keyword.Nightbound -> Nothing
   Keyword.Decayed -> Nothing
   Keyword.Compleated -> Nothing
+  Keyword.Reconfigure _ -> Just KeywordFamily.Reconfigure
   Keyword.ReadAhead -> Nothing
   Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing

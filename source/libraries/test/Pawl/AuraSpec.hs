@@ -249,6 +249,68 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
         Spec.assertEqWith s "CR 702.6d the plain ability, on the same board, attached it to the Goblin" (fmap Object.attachedTo (Game.lookupObject bladeId afterPlain)) (Just (Just (Recipient.ToCreature goblin)))
         Spec.assertEqWith s "which is then 4/1" (Projection.powerOf goblin afterPlain) (Just 4)
       _ -> Spec.assertFailure s "Dúnedain Blade should offer both of rule 702.6's minted abilities"
+  -- CR 702.151a's first ability -- "[Cost]: Attach this permanent to another
+  -- target creature you control. Activate only as a sorcery" -- driven as the
+  -- whole card, plus the two rules that make it mean anything: CR 301.5c's
+  -- "an Equipment that's also a creature can't equip a creature unless that
+  -- Equipment has reconfigure", and CR 702.151b's "attaching an Equipment with
+  -- reconfigure to another creature causes the Equipment to stop being a
+  -- creature until it becomes unattached from that creature".
+  --
+  -- Rabbit Battery ({R} Artifact Creature -- Equipment Rabbit, 1/1: "Haste" /
+  -- "Equipped creature gets +1\/+1 and has haste." / "Reconfigure {R}", checked
+  -- against Scryfall on 2026-09-18) is the producer, and the Goblin Piker the
+  -- host: 2\/1 unequipped and hasteless, so both halves of the Battery's grant
+  -- change something.
+  --
+  -- The attachment is read BEFORE state-based actions and the card type AFTER,
+  -- which is what keeps the two assertions apart. Without rule 702.151b the
+  -- Battery is an attached creature and CR 704.5p (Pawl.Engine.Sba's
+  -- cannotBeAttached) detaches it on the next pass, so the third assertion is
+  -- rule 702.151b's consequence rather than a restatement of it.
+  Spec.it s "CR 702.151b an attached Rabbit Battery is not a creature and stays attached" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    battery <- S.printingOf s registry "Rabbit Battery"
+    let (creature, g1) = S.addPermanent piker S.alice (S.landsInPlay mountain 1)
+        (batteryId, g2) = S.addPermanent battery S.alice g1
+        board = g2 {GameState.priority = Just S.alice}
+        minted = case Projection.abilitiesOf batteryId board of
+          ab : _ -> Just ab
+          [] -> Nothing
+    case minted of
+      Nothing -> Spec.assertFailure s "Rabbit Battery should offer rule 702.151a's minted ability"
+      Just ability -> do
+        let activated = snd (Engine.runGamePure (aimedAtObject creature) board (Activate.activateAbility S.alice batteryId ability))
+            resolved = snd (Engine.runGamePure (aimedAtObject creature) activated Stack.resolveTop)
+            after = S.settleSba resolved
+        Spec.assertEqWith s "CR 301.5c the Equipment creature equipped, reconfigure being that rule's exception" (fmap Object.attachedTo (Game.lookupObject batteryId resolved)) (Just (Just (Recipient.ToCreature creature)))
+        Spec.assertBool s (not (Projection.isCreatureOf batteryId after)) "CR 702.151b and stopped being a creature while attached"
+        Spec.assertEqWith s "CR 704.5p so nothing detaches it" (fmap Object.attachedTo (Game.lookupObject batteryId after)) (Just (Just (Recipient.ToCreature creature)))
+        Spec.assertEqWith s "and the Piker is 3 power" (Projection.powerOf creature after) (Just 3)
+        Spec.assertBool s (Projection.hasKeyword Keyword.Haste creature after) "with haste"
+  -- CR 301.5c's RESTRICTION, the arm the case above is the exception to. One
+  -- board, one move, and the only difference is a Humility on the battlefield:
+  -- CR 613.1f strips the Battery's reconfigure (it is a creature while
+  -- unattached), leaving an Equipment that is also a creature and has no
+  -- reconfigure, which is exactly the permanent rule 301.5c forbids to equip.
+  --
+  -- Effect.Attach directly rather than the minted ability, because Humility has
+  -- taken that ability away too: the question here is what
+  -- Pawl.Engine.Attach.attachmentFor permits, not what may be activated.
+  Spec.it s "CR 301.5c an Equipment creature whose reconfigure Humility removes can't equip" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    battery <- S.printingOf s registry "Rabbit Battery"
+    humility <- S.printingOf s registry "Humility"
+    let (creature, g1) = S.addPermanent piker S.alice (S.landsInPlay mountain 1)
+        (batteryId, plain) = S.addPermanent battery S.alice g1
+        (_, humbled) = S.addPermanent humility S.alice plain
+        slot = SlotName.MkSlotName (Text.pack "target")
+        recipients = Map.singleton slot (Set.singleton (Recipient.ToCreature creature))
+        attachOn g = S.runPure S.identityAnswer g (Resolve.applyEffect batteryId batteryId S.alice recipients recipients (Effect.Attach slot))
+    Spec.assertEqWith s "with reconfigure the Equipment creature equips" (fmap Object.attachedTo (Game.lookupObject batteryId (attachOn plain))) (Just (Just (Recipient.ToCreature creature)))
+    Spec.assertEqWith s "CR 301.5c without it the same move does nothing" (fmap Object.attachedTo (Game.lookupObject batteryId (attachOn humbled))) (Just Nothing)
   -- CR 701.3c: "Attaching an Aura, Equipment, or Fortification on the
   -- battlefield to a different object or player causes [it] to receive a new
   -- timestamp." That feeds CR 613.7's layer ordering, so it is not cosmetic.
@@ -484,7 +546,8 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
   -- reconfigure" -- and so does Skilled Animator's own ruling: "If an
   -- Equipment becomes an artifact creature, it usually can't be attached to
   -- another creature. If it was attached to a creature, it becomes
-  -- unattached." (Bonesplitter has no reconfigure; nothing in the pool does.)
+  -- unattached." (Bonesplitter has no reconfigure; Rabbit Battery does, and the
+  -- "CR 702.151" group below is where that exception is proved.)
   --
   -- Note which SBA does NOT fire here: CR 704.5n needs an ILLEGAL host, and
   -- the Piker is a perfectly legal one. It is the Equipment itself that has
