@@ -71,7 +71,8 @@ import qualified Pawl.Types.Zone as Zone
 -- Brawl is exact today rather than an approximation, and it rests on a
 -- capability pawl lacks rather than on a claim about Magic: Deck.commander is
 -- set by nothing but a Commander deck, and GameSettings carries no Commander
--- variant selection for the two to disagree with (#175).
+-- variant selection for the two to disagree with -- CR 800.2's record holds
+-- options, and no named variant is one of its fields.
 --
 -- Parametric in the designation because it reaches this two ways -- as the
 -- Deck's Printings when a game is built, and as the Player's PrintingIds when one
