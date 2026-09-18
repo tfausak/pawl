@@ -785,9 +785,14 @@ absorbSpec s registry = Spec.describe s "Absorb (CR 702.64)" $ do
       Spec.assertEqWith s "nothing is marked" (S.damageOf venser after) (Just 0)
       Spec.assertEqWith s "and no damage event happened at all" (fmap DamageEvent.amount (S.damageEventsOf after)) []
   -- CR 702.64b's own sentence -- "it will apply separately to damage from other
-  -- sources" -- which is the rule stating the OPPOSITE of CR 615.7 for this
-  -- shield. Two sources, one after the other in the same turn: a countdown of 1
-  -- would cut the first to 2 and let the second's 4 through whole.
+  -- sources" -- read over two events one after the other in the same turn: the
+  -- second source's 4 loses the full 1 again.
+  --
+  -- What this case does NOT tell apart is the CR 615.7 reading: a keyword's row is
+  -- re-minted off the projection for each application, so a countdown would be
+  -- whole again by the second settlement and cut it to 3 as well. The case below,
+  -- where both events are in ONE batch, is the one that discriminates, and the
+  -- mutation to PreventNext reddens it alone.
   Spec.it s "CR 702.64b a second source in the same turn is cut by the full 1 again"
     . withBoard
     $ \_ venser _ source other board -> do
@@ -795,9 +800,11 @@ absorbSpec s registry = Spec.describe s "Absorb (CR 702.64)" $ do
           after = settleDamage S.identityAnswer first_ [hit other (Recipient.ToCreature venser) 4]
       Spec.assertEqWith s "the first source's 3 was cut to 2" (S.damageOf venser first_) (Just 2)
       Spec.assertEqWith s "and the second's 4 to 3, so 5 in all rather than 6" (S.damageOf venser after) (Just 5)
-  -- CR 702.64b's other half read across ONE batch: two simultaneous events from
-  -- different sources each lose their own 1, and nobody is asked which the shield
-  -- covers, since `contestedResource` gives absorb no supply to divide.
+  -- CR 702.64b's other half read across ONE batch, and the case that tells CR
+  -- 615.7 apart from rule 702.64b: two simultaneous events from different sources
+  -- each lose their own 1, where a countdown of 1 would be spent on the first and
+  -- let the second through whole -- 5 marked against 6. Nobody is asked which the
+  -- shield covers either, `contestedResource` giving absorb no supply to divide.
   Spec.it s "CR 702.64b two simultaneous events each lose 1, and nothing is asked"
     . withBoard
     $ \_ venser _ source other board -> do
