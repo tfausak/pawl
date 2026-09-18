@@ -424,6 +424,11 @@ data Response
     -- reason: a transcript that answered one as-enters "may" must not silently
     -- answer a different one.
     ChoseRevealOnEntry (Maybe ObjectId.ObjectId)
+  | -- | CR 508.1g / 702.154a: the creature an attacker with enlist tapped
+    -- (Nothing = declined). Distinct from ChoseRevealOnEntry and
+    -- ChoseCopyTarget, the other Maybe-ObjectId answers, for their reason: a
+    -- transcript that answered one "may" must not silently answer another.
+    ChoseEnlist (Maybe ObjectId.ObjectId)
   | -- | CR 303.4k: whether an Aura being turned face up exercised its printed
     -- "you may attach it" (Exercises) or left itself unattached (Declines).
     -- Distinct from ChoseRiot and ChosePayLifeOnEntry for their own reason, one

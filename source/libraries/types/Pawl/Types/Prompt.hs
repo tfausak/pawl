@@ -283,6 +283,12 @@ data Prompt r where
   -- | CR 508.1g / 701.43d: whether one chosen attacker with exert is exerted;
   -- never elided, CR 701.43b making an exerted creature exertable again.
   ChooseExert :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 508.1g / 702.154a: which creature, if any, one chosen attacker with
+  -- enlist taps -- "up to one", so declining is always an answer and the prompt
+  -- is never elided, one candidate included. The candidates are filtered to rule
+  -- 702.154a's three conjuncts, so an answer outside them is rejected rather
+  -- than repaired.
+  ChooseEnlist :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
   -- | CR 509.1: the legal blockers, then the attackers; the answer maps each
   -- blocking creature to the set it blocks (CR 509.1a's one can be raised), a
   -- non-blocker absent. Pawl.Engine.Combat.legalBlockDeclaration judges it.

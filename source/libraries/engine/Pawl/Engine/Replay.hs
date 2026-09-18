@@ -128,6 +128,7 @@ encode p answer = case p of
   Prompt.ChooseUnleash {} -> Response.ChoseUnleash answer
   Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
   Prompt.ChooseRevealOnEntry {} -> Response.ChoseRevealOnEntry answer
+  Prompt.ChooseEnlist {} -> Response.ChoseEnlist answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
   Prompt.ChooseManaType {} -> Response.ChoseManaType answer
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
@@ -396,6 +397,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseRevealOnEntry {} -> case response of
     Response.ChoseRevealOnEntry m -> Just m
+    _ -> Nothing
+  Prompt.ChooseEnlist {} -> case response of
+    Response.ChoseEnlist m -> Just m
     _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
@@ -846,6 +850,9 @@ defaultAnswer p = case p of
   -- CR 614.1c: declining, for ChoosePayLifeOnEntry's reason above -- it is the
   -- branch the card states as its default, and the half that shows nobody a card.
   Prompt.ChooseRevealOnEntry {} -> Nothing
+  -- CR 508.1g: declining, which rule 702.154a's "up to one" always permits and
+  -- which taps nobody.
+  Prompt.ChooseEnlist {} -> Nothing
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
   -- CR 105.4: every candidate is a type Mana.producedTypes offered, so the head
