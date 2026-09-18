@@ -603,6 +603,9 @@ engineMintedDamage rewrite = case rewrite of
   -- STATIC ability prints (Temple Altisaur), which names nothing an engine has to
   -- bake.
   DamageRewrite.PreventAllBut _ -> False
+  -- CR 702.64a's ceiling is the same kind of printed amount, and rule 702.64a is
+  -- the rulebook rather than a card, so nothing here is baked either.
+  DamageRewrite.PreventUpTo _ -> False
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   DamageRewrite.Redirect _ -> True
@@ -701,6 +704,7 @@ preventsDamage rewrite = case rewrite of
   DamageRewrite.PreventAll -> True
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventAllBut _ -> True
+  DamageRewrite.PreventUpTo _ -> True
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False

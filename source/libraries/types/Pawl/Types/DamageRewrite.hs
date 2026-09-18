@@ -100,6 +100,26 @@ data DamageRewrite effect
     -- `prevents` and out of CR 615.13's trigger. The two also disagree on an
     -- event SMALLER than the number -- SetAmount would raise a 1 to a 3.
     PreventAllBut Natural.Natural
+  | -- | CR 702.64a: a static prevention that stops this much of each applicable
+    -- damage event and lets the rest through -- absorb N's "prevent N of that
+    -- damage".
+    --
+    -- A CEILING on what is stopped, and thereby the arm above read from the other
+    -- end: PreventAllBut names what survives, this one what does not happen, and
+    -- the two agree only where the event's amount is the sum of the two numbers.
+    --
+    -- Not PreventNext with the same number, which is the same contrast CR 615.7
+    -- draws against CR 615.10: rule 702.64b renews the ceiling for each source
+    -- and each time, so nothing is written back and
+    -- Pawl.Engine.Replacement.contestedResource gives it no supply. A countdown
+    -- of N would be spent by the first event and let the second through whole.
+    --
+    -- PER EVENT, where rule 702.64b says "from any one source at any one time".
+    -- The two agree over what a board can produce: a source deals its damage to
+    -- one recipient in one event, and CR 510.4's two combat damage steps -- the
+    -- one way one source hits one creature twice -- are the different TIMES rule
+    -- 702.64b's own second sentence lets the ceiling renew at.
+    PreventUpTo Natural.Natural
   | SetAmount Natural.Natural
   | Scale Scaling.Scaling
   | Redirect Recipient.Recipient

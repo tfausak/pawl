@@ -762,6 +762,31 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Frenzy 2) /= Codec.encode Keyword.codec (Keyword.Bushido 2))
       "frenzy 2 is not bushido 2"
+  -- CR 702.58a's N is a COUNT OF COUNTERS the permanent enters with, where rule
+  -- 702.68a's is an amount of damage; the wire cannot tell those apart, so the
+  -- tag is what keeps graft 2 off frenzy's form.
+  Spec.it s "Graft carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Graft 1)
+      " {\"type\":\"Graft\",\"value\":1} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Graft 2) /= Codec.encode Keyword.codec (Keyword.Frenzy 2))
+      "graft 2 is not frenzy 2"
+  -- CR 702.64a's N is an amount of damage PREVENTED, the opposite direction from
+  -- frenzy's dealt one, and the tag is again the whole of the difference.
+  Spec.it s "Absorb carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Absorb 1)
+      " {\"type\":\"Absorb\",\"value\":1} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Absorb 2) /= Codec.encode Keyword.codec (Keyword.Graft 2))
+      "absorb 2 is not graft 2"
   -- CR 702.70a's N rides the constructor the same way, and the two payloaded
   -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do
