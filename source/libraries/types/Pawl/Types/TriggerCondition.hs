@@ -63,6 +63,14 @@ data TriggerCondition
     -- the printed form, and Soul's Fire aiming it at a player is the noncombat
     -- half no combat-only arm reaches.
     SelfDealsDamageToPlayer PlayerRelation.PlayerRelation
+  | -- | CR 603.2 / 120.3: the bearer dealt damage of any kind to a CREATURE --
+    -- the arm above with rule 120.3's other recipient (Strax, Sontaran Nurse's
+    -- "Glory of Battle").
+    --
+    -- Nullary rather than Filter-carrying: the printed form qualifies the
+    -- recipient no further than "a creature", and a Filter would owe CR 608.2h
+    -- last known information for a recipient the damage has already killed.
+    SelfDealsDamageToCreature
   | -- | CR 120.3: the bearer was dealt damage -- the enrage trigger's event
     -- (Ripjaw Raptor).
     SelfIsDealtDamage

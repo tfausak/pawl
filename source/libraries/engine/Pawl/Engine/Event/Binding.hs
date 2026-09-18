@@ -138,6 +138,12 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
       Recipient.ToObject _ -> Map.empty
       -- Unreachable, for the reason the DamageToPlayerPrevented arm above gives.
       Recipient.ToPile _ -> Map.empty
+  -- CR 120.3's amount for the arm one recipient over. No slot for the damaged
+  -- CREATURE: Strax's "Glory of Battle" puts its counter on the bearer, whom CR
+  -- 113.7a's source slot already names, and the amount is unconditional given a
+  -- match.
+  (TriggerCondition.SelfDealsDamageToCreature, GameEvent.DamageDealt ev) ->
+    Binding.setEventAmount (DamageEvent.amount ev) Map.empty
   -- CR 603.2's "that much": how many counters actually came off, read off the
   -- event's own before/after pair. Chandra, Fire Artisan's "she deals that much
   -- damage" counts THAT and not the damage that caused it -- CR 306.8's removal
@@ -1112,6 +1118,9 @@ eventBindingSlots cond = case cond of
   -- Plus CR 120.1's source, which Belltower Sphinx's "that source's controller"
   -- reads, and equally guaranteed -- every DamageDealt event carries one. No slot
   -- for the recipient, who is the bearer. See the eventBindings arm above.
+  -- Just the amount for the arm one recipient over, and equally guaranteed -- see
+  -- the eventBindings arm above for why the recipient gets no slot.
+  TriggerCondition.SelfDealsDamageToCreature -> Set.singleton Binding.eventAmount
   TriggerCondition.SelfIsDealtDamage -> Set.fromList [Binding.combatDamager, Binding.eventAmount]
   -- CR 510.2's damager, which the bystander's form needs and the self-scoped one
   -- above does not: there the damager IS the bearer, already bound as CR 113.7a's

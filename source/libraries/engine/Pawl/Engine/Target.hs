@@ -917,7 +917,7 @@ creatureRecipientsGiven pcs gs =
 -- describe different candidate sets: CR 306 planeswalkers and CR 302 creatures
 -- overlap but neither contains the other, and Pool.Creatures must not start
 -- offering planeswalkers. The TAG is not what settles which of CR 120.3's results
--- damage to the candidate has -- Pawl.Engine.Damage.damagedCardTypes settles that
+-- damage to the candidate has -- Pawl.Engine.Projection.damagedCardTypes settles that
 -- off the projection when the damage is applied -- so a permanent with both card
 -- types is deduplicated to one candidate by onePerObject below rather than
 -- appearing once per tag.
@@ -965,7 +965,7 @@ battleRecipientsGiven pcs gs =
 -- target choice too many.
 --
 -- The survivor keeps the earliest list's tag, and which that is carries no rules
--- weight: Pawl.Engine.Damage.damagedCardTypes reads the recipient's PROJECTED
+-- weight: Pawl.Engine.Projection.damagedCardTypes reads the recipient's PROJECTED
 -- card types as the damage is applied, so every one of CR 120.3's results the
 -- permanent is owed applies whichever tag it was chosen under. What the fixed
 -- order buys is that the answer is deterministic, which CR 608.2b's

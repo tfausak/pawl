@@ -7504,6 +7504,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
   TriggerCondition.SelfDealsDamageToPlayer _ -> False
+  TriggerCondition.SelfDealsDamageToCreature -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
@@ -7786,6 +7787,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
   TriggerCondition.SelfDealsDamageToPlayer _ -> False
+  TriggerCondition.SelfDealsDamageToCreature -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False

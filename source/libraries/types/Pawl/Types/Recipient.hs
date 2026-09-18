@@ -13,7 +13,7 @@ data Recipient
     -- combat recipient in its own right, and because CR 115.4's pool is not CR
     -- 110.1's. It is NOT which of CR 120.3's results the damage has: a permanent
     -- may hold more than one of CR 120.1a's card types at once, so
-    -- Pawl.Engine.Damage.damagedCardTypes reads the recipient's projected card
+    -- Pawl.Engine.Projection.damagedCardTypes reads the recipient's projected card
     -- types as the damage is applied and this tag is only one input to it.
     ToPlaneswalker ObjectId.ObjectId
   | -- | CR 115.4's fourth kind of "any target", and ToPlaneswalker's twin one card

@@ -3568,6 +3568,75 @@ raidBoard =
     S.alice
     S.declareAttackers
 
+-- CR 603.2 / 120.3 with the recipient a CREATURE rather than a player. Strax,
+-- Sontaran Nurse {3}{R}{G} Legendary Creature -- Alien Cleric 5/5 (Doctor Who;
+-- Oracle text verified on Scryfall 2026-09-18): "Vigilance, trample / Grenades!
+-- -- {2}, {T}, Sacrifice an artifact: Choose a player at random. When you do,
+-- Strax fights another target creature that player controls. / Glory of Battle
+-- -- Whenever Strax deals damage to a creature, put a +1/+1 counter on Strax."
+-- The third line is TriggerCondition.SelfDealsDamageToCreature, and this group
+-- is what proves it.
+--
+-- COMBAT damage rather than the card's own fight, because the fight's "when you
+-- do" half never arms (#3165) -- Pawl.ResolveSpec's Strax group is where that is
+-- recorded. The condition is not combat-scoped, which is why it is the arm
+-- beside SelfDealsDamageToPlayer rather than beside
+-- SelfDealsCombatDamageToPlayer.
+--
+-- Wall of Stone 0/8 is the blocker: it survives all five, so a counter here is
+-- the trigger and not a death trigger, and CR 702.19b's trample assigns nothing
+-- past it -- five is short of the Wall's lethal eight, so the whole event has
+-- one recipient.
+--
+-- The two legs are ONE board differing in one thing, the block: unblocked, the
+-- same five reach bob, which is CR 120.3's other recipient and no match.
+straxBoard :: S.Board
+straxBoard =
+  S.duel
+    S.declareAttackers
+    [S.settled "strax" "Strax, Sontaran Nurse"]
+    [S.settled "wall" "Wall of Stone"]
+
+straxAttack :: Seq.Seq S.Timed
+straxAttack =
+  S.turn
+    1
+    [ S.on S.declareAttackers S.alice (S.attack [S.aliasRef "strax"]),
+      S.on S.declareBlockers S.bob (S.block [])
+    ]
+
+straxAttackBlocked :: Seq.Seq S.Timed
+straxAttackBlocked =
+  S.turn
+    1
+    [ S.on S.declareAttackers S.alice (S.attack [S.aliasRef "strax"]),
+      S.on S.declareBlockers S.bob (S.block [(S.aliasRef "wall", S.aliasRef "strax")])
+    ]
+
+straxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+straxSpec s registry = Spec.describe s "Strax, Sontaran Nurse" $ do
+  -- The proving case.
+  Spec.it s "CR 120.3 Glory of Battle: damage to the blocking Wall puts a +1/+1 counter on Strax" $ do
+    built <- S.buildBoardOrFail s registry straxBoard
+    case (aliasIn "strax" built, aliasIn "wall" built) of
+      (Just straxId, Just wallId) -> do
+        (_, after) <- S.runScriptOrFail s straxAttackBlocked built S.combatGame
+        Spec.assertEqWith s "CR 603.2: Strax dealt damage to a creature, so Glory of Battle resolved" (S.counterOf CounterKind.PlusOnePlusOne straxId after) 1
+        Spec.assertEqWith s "and the Wall really took the five, so the event had a creature recipient" (S.damageOf wallId after) (Just 5)
+        Spec.assertEqWith s "CR 702.19b: five is short of the 0/8's lethal eight, so nothing trampled through" (S.lifeOf S.bob after) (Just 20)
+      _ -> Spec.assertFailure s "the board should alias Strax and the Wall"
+  -- CR 120.3's other recipient on the same board: the block is the only
+  -- difference, and a condition written over the bare damage event fires here
+  -- too.
+  Spec.it s "CR 120.3 the same five dealt to a PLAYER does not" $ do
+    built <- S.buildBoardOrFail s registry straxBoard
+    case aliasIn "strax" built of
+      Just straxId -> do
+        (_, after) <- S.runScriptOrFail s straxAttack built S.combatGame
+        Spec.assertEqWith s "no counter: a player is not a creature" (S.counterOf CounterKind.PlusOnePlusOne straxId after) 0
+        Spec.assertEqWith s "and the five landed, so the damage event happened" (S.lifeOf S.bob after) (Just 15)
+      _ -> Spec.assertFailure s "the board should alias Strax"
+
 aliasIn :: String -> S.BuiltBoard -> Maybe ObjectId.ObjectId
 aliasIn name built = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
 
@@ -3730,6 +3799,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   karplusanMinotaurSpec s registry
   aloeAlchemistSpec s registry
   wildgrowthWalkerSpec s registry
+  straxSpec s registry
   raffinesInformantSpec s registry
   raffineSchemingSeerSpec s registry
   ironMongerSpec s registry
