@@ -3535,6 +3535,44 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
     Spec.assertEqWith s "CR 702.119c naming the Russet Wolves instead, on the same board and with the Altar eating the same Hill Giant, pays: the Behemoth resolved and both creatures are gone" (standing (run wolvesId)) (1, 0, 0)
     Spec.assertEqWith s "and the reversed cast put the Behemoth back in alice's hand (CR 733.1)" (length (Game.zoneMembers Zone.Hand S.alice (run giantId))) 1
 
+  -- CR 702.119b on Crabomination {4}{B}{B} 5/5 Creature -- Crab Demon, "Emerge
+  -- from artifact {5}{B}{B}" (Oracle text checked on Scryfall, 2026-09-18). The
+  -- only printing whose emerge names a quality, so it is the whole of rule
+  -- 702.119b's demand.
+  --
+  -- pawl's card omits the printed triggered ability -- "When this creature
+  -- enters, target opponent exiles the top card of their library, a card at
+  -- random from their graveyard, and a card at random from their hand. You may
+  -- cast a spell from among cards exiled this way without paying its mana cost."
+  -- No Pawl.Types.Effect arm picks a card at random out of a zone (#3861). The
+  -- omission is stricter than printed -- alice exiles nothing and gains no cast
+  -- -- and nothing about it touches the emerge cost this group is about.
+  --
+  -- TWO BOARDS DIFFERING IN ONE PERMANENT'S CARD TYPE, which is the whole of
+  -- rule 702.119b. Both are alice holding Crabomination over FOUR Swamps with a
+  -- single mana value 3 permanent beside them; on one it is Crawlspace, an
+  -- ARTIFACT, and on the other Kalakscion, Hunger Tyrant, a CREATURE. Four mana
+  -- pays {5}{B}{B} reduced by three and nothing else either board offers -- the
+  -- printed {4}{B}{B} wants six -- so the Crawlspace board proves rule 702.119b's
+  -- [quality] is the pool and the Kalakscion board proves rule 702.119a's
+  -- creatures are not.
+  Spec.it s "CR 702.119b the emerge cost sacrifices a permanent of the stated quality, not a creature" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+    crab <- S.printingOf s registry "Crabomination"
+    let (_, gs1) = S.addPermanent crawlspace S.alice (S.landsInPlay swamp 4)
+        (spellId, gs2) = S.addHandCard crab S.alice gs1
+        start = aliceOnTurn gs2
+        after = S.runPure S.identityAnswer (S.runPure S.identityAnswer start (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
+        -- The same board with the Crawlspace swapped for a creature of the same
+        -- mana value, which is the only thing that differs.
+        (_, creature1) = S.addPermanent kalakscion S.alice (S.landsInPlay swamp 4)
+        (creatureSpell, creature2) = S.addHandCard crab S.alice creature1
+        creatureBoard = aliceOnTurn creature2
+    Spec.assertEqWith s "CR 702.119b four Swamps paid {5}{B}{B} less the Crawlspace's three, so Crabomination resolved, and CR 702.119c sacrificed that artifact" (length (namedOnBattlefield "Crabomination" after), length (namedInGraveyard "Crawlspace" after)) (1, 1)
+    Spec.assertBool s (not (S.castable S.alice creatureSpell creatureBoard)) "CR 702.119b a creature of the same mana value is not a [quality] permanent, so the same four Swamps cannot pay the emerge cost at all"
+
 -- CR 702.180a on Unending Whisper {U} Sorcery, "Draw a card." with "Harmonize
 -- {5}{U}" (Oracle text checked on Scryfall, 2026-09-13). Chosen over Nature's
 -- Rhythm, the issue's card, for its effect and its cost alike: both are

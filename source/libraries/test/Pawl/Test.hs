@@ -197,6 +197,7 @@ import qualified Pawl.Codec.EachCardFromAmongSpec
 import qualified Pawl.Codec.EachCardInGraveyardSpec
 import qualified Pawl.Codec.EachCardInHandSpec
 import qualified Pawl.Codec.EffectSpec
+import qualified Pawl.Codec.EmergeSpec
 import qualified Pawl.Codec.EndTurnSignalSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntersWithSpec
@@ -857,6 +858,7 @@ spec s registry = do
   Pawl.Codec.EachCardInGraveyardSpec.spec s
   Pawl.Codec.EachCardInHandSpec.spec s
   Pawl.Codec.EffectSpec.spec s
+  Pawl.Codec.EmergeSpec.spec s
   Pawl.Codec.EndTurnSignalSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntersWithSpec.spec s

@@ -441,6 +441,8 @@ library codec
     Pawl.Codec.Earthbend
     Pawl.Codec.Effect
     Pawl.Codec.EffectSpec
+    Pawl.Codec.Emerge
+    Pawl.Codec.EmergeSpec
     Pawl.Codec.EndingStep
     Pawl.Codec.EndingStepSpec
     Pawl.Codec.EndTurnSignal
@@ -1760,6 +1762,7 @@ library types
     Pawl.Types.EachCardInHand
     Pawl.Types.Earthbend
     Pawl.Types.Effect
+    Pawl.Types.Emerge
     Pawl.Types.EndingStep
     Pawl.Types.EndTurnSignal
     Pawl.Types.EntersWith

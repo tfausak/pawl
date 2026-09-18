@@ -4,6 +4,7 @@ import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Cycling as Cycling
 import qualified Pawl.Codec.Devour as Devour
+import qualified Pawl.Codec.Emerge as Emerge
 import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Gift as Gift
@@ -115,7 +116,7 @@ codec =
       Arm.payload "Affinity" (Filter.codec codec) Keyword.Affinity (\x -> case x of Keyword.Affinity y -> Just y; _ -> Nothing),
       Arm.payload "Cleave" (Cost.codec codec) Keyword.Cleave (\x -> case x of Keyword.Cleave y -> Just y; _ -> Nothing),
       Arm.payload "Awaken" (Cost.codec codec) Keyword.Awaken (\x -> case x of Keyword.Awaken y -> Just y; _ -> Nothing),
-      Arm.payload "Emerge" (Cost.codec codec) Keyword.Emerge (\x -> case x of Keyword.Emerge y -> Just y; _ -> Nothing),
+      Arm.payload "Emerge" (Emerge.codec codec) Keyword.Emerge (\x -> case x of Keyword.Emerge y -> Just y; _ -> Nothing),
       Arm.payload "Evoke" (Cost.codec codec) Keyword.Evoke (\x -> case x of Keyword.Evoke y -> Just y; _ -> Nothing),
       Arm.payload "Dash" (Cost.codec codec) Keyword.Dash (\x -> case x of Keyword.Dash y -> Just y; _ -> Nothing),
       Arm.payload "Blitz" (Cost.codec codec) Keyword.Blitz (\x -> case x of Keyword.Blitz y -> Just y; _ -> Nothing),

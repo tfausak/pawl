@@ -12,6 +12,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DevourCount as DevourCount
+import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Gift as Gift
@@ -386,15 +387,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (Keyword.Awaken (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 6])) []))
       " {\"type\":\"Awaken\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":6}]}} "
-  -- CR 702.119a's payload is a whole Cost, cleave's shape -- Drownyard
-  -- Behemoth's {7}{U}. The SACRIFICE rule 702.119a states is not in the payload:
-  -- it is appended at the offer, by Pawl.Engine.Cost.candidateCostsGiven.
-  Spec.it s "Emerge carries its cost" $
+  -- CR 702.119a's payload is a whole Cost and CR 702.119b's optional quality
+  -- beside it, Equip's shape -- Drownyard Behemoth's {7}{U} and no quality. The
+  -- SACRIFICE rule 702.119a states is not in the payload: it is appended at the
+  -- offer, by Pawl.Engine.Cost.candidateCostsGiven.
+  Spec.it s "Emerge carries its cost and its quality" $
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Emerge (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 7])) []))
-      " {\"type\":\"Emerge\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":7}]}} "
+      (Keyword.Emerge (Emerge.MkEmerge (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 7])) []) Nothing))
+      " {\"type\":\"Emerge\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":7}]},\"quality\":null}} "
   -- CR 702.188a and CR 702.190a carry a whole Cost each, cleave's shape. The
   -- return each rule states is NOT in the payload: it is appended at the offer, by
   -- Pawl.Engine.Keyword.plainAlternativeCosts, off the rule rather than the card.

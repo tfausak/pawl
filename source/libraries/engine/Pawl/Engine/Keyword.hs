@@ -77,6 +77,7 @@ import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryR as EntryR
@@ -2973,17 +2974,22 @@ surgeCosts keywords =
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
--- CR 702.119a: surgeCosts' twin over emerge -- the MANA half of rule 702.119a's
--- alternative cost, which is all the card states. The sacrifice and the generic
--- reduction the rule states beside it are the RULE's, so
--- Pawl.Engine.Cost.candidateCostsGiven attaches them at the offer, where the
--- board that fixes the reduction's amount is in hand.
+-- CR 702.119a and CR 702.119b: surgeCosts' twin over emerge -- the MANA half of
+-- rule 702.119a's alternative cost and rule 702.119b's [quality], which is all
+-- the card states. The sacrifice and the generic reduction the rule states
+-- beside it are the RULE's, so Pawl.Engine.Cost.candidateCostsGiven attaches
+-- them at the offer, where the board that fixes the reduction's amount is in
+-- hand.
+--
+-- The whole payload rather than its cost, because that caller needs both halves
+-- at once: rule 702.119b's quality is the pool it draws the victim from and the
+-- cost is what the candidate charges.
 --
 -- A list and a wildcard for flashbackCosts' reasons.
-emergeCosts :: Set Keyword -> [Cost Keyword]
+emergeCosts :: Set Keyword -> [Emerge.Emerge Keyword]
 emergeCosts keywords =
   let costOf keyword = case keyword of
-        Keyword.Emerge cost -> Just cost
+        Keyword.Emerge emerge -> Just emerge
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 

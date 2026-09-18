@@ -18,6 +18,7 @@ import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DiscardCards as DiscardCards
+import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Expansion as Expansion
@@ -2597,7 +2598,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Harmonize cost -> Keyword.Type.Harmonize (rewriteCost pairs cost)
   Keyword.Type.Cleave cost -> Keyword.Type.Cleave (rewriteCost pairs cost)
   Keyword.Type.Awaken cost -> Keyword.Type.Awaken (rewriteCost pairs cost)
-  Keyword.Type.Emerge cost -> Keyword.Type.Emerge (rewriteCost pairs cost)
+  -- CR 702.119b's quality rides the payload beside the cost, so both halves
+  -- take rule 612.2's swap.
+  Keyword.Type.Emerge (Emerge.MkEmerge cost criterion) -> Keyword.Type.Emerge (Emerge.MkEmerge (rewriteCost pairs cost) (fmap (rewrite pairs) criterion))
   Keyword.Type.Surge cost -> Keyword.Type.Surge (rewriteCost pairs cost)
   Keyword.Type.Spectacle cost -> Keyword.Type.Spectacle (rewriteCost pairs cost)
   Keyword.Type.Prowl cost -> Keyword.Type.Prowl (rewriteCost pairs cost)

@@ -8,21 +8,24 @@
         {
           "type": "Emerge",
           "value": {
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 7
-              },
-              {
-                "type": "OfType",
-                "value": {
-                  "type": "Colored",
+            "cost": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 7
+                },
+                {
+                  "type": "OfType",
                   "value": {
-                    "type": "Blue"
+                    "type": "Colored",
+                    "value": {
+                      "type": "Blue"
+                    }
                   }
                 }
-              }
-            ]
+              ]
+            },
+            "quality": null
           }
         }
       ],
