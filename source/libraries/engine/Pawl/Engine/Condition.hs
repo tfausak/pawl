@@ -31,6 +31,7 @@
 module Pawl.Engine.Condition where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
@@ -86,16 +87,21 @@ holds viewOf context gs oid condition =
 -- The CHANNEL is boundAmounts rather than the object, for the reason
 -- Pawl.Engine.Quantity's InSlot arm gives: CR 400.7 mints the permanent with no
 -- bindings, so the announcement is off-object here. Object.announcedX is where it
--- landed instead (Pawl.Engine.Event.changeZoneAttaching), and 0 where no cast X
--- stands behind the permanent -- a token copy, or one an effect put onto the
--- battlefield.
+-- landed instead (Pawl.Engine.Event.changeZoneAttaching).
 --
--- Pawl.KeywordSpec's ravenous group is what proves it: CR 702.156a's "if X is 5 or
--- more" is the one condition in the pool that reads it.
+-- ZERO and not an absent key where the permanent carries none -- a token copy, or
+-- one an effect put onto the battlefield -- which is rule 107.3m's own number and
+-- Projection.announcedXOf's answer for the replacement half of the same keyword.
+-- An absent key would leave the comparison unanswerable, which Condition.holds
+-- reads as False; that agrees for "5 or more" and would not for a clause naming a
+-- smaller threshold.
+--
+-- Pawl.EntryReplacementSpec's Ravenous group is what proves it: CR 702.156a's "if X
+-- is 5 or more" is the one condition in the pool that reads this.
 inheritedX :: TriggerCondition.TriggerCondition -> ObjectId -> GameState -> Map.Map SlotName Natural
 inheritedX condition oid gs = case condition of
   TriggerCondition.SelfEnters ->
-    maybe Map.empty (Map.singleton Binding.variableX) (Object.announcedX =<< Game.lookupObject oid gs)
+    Map.singleton Binding.variableX (Maybe.fromMaybe 0 (Object.announcedX =<< Game.lookupObject oid gs))
   _ -> Map.empty
 
 -- CR 611.2b: the condition with every PlayerRef.InSlot inside it baked to the
