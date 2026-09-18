@@ -2991,6 +2991,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.147a names no quality either: the Filter its minted combat
   -- restriction carries is written in Pawl.Engine.Keyword, not into the keyword.
   Keyword.Decayed -> []
+  Keyword.Demonstrate -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Compleated -> []

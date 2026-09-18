@@ -2395,6 +2395,78 @@ gravestormSpec s registry = Spec.describe s "Gravestorm" $ do
     Spec.assertEqWith s "CR 700.4 bob lost 1 life to the original and 1 to each of TWO copies" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "and drew three cards, the two Giants having left his battlefield" (S.handSize S.bob after) 3
 
+-- CR 702.144a's demonstrate, on Incarnation Technique {4}{B} Sorcery --
+-- "Demonstrate / Mill five cards, then return a creature card from your
+-- graveyard to the battlefield." (Oracle text checked on Scryfall, 2026-09-18).
+--
+-- THREE SEATS, so that "choose an opponent" is a choice rather than an elision
+-- (Pawl.Engine.PlayerEffect elides a one-candidate ChoosePlayer): alice picks
+-- bob, and carol is the seat that shows the pick was read rather than assumed.
+--
+-- ONE creature card in each player's graveyard, each a different name, and
+-- libraries of Swamps so the mill adds none: which card each resolution returns
+-- is then forced, and WHOSE graveyard was consulted is the whole of what the
+-- board says.
+demonstrateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+demonstrateSpec s registry = Spec.describe s "Demonstrate" $ do
+  Spec.it s "CR 702.144a demonstrate is minted for a spell on the stack and nowhere else" $ do
+    Spec.assertEqWith s "the stack roster mints it" (Keyword.stackTriggeredAbilitiesOf (Map.singleton Keyword.Type.Demonstrate 1)) [Keyword.demonstrate]
+    Spec.assertEqWith s "and the battlefield roster does not" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Demonstrate 1)) []
+
+  -- THE PROVING TEST.
+  Spec.it s "CR 702.144a Incarnation Technique copied and demonstrated to bob resolves for bob; declined, for nobody" $ do
+    technique <- S.printingOf s registry "Incarnation Technique"
+    swamp <- S.printingOf s registry "Swamp"
+    hers <- S.printingOf s registry "Cabal Evangel"
+    his <- S.printingOf s registry "Hill Giant"
+    theirs <- S.printingOf s registry "Goblin Piker"
+    let stock pid gs = foldr (\_ g -> snd (S.addLibraryCard swamp pid g)) gs [1 :: Int .. 15]
+        lands = S.landsFor swamp S.alice 5 (Setup.emptyGame S.threePlayers)
+        stocked = stock S.carol (stock S.bob (stock S.alice lands))
+        (_, g1) = S.addGraveyardCard hers S.alice stocked
+        (_, g2) = S.addGraveyardCard his S.bob g1
+        (_, g3) = S.addGraveyardCard theirs S.carol g2
+        (spellId, g4) = S.addHandCard technique S.alice g3
+        board =
+          g4
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        step decision gs action = snd (Engine.runGamePure (demonstrating decision) gs (action >> Engine.settleForPriority))
+        resolveAll decision gs = if null (GameState.stack gs) then gs else resolveAll decision (step decision gs Stack.resolveTop)
+        after decision = resolveAll decision (step decision board (S.cast S.alice spellId))
+        copied = after OptionalDecision.Exercises
+        declined = after OptionalDecision.Declines
+        controllersOf printing gs =
+          List.sort (Maybe.mapMaybe (`Projection.View.controllerOf` gs) (filter (`Set.member` GameState.battlefield gs) (S.namedObjects (S.printingName printing) gs)))
+    Spec.assertEqWith
+      s
+      "CR 707.10 the copy alice demonstrated is bob's: it resolved out of BOB's graveyard, under bob's control"
+      (controllersOf his copied)
+      [S.bob]
+    Spec.assertEqWith
+      s
+      "CR 608.2d carol was not the opponent alice chose, so nothing left her graveyard"
+      (controllersOf theirs copied)
+      []
+    Spec.assertEqWith s "and alice's own copy returned her own creature" (controllersOf hers copied) [S.alice]
+    Spec.assertEqWith
+      s
+      "CR 608.2c declining the may copies nothing, so neither opponent's graveyard was touched"
+      (controllersOf his declined, controllersOf theirs declined)
+      ([], [])
+    Spec.assertEqWith s "and only the original spell resolved, returning alice's creature" (controllersOf hers declined) [S.alice]
+
+-- CR 603.5's "may" answered once per demonstrate trigger, and CR 702.144a's
+-- "choose an opponent" pinned to bob by FILTERING the offered seats, so an offer
+-- that stopped naming him picks somebody else loudly rather than quietly.
+demonstrating :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+demonstrating decision p = case p of
+  Prompt.ChooseOptional {} -> decision
+  Prompt.ChoosePlayer _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== S.bob) (NonEmpty.toList offered))
+  _ -> S.identityAnswer p
+
 -- CR 702.78a's conspire: "As an additional cost to cast this spell, you may tap
 -- two untapped creatures you control that each share a color with it" and "When
 -- you cast this spell, if its conspire cost was paid, copy it."
@@ -3353,6 +3425,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   casualtySpec s registry
   gravestormSpec s registry
   conspireSpec s registry
+  demonstrateSpec s registry
   echoSpec s registry
   exploitSpec s registry
   championSpec s registry

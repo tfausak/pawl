@@ -35,6 +35,7 @@ import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CastRepetition as CastRepetition
 import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
+import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
@@ -277,6 +278,11 @@ abilitiesFor keyword count = case keyword of
   -- themselves, as rule 702.40a does.
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  -- CR 702.144a states no zone of its own, and CR 113.6k supplies one: a
+  -- trigger condition that cannot trigger from the battlefield functions in
+  -- every zone it can trigger from, which for a cast trigger is the stack. So
+  -- stackTriggeredAbilitiesOf mints it and this roster stays empty.
+  Keyword.Demonstrate -> []
   -- CR 702.60a's trigger functions on the STACK too, so
   -- stackTriggeredAbilitiesOf mints it and this roster stays empty.
   Keyword.Ripple _ -> []
@@ -628,6 +634,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Demonstrate -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Recover _ -> []
@@ -1124,6 +1131,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Demonstrate -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   -- CR 702.59a states a TRIGGERED ability, not an activated one, so this roster
@@ -1744,6 +1752,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Demonstrate -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Recover _ -> []
@@ -2369,6 +2378,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Demonstrate -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Recover _ -> []
@@ -3979,6 +3989,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Demonstrate -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Recover _ -> []
@@ -4317,6 +4328,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Demonstrate -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Recover _ -> []
@@ -4609,6 +4621,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
   Keyword.Conspire -> []
+  Keyword.Demonstrate -> []
   Keyword.Ripple _ -> []
   Keyword.Replicate _ -> []
   Keyword.Recover _ -> []
@@ -4842,6 +4855,7 @@ familyOf keyword = case keyword of
   Keyword.Storm -> Nothing
   Keyword.Gravestorm -> Nothing
   Keyword.Conspire -> Nothing
+  Keyword.Demonstrate -> Nothing
   Keyword.Deathtouch -> Nothing
   Keyword.Defender -> Nothing
   Keyword.DoubleStrike -> Nothing
@@ -7354,6 +7368,7 @@ stackAbilitiesFor keyword count = case keyword of
   Keyword.Ripple n -> List.genericReplicate count (ripple n)
   Keyword.Storm -> List.genericReplicate count storm
   Keyword.Gravestorm -> List.genericReplicate count gravestorm
+  Keyword.Demonstrate -> List.genericReplicate count demonstrate
   _ -> List.genericReplicate count =<< Maybe.maybeToList (stackCopyTrigger keyword)
 
 -- The arm of `stackTriggeredAbilitiesOf` above that reads a keyword's PAYLOAD,
@@ -7471,6 +7486,83 @@ gravestorm =
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
+
+-- CR 702.144a: "When you cast this spell, you may copy it and you may choose new
+-- targets for the copy. If you copy the spell, choose an opponent. That player
+-- copies the spell and may choose new targets for that copy."
+--
+-- `storm` above's trigger split into TWO CLAUSES: the first sentence is CR
+-- 603.5's "may" over one copy, and the rest hangs off it through CR 608.2c's
+-- "if you do" (Clause.ifTaken naming clause 0), so a declined copy chooses no
+-- opponent and makes no second copy either.
+--
+-- The last two sentences share one clause rather than taking one each, which is
+-- the shape Skullwinder already prints in data\/cards: no rider falls between
+-- them, and the second reads a slot the first fills in the same resolution, so
+-- splitting them would only add a second `ifTaken` naming the first.
+--
+-- NOT `copiesOf`, whose whole payload is one CopyStackObject with the resolving
+-- controller as CR 707.10's copier. Rule 702.144a states TWO copies under two
+-- seats, and the second one's copier is a player chosen during this very
+-- resolution -- PlayerRef.InSlot over the slot Effect.ChoosePlayer fills, the
+-- read Skullwinder's "choose an opponent. That player returns a card ..." already
+-- makes one type over.
+--
+-- The opponent's copy carries CopyTargets.ChosenByController like the
+-- controller's, and that is rule 702.144a's "may choose new targets for THAT
+-- copy" rather than a repeat: CR 707.10c hands the offer to the copy's
+-- controller, which for this copy is the chosen opponent (CR 707.10) -- the half
+-- Pawl.CopySpec's Meletis Charlatan case proves of CopyStackObject.copier.
+--
+-- Rule 702.144a states no zone, where rules 702.40a and 702.69a state the stack
+-- themselves; CR 113.6k supplies it, a cast trigger being unable to trigger from
+-- the battlefield.
+demonstrate :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+demonstrate =
+  let copyBy copier =
+        Effect.CopyStackObject
+          CopyStackObject.MkCopyStackObject
+            { CopyStackObject.ref = ObjectRef.EachOnStack Filter.IsSource,
+              CopyStackObject.targets = CopyTargets.ChosenByController,
+              CopyStackObject.quantity = CopyStackObject.defaultQuantity,
+              CopyStackObject.copier = copier,
+              CopyStackObject.exceptions = []
+            }
+      yours =
+        Clause.MkClause
+          Nothing
+          Nothing
+          Nothing
+          (Optionality.Optional (PlayerRef.Relative PlayerRelation.You))
+          Nothing
+          (Seq.singleton (copyBy CopyStackObject.defaultCopier))
+      theirs =
+        Clause.MkClause
+          (Just (NonEmpty.singleton (ClauseIndex.MkClauseIndex 0)))
+          Nothing
+          Nothing
+          Optionality.Mandatory
+          Nothing
+          ( Seq.fromList
+              [ Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer PlayerScope.Opponents demonstrateOpponent),
+                copyBy (PlayerRef.InSlot demonstrateOpponent)
+              ]
+          )
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfCast,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.fromList [yours, theirs]) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slot rule 702.144a's "choose an opponent" fills and its "that player"
+-- reads; `cascadeExiled` is the same minted-slot move over objects rather than
+-- players.
+demonstrateOpponent :: SlotName.SlotName
+demonstrateOpponent = SlotName.MkSlotName (Text.pack "demonstrated")
 
 -- CR 702.85a: "When you cast this spell, exile cards from the top of your library
 -- until you exile a nonland card whose mana value is less than this spell's mana

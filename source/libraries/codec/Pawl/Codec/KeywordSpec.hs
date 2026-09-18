@@ -1282,6 +1282,12 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.ReadAhead
       " {\"type\":\"ReadAhead\"} "
     Spec.assertBool s (Codec.encode Keyword.codec Keyword.ReadAhead /= Codec.encode Keyword.codec Keyword.Riot) "read ahead and riot encode differently"
+  Spec.it s "Demonstrate" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Demonstrate
+      " {\"type\":\"Demonstrate\"} "
   Spec.it s "Daybound" $
     Common.assertCodec
       s
