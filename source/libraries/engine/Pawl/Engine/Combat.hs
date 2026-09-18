@@ -1622,7 +1622,7 @@ designateDefenders = do
   gs <- State.get
   let pid = GameState.activePlayer gs
   -- Not implemented: CR 800.4h's handing of this choice to the next player in turn
-  -- order on a turn whose active player has left (CR 800.4j) (#181).
+  -- order on a turn whose active player has left (CR 800.4j) (#3862).
   --
   -- Engine.runTurnBasedActions binds the identical test before calling this, so on
   -- the engine's path this guard is redundant. Do NOT delete it: a direct caller

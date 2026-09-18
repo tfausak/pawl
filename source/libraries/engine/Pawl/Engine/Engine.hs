@@ -446,7 +446,7 @@ runTurnBasedActions phase = do
   --
   -- Not implemented: CR 800.4h, which reaches the CHOICES on that list -- a choice
   -- a rule requires of a departed player is made by the next player in turn order
-  -- (#181). Only the defending-player choice is real, and unobservable.
+  -- (#3862). Only the defending-player choice is real, and unobservable.
   hasActive <- State.gets (List.elem active . Game.stillPlaying)
   case phase of
     Phase.Beginning BeginningStep.Untap -> do

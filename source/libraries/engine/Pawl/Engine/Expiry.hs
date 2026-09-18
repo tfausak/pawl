@@ -18,6 +18,11 @@
 -- Object.detainedUntil and Object.goadedBy are sets of seats rather than
 -- vocabularies of durations, and dropAtTurnOf is the only sweep either can
 -- reach. See clearedDetentions and clearedGoads.
+--
+-- Not implemented: CR 800.4c. When a sweep here ends a control-changing effect
+-- and the object's CR 110.2 default controller has left the game, the object
+-- should be exiled as the effect ends; no sweep asks. Every sweep is a site,
+-- dropAtCleanup the one an Act of Treason reaches (#3858).
 module Pawl.Engine.Expiry where
 
 import qualified Control.Monad as Monad
