@@ -4301,9 +4301,9 @@ selfSpec s registry = Spec.describe s "CR 201.5 a resolving spell naming itself"
 -- THREE SEATS, each controlling one creature, so no seat in the offer is one the
 -- fight could not reach and the three readings of "that player" are distinct.
 --
--- Not implemented: "Glory of Battle", pawl having no trigger condition for a
--- creature dealing damage to a creature (#3821). The omission leaves pawl's
--- Strax stricter than printed -- it never grows.
+-- "Glory of Battle" is transcribed as TriggerCondition.SelfDealsDamageToCreature
+-- and proved in Pawl.CardTriggerSpec's Strax group; it does not fire here,
+-- because the fight below never happens.
 --
 -- Not implemented: the "when you do" half never arms, because
 -- Pawl.Engine.Resolve.Effect.applyClauseEffects reads CR 603.12's "happened" off

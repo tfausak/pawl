@@ -146,6 +146,41 @@
         "type": "Literal",
         "value": 5
       },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfDealsDamageToCreature"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PutCounters",
+                        "value": {
+                          "kind": {
+                            "type": "PlusOnePlusOne"
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       "typeLine": {
         "subtypes": [
           {

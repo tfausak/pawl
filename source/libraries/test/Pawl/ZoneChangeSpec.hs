@@ -2239,6 +2239,84 @@ soulsMajestySpec s registry = Spec.describe s "SoulsMajesty" $ do
         after = snd (Engine.runGamePure (targetingCreature spider) cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew two" (S.handSize S.alice after) 2
 
+-- Randomness under CR 400.7's zone change: Elkin Lair {3}{R} World
+-- Enchantment (Homelands; Oracle text checked against api.scryfall.com,
+-- 2026-09-18) -- "At the beginning of each player's upkeep, that player exiles a
+-- card at random from their hand. The player may play that card this turn. At
+-- the beginning of the next end step, if the player hasn't played the card, they
+-- put it into their graveyard."
+--
+-- The pool's only card moving a card at random OUT of a hand (Scryfall
+-- o:/(exiles?|puts?|returns?|shuffles?) .{0,20}cards? at random from (your|their|his or her|that player.s|target player.s|each player.s) hand/,
+-- 2026-09-11, one hit), so Effect.MoveToZone's gather asking randomCardsInHand
+-- is what this card is here to exercise.
+--
+-- Not implemented: "The player may play that card this turn" (#3842) and the
+-- delayed end-step move that follows it (#3843). The exiled card simply stays in
+-- exile, which leaves pawl's Elkin Lair stricter than printed for every seat
+-- alike -- the trigger is symmetric, so the omission favours nobody.
+--
+-- TWO SEATS, and ALICE controls the enchantment while BOB takes the upkeep:
+-- "that player" and "the resolving controller" are the same seat on a one-seat
+-- board, and alice holds a card of her own so a gather reading the controller's
+-- hand exiles the wrong one rather than nothing.
+--
+-- THREE distinct printings in bob's hand, and the PAIR of legs is the proof: "at
+-- random" is not a property of one outcome, since the engine does not roll, so
+-- the two legs differ in the index the interpreter answered with and in nothing
+-- else. Exiling the head of the hand unasked passes the second and fails the
+-- first.
+elkinLairSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+elkinLairSpec s registry =
+  let -- S.addHandCard puts its card at the FRONT of the hand, so the list is
+      -- stocked in reverse and index 0 is the first card named.
+      board lair mine theirs =
+        let (_, withLair) = S.addPermanent lair S.alice (Setup.emptyGame S.bothPlayers)
+            withAlices = List.foldl' (\g q -> snd (S.addHandCard q S.alice g)) withLair (reverse mine)
+         in List.foldl' (\g q -> snd (S.addHandCard q S.bob g)) withAlices (reverse theirs)
+      -- BOB's upkeep, stamped and recorded -- the half TurnScope.EachTurn buys,
+      -- since under ControllersTurn the trigger would not fire here at all.
+      runBobsUpkeep :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      runBobsUpkeep answer gs =
+        let upkeep = Phase.Beginning BeginningStep.Upkeep
+            began =
+              Event.recordEvent
+                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.bob))
+                (gs {GameState.phase = upkeep, GameState.activePlayer = S.bob})
+            settled = S.runPure answer began Engine.settleForPriority
+         in S.runPure answer settled Engine.priorityLoop
+      -- Pinned by INDEX into the offer rather than read off the prompt's fields:
+      -- an answerer that hunted for "a legal card" would go on answering legally
+      -- after a mutation broke which card the engine honours.
+      rolling :: Int -> Prompt.Prompt r -> r
+      rolling i p = case p of
+        Prompt.RandomObject offered -> case List.drop (min i (length (NonEmpty.toList offered) - 1)) (NonEmpty.toList offered) of
+          h : _ -> h
+          [] -> NonEmpty.head offered
+        _ -> S.identityAnswer p
+      named n = Just (CardName.MkCardName (Text.pack n))
+      bobsCards = ["Goblin Piker", "Bog Wraith", "Bird Maiden"]
+   in Spec.describe s "ElkinLair" $ do
+        -- The proving case.
+        Spec.it s "CR 400.7 the card exiled is the one randomness named, not the first in hand" $ do
+          lair <- S.printingOf s registry "Elkin Lair"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          ps <- traverse (S.printingOf s registry) bobsCards
+          let after = runBobsUpkeep (rolling 2) (board lair [bolt] ps)
+          Spec.assertEqWith s "the LAST card of bob's hand is in exile" (namesIn Zone.Exile S.bob after) [named "Bird Maiden"]
+          Spec.assertEqWith s "and the two randomness passed over stay in hand" (namesIn Zone.Hand S.bob after) [named "Goblin Piker", named "Bog Wraith"]
+          Spec.assertEqWith s "CR 603.2's \"that player\" is bob: alice's own card is untouched" (namesIn Zone.Hand S.alice after) [named "Lightning Bolt"]
+          Spec.assertEqWith s "and the trigger resolved" (length (GameState.stack after)) 0
+        -- The other half of the pair: the same board, the same everything, one
+        -- different answer.
+        Spec.it s "CR 400.7 the same board with a different roll exiles a different card" $ do
+          lair <- S.printingOf s registry "Elkin Lair"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          ps <- traverse (S.printingOf s registry) bobsCards
+          let after = runBobsUpkeep (rolling 0) (board lair [bolt] ps)
+          Spec.assertEqWith s "the FIRST card this time" (namesIn Zone.Exile S.bob after) [named "Goblin Piker"]
+          Spec.assertEqWith s "and the other two stay in hand" (namesIn Zone.Hand S.bob after) [named "Bog Wraith", named "Bird Maiden"]
+
 -- CR 701.9b's two exceptions to the discarding player's own choice, both over
 -- Discard.These. bob holds four distinct cards, so every assertion reads
 -- identity, and the expectations are read off his hand's own order rather than
@@ -2306,6 +2384,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
   discardExceptionsSpec s registry
+  elkinLairSpec s registry
   libraryPositionSpec s registry
   aetherspoutsSpec s registry
   drawCardSpec s registry

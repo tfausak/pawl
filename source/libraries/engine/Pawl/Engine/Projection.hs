@@ -77,6 +77,7 @@ import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
@@ -4626,6 +4627,46 @@ isPlaneswalkerOf = isPlaneswalkerGiven Map.empty
 
 isPlaneswalkerGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
 isPlaneswalkerGiven pcs oid gs = Set.member CardType.Planeswalker (cardTypesGiven pcs oid gs)
+
+-- CR 120.3: "damage may have one or more of the following results, depending on
+-- ... the characteristics of the damage's recipient". ONE OR MORE, and the
+-- characteristics are the recipient's -- so the results damage to a permanent has
+-- are keyed to the set of CR 120.1a card types it has, not to a single choice
+-- among them. This is that set, narrowed to the three card types CR 120.1a admits
+-- and CR 120.3c/120.3e/120.3h give results to.
+--
+-- A permanent really can hold two of them at once: Liquimetal Coating makes Jace
+-- Beleren an artifact "in addition to its other types" and March of the Machines
+-- then makes that noncreature artifact an artifact creature, both under CR
+-- 205.1b's retention clause, leaving a 3/3 artifact creature planeswalker that is
+-- owed CR 120.3c AND CR 120.3e off one damage event. Pawl.DamageSpec's
+-- CreatureAndPlaneswalker group is the proof.
+--
+-- The recipient's own TAG is unioned in rather than replaced by the projection,
+-- and the union is what keeps this from ever taking a result away. The tag is the
+-- classification made where the recipient was built -- CR 510.1b's combat
+-- recipient, CR 601.2c's chosen target -- and it is the only reading left for a
+-- permanent that is no longer there to be projected, which is CR 608.2h's last
+-- known information. The projection is what CR 120.3 actually asks for and what
+-- one tag cannot express.
+--
+-- Empty for a player, who is CR 120.3a/120.3b's business and has no card types at
+-- all, and for a ToObject naming nothing (CR 608.2h) or naming a permanent that
+-- is none of the three (CR 120.1a's "can't").
+damagedCardTypes :: GameState -> Recipient.Recipient -> Set CardType.CardType
+damagedCardTypes gs recipient =
+  let tagged = case recipient of
+        Recipient.ToCreature _ -> Set.singleton CardType.Creature
+        Recipient.ToPlaneswalker _ -> Set.singleton CardType.Planeswalker
+        Recipient.ToBattle _ -> Set.singleton CardType.Battle
+        Recipient.ToObject _ -> Set.empty
+        Recipient.ToPlayer _ -> Set.empty
+        Recipient.ToPile _ -> Set.empty
+      projected = case Recipient.objectOf recipient of
+        Nothing -> Set.empty
+        Just oid -> Set.intersection damageable (cardTypesOf oid gs)
+      damageable = Set.fromList [CardType.Battle, CardType.Creature, CardType.Planeswalker]
+   in Set.union tagged projected
 
 -- CR 613.1d a third time, for CR 115.4's fourth kind of "any target" and CR
 -- 120.3h's defense-counter removal.

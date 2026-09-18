@@ -36,6 +36,7 @@ import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Combat as Combat
@@ -731,6 +732,87 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DamageDealt ev ->
       DamageEvent.source ev == bearer
         && maybe False (PlayerRelation.holds (Game.teams gs) relation you) (Recipient.playerOf (DamageEvent.target ev))
+    GameEvent.Moved {} -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 603.2 / 120.3: the same arm with rule 120.3's other recipient -- a CREATURE
+  -- rather than a player. Strax, Sontaran Nurse's "Glory of Battle" is the reader,
+  -- and its own "Grenades!" fight is a noncombat source, so no CR 510.1 narrowing
+  -- here either.
+  --
+  -- Projection.damagedCardTypes rather than a Recipient.ToCreature test, the same
+  -- reading CR 120.3's own results take: the TAG is the classification made
+  -- where the recipient was built, and an attacked permanent that is both a
+  -- planeswalker and a creature carries the planeswalker one while still being
+  -- dealt damage to a creature. The tag is unioned in rather than replaced,
+  -- which is CR 608.2h's last known information for a recipient the damage has
+  -- already killed.
+  TriggerCondition.SelfDealsDamageToCreature -> case event of
+    GameEvent.DamageDealt ev ->
+      DamageEvent.source ev == bearer
+        && Set.member CardType.Creature (Projection.damagedCardTypes gs (DamageEvent.target ev))
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False

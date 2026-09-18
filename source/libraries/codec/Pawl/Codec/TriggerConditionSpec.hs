@@ -106,6 +106,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.Opponent)
       " {\"type\":\"SelfDealsDamageToPlayer\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 120.3's other recipient, nullary for the reason the constructor's haddock
+  -- gives: nothing qualifies the creature it was dealt to.
+  Spec.it s "SelfDealsDamageToCreature" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfDealsDamageToCreature
+      " {\"type\":\"SelfDealsDamageToCreature\"} "
   -- CR 120.3: the same history read the other way round -- the bearer was DEALT
   -- damage. Nullary, since enrage qualifies the damage in no way.
   Spec.it s "SelfIsDealtDamage" $

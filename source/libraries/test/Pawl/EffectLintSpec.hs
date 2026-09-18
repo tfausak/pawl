@@ -1057,8 +1057,8 @@ data Asks
     -- raises no prompt: every ObjectRef position but the three below.
     AsksNothing
   | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
-    -- monad. It asks the graveyard, hand, from-among, one-permanent and
-    -- any-number arms; the random arm answers @pure []@ there (#3629).
+    -- monad. The one site that asks EVERY choosing arm, the random one
+    -- (Elkin Lair) included.
     AsksMoveGather
   | -- | Pawl.Engine.Resolve's Effect.Reveal arm. It asks the from-among arm
     -- through chooseCardFromAmong and the random arm through
@@ -1124,9 +1124,9 @@ chooserRef ref = case ref of
 
 -- The asking matrix itself: whether the site an Asks names asks THIS arm. A
 -- per-(site, arm) pair and not a per-site or per-arm predicate, because both
--- coarser readings admit a ref that names nothing -- MoveToZone's gather does not
--- ask the random arm (#3629), and Reveal's arm does not ask either zone-keyed
--- chosen one.
+-- coarser readings admit a ref that names nothing -- Reveal's arm does not ask
+-- either zone-keyed chosen one, and the transform gather asks only the
+-- battlefield subset.
 asksFor :: Asks -> ObjectRef.ObjectRef -> Bool
 asksFor asks ref = case asks of
   AsksNothing -> False
@@ -1134,6 +1134,7 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInGraveyard {} -> True
     ObjectRef.ChosenCardInHand {} -> True
     ObjectRef.ChosenCardFromAmong {} -> True
+    ObjectRef.RandomCardInHand {} -> True
     ObjectRef.ChosenPermanent {} -> True
     ObjectRef.SourceAndChosenPermanent {} -> True
     ObjectRef.AnyNumberMatching {} -> True
@@ -1213,7 +1214,7 @@ effectObjectRefs effect =
         Effect.ControlPlayerThisResolution {} -> []
         Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
         Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> read_ [ref]
-        -- THE gather that asks, and the one that elides the random arm (#3629).
+        -- THE gather that asks every choosing arm.
         Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [(AsksMoveGather, ref)]
         Effect.Draw {} -> []
         Effect.Mill {} -> []
@@ -2239,13 +2240,12 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- Every asking arm gets an accept case AND a reject case, and the four
   -- degenerate classifications this rules out are why. "Every pair asks" is ruled
-  -- out by Transform's four rejects and by MoveToZone's random arm; "MoveToZone
-  -- asks everything" by that same random arm (#3629); "the three chosen arms
-  -- always ask, the random one never does" by Reveal accepting the random arm and
-  -- rejecting both zone-keyed chosen ones, and Discard answering the same row;
-  -- "the battlefield subset asks
-  -- everywhere" by the last assertion, which rejects it at two sites and
-  -- accepts it at two.
+  -- out by Transform's four rejects; "the three chosen arms always ask, the
+  -- random one never does" by Reveal accepting the random arm and rejecting both
+  -- zone-keyed chosen ones, and Discard answering the same row; "the battlefield
+  -- subset asks everywhere" by the last assertion, which rejects it at two sites
+  -- and accepts it at two. MoveToZone's gather really does ask every choosing
+  -- arm, so its row is four accepts and rules nothing out on its own.
   Spec.it s "the lint itself catches a chosen card under an opcode that cannot ask" $ do
     exhume <- S.printingOf s registry "Exhume"
     let anyCard = Filter.Type.HasCardType CardType.Creature
@@ -2263,9 +2263,9 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         inert = fmap (not . null . inertChoosers)
     Spec.assertEqWith
       s
-      "MoveToZone's gather asks the three chosen arms and not the random one (#3629)"
+      "MoveToZone's gather asks the three chosen arms and the random one"
       (inert (fmap moves [inGraveyard, inHand, fromAmong, atRandom]))
-      [False, False, False, True]
+      [False, False, False, False]
     Spec.assertEqWith
       s
       "CR 701.20a's reveal asks from-among and at-random, and neither zone-keyed chosen arm"

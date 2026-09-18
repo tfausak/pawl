@@ -138,6 +138,12 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
       Recipient.ToObject _ -> Map.empty
       -- Unreachable, for the reason the DamageToPlayerPrevented arm above gives.
       Recipient.ToPile _ -> Map.empty
+  -- CR 120.3's amount for the arm one recipient over. No slot for the damaged
+  -- CREATURE: Strax's "Glory of Battle" puts its counter on the bearer, whom CR
+  -- 113.7a's source slot already names, and the amount is unconditional given a
+  -- match.
+  (TriggerCondition.SelfDealsDamageToCreature, GameEvent.DamageDealt ev) ->
+    Binding.setEventAmount (DamageEvent.amount ev) Map.empty
   -- CR 603.2's "that much": how many counters actually came off, read off the
   -- event's own before/after pair. Chandra, Fire Artisan's "she deals that much
   -- damage" counts THAT and not the damage that caused it -- CR 306.8's removal
@@ -1103,6 +1109,9 @@ eventBindingSlots cond = case cond of
   -- The same pair for the arm without the combat narrowing, and equally guaranteed
   -- -- every DamageDealt event carries an amount, whichever CR 120.3 kind it was.
   TriggerCondition.SelfDealsDamageToPlayer _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
+  -- Just the amount for the arm one recipient over, and equally guaranteed -- see
+  -- the eventBindings arm above for why the recipient gets no slot.
+  TriggerCondition.SelfDealsDamageToCreature -> Set.singleton Binding.eventAmount
   -- CR 120.3's amount for enrage, which Coalhauler Swine's "it deals that much
   -- damage to each player" reads: the same slot CR 615.13's prevention and CR
   -- 119.9's life gain stamp, and guaranteed given a match -- every DamageDealt

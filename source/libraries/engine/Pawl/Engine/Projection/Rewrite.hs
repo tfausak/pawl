@@ -1499,6 +1499,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StepBegins {} -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> condition
   TriggerCondition.SelfDealsDamageToPlayer _ -> condition
+  TriggerCondition.SelfDealsDamageToCreature -> condition
   TriggerCondition.SelfIsDealtDamage -> condition
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDealCombatDamageToPlayer f -> TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.rewrite pairs f)

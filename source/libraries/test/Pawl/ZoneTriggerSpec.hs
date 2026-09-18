@@ -2012,6 +2012,11 @@ representativeEvents cond =
         TriggerCondition.SelfDealsDamageToPlayer _ ->
           noTable combatDamage
             NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat))]
+        -- CR 120.3's other recipient, the bearer still the SOURCE. TWO of them for
+        -- the arm above's reason: this condition admits both damage kinds.
+        TriggerCondition.SelfDealsDamageToCreature ->
+          noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToCreature arrived) 4 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat))
+            NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent departed (Recipient.ToCreature arrived) 5 False False False 0 Nothing Nothing mempty False DamageKind.Combat))]
         -- CR 120.3's event pointed the other way, at the BEARER -- so the pair
         -- really matches. TWO of them, combat and noncombat, because this
         -- condition admits both, as the arm above does: a floor claimed for one
@@ -2546,6 +2551,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
     TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.AnyPlayer,
     TriggerCondition.SelfDealsDamageToPlayer PlayerRelation.Opponent,
+    TriggerCondition.SelfDealsDamageToCreature,
     TriggerCondition.SelfIsDealtDamage,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.Type.And []),

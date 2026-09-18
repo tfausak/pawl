@@ -716,8 +716,8 @@ settleAssignments announced =
 -- naming none of them is CR 120.1a's "can't" and nothing else.
 --
 -- The order of the three tests settles only WHICH tag a permanent with more than
--- one of those card types is given, never what damage to it does: damagedCardTypes
--- below reads the recipient's projected card types as the damage is applied, so a
+-- one of those card types is given, never what damage to it does:
+-- Projection.damagedCardTypes reads the recipient's projected card types as the damage is applied, so a
 -- permanent that is both a creature and a planeswalker gets CR 120.3c and CR
 -- 120.3e whichever arm classified it.
 damageRecipient :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
@@ -733,52 +733,12 @@ damageRecipient gs recipient = case recipient of
     | otherwise -> Nothing
   Recipient.ToPile _ -> Nothing
 
--- CR 120.3: "damage may have one or more of the following results, depending on
--- ... the characteristics of the damage's recipient". ONE OR MORE, and the
--- characteristics are the recipient's -- so the results damage to a permanent has
--- are keyed to the set of CR 120.1a card types it has, not to a single choice
--- among them. This is that set, narrowed to the three card types CR 120.1a admits
--- and CR 120.3c/120.3e/120.3h give results to.
---
--- A permanent really can hold two of them at once: Liquimetal Coating makes Jace
--- Beleren an artifact "in addition to its other types" and March of the Machines
--- then makes that noncreature artifact an artifact creature, both under CR
--- 205.1b's retention clause, leaving a 3/3 artifact creature planeswalker that is
--- owed CR 120.3c AND CR 120.3e off one damage event. Pawl.DamageSpec's
--- CreatureAndPlaneswalker group is the proof.
---
--- The recipient's own TAG is unioned in rather than replaced by the projection,
--- and the union is what keeps this from ever taking a result away. The tag is the
--- classification made where the recipient was built -- CR 510.1b's combat
--- recipient, CR 601.2c's chosen target -- and it is the only reading left for a
--- permanent that is no longer there to be projected, which is CR 608.2h's last
--- known information. The projection is what CR 120.3 actually asks for and what
--- one tag cannot express.
---
--- Empty for a player, who is CR 120.3a/120.3b's business and has no card types at
--- all, and for a ToObject naming nothing (CR 608.2h) or naming a permanent that
--- is none of the three (CR 120.1a's "can't").
-damagedCardTypes :: GameState -> Recipient.Recipient -> Set.Set CardType.CardType
-damagedCardTypes gs recipient =
-  let tagged = case recipient of
-        Recipient.ToCreature _ -> Set.singleton CardType.Creature
-        Recipient.ToPlaneswalker _ -> Set.singleton CardType.Planeswalker
-        Recipient.ToBattle _ -> Set.singleton CardType.Battle
-        Recipient.ToObject _ -> Set.empty
-        Recipient.ToPlayer _ -> Set.empty
-        Recipient.ToPile _ -> Set.empty
-      projected = case Recipient.objectOf recipient of
-        Nothing -> Set.empty
-        Just oid -> Set.intersection damageable (Projection.cardTypesOf oid gs)
-      damageable = Set.fromList [CardType.Battle, CardType.Creature, CardType.Planeswalker]
-   in Set.union tagged projected
-
 -- CR 120.4a: the bar a permanent's own characteristics set, below which none of
 -- an effect's damage to it is EXCESS. One number per recipient, so redirectExcess
 -- below is arithmetic on the event and never a second classification of the
 -- permanent.
 --
--- One entry per CR 120.1a card type the recipient HAS, read off damagedCardTypes
+-- One entry per CR 120.1a card type the recipient HAS, read off Projection.damagedCardTypes
 -- so this and CR 120.3's results agree about what the permanent is:
 --
 --   * a creature's bar is CR 120.6's lethal damage, "taking into account damage
@@ -808,7 +768,7 @@ damagedCardTypes gs recipient =
 excessThreshold :: GameState -> ObjectId -> Recipient.Recipient -> Maybe Natural
 excessThreshold gs source recipient = do
   oid <- Recipient.objectOf recipient
-  let types = damagedCardTypes gs recipient
+  let types = Projection.damagedCardTypes gs recipient
       bars =
         fmap
           snd
@@ -928,7 +888,7 @@ processDamage :: [DamageEvent.DamageEvent] -> Game [(PlayerId, Natural)]
 processDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events
   -- The state the whole batch is read against: recipients are classified off it
-  -- (damagedCardTypes), the commander tally is asked of it, and `counterResults`
+  -- (Projection.damagedCardTypes), the commander tally is asked of it, and `counterResults`
   -- reads each source's controller out of it. CR 510.2's simultaneity, which no
   -- event in the batch may disturb for the next.
   board <- State.get
@@ -968,7 +928,7 @@ processDamage events = do
                 }
          in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
       -- CR 120.3's "one or more of the following results", read off
-      -- damagedCardTypes: every result the recipient's card types earn it applies,
+      -- Projection.damagedCardTypes: every result the recipient's card types earn it applies,
       -- rather than the first one that matches. A permanent that is both a creature
       -- and a planeswalker takes CR 120.3e's mark AND loses CR 120.3c's loyalty
       -- counters from one event.
@@ -989,7 +949,7 @@ processDamage events = do
       -- CR 120.3d's counters go to a CREATURE recipient, the same card type CR
       -- 120.3e's mark answers to, so the two readings of "is this a creature" must
       -- be one reading.
-      damagedTypesOf ev = damagedCardTypes board (DamageEvent.target ev)
+      damagedTypesOf ev = Projection.damagedCardTypes board (DamageEvent.target ev)
       markOne g ev = case DamageEvent.target ev of
         -- Every object-shaped recipient goes through one arm, INCLUDING
         -- Recipient.ToObject: CR 120.1a's three card types are what decide the
@@ -1034,7 +994,7 @@ processDamage events = do
       --
       -- Players only, so this is a walk of its own rather than a row in
       -- onPermanent's `results` list: that list is keyed by CardType and a player
-      -- has none (damagedCardTypes answers empty for one).
+      -- has none (Projection.damagedCardTypes answers empty for one).
       tallyOne g ev = case DamageEvent.target ev of
         Recipient.ToPlayer pid
           | DamageEvent.kind ev == DamageKind.Combat ->

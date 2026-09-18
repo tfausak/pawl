@@ -136,10 +136,8 @@ data ObjectRef
   | -- | CR 701.20a / 701.9b / Merfolk Spy, Fall, Hymn to Tourach: the cards
     -- randomness names out of the hands the PlayerRef names, asked of the
     -- interpreter through Prompt.RandomObject and filtered back against the
-    -- candidates.
-    --
-    -- Not implemented: the MoveToZone gather, which elides this arm so that only
-    -- Reveal and Discard carry it out (#3629).
+    -- candidates. Carried out by Effect.Reveal, Effect.Discard and
+    -- Effect.MoveToZone's gather, all three through randomCardsInHand.
     RandomCardInHand RandomCardInHand.RandomCardInHand
   | -- | CR 608.2d / Tovolar, Dire Overlord: any number of the permanents on the
     -- battlefield matching the Filter, offered rather than swept, the empty answer

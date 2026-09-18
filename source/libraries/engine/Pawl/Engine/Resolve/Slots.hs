@@ -2485,7 +2485,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot filter_) ->
     matchingFromAmong legal resolving controller source gs filter_ $
       objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot)
-  -- Answered for real by the REVEAL arm, over the seats handChoosers names.
+  -- Answered for real by randomCardsInHand, over the seats handChoosers names --
+  -- the Reveal arm, the Discard arm and Effect.MoveToZone's gather.
   ObjectRef.RandomCardInHand _ -> []
 
 -- The players a ZoneScope names, in APNAP order -- whose graveyards is
