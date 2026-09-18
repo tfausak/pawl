@@ -193,6 +193,7 @@ codec =
       Arm.payload "Disguise" (Cost.codec codec) Keyword.Disguise (\x -> case x of Keyword.Disguise y -> Just y; _ -> Nothing),
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot (\x -> case x of Keyword.Plot y -> Just y; _ -> Nothing),
       Arm.payload "Foretell" (Cost.codec codec) Keyword.Foretell (\x -> case x of Keyword.Foretell y -> Just y; _ -> Nothing),
+      Arm.nullary "Demonstrate" Keyword.Demonstrate,
       Arm.payload "Escape" (Cost.codec codec) Keyword.Escape (\x -> case x of Keyword.Escape y -> Just y; _ -> Nothing),
       Arm.payload "Companion" (Filter.codec codec) Keyword.Companion (\x -> case x of Keyword.Companion y -> Just y; _ -> Nothing),
       Arm.nullary "Ascend" Keyword.Ascend,
@@ -375,6 +376,7 @@ tagOf x = case x of
   Keyword.Disguise {} -> "Disguise"
   Keyword.Plot {} -> "Plot"
   Keyword.Foretell {} -> "Foretell"
+  Keyword.Demonstrate {} -> "Demonstrate"
   Keyword.Escape {} -> "Escape"
   Keyword.Companion {} -> "Companion"
   Keyword.Ascend {} -> "Ascend"
