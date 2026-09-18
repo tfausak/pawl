@@ -106,6 +106,18 @@ data Face card = MkFace
     -- per-cleanup and take the printed card the way Face.castingPermissions'
     -- readers do (Pawl.Engine.Vanguard).
     vanguard :: Maybe Vanguard.Vanguard,
+    -- | CR 903.3a: whether this card prints "this card can be your commander",
+    -- the deck-construction ability that lets a card CR 903.3 would otherwise
+    -- refuse be designated. False for every card that does not print it.
+    --
+    -- NOT a Pawl.Types.Keyword, which is rule 702's vocabulary and nothing
+    -- else: rule 903.3a names no keyword, and the partner abilities beside it
+    -- are keywords only because CR 702.124a says so. A printed FLAG rather than
+    -- a static ability, because CR 113.6n functions it before the game begins,
+    -- where there is no object for a continuous effect to touch --
+    -- Pawl.Engine.Commander.designations reads it off the front face for the
+    -- reason that function gives.
+    canBeYourCommander :: Bool,
     -- | CR 702, counted. A card can print the same keyword twice -- Apex
     -- Devastator's "Cascade, cascade, cascade, cascade" -- and CR 702.85c makes
     -- each instance trigger separately, so the count is printed text rather than

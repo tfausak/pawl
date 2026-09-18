@@ -392,7 +392,8 @@ createDeck pid deck = do
   -- deck's claim -- rule 702.124 admits a second commander only for a pair one
   -- of its partner abilities allows, and an inadmissible pair designates
   -- neither.
-  designatedIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Commander.designations deck))
+  settings <- State.gets GameState.settings
+  designatedIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Commander.designations settings deck))
   Monad.forM_ designatedIds $ \printingId -> do
     Monad.void (createInCommandZone pid printingId)
     State.modify' (Commander.designate pid printingId)

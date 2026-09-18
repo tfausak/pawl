@@ -3836,6 +3836,7 @@ subgameSpellOn borrowed name effects gs0 =
             Face.loyalty = Nothing,
             Face.defense = Nothing,
             Face.vanguard = Nothing,
+            Face.canBeYourCommander = False,
             Face.keywords = Map.empty,
             Face.colorIndicator = Set.empty,
             Face.staticAbilities = [],

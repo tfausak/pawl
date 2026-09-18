@@ -37,8 +37,6 @@ data Deck = MkDeck
     -- A Set and not `cards`' multiset: CR 903.5b gives every card in the deck
     -- but a basic land a different English name, and CR 903.3 designates a
     -- legendary one, so two designations are two distinct printings.
-    --
-    -- Not implemented: CR 903.3a's "this card can be your commander" (#939).
     commander :: Set.Set Printing.Printing,
     -- | CR 902.3: the vanguard card this player brings, which CR 313.2 keeps in
     -- the command zone for the whole game.

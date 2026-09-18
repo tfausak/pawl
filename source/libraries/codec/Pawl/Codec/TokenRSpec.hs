@@ -68,6 +68,7 @@ soldier =
               Face.loyalty = Nothing,
               Face.defense = Nothing,
               Face.vanguard = Nothing,
+              Face.canBeYourCommander = False,
               Face.keywords = Map.empty,
               Face.colorIndicator = Set.empty,
               Face.characteristicPT = Nothing,
