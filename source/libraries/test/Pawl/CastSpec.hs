@@ -52,6 +52,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -3767,6 +3768,60 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
     Spec.assertEqWith s "CR 702.152a and drew a card as it died" (drew blitzed) 1
     Spec.assertEqWith s "cast for {1}{R} and bolted, it died and made its Treasure without drawing" (drew bolted, dead bolted) (0, (0, 1))
 
+-- CR 702.113a on Part the Waterveil {4}{U}{U} Sorcery, "Take an extra turn after
+-- this one. Exile Part the Waterveil. / Awaken 6--{6}{U}{U}{U}" (Oracle text
+-- checked on Scryfall, 2026-09-17).
+--
+-- ONE board for both cases, so the negative cannot be a shortage: nine Islands
+-- pay either cost, and the case that leaves the Forest a plain land had the
+-- awaken cost available and declined it. The target is a tenth land of a name
+-- of its own, so it is pinned by id and not confused with the nine paying it.
+--
+-- The spell ability rule 702.113a's second half states rides the CARD as a
+-- clause gated on Quantity.CastUsing, cleave's shape; Pawl.Types.Keyword's
+-- Awaken says why. Rule 702.113b's "cast as if it didn't have that target" is
+-- not implemented, so the Forest is targeted on the unawakened cast too
+-- (#2833) -- which is why both casts here are given a land to aim at.
+--
+-- That clause is written ABOVE the card's own "Exile Part the Waterveil" rather
+-- than in printed order: CR 400.7 makes the exiled card a new object with no
+-- memory of the spell, so Object.castUsing is gone by the time a clause below
+-- the move reads it, and the gate answers false. Nothing happens between the
+-- two, so the orders are observably the same.
+awakenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+awakenSpec s registry = Spec.describe s "Awaken" $ do
+  Spec.it s "CR 702.113a awakened, the Forest becomes a 6/6 Elemental creature land with haste; cast for {4}{U}{U} it stays a plain land" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    waterveil <- S.printingOf s registry "Part the Waterveil"
+    let (forestId, gs0) = S.addPermanent forest S.alice (S.landsInPlay island 9)
+        (waterveilId, gs1) = S.addHandCard waterveil S.alice gs0
+        board = aliceOnTurn gs1
+        cast cost = castResolved (payingAimedAt cost forestId) waterveilId board
+        reading gs =
+          ( S.powerToughnessOf forestId gs,
+            S.counterOf CounterKind.PlusOnePlusOne forestId gs,
+            Projection.hasKeyword Keyword.Haste forestId gs,
+            Set.member CardType.Creature (Projection.cardTypesOf forestId gs),
+            Set.member CardType.Land (Projection.cardTypesOf forestId gs),
+            Set.member Subtype.Elemental (Projection.subtypesOf forestId gs)
+          )
+    Spec.assertEqWith s "CR 702.113a the awaken cost was paid, so the Forest is a 0/0 Elemental creature with haste under six +1/+1 counters and is still a land" (reading (cast awakenCost)) (Just (6, 6), 6, True, True, True, True)
+    Spec.assertEqWith s "CR 702.113a the printed cost was paid, so the Forest gains nothing at all" (reading (cast waterveilCost)) (Nothing, 0, False, False, True, False)
+    Spec.assertEqWith s "the control: both casts exiled the Waterveil and gave alice an extra turn" (fmap (\gs -> (S.onBattlefield waterveilId gs, length (GameState.extraTurns gs))) [cast awakenCost, cast waterveilCost]) [(False, 1), (False, 1)]
+
+-- payingFor with every target slot aimed at `victim`, which Part the Waterveil
+-- needs because rule 702.113b's target is chosen on both casts (#2833).
+payingAimedAt :: [ManaSymbol.ManaSymbol] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+payingAimedAt wanted victim p = case p of
+  Prompt.ChooseTargets {} -> aimedAt victim p
+  _ -> payingFor wanted p
+
+-- Part the Waterveil's printed {4}{U}{U} and its awaken {6}{U}{U}{U}.
+waterveilCost, awakenCost :: [ManaSymbol.ManaSymbol]
+waterveilCost = [ManaSymbol.Generic 4, theBlue, theBlue]
+awakenCost = [ManaSymbol.Generic 6, theBlue, theBlue, theBlue]
+
 -- CR 702.148a on Path of Peril {1}{B}{B} Sorcery, "Cleave {4}{W}{B} / Destroy
 -- all creatures [with mana value 2 or less]." (Oracle text checked on Scryfall,
 -- 2026-09-12).
@@ -5211,6 +5266,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   harmonizeSpec s registry
   dashSpec s registry
   blitzSpec s registry
+  awakenSpec s registry
   cleaveSpec s registry
   webSlingingSpec s registry
   warpSpec s registry

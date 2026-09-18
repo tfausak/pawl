@@ -376,6 +376,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (Keyword.Cleave (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []))
       " {\"type\":\"Cleave\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
+  -- CR 702.113a's payload is a whole Cost, cleave's shape -- Part the Waterveil's
+  -- {6}{U}{U}{U}. Rule 702.113a's N is not in the payload: the spell ability the
+  -- rule's second half states rides the card's own clause.
+  Spec.it s "Awaken carries its cost" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Awaken (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 6])) []))
+      " {\"type\":\"Awaken\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":6}]}} "
   -- CR 702.119a's payload is a whole Cost, cleave's shape -- Drownyard
   -- Behemoth's {7}{U}. The SACRIFICE rule 702.119a states is not in the payload:
   -- it is appended at the offer, by Pawl.Engine.Cost.candidateCostsGiven.

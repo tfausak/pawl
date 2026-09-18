@@ -477,6 +477,19 @@ data Keyword
     -- if it isn't renowned, put N +1/+1 counters on it and it becomes renowned;
     -- renowned itself is a designation (CR 702.112b).
     Renown Natural.Natural
+  | -- | 702.113a: awaken N--[cost] -- an alternative cost, plus a spell ability
+    -- that runs only if that cost was paid, putting N +1/+1 counters on a target
+    -- land you control and animating it.
+    --
+    -- THE COST ALONE is the payload, Cleave's shape: nothing in pawl mints a
+    -- SPELL ability from a keyword, so the card states that half itself, as a
+    -- clause gated on Quantity.CastUsing, and rule 702.113a's N is written where
+    -- the counters are put rather than copied here. No printing grants awaken to
+    -- another object, which is what makes the two spellings observably the same.
+    --
+    -- Not implemented: rule 702.113b's "the spell is cast as if it didn't have
+    -- that target" -- the land is targeted on an unawakened cast too (#2833).
+    Awaken (Cost.Cost Keyword)
   | Devoid -- 702.114
   | -- | 702.115a: whenever this creature deals combat damage to a player, that
     -- player exiles the top card of their library, face up (CR 406.3); each

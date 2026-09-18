@@ -167,6 +167,10 @@ data KeywordFamily
     Dash
   | -- | CR 702.112a: renown N.
     Renown
+  | -- | CR 702.113a: awaken N--[cost]; the family Quantity.CastUsing names, which
+    -- is how Part the Waterveil's clause asks rule 702.113a's "if this spell's
+    -- awaken cost was paid".
+    Awaken
   | -- | CR 702.120a: escalate [cost].
     Escalate
   | -- | CR 702.122a: crew N.

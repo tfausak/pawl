@@ -2715,6 +2715,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Warp cost -> costFilters cost
   -- CR 702.148a: the cleave cost, flashback's shape.
   Keyword.Cleave cost -> costFilters cost
+  Keyword.Awaken cost -> costFilters cost
   -- CR 702.119a: the emerge cost, flashback's shape. The sacrifice the rule
   -- states is appended at the offer (Pawl.Engine.Cost.candidateCostsGiven) and is
   -- not part of the payload.

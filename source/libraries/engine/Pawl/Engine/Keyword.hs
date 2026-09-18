@@ -447,6 +447,11 @@ abilitiesFor keyword count = case keyword of
   -- 612.1 text change, which Pawl.Types.Keyword's Cleave says the card states for
   -- itself.
   Keyword.Cleave _ -> []
+  -- CR 702.113a states a static ability and a SPELL ability, neither of them a
+  -- triggered one: the first is plainAlternativeCosts' alternative cost and the
+  -- second is part of the spell, which Pawl.Types.Keyword's Awaken says the card
+  -- states for itself.
+  Keyword.Awaken _ -> []
   -- CR 702.76a's, CR 702.117a's, CR 702.137a's and CR 702.173a's static
   -- abilities state an alternative cost and nothing else, so they mint no
   -- ability of their own either:
@@ -683,6 +688,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -1170,6 +1176,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -1792,6 +1799,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -2447,6 +2455,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- castFromGraveyardReplacementsOf's.
   Keyword.Harmonize _ -> [CastingPermission.CastFromGraveyard]
   Keyword.Cleave _ -> []
+  Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -2746,16 +2755,17 @@ copiedCastUsing castUsing = case castUsing of
   Just (Keyword.Suspend _) -> Nothing
   _ -> castUsing
 
--- CR 702.74a, 702.109a, 702.148a, 702.152a, 702.188a and 702.190a: every evoke,
--- dash, blitz, cleave, web-slinging and sneak cost this card may be cast for,
--- each beside the keyword that offers it -- the tag CR 601.2b records as
--- Object.castUsing -- in ascending Set order.
+-- CR 702.74a, 702.109a, 702.113a, 702.148a, 702.152a, 702.188a and 702.190a:
+-- every evoke, dash, blitz, cleave, awaken, web-slinging and sneak cost this
+-- card may be cast for, each beside the keyword that offers it -- the tag CR
+-- 601.2b records as Object.castUsing -- in ascending Set order.
 -- Read by Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is
 -- offered, bestowCosts' reading: evoke's static ability functions "in any zone
 -- from which the card with evoke can be cast", dash and blitz name no zone, and
 -- cleave's, web-slinging's and sneak's function "while a spell with [the
 -- keyword] is on the stack", which CR 113.6e reaches from wherever the cast
--- begins.
+-- begins, and awaken's is rule 702.113a's own "while the spell with awaken is on
+-- the stack".
 --
 -- THE TAG IS THE BARE KEYWORD and the cost is not always the bare payload: rule
 -- 702.188a and rule 702.190a each spell an alternative cost of "[cost] AND
@@ -2764,9 +2774,9 @@ copiedCastUsing castUsing = case castUsing of
 -- what Quantity.CastUsing compares against (Spiders-Man, Heroic Horde) and what
 -- Pawl.Engine.Cast.candidateTimingOk reads rule 702.190a's window off.
 --
--- UNGATED, where surgeCosts' and spectacleCosts' callers gate: rule 702.148a
--- states no clause of its own, and rule 702.188a states none either. Rule
--- 702.190a's clause is a WINDOW rather than a condition on the board, so it
+-- UNGATED, where surgeCosts' and spectacleCosts' callers gate: rules 702.113a,
+-- 702.148a and 702.188a state no clause of their own. Rule 702.190a's clause is
+-- a WINDOW rather than a condition on the board, so it
 -- gates in Pawl.Engine.Cast beside the card's own timing and not here -- an offer
 -- withheld here would still leave the printed cost castable in that window, which
 -- is the opposite of what that rule says. A list and a wildcard for
@@ -2780,6 +2790,7 @@ plainAlternativeCosts keywords =
         Keyword.Dash cost -> Just (keyword, cost)
         Keyword.Blitz cost -> Just (keyword, cost)
         Keyword.Cleave cost -> Just (keyword, cost)
+        Keyword.Awaken cost -> Just (keyword, cost)
         -- CR 702.188a's "a tapped creature you control", three conjuncts and CR
         -- 400.3 for the destination -- ninjutsu's component one rule over, whose
         -- haddock has the argument for asking the creature conjunct at all.
@@ -3725,6 +3736,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -4173,6 +4185,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -4439,6 +4452,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
@@ -4867,6 +4881,7 @@ familyOf keyword = case keyword of
   Keyword.Disturb _ -> Just KeywordFamily.Disturb
   Keyword.Harmonize _ -> Just KeywordFamily.Harmonize
   Keyword.Cleave _ -> Just KeywordFamily.Cleave
+  Keyword.Awaken _ -> Just KeywordFamily.Awaken
   Keyword.Surge _ -> Just KeywordFamily.Surge
   Keyword.Spectacle _ -> Just KeywordFamily.Spectacle
   Keyword.Prowl _ -> Just KeywordFamily.Prowl
