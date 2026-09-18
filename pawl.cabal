@@ -1113,6 +1113,7 @@ library engine
     Pawl.Engine.Initiative
     Pawl.Engine.Interchangeable
     Pawl.Engine.Keyword
+    Pawl.Engine.Learn
     Pawl.Engine.Mana
     Pawl.Engine.ManaAbility
     Pawl.Engine.ManaCount
@@ -1126,6 +1127,7 @@ library engine
     Pawl.Engine.PlayerDesignation
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Plot
+    Pawl.Engine.Populate
     Pawl.Engine.Prepare
     Pawl.Engine.Projection
     Pawl.Engine.Projection.Rewrite
@@ -1480,6 +1482,7 @@ library test
     Pawl.InitiativeSpec
     Pawl.InvestigateSpec
     Pawl.KeywordTriggerSpec
+    Pawl.LearnSpec
     Pawl.LeavesTriggerSpec
     Pawl.LibraryOrderSpec
     Pawl.LifeReplacementSpec
@@ -1501,6 +1504,7 @@ library test
     Pawl.PlaneswalkerSpec
     Pawl.PlayerDesignationSpec
     Pawl.PlayerEffectSpec
+    Pawl.PopulateSpec
     Pawl.PowerToughnessSpec
     Pawl.PreparationSpec
     Pawl.PreventionSpec
@@ -1825,6 +1829,7 @@ library types
     Pawl.Types.LastKnown
     Pawl.Types.Layer
     Pawl.Types.Layout
+    Pawl.Types.LearnMode
     Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition
     Pawl.Types.LifeChange

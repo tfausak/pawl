@@ -639,6 +639,14 @@ data Effect card ability
     -- Pawl.Engine.Forage.forage as one procedure. Nullary, rule 701.61a fixing
     -- everything but the forager's own two choices.
     Forage
+  | -- | CR 701.36a: the resolving controller populates, performed by
+    -- Pawl.Engine.Populate.populate as one procedure. Nullary, rule 701.36a
+    -- fixing everything but which creature token is copied.
+    Populate
+  | -- | CR 701.48a: the resolving controller learns, performed by
+    -- Pawl.Engine.Learn.learn as one procedure. Nullary, rule 701.48a fixing
+    -- everything but the learner's own choices.
+    Learn
   | -- | CR 701.49: the resolving controller ventures into the dungeon,
     -- performed by Pawl.Engine.Dungeon.venture. The payload is CR 701.49d's
     -- "[quality]", a CR 205.3p dungeon type rather than a Filter.

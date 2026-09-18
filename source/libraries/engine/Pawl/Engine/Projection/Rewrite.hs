@@ -486,6 +486,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Airbend ref -> Effect.Airbend (rewriteObjectRef pairs ref)
   Effect.TemptWithTheRing -> effect
   Effect.Forage -> effect
+  Effect.Populate -> effect
+  Effect.Learn -> effect
   -- CR 612.2's gate, and this arm is where it bites rather than where it is
   -- restated: the payload IS a subtype word (CR 701.49d's quality), but a pair
   -- reaching it would have to come from a Pawl.Types.SubtypeFamily, and that type

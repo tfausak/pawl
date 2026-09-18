@@ -306,6 +306,8 @@ manaProduced effect = case effect of
   Effect.Airbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.Forage -> Nothing
+  Effect.Populate -> Nothing
+  Effect.Learn -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
@@ -510,6 +512,10 @@ movesLibraryCard effect = case effect of
   Effect.Airbend _ -> False
   Effect.TemptWithTheRing -> False
   Effect.Forage -> False
+  Effect.Populate -> False
+  -- CR 701.48a's middle sentence is a draw, which Effect.Draw's arm above
+  -- already makes a library move; an ability that learns is no mana ability.
+  Effect.Learn -> True
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
   Effect.Vote {} -> False
