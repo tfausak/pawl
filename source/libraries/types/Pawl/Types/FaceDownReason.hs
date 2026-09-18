@@ -35,6 +35,16 @@ data FaceDownReason
   | -- | CR 701.40a: manifested, i.e. put onto the battlefield face down by the
     -- keyword action. The one reason that unlocks CR 701.40b's procedure.
     Manifested
+  | -- | CR 701.58a: cloaked, i.e. put onto the battlefield face down by that
+    -- keyword action. Manifested's twin one rule over, and its own arm for the
+    -- reason Disguised is Morphed's own: CR 701.58a's list carries ward {2} and
+    -- CR 701.40a's does not, and CR 701.58b's procedure has this reason for its
+    -- subject -- "a cloaked permanent you control" -- so answering CR 708.6 with
+    -- either neighbour would price the turn-up wrong. Not Disguised, which is
+    -- the other near miss: that reason's procedure (CR 702.168d) charges the
+    -- disguise cost, and a cloaked creature card with no disguise ability is
+    -- turnable for its mana cost all the same.
+    Cloaked
   | -- | CR 708.2a's other producer: a face-up permanent turned face down by a
     -- spell or ability, Backslide's "turn target creature with a morph ability
     -- face down". CR 708.7's permission does NOT follow from this one -- nothing
