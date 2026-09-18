@@ -46,6 +46,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Initiative as Initiative
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Learn as Learn
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
@@ -53,6 +54,7 @@ import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
+import qualified Pawl.Engine.Populate as Populate
 import qualified Pawl.Engine.Prepare as Prepare
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
@@ -2434,6 +2436,13 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- fewer than three cards in their graveyard who controls no Food, which is
   -- Pawl.Engine.Forage.canForage. The executing arm reads the same two pools.
   Effect.Forage -> not (Forage.canForage controller gs)
+  -- CR 701.36b states the empty board's outcome outright -- "if you control no
+  -- creature tokens when instructed to populate, you won't create a token" -- so
+  -- populating is a legal no-op rather than something CR 608.2d refuses.
+  Effect.Populate -> False
+  -- CR 701.48a is two "you may"s, and declining both is an outcome the rule
+  -- states rather than an impossibility, so nothing here refuses the offer.
+  Effect.Learn -> False
   Effect.Venture {} -> False
   -- CR 608.2d's own worked example: a player who controls nothing the edict
   -- matches cannot sacrifice one. Through Replacement.sacrificeCandidates, so CR
@@ -7574,6 +7583,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 701.61a: the resolving controller forages; the keyword action is
   -- Pawl.Engine.Forage.forage's, prompts and all.
   Effect.Forage -> Monad.void (Forage.forage controller resolving)
+  -- CR 701.36a: the resolving controller populates; the keyword action is
+  -- Pawl.Engine.Populate.populate's, prompt and all.
+  Effect.Populate -> Populate.populate controller resolving
+  -- CR 701.48a: the resolving controller learns; the keyword action is
+  -- Pawl.Engine.Learn.learn's, prompts and all. `source` is the object the
+  -- card brought in from outside the game is credited to (CR 400.11c).
+  Effect.Learn -> Learn.learn controller resolving source
   -- CR 701.49: the whole keyword action, which Pawl.Engine.Dungeon owns.
   Effect.Venture quality -> Dungeon.venture controller quality
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do

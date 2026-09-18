@@ -48,6 +48,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.LearnMode as LearnMode
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -1516,6 +1517,15 @@ combatReplaySpec s =
           -- Discriminating: a decode that ignored the response and answered the
           -- half rule 701.61a names first would pass one leg by accident.
           Spec.assertEqWith s "exiling three cards round trips" (Replay.decode p (Replay.encode p ForageMode.ExileCards)) (Just ForageMode.ExileCards)
+        -- CR 701.48a: so is which branch of learning the learner took, declining
+        -- included.
+        Spec.it s "ChooseLearn round-trips through the transcript" $ do
+          let p = Prompt.ChooseLearn decider S.alice oid (LearnMode.TakeLesson NonEmpty.:| [LearnMode.DiscardAndDraw])
+          Spec.assertEqWith s "taking a Lesson round trips" (Replay.decode p (Replay.encode p (Just LearnMode.TakeLesson))) (Just (Just LearnMode.TakeLesson))
+          -- Discriminating: a decode that ignored the response and answered the
+          -- short transcript's decline would pass one leg by accident.
+          Spec.assertEqWith s "discarding and drawing round trips" (Replay.decode p (Replay.encode p (Just LearnMode.DiscardAndDraw))) (Just (Just LearnMode.DiscardAndDraw))
+          Spec.assertEqWith s "and so does declining both" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
         Spec.it s "a blight choice does not decode as a Ring-bearer choice" $ do
           -- Discriminating: fails if ChooseBlight reuses ChoseRingBearer rather than
           -- getting its own ObjectId-shaped constructor. These two are not merely

@@ -562,6 +562,7 @@ import qualified Pawl.JsonSchema.PatternSpec
 import qualified Pawl.JsonSchema.SchemaSpec
 import qualified Pawl.JsonSchema.ValidateSpec
 import qualified Pawl.KeywordTriggerSpec
+import qualified Pawl.LearnSpec
 import qualified Pawl.LeavesTriggerSpec
 import qualified Pawl.LibraryOrderSpec
 import qualified Pawl.LifeReplacementSpec
@@ -583,6 +584,7 @@ import qualified Pawl.PlaneswalkerCombatSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerDesignationSpec
 import qualified Pawl.PlayerEffectSpec
+import qualified Pawl.PopulateSpec
 import qualified Pawl.PowerToughnessSpec
 import qualified Pawl.PreparationSpec
 import qualified Pawl.PreventionSpec
@@ -1208,6 +1210,7 @@ spec s registry = do
   Pawl.FilterSpec.spec s
   Pawl.FlipSpec.spec s registry
   Pawl.ForageSpec.spec s registry
+  Pawl.LearnSpec.spec s registry
   Pawl.GameSpec.spec s registry
   Pawl.GoadSpec.spec s registry
   Pawl.Json.ArraySpec.spec s
@@ -1259,6 +1262,7 @@ spec s registry = do
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.CastProhibitionSpec.spec s registry
   Pawl.CastPermissionSpec.spec s registry
+  Pawl.PopulateSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.PreparationSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry

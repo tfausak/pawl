@@ -697,6 +697,8 @@ effectObjectRefs effect = case effect of
   Effect.Airbend ref -> [ref]
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
+  Effect.Populate -> []
+  Effect.Learn -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
   Effect.Vote {} -> []
@@ -852,6 +854,8 @@ effectPlayerRefs effect = case effect of
   Effect.Airbend {} -> []
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
+  Effect.Populate -> []
+  Effect.Learn -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
   -- CR 701.38a's specified player, the seat the vote starts with.
@@ -942,6 +946,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Airbend {} -> Map.empty
   Effect.TemptWithTheRing -> Map.empty
   Effect.Forage -> Map.empty
+  Effect.Populate -> Map.empty
+  Effect.Learn -> Map.empty
   Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
   -- CR 101.4's "each player sacrifices": the arm takes every player recipient
@@ -1543,6 +1549,8 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Airbend {} -> True
   Effect.TemptWithTheRing -> True
   Effect.Forage -> True
+  Effect.Populate -> True
+  Effect.Learn -> True
   Effect.Venture {} -> True
   Effect.ExileHandThenDraw -> True
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -1766,6 +1774,8 @@ readsX =
         Effect.Airbend {} -> False
         Effect.TemptWithTheRing -> False
         Effect.Forage -> False
+        Effect.Populate -> False
+        Effect.Learn -> False
         Effect.Venture {} -> False
         Effect.ExileHandThenDraw -> False
         Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
@@ -1979,6 +1989,8 @@ boundSlots effect = case effect of
   Effect.Airbend _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
   Effect.Forage -> Set.empty
+  Effect.Populate -> Set.empty
+  Effect.Learn -> Set.empty
   Effect.Venture {} -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty

@@ -2054,6 +2054,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Forage
       " {\"type\":\"Forage\"} "
+  -- CR 701.36a: nullary, rule 701.36a fixing the quality, the count and the
+  -- chooser, leaving an author nothing to write.
+  Spec.it s "Populate" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Populate
+      " {\"type\":\"Populate\"} "
+  -- CR 701.48a: nullary, rule 701.48a fixing both branches and the learner.
+  Spec.it s "Learn" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Learn
+      " {\"type\":\"Learn\"} "
   -- CR 701.49: the plain keyword action, whose payload is absent -- rule 701.49
   -- fixes the venturer, and CR 701.49a lets the player choose from every dungeon
   -- card they own, leaving an author nothing to write.

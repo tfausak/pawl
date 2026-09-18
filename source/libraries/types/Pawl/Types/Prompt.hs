@@ -30,6 +30,7 @@ import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.LearnMode as LearnMode
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
@@ -361,6 +362,12 @@ data Prompt r where
   -- Forager). Raised only where both halves can be carried out, which is what
   -- makes it a choice (Pawl.Engine.Forage.forage).
   ChooseForage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt ForageMode.ForageMode
+  -- | CR 701.48a: which branch of learning the learner takes, or Nothing to take
+  -- neither -- the rule's two "you may"s, which declining is always an answer to.
+  -- The ObjectId is the spell or ability resolving. The NonEmpty is the branches
+  -- that can be carried out at all (Pawl.Engine.Learn.learn); raised whenever
+  -- there is one, since declining is a distinct outcome even then.
+  ChooseLearn :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty LearnMode.LearnMode -> Prompt (Maybe LearnMode.LearnMode)
   -- | CR 601.2b: how many times the optional additional cost of that keyword --
   -- kicker, multikicker, squad, offspring, replicate or casualty (CR 702.33a/c,
   -- 702.157a, 702.175a, 702.56a, 702.153a) --
