@@ -1059,6 +1059,7 @@ library engine
     Pawl.Engine.Activate
     Pawl.Engine.ActivationProhibition
     Pawl.Engine.ActivationRestriction
+    Pawl.Engine.Airbend
     Pawl.Engine.Amass
     Pawl.Engine.Attach
     Pawl.Engine.AttachRestriction
@@ -1417,6 +1418,7 @@ library test
     Pawl.ActivateSpec
     Pawl.ActivationProhibitionSpec
     Pawl.AdventureSpec
+    Pawl.AirbendSpec
     Pawl.AttackKeywordTriggerSpec
     Pawl.AuraSpec
     Pawl.BattleSpec

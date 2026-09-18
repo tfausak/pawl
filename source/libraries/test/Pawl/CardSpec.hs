@@ -584,6 +584,7 @@ objectRefPositions =
         ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
         ("detain", Effect.Detain (plantedRef "dt"), [plantedRef "dt"]),
         ("earthbend", Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Type.Literal 1) (plantedRef "eb")), [plantedRef "eb"]),
+        ("airbend", Effect.Airbend (plantedRef "ab"), [plantedRef "ab"]),
         ("goad", Effect.Goad (plantedRef "go"), [plantedRef "go"]),
         ("does-not-untap-next", Effect.DoesNotUntapNext (plantedRef "du"), [plantedRef "du"]),
         ("transform", Effect.Transform (plantedRef "tr"), [plantedRef "tr"]),
@@ -1089,6 +1090,7 @@ ownCounts effect = case effect of
   Effect.Blight (Blight.MkBlight _ quantity _) -> quantityCounts quantity
   -- Earthbend's N likewise.
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantityCounts quantity
+  Effect.Airbend {} -> []
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Venture {} -> []
@@ -1470,6 +1472,7 @@ effectNestedEffects effect = case effect of
   Effect.Amass {} -> []
   Effect.Blight {} -> []
   Effect.Earthbend {} -> []
+  Effect.Airbend {} -> []
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Venture {} -> []
@@ -1923,6 +1926,7 @@ effectReplacements effect = case effect of
   Effect.Amass _ -> []
   Effect.Blight _ -> []
   Effect.Earthbend _ -> []
+  Effect.Airbend _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Venture {} -> []
@@ -2219,6 +2223,7 @@ reservedSlots =
       Binding.became,
       Binding.departedPermanent,
       Binding.earthbentLand,
+      Binding.airbentObjects,
       Binding.eventAmount,
       Binding.preventedDamageSource,
       Binding.sacrificedCount,
@@ -2339,6 +2344,7 @@ effectMintedFaces effect = case effect of
   Effect.Amass _ -> []
   Effect.Blight _ -> []
   Effect.Earthbend _ -> []
+  Effect.Airbend _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Venture {} -> []
@@ -5022,6 +5028,8 @@ effectFilters effect = case effect of
   -- PutCounters' shape above: rule 701.66a's count and the target land's own
   -- Filters, the latter framed by the source's host as every ObjectRef is.
   Effect.Earthbend (Earthbend.MkEarthbend quantity ref) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
+  -- Rule 701.65a states no count, so the exiled objects' own Filters are all of it.
+  Effect.Airbend ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Venture {} -> []

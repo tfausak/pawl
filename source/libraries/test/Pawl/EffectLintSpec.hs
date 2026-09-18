@@ -232,6 +232,7 @@ ownQuantities effect = case effect of
   Effect.Amass (Amass.MkAmass quantity _ _) -> [quantity]
   Effect.Blight (Blight.MkBlight _ quantity _) -> [quantity]
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> [quantity]
+  Effect.Airbend {} -> []
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Venture {} -> []
@@ -1202,6 +1203,10 @@ effectObjectRefs effect =
         -- CR 701.66a's "target land you control" is an ordinary read, Detain's arm
         -- below: the animation and the counters act on it and nothing gathers.
         Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> read_ [ref]
+        -- CR 701.65a's objects reach the SAME gather Effect.MoveToZone's ref does:
+        -- Pawl.Engine.Airbend.exile is a MoveToZone, and the arm hands this ref to
+        -- it unchanged.
+        Effect.Airbend ref -> [(AsksMoveGather, ref)]
         Effect.TemptWithTheRing -> []
         Effect.Forage -> []
         Effect.Venture {} -> []

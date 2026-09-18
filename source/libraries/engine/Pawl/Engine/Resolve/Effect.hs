@@ -18,6 +18,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Airbend as Airbend
 import qualified Pawl.Engine.Amass as Amass
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Binding as Binding
@@ -200,6 +201,7 @@ import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaAddition as ManaAddition
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mentored as Mentored
@@ -2426,6 +2428,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Amass {} -> False
   Effect.Blight {} -> False
   Effect.Earthbend {} -> False
+  Effect.Airbend {} -> False
   Effect.TemptWithTheRing {} -> False
   -- CR 701.61a: neither half of forage can be carried out by a player holding
   -- fewer than three cards in their graveyard who controls no Food, which is
@@ -4211,8 +4214,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- Pawl.Engine.Mana is the only thing that acts on it.
                       ExilePlayPermission.spending = spending,
                       -- CR 118.9, carried from the opcode unread;
-                      -- Pawl.Engine.Cost is the only thing that acts on it.
-                      ExilePlayPermission.withoutPayingManaCost = free,
+                      -- Pawl.Engine.Cost is the only thing that acts on it. The
+                      -- opcode's Bool is the waiver alone -- an alternative cost
+                      -- of nothing -- where the permission's field holds any
+                      -- amount (CR 118.9a), which is what rule 701.65a's {2}
+                      -- needs; no card states an amount here, so no opcode field
+                      -- carries one.
+                      ExilePlayPermission.alternativeManaCost = if free then Just (ManaCost.MkManaCost []) else Nothing,
                       -- CR 715.3d's "other effects that allow a player to cast
                       -- it": a card said this, not rule 715.3d, so the Adventure
                       -- exclusion does not reach it.
@@ -7467,6 +7475,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ lands $ \land -> do
       State.modify' (bindEarthbentLand resolving land)
       applyEffectWith runSubgame resolving source controller legal chosen Earthbend.arm
+  -- CR 701.65a: "airbend" -- the whole keyword action, whose exile
+  -- Pawl.Engine.Airbend writes as an Effect and this arm runs through the SAME
+  -- executor a card's own instructions run through. Nothing here reads which
+  -- effect that is.
+  --
+  -- MAY TARGET, Earthbend's arm one rule over: where the printing says "target"
+  -- (Airbending Lesson) the card declares the slot and CR 608.2b has already
+  -- narrowed `legal`, and where it does not (Avatar's Wrath's "airbend all other
+  -- creatures") the ObjectRef is a sweep. Neither is read here -- the exile
+  -- Pawl.Engine.Airbend mints takes the reference unchanged. An illegal or
+  -- unfilled slot exiles nothing and the read-back below is empty.
+  --
+  -- The arrivals are read back off Binding.airbentObjects rather than off the
+  -- ObjectRef, which is CR 400.7: the ids the reference named are gone, and the
+  -- permission rule 701.65a states is about the incarnations the funnel minted in
+  -- exile. Read through Binding.slotObjects and not through ObjectRef.InSlot,
+  -- since the move binds ONE arrival as a target and several as a group, and only
+  -- that reader answers both shapes.
+  Effect.Airbend ref -> do
+    applyEffectWith runSubgame resolving source controller legal chosen (Airbend.exile ref)
+    gs <- State.get
+    let exiled = Map.findWithDefault Set.empty Binding.airbentObjects (Binding.slotObjects (slotBindings resolving gs))
+    State.modify' (\g -> foldr (Airbend.grant source) g exiled)
   -- CR 701.47a: the resolving controller amasses; the keyword action is
   -- Pawl.Engine.Amass.amass's, and this arm evaluates only the printed N.
   --

@@ -6,6 +6,7 @@ import qualified Pawl.AbilitySlotLintSpec
 import qualified Pawl.ActivateSpec
 import qualified Pawl.ActivationProhibitionSpec
 import qualified Pawl.AdventureSpec
+import qualified Pawl.AirbendSpec
 import qualified Pawl.AttackKeywordTriggerSpec
 import qualified Pawl.AuraSpec
 import qualified Pawl.BattleSpec
@@ -1179,6 +1180,7 @@ spec s registry = do
   Pawl.DamageSpec.spec s registry
   Pawl.DungeonSpec.spec s registry
   Pawl.EarthbendSpec.spec s registry
+  Pawl.AirbendSpec.spec s registry
   Pawl.DaytimeSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s

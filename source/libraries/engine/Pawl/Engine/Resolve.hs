@@ -629,10 +629,10 @@ finishSpell oid face controller = do
           ExilePlayPermission.source = newId,
           ExilePlayPermission.expiry = Expiry.Type.Never,
           -- CR 715.3d says nothing about mana, in either sense: neither
-          -- CR 118.14's rider nor CR 118.9's waiver, so the Adventure half
-          -- is cast for its printed cost.
+          -- CR 118.14's rider nor CR 118.9a's alternative cost, so the Adventure
+          -- half is cast for its printed cost.
           ExilePlayPermission.spending = ManaSpending.AsProduced,
-          ExilePlayPermission.withoutPayingManaCost = False,
+          ExilePlayPermission.alternativeManaCost = Nothing,
           -- This IS rule 715.3d's permission, and so the one its next sentence
           -- excludes the Adventure half from.
           ExilePlayPermission.origin = PlayPermissionOrigin.Adventure

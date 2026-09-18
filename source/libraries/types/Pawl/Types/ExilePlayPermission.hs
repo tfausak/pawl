@@ -1,6 +1,7 @@
 module Pawl.Types.ExilePlayPermission where
 
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
@@ -19,11 +20,14 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- wrote it or an Effect did -- and `origin` below is which, because one clause
 -- of the rules turns on the difference.
 --
--- `player` is CR 109.5's "you": the controller of the spell or ability whose
--- resolution granted the permission, baked in at that moment. Victor Mancha,
--- Runaway prints "YOU may play it", and every other producer surveyed grants it
--- to its controller or to the exiled card's owner; no opcode field names a third
--- party, because no card in this pool asks for one.
+-- `player` is the one player this permission is for, baked in at the moment it
+-- was granted. Usually CR 109.5's "you", the controller of the spell or ability
+-- whose resolution granted it -- Victor Mancha, Runaway prints "YOU may play it"
+-- -- and rule 701.65a's airbend is the other reading in the tree, granting to the
+-- exiled card's OWNER. No opcode FIELD names either, because no card in this pool
+-- asks for a third party and rule 701.65a states its own beneficiary:
+-- Effect.GrantPlayFromExile's arm writes the controller and
+-- Pawl.Engine.Airbend.permission writes the owner.
 --
 -- `source` is the object the granting effect came from, and it is load-bearing
 -- rather than bookkeeping: Pawl.Engine.Expiry.sweepConditional evaluates an
@@ -51,16 +55,23 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- (Pawl.Types.CastOffer.spending) by Pawl.Engine.Cast.spendingWith -- and
 -- Pawl.Engine.Mana.relax is what acts on the value it hands back.
 --
--- `withoutPayingManaCost` is CR 118.9's "you may cast [this object] without
--- paying its mana cost" said of the cards this permission covers, printed in the
--- same sentence as the permission itself (Extract Power) -- an alternative cost
--- of nothing, which CR 118.5 still makes the caster announce rather than paying
--- itself. It rides the permission rather than the exiled card for CR 118.14's
--- scoping reason one field up: the waiver belongs to the effect that granted the
--- play, so the same card played under some other permission pays its printed
--- cost. Pawl.Engine.Cost.candidateCostsGiven's exile arm is the one reader, and
--- it REPLACES the printed cost there rather than joining it, since this
--- permission is the only thing making the cast legal at all.
+-- `alternativeManaCost` is CR 118.9a's alternative cost said of the cards this
+-- permission covers, printed in the same sentence as the permission itself:
+-- `Just` an empty ManaCost is CR 118.9's "you may cast [this object] without
+-- paying its mana cost" (Extract Power), and `Just` {2} is rule 701.65a's "may
+-- cast it by paying {2} rather than paying its mana cost". ONE field and not two,
+-- because the two are one thing to every reader -- CR 118.5 makes the caster
+-- announce and pay whatever amount it holds, and CR 107.3b's "the only legal
+-- choice for X is 0" falls out of an empty cost having no variable rather than
+-- being enforced. Nothing means the permission states no cost and the card is
+-- cast for its printed one.
+--
+-- It rides the permission rather than the exiled card for CR 118.14's scoping
+-- reason one field up: the cost belongs to the effect that granted the play, so
+-- the same card played under some other permission pays its printed cost.
+-- Pawl.Engine.Cost.candidateCostsGiven's exile arm is the one reader, and it
+-- REPLACES the printed cost there rather than joining it, since this permission
+-- is the only thing making the cast legal at all.
 --
 -- `origin` is which rule granted this permission, and CR 715.3d's closing clause
 -- is the one place it is read: "it can't be cast as an Adventure this way,
@@ -82,7 +93,7 @@ data ExilePlayPermission = MkExilePlayPermission
     source :: ObjectId.ObjectId,
     expiry :: Expiry.Expiry,
     spending :: ManaSpending.ManaSpending,
-    withoutPayingManaCost :: Bool,
+    alternativeManaCost :: Maybe ManaCost.ManaCost,
     origin :: PlayPermissionOrigin.PlayPermissionOrigin
   }
   deriving (Eq, Ord, Show)

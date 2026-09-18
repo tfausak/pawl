@@ -625,6 +625,12 @@ data Effect card ability
     -- is exiled. Performed by Pawl.Engine.Earthbend as one procedure. Targets,
     -- unlike every other rule 701 arm here.
     Earthbend Earthbend.Earthbend
+  | -- | CR 701.65a: "airbend" -- the objects the ObjectRef names are exiled, and
+    -- each CARD exiled this way may be cast by its OWNER for {2} rather than its
+    -- mana cost for as long as it stays exiled. Performed by Pawl.Engine.Airbend
+    -- as one procedure. Targets, Earthbend's shape one rule over, and a bare
+    -- ObjectRef because rule 701.65a fixes everything else.
+    Airbend ObjectRef.ObjectRef
   | -- | CR 701.54a: the Ring tempts the resolving controller, performed by
     -- Pawl.Engine.Ring.tempt as one procedure that cannot stop early (CR
     -- 701.54d). Nullary, rule 701.54a fixing everything.
@@ -672,7 +678,9 @@ data Effect card ability
     --
     -- Not implemented: a beneficiary other than CR 109.5's "you". The owner-side
     -- grants (Release to the Wind, Soul Partition) each carry a second clause
-    -- pawl cannot yet spell.
+    -- pawl cannot yet spell; rule 701.65a's owner-side permission is the
+    -- rulebook's and is minted by Pawl.Engine.Airbend rather than through this
+    -- opcode.
     GrantPlayFromExile GrantPlayFromExile.GrantPlayFromExile
   | -- | CR 406.3: CR 109.5's "you" may look at the face-down exiled cards the
     -- payload names, for as long as they remain in exile (Extract Power), and

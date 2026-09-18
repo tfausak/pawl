@@ -303,6 +303,7 @@ manaProduced effect = case effect of
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
   Effect.Earthbend _ -> Nothing
+  Effect.Airbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.Forage -> Nothing
   Effect.Venture {} -> Nothing
@@ -506,6 +507,7 @@ movesLibraryCard effect = case effect of
   Effect.Amass _ -> False
   Effect.Blight _ -> False
   Effect.Earthbend _ -> False
+  Effect.Airbend _ -> False
   Effect.TemptWithTheRing -> False
   Effect.Forage -> False
   Effect.Venture {} -> False

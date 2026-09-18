@@ -1237,6 +1237,29 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Literal 2) (ObjectRef.EachMatching (Filter.HasCardType CardType.Land))))
       " {\"type\":\"Earthbend\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":2},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
+  -- CR 701.65a, a BARE ObjectRef where rule 701.66a's arm above carries a count
+  -- beside it: the exile and the {2} are the rulebook's, so the ref is the only
+  -- thing a card states. Compared against MakePlotted, the nearest bare-ref arm,
+  -- so the tag is proved load-bearing.
+  Spec.it s "Airbend round-trips both ObjectRef arms, and is not MakePlotted" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Airbend (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"Airbend\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Airbend (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"Airbend\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+    Spec.assertBool
+      s
+      ( toJson (Effect.Airbend (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+          /= toJson (Effect.MakePlotted (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      )
+      "Airbend and MakePlotted of the same slot encode differently"
   -- CR 701.15a, which shares Detain's wire shape down to the field: both are a
   -- bare ObjectRef whose duration and whose actor the rulebook fixes, so the tag
   -- is the only thing telling them apart. data/cards prints the slot arm (Jeering
