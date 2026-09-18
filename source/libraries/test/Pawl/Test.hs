@@ -235,6 +235,7 @@ import qualified Pawl.Codec.ForbidBlockSpec
 import qualified Pawl.Codec.FromOutsideTheGameSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GameSettingsSpec
+import qualified Pawl.Codec.GiftSpec
 import qualified Pawl.Codec.GrantLookAtExiledSpec
 import qualified Pawl.Codec.GrantPlayFromExileSpec
 import qualified Pawl.Codec.GrantedAbilitySpec
@@ -893,6 +894,7 @@ spec s registry = do
   Pawl.Codec.FromOutsideTheGameSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GameSettingsSpec.spec s
+  Pawl.Codec.GiftSpec.spec s
   Pawl.Codec.GrantLookAtExiledSpec.spec s
   Pawl.Codec.GrantPlayFromExileSpec.spec s
   Pawl.Codec.GrantedAbilitySpec.spec s

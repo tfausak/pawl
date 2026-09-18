@@ -1213,6 +1213,8 @@ substituteXInComponent x component = case component of
   CostComponent.Blight _ -> component
   CostComponent.Forage -> component
   CostComponent.FlipCoin -> component
+  -- CR 702.174a's cost names no X.
+  CostComponent.ChooseOpponent -> component
   -- PayLifeX's rewrite one keyword action over: CR 107.3a gives ONE announced
   -- value to the whole cost, so Soul Immolation's "blight X" takes the same X a
   -- mana cost's {X} would have taken.
@@ -1277,6 +1279,7 @@ componentHasVariable component = case component of
   -- 601.2b to announce.
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
+  CostComponent.ChooseOpponent -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1365,6 +1368,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.Blight _ -> False
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
+  CostComponent.ChooseOpponent -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1654,6 +1658,7 @@ loyaltyAmountOf component = case component of
   CostComponent.BlightX -> Nothing
   CostComponent.Forage -> Nothing
   CostComponent.FlipCoin -> Nothing
+  CostComponent.ChooseOpponent -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
@@ -1767,6 +1772,7 @@ zoneOfComponent component = case component of
   -- is Sacrifice's.
   CostComponent.Forage -> Nothing
   CostComponent.FlipCoin -> Nothing
+  CostComponent.ChooseOpponent -> Nothing
 
 -- CR 118.8c: does this cost include "actions involving cards with a stated
 -- quality in a hidden zone"? What Resolve.offerCast reads to decide whether a
@@ -1838,6 +1844,7 @@ componentStatesHiddenQuality component = case component of
   -- for their reason. Rule 701.61a states no quality either way.
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
+  CostComponent.ChooseOpponent -> False
   -- The other hidden zone (CR 400.2), and the FIRST conjunct is satisfied where
   -- no other arm's is -- but the second is not: CR 701.17a takes the cards off
   -- the top, so "mill a card" describes no quality for a player to fail to find.
@@ -2268,6 +2275,8 @@ claimOf slots pid oid component gs =
         -- printing two forages in one cost.
         CostComponent.Forage -> Nothing
         CostComponent.FlipCoin -> Nothing
+        -- CR 702.174a's choice spends nothing, FlipCoin's answer just above.
+        CostComponent.ChooseOpponent -> Nothing
         -- Nothing, Blight's arm above and for its reason one rule over: CR 701.20b
         -- leaves the revealed card in the hand, so nothing leaves any pool. CR
         -- 701.20c is what makes the shared-choice half right here too -- a card
@@ -2654,6 +2663,11 @@ uncountedCeiling component = case component of
   -- bounds how many coins a player may flip, so this part alone would allow any
   -- number of repeats.
   CostComponent.FlipCoin -> Just 1
+  -- 1, FlipCoin's answer just above and for its reason: `claimOf` states no
+  -- claim, so there is no pool to divide. Not an understatement here -- rule
+  -- 702.174a's cost is offered once per gift ability
+  -- (Pawl.Engine.Keyword.optionalCost) -- but the safe direction either way.
+  CostComponent.ChooseOpponent -> Just 1
 
 -- This player's life total as an amount that could be PAID (CR 119.4), floored
 -- at zero: a player at or below 0 life can pay nothing but CR 119.4b's zero.
@@ -2840,6 +2854,7 @@ lifeOwedByComponent component = case component of
   CostComponent.BlightX -> 0
   CostComponent.Forage -> 0
   CostComponent.FlipCoin -> 0
+  CostComponent.ChooseOpponent -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -2889,6 +2904,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.BlightX -> 0
   CostComponent.Forage -> 0
   CostComponent.FlipCoin -> 0
+  CostComponent.ChooseOpponent -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -3114,6 +3130,10 @@ canPayComponent slots pid oid component gs = case component of
   -- is no board on which a player lacks it. The OUTCOME does not enter into it --
   -- a flip the payer goes on to lose pays the cost exactly as a won one does.
   CostComponent.FlipCoin -> True
+  -- CR 102.2 / CR 104.2a: rule 702.174a's cost names an opponent, so a payer
+  -- with none left cannot pay it. Nothing about `oid`: the choice is about the
+  -- table, not about the object the cost is on.
+  CostComponent.ChooseOpponent -> not (null (Game.opponentsOf pid gs))
   -- CR 701.17b's last sentence, stated of costs in as many words: "the player
   -- can't pay a cost that includes milling a number of cards greater than the
   -- number of cards in their library". Not the general "as many as possible" of
@@ -3189,6 +3209,7 @@ criteriaOf component = case component of
   -- Filter, so there is no criterion for the lint to sweep.
   CostComponent.Forage -> []
   CostComponent.FlipCoin -> []
+  CostComponent.ChooseOpponent -> []
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   CostComponent.MillCards _ -> []
@@ -3804,6 +3825,9 @@ paidInSecondPass component = case component of
   -- coin flip is the rule's own example of a cost involving a random element, so
   -- it is paid after every part that does not.
   CostComponent.FlipCoin -> True
+  -- CR 702.174a's choice moves no object and involves no random element, so
+  -- neither half of rule 601.2h's first criterion reaches it.
+  CostComponent.ChooseOpponent -> False
   -- CR 701.20b moves nothing out of any zone, so rule 601.2h's library half has
   -- nothing to ask of it.
   CostComponent.RevealCardFromHand _ -> False
@@ -3915,6 +3939,9 @@ orderSensitive component = case component of
   -- on this pool -- `paidInSecondPass` above puts it there and nothing else --
   -- so `orderObservable` is False either way.
   CostComponent.FlipCoin -> False
+  -- False: rule 702.174a's choice spends nothing another part of the same cost
+  -- could have spent, FlipCoin's answer just above.
+  CostComponent.ChooseOpponent -> False
   -- CR 701.17a puts a card into a graveyard, which a graveyard-reading part of
   -- the same cost could then spend (Circling Vultures' "the top creature card of
   -- your graveyard"). Alone in CR 601.2h's second pass on this pool, so nothing
@@ -4445,6 +4472,16 @@ chooseManaYield pid oid candidates gs = case candidates of
         then answer
         else NonEmpty.head candidates
 
+-- CR 614.1c's record written from the other provenance: the player the payer
+-- chose as a COST, rather than the one an as-enters replacement asks for. One
+-- field for both because the rules make it one fact -- "the chosen player" is
+-- what CR 702.174b's effect names -- and no card carries both writers.
+stampChosenPlayer :: ObjectId -> PlayerId -> Game ()
+stampChosenPlayer oid pid =
+  State.modify' $ \gs ->
+    let stamp object = object {Object.chosenPlayer = Just pid}
+     in gs {GameState.objects = Map.adjust stamp oid (GameState.objects gs)}
+
 payComponent :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent moment slots pid oid component = case component of
   -- CR 118.3 asked AGAIN here and not only at the gate: CR 601.2h lets the payer
@@ -4963,6 +5000,34 @@ payComponent moment slots pid oid component = case component of
     statements <- Coin.statementsFor (Just pid)
     _ <- Event.flipWinLoseCoin pid statements
     pure bindsNothing
+  -- CR 702.174a's first ability, paid by naming the opponent the gift is
+  -- promised to. The answer is FILTERED rather than trusted and falls back to the
+  -- head, Pawl.Engine.Event's as-enters chooser's posture.
+  --
+  -- Written to Object.chosenPlayer rather than bound as a slot: CR 702.174b's
+  -- payoff is a triggered ability of the PERMANENT the spell becomes, and CR
+  -- 400.7 clears a spell's bindings on that move where
+  -- Pawl.Engine.Event.changeZoneAttaching carries this field across it under CR
+  -- 400.7d. Pawl.Types.PlayerRef's ChosenPlayer is what reads it back.
+  --
+  -- ALWAYS PAID where the gate allowed the offer at all: the payer has an
+  -- opponent, and naming one spends nothing that could run out.
+  CostComponent.ChooseOpponent -> do
+    gs <- State.get
+    case Game.opponentsOf pid gs of
+      -- CR 118.3 asked AGAIN here, TapThis' reason above: the last opponent may
+      -- have left (CR 104.2a) since the gate.
+      [] -> pure Payment.Unpaid
+      -- CR 102.2: a two-player game leaves exactly one opponent, and one option
+      -- is not a choice.
+      [sole] -> do
+        stampChosenPlayer oid sole
+        pure bindsNothing
+      first : second : rest -> do
+        let offered = first NonEmpty.:| (second : rest)
+        answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor pid gs) pid oid offered)
+        stampChosenPlayer oid (if List.elem answer (NonEmpty.toList offered) then answer else first)
+        pure bindsNothing
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.

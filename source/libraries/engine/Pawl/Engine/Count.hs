@@ -615,6 +615,15 @@ playersFor viewOf context gs ref =
         -- unanswered rather than answered off some other seat.
         PlayerRef.ControllerOfBound slot ->
           fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller)
+        -- CR 614.1c / CR 702.174b: the player the object a slot names chose, read
+        -- off Object.chosenPlayer rather than off the view -- a choice is a
+        -- record, not a characteristic (CR 707.2), so no projection answers it.
+        --
+        -- Unanswered where the slot names no object, names several, or names one
+        -- that has left, ControllerOfBound's posture above without its CR 608.2h
+        -- look-back (Pawl.Types.PlayerRef says why).
+        PlayerRef.ChosenPlayerOfBound slot ->
+          fmap pure (Filter.slotOneObject slot context >>= \oid -> Game.lookupObject oid gs >>= Object.chosenPlayer)
         -- CR 508.6's set: the players controlling a creature attacking the player
         -- a slot names, narrowed by the relation the card printed. The SAME fold
         -- Pawl.Engine.Resolve.Slots.playerRefPlayers makes for the reference in an

@@ -2749,6 +2749,8 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.157a and CR 702.175a: the squad and offspring costs, kicker's shape.
   Keyword.Squad cost -> costFilters cost
   Keyword.Offspring cost -> costFilters cost
+  -- CR 702.174a: the [something], which carries no Filter.
+  Keyword.Gift _ -> []
   -- CR 702.56a: the replicate cost, kicker's shape.
   Keyword.Replicate cost -> costFilters cost
   Keyword.Recover cost -> costFilters cost
@@ -3163,6 +3165,9 @@ costComponentFilters component = case component of
   -- CR 701.17a takes the cards off the top, so this component carries no Filter
   -- to narrow -- ExileThisFromGraveyard's answer above and for its reason.
   CostComponent.MillCards _ -> []
+  -- CR 702.174a names an opponent rather than an object, so this component
+  -- carries no Filter either.
+  CostComponent.ChooseOpponent -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSlot too.

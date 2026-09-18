@@ -7,6 +7,7 @@ import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Protection as Protection
@@ -728,6 +729,20 @@ data Keyword
   | -- | 702.175a: "You may pay an additional [cost] as you cast this spell", and
     -- an enters trigger making a 1\/1 token copy if it was paid.
     Offspring (Cost.Cost Keyword)
+  | -- | 702.174a: "Gift a [something]" -- an optional additional cost that
+    -- chooses an opponent, plus a second ability giving that player the
+    -- [something], which on a permanent is CR 702.174b's enters trigger.
+    --
+    -- THE [SOMETHING] ALONE is the payload: rule 702.174a fixes the first
+    -- ability's words for every printing, so Pawl.Engine.Keyword.optionalCost
+    -- mints the cost, bargain's shape, and rule 702.174b reads the effect off
+    -- this word.
+    --
+    -- Not implemented: CR 702.174b's instant and sorcery half, which is a SPELL
+    -- ability rather than a triggered one -- Awaken above's limit, one rule
+    -- number apart -- and CR 702.174c's "whenever a player gives a gift"
+    -- (#3834).
+    Gift Gift.Gift
   | -- | 702.173a: freerunning [cost] -- you may pay [cost] rather than this
     -- spell's mana cost if a player was dealt combat damage this turn by a
     -- creature that was then an Assassin or a commander under your control,

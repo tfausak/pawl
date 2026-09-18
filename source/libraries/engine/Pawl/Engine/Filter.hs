@@ -2607,6 +2607,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Ravenous -> keyword
   Keyword.Type.Squad cost -> Keyword.Type.Squad (rewriteCost pairs cost)
   Keyword.Type.Offspring cost -> Keyword.Type.Offspring (rewriteCost pairs cost)
+  -- CR 702.174a's payload is a [something] and not a Cost, so a CR 612.2 land-type
+  -- change has nothing in it to rewrite.
+  Keyword.Type.Gift _ -> keyword
   -- CR 702.143a states a cost too, so it is reached the same way.
   Keyword.Type.Foretell cost -> Keyword.Type.Foretell (rewriteCost pairs cost)
   -- CR 702.139a states a CONDITION rather than a cost, so `rewrite` reaches it
@@ -2751,6 +2754,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileThis -> component
   CostComponent.MillCards _ -> component
+  CostComponent.ChooseOpponent -> component
 
 -- CR 603.2: replace every ControlledByBound atom whose slot this environment
 -- names with the baked ControlledByPlayer arm. What makes "target creature THAT

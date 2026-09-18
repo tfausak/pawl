@@ -148,6 +148,20 @@ data PlayerRef
     -- slot naming no object, naming several, or naming one the projection cannot
     -- describe leaves the count unanswered rather than aimed at some other seat.
     ControllerOfBound SlotName.SlotName
+  | -- | CR 614.1c / CR 702.174b: the player the object a slot names CHOSE --
+    -- "the chosen player" of the gift ability Pawl.Engine.Keyword mints, read off
+    -- the permanent CR 113.7a's source slot holds.
+    --
+    -- ControllerOfBound's shape one field over, and a separate arm for the reason
+    -- that one is separate from InSlot: the slot holds an OBJECT, and what is
+    -- asked of it is a record rather than a characteristic. Pawl.Types.ObjectRef's
+    -- ChosenPlayer is the same read from the other type, for a clause whose
+    -- recipient position takes an ObjectRef (Stuffy Doll's damage).
+    --
+    -- Not implemented: CR 608.2h's look-back, which Pawl.Types.LastKnown does not
+    -- carry for this field -- a permanent that has left names nobody, the limit
+    -- ObjectRef.ChosenPlayer has (#3835).
+    ChosenPlayerOfBound SlotName.SlotName
   | -- | CR 508.6: the players attacking the player a slot names, narrowed by
     -- relation -- Curse of Vitality's "each opponent attacking that player".
     --

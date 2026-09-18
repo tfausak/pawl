@@ -14,6 +14,7 @@ import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DevourCount as DevourCount
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -416,6 +417,10 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []
     Common.assertCodec s Keyword.codec (Keyword.Squad cost) " {\"type\":\"Squad\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Common.assertCodec s Keyword.codec (Keyword.Offspring cost) " {\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+  -- CR 702.174a carries its [something] and not a cost: rule 702.174a writes the
+  -- additional cost out in the rulebook, so the card prints only the word.
+  Spec.it s "Gift carries its something" $
+    Common.assertCodec s Keyword.codec (Keyword.Gift Gift.Card) " {\"type\":\"Gift\",\"value\":{\"type\":\"Card\"}} "
   -- CR 702.56a carries a Cost as squad does; CR 702.153a carries only its N, the
   -- creature it names being written in the rulebook rather than on the card.
   Spec.it s "Replicate carries its cost and Casualty its N" $ do

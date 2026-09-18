@@ -70,6 +70,9 @@ data ObjectRef
     EachOpponent
   | -- | CR 614.12a / 120.3a / Stuffy Doll: the player this effect's source chose as
     -- it entered the battlefield, read off Object.chosenPlayer there.
+    --
+    -- Not implemented: CR 608.2h's look-back, which Pawl.Types.LastKnown does not
+    -- carry for this field -- a source that has left names nobody (#3835).
     ChosenPlayer
   | -- | CR 120.3a: the players a PlayerRef names -- Deflecting Palm's "that
     -- source's controller", where the seat is identified by an object a slot

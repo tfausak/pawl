@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Cycling as Cycling
 import qualified Pawl.Codec.Devour as Devour
 import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Gift as Gift
 import qualified Pawl.Codec.Morph as Morph
 import qualified Pawl.Codec.PartnerText as PartnerText
 import qualified Pawl.Codec.Protection as Protection
@@ -125,6 +126,7 @@ codec =
       Arm.nullary "Ravenous" Keyword.Ravenous,
       Arm.payload "Squad" (Cost.codec codec) Keyword.Squad (\x -> case x of Keyword.Squad y -> Just y; _ -> Nothing),
       Arm.payload "Offspring" (Cost.codec codec) Keyword.Offspring (\x -> case x of Keyword.Offspring y -> Just y; _ -> Nothing),
+      Arm.payload "Gift" Gift.codec Keyword.Gift (\x -> case x of Keyword.Gift y -> Just y; _ -> Nothing),
       Arm.payload "Replicate" (Cost.codec codec) Keyword.Replicate (\x -> case x of Keyword.Replicate y -> Just y; _ -> Nothing),
       Arm.payload "Graft" Common.natural Keyword.Graft (\x -> case x of Keyword.Graft y -> Just y; _ -> Nothing),
       Arm.payload "Absorb" Common.natural Keyword.Absorb (\x -> case x of Keyword.Absorb y -> Just y; _ -> Nothing),
@@ -306,6 +308,7 @@ tagOf x = case x of
   Keyword.Ravenous {} -> "Ravenous"
   Keyword.Squad {} -> "Squad"
   Keyword.Offspring {} -> "Offspring"
+  Keyword.Gift {} -> "Gift"
   Keyword.Replicate {} -> "Replicate"
   Keyword.Graft {} -> "Graft"
   Keyword.Absorb {} -> "Absorb"

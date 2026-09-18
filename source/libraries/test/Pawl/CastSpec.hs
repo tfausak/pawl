@@ -4418,6 +4418,60 @@ offspringSpec s registry = Spec.describe s "Offspring" $ do
     Spec.assertEqWith s "CR 601.2e and no Mountain is tapped" (S.tappedCount S.alice twice) 0
     Spec.assertEqWith s "the control: answered once, the 2/2 and one 1/1" (List.sort (fmap (`S.powerToughnessOf` once) (namedOnBattlefield "Coruscation Mage" once))) [Just (1, 1), Just (2, 2)]
 
+-- CR 702.174a-e on Scrapshooter {1}{G}{G} 4/4 Creature -- Raccoon Archer, "Gift a
+-- card / Reach / When this creature enters, if the gift was promised, destroy
+-- target artifact or enchantment an opponent controls." (Oracle text checked on
+-- Scryfall, 2026-09-18.)
+--
+-- THREE SEATS, which rule 702.174a needs: "you may choose an opponent" is not a
+-- choice at two, and the seat promised has to be tellable from the other one.
+-- carol is promised and bob is not, and bob is the seat whose Bonesplitter the
+-- printed trigger destroys -- so no assertion here can be answered by naming the
+-- same player twice.
+giftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+giftSpec s registry = Spec.describe s "Gift" $ do
+  Spec.it s "CR 702.174a-e the promised opponent draws, and CR 702.174b's trigger fires" $ do
+    (shooterId, board) <- scrapshooterBoard s registry
+    let after = castResolved (promising S.carol) shooterId board
+    Spec.assertEqWith s "CR 702.174e the promised carol drew a card and bob did not" (S.handSize S.carol after, S.handSize S.bob after) (1, 0)
+    Spec.assertEqWith s "CR 702.174b the gift was promised, so bob's Bonesplitter was destroyed" (namedOnBattlefield "Bonesplitter" after) []
+    Spec.assertEqWith s "and the 4/4 entered with the stack empty" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Scrapshooter" after), length (GameState.stack after)) ([Just (4, 4)], 0)
+  -- The same board differing in exactly one thing: the answer to rule 702.174a's
+  -- "you may".
+  Spec.it s "CR 603.4 unpromised, nobody draws and the trigger does not fire" $ do
+    (shooterId, board) <- scrapshooterBoard s registry
+    let after = castResolved declining shooterId board
+    Spec.assertEqWith s "CR 702.174k no gift was promised, so neither opponent drew" (S.handSize S.carol after, S.handSize S.bob after) (0, 0)
+    Spec.assertEqWith s "CR 603.4 and bob's Bonesplitter survives" (length (namedOnBattlefield "Bonesplitter" after)) 1
+    Spec.assertEqWith s "and the 4/4 entered with the stack empty" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Scrapshooter" after), length (GameState.stack after)) ([Just (4, 4)], 0)
+
+-- alice on turn with three Forests and Scrapshooter in hand, bob with a
+-- Bonesplitter, and two cards in each opponent's library so that rule 702.174e's
+-- draw is a draw rather than CR 104.3c.
+scrapshooterBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+scrapshooterBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  shooter <- S.printingOf s registry "Scrapshooter"
+  splitter <- S.printingOf s registry "Bonesplitter"
+  let (shooterId, gs1) = S.addHandCard shooter S.alice (S.landsFor forest S.alice 3 S.threePlayerGame)
+      (_, gs2) = S.addPermanent splitter S.bob gs1
+      stock pid gs = snd (S.addLibraryCard forest pid (snd (S.addLibraryCard forest pid gs)))
+  pure (shooterId, aliceOnTurn (stock S.carol (stock S.bob gs2)))
+
+-- CR 702.174a paid, promising `who`. The seat is found in the offer rather than
+-- built, so an engine that offered the wrong set cannot be repaired here.
+promising :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+promising who p = case p of
+  Prompt.ChooseKicker _ _ _ (Keyword.Gift _) _ -> KickerDecision.MkKickerDecision 1
+  Prompt.ChooseOpponent _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (who ==) (NonEmpty.toList offered))
+  _ -> S.identityAnswer p
+
+-- CR 702.174a declined, every other prompt answered as `promising` answers it.
+declining :: Prompt.Prompt r -> r
+declining p = case p of
+  Prompt.ChooseKicker _ _ _ (Keyword.Gift _) _ -> KickerDecision.MkKickerDecision 0
+  _ -> S.identityAnswer p
+
 -- CR 601.2b's optional additional cost paid `times` times, every other prompt
 -- S.identityAnswer's.
 paidTimes :: Natural.Natural -> Prompt.Prompt r -> r
@@ -5277,6 +5331,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   freerunningSpec s registry
   squadSpec s registry
   offspringSpec s registry
+  giftSpec s registry
   bargainSpec s registry
   teamworkSpec s registry
   grantedFlashbackSpec s registry

@@ -149,4 +149,12 @@ data CostComponent keyword
     -- to bar a mana ability and CR 601.2h reads to put the payment in its second
     -- pass.
     MillCards Natural.Natural
+  | -- | CR 702.174a as a cost / Scrapshooter: the paying player chooses an
+    -- opponent, recorded on the object the cost is on as Object.chosenPlayer so
+    -- that CR 400.7d's exception carries it to the permanent the spell becomes.
+    --
+    -- Nullary, FlipCoin's shape: rule 702.174a fixes every word of this cost but
+    -- the payer's own call. Unpayable only where the payer has no opponent left
+    -- (CR 102.2, CR 104.2a), which is what keeps it a cost rather than a no-op.
+    ChooseOpponent
   deriving (Eq, Ord, Show)
