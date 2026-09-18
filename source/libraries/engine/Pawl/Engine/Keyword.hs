@@ -1846,8 +1846,9 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
-  -- CR 702.151a: two abilities per instance, of which this is the first;
-  -- the unattach half has no opcode to resolve into (#3849).
+  -- CR 702.151a states TWO abilities; only the attach one is minted, the
+  -- unattach half having no opcode to resolve into (#3849). One per instance,
+  -- equip's reading above.
   Keyword.Reconfigure cost -> List.genericReplicate count (reconfigure cost)
   Keyword.ReadAhead -> []
   Keyword.Training -> []
@@ -3815,9 +3816,9 @@ livingMetal =
 -- for a permanent attached to nothing and for one attached to a PLAYER, which is
 -- the whole of the rule's "to another creature" here -- CR 301.5 admits no other
 -- host for an Equipment, and Pawl.Engine.Sba.becomesUnattached detaches it the
--- moment its host stops being one. An empty nest also keeps this off the host's
--- own projection, which is the object being projected's neighbour rather than
--- itself.
+-- moment its host stops being one. An empty nest also asks nothing of the HOST's
+-- own characteristics, which a nest naming a card type would, and so cannot
+-- reach a second object's layers from inside this one's.
 --
 -- CR 205.1a's subtype consequence rides on Modification.LoseCardType, so an
 -- attached Rabbit Battery is an Equipment and no longer a Rabbit.
