@@ -1074,6 +1074,7 @@ library engine
     Pawl.Engine.Card
     Pawl.Engine.Cast
     Pawl.Engine.Claim
+    Pawl.Engine.Cloak
     Pawl.Engine.Coin
     Pawl.Engine.Combat
     Pawl.Engine.CombatRestriction
@@ -1436,6 +1437,7 @@ library test
     Pawl.CastRestrictionSpec
     Pawl.CastSpec
     Pawl.ClassSpec
+    Pawl.CloakSpec
     Pawl.CodecIntegrationSpec
     Pawl.CoinSpec
     Pawl.ColorSpec

@@ -25,6 +25,12 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownReason" $ do
       FaceDownReason.codec
       FaceDownReason.Manifested
       " {\"type\":\"Manifested\"} "
+  Spec.it s "Cloaked" $
+    Common.assertCodec
+      s
+      FaceDownReason.codec
+      FaceDownReason.Cloaked
+      " {\"type\":\"Cloaked\"} "
   Spec.it s "TurnedFaceDown" $
     Common.assertCodec
       s

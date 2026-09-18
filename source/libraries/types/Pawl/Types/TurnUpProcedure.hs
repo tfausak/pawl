@@ -23,10 +23,16 @@ data TurnUpProcedure
     -- face up. Rule 702.37e's procedure with a different price list, and its
     -- subject is the same shape -- "a face-down permanent you control WITH A
     -- DISGUISE ABILITY" -- so this one asks nothing about the allower either. CR
-    -- 701.58d is where both this and a cloak's procedure would be open at once,
+    -- 701.58d is where both this and the Cloak procedure below are open at once,
     -- the case CR 701.40c already makes for morph and manifest.
     Disguise
   | -- | CR 701.40b: show that the card is a creature card, pay that card's mana
     -- cost.
     Manifest
+  | -- | CR 701.58b: show that the card is a creature card, pay that card's mana
+    -- cost. Rule 701.40b's procedure word for word, and its own arm because the
+    -- two rules' SUBJECTS differ: rule 701.58b's is "a cloaked permanent you
+    -- control" and rule 701.40b's is a manifested one, so one procedure covering
+    -- both would open each rule's price to the other rule's permanent.
+    Cloak
   deriving (Bounded, Enum, Eq, Ord, Show)
