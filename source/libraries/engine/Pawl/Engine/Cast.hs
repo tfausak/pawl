@@ -2279,11 +2279,13 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- Carried as the counts per cost rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
       paid <- announceOptionalCosts spending pid sid announcedCandidates optionalOffers gs
-      -- Not implemented: CR 702.33g's targets, which a spell whose kicked-only
-      -- clause names a slot of its own should be asked for only on a kicked cast
-      -- (#2833). No card in data/cards/ prints that shape -- Burst Lightning's two
-      -- clauses share one slot -- so the CR 601.2c step below fills every slot the
-      -- chosen modes declare.
+      -- Not implemented: CR 702.33g's and CR 702.113b's targets, which a spell
+      -- whose kicked-only or awaken-only clause names a slot of its own should be
+      -- asked for only on the cast that paid for it (#2833). Part the Waterveil
+      -- prints that shape -- Burst Lightning's two clauses share one slot, but
+      -- rule 702.113a's land is the awaken clause's alone -- so the CR 601.2c step
+      -- below fills every slot the chosen modes declare and its land is targeted
+      -- on an unawakened cast too.
       --
       -- CR 702.33d: "if a spell's controller declares the intention to pay any of
       -- that spell's kicker costs, that spell has been kicked" -- the DECLARATION
