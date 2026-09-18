@@ -692,6 +692,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Sunburst
       " {\"type\":\"Sunburst\"} "
+  -- CR 702.156a's ravenous is nullary: rule 702.156a fixes the counter kind and
+  -- the threshold, and its count is CR 107.3m's announced X rather than a printed
+  -- number.
+  Spec.it s "Ravenous" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Ravenous
+      " {\"type\":\"Ravenous\"} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec Keyword.Ravenous /= Codec.encode Keyword.codec Keyword.Sunburst)
+      "ravenous and sunburst encode differently"
   -- CR 702.63a's N is a COUNT OF COUNTERS rather than a size or a threshold, and
   -- the wire cannot tell those apart -- so the tag is all that keeps vanishing 2
   -- from bushido 2.

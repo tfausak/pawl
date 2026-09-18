@@ -639,6 +639,14 @@ data Keyword
     -- entered unless it has exactly that chapter's number of lore counters; rule
     -- 714.3b REPLACES rule 714.3a's ability rather than adding to it.
     ReadAhead
+  | -- | 702.156a: "This permanent enters with X +1\/+1 counters on it" and "When
+    -- this permanent enters, if X is 5 or more, draw a card", both X being CR
+    -- 107.3m's announced one.
+    --
+    -- Nullary: rule 702.156a fixes the counter kind, the threshold and the draw,
+    -- and the number is the spell's announced X rather than anything a card
+    -- prints.
+    Ravenous
   | -- | 702.157a: "As an additional cost to cast this spell, you may pay [cost]
     -- any number of times", and an enters trigger making a token copy per payment.
     Squad (Cost.Cost Keyword)

@@ -574,6 +574,80 @@ sunburstSpec s registry =
               Spec.assertEqWith s "four charge counters off five mana" (countersOn charge oid after) 4
               Spec.assertEqWith s "and no +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 0
 
+-- alice holds Jacked Rabbit, controls seven untapped Plains and has two cards
+-- left in her library. SEVEN for both cases below, so the two boards differ in
+-- nothing but the number announced -- X=4 leaves a Plains unspent rather than
+-- taking one away, and the negative cannot pass for want of mana.
+--
+-- The library is stocked because the positive case DRAWS: an empty one loses
+-- alice the game to CR 104.3c before the assertion runs, and two cards leave the
+-- draw a change in a count rather than the last card.
+ravenousBoard :: Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+ravenousBoard plains rabbit =
+  let lands = S.landsFor plains S.alice 7 (Setup.emptyGame S.bothPlayers)
+      stocked = snd (S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice lands)))
+      (held, gs) = S.addHandCard rabbit S.alice stocked
+   in (readyForAlice gs, held)
+
+-- CR 601.2b's announcement pinned to one value rather than followed to the mana,
+-- Pawl.CopySpec's copyNamedAnnouncing's reason: an answerer taking the prompt's
+-- affordability bound would announce 5 on both boards.
+announcing :: Natural.Natural -> Prompt.Prompt r -> r
+announcing x p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> S.aggressiveAnswer p
+
+-- Cast, resolve the spell, then place and resolve the entry trigger CR 603.6a
+-- gathered -- which the X=4 board does not have, `placePendingTriggers` having
+-- dropped it on CR 603.4's "if".
+entersAnnouncing :: Natural.Natural -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+entersAnnouncing x gs spellId =
+  S.runPure (announcing x) gs (S.cast S.alice spellId >> Stack.resolveTop >> Engine.placePendingTriggers >> Stack.resolveTop)
+
+-- CR 702.156: ravenous, on Jacked Rabbit ({X}{1}{W} 1/2 Rabbit Warrior, ravenous
+-- plus an attack trigger that reads its own power). Both halves of rule 702.156a
+-- at once -- a minted CR 614.1c row whose count is CR 107.3m's announced X, and a
+-- minted entry trigger whose intervening "if" reads the same number.
+--
+-- ONE BOARD, TWO ANNOUNCEMENTS: the seven Plains, the card and the seat are the
+-- same in both cases, so what the assertions tell apart is the value of X and
+-- nothing else.
+--
+-- Distinct numbers everywhere: a printed 1/2 with five counters is a 6/7 and with
+-- four a 5/6, so no counter count coincides with a power, a toughness or the
+-- threshold.
+ravenousSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ravenousSpec s registry =
+  let rabbitIn = newestNamed (CardName.MkCardName $ Text.pack "Jacked Rabbit")
+   in Spec.describe s "Ravenous (CR 702.156)" $ do
+        Spec.it s "CR 702.156a X is 5, so it enters a 6/7 and draws" $ do
+          plains <- S.printingOf s registry "Plains"
+          rabbit <- S.printingOf s registry "Jacked Rabbit"
+          let (gs, held) = ravenousBoard plains rabbit
+              after = entersAnnouncing 5 gs held
+          case rabbitIn after of
+            Nothing -> Spec.assertFailure s "Jacked Rabbit did not reach the battlefield"
+            Just oid -> do
+              Spec.assertEqWith s "five +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 5
+              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 6)
+              Spec.assertEqWith s "toughness" (Projection.toughnessOf oid after) (Just 7)
+              -- The Rabbit left the hand to be cast, so one card in hand is the
+              -- card rule 702.156a drew and nothing else.
+              Spec.assertEqWith s "drew a card" (S.handSize S.alice after) 1
+        -- THE PAIR THAT MAKES IT THE THRESHOLD. The board above, one lower.
+        Spec.it s "CR 702.156a X is 4, so it enters a 5/6 and draws nothing" $ do
+          plains <- S.printingOf s registry "Plains"
+          rabbit <- S.printingOf s registry "Jacked Rabbit"
+          let (gs, held) = ravenousBoard plains rabbit
+              after = entersAnnouncing 4 gs held
+          case rabbitIn after of
+            Nothing -> Spec.assertFailure s "Jacked Rabbit did not reach the battlefield"
+            Just oid -> do
+              Spec.assertEqWith s "four +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 4
+              Spec.assertEqWith s "power" (Projection.powerOf oid after) (Just 5)
+              Spec.assertEqWith s "toughness" (Projection.toughnessOf oid after) (Just 6)
+              Spec.assertEqWith s "drew nothing" (S.handSize S.alice after) 0
+
 -- CR 702.54: bloodthirst, on Bloodrage Vampire ({2}{B} 3/1 Vampire, "Bloodthirst
 -- 1" and nothing else) for rule 702.54a's N, and on Petrified Wood-Kin ({6}{G}
 -- 3/3, "Bloodthirst X") for rule 702.54b's X. The second minted entry replacement
@@ -2598,6 +2672,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   bloodthirstSpec s registry
   amplifySpec s registry
   sunburstSpec s registry
+  ravenousSpec s registry
   brineElementalSpec s registry
   coldsteelHeartSpec s registry
   stuffyDollSpec s registry

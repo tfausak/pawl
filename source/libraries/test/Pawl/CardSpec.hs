@@ -2742,6 +2742,9 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.MoreThanMeetsTheEye cost -> costFilters cost
   Keyword.Kicker cost -> costFilters cost
   Keyword.Multikicker cost -> costFilters cost
+  -- CR 702.156a names no quality: the counter kind and the threshold are the
+  -- rule's own nouns, so neither reaches a Filter.
+  Keyword.Ravenous -> []
   -- CR 702.157a and CR 702.175a: the squad and offspring costs, kicker's shape.
   Keyword.Squad cost -> costFilters cost
   Keyword.Offspring cost -> costFilters cost
@@ -5982,9 +5985,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- (Protean Hydra). The amount is a Quantity on an
         -- EntryRewrite.WithCounters row rather than an effect, so Card.allEffects
         -- cannot see this one either.
-        entryCountersReadX c =
+        entryCountersReadX rows =
           or $ do
-            ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) <- fmap PrintedReplacement.effect (Face.replacementEffects c)
+            ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) <- rows
             -- CR 707.9e's additional counters are the same reader one rewrite
             -- over: Altered Ego's "except it enters with X additional +1/+1
             -- counters on it" announces X on the spell and reads it at the entry.
@@ -6009,10 +6012,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           any
             (\ability -> TriggeredAbility.condition ability == TriggerCondition.SelfEnters && modalReadsAnnouncedX (TriggeredAbility.modal ability))
             (Face.triggeredAbilities c)
+        -- CR 107.3m's reader that no card writes: a KEYWORD whose minted CR 614.1c
+        -- row carries the announcement (ravenous, CR 702.156a, on Jacked Rabbit).
+        -- Read off the mint rather than named here, so the next such keyword owes
+        -- this lint no arm.
+        mintedCountersReadX c = any (entryCountersReadX . flip KeywordEngine.mintedReplacementsFor 1) (Map.keys (Face.keywords c))
         readsX c =
           Resolve.readsX (Card.allEffects c)
             || Face.loyalty c == Just Loyalty.Variable
-            || entryCountersReadX c
+            || entryCountersReadX (fmap PrintedReplacement.effect (Face.replacementEffects c))
+            || mintedCountersReadX c
             || any declaresVariable (payGateCostsOf (Face.spell c))
             || modalReadsAnnouncedX (Face.spell c)
             || entersTriggerReadsX c
@@ -6111,7 +6120,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 107.3m gives exactly one triggered ability a value of X to read -- an
   -- object's enters-the-battlefield ability, whose X is the one announced for the
   -- spell that became that object -- and Pawl.Engine.Engine.placeBorne inherits it
-  -- on exactly that condition. Every other trigger is placed with X as zero, so a
+  -- on exactly that condition, as Pawl.Engine.Condition.inheritedX does for the
+  -- same ability's intervening "if" (CR 702.156a's "if X is 5 or more").
+  -- Every other trigger is placed with X as zero, so a
   -- slot counted by X there would silently take no targets. CR 107.3n's delayed
   -- twin is the same shape one ability over and is NOT inherited: Scryfall
   -- `m:{X} o:"at the beginning of the next end step" (t:instant or t:sorcery)`,
