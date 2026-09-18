@@ -90,8 +90,9 @@ data DamageRewrite effect
     -- damage event standing and prevents the rest -- Temple Altisaur's "prevent
     -- all but 1 of that damage".
     --
-    -- A FLOOR on what survives, and thereby the opposite of PreventNext's
-    -- ceiling on what is stopped: the rule's shield "will apply separately to
+    -- A FLOOR on what survives, and thereby the opposite of PreventNext's and
+    -- PreventUpTo's ceiling on what is stopped: the rule's shield "will apply
+    -- separately to
     -- damage from other applicable events", so nothing is written back and
     -- Pawl.Engine.Replacement.contestedResource gives it no supply.
     --
