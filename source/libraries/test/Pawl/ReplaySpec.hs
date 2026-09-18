@@ -1029,6 +1029,19 @@ combatReplaySpec s =
           -- cards, or only a set of them, would pass the first leg and lose the
           -- reordering this one asks for.
           Spec.assertEqWith s "so does keeping both, reordered" (Replay.decode p (Replay.encode p swapped)) (Just swapped)
+        -- CR 401.4: the order an owner named for cards put back into their
+        -- library, which is a decision like any other. Its own response
+        -- constructor, so it cannot be confused with the arrangement of cards
+        -- ARRIVING at one end of a library.
+        Spec.it s "ArrangeLibraryCards round-trips, and does not decode as an arrival arrangement" $ do
+          let p = Prompt.ArrangeLibraryCards decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 9]
+          Spec.assertEqWith s "an order round trips" (Replay.decode p (Replay.encode p [1, 0])) (Just [1, 0])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ArrangedLibraryArrivals [1, 0])) Nothing
+          Spec.assertEqWith
+            s
+            "a short transcript leaves the cards in the order they were looked at"
+            (Replay.defaultAnswer p)
+            [0, 1]
         Spec.it s "a scry choice does not decode as a discard choice" $ do
           -- Discriminating: this fails if ChooseScry reuses another
           -- ObjectId-list response instead of getting its own constructor.

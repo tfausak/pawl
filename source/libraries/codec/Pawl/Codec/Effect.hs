@@ -153,6 +153,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Surveil" PlayerQuantity.codec Effect.Surveil (\x -> case x of Effect.Surveil y -> Just y; _ -> Nothing),
           Arm.payload "Fateseal" PlayerQuantity.codec Effect.Fateseal (\x -> case x of Effect.Fateseal y -> Just y; _ -> Nothing),
           Arm.payload "Explore" ObjectRef.codec Effect.Explore (\x -> case x of Effect.Explore y -> Just y; _ -> Nothing),
+          Arm.payload "ArrangeInLibrary" ObjectRef.codec Effect.ArrangeInLibrary (\x -> case x of Effect.ArrangeInLibrary y -> Just y; _ -> Nothing),
           Arm.payload "Connive" Connive.codec Effect.Connive (\x -> case x of Effect.Connive y -> Just y; _ -> Nothing),
           Arm.payload "Mill" Mill.codec Effect.Mill (\x -> case x of Effect.Mill y -> Just y; _ -> Nothing),
           Arm.payload "Discard" Discard.codec Effect.Discard (\x -> case x of Effect.Discard y -> Just y; _ -> Nothing),
@@ -283,6 +284,7 @@ tagOf x = case x of
   Effect.Surveil {} -> "Surveil"
   Effect.Fateseal {} -> "Fateseal"
   Effect.Explore {} -> "Explore"
+  Effect.ArrangeInLibrary {} -> "ArrangeInLibrary"
   Effect.Connive {} -> "Connive"
   Effect.Mill {} -> "Mill"
   Effect.Discard {} -> "Discard"

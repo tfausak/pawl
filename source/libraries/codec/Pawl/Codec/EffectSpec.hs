@@ -600,6 +600,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Explore (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"Explore\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- Ponder's "then put them back in any order", against the slot its look bound.
+  Spec.it s "ArrangeInLibrary" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ArrangeInLibrary (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "looked"))))
+      " {\"type\":\"ArrangeInLibrary\",\"value\":{\"type\":\"InSlot\",\"value\":\"looked\"}} "
   -- Raffine's Informant's "it connives", against the trigger-source slot.
   Spec.it s "Connive" $
     Common.assertJsonCodec

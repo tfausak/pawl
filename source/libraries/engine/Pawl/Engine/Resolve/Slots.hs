@@ -586,6 +586,7 @@ effectObjectRefs effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore ref -> [ref]
+  Effect.ArrangeInLibrary ref -> [ref]
   Effect.Connive (Connive.MkConnive _ ref) -> [ref]
   Effect.Discard subject -> case subject of
     Discard.Counted {} -> []
@@ -757,6 +758,7 @@ effectPlayerRefs effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.Explore {} -> []
+  Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
   Effect.Discard {} -> []
   Effect.LoseLife (LifeLoss.MkLifeLoss ref _ _ _) -> [ref]
@@ -976,6 +978,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.Explore _ -> Map.empty
+  Effect.ArrangeInLibrary _ -> Map.empty
   Effect.Connive (Connive.MkConnive quantity _) -> quantitySlots quantity
   Effect.Discard subject -> case subject of
     -- The bound slot is a DEFINITION, not a read, so it is not joined in here.
@@ -1559,6 +1562,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Explore {} -> True
+  Effect.ArrangeInLibrary {} -> True
   Effect.Connive (Connive.MkConnive quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -1780,6 +1784,7 @@ readsX =
         Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.Explore {} -> False
+        Effect.ArrangeInLibrary {} -> False
         Effect.Connive (Connive.MkConnive quantity _) -> Quantity.readsX quantity
         Effect.Discard subject -> case subject of
           Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
@@ -1935,6 +1940,7 @@ boundSlots effect = case effect of
   Effect.Surveil {} -> Set.empty
   Effect.Fateseal {} -> Set.empty
   Effect.Explore {} -> Set.empty
+  Effect.ArrangeInLibrary {} -> Set.empty
   Effect.Connive {} -> Set.empty
   Effect.DealDamage {} -> Set.empty
   Effect.Fight {} -> Set.empty

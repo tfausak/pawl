@@ -11,6 +11,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -31,6 +32,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
@@ -395,10 +397,34 @@ resolveCardBacked runSubgame oid rest printingId = do
           -- target? Read off `gs1` and not `obj`, since the CR 702.140b clear
           -- above may have taken the record back.
           mutating = maybe False Object.mutating (Game.lookupObject oid gs1)
-          -- CR 608.3's ordinary permanent entry for a non-Aura, named so that
-          -- the refusing mutate branch below can reach the same move rather than
-          -- restating it.
-          entersOrdinarily = armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False CarryOver.Carried False
+          -- CR 702.190b: the riders a spell cast for its sneak cost carries onto
+          -- the permanent it becomes -- tapped, and attacking whatever the
+          -- creature the cost returned was attacking. Nothing for every other
+          -- cast, which enters untapped and out of combat.
+          --
+          -- Read off Object.castUsing, the record CR 601.2b's announcement wrote
+          -- (Pawl.Engine.Cast), which is rule 702.190b's own "whose sneak cost
+          -- was paid" -- a classification of the cost that was paid, never the
+          -- identity of the spell's effect.
+          sneak = Keyword.castUsingEntry (Object.castUsing obj)
+          -- Resolved against `gs1`, BEFORE the move: the slot the cost bound
+          -- lives on the spell, and CR 400.7 deletes that object as it enters.
+          -- CR 608.2h is what still answers, the returned creature having left
+          -- the battlefield as the cost was paid.
+          sneakAttack = sneak >>= \riders -> Resolve.entryAttack Map.empty oid riders gs1
+          -- CR 608.3's permanent entry, named so that the Aura branch and the
+          -- refusing mutate branch below reach the same move rather than
+          -- restating it. `seed` is CR 303.4's host and `facing` CR 708.4's
+          -- status, the two things those branches differ in.
+          entersAs seed facing = do
+            arrivals <- Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue seed (maybe TapState.Untapped EntryRiders.tapped sneak) Map.empty (Just controller) entering facing False CarryOver.Carried False
+            -- AFTER the move, ninjutsu's ordering one opcode over
+            -- (Pawl.Engine.Resolve.Effect's MoveToZone arm): the permanent has
+            -- to be on the battlefield before CR 508.4 can put it in combat, and
+            -- CR 506.3a-c are guards inside that function rather than here.
+            Monad.forM_ sneakAttack (\choice -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking choice) arrivals)
+            armBecame oid obj gs1 arrivals
+          entersOrdinarily = entersAs Nothing (Object.facing obj)
        in if not (Card.isPermanent face)
             then Resolve.resolveSpellWith runSubgame oid
             else
@@ -490,7 +516,7 @@ resolveCardBacked runSubgame oid rest printingId = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          armBecame oid obj gs1 =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs1) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried False
+                          entersAs (enchantedBy oid gs1) Facing.FaceUp
     _ -> State.put gs {GameState.stack = rest}
 
 -- What a spell's Object.castUsing record buys the permanent it becomes: CR

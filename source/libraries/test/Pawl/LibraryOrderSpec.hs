@@ -95,6 +95,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Zone as Zone
 
 countersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1807,6 +1808,108 @@ kinshipSpec s registry = Spec.describe s "Kinship" $ do
 -- The elision half: CR 608.2a's gate is asked BEFORE CR 603.5's "may", so a top
 -- card that is not a land is never a question. Counts the optional prompts one
 -- upkeep raises.
+-- CR 401.4: "if an effect puts two or more cards in a specific position in a
+-- library at the same time, the owner of those cards may arrange them in any
+-- order."
+--
+-- Ponder ({U} Sorcery, "Look at the top three cards of your library, then put
+-- them back in any order. You may shuffle. / Draw a card." -- Oracle text
+-- checked on Scryfall, 2026-09-18) is the producer, cast for real. The LOOK
+-- shows three and changes nothing; the arrangement is the whole of what a board
+-- can see, and Ponder's own draw is what makes it visible from outside the
+-- library -- whichever card the answer put on top is the card that ends up in
+-- hand.
+--
+-- Four DIFFERENT printings in alice's library, top-first [piker, maiden,
+-- mountain, forest]. Interchangeable cards could not tell a chosen order from
+-- the order they were found in, and the fourth is what shows that the cards go
+-- back at the positions they already held rather than being stacked onto the
+-- library afresh.
+--
+-- THE SHUFFLE IS DECLINED in every case: rule 701.24a would randomise the order
+-- this group exists to read.
+ponderBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+ponderBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  mountain <- S.printingOf s registry "Mountain"
+  forest <- S.printingOf s registry "Forest"
+  ponder <- S.printingOf s registry "Ponder"
+  let deal (acc, g) printing = let (oid, g2) = S.addLibraryCard printing S.alice g in (oid : acc, g2)
+      -- addLibraryCard puts its card ON TOP, so the deepest is stocked first and
+      -- `ids` comes back top-first.
+      (ids, stocked) = List.foldl' deal ([], S.landsInPlay island 1) [forest, mountain, maiden, piker]
+      (board, spellId) = S.handOne ponder stocked
+  pure (ids, spellId, board)
+
+-- Answers Prompt.ArrangeLibraryCards with a FIXED permutation and declines the
+-- printed "may", surveilAnswer's posture and for its reason: an answerer
+-- deriving its order from the offered list would still answer legally after a
+-- mutation broke which cards the engine looked at.
+ponderAnswer :: [Natural] -> Prompt.Prompt r -> r
+ponderAnswer order p = case p of
+  Prompt.ArrangeLibraryCards {} -> order
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  _ -> S.identityAnswer p
+
+ponderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ponderSpec s registry = Spec.describe s "PutBackInOrder" $ do
+  -- The whole card. The answer sends the THIRD looked-at card to the top, so
+  -- the draw takes mountain; an engine that put the three back as it found them
+  -- would draw piker, and one that stacked them onto the library rather than
+  -- refilling their own positions would leave forest somewhere else.
+  Spec.it s "CR 401.4 whole card: Ponder's three go back in the stated order, and the draw takes the one put on top" $ do
+    (ids, spellId, board) <- ponderBoard s registry
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let after = S.runPure (ponderAnswer [2, 0, 1]) board $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+        Spec.assertEqWith
+          s
+          "CR 401.4 the drawn card is the one alice put on top"
+          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
+          [cardNamed "Mountain"]
+        Spec.assertEqWith s "the library started top-first piker, maiden, mountain, forest" (Game.zoneMembers Zone.Library S.alice board) [piker, maiden, mountain, forest]
+        Spec.assertEqWith s "mountain was drawn off the top, leaving the other two in the stated order above the untouched forest" (Game.zoneMembers Zone.Library S.alice after) [piker, maiden, forest]
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- One thing changed: the answer. A different permutation puts a different card
+  -- on top, which is what makes the order alice's rather than a constant.
+  Spec.it s "CR 401.4 a different answer puts a different card in hand" $ do
+    (ids, spellId, board) <- ponderBoard s registry
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let after = S.runPure (ponderAnswer [1, 2, 0]) board $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+        Spec.assertEqWith
+          s
+          "CR 401.4 maiden was stated first this time, so maiden is the card drawn"
+          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
+          [cardNamed "Bird Maiden"]
+        Spec.assertEqWith s "and the two left behind are in the order alice stated, above the untouched forest" (Game.zoneMembers Zone.Library S.alice after) [mountain, piker, forest]
+        Spec.assertEqWith s "the same board as the case above" (Game.zoneMembers Zone.Library S.alice board) [piker, maiden, mountain, forest]
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- CR 401.4's own "two or more", driven through the opcode because Ponder's
+  -- count is fixed at three: one card has one order, so nobody is asked. The
+  -- pair differs in the ref's count alone, on one board.
+  Spec.it s "CR 401.4 one card is one order and raises no prompt, where two do" $ do
+    (_, _, board) <- ponderBoard s registry
+    let topOf n = Effect.ArrangeInLibrary (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal n)))
+        counting :: Prompt.Prompt r -> State.State Int r
+        counting p = case p of
+          Prompt.ArrangeLibraryCards {} -> do
+            State.modify (+ 1)
+            pure (S.identityAnswer p)
+          _ -> pure (S.identityAnswer p)
+        asks n = State.execState (Engine.runGame counting board (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty (topOf n))) 0
+    Spec.assertEqWith s "one card asks nothing; two are a decision" (asks 1, asks 2) (0, 1)
+
 lookAtPromptSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lookAtPromptSpec s registry = Spec.describe s "LookAtPrompt" $ do
   let counting :: Prompt.Prompt r -> State.State Int r
@@ -2686,6 +2789,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   exploreOrderSpec s registry
   lookAtSpec s registry
   kinshipSpec s registry
+  ponderSpec s registry
   lookAtPromptSpec s registry
   playerSacrificesSpec s registry
   createEmblemSpec s registry

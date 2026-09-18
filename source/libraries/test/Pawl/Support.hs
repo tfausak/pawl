@@ -2624,6 +2624,7 @@ promptDecider prompt = case prompt of
   Prompt.ReturnCommander decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLibraryEnd decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ArrangeLibraryArrivals decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ArrangeLibraryCards decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseModes decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCopyTarget decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEntryOption decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2754,6 +2755,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ReturnCommander {} -> "ReturnCommander"
   Prompt.ChooseLibraryEnd {} -> "ChooseLibraryEnd"
   Prompt.ArrangeLibraryArrivals {} -> "ArrangeLibraryArrivals"
+  Prompt.ArrangeLibraryCards {} -> "ArrangeLibraryCards"
   Prompt.ChooseModes {} -> "ChooseModes"
   Prompt.ChooseCopyTarget {} -> "ChooseCopyTarget"
   Prompt.ChooseEntryOption {} -> "ChooseEntryOption"

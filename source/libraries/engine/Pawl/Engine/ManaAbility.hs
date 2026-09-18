@@ -324,6 +324,7 @@ manaProduced effect = case effect of
   Effect.Mill {} -> Nothing
   Effect.Reveal {} -> Nothing
   Effect.LookAt {} -> Nothing
+  Effect.ArrangeInLibrary {} -> Nothing
   Effect.Scry {} -> Nothing
   Effect.Surveil {} -> Nothing
   Effect.Fateseal {} -> Nothing
@@ -449,6 +450,8 @@ movesLibraryCard effect = case effect of
   Effect.LookAt {} -> False
   -- CR 701.25a's surveil may put the looked-at cards into a graveyard.
   Effect.Surveil {} -> True
+  -- CR 401.4's arrangement rewrites one library's order and moves nothing.
+  Effect.ArrangeInLibrary {} -> False
   -- CR 701.44a's explore reveals the top card and may put it into a hand or a
   -- graveyard.
   Effect.Explore {} -> True

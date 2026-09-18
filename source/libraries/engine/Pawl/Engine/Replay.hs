@@ -121,6 +121,7 @@ encode p answer = case p of
   Prompt.ReturnCommander {} -> Response.ReturnedCommander answer
   Prompt.ChooseLibraryEnd {} -> Response.ChoseLibraryEnd answer
   Prompt.ArrangeLibraryArrivals {} -> Response.ArrangedLibraryArrivals answer
+  Prompt.ArrangeLibraryCards {} -> Response.ArrangedLibraryCards answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
@@ -559,6 +560,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ArrangeLibraryArrivals {} -> case response of
     Response.ArrangedLibraryArrivals order -> Just order
+    _ -> Nothing
+  Prompt.ArrangeLibraryCards {} -> case response of
+    Response.ArrangedLibraryCards order -> Just order
     _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
@@ -1044,6 +1048,8 @@ defaultAnswer p = case p of
   -- CR 401.4: the canonical order is always a legal answer, as OrderTriggers'
   -- arm above says.
   Prompt.ArrangeLibraryArrivals _ _ _ oids -> zipWith const [0 ..] oids
+  -- CR 401.4 again, for cards that never left the library.
+  Prompt.ArrangeLibraryCards _ _ oids -> zipWith const [0 ..] oids
 
 -- Run a game under a base interpreter, keeping every answer in order.
 --

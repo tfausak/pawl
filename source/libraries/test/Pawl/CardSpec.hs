@@ -563,6 +563,7 @@ objectRefPositions =
         ("reveal", Effect.Reveal (Reveal.MkReveal (plantedRef "rv") Nothing), [plantedRef "rv"]),
         ("look-at", Effect.LookAt (LookAt.MkLookAt (plantedRef "la") (SlotName.MkSlotName (Text.pack "seen"))), [plantedRef "la"]),
         ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
+        ("arrange-in-library", Effect.ArrangeInLibrary (plantedRef "al"), [plantedRef "al"]),
         ("connive", Effect.Connive (Connive.MkConnive (Quantity.Type.Literal 1) (plantedRef "cn")), [plantedRef "cn"]),
         ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
         ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders Nothing []), [plantedRef "cc"]),
@@ -1109,6 +1110,7 @@ ownCounts effect = case effect of
   -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
   -- the one on top, so there is no number a card author writes.
   Effect.Explore {} -> []
+  Effect.ArrangeInLibrary {} -> []
   -- Connive's N is a Quantity like the Search's above, so its Counts are
   -- reachable from here.
   Effect.Connive (Connive.MkConnive quantity _) -> quantityCounts quantity
@@ -1487,6 +1489,7 @@ effectNestedEffects effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
+  Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
   Effect.Discard {} -> []
   Effect.LoseLife {} -> []
@@ -1939,6 +1942,7 @@ effectReplacements effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
+  Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
   Effect.Discard {} -> []
   Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause _) -> []
@@ -2354,6 +2358,7 @@ effectMintedFaces effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
+  Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
   Effect.Discard {} -> []
   Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause _) -> []
@@ -5059,6 +5064,7 @@ effectFilters effect = case effect of
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as PutCounters' does.
   Effect.Explore ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.ArrangeInLibrary ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Connive (Connive.MkConnive quantity ref) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
   -- The These arm's ref carries a Filter a card author writes -- Amnesia's
   -- "nonland" -- so the lint reaches it, as Reveal's does.

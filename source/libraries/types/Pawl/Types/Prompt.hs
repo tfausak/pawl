@@ -382,6 +382,15 @@ data Prompt r where
   -- library at once; the answer permutes the indices, reading from that end
   -- inward.
   ArrangeLibraryArrivals :: Decider.Decider -> PlayerId.PlayerId -> LibraryPosition.LibraryPosition -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
+  -- | CR 401.4: the owner arranges two or more cards an effect puts back into
+  -- their library at the positions those cards already occupy (Ponder); the
+  -- answer permutes the indices, reading from the top of the library inward.
+  --
+  -- No LibraryPosition, which is the difference from ArrangeLibraryArrivals
+  -- above: nothing arrives, so there is no end for the effect to have stated.
+  -- Asked at two or more cards, rule 401.4's own count being where one order
+  -- stops being the only order.
+  ArrangeLibraryCards :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
   -- | CR 601.2b / 700.2a: the modes, before X and targets, from the legal ones;
   -- a Seq because CR 700.2d may let one mode be chosen twice. A forced
   -- selection is not asked.
