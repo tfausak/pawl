@@ -76,7 +76,7 @@ lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Integer
 lifeOf pid gs = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
 
 -- What rule 701.48a put into her graveyard, which is her graveyard WITHOUT Cram
--- Session: CR 608.2m puts the resolved sorcery there itself, and that is a fact
+-- Session: CR 608.2n puts the resolved sorcery there itself, and that is a fact
 -- about the fixture rather than about learning.
 discardedBy :: Printing.Printing -> GameState.GameState -> [Printing.Printing]
 discardedBy cram gs = List.sort (filter (/= cram) (printingsIn Zone.Graveyard S.alice gs))

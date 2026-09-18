@@ -81,8 +81,9 @@ populate pid resolving = do
           let offered = first NonEmpty.:| (second : more)
           answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor pid gs) pid resolving offered)
           pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-      -- Re-read: the prompt above ran in Game, and CR 608.2f wants the copiable
-      -- values off the board as it stands when the token is minted.
+      -- Against the LIVE state and not `gs`, Pawl.Engine.Event.bringInto's care:
+      -- Game.choose above wrote the answer into the transcript, and minting off
+      -- the state from before the prompt would drop that.
       minting <- State.get
       Monad.forM_ (Game.cardOfWithLastKnown token minting) $ \card ->
         Monad.void (Event.createTokens pid card (Just (Event.copiedSnapshotWithLastKnown token minting)) 1 TapState.Untapped Map.empty Nothing)

@@ -10,7 +10,7 @@
 -- effect it is.
 --
 -- Rule 701.48 has no "whenever a player learns", so there is no GameEvent here.
--- Scryfall @o:"learns"@, 2026-09-18, returns no card that watches for one; a
+-- Scryfall @o:"learns"@, 2026-09-18, returns no card; a
 -- printing worded that way is what would need it.
 module Pawl.Engine.Learn where
 
