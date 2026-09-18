@@ -2239,7 +2239,7 @@ soulsMajestySpec s registry = Spec.describe s "SoulsMajesty" $ do
         after = snd (Engine.runGamePure (targetingCreature spider) cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew two" (S.handSize S.alice after) 2
 
--- CR 701.20a's randomness under CR 400.7's zone change: Elkin Lair {3}{R} World
+-- Randomness under CR 400.7's zone change: Elkin Lair {3}{R} World
 -- Enchantment (Homelands; Oracle text checked against api.scryfall.com,
 -- 2026-09-18) -- "At the beginning of each player's upkeep, that player exiles a
 -- card at random from their hand. The player may play that card this turn. At
@@ -2298,7 +2298,7 @@ elkinLairSpec s registry =
       bobsCards = ["Goblin Piker", "Bog Wraith", "Bird Maiden"]
    in Spec.describe s "ElkinLair" $ do
         -- The proving case.
-        Spec.it s "CR 701.20a the card exiled is the one randomness named, not the first in hand" $ do
+        Spec.it s "CR 400.7 the card exiled is the one randomness named, not the first in hand" $ do
           lair <- S.printingOf s registry "Elkin Lair"
           bolt <- S.printingOf s registry "Lightning Bolt"
           ps <- traverse (S.printingOf s registry) bobsCards
@@ -2309,7 +2309,7 @@ elkinLairSpec s registry =
           Spec.assertEqWith s "and the trigger resolved" (length (GameState.stack after)) 0
         -- The other half of the pair: the same board, the same everything, one
         -- different answer.
-        Spec.it s "CR 701.20a the same board with a different roll exiles a different card" $ do
+        Spec.it s "CR 400.7 the same board with a different roll exiles a different card" $ do
           lair <- S.printingOf s registry "Elkin Lair"
           bolt <- S.printingOf s registry "Lightning Bolt"
           ps <- traverse (S.printingOf s registry) bobsCards

@@ -3971,7 +3971,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 members <- fromAmongMembers legal resolving chosen slot
                 gs <- State.get
                 pure (matchingFromAmong legal resolving controller source gs filter_ members)
-              -- CR 701.20a's asking read, the third site to make it after
+              -- The asking read of the ref, the third site to make it after
               -- Effect.Reveal and Effect.Discard: Elkin Lair's "that player
               -- exiles a card at random from their hand". randomCardsInHand and
               -- not a roll here, so the three sites cannot ask differently --

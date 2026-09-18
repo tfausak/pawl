@@ -3633,7 +3633,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
   TriggerCondition.SelfDealsDamageToPlayer _ -> []
-  -- Nullary too, and for the same reason.
+  -- Nullary as well: the printed form qualifies the damaged creature in no way,
+  -- so a text change has nothing here to rewrite.
   TriggerCondition.SelfDealsDamageToCreature -> []
   -- Enrage's condition is nullary: rule 120.3 qualifies the damage in no way, so
   -- there is nothing for a text change to rewrite.

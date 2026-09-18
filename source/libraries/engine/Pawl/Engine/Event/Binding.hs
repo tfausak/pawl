@@ -1109,6 +1109,9 @@ eventBindingSlots cond = case cond of
   -- The same pair for the arm without the combat narrowing, and equally guaranteed
   -- -- every DamageDealt event carries an amount, whichever CR 120.3 kind it was.
   TriggerCondition.SelfDealsDamageToPlayer _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
+  -- Just the amount for the arm one recipient over, and equally guaranteed -- see
+  -- the eventBindings arm above for why the recipient gets no slot.
+  TriggerCondition.SelfDealsDamageToCreature -> Set.singleton Binding.eventAmount
   -- CR 120.3's amount for enrage, which Coalhauler Swine's "it deals that much
   -- damage to each player" reads: the same slot CR 615.13's prevention and CR
   -- 119.9's life gain stamp, and guaranteed given a match -- every DamageDealt
@@ -1118,9 +1121,6 @@ eventBindingSlots cond = case cond of
   -- Plus CR 120.1's source, which Belltower Sphinx's "that source's controller"
   -- reads, and equally guaranteed -- every DamageDealt event carries one. No slot
   -- for the recipient, who is the bearer. See the eventBindings arm above.
-  -- Just the amount for the arm one recipient over, and equally guaranteed -- see
-  -- the eventBindings arm above for why the recipient gets no slot.
-  TriggerCondition.SelfDealsDamageToCreature -> Set.singleton Binding.eventAmount
   TriggerCondition.SelfIsDealtDamage -> Set.fromList [Binding.combatDamager, Binding.eventAmount]
   -- CR 510.2's damager, which the bystander's form needs and the self-scoped one
   -- above does not: there the damager IS the bearer, already bound as CR 113.7a's
