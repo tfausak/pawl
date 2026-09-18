@@ -2434,6 +2434,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- Pawl.Engine.Keyword.soulshift mints rather than in this value, so the swap
   -- arrives there instead (Pawl.Engine.Projection.mintedTriggeredAbilitiesOf).
   Keyword.Type.Soulshift _ -> keyword
+  Keyword.Type.Dredge _ -> keyword
   -- CR 702.54a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "+1/+1 counter" is the rule's own noun and no card prints it.
   Keyword.Type.Bloodthirst _ -> keyword

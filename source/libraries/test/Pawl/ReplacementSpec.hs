@@ -10,6 +10,7 @@
 -- than here.
 module Pawl.ReplacementSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -1239,6 +1240,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   warLeechSpec s registry
   faerieSquadronSpec s registry
   hyenaUmbraSpec s registry
+  darkblastSpec s registry
 
 -- Faerie Squadron {U} Creature -- Faerie 1/1, whole text: "Kicker {3}{U} (You may
 -- pay an additional {3}{U} as you cast this spell.) / If this creature was
@@ -2856,3 +2858,69 @@ hyenaUmbraSpec s registry = Spec.describe s "Hyena Umbra (CR 702.89a)" $ do
       "and the Aura died in its place"
       (S.onBattlefield umbra after, inAliceGraveyard hyenaUmbra after)
       (False, 1)
+
+-- CR 702.52a / 614.11: Darkblast ({B} Instant, "Target creature gets -1/-1 until
+-- end of turn. / Dredge 3" -- name, cost, type line and Oracle text checked
+-- against api.scryfall.com 2026-09-18).
+--
+-- The pool's dredge producer and the only row rule 702 mints into a GRAVEYARD:
+-- Pawl.Engine.Keyword.graveyardReplacementsOf builds it off the printed face and
+-- Pawl.Engine.Projection.replacementsAffecting's graveyard walk gathers it, so
+-- nothing has to be cast for the row to stand.
+--
+-- THE BOARD in every case: the Darkblast in alice's graveyard, her library
+-- stocked with basics of four distinct names, and one call to Event.drawCard --
+-- the narrowest path that raises CR 121.1's WouldDraw. The three cases differ in
+-- exactly one thing each: the answer to the dredge prompt, and the size of the
+-- library.
+--
+-- Every number is distinct -- four library cards, a dredge of three, one card
+-- returned -- so no two readings land on the same count.
+darkblastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+darkblastSpec s registry = Spec.describe s "Darkblast (CR 702.52)" $ do
+  Spec.it s "CR 702.52a dredging returns the card and mills three instead of drawing" $ do
+    board <- dredgeBoard s registry 4
+    let after = S.runPure dredging board (Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 702.52a the Darkblast came back, and no library card was drawn" (handNames S.alice after) [CardName.MkCardName (Text.pack "Darkblast")]
+    Spec.assertEqWith s "CR 701.17a three cards were milled, not one drawn" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+    Spec.assertEqWith s "CR 614.6 and the graveyard holds those three alone" (length (graveyardNames S.alice after)) 3
+  -- The CONTROL for the case above: the same board and the same answerer, one
+  -- card short of rule 702.52a's "at least N cards in your library", which rule
+  -- 702.52b is the other half of. Pawl.Engine.Replacement.stocked keeps the row
+  -- out of CR 616.1's offer entirely, so the draw happens as proposed.
+  Spec.it s "CR 702.52b a library short of three is not offered the dredge at all" $ do
+    board <- dredgeBoard s registry 2
+    let after = S.runPure dredging board (Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 702.52b the Darkblast stayed in the graveyard" (graveyardNames S.alice after) [CardName.MkCardName (Text.pack "Darkblast")]
+    Spec.assertEqWith s "CR 121.1 so alice drew her card" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "and only that one card left her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+  -- The other CONTROL: rule 702.52a's "you MAY". Same board as the first case,
+  -- and only the answer differs -- S.identityAnswer declines every optional
+  -- decision -- so the draw is left standing and nothing is milled.
+  Spec.it s "CR 702.52a declining leaves the draw standing" $ do
+    board <- dredgeBoard s registry 4
+    let after = S.runPure S.identityAnswer board (Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 702.52a the Darkblast stayed in the graveyard" (graveyardNames S.alice after) [CardName.MkCardName (Text.pack "Darkblast")]
+    Spec.assertEqWith s "CR 121.1 alice drew her card" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "and nothing was milled" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+
+-- Alice's graveyard holding one Darkblast, and her library `n` basics of
+-- distinct names. Distinct names so a milled card cannot be mistaken for
+-- another, and basics so nothing in the library carries a row of its own.
+dredgeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+dredgeBoard s registry n = do
+  darkblast <- S.printingOf s registry "Darkblast"
+  basics <- Monad.mapM (S.printingOf s registry) (take n ["Island", "Mountain", "Forest", "Plains"])
+  let (_, g1) = S.addGraveyardCard darkblast S.alice (Setup.emptyGame S.bothPlayers)
+  pure (List.foldl' (\g b -> snd (S.addLibraryCard b S.alice g)) g1 basics)
+
+-- Exercises the dredge and nothing else, pinned rather than searched: every
+-- other decision falls through to S.identityAnswer, which declines.
+dredging :: Prompt.Prompt r -> r
+dredging p = case p of
+  Prompt.ChooseDredge {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- graveyardNames one zone over.
+handNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+handNames pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Hand pid gs))

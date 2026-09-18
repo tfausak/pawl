@@ -72,6 +72,8 @@ import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DevourCount as DevourCount
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Draw as Draw
+import qualified Pawl.Types.DrawR as DrawR
+import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.Effect as Effect
@@ -240,6 +242,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
   -- CR 702.46b: each instance triggers separately.
   Keyword.Soulshift n -> List.genericReplicate count (soulshift n)
+  -- CR 702.52a states one STATIC ability and no trigger; graveyardReplacementsOf
+  -- below mints it.
+  Keyword.Dredge _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> List.genericReplicate count haunt
   -- Rule 702.62a's two triggered abilities function in the EXILE zone, so
@@ -624,6 +629,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Dredge _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   -- CR 702.62a states no activated ability, in the hand or anywhere else.
@@ -1123,6 +1129,10 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  -- CR 702.52a states a STATIC ability, not an activated one: dredge replaces a
+  -- draw rather than offering anything to activate. `graveyardReplacementsOf`
+  -- above is where the rule's one ability is minted.
+  Keyword.Dredge _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   Keyword.Suspend _ -> []
@@ -1744,6 +1754,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Dredge _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   -- CR 702.62a states no activated ability on the battlefield either.
@@ -2422,6 +2433,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Dredge _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   -- CR 702.62a's free play is the third ability's OfferCast rather than a
@@ -3671,6 +3683,37 @@ castFromGraveyardExile =
 handReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts keywords))]
 
+-- | The replacement effects rule 702 mints for a card in a GRAVEYARD, off its
+-- printed keywords -- `handReplacementsOf`'s sibling one zone over, and rule
+-- 702.52a's dredge is the only one that reaches it.
+--
+-- Its own mint point for `handReplacementsOf`'s reason: rule 702.52a functions
+-- "only while the card with dredge is in a player's graveyard", which is a zone
+-- `mintedReplacementsFor`'s projection walk does not reach. Read off the
+-- PRINTED face by Pawl.Engine.Projection.replacementsAffecting's graveyard
+-- walk, so a dredge an effect granted to a card in a graveyard mints nothing
+-- (gap #1859).
+--
+-- ONE ROW PER DISTINCT dredge ability, which is what a keyword SET gives and
+-- what rule 702.52 asks for: each ability states its own N, so two unlike ones
+-- are two distinguishable CR 616.1 candidates, and rule 702.52 states no
+-- multiplicity clause for two alike. Scryfall `keyword:dredge`, 2026-09-18,
+-- answers no card printing two dredge abilities; a printing with two would be
+-- what tells the two readings apart.
+--
+-- A wildcard rather than an exhaustive case, `madnessCosts` above's reason.
+--
+-- ControllerRelation.Yours is rule 702.52a's "you": the card is in a graveyard,
+-- where CR 108.4 gives it no controller and CR 108.4a substitutes its owner, and
+-- Pawl.Engine.Replacement.applies reads the relation off the candidate's
+-- controller, which for a graveyard card is that owner.
+graveyardReplacementsOf :: Set Keyword -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
+graveyardReplacementsOf keywords =
+  let rowFor keyword = case keyword of
+        Keyword.Dredge n -> Just (ReplacementEffect.DrawR (DrawR.MkDrawR ControllerRelation.Yours (DrawRewrite.Dredge n)))
+        _ -> Nothing
+   in Maybe.mapMaybe rowFor (Set.toAscList keywords)
+
 -- CR 702.35a's FIRST ability: "if a player would discard this card, that player
 -- discards it, but exiles it instead of putting it into their graveyard".
 --
@@ -4058,6 +4101,10 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  -- CR 702.52a's row functions in a GRAVEYARD, where this roster cannot reach:
+  -- Pawl.Engine.Projection.replacementsAffecting gathers it off the printed face
+  -- of a graveyard card. `graveyardReplacementsOf` above is where it is minted.
+  Keyword.Dredge _ -> []
   -- CR 702.54a's ONE static ability, vanishing's row with rule 702.54a's condition
   -- on it. That condition is Replacement.admitsEntry's rather than this function's
   -- -- nothing knowable from a keyword and a count can answer it. ONE ROW PER
@@ -4409,6 +4456,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Dredge _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   -- CR 702.62a says nothing about combat.
@@ -4703,6 +4751,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Dredge _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   -- CR 702.62a says nothing about attaching.
@@ -4896,6 +4945,7 @@ familyOf keyword = case keyword of
   Keyword.Buyback _ -> Just KeywordFamily.Buyback
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
   Keyword.Soulshift _ -> Just KeywordFamily.Soulshift
+  Keyword.Dredge _ -> Just KeywordFamily.Dredge
   Keyword.Bloodthirst _ -> Just KeywordFamily.Bloodthirst
   Keyword.Hideaway _ -> Just KeywordFamily.Hideaway
   Keyword.Reinforce {} -> Just KeywordFamily.Reinforce

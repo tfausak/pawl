@@ -142,6 +142,7 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.MergeComponent as MergeComponent
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MutateSide as MutateSide
@@ -3349,6 +3350,46 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         bringInto payload (ReplacementCandidate.source candidate) pid
         pure Nothing
+      -- CR 702.52a: "you may instead mill N cards and return this card from
+      -- your graveyard to your hand". The "may" is a real choice whenever the
+      -- row is offered, so it is a PROMPT and never elided -- rule 702.52b's
+      -- short library is `Replacement.stocked`'s refusal instead, which keeps
+      -- the row out of CR 616.1's offer rather than asking a question with one
+      -- answer.
+      --
+      -- Declining leaves the event STANDING: the draw happens as proposed, and
+      -- `applyChosen` has already recorded the candidate under CR 614.5, so the
+      -- row is not offered against this draw again and a second dredger in the
+      -- same graveyard still is.
+      --
+      -- Exercising cancels, the GainLife arm's CR 614.6: no card is drawn and CR
+      -- 121.2's tally does not move.
+      --
+      -- The mill is CR 701.17a's, written the way Pawl.Engine.Cost's
+      -- MillCards component writes it -- through `changeZoneReturning`, the CR
+      -- 400.7 funnel, then ONE GameEvent.Milled for the batch and none where
+      -- every move was cancelled -- so a watcher cannot tell dredge's mill from
+      -- any other.
+      --
+      -- The card returned is the CANDIDATE's source, rule 702.52a's "this card";
+      -- Pawl.Engine.Replacement.readsSource is what keeps two dredgers in one
+      -- graveyard from being elided into one.
+      --
+      -- Milled FIRST, then returned, which is the rule's own order. The two
+      -- cannot collide: the dredger is already in the graveyard, and the mill
+      -- takes cards off the front of the library.
+      DrawRewrite.Dredge n -> do
+        gs <- State.get
+        let decider = Decide.deciderFor pid gs
+        answer <- Game.choose (Prompt.ChooseDredge decider pid (ReplacementCandidate.source candidate) n)
+        case answer of
+          OptionalDecision.Declines -> pure (Just event)
+          OptionalDecision.Exercises -> do
+            Replacement.consume (ReplacementCandidate.identity candidate)
+            milled <- millFrom pid n
+            Monad.unless (null milled) (State.modify' (recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList milled)))))
+            Monad.void (changeZoneReturning (ReplacementCandidate.source candidate) Zone.Hand)
+            pure Nothing
     -- Unreachable: `applies` admits DrawR only against WouldDraw.
     (ReplacementEffect.DrawR {}, _) -> pure (Just event)
     -- CR 121.2a with CR 614.6: Alms Collector's "if an opponent would draw two or
@@ -4671,6 +4712,20 @@ changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just as
 -- that (CR 712.21); empty when the id is unknown or the CR 616.1 replacement loop
 -- cancelled the move (`resolved == Nothing`). changeZoneReturning itself is the
 -- `seed = Nothing` case below.
+-- CR 701.17a: move the top `n` cards of a player's own library (CR 400.3) to
+-- their graveyard, answering the ids that ARRIVED. The caller records the CR
+-- 701.17a event, because what counts as one mill is the caller's question --
+-- Pawl.Engine.Cost's MillCards component writes the same two steps.
+--
+-- An exact take rather than an "as many as possible": every caller has already
+-- refused a count the library cannot meet (Cost.canPayComponent,
+-- Pawl.Engine.Replacement.stocked), which is rule 702.52b for the dredge road.
+millFrom :: PlayerId -> Natural -> Game [ObjectId]
+millFrom pid n = do
+  gs <- State.get
+  let cards = List.genericTake n (Game.zoneMembers Zone.Library pid gs)
+  fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards)
+
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
 changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
 
