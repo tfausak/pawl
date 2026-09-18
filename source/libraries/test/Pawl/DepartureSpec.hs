@@ -1,3 +1,6 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- Covers Pawl.Engine.Departure: who is still in the game, and the CR 104.2a/104.3
 -- consequences of leaving it.
 module Pawl.DepartureSpec where
@@ -49,6 +52,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import Pawl.Types.Printing (Printing)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
@@ -67,6 +71,17 @@ isPayDecision :: Response.Response -> Bool
 isPayDecision response = case response of
   Response.ChoseToPay _ -> True
   _ -> False
+
+-- Takes the LAST permanent offered when `who` is the seat asked, and answers
+-- everything else as S.identityAnswer does -- which takes the first. The pair is
+-- what lets the permanent that ends up exiled name the seat the engine put the
+-- question to. The Decider is checked alongside the player for paysFor's reason.
+takesLast :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+takesLast who p = case p of
+  Prompt.ChoosePermanent (Decider.MkDecider d) player _ offered
+    | d == who && player == who ->
+        NonEmpty.last offered
+  _ -> S.identityAnswer p
 
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
@@ -996,6 +1011,76 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     -- assertions above would pass on a board that never reached the gate.
     Spec.assertEqWith s "a bob who stayed pays the ward cost, going 37 -> 34" (S.lifeOf S.bob staying) (Just 34)
     Spec.assertEqWith s "and he was asked exactly once" (payDecisions stayingTranscript) [Response.ChoseToPay PaymentDecision.Pays]
+
+  -- CR 800.4g: "if an object requires a player who has left the game to make a
+  -- choice other than whether to pay a cost, the controller of the object
+  -- chooses another player to make that choice. If the original choice was to be
+  -- made by an opponent of the controller of the object, that player chooses
+  -- another opponent if possible."
+  --
+  -- Synthetic Arbiter of Forfeits ({2}{U} Creature -- Advisor 2/3, "Whenever a
+  -- player casts a spell, that player chooses a permanent you control other than
+  -- this creature and exiles it") is the producer, and it is SYNTHETIC because
+  -- the rule needs two things at once that no printing puts together: a chooser
+  -- named by a slot filled BEFORE the departure, and candidates that outlive the
+  -- chooser. Every printed "an opponent chooses" -- Murmurs from Beyond, Wormfang
+  -- Crab, Animal Magnetism -- names its opponent inside the same resolution that
+  -- then asks them, a window no player can leave the game in here. Scryfall
+  -- o:"that player chooses", 2026-09-18, enumerates the trigger-bound shape, and
+  -- every hit either has the bound player choose among their OWN objects, which
+  -- leave with them (CR 800.4a), or fires on a turn a departed player never gets
+  -- (CR 800.4k). A printing joining a cast or damage trigger to a choice over the
+  -- ability controller's permanents would replace this card.
+  --
+  -- Binding.triggerPlayer is what survives the departure: a CR 601.2i cast
+  -- trigger stamps the caster's PlayerId, and PlayerRef.InSlot reads it back at
+  -- resolution with no survival filter of its own -- where PlayerRef.Relative
+  -- Opponent is answered off Game.stillPlaying and so can never name a seat that
+  -- has gone.
+  --
+  -- THREE SEATS, the CR 800.4f case's reason and this one: alice's remaining
+  -- opponent once bob leaves is carol alone, so "another opponent if possible"
+  -- elides to her, where the first sentence's unnarrowed "another player" would
+  -- have offered alice herself and the prompt would have been a real one.
+  Spec.it s "CR 800.4g a departed player's choice is made by another opponent" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    arbiter <- S.printingOf s registry "Synthetic Arbiter of Forfeits"
+    growth <- S.printingOf s registry "Giant Growth"
+    let withLands = S.landsFor forest S.bob 3 S.threePlayerGame
+        (_, withArbiter) = S.addPermanent arbiter S.alice withLands
+        -- TWO candidates, so the choice is a real one, and differently named, so
+        -- which of them went says who picked.
+        (_, withIsland) = S.addPermanent island S.alice withArbiter
+        (_, withMountain) = S.addPermanent mountain S.alice withIsland
+        (growthId, withGrowth) = S.addHandCard growth S.bob withMountain
+        board =
+          withGrowth
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- The Arbiter is the board's only creature, so identityAnswer's targeting
+        -- of the Growth has one option and nothing here searches for the one that
+        -- makes the assertion pass.
+        onStack = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.bob growthId)) Engine.settleForPriority
+        gone = S.runPure S.identityAnswer onStack (Departure.leaveGame Departure.Type.Conceded S.bob)
+        after = S.runPure (takesLast S.carol) gone Stack.resolveTop
+        staying = S.runPure (takesLast S.carol) onStack Stack.resolveTop
+        held name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
+    -- The setup: the cast trigger really fired, and bob's departure really took
+    -- his Growth with him, leaving the trigger to resolve alone.
+    Spec.assertEqWith s "the Growth and the Arbiter's trigger are both on the stack" (length (GameState.stack onStack)) 2
+    Spec.assertEqWith s "bob leaving takes his Growth with it, leaving the trigger" (length (GameState.stack gone)) 1
+    Spec.assertEqWith s "and bob is out of the game" (statusOf S.bob gone) (Just (Status.Departed Departure.Type.Conceded))
+    -- The rule: carol answered in bob's place, and her answer is the one the
+    -- board carries out.
+    Spec.assertEqWith s "CR 800.4g carol chose in bob's place, exiling the Mountain and leaving the Island" (held "Mountain" after, held "Island" after) (0, 1)
+    -- The PAIR, differing from the board above in bob's departure and nothing
+    -- else: a bob who stayed is the one asked, and takes the other land. Without
+    -- it the assertion above would pass on a board that never reached the choice.
+    Spec.assertEqWith s "a bob who stayed answers for himself, exiling the Island instead" (held "Mountain" staying, held "Island" staying) (1, 0)
 
 -- alice with Door to Nothingness and one land per colored symbol of its
 -- activation cost, plus whatever other seats the case wants.

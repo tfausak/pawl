@@ -18,7 +18,11 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- 400.1) however many seats are in play. CR 608.2c's default is the resolving
 -- controller, which is what @Relative You@ spells; Wormfang Crab's "an opponent
 -- chooses a permanent you control" is the other seat, named through the slot an
--- Pawl.Types.Effect ChoosePlayer filled earlier in the same resolution.
+-- Pawl.Types.Effect ChoosePlayer filled earlier in the same resolution. A slot a
+-- TRIGGER filled is the other road, and the one that outlives the resolution:
+-- Pawl.Engine.Binding.triggerPlayer holds a seat named a priority window ago, so
+-- CR 800.4g's departed chooser is reachable from here
+-- (Pawl.Engine.Resolve.Effect.askedChooser).
 --
 -- A ref naming NO seat -- an unfilled slot, or one holding something that is not
 -- a player -- names no permanent either, and that share of the instruction is

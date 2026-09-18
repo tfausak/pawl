@@ -481,6 +481,64 @@ apnapPlayersOf ref legal controller gs =
   let named = playerRefPlayers legal controller gs ref
    in filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
 
+-- CR 608.2c / 800.4g: the ONE seat a choice opcode's own chooser reference
+-- names, and who answers instead when that seat has LEFT the game.
+--
+-- A reference naming nobody, or naming several where no printing writes one,
+-- answers Nothing: that share of the instruction is ignored (CR 101.3), which is
+-- the reading both callers already had.
+--
+-- The REASSIGNMENT is rule 800.4g's, and it is a choice rather than a fallback
+-- to the controller: the object's controller picks the substitute, narrowed to
+-- another opponent where the departed chooser was one of theirs and widened back
+-- to the whole table where no opponent is left. "Another" needs no exclusion of
+-- its own, Game.stillPlaying having already dropped the seat that left.
+--
+-- Pawl.Engine.Target's chooserOf is the same question over CR 601.2c's
+-- announcement, and its posture is the one followed here: elided at one
+-- candidate, Prompt.ChooseOpponent where the offer cannot hold the controller
+-- and Prompt.ChoosePlayer where it can, and an answer naming somebody never
+-- offered filtered back to the first.
+--
+-- CR 800.4f is the same situation for a COST and the opposite answer -- the cost
+-- is not paid, and nobody is asked in the departed player's place -- which is
+-- why it lives at Pawl.Engine.Resolve.payGatePaidBy and not here.
+--
+-- Pawl.DepartureSpec's "CR 800.4g a departed player's choice is made by another
+-- opponent" is what proves the reassignment.
+--
+-- The two PLURAL askers are not routed here and no board reaches them: every
+-- Pawl.Types.Optionality asker (CR 603.5, Resolve.exercises) and every
+-- Pawl.Types.OrElse chooser (CR 608.2d, Resolve.chosenBranch) data/cards writes
+-- is CR 109.5's `you` or PlayerRef.EachPlayer, both of which playerRefPlayers
+-- answers off Game.stillPlaying. A card writing PlayerRef.InSlot or
+-- PlayerRef.ControllerOfBound into either field would refute that.
+askedChooser :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerRef -> Game (Maybe PlayerId)
+askedChooser source controller legal ref = do
+  gs <- State.get
+  case playerRefPlayers legal controller gs ref of
+    [named]
+      | List.elem named (Game.stillPlaying gs) -> pure (Just named)
+      | otherwise ->
+          let opponents = Game.opponentsOf controller gs
+              candidates =
+                if Game.areOpponents gs controller named && not (List.null opponents)
+                  then opponents
+                  else Game.stillPlaying gs
+           in case candidates of
+                [] -> pure Nothing
+                [sole] -> pure (Just sole)
+                first : second : rest -> do
+                  let offered = first NonEmpty.:| (second : rest)
+                      decider = Decide.deciderFor controller gs
+                      question =
+                        if List.elem controller (NonEmpty.toList offered)
+                          then Prompt.ChoosePlayer decider controller source offered
+                          else Prompt.ChooseOpponent decider controller source offered
+                  answer <- Game.choose question
+                  pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    _ -> pure Nothing
+
 -- CR 701.27a and CR 701.28a: turn each named permanent over. ONE function for
 -- both opcodes, which is CR 701.28a said as code -- "this follows rules
 -- 701.27a-f, 712.9-10, and 712.18", so a convert cannot pick up a gate a
@@ -1663,10 +1721,10 @@ chooseCardsInHand resolving source controller legal (ChosenCardInHand.MkChosenCa
 -- WHO is asked is the ref's own chooser, ONE seat: CR 608.2c's resolving
 -- controller by default, or the seat a PlayerRef names -- Animal Magnetism's "an
 -- opponent chooses a creature card from among them", read out of the slot a
--- ChoosePlayer filled earlier in this resolution. Read through playerRefPlayers
--- so the slot is read as every other is (CR 608.2b): a reference naming nobody,
--- or naming several where no printing writes one, asks nobody and so names no
--- card (CR 101.3).
+-- ChoosePlayer filled earlier in this resolution. Read through askedChooser, so
+-- the slot is read as every other is (CR 608.2b), a reference naming nobody or
+-- naming several asks nobody and so names no card (CR 101.3), and CR 800.4g
+-- hands the choice on where the seat it names has left the game.
 --
 -- HOW MANY is the ref's Quantity, evaluated HERE (CR 608.2c) off the announcement
 -- CR 601.2b left on the resolving object -- TopOfLibrary's reading, and its clamp:
@@ -1707,9 +1765,10 @@ chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmon
               let taken = if List.elem answer (NonEmpty.toList offered) then answer else first
               rest <- pick asked (n - 1) (List.delete taken available)
               pure (taken : rest)
-  case playerRefPlayers legal controller gs chooser of
-    [asked] -> pick asked wanted candidates
-    _ -> pure []
+  asked <- askedChooser source controller legal chooser
+  case asked of
+    Just who -> pick who wanted candidates
+    Nothing -> pure []
 
 -- CR 701.20a / 701.9b: the cards randomness names out of each hand the ref
 -- reaches, paired with the seat whose hand it is. The ONE asking read of
@@ -3780,18 +3839,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- A chooser naming anything but ONE seat names no permanent either, and
         -- that share of the instruction is ignored (CR 101.3), chooseCardFromAmong's
         -- reading; it is read AFTER the two elided cases, since neither asks
-        -- anybody anything.
+        -- anybody anything, and through askedChooser, so CR 800.4g hands the
+        -- choice on where the seat it names has left the game.
         chosenPermanent filter_ chooser = do
           gs <- State.get
           case battlefieldMatching legal resolving controller source gs filter_ of
             [] -> pure []
             [only] -> pure [only]
-            first : second : more -> case playerRefPlayers legal controller gs chooser of
-              [asked] -> do
-                let offered = first NonEmpty.:| (second : more)
-                answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor asked gs) asked source offered)
-                pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-              _ -> pure []
+            first : second : more -> do
+              asked <- askedChooser source controller legal chooser
+              case asked of
+                Just who -> do
+                  let offered = first NonEmpty.:| (second : more)
+                  answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor who gs) who source offered)
+                  pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+                Nothing -> pure []
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
