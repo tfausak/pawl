@@ -165,6 +165,9 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   -- CR 113.6g: Counterable is the absence of a card stating it can't be
   -- countered.
   counterability <- Fields.defaulted "counterability" Counterability.Type.Counterable Counterability.codec Face.counterability
+  -- CR 903.3a: False is the absence of a card stating it can be your
+  -- commander.
+  canBeYourCommander <- Fields.defaulted "canBeYourCommander" False Common.boolean Face.canBeYourCommander
   pure
     Face.MkFace
       { Face.name = name,
@@ -211,5 +214,6 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
         Face.mulliganActions = mulliganActions,
         Face.openingHandActions = openingHandActions,
         Face.specialActions = specialActions,
-        Face.counterability = counterability
+        Face.counterability = counterability,
+        Face.canBeYourCommander = canBeYourCommander
       }

@@ -110,6 +110,7 @@ faceDownFace listed =
       Face.loyalty = Nothing,
       Face.defense = Nothing,
       Face.vanguard = Nothing,
+      Face.canBeYourCommander = False,
       Face.keywords = Map.fromSet (const 1) (FaceDownCharacteristics.keywords listed),
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,

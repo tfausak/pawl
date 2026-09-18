@@ -134,6 +134,7 @@ baseFace =
       Face.loyalty = Nothing,
       Face.defense = Nothing,
       Face.vanguard = Nothing,
+      Face.canBeYourCommander = False,
       Face.keywords = Map.empty,
       Face.staticAbilities = [],
       Face.spell = minimalModal,
@@ -186,6 +187,7 @@ minimalFace =
       Face.loyalty = Nothing,
       Face.defense = Nothing,
       Face.vanguard = Nothing,
+      Face.canBeYourCommander = False,
       Face.keywords = Map.empty,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
@@ -678,6 +680,12 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
   Spec.it s "MkFace, a vanguard's printed modifiers" $ do
     v <- Common.assertJson s " {\"name\":\"Gerrard\",\"typeLine\":{\"types\":[{\"type\":\"Vanguard\"}]},\"vanguard\":{\"handModifier\":-4,\"lifeModifier\":0}} "
     Spec.assertEq s (Face.vanguard <$> decodeFace v) (Right (Just Vanguard.MkVanguard {Vanguard.handModifier = -4, Vanguard.lifeModifier = 0}))
+  -- CR 903.3a, here for the vanguard's reason: 'populatedFace' leaves this at its
+  -- default, so the True half needs a case of its own. The False half is
+  -- 'baseFace''s round trip, whose JSON carries no key at all.
+  Spec.it s "MkFace, CR 903.3a's can-be-your-commander ability" $ do
+    v <- Common.assertJson s " {\"name\":\"Freyalise\",\"typeLine\":{\"types\":[{\"type\":\"Planeswalker\"}]},\"canBeYourCommander\":true} "
+    Spec.assertEq s (Face.canBeYourCommander <$> decodeFace v) (Right True)
   -- Every field at once, including the recursive card-in-card ones that only
   -- Card itself ties the knot on.
   Spec.it s "MkFace, every field populated at once" $
