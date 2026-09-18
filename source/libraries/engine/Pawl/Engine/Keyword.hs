@@ -6354,6 +6354,13 @@ offspring cost = paidTokenCopies (Keyword.Offspring cost) (Quantity.Literal 1) [
 -- writes for the [something] -- CR 702.174e's card, so "the chosen player draws a
 -- card".
 --
+-- A REGRESSION FENCE rather than proved behaviour, unusually for an intervening
+-- "if": widening the comparison leaves Pawl.CastSpec's Gift group green, because
+-- the only thing the effect reads is the chosen player and that seat is empty in
+-- exactly the case rule 603.4 excludes. What would tell them apart is CR
+-- 702.174c's "whenever a player gives a gift", which watches the ability resolve
+-- (#3834).
+--
 -- The intervening "if" is CR 603.4's, evoke's and paidTokenCopies' reading:
 -- Quantity.TimesPaid reads Object.paidCosts, which CR 707.2 does not copy and CR
 -- 400.7 clears on every move but rule 400.7d's -- so a Clone of the permanent and

@@ -289,10 +289,10 @@ riderSlots riders =
         Nothing -> Map.empty
    in joinSlots [attacked, maybe Map.empty oneSlot (EntryRiders.blocking riders), maybe Map.empty oneSlot (EntryRiders.attachedTo riders)]
 
--- The slots a PlayerRef reads. Six arms name one: EachPlayerExcept,
--- EachOpponentExcept, InSlot, ControllerOfBound and Attacking at arity One,
--- EachInSlot at arity Many. The other four name none, and the arms below carry
--- the reason for each arity that is not self-evident.
+-- The slots a PlayerRef reads. EachPlayerExcept, EachOpponentExcept, InSlot,
+-- ControllerOfBound, ChosenPlayerOfBound and Attacking name one at arity One and
+-- EachInSlot names one at arity Many; the rest name none, and the arms below
+-- carry the reason for each arity that is not self-evident.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
