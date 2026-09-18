@@ -42,6 +42,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
+import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -677,7 +678,7 @@ effectObjectRefs effect = case effect of
   Effect.ExileHaunting {} -> []
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
-  Effect.ChooseOpponentAtRandom {} -> []
+  Effect.ChoosePlayerAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
@@ -829,7 +830,7 @@ effectPlayerRefs effect = case effect of
   Effect.ExileHaunting {} -> []
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
-  Effect.ChooseOpponentAtRandom {} -> []
+  Effect.ChoosePlayerAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
@@ -1152,7 +1153,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.PlaySubgame _ -> Map.empty
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
   Effect.ChoosePlayer _ -> Map.empty
-  Effect.ChooseOpponentAtRandom _ -> Map.empty
+  Effect.ChoosePlayerAtRandom _ -> Map.empty
   -- A DEFINITION for the result slot (boundSlots below), but CR 706.2's modifier
   -- is a READ: the instruction's own Quantity may name a slot an earlier effect
   -- of this same resolution bound, CR 608.2c following the list in written order.
@@ -1679,7 +1680,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.PlaySubgame _ -> True
   -- PlaySubgame's answer: a definition reads no slot.
   Effect.ChoosePlayer _ -> True
-  Effect.ChooseOpponentAtRandom _ -> True
+  Effect.ChoosePlayerAtRandom _ -> True
   Effect.RollDie rollDie -> Quantity.slotsAreExhaustive (RollDie.count rollDie) && all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> Quantity.slotsAreExhaustive (FlipCoin.count flipCoin)
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
@@ -1859,7 +1860,7 @@ readsX =
         Effect.AttachBound {} -> False
         Effect.PlaySubgame _ -> False
         Effect.ChoosePlayer _ -> False
-        Effect.ChooseOpponentAtRandom _ -> False
+        Effect.ChoosePlayerAtRandom _ -> False
         -- CR 706.2's modifier and CR 706.1's count are ordinary Quantities, so
         -- either may be the X the caster announced (CR 601.2b; Neverwinter
         -- Hydra's "roll X dice").
@@ -1901,7 +1902,7 @@ boundSlots effect = case effect of
   Effect.PlaySubgame slot -> Set.singleton slot
   -- CR 608.2d: the player this effect chose.
   Effect.ChoosePlayer choice -> Set.singleton (ChoosePlayer.slot choice)
-  Effect.ChooseOpponentAtRandom slot -> Set.singleton slot
+  Effect.ChoosePlayerAtRandom choice -> Set.singleton (ChoosePlayerAtRandom.slot choice)
   -- CR 706.4: the result the roller used, and, where the card reads it, the
   -- other result of the same instruction, for a later effect of this resolution
   -- to read as Quantity.InSlot.

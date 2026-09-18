@@ -44,6 +44,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Activator as Activator
@@ -4283,6 +4284,106 @@ selfSpec s registry = Spec.describe s "CR 201.5 a resolving spell naming itself"
       (length (Game.zoneMembers Zone.Graveyard S.bob afterOriginal), length (Game.zoneMembers Zone.Graveyard S.alice afterOriginal))
       (1, 0)
 
+-- Strax, Sontaran Nurse {3}{R}{G} Legendary Creature -- Alien Cleric 5/5 (Doctor
+-- Who, Oracle text fetched from Scryfall 2026-09-17): "Vigilance, trample /
+-- Grenades! -- {2}, {T}, Sacrifice an artifact: Choose a player at random. When
+-- you do, Strax fights another target creature that player controls. / Glory of
+-- Battle -- Whenever Strax deals damage to a creature, put a +1/+1 counter on
+-- Strax."
+--
+-- The pool's first "choose a player at random" (CR 608.2d), and what
+-- Effect.ChoosePlayerAtRandom's PlayerScope is for: PlayerScope.EachPlayer puts
+-- the resolving controller in the offer, where Ruhan of the Fomori's
+-- PlayerScope.Opponents leaves them out. Pawl.CombatCostSpec's RandomPlayer
+-- group is that other half, and asserts the offer holds both opponents and not
+-- alice; this one asserts the same prompt holds all three seats.
+--
+-- THREE SEATS, each controlling one creature, so no seat in the offer is one the
+-- fight could not reach and the three readings of "that player" are distinct.
+--
+-- Not implemented: "Glory of Battle", pawl having no trigger condition for a
+-- creature dealing damage to a creature (#3821). The omission leaves pawl's
+-- Strax stricter than printed -- it never grows.
+--
+-- Not implemented: the "when you do" half never arms, because
+-- Pawl.Engine.Resolve.Effect.applyClauseEffects reads CR 603.12's "happened" off
+-- the event log and a slot bind records no event (#3165). So the fight does not
+-- happen here and the bind is unobservable on the board; the offer below is what
+-- this card proves. Strax is that issue's first producer in the pool -- with the
+-- gate lifted by hand the whole chain runs, alice's own creature dying to Strax's
+-- five and Strax taking its one.
+straxSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+straxSpec s registry =
+  let build strax thumb mountain maiden piker giant =
+        let g0 = Setup.emptyGame S.threePlayers
+            (straxId, g1) = S.addPermanent strax S.alice g0
+            (_, g2) = S.addPermanent maiden S.alice g1
+            (_, g3) = S.addPermanent thumb S.alice g2
+            (_, g4) = S.addPermanent mountain S.alice g3
+            (_, g5) = S.addPermanent mountain S.alice g4
+            (_, g6) = S.addPermanent piker S.bob g5
+            (_, g7) = S.addPermanent giant S.carol g6
+         in ( straxId,
+              g7
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      staged = do
+        strax <- S.printingOf s registry "Strax, Sontaran Nurse"
+        thumb <- S.printingOf s registry "Krark's Thumb"
+        mountain <- S.printingOf s registry "Mountain"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Hill Giant"
+        pure (Face.activatedAbilities (S.combinedFace strax), build strax thumb mountain maiden piker giant)
+   in Spec.describe s "Strax" $ do
+        -- THE GAMEPLAY ASSERTION. Recorded off the prompt, since the candidate
+        -- list is not readable off the resulting board -- the engine offers and
+        -- filters back rather than rolling, so WHAT it offered is the part of
+        -- that posture a test can see. PlayerScope.Opponents in the card's place
+        -- offers [bob, carol] and reddens the equality.
+        Spec.it s "CR 109.5 the offer is every player, alice included, and not only her opponents" $ do
+          (abilities, (straxId, gs)) <- staged
+          case abilities of
+            [] -> Spec.assertFailure s "Strax should print an activated ability"
+            ability : _ -> do
+              let logging :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+                  logging p = case p of
+                    Prompt.RandomPlayer offered -> do
+                      State.modify' (NonEmpty.toList offered :)
+                      pure (straxAnswer straxId ability S.alice p)
+                    _ -> pure (straxAnswer straxId ability S.alice p)
+                  ((_, after), offers) = State.runState (Engine.runGame logging gs Engine.priorityLoop) []
+              Spec.assertEqWith s "asked once, offering all three seats with alice among them" (reverse offers) [[S.alice, S.bob, S.carol]]
+              -- Supporting, and LAST so it cannot absorb a mutation the equality
+              -- above should catch: the ability really was activated, so the
+              -- equality is not passing on a board where the prompt was never
+              -- raised.
+              Spec.assertEqWith s "CR 602.2b Strax paid its own {T}" (fmap Object.tapped (Game.lookupObject straxId after)) (Just TapState.Tapped)
+
+-- Activates Strax's "Grenades!" whenever it is offered, pinning WHICH seat
+-- randomness names. STATELESS, unlike Pawl.CombatEffectSpec's mazeAnswer: this
+-- ability's cost taps its own source, so it is offered exactly once and the
+-- priority loop terminates without a flag to say it has been taken.
+--
+-- The seat is FILTERED out of the offered candidates rather than built, so an
+-- answer the engine never offered cannot slip through, and a seat outside the
+-- offer falls back to its head.
+straxAnswer ::
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
+  PlayerId.PlayerId ->
+  Prompt.Prompt r ->
+  r
+straxAnswer straxId ability who p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    if elem (A.Activate straxId ability) actions then A.Activate straxId ability else A.Pass
+  Prompt.RandomPlayer offered ->
+    Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
@@ -4292,3 +4393,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   crabSpec s registry
   snagSpec s registry
   selfSpec s registry
+  straxSpec s registry

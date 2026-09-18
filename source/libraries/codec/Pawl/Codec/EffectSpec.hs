@@ -33,6 +33,7 @@ import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
+import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Color as Color
@@ -1880,13 +1881,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer PlayerScope.EachPlayer (SlotName.MkSlotName (Text.pack "chosen"))))
       " {\"type\":\"ChoosePlayer\",\"value\":{\"scope\":{\"type\":\"EachPlayer\"},\"slot\":\"chosen\"}} "
-  Spec.it s "ChooseOpponentAtRandom" $
+  Spec.it s "ChoosePlayerAtRandom" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChooseOpponentAtRandom (SlotName.MkSlotName (Text.pack "opponent")))
-      " {\"type\":\"ChooseOpponentAtRandom\",\"value\":\"opponent\"} "
+      (Effect.ChoosePlayerAtRandom (ChoosePlayerAtRandom.MkChoosePlayerAtRandom PlayerScope.Opponents (SlotName.MkSlotName (Text.pack "opponent"))))
+      " {\"type\":\"ChoosePlayerAtRandom\",\"value\":{\"scope\":{\"type\":\"Opponents\"},\"slot\":\"opponent\"}} "
   Spec.it s "RollDie" $
     Common.assertJsonCodec
       s

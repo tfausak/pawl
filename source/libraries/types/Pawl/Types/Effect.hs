@@ -12,6 +12,7 @@ import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
+import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
@@ -559,12 +560,10 @@ data Effect card ability
     -- Vendors' "choose a player". Choose, not target; elided at one candidate.
     ChoosePlayer ChoosePlayer.ChoosePlayer
   | -- | ChoosePlayer's twin with the decision replaced by randomness (Ruhan of
-    -- the Fomori), so Prompt's RandomOpponent carries no Decider. Elided at one
-    -- candidate, CR 102.2 leaving a two-player game exactly one opponent.
-    --
-    -- Not implemented: a scope beside this slot, so "choose a player at random"
-    -- (Scrambleverse, Wildfire Devils) has no spelling (#3230).
-    ChooseOpponentAtRandom SlotName.SlotName
+    -- the Fomori's "choose an opponent at random", Strax, Sontaran Nurse's
+    -- "choose a player at random"), so Prompt's RandomPlayer carries no Decider.
+    -- Elided at one candidate.
+    ChoosePlayerAtRandom ChoosePlayerAtRandom.ChoosePlayerAtRandom
   | -- | CR 706.1: roll dice of the stated kind and number, and bind the result
     -- as an amount at the payload's slot for a later effect to read as
     -- Quantity.InSlot (Ancient Copper Dragon, Valiant Endeavor).

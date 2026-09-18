@@ -65,15 +65,15 @@ data Response
     -- is the whole point -- a transcript of a player DECIDING must not satisfy a
     -- prompt that asked randomness, which is CR 701.9b's distinction.
     SelectedAtRandom ObjectId.ObjectId
-  | -- | The opponent randomness named for a
-    -- Pawl.Types.Effect.ChooseOpponentAtRandom (Ruhan of the Fomori's "choose an
-    -- opponent at random").
+  | -- | The player randomness named for a
+    -- Pawl.Types.Effect.ChoosePlayerAtRandom (Ruhan of the Fomori's "choose an
+    -- opponent at random", Strax, Sontaran Nurse's "choose a player at random").
     --
-    -- Its own constructor rather than ChoseOpponent reused, though both name one
-    -- opponent: this type's rule at the top, and here the difference is the whole
+    -- Its own constructor rather than ChosePlayer reused, though both name one
+    -- player: this type's rule at the top, and here the difference is the whole
     -- point -- a transcript of a player DECIDING must not satisfy a prompt that
     -- asked randomness, which is CR 701.9b's distinction.
-    SelectedOpponentAtRandom PlayerId.PlayerId
+    SelectedPlayerAtRandom PlayerId.PlayerId
   | -- | The card randomness named out of a printed spellbook (Tome of the
     -- Infinite's "conjure a random card from Tome of the Infinite's
     -- spellbook").

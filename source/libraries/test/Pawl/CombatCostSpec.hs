@@ -2430,8 +2430,8 @@ conditionalAttackRequirementSpec s registry = Spec.describe s "ConditionalAttack
 -- An engine that rolled the head of the offer itself rather than honouring the
 -- answer collapses the pair onto the bob leg, and one that never landed the bind
 -- makes declining legal on both.
-randomOpponentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-randomOpponentSpec s registry = Spec.describe s "RandomOpponent" $ do
+randomPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+randomPlayerSpec s registry = Spec.describe s "RandomPlayer" $ do
   Spec.it s "CR 608.2d the opponent randomness named is the one the requirement makes Ruhan attack" $ do
     ruhan <- S.printingOf s registry "Ruhan of the Fomori"
     let (board, mine, _, _) = S.threePlayerCombat [ruhan] [] []
@@ -2486,7 +2486,7 @@ randomOpponentSpec s registry = Spec.describe s "RandomOpponent" $ do
     let (board, _, _, _) = S.threePlayerCombat [ruhan] [] []
         logging :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
         logging p = case p of
-          Prompt.RandomOpponent offered -> do
+          Prompt.RandomPlayer offered -> do
             State.modify' (NonEmpty.toList offered :)
             pure (ruhanAnswer S.carol p)
           _ -> pure (ruhanAnswer S.carol p)
@@ -2504,7 +2504,7 @@ randomOpponentSpec s registry = Spec.describe s "RandomOpponent" $ do
 -- turn-based action without a choice, and every opponent defends.
 ruhanAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 ruhanAnswer who p = case p of
-  Prompt.RandomOpponent offered ->
+  Prompt.RandomPlayer offered ->
     Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
   _ -> S.identityAnswer p
 
@@ -2706,7 +2706,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   mostLifeRequirementSpec s registry
   troveOfTemptationSpec s registry
   conditionalAttackRequirementSpec s registry
-  randomOpponentSpec s registry
+  randomPlayerSpec s registry
   declarationRetrySpec s registry
   blockCostSpec s registry
   exertSpec s registry

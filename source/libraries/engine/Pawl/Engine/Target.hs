@@ -1672,7 +1672,7 @@ piledOffer perspective gs =
 --
 -- Elided at one member and skipped at none, the posture the three randomness
 -- prompts over a candidate list take (Pawl.Engine.Resolve's RandomObject and
--- RandomOpponent, Pawl.Engine.Engine's RandomFirstPlayer): a one-card pile
+-- RandomPlayer, Pawl.Engine.Engine's RandomFirstPlayer): a one-card pile
 -- leaves nothing to draw, and CR 702.143e makes every foretold card such a
 -- pile. Filtered rather than trusted, so an answer naming a card outside the
 -- pile falls back to the first of them: an interpreter's answer is not a

@@ -340,7 +340,7 @@ ownQuantities effect = case effect of
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
-  Effect.ChooseOpponentAtRandom _ -> []
+  Effect.ChoosePlayerAtRandom _ -> []
   Effect.RollDie rollDie -> RollDie.count rollDie : Maybe.maybeToList (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
@@ -1319,7 +1319,7 @@ effectObjectRefs effect =
         Effect.Attach {} -> []
         Effect.PlaySubgame {} -> []
         Effect.ChoosePlayer {} -> []
-        Effect.ChooseOpponentAtRandom {} -> []
+        Effect.ChoosePlayerAtRandom {} -> []
         Effect.RollDie {} -> []
         Effect.FlipCoin {} -> []
         Effect.TakeExtraTurn {} -> []
