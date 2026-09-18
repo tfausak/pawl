@@ -647,6 +647,15 @@ data Effect card ability
     -- Pawl.Engine.Learn.learn as one procedure. Nullary, rule 701.48a fixing
     -- everything but the learner's own choices.
     Learn
+  | -- | CR 701.58a: the players the PlayerRef names each cloak the top card of
+    -- their own library, performed by Pawl.Engine.Cloak.cloak as one procedure
+    -- (Ransom Note's "your library", Unexplained Absence's "its controller
+    -- cloaks the top card of their library").
+    --
+    -- Not implemented: a printing that has one player cloak from ANOTHER's
+    -- library, where CR 110.2a puts the permanent under the instructed player's
+    -- control rather than the library owner's (#3855).
+    Cloak PlayerRef.PlayerRef
   | -- | CR 701.49: the resolving controller ventures into the dungeon,
     -- performed by Pawl.Engine.Dungeon.venture. The payload is CR 701.49d's
     -- "[quality]", a CR 205.3p dungeon type rather than a Filter.

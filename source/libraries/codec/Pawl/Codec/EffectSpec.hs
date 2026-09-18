@@ -2071,6 +2071,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Learn
       " {\"type\":\"Learn\"} "
+  -- CR 701.58a: rule 701.58a fixes the listing and the card, so the payload is
+  -- the bare PlayerRef -- whose library the top card comes off.
+  Spec.it s "Cloak" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Cloak (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"Cloak\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 701.49: the plain keyword action, whose payload is absent -- rule 701.49
   -- fixes the venturer, and CR 701.49a lets the player choose from every dungeon
   -- card they own, leaving an author nothing to write.
