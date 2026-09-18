@@ -810,6 +810,7 @@ modificationCounts modification = case modification of
   Modification.AddSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.SetCardType _ -> []
+  Modification.LoseCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
   Modification.ChangeSubtypeWord {} -> []
@@ -3002,6 +3003,10 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Compleated -> []
+  -- CR 702.151a's payload is equip's: a COST, whose Filters are its components'.
+  -- The "another target creature you control" filter its minted ability carries
+  -- is the ENGINE's, never a card's.
+  Keyword.Reconfigure cost -> costFilters cost
   Keyword.ReadAhead -> []
   Keyword.Training -> []
   -- CR 702.100a is payload-free: the Filter its minted ability carries -- the
@@ -3523,6 +3528,7 @@ modificationFilters modification = case modification of
   Modification.AddSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.SetCardType _ -> []
+  Modification.LoseCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
   Modification.ChangeSubtypeWord {} -> []

@@ -235,7 +235,9 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 -- creature is the case only this one catches (CR 301.5c). That rule's reconfigure
 -- exception costs nothing here: CR 702.151b makes a reconfigure Equipment stop
 -- being a creature until it becomes unattached, so it never reaches this branch
--- (and no card in the pool has reconfigure). The two share an ACTION -- detach,
+-- -- which Pawl.AuraSpec's "CR 702.151b an attached Rabbit Battery is not a
+-- creature and stays attached" proves rather than asserts. The two share an
+-- ACTION -- detach,
 -- stay on the battlefield -- so performStateBasedActions ORs them into one list.
 --
 -- Read off the PROJECTED characteristics, which is the whole point: the card

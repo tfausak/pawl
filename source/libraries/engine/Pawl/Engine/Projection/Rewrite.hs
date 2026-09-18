@@ -275,6 +275,7 @@ rewriteModification pairs m =
         -- CR 205.4a's supertypes a third, so these hold no word a pair could name.
         Modification.AddCardType _ -> acc
         Modification.SetCardType _ -> acc
+        Modification.LoseCardType _ -> acc
         Modification.AddSupertype _ -> acc
         Modification.RemoveSupertype _ -> acc
         -- The two words of a STORED text change are its own resolution's choice

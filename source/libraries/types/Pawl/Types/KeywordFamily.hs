@@ -320,4 +320,7 @@ data KeywordFamily
   | -- | CR 702.180a: harmonize [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Harmonize
+  | -- | CR 702.151a: reconfigure [cost]. No card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Reconfigure
   deriving (Bounded, Enum, Eq, Ord, Show)

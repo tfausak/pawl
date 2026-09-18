@@ -289,14 +289,23 @@ data Modification ability
     -- crew is written that way in Pawl.Engine.Keyword.
     --
     -- Gliding Licid stops being a Creature by becoming an Enchantment, which is
-    -- this arm and not a removal.
-    --
-    -- Not implemented: a REMOVAL arm, which Luxior, Giada's Gift wants --
-    -- "equipped permanent isn't a planeswalker and is a creature in addition to
-    -- its other types" takes one card type away and ADDS another, where this arm
-    -- would replace every type the object had and AddCardType above removes none
-    -- (#2291).
+    -- this arm and not the removal below.
     SetCardType CardType.CardType
+  | -- | layer 4, CR 613.1d / 205.1a removal: this card type is taken away and no
+    -- other put in its place -- CR 702.151b's "attaching an Equipment with
+    -- reconfigure to another creature causes the Equipment to stop being a
+    -- creature". The third layer-4 card-type arm, and the only one that leaves
+    -- the object with FEWER types than it had: the set above replaces every
+    -- type, and the add above removes none.
+    --
+    -- CR 205.1a's own consequence for subtypes rides along, exactly as it does
+    -- on the set: a subtype correlated only with the removed card type goes with
+    -- it (an attached Rabbit Battery is no longer a Rabbit), and one correlated
+    -- with a card type the object still has stays (it is still an Equipment,
+    -- Equipment being an artifact type). Pawl.Engine.Projection.cardTypesAfter
+    -- threads the whole unit's answer into that check, so both arms ask one
+    -- predicate.
+    LoseCardType CardType.CardType
   | -- | layer 4, CR 613.1d / 205.4b: this object gains a supertype (Leyline of
     -- Singularity's "All nonland permanents are legendary"). An ADD and never a
     -- set, because CR 205.4b says so outright -- "when an object gains or loses a
