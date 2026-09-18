@@ -22,7 +22,7 @@
 -- an approximation, and it rests on a capability pawl lacks rather than on a
 -- claim about Magic -- Deck.vanguard is set by nothing but a Vanguard deck, and
 -- no rule pawl implements asks whether a game is a Vanguard game without also
--- naming the card (#175).
+-- naming the card.
 --
 -- All three of rule 902.7's limbs are done; the activated one is
 -- Pawl.Engine.Activate's command-zone arm, proved on Barrin in

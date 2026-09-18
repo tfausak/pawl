@@ -16,7 +16,7 @@ module Pawl.Types.AttackOption where
 --
 -- Not implemented: CR 809.3c's adjacent-seat restriction, which is neither of
 -- these -- either neighbour, chosen -- and arrives with the Emperor variant
--- (#175).
+-- (#2851).
 data AttackOption
   = -- | CR 802.1: every one of the attacking player's opponents is a defending
     -- player, so CR 507.1 chooses nobody.
