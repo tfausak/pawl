@@ -311,7 +311,11 @@ activatedAbilityOffends ability =
         if tapsForTotalPowerAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.tappedForTotalPower
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal]) (ActivatedAbility.modal ability)
+      exiled =
+        if exilesSelfAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.exiledCard
+          else Set.empty
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled]) (ActivatedAbility.modal ability)
 
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
@@ -349,6 +353,26 @@ tapsForTotalPowerAsCost =
         CostComponent.TapForTotalPower {} -> True
         _ -> False
    in any isThresholdTap . Cost.Type.components
+
+-- Does this cost EXILE the object it is on? sacrificesAsCost's shape, and the
+-- same reason: CR 601.2h's payment binds Binding.exiledCard (Cost.payComponent's
+-- ExileThis and ExileThisFromGraveyard arms, folded on by Activate), so CR
+-- 702.167a's "Return this card to the battlefield" is an ordinary slot read.
+--
+-- Both components, one question: they differ in the zone the object leaves (CR
+-- 113.6m, Cost.zoneFunctionedFrom) and not in what they bind, and no printing
+-- carries both.
+--
+-- Not offered on the CAST side (Pawl.CardSpec's cardOffends): no printing in
+-- `data/cards/` exiles the spell itself as an additional cost, so the exemption
+-- would fence nothing.
+exilesSelfAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+exilesSelfAsCost =
+  let isExile component = case component of
+        CostComponent.ExileThis -> True
+        CostComponent.ExileThisFromGraveyard -> True
+        _ -> False
+   in any isExile . Cost.Type.components
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
