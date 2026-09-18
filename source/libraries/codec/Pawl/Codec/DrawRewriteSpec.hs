@@ -31,4 +31,11 @@ spec s = Spec.describe s "Pawl.Codec.DrawRewrite" $ do
             }
       )
       " {\"type\":\"FromOutsideTheGame\",\"value\":{\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false}} "
+  -- CR 702.52a: Darkblast's dredge 3.
+  Spec.it s "Dredge" $
+    Common.assertCodec
+      s
+      DrawRewrite.codec
+      (DrawRewrite.Dredge 3)
+      " {\"type\":\"Dredge\",\"value\":3} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DrawRewrite.codec

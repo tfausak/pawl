@@ -106,6 +106,10 @@ data KeywordFamily
     -- Pawl.Types.ReduceActivationCost's @grantedBy@ rather than through a Filter;
     -- it is not in the pool yet, and the family is owed at the keyword.
     Ninjutsu
+  | -- | CR 702.52a: dredge N. The family "a card with dredge" would name, as
+    -- against dredge 3; no card in the pool asks yet, and it is owed at the
+    -- keyword rather than at the first asker.
+    Dredge
   | -- | CR 702.54a: bloodthirst N, and CR 702.54b's bloodthirst X with it -- the
     -- family is what "a creature with bloodthirst" names, which is the shape a
     -- card would ask in.

@@ -33,4 +33,19 @@ data DrawRewrite
     -- reason -- the producer's Pawl.Types.DrawR writes `whose` as Yours, so the
     -- two are one seat on it.
     FromOutsideTheGame FromOutsideTheGame.FromOutsideTheGame
+  | -- | CR 702.52a: dredge N -- "you may instead mill N cards and return this
+    -- card from your graveyard to your hand".
+    --
+    -- The card returned is the row's own SOURCE, so the arm carries only the
+    -- count: rule 702.52a says "this card", and the row is minted onto the card
+    -- in the graveyard (Pawl.Engine.Keyword.graveyardReplacementsOf).
+    --
+    -- The miller is the player the EVENT names, GainLife's seat above and for
+    -- its reason.
+    --
+    -- Rule 702.52a's "as long as you have at least N cards in your library" is
+    -- asked by Pawl.Engine.Replacement.applies rather than written here, which
+    -- is also rule 702.52b: a row that cannot mill N is not offered at all, so
+    -- CR 616.1's choice never sees it.
+    Dredge Natural.Natural
   deriving (Eq, Ord, Show)
