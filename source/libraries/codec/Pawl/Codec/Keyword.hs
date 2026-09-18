@@ -205,6 +205,7 @@ codec =
       Arm.nullary "JobSelect" Keyword.JobSelect,
       Arm.nullary "Tiered" Keyword.Tiered,
       Arm.nullary "Exert" Keyword.Exert,
+      Arm.nullary "Enlist" Keyword.Enlist,
       Arm.payload "Bestow" (Cost.codec codec) Keyword.Bestow (\x -> case x of Keyword.Bestow y -> Just y; _ -> Nothing),
       Arm.nullary "Station" Keyword.Station,
       Arm.payload "Mutate" (Cost.codec codec) Keyword.Mutate (\x -> case x of Keyword.Mutate y -> Just y; _ -> Nothing),
@@ -385,6 +386,7 @@ tagOf x = case x of
   Keyword.JobSelect {} -> "JobSelect"
   Keyword.Tiered {} -> "Tiered"
   Keyword.Exert {} -> "Exert"
+  Keyword.Enlist {} -> "Enlist"
   Keyword.Bestow {} -> "Bestow"
   Keyword.Station {} -> "Station"
   Keyword.Mutate {} -> "Mutate"

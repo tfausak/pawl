@@ -3953,7 +3953,7 @@ banewaspAfflictionSpec s registry =
 -- so a payload naming the reserved source slot would move nothing. The card
 -- names Binding.became instead, exactly as Screams from Within's does, and CR
 -- 603.7c is what carries it across the arming: the environment
--- Resolve.Effect.armDelayed captures is the dies trigger's OWN bindings, the
+-- Event.armDelayed captures is the dies trigger's OWN bindings, the
 -- `became` Event.eventBindings stamped among them, so the entry still names the
 -- graveyard card when the end step comes round.
 --

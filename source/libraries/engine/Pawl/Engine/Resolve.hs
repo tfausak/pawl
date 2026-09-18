@@ -31,7 +31,7 @@ import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, armDelayed, clauseIsImpossible, noSubgame, performManaAbility, targetSlotsOf)
+import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, clauseIsImpossible, noSubgame, performManaAbility, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, oneSlot, playerRefSlots, quantitySlots, slotBindings, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
@@ -538,7 +538,7 @@ applyEpic oid controller = do
     Monad.forM_ (Game.lookupObject oid gs) $ \obj ->
       let archived = obj {Object.bindings = Binding.setCopy (Keyword.Engine.withoutEpic (Event.copiedSnapshot oid gs)) (Object.bindings obj)}
        in State.modify' $ \g ->
-            armDelayed
+            Event.armDelayed
               Keyword.Engine.epicCopy
               oid
               controller
@@ -590,7 +590,7 @@ finishSpell oid face controller = do
     -- Rule 702.88a makes the delayed ability part of the SAME rewrite as the
     -- exile, so it is armed only where that rewrite is what moved the card.
     Monad.when (took reboundRow) $
-      State.modify' (armDelayed Keyword.Engine.reboundUpkeep newId controller (Map.singleton Keyword.Engine.reboundSlot (Binding.toObject newId)) Onset.Immediately Nothing)
+      State.modify' (Event.armDelayed Keyword.Engine.reboundUpkeep newId controller (Map.singleton Keyword.Engine.reboundSlot (Binding.toObject newId)) Onset.Immediately Nothing)
     -- CR 715.3d's "for as long as that card remains exiled, that player may play
     -- it", which is the same sentence as the exile it hangs off.
     Monad.when (took adventureRow) . State.modify' $ \gs ->

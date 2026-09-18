@@ -516,7 +516,7 @@ armBecame oid obj gs1 arrivals = do
   gs <- State.get
   let permanents = filter (\arrival -> fmap Object.zone (Game.lookupObject arrival gs) == Just Zone.Battlefield) (Foldable.toList arrivals)
       ability = Keyword.resolutionDelayedAbility (Object.castUsing obj) >>= Keyword.mintedDelayedAbility
-      arm delayed permanent = Resolve.armDelayed delayed oid (Resolve.spellController obj oid gs1) (Map.singleton Keyword.becameSlot (Binding.toObject permanent)) Onset.Immediately Nothing
+      arm delayed permanent = Event.armDelayed delayed oid (Resolve.spellController obj oid gs1) (Map.singleton Keyword.becameSlot (Binding.toObject permanent)) Onset.Immediately Nothing
   Foldable.for_ ability (\delayed -> State.modify' (\g -> List.foldl' (flip (arm delayed)) g permanents))
   -- CR 702.62a's last sentence, off the same record and at the same moment the
   -- delayed abilities above are armed: a spell cast for the cost suspend's third

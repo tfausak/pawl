@@ -222,7 +222,6 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
-import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
@@ -297,30 +296,6 @@ import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
-
--- CR 603.7a: create a delayed triggered ability, appended so it never fires on
--- an event that already happened. Every entry is built here: by
--- Effect.ArmDelayedTrigger's arm below, and by Pawl.Engine.Stack for CR
--- 702.109a's, CR 702.152a's and CR 702.185a's spell.
-armDelayed :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ObjectId -> PlayerId -> Map.Map SlotName Binding.Type.Binding -> Onset.Onset -> Maybe Expiry.Type.Expiry -> GameState -> GameState
-armDelayed ability source controller captured onset expiry gs =
-  let -- CR 603.7a's creation moment, from the same counter every other moment
-      -- comes from, so CR 701.27f can compare it against Object.turnedOverAt.
-      -- Minted here rather than reusing the resolving object's stamp: one
-      -- resolution can arm several entries, and each is created as its own
-      -- opcode runs.
-      (createdAt, gs1) = Game.freshTimestamp gs
-      entry =
-        DelayedTrigger.MkDelayedTrigger
-          { DelayedTrigger.ability = ability,
-            DelayedTrigger.source = source,
-            DelayedTrigger.controller = controller,
-            DelayedTrigger.bindings = captured,
-            DelayedTrigger.window = Event.armOnset onset,
-            DelayedTrigger.expiry = expiry,
-            DelayedTrigger.createdAt = createdAt
-          }
-   in gs1 {GameState.delayedTriggers = GameState.delayedTriggers gs1 Seq.|> entry}
 
 -- CR 603.7: the text an Effect.ArmDelayedTrigger's name resolves to, off the
 -- SOURCE's own card.
@@ -5666,7 +5641,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- the OUTER Maybe is the card printing no duration; the inner one is
             -- Expiry.arm reporting that a printed duration never STARTED (CR
             -- 611.2b).
-            State.put (armDelayed ability source controller captured onset (duration >>= \d -> Expiry.arm (Binding.playersIn legal) controller source d gs) gs)
+            State.put (Event.armDelayed ability source controller captured onset (duration >>= \d -> Expiry.arm (Binding.playersIn legal) controller source d gs) gs)
   Effect.Replace (Replace.MkReplace duration uses origin condition re) ->
     -- CR 614.3 / 615.3: install the floating replacement. Targetless and
     -- unprompted. CR 113.7: the SOURCE is this effect's source, which with the
