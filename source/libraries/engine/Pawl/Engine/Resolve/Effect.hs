@@ -1708,8 +1708,9 @@ chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmon
 
 -- CR 701.20a / 701.9b: the cards randomness names out of each hand the ref
 -- reaches, paired with the seat whose hand it is. The ONE asking read of
--- ObjectRef.RandomCardInHand, shared by Effect.Reveal (Fall) and Effect.Discard
--- (Hymn to Tourach), so the two cannot ask differently.
+-- ObjectRef.RandomCardInHand, shared by Effect.Reveal (Fall), Effect.Discard
+-- (Hymn to Tourach) and Effect.MoveToZone's gather (Elkin Lair), so no two of
+-- them can ask differently.
 --
 -- The question goes to the INTERPRETER: the engine does not roll and no player
 -- picks. Filtered rather than trusted, so an answer naming a card never offered
@@ -3970,10 +3971,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 members <- fromAmongMembers legal resolving chosen slot
                 gs <- State.get
                 pure (matchingFromAmong legal resolving controller source gs filter_ members)
-              -- Not implemented: a card moved at random out of a hand. Nothing
-              -- asks randomCardsInHand here, so a card writing the ref under this
-              -- opcode names no object (#3629).
-              ObjectRef.RandomCardInHand _ -> pure []
+              -- CR 701.20a's asking read, the third site to make it after
+              -- Effect.Reveal and Effect.Discard: Elkin Lair's "that player
+              -- exiles a card at random from their hand". randomCardsInHand and
+              -- not a roll here, so the three sites cannot ask differently --
+              -- the seats it asks are the ref's own (the hand's owner, not this
+              -- controller), in APNAP order, off the pre-move state (CR 608.2c).
+              --
+              -- The seat each card came from is dropped, the move filing the
+              -- arrival under Object.owner (CR 400.3) as every sibling arm's
+              -- does.
+              ObjectRef.RandomCardInHand random -> fmap (fmap snd) (randomCardsInHand resolving source controller legal random)
               -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
               -- you control", announced while the effect is applied and so asked
               -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
@@ -4503,7 +4511,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case ref of
       -- A QUESTION rather than a read, so it is answered here, by
       -- randomCardsInHand -- the one asking read of the ref, shared with the
-      -- Discard arm.
+      -- Discard arm and with Effect.MoveToZone's gather.
       ObjectRef.RandomCardInHand random -> do
         -- Every card named across every seat, so the binding below sees one group
         -- rather than one write per seat -- Fall reads it back with an
