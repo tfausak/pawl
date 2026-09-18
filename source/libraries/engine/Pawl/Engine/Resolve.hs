@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -396,6 +397,12 @@ resolveSpellWith runSubgame oid = do
               then Event.changeZone oid Zone.Graveyard
               else do
                 let effectController = spellController obj oid gs
+                -- CR 702.131a's spell ability, FIRST: ascend is printed above the
+                -- card's other text, and CR 608.2c follows a spell's instructions
+                -- in printed order -- Secrets of the Golden City's "if you have
+                -- the city's blessing, draw three cards instead" reads the mark
+                -- this line may just have granted.
+                PlayerDesignation.ascendOnSpellResolution oid effectController
                 Monad.forM_ (modesOf oid gs) $ \(mi, mode) -> withDefinedSlots oid mi mode $ do
                   let idx = ModeInstance.index mi
                       -- CR 608.2c's printed order, and the lookup CR 608.2d's

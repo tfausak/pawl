@@ -1,5 +1,5 @@
 -- | CR 702.131 ascend and CR 702.195 storied: two keywords whose whole content is
--- a rest-of-game mark on a PLAYER, and the continuous check that grants each.
+-- a rest-of-game mark on a PLAYER, and the checks that grant each.
 --
 -- Pawl.Engine.Speed's sibling, and for its reason: rule 702 states these
 -- abilities in the rulebook, so casing on Keyword.Ascend and Keyword.Storied here
@@ -15,17 +15,19 @@
 -- put the reapplication of continuous effects after the gain and before the
 -- trigger check, which is where performSettle's loop already puts it.
 --
--- Not implemented: CR 702.131a, ascend on an instant or sorcery, which is a SPELL
--- ability checked once as the spell resolves rather than a static one checked
--- continuously (#3508).
+-- CR 702.131a is the third check here, and the one that is NOT continuous:
+-- ascend on an instant or sorcery is a SPELL ability, performed once as the spell
+-- resolves (`ascendOnSpellResolution`, called from Pawl.Engine.Resolve).
 module Pawl.Engine.PlayerDesignation where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.CardType as CardType
@@ -69,7 +71,7 @@ settle = do
 -- deterministic.
 gaining :: Map ObjectId PC.ProjectedCharacteristics -> GameState -> [(PlayerId, PlayerDesignation.PlayerDesignation)]
 gaining pcs gs =
-  owed Keyword.Ascend PlayerDesignation.CitysBlessing 10 (const True)
+  owed Keyword.Ascend PlayerDesignation.CitysBlessing citysBlessingThreshold (const True)
     <> owed Keyword.Storied PlayerDesignation.EnduringStory 3 storyMaterial
   where
     battlefield = Set.toList (GameState.battlefield gs)
@@ -102,3 +104,47 @@ storyMaterial pc =
 grant :: PlayerId -> PlayerDesignation.PlayerDesignation -> GameState -> GameState
 grant pid mark gs =
   gs {GameState.players = Map.adjust (\p -> p {Player.designations = Set.insert mark (Player.designations p)}) pid (GameState.players gs)}
+
+-- | CR 702.131a, ascend's OTHER half: the spell ability an instant or sorcery
+-- with ascend performs as it resolves -- "if you control ten or more permanents
+-- and you don't have the city's blessing, you get the city's blessing for the
+-- rest of the game".
+--
+-- A one-shot rather than `settle`'s standing check, which is the whole of what
+-- rule 702.131a differs from rule 702.131b by: reaching ten permanents later in
+-- the turn grants nothing, the spell having already resolved. Nothing loops on
+-- the result for that reason -- CR 702.131d's reapplication of continuous
+-- effects happens at the next CR 117.5 boundary, where Engine.performSettle
+-- already runs.
+--
+-- The keyword AND the card types are read off the projection rather than off the
+-- printed face, `gaining`'s reading of CR 613.1f and CR 613.1d: a spell granted
+-- ascend by a text-changing effect ascends and one whose text was blanked does
+-- not, and layer 4 is what says which card types the resolving object has.
+-- `Keyword.Engine.isSpellCard` is the same classification rule 702.55a's two
+-- halves are told apart by.
+--
+-- That type test is a REGRESSION FENCE rather than a proven behaviour: the only
+-- object it excludes is a resolving PERMANENT spell with ascend, and every board
+-- that has one hands `settle` the same mark an instant later, so no gameplay-level
+-- assertion can tell the two apart. Rule 702.131a's own wording is what it rests
+-- on.
+ascendOnSpellResolution :: ObjectId -> PlayerId -> Game ()
+ascendOnSpellResolution oid controller = do
+  gs <- State.get
+  let ascends =
+        Map.member Keyword.Ascend (Projection.keywordsOf oid gs)
+          && Keyword.Engine.isSpellCard (Projection.cardTypesOf oid gs)
+      -- "You don't have the city's blessing" is a guard the set-insert would not
+      -- need; it is here because rule 702.131a states it, and because a second
+      -- grant must stay unobservable.
+      unblessed = not (maybe False (Set.member PlayerDesignation.CitysBlessing . Player.designations) (Map.lookup controller (GameState.players gs)))
+  Monad.when (ascends && unblessed && controls gs >= citysBlessingThreshold) $
+    State.modify' (grant controller PlayerDesignation.CitysBlessing)
+  where
+    controls gs = length [() | oid' <- Set.toList (GameState.battlefield gs), Projection.controllerOf oid' gs == Just controller]
+
+-- | CR 702.131a's and CR 702.131b's shared "ten or more permanents". One constant
+-- so the spell half and the static half cannot drift apart.
+citysBlessingThreshold :: Int
+citysBlessingThreshold = 10
