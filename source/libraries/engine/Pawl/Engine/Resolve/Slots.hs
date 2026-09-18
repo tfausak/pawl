@@ -693,6 +693,8 @@ effectObjectRefs effect = case effect of
   Effect.Blight {} -> []
   -- CR 701.66a's "target land you control".
   Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> [ref]
+  -- CR 701.65a's "those objects".
+  Effect.Airbend ref -> [ref]
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Venture {} -> []
@@ -846,6 +848,8 @@ effectPlayerRefs effect = case effect of
   Effect.Blight (Blight.Type.MkBlight ref _ _) -> [ref]
   -- Rule 701.66a reaches no player the card did not target.
   Effect.Earthbend {} -> []
+  -- Rule 701.65a names the owner of each exiled card, whom no slot can hold.
+  Effect.Airbend {} -> []
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Venture {} -> []
@@ -935,6 +939,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The count and the blighters; the slot is a DEFINITION, Amass's reason above.
   Effect.Blight (Blight.Type.MkBlight _ quantity _) -> quantitySlots quantity
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantitySlots quantity
+  Effect.Airbend {} -> Map.empty
   Effect.TemptWithTheRing -> Map.empty
   Effect.Forage -> Map.empty
   Effect.Venture {} -> Map.empty
@@ -1535,6 +1540,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Amass (Amass.Type.MkAmass quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.Blight (Blight.Type.MkBlight _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Airbend {} -> True
   Effect.TemptWithTheRing -> True
   Effect.Forage -> True
   Effect.Venture {} -> True
@@ -1757,6 +1763,7 @@ readsX =
         Effect.Amass (Amass.Type.MkAmass quantity _ _) -> Quantity.readsX quantity
         Effect.Blight (Blight.Type.MkBlight _ quantity _) -> Quantity.readsX quantity
         Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.readsX quantity
+        Effect.Airbend {} -> False
         Effect.TemptWithTheRing -> False
         Effect.Forage -> False
         Effect.Venture {} -> False
@@ -1967,6 +1974,9 @@ boundSlots effect = case effect of
   -- and reporting it would make every earthbending card fail Pawl.CardSpec's
   -- reserved-binding sweep.
   Effect.Earthbend _ -> Set.empty
+  -- Binding.airbentObjects is stamped by the MoveToZone Pawl.Engine.Airbend
+  -- mints, and is reserved for the same reason Binding.earthbentLand is.
+  Effect.Airbend _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
   Effect.Forage -> Set.empty
   Effect.Venture {} -> Set.empty

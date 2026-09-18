@@ -3,6 +3,7 @@
 module Pawl.Codec.ExilePlayPermission where
 
 import qualified Pawl.Codec.Expiry as Expiry
+import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.ManaSpending as ManaSpending
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayPermissionOrigin as PlayPermissionOrigin
@@ -13,7 +14,7 @@ import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 
 -- | Every axis 'Fields.required', because none of them has a default the rules
--- give: `spending` is CR 118.14's rider, `withoutPayingManaCost` is CR 118.9's,
+-- give: `spending` is CR 118.14's rider, `alternativeManaCost` is CR 118.9a's,
 -- and `origin` is CR 715.3d's own question -- a permission written without any
 -- of them would decode as a different permission rather than as an incomplete
 -- one. The type's haddock argues each field. Unlike
@@ -26,7 +27,7 @@ codec = Fields.object $ do
   source <- Fields.required "source" ObjectId.codec ExilePlayPermission.source
   expiry <- Fields.required "expiry" Expiry.codec ExilePlayPermission.expiry
   spending <- Fields.required "spending" ManaSpending.codec ExilePlayPermission.spending
-  withoutPayingManaCost <- Fields.required "withoutPayingManaCost" Common.boolean ExilePlayPermission.withoutPayingManaCost
+  alternativeManaCost <- Fields.required "alternativeManaCost" (Common.maybe ManaCost.codec) ExilePlayPermission.alternativeManaCost
   origin <- Fields.required "origin" PlayPermissionOrigin.codec ExilePlayPermission.origin
   pure
     ExilePlayPermission.MkExilePlayPermission
@@ -34,6 +35,6 @@ codec = Fields.object $ do
         ExilePlayPermission.source = source,
         ExilePlayPermission.expiry = expiry,
         ExilePlayPermission.spending = spending,
-        ExilePlayPermission.withoutPayingManaCost = withoutPayingManaCost,
+        ExilePlayPermission.alternativeManaCost = alternativeManaCost,
         ExilePlayPermission.origin = origin
       }

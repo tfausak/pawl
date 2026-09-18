@@ -614,6 +614,19 @@ departedPermanent = SlotName.MkSlotName (Text.pack "thatDepartedPermanent")
 earthbentLand :: SlotName
 earthbentLand = SlotName.MkSlotName (Text.pack "thatEarthbentLand")
 
+-- CR 701.65a: the reserved slot under which the objects an airbend exiled are
+-- bound -- "those objects", the subject of rule 701.65a's second sentence.
+-- Written by the MoveToZone Pawl.Engine.Airbend mints and read back by
+-- Pawl.Engine.Resolve.Effect's Airbend arm, which is the only reader: the
+-- permission that sentence states is stamped onto what the CR 400.7 funnel
+-- actually minted in exile, and nothing else can name those ids.
+--
+-- Reserved rather than the card's own slot name, earthbentLand's reason: the
+-- instruction lives in the engine (rule 701 being the rulebook's), so it cannot
+-- know what a card called its slot.
+airbentObjects :: SlotName
+airbentObjects = SlotName.MkSlotName (Text.pack "thoseAirbentObjects")
+
 -- CR 601.2i: the reserved slot under which a cast trigger's WATCHED SPELL is
 -- bound -- the printed "it" in Presence of the Master's "whenever a player casts
 -- an enchantment spell, counter it", and "that spell" wherever a card spells the
