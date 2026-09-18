@@ -33,9 +33,9 @@
 -- TURNING OVER and does not care what proposed it.
 --
 -- THE INVARIANT: rules 701.40, 701.58, 702.37 and 702.168 are part of the
--- rulebook, so
--- reading Keyword.Morph's cost or a FaceDownReason here is the same closed-half
--- act as reading a Phase. This module never asks which CARD is underneath.
+-- rulebook, so reading Keyword.Morph's cost or a FaceDownReason here is the
+-- same closed-half act as reading a Phase. This module never asks which CARD is
+-- underneath.
 module Pawl.Engine.FaceDown where
 
 import qualified Control.Monad as Monad
@@ -226,9 +226,8 @@ turnableFaceUp pid gs =
     pure (oid, procedure)
 
 -- CR 702.37e, CR 702.168d, CR 701.40b and CR 701.58b, in the order all four
--- rules share:
--- show all players what the procedure's cost is, pay it, then turn the permanent
--- face up. ONE function for all of them, because everything after the payment is
+-- rules share: show all players what the procedure's cost is, pay it, then turn
+-- the permanent face up. ONE function for all of them, because everything after the payment is
 -- the same game action -- the rules differ only in what they showed and what they
 -- charged, which is `costOf` and nothing else.
 --
@@ -288,11 +287,10 @@ turnFaceUp perform pid procedure oid = do
 --
 -- TWO conjuncts and both are the rules' own words. MANIFESTED OR CLOAKED, so the
 -- reason on the status is asked (CR 708.6) and a morph-cast permanent is not
--- covered; and
--- the CARD it is REPRESENTED BY is an instant or a sorcery, so the read goes
--- through Game.faceUpFaceOf for creatureCardCostOf's reason -- CR 708.2a has left the
--- permanent itself with no card type at all, so a projected read would answer
--- about the 2/2 rather than about the card.
+-- covered; and the CARD it is REPRESENTED BY is an instant or a sorcery, so the
+-- read goes through Game.faceUpFaceOf for creatureCardCostOf's reason -- CR
+-- 708.2a has left the permanent itself with no card type at all, so a projected
+-- read would answer about the 2/2 rather than about the card.
 --
 -- The REVEAL is not modelled, for the reason the procedures' showing is not:
 -- nothing in pawl hides a face-down permanent's card from a reader, so there is
