@@ -36,6 +36,7 @@ import qualified Pawl.Types.CastRepetition as CastRepetition
 import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
+import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
@@ -226,6 +227,10 @@ triggeredAbilitiesOf counts = concatMap (uncurry abilitiesFor) (Map.toAscList co
 abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
+  -- CR 702.72a states TWO triggered abilities, hence the `concat`; each
+  -- instance is its own pair, and CR 607.2k links the pair an instance mints
+  -- through the exile pile rather than through a slot.
+  Keyword.Champion quality -> concat (List.genericReplicate count (champion quality))
   -- TWO abilities per instance -- hence the `concat`: rule 702.45a's ability
   -- watches two events, and a TriggeredAbility carries one condition.
   Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
@@ -589,6 +594,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Champion _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -1079,6 +1085,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Champion _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -1693,6 +1700,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Champion _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -2312,6 +2320,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Champion _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -3860,6 +3869,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Champion _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -4192,6 +4202,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Champion _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -4477,6 +4488,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
+  Keyword.Champion _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -4668,6 +4680,7 @@ familyOf keyword = case keyword of
   Keyword.Fading _ -> Just KeywordFamily.Fading
   Keyword.Frenzy _ -> Just KeywordFamily.Frenzy
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
+  Keyword.Champion _ -> Just KeywordFamily.Champion
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Mobilize _ -> Just KeywordFamily.Mobilize
   Keyword.Firebending _ -> Just KeywordFamily.Firebending
@@ -8095,3 +8108,136 @@ modular =
 -- The slot rule 702.43a's one target is chosen into, mentorTarget's position.
 modularTarget :: SlotName.SlotName
 modularTarget = SlotName.MkSlotName (Text.pack "modularRecipient")
+
+-- CR 702.72a's pair, minted together because rule 702.72b links them (CR 607.2k):
+-- "When this permanent enters, sacrifice it unless you exile another [object] you
+-- control" and "When this permanent leaves the battlefield, return the exiled card
+-- to the battlefield under its owner's control."
+champion :: Filter Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+champion quality = [championEnters quality, championLeaves]
+
+-- CR 702.72a's FIRST ability, written as CR 118.12a rewrites an "unless": an
+-- optional exile, then a sacrifice for the case where it did not happen. Not a
+-- PayGate, which is the tree's usual carrier for that rule, because no
+-- Pawl.Types.CostComponent arm exiles a permanent and a cost binds nothing the
+-- linked second ability could name.
+--
+-- The sacrifice's CR 608.2c condition therefore reads the exile PILE rather than
+-- CR 118.12's answer to the "may", which differs only where something replaces
+-- the exile a willing controller announced -- stricter than printed there, the
+-- sacrifice happening when rule 118.12 would not have it. A quality nothing on
+-- the battlefield matches leaves that pile empty however the "may" is answered,
+-- so the sacrifice follows, which is what "unless" demands -- proved by
+-- Pawl.KeywordTriggerSpec's "CR 702.72a with no other Merfolk to exile the
+-- Prophet is sacrificed".
+--
+-- The Filter is the printed [object]; "another" is Not IsSource and "you
+-- control" is ControlledBy You (CR 109.5), both the rule's rather than the
+-- card's.
+championEnters :: Filter Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+championEnters quality =
+  let another =
+        Filter.And
+          [ quality,
+            Filter.ControlledBy PlayerRelation.You,
+            Filter.Not Filter.IsSource
+          ]
+      exile =
+        Clause.MkClause
+          Nothing
+          Nothing
+          Nothing
+          (Optionality.Optional (PlayerRef.Relative PlayerRelation.You))
+          Nothing
+          ( Seq.singleton
+              ( Effect.MoveToZone
+                  ( MoveToZone.MkMoveToZone
+                      (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent another (PlayerRef.Relative PlayerRelation.You)))
+                      Zone.Exile
+                      championRiders
+                      Nothing
+                      Nothing
+                      LibraryPlacement.defaultValue
+                      Nothing
+                  )
+              )
+          )
+      -- CR 607.2k's pile, counted: one per card this source exiled (CR 607.3), so
+      -- zero is "you did not exile". Read as this clause is APPLIED rather than
+      -- when the trigger resolved, which is what lets the clause before it flip
+      -- the answer.
+      nothingExiled =
+        Condition.Compares
+          ( Compares.MkCompares
+              (Quantity.AgainstCardsExiledWith (Quantity.Literal 1))
+              Comparison.AtMost
+              (Quantity.Literal 0)
+          )
+      sacrifice =
+        Clause.MkClause
+          Nothing
+          (Just nothingExiled)
+          Nothing
+          Optionality.Mandatory
+          Nothing
+          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController}))
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.fromList [exile, sacrifice]) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.72a's SECOND ability, Wormfang Crab's sentence written once for the
+-- keyword: the return names ObjectRef.EachCardExiledWithSource, which is CR
+-- 607.2k's link, and CR 702.72a's "under its owner's control" is the rider.
+championLeaves :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+championLeaves =
+  let clause =
+        Clause.MkClause
+          Nothing
+          Nothing
+          Nothing
+          Optionality.Mandatory
+          Nothing
+          ( Seq.singleton
+              ( Effect.MoveToZone
+                  ( MoveToZone.MkMoveToZone
+                      (ObjectRef.EachCardExiledWithSource Nothing)
+                      Zone.Battlefield
+                      championRiders {EntryRiders.underOwner = True}
+                      Nothing
+                      Nothing
+                      LibraryPlacement.defaultValue
+                      Nothing
+                  )
+              )
+          )
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfLeavesTheBattlefield,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The riders both halves of rule 702.72a write: nothing stated. The return
+-- overrides `underOwner`, CR 702.72a's "under its owner's control".
+championRiders :: EntryRiders.EntryRiders Quantity.Quantity
+championRiders =
+  EntryRiders.MkEntryRiders
+    { EntryRiders.tapped = TapState.Untapped,
+      EntryRiders.attacking = Nothing,
+      EntryRiders.blocking = Nothing,
+      EntryRiders.transformed = False,
+      EntryRiders.counters = Map.empty,
+      EntryRiders.underOwner = False,
+      EntryRiders.exiledFaceDown = False,
+      EntryRiders.attachedTo = Nothing,
+      EntryRiders.faceDown = Nothing
+    }

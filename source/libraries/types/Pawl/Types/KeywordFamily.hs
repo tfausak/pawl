@@ -124,6 +124,10 @@ data KeywordFamily
     Frenzy
   | -- | CR 702.70a: poisonous N.
     Poisonous
+  | -- | CR 702.72a: champion an [object]. The family a card writing "a creature
+    -- with champion" names, as against champion a Merfolk; no card in the pool
+    -- asks yet, and it is owed at the keyword rather than at the first asker.
+    Champion
   | -- | CR 702.74a: evoke [cost]; the family Quantity.CastUsing names.
     Evoke
   | -- | CR 702.75a: hideaway N. The family a card writing "a permanent with

@@ -2443,6 +2443,11 @@ rewriteKeyword pairs keyword = case keyword of
   -- the bonus is in the ability Pawl.Engine.Keyword.frenzy mints.
   Keyword.Type.Frenzy _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
+  -- CR 702.72a's [object] is a printed word, so CR 612.2 swaps inside it: under
+  -- "Merfolk becomes Goblin" Wanderwine Prophets champions a Goblin, and the
+  -- entry ability Pawl.Engine.Keyword.championEnters mints reads the rewritten
+  -- quality.
+  Keyword.Type.Champion quality -> Keyword.Type.Champion (rewrite pairs quality)
   Keyword.Type.Renown _ -> keyword
   -- CR 702.85a is payload-free, so CR 612.2 has nothing to swap; the walk's
   -- nonland filter is in the ability Pawl.Engine.Keyword.cascade mints.

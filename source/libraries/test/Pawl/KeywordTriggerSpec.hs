@@ -19,6 +19,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -2910,6 +2911,106 @@ exploitSpec s registry =
           Spec.assertEqWith s "and alice gained nothing" (S.lifeOf S.alice after) (Just 20)
           Spec.assertBool s (S.onBattlefield giantId after) "CR 702.110a the Hill Giant stayed on the battlefield"
 
+-- CR 702.72 champion, whose rule is a PAIR of triggered abilities linked through
+-- the exile pile (CR 702.72b, CR 607.2k): "When this permanent enters, sacrifice
+-- it unless you exile another [object] you control" and "When this permanent
+-- leaves the battlefield, return the exiled card to the battlefield under its
+-- owner's control."
+--
+-- Wanderwine Prophets {4}{U}{U} Creature -- Merfolk Wizard 4\/4 is the printing,
+-- "Champion a Merfolk" plus a combat-damage trigger that trades a Merfolk for an
+-- extra turn. Only the champion half is driven here; the extra turn is the card's
+-- own printed text and not rule 702.72's.
+--
+-- TWO BOARDS DIFFERING IN THE QUALITY ALONE: alice controls a Goblin Piker and
+-- two more creatures, which are Merfolk on one board and not on the other. The
+-- Piker is on both, so "the Piker was not exiled" is what says the [object]
+-- filter narrowed rather than the entry ability exiling whatever it found.
+--
+-- The champion'd Merfolk is BOB's card under alice's control, so rule 702.72a's
+-- "under its owner's control" cannot collapse onto the controller that exiled it.
+championSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+championSpec s registry =
+  let prophetsName = CardName.MkCardName $ Text.pack "Wanderwine Prophets"
+      abolisherName = CardName.MkCardName $ Text.pack "Razorfin Abolisher"
+      pikerName = CardName.MkCardName $ Text.pack "Goblin Piker"
+      -- Takes rule 702.72a's offer and exiles the NAMED candidate, which is the
+      -- second one offered -- a fixture taking the first would prove nothing
+      -- about which permanent the choice reached.
+      exiling :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      exiling victim p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChoosePermanent _ _ _ offered ->
+          Maybe.fromMaybe (NonEmpty.head offered) (List.find (== victim) (NonEmpty.toList offered))
+        _ -> S.identityAnswer p
+      -- alice's Goblin Piker, alice's `first`, and bob's `second` under alice's
+      -- control; the Prophets on the stack over them.
+      prophetsBoard first second = do
+        prophets <- S.printingOf s registry "Wanderwine Prophets"
+        piker <- S.printingOf s registry "Goblin Piker"
+        firstP <- S.printingOf s registry first
+        secondP <- S.printingOf s registry second
+        let base = Setup.emptyGame S.bothPlayers
+            (_, withPiker) = S.addPermanent piker S.alice base
+            (_, withFirst) = S.addPermanent firstP S.alice withPiker
+            (secondId, withSecond) = S.addPermanent secondP S.bob withFirst
+            lent = S.giveControl secondId S.alice withSecond
+            (spell, staged) = S.spellOnStack prophets S.alice lent
+        pure (spell, secondId, staged)
+      -- The spell resolves, rule 702.72a's entry trigger is placed (CR 603.3) and
+      -- resolves.
+      played :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      played answer staged =
+        S.runPure answer staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+      namesIn zone pid gs =
+        Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs)
+      battlefieldNamed name pid gs =
+        List.find (\oid -> fmap Face.name (Game.faceOf oid gs) == Just name) (Game.zoneMembers Zone.Battlefield pid gs)
+   in Spec.describe s "Champion" $ do
+        -- The proving case: the Merfolk alice named goes to exile and the Prophet
+        -- stays, which is rule 702.72a's "unless" taken.
+        Spec.it s "CR 702.72a exiling another Merfolk keeps the Prophet on the battlefield" $ do
+          (_, abolisherId, staged) <- prophetsBoard "Tidal Warrior" "Razorfin Abolisher"
+          let after = played (exiling abolisherId) staged
+          Spec.assertEqWith s "CR 702.72a the Prophet is on the battlefield" (S.countOnBattlefieldByName prophetsName S.alice after) 1
+          Spec.assertBool s (notElem prophetsName (namesIn Zone.Graveyard S.alice after)) "and not in the graveyard"
+          Spec.assertEqWith s "CR 702.72a the Merfolk alice named is in its owner's exile" (namesIn Zone.Exile S.bob after) [abolisherName]
+          Spec.assertBool s (Maybe.isNothing (battlefieldNamed abolisherName S.bob after)) "and off the battlefield"
+          -- The other Merfolk she did not name, and the Piker the [object] filter
+          -- never offered, both stay: one exile, and a narrowed one.
+          Spec.assertEqWith s "the Tidal Warrior she did not name stayed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Tidal Warrior")) S.alice after) 1
+          Spec.assertEqWith s "and the Goblin Piker, which is no Merfolk, stayed" (S.countOnBattlefieldByName pikerName S.alice after) 1
+        -- THE PAIR. The same board with the two companions' creature types
+        -- changed and nothing else: with no other Merfolk there is nothing to
+        -- exile, so rule 702.72a's sacrifice is what happens.
+        Spec.it s "CR 702.72a with no other Merfolk to exile the Prophet is sacrificed" $ do
+          (_, wolvesId, staged) <- prophetsBoard "Hill Giant" "Russet Wolves"
+          let after = played (exiling wolvesId) staged
+          Spec.assertEqWith s "CR 702.72a the Prophet is in its owner's graveyard" (filter (== prophetsName) (namesIn Zone.Graveyard S.alice after)) [prophetsName]
+          Spec.assertEqWith s "and not on the battlefield" (S.countOnBattlefieldByName prophetsName S.alice after) 0
+          Spec.assertEqWith s "CR 702.72a nothing was exiled" (namesIn Zone.Exile S.bob after) []
+          Spec.assertEqWith s "the Russet Wolves alice would have exiled stayed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.bob after) 1
+          Spec.assertEqWith s "and so did the Goblin Piker" (S.countOnBattlefieldByName pikerName S.alice after) 1
+        -- Rule 702.72a's SECOND ability, off the first's board: the Prophet dies
+        -- and the linked pile empties back onto the battlefield -- under BOB's
+        -- control, he owning the card alice championed.
+        Spec.it s "CR 702.72a the Prophet leaving returns the exiled card under its owner's control" $ do
+          (_, abolisherId, staged) <- prophetsBoard "Tidal Warrior" "Razorfin Abolisher"
+          let championed = played (exiling abolisherId) staged
+          case battlefieldNamed prophetsName S.alice championed of
+            Nothing -> Spec.assertFailure s "the Prophet did not reach the battlefield"
+            Just prophetId -> do
+              let after =
+                    S.runPure
+                      S.identityAnswer
+                      championed
+                      (Event.changeZone prophetId Zone.Graveyard >> Engine.settleForPriority >> Stack.resolveTop)
+              case battlefieldNamed abolisherName S.bob after of
+                Nothing -> Spec.assertFailure s "CR 702.72a the championed Merfolk did not return to the battlefield"
+                Just returned ->
+                  Spec.assertEqWith s "CR 702.72a it returned under its OWNER's control, not alice's" (Projection.View.controllerOf returned after) (Just S.bob)
+              Spec.assertEqWith s "and the exile pile is empty" (namesIn Zone.Exile S.bob after) []
+
 -- CR 702.101a: "Extort is a triggered ability. 'Extort' means 'Whenever you cast
 -- a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you gain
 -- life equal to the total life lost this way.'"
@@ -3120,6 +3221,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   conspireSpec s registry
   echoSpec s registry
   exploitSpec s registry
+  championSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry

@@ -328,6 +328,17 @@ data Keyword
     -- player gets N poison counters; the Ns are not summed, each instance
     -- triggering separately (CR 702.70b).
     Poisonous Natural.Natural
+  | -- | 702.72a: "champion an [object]" -- two triggered abilities, minted by
+    -- Pawl.Engine.Keyword.abilitiesFor. The Filter is the [object] alone;
+    -- "another" and "you control" are the rule's own and are written into the
+    -- entry ability, Affinity's split. Rule 702.72b links the pair through the
+    -- exile pile (CR 607.2k), which is why the return names
+    -- ObjectRef.EachCardExiledWithSource rather than a slot of its own.
+    --
+    -- Not implemented: CR 702.72c's "championed by", which no trigger can watch
+    -- -- Mistbind Clique's "When a Faerie is championed with this creature"
+    -- (#3825).
+    Champion (Filter.Filter Keyword)
   | -- | 702.73a: "This object is every creature type." A characteristic-defining
     -- ability (CR 604.3) landing in layer 4.
     Changeling

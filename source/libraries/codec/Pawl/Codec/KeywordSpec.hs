@@ -774,6 +774,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Poisonous 3) /= Codec.encode Keyword.codec (Keyword.Toxic 3))
       "poisonous 3 is not toxic 3"
+  -- CR 702.72a's [object] rides on the wire as a Filter, affinity's shape: the
+  -- printed qualities are creature types (Wanderwine Prophets' Merfolk) but rule
+  -- 702.72a fixes no shape, so the criterion cannot flatten to a subtype.
+  Spec.it s "Champion carries its quality" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Champion (Filter.HasSubtype Subtype.Merfolk))
+      " {\"type\":\"Champion\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Merfolk\"}}} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Champion (Filter.HasSubtype Subtype.Merfolk)) /= Codec.encode Keyword.codec (Keyword.Champion (Filter.HasSubtype Subtype.Island)))
+      "champion a Merfolk and champion an Island encode differently"
   -- CR 702.112a's N is written like every other keyword's, so the TAG is what
   -- keeps them apart: `Renown 2` and `Poisonous 2` differ only by it on the wire.
   Spec.it s "Renown carries its N" $ do
