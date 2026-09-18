@@ -68,6 +68,7 @@ import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
+import qualified Pawl.Types.Binding as Binding.Type
 import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
@@ -113,6 +114,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventGroup as EventGroup
+import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
@@ -196,6 +198,7 @@ import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.Transformed as Transformed
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
@@ -7943,6 +7946,31 @@ controllerTurnScoped cond = case cond of
   -- it fires on whatever turn the ability that created it resolved on, which for
   -- an instant-speed creator is an opponent's as readily as its controller's.
   TriggerCondition.Reflexive -> False
+
+-- CR 603.7a: create a delayed triggered ability, appended so it never fires on
+-- an event that already happened. Every entry is built here: by
+-- Pawl.Engine.Resolve.Effect for Effect.ArmDelayedTrigger, by Pawl.Engine.Stack
+-- for CR 702.109a's, CR 702.152a's and CR 702.185a's spell, and by
+-- Pawl.Engine.Combat for CR 702.154a's reflexive ability at rule 508.1g.
+armDelayed :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> ObjectId -> PlayerId -> Map.Map SlotName.SlotName Binding.Type.Binding -> Onset -> Maybe Expiry.Type.Expiry -> GameState -> GameState
+armDelayed ability source controller captured onset expiry gs =
+  let -- CR 603.7a's creation moment, from the same counter every other moment
+      -- comes from, so CR 701.27f can compare it against Object.turnedOverAt.
+      -- Minted here rather than reusing the resolving object's stamp: one
+      -- resolution can arm several entries, and each is created as its own
+      -- opcode runs.
+      (createdAt, gs1) = Game.freshTimestamp gs
+      entry =
+        DelayedTrigger.MkDelayedTrigger
+          { DelayedTrigger.ability = ability,
+            DelayedTrigger.source = source,
+            DelayedTrigger.controller = controller,
+            DelayedTrigger.bindings = captured,
+            DelayedTrigger.window = armOnset onset,
+            DelayedTrigger.expiry = expiry,
+            DelayedTrigger.createdAt = createdAt
+          }
+   in gs1 {GameState.delayedTriggers = GameState.delayedTriggers gs1 Seq.|> entry}
 
 -- CR 603.7a: the printed Onset as the game first stores it. The delayed-trigger
 -- twin of Expiry.arm, deliberately blind to the board -- unlike a duration, an

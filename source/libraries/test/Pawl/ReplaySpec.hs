@@ -264,6 +264,16 @@ combatReplaySpec s =
           let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
               answer = Just (ObjectId.MkObjectId 7)
           Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+        -- CR 508.1g / 702.154a: the third Maybe-ObjectId prompt, and the one the
+        -- transcript must not confuse with ChooseCopyTarget above -- a shared
+        -- Response constructor would replay a declined copy as a declined enlist.
+        Spec.it s "ChooseEnlist records and replays a Maybe ObjectId, and rejects a copy target's answer" $ do
+          let p = Prompt.ChooseEnlist decider S.alice oid (NonEmpty.fromList [ObjectId.MkObjectId 8])
+              answer = Just (ObjectId.MkObjectId 8)
+              other = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 8]
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith s "declines" (Replay.defaultAnswer p) Nothing
+          Spec.assertEqWith s "a copy target's response does not answer it" (Replay.decode p (Replay.encode other answer)) Nothing
         -- CR 208.2b: Primal Plasma is in no deck, so no gameplay-level test
         -- reaches Response.ChoseEntryOption through the record/replay path --
         -- this exercises the transcript codec directly, matching the shape

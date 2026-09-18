@@ -2631,6 +2631,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseUnleash decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePayLifeOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseRevealOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseEnlist decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseColor decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseManaType decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCardName decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2760,6 +2761,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseUnleash {} -> "ChooseUnleash"
   Prompt.ChoosePayLifeOnEntry {} -> "ChoosePayLifeOnEntry"
   Prompt.ChooseRevealOnEntry {} -> "ChooseRevealOnEntry"
+  Prompt.ChooseEnlist {} -> "ChooseEnlist"
   Prompt.ChooseColor {} -> "ChooseColor"
   Prompt.ChooseManaType {} -> "ChooseManaType"
   Prompt.ChooseCardName {} -> "ChooseCardName"

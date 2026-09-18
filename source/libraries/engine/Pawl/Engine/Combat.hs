@@ -16,6 +16,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.AttackCost as AttackCost
 import qualified Pawl.Engine.AttackRequirement as AttackRequirement
 import qualified Pawl.Engine.Battle as Battle
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.BlockCost as BlockCost
 import qualified Pawl.Engine.BlockPermission as BlockPermission
 import qualified Pawl.Engine.BlockRequirement as BlockRequirement
@@ -26,6 +27,7 @@ import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Requirement as Requirement
@@ -53,6 +55,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -1891,10 +1894,6 @@ attemptAttackDeclaration perform pid rejected = do
         -- CR 508.1's preamble undoes an exert along with the declaration, and
         -- nothing is added to CR 508.1h's total -- exert's cost is not mana.
         --
-        -- Not implemented: CR 702.154's enlist, rule 508.1g's other optional cost
-        -- to attack, whose cost is tapping a filtered untapped creature rather than
-        -- a yes-or-no and whose trigger reads that creature's power (#3519).
-        --
         Monad.forM_ attacking $ \oid -> do
           gsExert <- State.get
           Monad.when (Projection.hasKeyword Keyword.Exert oid gsExert) $ do
@@ -1905,6 +1904,59 @@ attemptAttackDeclaration perform pid rejected = do
                     g {GameState.objects = Map.adjust (\o -> o {Object.exertedBy = Set.insert pid (Object.exertedBy o)}) oid (GameState.objects g)}
             answer <- Game.choose (Prompt.ChooseExert exertDecider pid oid)
             Monad.when (answer == OptionalDecision.Exercises) (State.modify' exert)
+        -- CR 702.154a's optional cost to attack, rule 508.1g's other one, asked
+        -- after exert's and of `attacking` for the same reason. Rule 702.154d:
+        -- ONE offer per instance of the keyword, each independent, so the roster
+        -- is Projection.keywordsOf's count rather than hasKeyword's yes-or-no.
+        --
+        -- The candidates are rule 702.154a's three conjuncts plus battlefield
+        -- MEMBERSHIP, canAttackGiven's reading of CR 506.3: a phased-out
+        -- permanent is one the game treats as not existing (CR 702.26b) whose
+        -- zone still reads Zone.Battlefield. Recomputed inside the loop so a
+        -- creature a previous instance already tapped is gone from the next
+        -- offer, and so a second attacker's offer sees the first one's tap.
+        --
+        -- `attacking` is what "you didn't choose to attack with" reads, and only
+        -- CR 702.20b can tell that conjunct from the untapped one: rule 508.1f
+        -- has already tapped every other attacker. It is also what rule
+        -- 702.154c's "it isn't possible for a creature to enlist itself" needs:
+        -- the bearer is in that list.
+        --
+        -- Summoning.settledOrHastyGiven is CR 508.1a's own haste-or-settled test,
+        -- asked here of a creature that is NOT attacking -- rule 702.154a states
+        -- the same two halves.
+        --
+        -- The tap is Event.tap, Cost.tapObject's route, so a card watching for a
+        -- creature becoming tapped (CR 701.26a) sees it. Inside `before`'s span,
+        -- so CR 508.1's preamble undoes an enlist along with the declaration, and
+        -- nothing joins CR 508.1h's total -- enlist's cost is not mana.
+        --
+        -- CR 702.154b's linked triggered ability is armed HERE and only where the
+        -- tap happened, which is CR 603.12's reflexive form: the entry's
+        -- existence is that rule's affirmative answer, and it fires at the next
+        -- gather (CR 603.3). Binding.tappedPermanent carries "the tapped
+        -- creature" into it (CR 603.7c).
+        Monad.forM_ attacking $ \oid -> do
+          gsEnlist <- State.get
+          let instances = Map.findWithDefault 0 Keyword.Enlist (Projection.keywordsOf oid gsEnlist)
+          Monad.forM_ (List.genericReplicate instances ()) $ \() -> do
+            g <- State.get
+            let grants = Projection.controlGrants g
+                pcs = Projection.projectAll g
+                enlistable cid =
+                  notElem cid attacking
+                    && Set.member cid (GameState.battlefield g)
+                    && fmap Object.tapped (Game.lookupObject cid g) == Just TapState.Untapped
+                    && Summoning.settledOrHastyGiven pcs pid cid g
+                    && isCreatureObjectGiven pcs cid g
+                enlistCandidates = filter enlistable (Projection.controlsGiven grants pid g)
+            Monad.forM_ (NonEmpty.nonEmpty enlistCandidates) $ \enlistOffer -> do
+              answer <- Game.choose (Prompt.ChooseEnlist (Decide.deciderFor pid g) pid oid enlistOffer)
+              -- Reject-not-repair, Pawl.Engine.Cost's posture: an answer outside
+              -- the offer taps nobody and arms nothing.
+              Monad.forM_ (filter enlistable (Maybe.maybeToList answer)) $ \enlisted -> do
+                Event.tap enlisted
+                State.modify' (Event.armDelayed Keyword.Engine.enlistReflexive oid pid (Map.singleton Binding.tappedPermanent (Binding.toObject enlisted)) Onset.Immediately Nothing)
         gs1 <- State.get
         -- CR 508.1h: the total cost to attack is determined once and then LOCKED
         -- IN -- this `let`. Asking AttackCost.totalCost a second time is what the

@@ -2631,6 +2631,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 701.43d names no quality and carries no cost, so CR 612.2 has nothing here
   -- to swap.
   Keyword.Type.Exert -> keyword
+  Keyword.Type.Enlist -> keyword
   Keyword.Type.Persist -> keyword
   Keyword.Type.Undying -> keyword
   -- CR 702.184a's ability names "creature" and "charge counters", both the rules'

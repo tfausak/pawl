@@ -785,11 +785,17 @@ data Keyword
     Tiered
   | -- | 701.43d: "you may exert this creature as it attacks" is an optional cost
     -- to attack (CR 508.1g), read by Pawl.Engine.Combat.declareAttackers.
-    --
-    -- Not implemented: CR 702.154's enlist, rule 508.1g's other optional cost to
-    -- attack, whose cost is tapping a filtered creature rather than a yes-or-no
-    -- (#3519).
     Exert
+  | -- | 702.154a: "as this creature attacks, you may tap up to one untapped
+    -- creature you control that you didn't choose to attack with and that either
+    -- has haste or has been under your control continuously since this turn
+    -- began. When you do, this creature gets +X\/+0 until end of turn, where X is
+    -- the tapped creature's power." Rule 508.1g's other optional cost to attack,
+    -- offered by Pawl.Engine.Combat.declareAttackers beside Exert's; rule
+    -- 702.154b's linked triggered ability is
+    -- Pawl.Engine.Keyword.enlistReflexive, armed as CR 603.12's reflexive entry
+    -- only where the tap happened.
+    Enlist
   | -- | 702.103a: "As you cast this spell, you may choose to cast it bestowed. If
     -- you do, you pay [cost] rather than its mana cost." CR 702.103b's rewrite
     -- into an Aura with enchant creature is minted from this constructor rather

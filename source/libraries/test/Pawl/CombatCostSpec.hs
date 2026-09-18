@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -38,9 +39,11 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
@@ -49,6 +52,8 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -1980,6 +1985,117 @@ exertSpec s registry = Spec.describe s "Exert" $ do
         Spec.assertEqWith s "CR 701.43b the rider expired at that step all the same" (tapStateOf initiateId (untapFor S.alice handedBack)) (Just TapState.Untapped)
       _ -> Spec.assertFailure s "the fixture should have put two attackers on the board"
 
+-- Yavimaya Steelcrusher {1}{R} Creature -- Ape Warrior 2/2, "Enlist" plus "{1},
+-- Sacrifice this creature: Destroy target artifact." The pool's producer for
+-- Keyword.Enlist, and so for rule 508.1g's second optional cost and for CR
+-- 702.154b's linked reflexive ability.
+--
+-- Every case runs a PAIR of boards differing in exactly one thing -- the answer
+-- to Prompt.ChooseEnlist, or one creature's summoning sickness -- so no
+-- assertion can pass because the board could not have shown the difference. The
+-- numbers are all distinct: a 2/2 Steelcrusher, a 3/3 Hill Giant to enlist and a
+-- 2/1 Goblin Piker that stays home, so +3/+0 cannot be confused with the
+-- Giant's toughness or with a flat bonus.
+enlistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enlistSpec s registry = Spec.describe s "Enlist" $ do
+  Spec.it s "CR 702.154a enlisting a 3-power creature gives the attacker +3/+0, and the tapped creature is not attacking" $ do
+    crusher <- S.printingOf s registry "Yavimaya Steelcrusher"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [crusher, giant, piker] []
+    case mine of
+      crusherId : giantId : pikerId : _ -> do
+        let enlisted = S.runCombat (enlistAnswer [crusherId] (Just giantId)) gs
+            declined = S.runCombat (enlistAnswer [crusherId] Nothing) gs
+        -- The gameplay-level assertion this unit exists to prove, ahead of every
+        -- proxy below: rule 702.154a's X is the TAPPED creature's power, so a 2/2
+        -- that enlisted a 3/3 is a 5/2 and not a 5/5.
+        Spec.assertEqWith s "CR 702.154a the enlisting Steelcrusher is 5/2" (S.powerToughnessOf crusherId enlisted) (Just (5, 2))
+        Spec.assertEqWith s "and it is still 2/2 without the enlist" (S.powerToughnessOf crusherId declined) (Just (2, 2))
+        -- The pump reached combat damage, which is what makes the reading above a
+        -- behaviour rather than a characteristic nobody read.
+        Spec.assertEqWith s "bob took 5 from the enlisting Steelcrusher" (S.lifeOf S.bob enlisted) (Just 15)
+        Spec.assertEqWith s "and 2 without the enlist" (S.lifeOf S.bob declined) (Just 18)
+        -- CR 702.154a's cost: the Giant is tapped, and only where the enlist
+        -- happened.
+        Spec.assertEqWith s "CR 702.154a the enlisted creature is tapped" (tapStateOf giantId enlisted) (Just TapState.Tapped)
+        Spec.assertEqWith s "and untapped where the enlist was declined" (tapStateOf giantId declined) (Just TapState.Untapped)
+        -- "that you didn't choose to attack with": the Giant paid a cost, it did
+        -- not join the attack, so bob's life above is the Steelcrusher's alone.
+        Spec.assertBool s (notElem giantId (attackersOf enlisted)) "CR 702.154a the enlisted creature is not an attacker"
+        Spec.assertBool s (notElem pikerId (attackersOf enlisted)) "and neither is the Piker that stayed home"
+      _ -> Spec.assertFailure s "the fixture should have put three creatures on the board"
+  -- CR 702.154a's third conjunct, as a pair of boards differing in exactly one
+  -- thing: the Giant's summoning sickness. Both boards answer ChooseEnlist the
+  -- same way, so a sick Giant that WAS offered would tap and pump exactly as the
+  -- settled one does.
+  Spec.it s "CR 702.154a a summoning-sick creature is not offered, and enlists nothing" $ do
+    crusher <- S.printingOf s registry "Yavimaya Steelcrusher"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (gs, mine, _) = S.combatBoardOf [crusher, giant] []
+    case mine of
+      crusherId : giantId : _ -> do
+        let sickBoard = S.runPure S.identityAnswer gs (State.modify' (makeSick giantId))
+            settled = S.runCombat (enlistAnswer [crusherId] (Just giantId)) gs
+            sick = S.runCombat (enlistAnswer [crusherId] (Just giantId)) sickBoard
+        Spec.assertEqWith s "CR 702.154a the sick creature could not be enlisted, so the attacker is still 2/2" (S.powerToughnessOf crusherId sick) (Just (2, 2))
+        Spec.assertEqWith s "where the settled one pumped it to 5/2" (S.powerToughnessOf crusherId settled) (Just (5, 2))
+        Spec.assertEqWith s "and the sick creature was not tapped" (tapStateOf giantId sick) (Just TapState.Untapped)
+        -- The prompt itself, so the negative above is "never offered" rather than
+        -- "offered and refused".
+        Spec.assertEqWith s "one Prompt.ChooseEnlist was raised for the settled creature" (enlistAsks (answersFor (enlistAnswer [crusherId] (Just giantId)) gs S.combatGame)) 1
+        Spec.assertEqWith s "and none for the sick one" (enlistAsks (answersFor (enlistAnswer [crusherId] (Just giantId)) sickBoard S.combatGame)) 0
+      _ -> Spec.assertFailure s "the fixture should have put two creatures on the board"
+
+  -- CR 702.154a's SECOND conjunct, "that you didn't choose to attack with",
+  -- which only a VIGILANT co-attacker can separate from the first: CR 508.1f
+  -- taps every other attacker before rule 508.1g is reached, so an untapped
+  -- creature that was declared exists only under CR 702.20b. The pair differs in
+  -- exactly one thing -- whether Kemba's Legion was declared as an attacker.
+  Spec.it s "CR 702.154a a vigilant co-attacker is untapped and still cannot be enlisted" $ do
+    crusher <- S.printingOf s registry "Yavimaya Steelcrusher"
+    legion <- S.printingOf s registry "Kemba's Legion"
+    let (gs, mine, _) = S.combatBoardOf [crusher, legion] []
+    case mine of
+      crusherId : legionId : _ -> do
+        let together = S.runCombat (enlistAnswer [crusherId, legionId] (Just legionId)) gs
+            aloneBoard = S.runCombat (enlistAnswer [crusherId] (Just legionId)) gs
+        Spec.assertEqWith s "CR 702.154a a declared attacker cannot be enlisted, so the Steelcrusher is still 2/2" (S.powerToughnessOf crusherId together) (Just (2, 2))
+        Spec.assertEqWith s "and the same Legion left at home pumps it to 6/2" (S.powerToughnessOf crusherId aloneBoard) (Just (6, 2))
+        -- CR 702.20b is what makes the pair a test of the second conjunct rather
+        -- than of the first: the Legion is untapped on BOTH boards.
+        Spec.assertEqWith s "CR 702.20b the vigilant attacker is untapped" (tapStateOf legionId together) (Just TapState.Untapped)
+        Spec.assertEqWith s "and the enlisted one is tapped by the cost" (tapStateOf legionId aloneBoard) (Just TapState.Tapped)
+        Spec.assertEqWith s "no Prompt.ChooseEnlist was raised where the only candidate attacked" (enlistAsks (answersFor (enlistAnswer [crusherId, legionId] (Just legionId)) gs S.combatGame)) 0
+      _ -> Spec.assertFailure s "the fixture should have put two creatures on the board"
+
+-- S.aggressiveAnswer with both of the declaration's prompts pinned: which
+-- creatures attack, and which one the enlist taps. Pinned EXPLICITLY rather than
+-- left to the fallthrough, which is a searching answerer and could repair a
+-- mutation; the enlist answer is FILTERED against the offer, so an answer the
+-- engine did not offer is never smuggled in.
+enlistAnswer :: [ObjectId.ObjectId] -> Maybe ObjectId.ObjectId -> Prompt.Prompt r -> r
+enlistAnswer declared chosen p = case p of
+  Prompt.DeclareAttackers _ _ offered -> filter (`elem` declared) offered
+  Prompt.ChooseEnlist _ _ _ offered -> List.find (\oid -> Just oid == chosen) (NonEmpty.toList offered)
+  _ -> S.aggressiveAnswer p
+
+-- CR 302.6: the object as it entered rather than as addPermanent settled it.
+makeSick :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+makeSick oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+
+-- The responses one run recorded, Pawl.PreventionSpec's helper duplicated per
+-- this suite's group-local convention.
+answersFor :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Type.Game a -> [Response.Response]
+answersFor answer gs game = snd (Replay.record answer gs game)
+
+enlistAsks :: [Response.Response] -> Int
+enlistAsks responses =
+  let isEnlist r = case r of
+        Response.ChoseEnlist _ -> True
+        _ -> False
+   in length (filter isEnlist responses)
+
 -- S.aggressiveAnswer with Prompt.ChooseExert pinned, on Support's `attackTo`
 -- pattern: the rank-1 signature partially applies to the `forall r. Prompt r ->
 -- r` runCombat and runPure want. Pinned EXPLICITLY rather than left to the
@@ -2710,3 +2826,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   declarationRetrySpec s registry
   blockCostSpec s registry
   exertSpec s registry
+  enlistSpec s registry

@@ -3020,6 +3020,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
   -- TriggeredAbility, so any Filter in it is swept there rather than here.
   Keyword.Exert -> []
+  Keyword.Enlist -> []
   -- CR 702.43a names no quality: the +1/+1 counters and the "target artifact
   -- creature" are written into the replacement effect and the ability
   -- Pawl.Engine.Keyword mints, not into the keyword.

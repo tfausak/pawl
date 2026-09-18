@@ -2813,7 +2813,9 @@ delayedPending grouped gs =
       -- entry only where that question was answered yes -- from the CR 118.12
       -- pay-gate branch that actually ran, and from
       -- Resolve.applyClauseEffects, which skips the arm when the preceding
-      -- instruction recorded no event (CR 603.12, 701.28e) -- so the entry's
+      -- instruction recorded no event (CR 603.12, 701.28e) -- and
+      -- Pawl.Engine.Combat.declareAttackers appends one only where CR 702.154a's
+      -- enlist cost was actually paid, so the entry's
       -- EXISTENCE is the affirmative answer and no event is needed. It
       -- therefore fires at the first gather after it was armed, which CR 603.3
       -- makes the next time a player would receive priority.

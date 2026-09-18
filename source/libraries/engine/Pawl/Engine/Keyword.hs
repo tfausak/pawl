@@ -504,6 +504,11 @@ abilitiesFor keyword count = case keyword of
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
   Keyword.Exert -> []
+  -- CR 702.154b's triggered ability is minted, but not here: it is linked to the
+  -- CR 508.1g cost, so it exists only where that cost was paid. Pawl.Engine.Combat
+  -- arms `enlistReflexive` as CR 603.12's reflexive entry at the moment of the
+  -- tap, which is also what keeps rule 702.154d's instances independent.
+  Keyword.Enlist -> []
   -- CR 702.184a is an ACTIVATED ability; battlefieldAbilitiesFor mints it.
   Keyword.Station -> []
   -- CR 702.89a states a REPLACEMENT and nothing else; see mintedReplacementsFor.
@@ -735,6 +740,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Exert -> []
+  Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
   -- CR 702.184a's ability puts its counters on "this permanent", so it belongs to
@@ -1222,6 +1228,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Exert -> []
+  Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
   Keyword.Station -> []
@@ -1848,6 +1855,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
   -- rather than the stack.
   Keyword.Exert -> []
+  Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
   -- CR 702.184a states a whole self-contained ability, so one per instance,
@@ -2520,6 +2528,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Exert -> []
+  Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
   -- CR 702.184a permits no casting; the station card is cast for its own cost.
@@ -4121,6 +4130,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
   -- writes Object.exertedBy directly.
   Keyword.Exert -> []
+  Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
   -- CR 702.184a replaces nothing: it is an activated ability.
@@ -4392,6 +4402,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
   -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
+  -- CR 702.154a's optional cost to attack, for rule 508.1g's same reason.
+  Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
   Keyword.Changeling -> []
@@ -4678,6 +4690,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Exert -> []
+  Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
   Keyword.Changeling -> []
@@ -4934,6 +4947,7 @@ familyOf keyword = case keyword of
   Keyword.Exhaust -> Nothing
   Keyword.Boast -> Nothing
   Keyword.Exert -> Nothing
+  Keyword.Enlist -> Nothing
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing
   Keyword.Station -> Nothing
@@ -5740,6 +5754,39 @@ bushidoHalf condition n =
           )
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = condition,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.154a's second half, rule 702.154b's linked triggered ability: "when you
+-- do, this creature gets +X\/+0 until end of turn, where X is the tapped
+-- creature's power". Frenzy's pump shape with the bonus read off a slot.
+--
+-- TriggerCondition.Reflexive, because rule 702.154a's "when you do" is CR
+-- 603.12's form: Pawl.Engine.Combat.declareAttackers arms one entry per enlist
+-- instance whose cost was actually paid, and the entry's EXISTENCE is that
+-- rule's affirmative answer. Arming per payment is also CR 702.154d -- two
+-- enlist instances each fire for their own tap and no other.
+--
+-- THE BONUS reads Binding.tappedPermanent, station's slot for the same question
+-- ("the tapped creature"), bound at the arming to the creature the cost tapped.
+-- CR 611.2d freezes it as the ability resolves, so a creature that has since
+-- changed power still pumps by what it is worth then rather than at declaration.
+enlistReflexive :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+enlistReflexive =
+  let effect =
+        Effect.ModifyTarget
+          ( ModifyTarget.MkModifyTarget
+              Duration.UntilEndOfTurn
+              (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.tappedPermanent Quantity.Power)) (Quantity.Literal 0)))
+              (ObjectRef.EachMatching Filter.IsSource)
+          )
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.Reflexive,
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))

@@ -1409,6 +1409,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Exert
       " {\"type\":\"Exert\"} "
+  -- CR 702.154a. Nullary: rule 702.154a states the whole ability, so an enlist
+  -- card prints no parameter for it.
+  Spec.it s "Enlist" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Enlist
+      " {\"type\":\"Enlist\"} "
   -- CR 702.184a. Nullary: rule 702.184a states the whole ability, so a station
   -- card prints no parameter for it.
   Spec.it s "Station" $
