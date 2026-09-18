@@ -3535,6 +3535,49 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
     Spec.assertEqWith s "CR 702.119c naming the Russet Wolves instead, on the same board and with the Altar eating the same Hill Giant, pays: the Behemoth resolved and both creatures are gone" (standing (run wolvesId)) (1, 0, 0)
     Spec.assertEqWith s "and the reversed cast put the Behemoth back in alice's hand (CR 733.1)" (length (Game.zoneMembers Zone.Hand S.alice (run giantId))) 1
 
+  -- CR 702.119b on Crabomination {4}{B}{B} 5/5 Creature -- Crab Demon, "Emerge
+  -- from artifact {5}{B}{B}" (Oracle text checked on Scryfall, 2026-09-18). The
+  -- only printing whose emerge names a quality, so it is the whole of rule
+  -- 702.119b's demand.
+  --
+  -- pawl's card omits the printed triggered ability -- "When this creature
+  -- enters, target opponent exiles the top card of their library, a card at
+  -- random from their graveyard, and a card at random from their hand. You may
+  -- cast a spell from among cards exiled this way without paying its mana cost."
+  -- No Pawl.Types.Effect arm picks a card at random out of a zone (#3861). The
+  -- omission is stricter than printed -- alice exiles nothing and gains no cast
+  -- -- and nothing about it touches the emerge cost this group is about.
+  --
+  -- ONE BOARD: alice holds Crabomination over FOUR Swamps, with Crawlspace (an
+  -- artifact, mana value 3) and a Dwarven Mauler (a creature, mana value 1) on
+  -- the battlefield. Four mana pays {5}{B}{B} reduced by the Crawlspace's three
+  -- and nothing else this board offers -- the printed {4}{B}{B} wants six, and
+  -- rule 702.119a's creature pool would offer only the Mauler, whose one leaves
+  -- {4}{B}{B} -- so a Crabomination that resolved at all proves the pool is rule
+  -- 702.119b's [quality] rather than rule 702.119a's creatures, and the
+  -- graveyard proves WHICH permanent rule 702.119c then sacrificed.
+  --
+  -- The Mauler is not decoration: it is the creature rule 702.119a's pool would
+  -- have named, and it is the control a sacrifice drawn from the wrong pool
+  -- would take instead.
+  Spec.it s "CR 702.119b the emerge cost sacrifices a permanent of the stated quality, not a creature" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    mauler <- S.printingOf s registry "Dwarven Mauler"
+    crab <- S.printingOf s registry "Crabomination"
+    let (_, gs1) = S.addPermanent crawlspace S.alice (S.landsInPlay swamp 4)
+        (_, gs2) = S.addPermanent mauler S.alice gs1
+        (spellId, board) = S.addHandCard crab S.alice gs2
+        start = aliceOnTurn board
+        after = S.runPure S.identityAnswer (S.runPure S.identityAnswer start (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
+        -- The same board without the Crawlspace, which is the only thing that
+        -- differs: same four Swamps, same Mauler, same hand.
+        (_, noArtifact1) = S.addPermanent mauler S.alice (S.landsInPlay swamp 4)
+        (noArtifactSpell, noArtifact2) = S.addHandCard crab S.alice noArtifact1
+        noArtifact = aliceOnTurn noArtifact2
+    Spec.assertEqWith s "CR 702.119b four Swamps paid {5}{B}{B} less the Crawlspace's three, so Crabomination resolved, and CR 702.119c sacrificed that artifact while the Dwarven Mauler, the creature rule 702.119a's pool would have named, stayed" (length (namedOnBattlefield "Crabomination" after), length (namedInGraveyard "Crawlspace" after), length (namedOnBattlefield "Dwarven Mauler" after)) (1, 1, 1)
+    Spec.assertBool s (not (S.castable S.alice noArtifactSpell noArtifact)) "CR 702.119b with only the Dwarven Mauler on the board no artifact is sacrificeable, so the same four Swamps cannot pay the emerge cost at all"
+
 -- CR 702.180a on Unending Whisper {U} Sorcery, "Draw a card." with "Harmonize
 -- {5}{U}" (Oracle text checked on Scryfall, 2026-09-13). Chosen over Nature's
 -- Rhythm, the issue's card, for its effect and its cost alike: both are

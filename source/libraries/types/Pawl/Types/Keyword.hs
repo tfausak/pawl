@@ -5,6 +5,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Devour as Devour
+import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Gift as Gift
@@ -515,13 +516,13 @@ data Keyword
     Skulk
   | -- | 702.119a: emerge [cost] -- an alternative cost of [cost] plus sacrificing
     -- a creature, whose total is then reduced by generic mana equal to that
-    -- creature's mana value. Priced by Pawl.Engine.Cost.candidateCostsGiven, which
-    -- offers one candidate per sacrificeable creature, naming it: CR 702.119c
-    -- makes the victim a CR 601.2b choice and CR 601.2f needs its mana value
-    -- before CR 601.2h sacrifices that same creature.
-    --
-    -- Not implemented: CR 702.119b's "emerge from [quality]" variant (#3701).
-    Emerge (Cost.Cost Keyword)
+    -- creature's mana value, and CR 702.119b's optional quality on the payload,
+    -- which names a PERMANENT pool in place of the creatures. Priced by
+    -- Pawl.Engine.Cost.candidateCostsGiven, which offers one candidate per
+    -- sacrificeable permanent, naming it: CR 702.119c makes the victim a CR
+    -- 601.2b choice and CR 601.2f needs its mana value before CR 601.2h
+    -- sacrifices that same permanent.
+    Emerge (Emerge.Emerge Keyword)
   | -- | 702.120a: for each mode of this modal spell (CR 700.2) chosen beyond the
     -- first, an additional cost paid as it is cast.
     Escalate (Cost.Cost Keyword)

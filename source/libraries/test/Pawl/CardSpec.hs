@@ -146,6 +146,7 @@ import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -2739,10 +2740,10 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.148a: the cleave cost, flashback's shape.
   Keyword.Cleave cost -> costFilters cost
   Keyword.Awaken cost -> costFilters cost
-  -- CR 702.119a: the emerge cost, flashback's shape. The sacrifice the rule
-  -- states is appended at the offer (Pawl.Engine.Cost.candidateCostsGiven) and is
-  -- not part of the payload.
-  Keyword.Emerge cost -> costFilters cost
+  -- CR 702.119a: the emerge cost, flashback's shape, plus CR 702.119b's quality
+  -- beside it, Cycling's shape. The sacrifice the rule states is appended at the
+  -- offer (Pawl.Engine.Cost.candidateCostsGiven) and is not part of the payload.
+  Keyword.Emerge (Emerge.MkEmerge cost mFilter) -> costFilters cost <> Maybe.maybeToList mFilter
   -- CR 702.188a and CR 702.190a: the web-slinging and sneak costs, flashback's
   -- shape. The return each rule states is appended at the offer
   -- (Pawl.Engine.Keyword.plainAlternativeCosts) and is not part of the payload.

@@ -79,6 +79,7 @@ import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Face as Face
@@ -370,9 +371,10 @@ candidateCostsGiven permitted pid name oid gs =
                 fmap
                   (\(keyword, cost) -> CandidateCost.plain (Just keyword) (withAdditional cost))
                   (Keyword.plainAlternativeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
-              -- CR 702.119a: emerge, evoked's offer with rule 702.119a's two
-              -- clauses attached -- the sacrifice in the candidate's components,
-              -- the generic reduction in `CandidateCost.reductions`. Offered from
+              -- CR 702.119a and CR 702.119b: emerge, evoked's offer with rule
+              -- 702.119a's two clauses attached -- the sacrifice in the candidate's
+              -- components, the generic reduction in `CandidateCost.reductions`.
+              -- Offered from
               -- every zone for bestow's reason, rule 702.119a's abilities
               -- functioning "while the spell with emerge is on the stack", which
               -- CR 113.6e reaches from wherever the cast begins; read off the
@@ -380,24 +382,34 @@ candidateCostsGiven permitted pid name oid gs =
               -- flashback's, rule 702.119a sending the cast through CR 601.2f-h in
               -- its own words.
               --
-              -- ONE CANDIDATE PER SACRIFICEABLE CREATURE, each naming that one
-              -- creature outright (Filter.IsObject): CR 702.119c chooses the
+              -- THE POOL IS RULE 702.119b's [quality] WHERE THE PAYLOAD CARRIES
+              -- ONE and rule 702.119a's creatures where it does not. Rule
+              -- 702.119b is the only difference between the two spellings: its
+              -- victim is a [quality] PERMANENT rather than a creature, and its
+              -- reduction is word for word rule 702.119a's "an amount of generic
+              -- mana equal to the sacrificed permanent's mana value", so the same
+              -- offer serves both. Proved by Pawl.CastSpec's "CR 702.119b the
+              -- artifact, and not the creature of the same mana value beside it,
+              -- is what Crabomination's emerge cost sacrificed".
+              --
+              -- ONE CANDIDATE PER SACRIFICEABLE VICTIM, each naming that one
+              -- permanent outright (Filter.IsObject): CR 702.119c chooses the
               -- permanent "as you choose to pay a spell's emerge cost (see rule
               -- 601.2b)" and sacrifices THAT permanent at CR 601.2h, so picking
               -- the candidate is rule 702.119c's choice and the component it
               -- carries admits nothing else. CR 601.2f's amount rides the same
               -- pick, which is why it has to be made here: the reduction is the
-              -- chosen creature's mana value and the total locks before CR 601.2h.
+              -- chosen permanent's mana value and the total locks before CR 601.2h.
               --
               -- What the identity buys over the mana value the amount needs: a
               -- victim eaten between the two steps -- spent to a mana ability at
               -- CR 601.2g -- leaves CR 601.2h with nothing to sacrifice and the
               -- cast reverses (CR 733.1), where a candidate naming a mana value
-              -- would let a second creature of that value pay instead
+              -- would let a second permanent of that value pay instead
               -- (Pawl.CastSpec's "CR 702.119c an Ashnod's Altar that eats the
               -- chosen creature reverses the cast").
               --
-              -- Two creatures of one mana value are therefore two candidates
+              -- Two permanents of one mana value are therefore two candidates
               -- rather than one, and Prompt.ChooseCost tells them apart -- they
               -- differ in the object their sacrifice component names.
               --
@@ -411,18 +423,17 @@ candidateCostsGiven permitted pid name oid gs =
               -- perspective, in every zone, so that atom is vacuously False there
               -- whatever the criterion is on.
               emerged =
-                let anyCreature = Filter.Type.HasCardType CardType.Creature
-                    victims =
+                let victims criterion =
                       Maybe.mapMaybe
                         (\vid -> fmap ((,) vid) (Filter.manaValue (Projection.viewOfObject vid gs)))
-                        (Replacement.sacrificeCandidates Map.empty pid (Just oid) anyCreature gs)
-                    offer cost (vid, n) =
+                        (Replacement.sacrificeCandidates Map.empty pid (Just oid) criterion gs)
+                    offer emerge (vid, n) =
                       CandidateCost.MkCandidateCost
-                        (Just (Keyword.Type.Emerge cost))
-                        (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.IsObject vid))]})
+                        (Just (Keyword.Type.Emerge emerge))
+                        (withAdditional (Emerge.cost emerge) {Cost.components = Cost.components (Emerge.cost emerge) <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.IsObject vid))]})
                         [ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]]
                  in concatMap
-                      (\cost -> fmap (offer cost) victims)
+                      (\emerge -> fmap (offer emerge) (victims (Maybe.fromMaybe (Filter.Type.HasCardType CardType.Creature) (Emerge.quality emerge))))
                       (Keyword.emergeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
               -- CR 702.117a and CR 702.137a: surge and spectacle, evoked's offer
               -- with a GATE -- read off the projection, wrapped by
