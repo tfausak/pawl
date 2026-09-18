@@ -1094,10 +1094,10 @@ brawlDesignating commander =
 brawlSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 brawlSpec s registry = Spec.describe s "Brawl" $ do
   -- CR 903.12c adds "(b) a planeswalker card" to the three kinds CR 903.3 allows,
-  -- and that is the whole of rule 903.12c's difference from rule 903.3. Serra the
-  -- Benevolent is the card the Designation group above shows a Commander deck
-  -- cannot designate, on a board differing from that one only in
-  -- GameSettings.brawl.
+  -- and that is the whole of rule 903.12c's difference from rule 903.3. The same
+  -- card and the same one-commander deck the Designation group above shows a
+  -- Commander deck cannot designate, through the same Setup.createDeck, with
+  -- GameSettings.brawl the only thing rule 903.3 reads that differs.
   Spec.it s "CR 903.12c a legendary planeswalker IS a Brawl deck's commander" $ do
     serra <- S.printingOf s registry "Serra the Benevolent"
     let board = brawlDesignating serra
