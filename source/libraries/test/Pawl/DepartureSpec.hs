@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -41,18 +42,31 @@ import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import Pawl.Types.Printing (Printing)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
+import Pawl.ZoneTriggerSpec (paysFor)
+
+-- CR 118.12's offers, picked out of a recorded transcript, so a case can assert
+-- who was asked whether to pay -- or, for CR 800.4f, that nobody was.
+payDecisions :: [Response.Response] -> [Response.Response]
+payDecisions = filter isPayDecision
+
+isPayDecision :: Response.Response -> Bool
+isPayDecision response = case response of
+  Response.ChoseToPay _ -> True
+  _ -> False
 
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
@@ -924,6 +938,64 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "bob lost the game" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
     Spec.assertEqWith s "alice and carol play on, with nothing decided" (Game.stillPlaying after, GameState.result after) ([S.alice, S.carol], Nothing)
     Spec.assertEqWith s "and his Child of Night left the game with him" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Child of Night")) S.bob after) 0
+
+  -- CR 800.4f: "if an object requires a player who has left the game to pay a
+  -- cost or choose whether to pay a cost, that cost is not paid."
+  --
+  -- Owlin Shieldmage, {3}{W}{B} Creature -- Bird Warlock 3/3 whose text box is
+  -- "Flying" and "Ward--Pay 3 life", is the producer, and the LIFE cost is what
+  -- makes the divergence observable. CR 800.4a strips a departing player of
+  -- every object they own or control, so a ward cost in mana, permanents or
+  -- cards is unaffordable (CR 118.3) and the gate would answer False either way;
+  -- a life total is not an object and CR 102.1 keeps the row, so a departed bob
+  -- really could pay it -- and did.
+  --
+  -- Ward is what reaches the gate at all. Rule 702.21a targets nothing, so CR
+  -- 608.2b never empties Binding.targetingObject, the trigger does not fizzle
+  -- when bob's Giant Growth leaves the game with him, and
+  -- PlayerRef.ControllerOfBound still names bob through CR 608.2h. Mana Leak's
+  -- gate reads the same reference over a slot that IS targeted, and fizzles.
+  --
+  -- THREE SEATS: CR 800.1 makes a game that begins with two players not a
+  -- multiplayer game, and CR 104.2a would end it the moment bob left, so
+  -- continuesAfterDeparture would skip the whole of CR 800.4a.
+  Spec.it s "CR 800.4f a departed player is not offered a ward cost, and does not pay it" $ do
+    forest <- S.printingOf s registry "Forest"
+    shieldmage <- S.printingOf s registry "Owlin Shieldmage"
+    growth <- S.printingOf s registry "Giant Growth"
+    let withLands = S.landsFor forest S.bob 3 S.threePlayerGame
+        (_, withMage) = S.addPermanent shieldmage S.alice withLands
+        (growthId, withGrowth) = S.addHandCard growth S.bob withMage
+        -- Distinct totals: 37 could not be read off another seat, and 37 - 3 is
+        -- nobody else's number either.
+        at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+        board =
+          withGrowth
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice,
+              GameState.players = at S.alice 41 (at S.bob 37 (at S.carol 29 (GameState.players withGrowth)))
+            }
+        -- The Shieldmage is the board's only creature, so identityAnswer's
+        -- targeting has one option and nothing here searches for the one that
+        -- makes the assertion pass.
+        onStack = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.bob growthId)) Engine.settleForPriority
+        gone = S.runPure S.identityAnswer onStack (Departure.leaveGame Departure.Type.Conceded S.bob)
+        ((_, after), transcript) = Replay.record (paysFor S.bob) gone Stack.resolveTop
+        ((_, staying), stayingTranscript) = Replay.record (paysFor S.bob) onStack Stack.resolveTop
+    -- The setup: the ward really fired over the Growth, and bob's departure
+    -- really took the Growth with him, leaving the trigger to resolve alone.
+    Spec.assertEqWith s "the Growth and the ward trigger are both on the stack" (length (GameState.stack onStack)) 2
+    Spec.assertEqWith s "bob leaving takes his Growth with it, leaving the trigger" (length (GameState.stack gone)) 1
+    Spec.assertEqWith s "and bob is out of the game holding 37 life" (statusOf S.bob gone, S.lifeOf S.bob gone) (Just (Status.Departed Departure.Type.Conceded), Just 37)
+    -- The rule.
+    Spec.assertEqWith s "CR 800.4f the ward cost is not paid, so bob is still at 37" (S.lifeOf S.bob after) (Just 37)
+    Spec.assertEqWith s "and he was never asked whether to pay it" (payDecisions transcript) []
+    -- The PAIR, differing from the board above in bob's departure and nothing
+    -- else: a bob who stayed is asked, pays, and goes 37 -> 34. Without it the
+    -- assertions above would pass on a board that never reached the gate.
+    Spec.assertEqWith s "a bob who stayed pays the ward cost, going 37 -> 34" (S.lifeOf S.bob staying) (Just 34)
+    Spec.assertEqWith s "and he was asked exactly once" (payDecisions stayingTranscript) [Response.ChoseToPay PaymentDecision.Pays]
 
 -- alice with Door to Nothingness and one land per colored symbol of its
 -- activation cost, plus whatever other seats the case wants.
