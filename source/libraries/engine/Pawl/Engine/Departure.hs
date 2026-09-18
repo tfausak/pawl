@@ -585,7 +585,7 @@ nonCardStackObjectsCease pid gs =
 -- controller, who here is the player leaving, so a board with two applicable
 -- rewrites would put the race to them rather than to another player; no card in
 -- `data/cards/` replaces a permanent being exiled, so no board reaches it
--- (#181).
+-- (#3860).
 --
 -- IN BATCH and in ONE event group, against that same board, for the reason the
 -- first clause files its last known information against it: "those objects are

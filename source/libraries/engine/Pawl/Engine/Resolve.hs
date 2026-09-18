@@ -1107,6 +1107,13 @@ branchTaken branch wasPaid = case branch of
 -- 118.12's own "sacrifice this enchantment" -- is affordable to the next payer
 -- against the board it left. Each payer spends only their own resources, so the
 -- sequencing is not observable as an ordering of the ACTIONS.
+--
+-- Not implemented: CR 800.4f, which drops a cost a player who has left the game
+-- would be asked to pay. Neither step of the payer list filters for survival --
+-- apnapPlayersOf intersects with Game.apnapOrder, which is SEATING and says so,
+-- and Slots.playerRefPlayers guards only its stillPlaying arms, where
+-- PlayerRef.ControllerOfBound reaches a departed player through CR 608.2h by
+-- design. Whether a board can reach the prompt is the open question (#3859).
 payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
 payGatePaid resolving source controller idx cIdx legal announced gate = do
   gs <- State.get
