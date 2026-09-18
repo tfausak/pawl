@@ -7491,11 +7491,15 @@ gravestorm =
 -- targets for the copy. If you copy the spell, choose an opponent. That player
 -- copies the spell and may choose new targets for that copy."
 --
--- `storm` above's trigger with the ONE instruction split into two clauses, which
--- is what rule 702.144a prints: the first sentence is CR 603.5's "may" over one
--- copy, and the last two hang off it through CR 608.2c's "if you do"
--- (Clause.ifTaken naming clause 0), so a declined copy chooses no opponent and
--- makes no second copy either.
+-- `storm` above's trigger split into TWO CLAUSES: the first sentence is CR
+-- 603.5's "may" over one copy, and the rest hangs off it through CR 608.2c's
+-- "if you do" (Clause.ifTaken naming clause 0), so a declined copy chooses no
+-- opponent and makes no second copy either.
+--
+-- The last two sentences share one clause rather than taking one each, which is
+-- the shape Skullwinder already prints in data\/cards: no rider falls between
+-- them, and the second reads a slot the first fills in the same resolution, so
+-- splitting them would only add a second `ifTaken` naming the first.
 --
 -- NOT `copiesOf`, whose whole payload is one CopyStackObject with the resolving
 -- controller as CR 707.10's copier. Rule 702.144a states TWO copies under two
@@ -7555,7 +7559,8 @@ demonstrate =
         }
 
 -- The slot rule 702.144a's "choose an opponent" fills and its "that player"
--- reads, `cascadeExiled`'s position one opcode over.
+-- reads; `cascadeExiled` is the same minted-slot move over objects rather than
+-- players.
 demonstrateOpponent :: SlotName.SlotName
 demonstrateOpponent = SlotName.MkSlotName (Text.pack "demonstrated")
 

@@ -2395,20 +2395,9 @@ gravestormSpec s registry = Spec.describe s "Gravestorm" $ do
     Spec.assertEqWith s "CR 700.4 bob lost 1 life to the original and 1 to each of TWO copies" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "and drew three cards, the two Giants having left his battlefield" (S.handSize S.bob after) 3
 
--- CR 702.78a's conspire: "As an additional cost to cast this spell, you may tap
--- two untapped creatures you control that each share a color with it" and "When
--- you cast this spell, if its conspire cost was paid, copy it."
---
--- Burn Trail {3}{R} Sorcery -- "Burn Trail deals 3 damage to any target. /
--- Conspire" (Oracle text checked on Scryfall, 2026-09-13) -- is the producer.
---
--- THE BOARD: alice holds THREE untapped red Hill Giants, so rule 702.78a's
--- choice of two is a real one rather than a set the prompt would elide, and one
--- untapped GREEN Giant Spider, which the cost's colour clause must keep out of
--- the offer. Burn Trail is red, so "share a color with it" is a question the
--- board can answer both ways.
--- CR 702.144a's demonstrate, on Incarnation Technique {4}{B} Sorcery, "Mill five
--- cards, then return a creature card from your graveyard to the battlefield."
+-- CR 702.144a's demonstrate, on Incarnation Technique {4}{B} Sorcery --
+-- "Demonstrate / Mill five cards, then return a creature card from your
+-- graveyard to the battlefield." (Oracle text checked on Scryfall, 2026-09-18).
 --
 -- THREE SEATS, so that "choose an opponent" is a choice rather than an elision
 -- (Pawl.Engine.PlayerEffect elides a one-candidate ChoosePlayer): alice picks
@@ -2478,6 +2467,18 @@ demonstrating decision p = case p of
   Prompt.ChoosePlayer _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== S.bob) (NonEmpty.toList offered))
   _ -> S.identityAnswer p
 
+-- CR 702.78a's conspire: "As an additional cost to cast this spell, you may tap
+-- two untapped creatures you control that each share a color with it" and "When
+-- you cast this spell, if its conspire cost was paid, copy it."
+--
+-- Burn Trail {3}{R} Sorcery -- "Burn Trail deals 3 damage to any target. /
+-- Conspire" (Oracle text checked on Scryfall, 2026-09-13) -- is the producer.
+--
+-- THE BOARD: alice holds THREE untapped red Hill Giants, so rule 702.78a's
+-- choice of two is a real one rather than a set the prompt would elide, and one
+-- untapped GREEN Giant Spider, which the cost's colour clause must keep out of
+-- the offer. Burn Trail is red, so "share a color with it" is a question the
+-- board can answer both ways.
 conspireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 conspireSpec s registry = Spec.describe s "Conspire" $ do
   Spec.it s "CR 702.78a conspire's trigger is minted for a spell on the stack and nowhere else" $ do
