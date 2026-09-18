@@ -140,16 +140,21 @@ import qualified Pawl.Types.Zone as Zone
 unpayable :: Cost Keyword.Type.Keyword
 unpayable = Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
 
--- CR 118.9's "without paying its mana cost": the printed cost with the mana part
--- replaced by an EMPTY ManaCost, which is {0} (CR 118.5a) and never Nothing, CR
--- 118.6's unpayable cost. The additional costs ride along (CR 118.9d), and the
--- face is the one being CAST (CR 709.3a / 712.11a).
-withoutPayingManaCost :: Face.Face card -> Cost Keyword.Type.Keyword
-withoutPayingManaCost face =
+-- CR 118.9a's alternative cost: the printed cost with the mana part replaced by
+-- the amount the effect stated, and never Nothing, CR 118.6's unpayable cost. The
+-- additional costs ride along (CR 118.9d), and the face is the one being CAST (CR
+-- 709.3a / 712.11a).
+insteadOfManaCost :: ManaCost.ManaCost -> Face.Face card -> Cost Keyword.Type.Keyword
+insteadOfManaCost mana face =
   Cost.MkCost
-    { Cost.mana = Just (ManaCost.MkManaCost []),
+    { Cost.mana = Just mana,
       Cost.components = Face.additionalCosts face
     }
+
+-- CR 118.9's "without paying its mana cost", which is insteadOfManaCost of an
+-- EMPTY ManaCost -- {0} (CR 118.5a).
+withoutPayingManaCost :: Face.Face card -> Cost Keyword.Type.Keyword
+withoutPayingManaCost = insteadOfManaCost (ManaCost.MkManaCost [])
 
 -- A candidate no keyword ability offered: the printed cost, a printed
 -- alternative, or a cost an effect applied (CR 118.9).
@@ -720,23 +725,22 @@ candidateCostsGiven permitted pid name oid gs =
                       fmap
                         (untagged . withAdditional)
                         (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (Keyword.foretellCost (Face.keywordSet face)))
-                -- CR 118.9: a CR 601.3 permission that says "without paying its
-                -- mana cost" (Extract Power) is an alternative cost of nothing,
-                -- and REPLACES the printed cost for the plotted arm's reason --
-                -- that permission is the only thing making this cast legal, so
-                -- the cost it states is the only route to it. CR 118.5 still
-                -- makes the caster announce the {0}, which is what casting the
-                -- card at all is.
+                -- CR 118.9a: a CR 601.3 permission that states an alternative
+                -- cost -- "without paying its mana cost" (Extract Power), or rule
+                -- 701.65a's {2} -- REPLACES the printed cost for the plotted arm's
+                -- reason: that permission is the only thing making this cast
+                -- legal, so the cost it states is the only route to it. CR 118.5
+                -- still makes the caster announce and pay it.
                 --
-                -- Scoped to the permission's OWN holder, CR 109.5's "you" as
-                -- Pawl.Types.ExilePlayPermission baked it in: a second player
-                -- casting the same card under some other permission is priced
-                -- by the `_` arm below.
+                -- Scoped to the permission's OWN holder, whom
+                -- Pawl.Types.ExilePlayPermission baked in: a second player casting
+                -- the same card under some other permission is priced by the `_`
+                -- arm below.
                 Zone.Exile
-                  | any
-                      (\permission -> ExilePlayPermission.withoutPayingManaCost permission && ExilePlayPermission.player permission == pid)
-                      (Object.playableFromExile obj) ->
-                      [untagged (withoutPayingManaCost face)]
+                  | Just permission <- Object.playableFromExile obj,
+                    ExilePlayPermission.player permission == pid,
+                    Just mana <- ExilePlayPermission.alternativeManaCost permission ->
+                      [untagged (insteadOfManaCost mana face)]
                 -- CR 118.9's other half, "applied to it from another effect", as a
                 -- STANDING grant (Omniscience): a player-scoped alternative cost no
                 -- per-card list can hold. APPENDED to the hand's ordinary list rather

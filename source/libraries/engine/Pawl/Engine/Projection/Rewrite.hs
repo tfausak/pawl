@@ -480,6 +480,9 @@ rewriteEffect pairs effect = case effect of
   -- CR 612 reaches the count and the ObjectRef's own filters; rule 701.66a
   -- names no subtype word.
   Effect.Earthbend (Earthbend.MkEarthbend quantity ref) -> Effect.Earthbend (Earthbend.MkEarthbend (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
+  -- CR 612 reaches the ObjectRef's own filters; rule 701.65a names no subtype
+  -- word and the {2} it fixes is not a card's text.
+  Effect.Airbend ref -> Effect.Airbend (rewriteObjectRef pairs ref)
   Effect.TemptWithTheRing -> effect
   Effect.Forage -> effect
   -- CR 612.2's gate, and this arm is where it bites rather than where it is
