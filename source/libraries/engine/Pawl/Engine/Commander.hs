@@ -21,15 +21,14 @@
 --
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
---   * CR 903.3a's "this card can be your commander" (#939) -- Rowan Kenrith
---     and Will Kenrith print it, and reaching it means enforcing rule 903.3's
---     restriction first, which is #940's.
---   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
+--   * CR 903.12b, CR 903.12d and CR 903.12e's Brawl deck construction, and CR
+--     903.13's Commander Draft -- deck-building rules, like rule 903.5's (#940).
 module Pawl.Engine.Commander where
 
 import qualified Control.Monad as Monad
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -51,6 +50,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -60,6 +60,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -95,8 +96,9 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- card is no commander "unless you have also designated a commander with 'choose
 -- a Background'" -- which is why the ONE-card case below is gated too. Rule
 -- 702.124k's second clause admits no exception for a Background named on its
--- own, and pawl reaches that reading without CR 903.3's creature/Vehicle/
--- Spacecraft restriction, which it does not enforce (#940).
+-- own. That arm is FIRST, ahead of `soleCommander`: rule 702.124k's prohibition
+-- is absolute, so a Background that also said it could be your commander (CR
+-- 903.3a) would still be refused.
 --
 -- Empty is also what an ILLEGAL pair gets, which is the closest pawl can come to
 -- rejecting the deck: nothing validates a deck (#940) and Pawl.Engine.Setup has
@@ -109,14 +111,22 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- designates on its own like any other. So the ONE-card case is gated for a
 -- Background and not for a Doctor.
 --
--- Not implemented: CR 903.3a's "this card can be your commander" (#939).
-designations :: Deck.Deck -> Set.Set Printing.Printing
-designations deck =
+-- CR 903.3's own restriction on the card -- "a creature card, a Vehicle card, or
+-- a Spacecraft card with one or more power\/toughness boxes" -- is asked of the
+-- ONE-card case alone, and `soleCommander` is it. CR 702.124a is why no partner
+-- limb shares it: "each partner ability has its own requirements for those two
+-- commanders", and rule 702.124h, rule 702.124i and rule 702.124j ask for two
+-- legendary CARDS, rule 702.124k for a Background enchantment and rule 702.124m
+-- for two legendary creature cards. So Rowan Kenrith beside Will Kenrith is a
+-- legal pair of planeswalkers on rule 702.124j's own words.
+designations :: GameSettings.GameSettings -> Deck.Deck -> Set.Set Printing.Printing
+designations settings deck =
   let named = Deck.commander deck
    in case Set.toList named of
         [] -> named
         [one] | isBackground one -> Set.empty
-        [_] -> named
+        [one] | soleCommander settings one -> named
+        [_] -> Set.empty
         [_, _] | all hasPartner named -> named
         [a, b] | sharesPartnerText a b -> named
         [a, b] | namesEachOther a b -> named
@@ -125,6 +135,98 @@ designations deck =
         [a, b] | isDoctorsCompanion a && isTheDoctor b -> named
         [a, b] | isDoctorsCompanion b && isTheDoctor a -> named
         _ -> Set.empty
+
+-- | CR 903.3's requirement of a deck's one commander: a legendary card that is
+-- "either (a) a creature card, (b) a Vehicle card, or (c) a Spacecraft card with
+-- one or more power\/toughness boxes" -- or, CR 903.3a, a card whose own ability
+-- says it can be your commander.
+--
+-- Brawl adds a planeswalker card to those three, which is the whole of CR
+-- 903.12c's difference from rule 903.3 and the reason this takes the settings. Pawl
+-- validates no deck (#940), so a card this refuses is designated as nothing and
+-- starts nowhere, which is `designations`' posture for every illegal deck.
+--
+-- Clauses (b) and (c) are REGRESSION FENCES and not proved: no legendary Vehicle
+-- and no legendary Spacecraft is in the corpus (Dawnsire, Sunstar Dreadnought and
+-- U.S.S. Enterprise-D, Galaxy-Class are what would prove them), so no test tells
+-- either from the rule's absence. Clause (a), rule 903.3a and rule 903.12c are
+-- each proved by a Pawl.CommanderSpec case.
+soleCommander :: GameSettings.GameSettings -> Printing.Printing -> Bool
+soleCommander settings printing =
+  legendary printing
+    && ( creatureCard printing
+           || hasType CardType.Artifact Subtype.Vehicle printing
+           || (hasType CardType.Artifact Subtype.Spacecraft printing && hasPowerToughnessBox printing)
+           || (GameSettings.brawl settings && Set.member CardType.Planeswalker (printedTypes printing))
+           || Face.canBeYourCommander (Card.frontFace (Printing.card printing))
+       )
+
+-- | CR 903.3(c)'s "with one or more power\/toughness boxes", which The Eternity
+-- Elevator -- a legendary Spacecraft printing none -- is the card that conjunct
+-- excludes.
+--
+-- Reads a station symbol's base-setting modification beside Face.power, because
+-- CR 721.1 puts the box inside a striation and CR 721.2b makes it a static
+-- ability: Lumen-Class Frigate's 3\/5 is transcribed as the {12+} ability's
+-- Modification.SetBasePowerToughness, and Face.power is empty for CR 721.2c.
+hasPowerToughnessBox :: Printing.Printing -> Bool
+hasPowerToughnessBox printing =
+  let face = Card.frontFace (Printing.card printing)
+      sets ability = any isBaseSet (NonEmpty.toList (StaticAbility.modifications ability))
+      isBaseSet modification = case modification of
+        Modification.SetBasePowerToughness {} -> True
+        _ -> False
+   in Maybe.isJust (Face.power face) || any sets (Face.staticAbilities face)
+
+-- | CR 903.3(a)'s "a creature card", asked of the card as it is in the COMMAND
+-- ZONE rather than of its printed type line. Rule 903.3 judges the card before
+-- the game begins, where CR 113.6c functions an ability that states which zones
+-- it does NOT function in, and CR 903.6 puts the card it designates into the
+-- command zone as the game begins. Grist, the Hunger Tide is the printing that
+-- makes the two readings differ -- "as long as Grist isn't on the battlefield,
+-- it's a 1\/1 Insect creature", which is why a planeswalker card is a legal
+-- commander -- and Pawl.CommanderSpec's "CR 903.3 a legendary planeswalker that
+-- is a creature card off the battlefield is designated" is the proof.
+--
+-- The command zone stands in for "before the game begins" because
+-- Pawl.Types.StaticAbility.functionsFrom cannot tell rule 113.6b's positive zone
+-- statement from rule 113.6c's negative one: both are a Set of Zone, so Anger's
+-- graveyard and Grist's every-zone-but-the-battlefield have the same shape. A
+-- card printed "as long as this card isn't in the command zone" would tell the
+-- two apart; Scryfall o:"isn't in the command zone", 2026-09-18, has none.
+--
+-- Reads the modifications without asking `affected` or `condition`, which is
+-- wider than the rule: an ability making some OTHER object a creature from the
+-- command zone would count here. Grist's is the corpus's only ability that adds
+-- a card type from that zone at all, and its affected set is its own source
+-- (checked over data\/cards, 2026-09-18), so nothing is wrongly designated today.
+creatureCard :: Printing.Printing -> Bool
+creatureCard printing =
+  let face = Card.frontFace (Printing.card printing)
+      added =
+        [ cardType
+        | ability <- Face.staticAbilities face,
+          Set.member Zone.Command (StaticAbility.functionsFrom ability),
+          Modification.AddCardType cardType <- NonEmpty.toList (StaticAbility.modifications ability)
+        ]
+   in Set.member CardType.Creature (printedTypes printing)
+        || elem CardType.Creature added
+
+-- | CR 903.3(b) and CR 903.3(c)'s card kinds: a card type and one of its
+-- subtypes, both off the printed front face for the reason `designations` gives.
+--
+-- The card TYPE is asked beside the subtype because CR 205.3g makes Vehicle and
+-- Spacecraft artifact types, and CR 205.3n prints Spacecraft as a planar type as
+-- well -- a subtype on its own would not tell the two apart.
+hasType :: CardType.CardType -> Subtype.Subtype -> Printing.Printing -> Bool
+hasType cardType subtype printing =
+  Set.member cardType (printedTypes printing)
+    && Set.member subtype (TypeLine.subtypes (Face.typeLine (Card.frontFace (Printing.card printing))))
+
+-- | The card types printed on this card's front face, for the reason
+-- `designations` gives.
+printedTypes :: Printing.Printing -> Set.Set CardType.CardType
+printedTypes printing = TypeLine.types (Face.typeLine (Card.frontFace (Printing.card printing)))
 
 -- | CR 702.124h's requirement of one card of a pair.
 hasPartner :: Printing.Printing -> Bool

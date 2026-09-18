@@ -185,6 +185,39 @@ designationSpec s registry = Spec.describe s "Designation" $ do
     Spec.assertEqWith s "alice is designated it" (fmap (commanderPrintingsOf gs) (Map.lookup S.alice (GameState.players gs))) (Just [shimatsu])
     Spec.assertEqWith s "and it is her commander" (fmap (\oid -> Commander.isCommander oid gs) (inCommandZone gs)) [True]
     Spec.assertEqWith s "having cast it no times yet" (commanderCastsOf gs) []
+  -- CR 903.3a: "some cards have an ability that states the card can be your
+  -- commander", which is what lets a card rule 903.3's own restriction --
+  -- "a creature card, a Vehicle card, or a Spacecraft card with one or more
+  -- power\/toughness boxes" -- would otherwise refuse be designated.
+  --
+  -- TWO boards differing in that printed ability and in nothing else that rule
+  -- 903.3 reads. Freyalise, Llanowar's Fury ({3}{G}{G} Legendary Planeswalker --
+  -- Freyalise, loyalty 3, "Freyalise, Llanowar's Fury can be your commander" --
+  -- checked against Scryfall, 2026-09-18) prints it; Serra the Benevolent is a
+  -- legendary planeswalker that does not. Neither is a creature, a Vehicle or a
+  -- Spacecraft card, so rule 903.3a is the only thing that can have designated
+  -- one of them. A single board would pass on an engine that designated whatever
+  -- the deck named, which is what pawl did before this.
+  Spec.it s "CR 903.3/903.3a a legendary planeswalker is designated only if it says it can be your commander" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    freyalise <- S.printingOf s registry "Freyalise, Llanowar's Fury"
+    serra <- S.printingOf s registry "Serra the Benevolent"
+    let said = commanderBoard mountain freyalise 0
+        silent = commanderBoard mountain serra 0
+    Spec.assertEqWith s "CR 903.3a Freyalise is alice's commander in the command zone" (fmap (\oid -> Commander.isCommander oid said) (inCommandZone said)) [True]
+    Spec.assertEqWith s "CR 903.3 Serra reaches no zone at all, her designation refused" (length (inCommandZone silent)) 0
+    Spec.assertEqWith s "and alice is designated nothing" (fmap (commanderPrintingsOf silent) (Map.lookup S.alice (GameState.players silent))) (Just [])
+  -- CR 903.3's "(a) a creature card", asked of the card as rule 903.3 judges it
+  -- -- before the game begins -- and not of its printed type line. Grist, the
+  -- Hunger Tide is a legendary PLANESWALKER card that is "a 1\/1 Insect creature"
+  -- in every zone but the battlefield (CR 113.6c) and prints no "can be your
+  -- commander", so it is designated where the case above's Serra, the same
+  -- printed card type without either, is not.
+  Spec.it s "CR 903.3 a legendary planeswalker that is a creature card off the battlefield is designated" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    let gs = commanderBoard mountain grist 0
+    Spec.assertEqWith s "Grist is alice's commander in the command zone" (fmap (\oid -> Commander.isCommander oid gs) (inCommandZone gs)) [True]
   -- The falsifier for a commander smuggled into the library: CR 903.6 puts it in
   -- the command zone and shuffles "the REMAINING cards of their deck" into the
   -- library, so the commander is in exactly one of the two.
@@ -1048,8 +1081,27 @@ brawlDuel mine theirs =
       brawling = empty {GameState.settings = (GameState.settings empty) {GameSettings.brawl = True}}
    in intoPlay S.alice (designating [(S.alice, mine), (S.bob, theirs)] brawling)
 
-brawlSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+-- Alice's Brawl deck with one commander, built through Setup.createDeck like
+-- commanderBoard -- CR 903.12a's option turned on before the deck is built, for
+-- brawlDuel's reason.
+brawlDesignating :: Printing.Printing -> GameState.GameState
+brawlDesignating commander =
+  let empty = Setup.emptyGame S.bothPlayers
+      brawling = empty {GameState.settings = (GameState.settings empty) {GameSettings.brawl = True}}
+      deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.singleton commander, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
+   in S.runPure S.identityAnswer brawling (Setup.createDeck S.alice deck)
+
+brawlSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 brawlSpec s registry = Spec.describe s "Brawl" $ do
+  -- CR 903.12c adds "(b) a planeswalker card" to the three kinds CR 903.3 allows,
+  -- and that is the whole of rule 903.12c's difference from rule 903.3. The same
+  -- card and the same one-commander deck the Designation group above shows a
+  -- Commander deck cannot designate, through the same Setup.createDeck, with
+  -- GameSettings.brawl the only thing rule 903.3 reads that differs.
+  Spec.it s "CR 903.12c a legendary planeswalker IS a Brawl deck's commander" $ do
+    serra <- S.printingOf s registry "Serra the Benevolent"
+    let board = brawlDesignating serra
+    Spec.assertEqWith s "Serra is alice's commander in the command zone" (fmap (\oid -> Commander.isCommander oid board) (inCommandZone board)) [True]
   -- CR 903.12h: "Brawl games do not use the state-based action described in
   -- rule 704.6c". The same three swings that kill bob in the CR 903.10a group
   -- above, on a board differing only in GameState.settings.

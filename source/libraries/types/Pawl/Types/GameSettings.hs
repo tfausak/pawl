@@ -22,14 +22,15 @@ import qualified Pawl.Types.Teams as Teams
 -- because every rule that reads it is reading the game it is in -- a subgame
 -- (CR 729) and a restarted game (CR 727) each carry their own copy.
 data GameSettings = MkGameSettings
-  { -- | CR 903.12a: whether this is a Brawl game. Three rules read it -- CR
-    -- 903.12f's starting life, CR 903.12g's free first mulligan, and CR
-    -- 903.12h's removal of CR 704.6c's state-based action.
+  { -- | CR 903.12a: whether this is a Brawl game. Four rules read it -- CR
+    -- 903.12c's designation (Pawl.Engine.Commander.soleCommander), CR 903.12f's
+    -- starting life, CR 903.12g's free first mulligan, and CR 903.12h's removal
+    -- of CR 704.6c's state-based action.
     --
-    -- Not implemented: CR 903.12b--e, which are deck construction (the card
-    -- pool, the legendary designation, the 60-card deck, the basic-land
-    -- exception). Pawl enforces no deck legality at all (#940), so a Brawl deck
-    -- is unchecked exactly as a Commander deck is.
+    -- Not implemented: CR 903.12b, CR 903.12d and CR 903.12e, which are deck
+    -- construction (the card pool, the 60-card deck, the basic-land exception).
+    -- Pawl enforces no deck legality at all (#940), so a Brawl deck is unchecked
+    -- exactly as a Commander deck is.
     brawl :: Bool,
     -- | CR 806.2b: which of the three attack options this game uses, if any.
     -- 'AttackOption.MultiplePlayers' by default (Pawl.Engine.Setup.newGame),
