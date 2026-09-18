@@ -254,6 +254,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.SameOwnerAsSource -> 0
   Filter.Type.SameControllerAsBound _ -> 0
   Filter.Type.SharesCreatureTypeWithBound _ -> 0
+  Filter.Type.ToughnessLessThanBound _ -> 0
   Filter.Type.HasChosenName -> 0
   Filter.Type.HasChosenColor -> 0
   Filter.Type.HasChosenSubtype -> 0
@@ -716,6 +717,27 @@ sharesCreatureTypeOffends :: Face.Face Card.Type.Card -> Bool
 sharesCreatureTypeOffends card =
   let (framed, elsewhere) = sharesCreatureTypeCounts card
    in elsewhere /= 0 || framed + elsewhere /= jsonAtoms sharesCreatureTypeTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The CR 208.1 tag, spelled once.
+toughnessLessThanBoundTag :: Text.Text
+toughnessLessThanBoundTag = Text.pack "ToughnessLessThanBound"
+
+-- How many CR 208.1 bound-toughness atoms this card carries in a resolution's own
+-- positions and how many anywhere else, sharesCreatureTypeCounts' shape one
+-- Filter.Context field over: Pawl.Engine.Resolve.Slots.effectContext is the one
+-- filler of Filter.Context.slotToughnesses too, so the atom is a silent False
+-- elsewhere. The second number is the offence.
+toughnessLessThanBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
+toughnessLessThanBoundCounts card =
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms toughnessLessThanBoundTag f) (filter (\(framing, _) -> elem framing [SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed] == wanted) (cardFilters card)))
+   in (total True, total False)
+
+-- The atom outside those positions, or the traversal and the codec disagreeing
+-- about how many the card holds -- sharesCreatureTypeOffends' two offences.
+toughnessLessThanBoundOffends :: Face.Face Card.Type.Card -> Bool
+toughnessLessThanBoundOffends card =
+  let (framed, elsewhere) = toughnessLessThanBoundCounts card
+   in elsewhere /= 0 || framed + elsewhere /= jsonAtoms toughnessLessThanBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- The CR 110.2 tag, spelled once.
 sameControllerAsBoundTag :: Text.Text
@@ -1194,6 +1216,23 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- a static restriction's affected set, read through a bare contextFor.
     Spec.assertBool s (sharesCreatureTypeOffends restricted) "the atom in an affected set offends"
     Spec.assertEqWith s "counted outside the admitted positions" (sharesCreatureTypeCounts restricted) (1, 1)
+  -- CR 208.1's bound comparison in the arm above's frame, one Filter.Context field
+  -- over: answerable only where effectContext fills Filter.Context.slotToughnesses.
+  -- See toughnessLessThanBoundOffends for the two offences.
+  Spec.it s "CR 208.1 no card asks ToughnessLessThanBound outside a resolution's own positions" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace toughnessLessThanBoundOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only where the resolution fills the toughnesses" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the card that does is ACCEPTED.
+    profaner <- S.printingOf s registry "Profaner of the Dead"
+    let face = S.combinedFace profaner
+        atom = Filter.Type.ToughnessLessThanBound (SlotName.MkSlotName (Text.pack "thatExploitedCreature"))
+        restricted = face {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching atom) Nothing]}
+    Spec.assertEqWith s "Profaner of the Dead's one atom is in its ObjectRef" (toughnessLessThanBoundCounts face) (1, 0)
+    -- The lint's own proof, the pair differing in one position: the same atom in
+    -- a static restriction's affected set, read through a bare contextFor.
+    Spec.assertBool s (toughnessLessThanBoundOffends restricted) "the atom in an affected set offends"
+    Spec.assertEqWith s "counted outside the admitted positions" (toughnessLessThanBoundCounts restricted) (1, 1)
   -- CR 110.2's Filter.SameControllerAsBound is CR 709.4a's atom one characteristic
   -- over, in the same position and with the STAKES reversed: it is vacuously TRUE
   -- where Filter.Context.slotControllers has no key for its slot, so an atom

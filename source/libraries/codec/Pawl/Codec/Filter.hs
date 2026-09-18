@@ -94,6 +94,7 @@ codec keywordCodec =
       Arm.nullary "SameOwnerAsSource" Filter.SameOwnerAsSource,
       Arm.payload "SameControllerAsBound" SlotName.codec Filter.SameControllerAsBound (\x -> case x of Filter.SameControllerAsBound y -> Just y; _ -> Nothing),
       Arm.payload "SharesCreatureTypeWithBound" SlotName.codec Filter.SharesCreatureTypeWithBound (\x -> case x of Filter.SharesCreatureTypeWithBound y -> Just y; _ -> Nothing),
+      Arm.payload "ToughnessLessThanBound" SlotName.codec Filter.ToughnessLessThanBound (\x -> case x of Filter.ToughnessLessThanBound y -> Just y; _ -> Nothing),
       Arm.nullary "HasChosenName" Filter.HasChosenName,
       Arm.nullary "HasChosenColor" Filter.HasChosenColor,
       Arm.nullary "HasChosenSubtype" Filter.HasChosenSubtype,
@@ -199,6 +200,7 @@ tagOf x = case x of
   Filter.SameOwnerAsSource {} -> "SameOwnerAsSource"
   Filter.SameControllerAsBound {} -> "SameControllerAsBound"
   Filter.SharesCreatureTypeWithBound {} -> "SharesCreatureTypeWithBound"
+  Filter.ToughnessLessThanBound {} -> "ToughnessLessThanBound"
   Filter.HasChosenName {} -> "HasChosenName"
   Filter.HasChosenColor {} -> "HasChosenColor"
   Filter.HasChosenSubtype {} -> "HasChosenSubtype"

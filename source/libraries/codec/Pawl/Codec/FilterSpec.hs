@@ -314,6 +314,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.SharesCreatureTypeWithBound (SlotName.MkSlotName (Text.pack "thatDepartedPermanent")))
       " {\"type\":\"SharesCreatureTypeWithBound\",\"value\":\"thatDepartedPermanent\"} "
+  Spec.it s "ToughnessLessThanBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.ToughnessLessThanBound (SlotName.MkSlotName (Text.pack "thatExploitedCreature")))
+      " {\"type\":\"ToughnessLessThanBound\",\"value\":\"thatExploitedCreature\"} "
   Spec.it s "HasChosenName" $
     Common.assertCodec
       s
