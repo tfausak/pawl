@@ -8157,6 +8157,43 @@ castUsingHaste castUsing = case castUsing of
   Just (Keyword.Suspend _) -> Just (Duration.ForAsLongAs youControlSource)
   _ -> Nothing
 
+-- CR 702.190b: "A permanent spell whose sneak cost was paid enters the
+-- battlefield tapped and attacking (see rule 506.3a). It will be attacking the
+-- same player, planeswalker, or battle as the creature that was returned to its
+-- owner's hand to pay the sneak cost of the spell that became that permanent."
+-- The riders that sentence states, for a spell whose Object.castUsing says
+-- sneak offered its cost; Nothing for every other cast, which enters ordinarily.
+--
+-- THE SAME RIDERS ninjutsu mints, rule 702.49c's sentence being rule 702.190b's:
+-- the returned creature is bound under Binding.returnedPermanent by the cost
+-- component both keywords append (Pawl.Engine.Cost's ReturnPermanents arm), and
+-- CR 608.2h's last known information is what answers what it was attacking once
+-- CR 400.7 has minted its new incarnation in the hand. Read by
+-- Pawl.Engine.Stack's permanent entry, where the ninja's are read by an
+-- Effect.MoveToZone instead.
+--
+-- EntryRiders rather than a Bool pair, so the two roads apply one value through
+-- one reader (Pawl.Engine.Resolve.Effect.entryAttack), and Natural rather than
+-- Quantity because nothing here is counted: the riders reaching a funnel are
+-- already settled (see Pawl.Types.EntryRiders).
+castUsingEntry :: Maybe Keyword -> Maybe (EntryRiders.EntryRiders Natural)
+castUsingEntry castUsing =
+  if sneakWindowed castUsing
+    then
+      Just
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Tapped,
+            EntryRiders.attacking = Just (EntryAttack.SameAs Binding.returnedPermanent),
+            EntryRiders.blocking = Nothing,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.empty,
+            EntryRiders.underOwner = False,
+            EntryRiders.exiledFaceDown = False,
+            EntryRiders.attachedTo = Nothing,
+            EntryRiders.faceDown = Nothing
+          }
+    else Nothing
+
 -- CR 611.2b's Master Thief clause, "for as long as you control this creature",
 -- over the effect's own source.
 youControlSource :: Condition.Condition

@@ -157,6 +157,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Mill {} -> Nothing
   Effect.Reveal {} -> Nothing
   Effect.LookAt {} -> Nothing
+  Effect.ArrangeInLibrary {} -> Nothing
   Effect.Scry {} -> Nothing
   Effect.Surveil {} -> Nothing
   Effect.Fateseal {} -> Nothing

@@ -864,9 +864,10 @@ data Keyword
     -- returning an unblocked creature instead of a tapped one and carrying a
     -- casting window of its own (Pawl.Engine.Cast.candidateTimingOk).
     --
-    -- Not implemented: CR 702.190b's rider, which enters a PERMANENT spell whose
-    -- sneak cost was paid tapped and attacking whatever the returned creature was
-    -- attacking (#3689).
+    -- CR 702.190b's rider -- the permanent enters tapped and attacking whatever
+    -- the returned creature was attacking -- is minted by
+    -- Pawl.Engine.Keyword.castUsingEntry and applied by Pawl.Engine.Stack's
+    -- permanent entry; Pawl.CastSpec's Sneak group proves it.
     Sneak (Cost.Cost Keyword)
   | -- | 702.191a: whenever you cast a spell, if this permanent is a creature and
     -- the amount of mana spent to cast that spell is greater than this creature's

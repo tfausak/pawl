@@ -535,6 +535,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Surveil x -> Effect.Surveil (rewritePlayerQuantity pairs x)
   Effect.Fateseal x -> Effect.Fateseal (rewritePlayerQuantity pairs x)
   Effect.Explore ref -> Effect.Explore (rewriteObjectRef pairs ref)
+  Effect.ArrangeInLibrary ref -> Effect.ArrangeInLibrary (rewriteObjectRef pairs ref)
   Effect.Connive (Connive.MkConnive quantity ref) -> Effect.Connive (Connive.MkConnive (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   -- The These arm's ref carries a Filter, so rule 612's text change reaches it
   -- exactly as Reveal's does; the Counted arm holds two slot NAMES and a count,

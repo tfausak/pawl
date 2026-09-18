@@ -254,6 +254,7 @@ ownQuantities effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.Explore {} -> []
+  Effect.ArrangeInLibrary {} -> []
   Effect.Connive (Connive.MkConnive quantity _) -> [quantity]
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> [quantity]
@@ -1225,6 +1226,7 @@ effectObjectRefs effect =
         Effect.Surveil {} -> []
         Effect.Fateseal {} -> []
         Effect.Explore ref -> read_ [ref]
+        Effect.ArrangeInLibrary ref -> read_ [ref]
         Effect.Connive (Connive.MkConnive _ ref) -> read_ [ref]
         Effect.Discard subject -> case subject of
           Discard.Counted {} -> []

@@ -49,6 +49,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -3970,10 +3971,12 @@ warpCost = [ManaSymbol.Generic 3]
 -- THREE ISLANDS on every board, enough for either cost, so no case below turns on
 -- mana. What the boards differ in is whether alice has an unblocked attacker.
 --
--- Not implemented: CR 702.190b, which enters a PERMANENT spell whose sneak cost
--- was paid tapped and attacking what the returned creature was attacking (#3689).
--- Every sneak permanent in the pool is a creature, and this card is a sorcery.
-sneakSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+-- CR 702.190b is the group's second card, Splinter, Hamato Yoshi {1}{B}
+-- Legendary Creature -- Mutant Ninja Rat 1/3, "Sneak {B} / Menace / Other Ninjas
+-- you control get +1\/+1" (Oracle text checked on Scryfall, 2026-09-18): a
+-- PERMANENT spell, which the sorcery above cannot be, so that the rider has a
+-- permanent to ride on.
+sneakSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sneakSpec s registry = Spec.describe s "Sneak" $ do
   Spec.it s "CR 702.190a in her declare blockers step alice casts the sorcery for {U}, returning the unblocked Piker; the printed {2}{U} is not on offer" $ do
     island <- S.printingOf s registry "Island"
@@ -4017,6 +4020,106 @@ sneakSpec s registry = Spec.describe s "Sneak" $ do
       s
       (not (any (S.isCastOf techniqueId) (Action.legalActions S.alice noAttack)))
       "the control: the same step and the same mana with nothing attacking offer no cast, so the window alone is not what carried the case above"
+
+  -- CR 702.190b: the permanent enters tapped and attacking whatever the returned
+  -- creature was attacking. TWO boards differing only in the Piker's declared
+  -- target, each answered by a seat that would send Splinter at the OTHER one if
+  -- it were ever asked -- so each lands where it does because rule 702.190b
+  -- SPECIFIED it and nobody was asked (CR 508.4's parenthetical). bob's Jace
+  -- Beleren is what gives the Piker two subjects to attack, since a lone
+  -- defending player would make the two readings agree.
+  Spec.it s "CR 702.190b the sneaked Splinter arrives tapped and attacking whatever the Piker it returned was attacking" $ do
+    board <- splinterBoard s registry
+    let atJace = AttackTarget.OfPlaneswalker (splinterJace board)
+        atBob = AttackTarget.OfPlayer S.bob
+        sneaked aimed asked = arrivedSplinter (castResolved (sneakingAt sneakCostBlack asked) (splinterCard board) (splinterDeclared board aimed))
+    Spec.assertEqWith
+      s
+      "CR 702.190b the Piker was sent at Jace, so Splinter is attacking Jace and arrived tapped, where the answerer would have picked bob"
+      (sneaked atJace atBob)
+      [(Just atJace, Just TapState.Tapped)]
+    Spec.assertEqWith
+      s
+      "CR 702.190b the Piker was sent at bob, so Splinter is attacking bob and arrived tapped, where the answerer would have picked Jace"
+      (sneaked atBob atJace)
+      [(Just atBob, Just TapState.Tapped)]
+    Spec.assertEqWith
+      s
+      "the Piker really was declared at each, so the two boards differ in that and nothing else"
+      (fmap (Map.elems . Combat.Type.attackers . GameState.combat . splinterDeclared board) [atJace, atBob])
+      [[atJace], [atBob]]
+
+  -- The control, and the reason rule 702.190b is keyed on Object.castUsing
+  -- rather than on the card: the SAME card and the same two Swamps, cast in
+  -- alice's own precombat main phase for the printed {1}{B}, enters untapped and
+  -- out of combat.
+  Spec.it s "CR 702.190b a Splinter cast for its printed {1}{B} enters untapped and attacking nothing" $ do
+    board <- splinterBoard s registry
+    Spec.assertEqWith
+      s
+      "CR 110.5b / 506.3 no sneak cost was paid, so Splinter arrived untapped and is not an attacking creature"
+      (arrivedSplinter (castResolved (payingFor splinterCost) (splinterCard board) (aliceOnTurn (splinterBase board))))
+      [(Nothing, Just TapState.Untapped)]
+
+-- CR 702.190b's board: alice's Goblin Piker and bob's Jace Beleren at three
+-- loyalty, two Swamps for either of Splinter's costs, Splinter in alice's hand
+-- and four cards under each library so no seat is decked by CR 104.3c.
+data SplinterBoard = MkSplinterBoard
+  { splinterBase :: GameState.GameState,
+    splinterCard :: ObjectId.ObjectId,
+    splinterJace :: ObjectId.ObjectId
+  }
+
+splinterBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m SplinterBoard
+splinterBoard s registry = do
+  swamp <- S.printingOf s registry "Swamp"
+  splinter <- S.printingOf s registry "Splinter, Hamato Yoshi"
+  piker <- S.printingOf s registry "Goblin Piker"
+  jace <- S.printingOf s registry "Jace Beleren"
+  let (g0, _, theirs) = S.combatBoardOf [piker] [jace]
+      jaceId = case theirs of
+        oid : _ -> oid
+        -- combatBoardOf returns one id per printing given, so this is
+        -- unreachable; a bogus id fails the assertions rather than the suite.
+        [] -> S.noSource
+      g1 = S.addCounter CounterKind.Loyalty 3 jaceId g0
+      withLands = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) g1 [1 :: Int .. 2]
+      (splinterId, withCard) = S.addHandCard splinter S.alice withLands
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) withCard [1 :: Int .. 4]
+  pure (MkSplinterBoard (stocked {GameState.priority = Just S.alice}) splinterId jaceId)
+
+-- splinterBoard with the Piker declared at `aimed` and alice back at priority in
+-- her declare blockers step, which is rule 702.190a's window. CR 509.1h: nothing
+-- of bob's can block, so the Piker is an unblocked creature.
+splinterDeclared :: SplinterBoard -> AttackTarget.AttackTarget -> GameState.GameState
+splinterDeclared board aimed =
+  (S.runPure (sneakingAt [] aimed) (splinterBase board) (Combat.declareAttackers S.manaPerformer S.alice))
+    { GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+      GameState.priority = Just S.alice
+    }
+
+-- What the Splinter on the battlefield is attacking and whether it is tapped,
+-- read by NAME because CR 400.7 gives the arriving permanent a fresh id.
+arrivedSplinter :: GameState.GameState -> [(Maybe AttackTarget.AttackTarget, Maybe TapState.TapState)]
+arrivedSplinter gs =
+  fmap
+    (\oid -> (Map.lookup oid (Combat.Type.attackers (GameState.combat gs)), fmap Object.tapped (Game.lookupObject oid gs)))
+    (namedOnBattlefield "Splinter, Hamato Yoshi" gs)
+
+-- Pays `wanted` where a cost is asked and aims every CR 508.1b and CR 508.4
+-- announcement at `target` whenever it is offered, so a rider that specified a
+-- target can be told from a prompt that was answered; aggressiveAnswer
+-- otherwise, which is what declares the attack at all.
+sneakingAt :: [ManaSymbol.ManaSymbol] -> AttackTarget.AttackTarget -> Prompt.Prompt r -> r
+sneakingAt wanted target p = case p of
+  Prompt.ChooseAttackTarget _ _ _ options -> if List.elem target (NonEmpty.toList options) then target else NonEmpty.head options
+  Prompt.ChooseCost {} -> payingFor wanted p
+  _ -> S.aggressiveAnswer p
+
+-- Splinter, Hamato Yoshi's printed {1}{B} and its sneak {B}.
+splinterCost, sneakCostBlack :: [ManaSymbol.ManaSymbol]
+splinterCost = [ManaSymbol.Generic 1, theBlack]
+sneakCostBlack = [theBlack]
 
 -- Donatello's Technique's printed {2}{U} and its sneak {U}.
 techniqueCost, sneakCost :: [ManaSymbol.ManaSymbol]

@@ -2310,6 +2310,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.FromOutsideTheGame {} -> False
   Effect.ExileThisSpell {} -> False
   Effect.LookAt {} -> False
+  Effect.ArrangeInLibrary {} -> False
   Effect.Scry {} -> False
   Effect.Surveil {} -> False
   Effect.Fateseal {} -> False
@@ -4576,6 +4577,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- the group, which Filter.IsBound reads as CR 701.20e's "among them".
       [only] -> State.modify' (bindSlot resolving slot only)
       several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
+  Effect.ArrangeInLibrary ref -> do
+    gs <- State.get
+    -- CR 608.2c: the cards are named as this instruction is reached, which for
+    -- Ponder is the slot the look bound one clause earlier.
+    let named = objectRefObjects legal resolving controller source gs ref
+        -- CR 400.3 makes every library its owner's, so the owner is both the
+        -- seat whose library is rewritten and CR 401.4's arranger -- never the
+        -- resolving controller, which is the same reading
+        -- Pawl.Types.LibraryPlacement takes of CR 401.2.
+        owners = ListUtils.nubOrd (Maybe.mapMaybe (\oid -> fmap Object.owner (Game.lookupObject oid gs)) named)
+    -- APNAP (CR 101.4) for a reference that could name two seats' cards at once;
+    -- each owner's library is rewritten before the next is asked.
+    Monad.mapM_ (`arrangeInLibrary` named) (filter (\pid -> List.elem pid owners) (Game.apnapOrder gs))
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -8406,6 +8420,43 @@ newestBattlefieldOf _ before after =
 reorderLibrary :: PlayerId -> [ObjectId] -> GameState -> GameState
 reorderLibrary pid order gs =
   gs {GameState.library = Map.insert pid (Seq.fromList order) (GameState.library gs)}
+
+-- CR 401.4: one owner puts the cards `cards` names back into their library, in
+-- an order they state, at the positions those cards already occupy.
+--
+-- The library is REWRITTEN rather than funnelled through Event.changeZone, for
+-- scryOne's reason one rule over: nothing crosses a zone boundary, so CR 400.7
+-- mints no new incarnation and the ids the prompt named are the ids that move.
+--
+-- ASKED AT TWO OR MORE, which is rule 401.4's own count: one card has one
+-- order, and the engine does not raise a question with a single answer. Two
+-- cards are two distinct objects however alike their printings, so
+-- indistinguishable here means "fewer than two cards to arrange" and nothing
+-- else -- a player who knows the order of the top two cards of their library
+-- can tell the two answers apart at their next draw.
+--
+-- The cards are taken in LIBRARY order (top first) rather than in the order the
+-- reference swept them, which is what makes the answer's indices mean what
+-- Prompt.ArrangeLibraryCards says they mean. A card the reference named that has
+-- left the library since (CR 603.7c) is simply not among them.
+arrangeInLibrary :: PlayerId -> [ObjectId] -> Game ()
+arrangeInLibrary pid cards = do
+  gs <- State.get
+  let whole = Game.zoneMembers Zone.Library pid gs
+      moving = filter (\oid -> List.elem oid cards) whole
+  Monad.when (length moving > 1) $ do
+    answer <- Game.choose (Prompt.ArrangeLibraryCards (Decide.deciderFor pid gs) pid moving)
+    State.modify' (reorderLibrary pid (refill whole moving (Game.permute moving answer)))
+
+-- Put `ordered` back at the positions `moving` occupies in `whole`, leaving
+-- every other card where it was. Game.permute answers a permutation of `moving`
+-- whatever it is given, so `ordered` never runs short.
+refill :: [ObjectId] -> [ObjectId] -> [ObjectId] -> [ObjectId]
+refill whole moving ordered =
+  let step remaining oid = case (List.elem oid moving, remaining) of
+        (True, next : rest) -> (rest, next)
+        _ -> (remaining, oid)
+   in snd (List.mapAccumL step ordered whole)
 
 -- CR 701.22a: one player's scry. A short library is looked at as far as it goes;
 -- rule 701.22 states no penalty for scrying more than there is.

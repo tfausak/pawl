@@ -226,6 +226,20 @@ data Effect card ability
     -- of the state (#1412), so the binding is the whole of the look and WHO
     -- looks is not carried.
     LookAt LookAt.LookAt
+  | -- | CR 401.4: the cards the ObjectRef names go back into their owner's
+    -- library at the positions they already occupy, in an order that owner
+    -- states (Ponder's "then put them back in any order").
+    --
+    -- The cards never leave the library, so this is a rewrite of its order and
+    -- no zone change at all -- Scry's road (Pawl.Engine.Resolve.Effect's
+    -- reorderLibrary) rather than MoveToZone's. That is also why no
+    -- LibraryPlacement rides here: the cards resume their own positions, so
+    -- there is no end for one to state.
+    --
+    -- Scry, Surveil and Fateseal split the looked-at cards two ways; this asks
+    -- for ONE ordered list back, which is a third question and not a special
+    -- case of theirs.
+    ArrangeInLibrary ObjectRef.ObjectRef
   | -- | CR 701.22a: the players the PlayerRef names each scry this many, the
     -- ordered partition being theirs (Prompt.ChooseScry). One library rewrite
     -- and no zone change.

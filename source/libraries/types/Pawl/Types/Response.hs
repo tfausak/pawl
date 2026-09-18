@@ -642,6 +642,10 @@ data Response
   | -- | CR 401.4's answer: the order an owner chose for the cards arriving at one
     -- end of their library, as a permutation of the offered indices.
     ArrangedLibraryArrivals [Natural.Natural]
+  | -- | CR 401.4's answer for cards that never left: the order an owner chose
+    -- for cards put back into their library, as a permutation of the offered
+    -- indices.
+    ArrangedLibraryCards [Natural.Natural]
   | -- | CR 702.140c's answer: which side of the target creature a mutating
     -- creature spell was put on.
     ChoseMutateSide MutateSide.MutateSide
