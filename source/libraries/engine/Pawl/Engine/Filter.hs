@@ -2442,6 +2442,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.68a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- the bonus is in the ability Pawl.Engine.Keyword.frenzy mints.
   Keyword.Type.Frenzy _ -> keyword
+  -- CR 702.58a's and CR 702.64a's Ns are numbers too -- a count of counters and
+  -- an amount of damage -- so CR 612.2 finds no word in either to swap.
+  Keyword.Type.Graft _ -> keyword
+  Keyword.Type.Absorb _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
   -- CR 702.72a's [object] is a printed word, so CR 612.2 swaps inside it: under
   -- "Merfolk becomes Goblin" Wanderwine Prophets champions a Goblin, and the

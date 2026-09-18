@@ -3011,6 +3011,140 @@ championSpec s registry =
                   Spec.assertEqWith s "CR 702.72a it returned under its OWNER's control, not alice's" (Projection.View.controllerOf returned after) (Just S.bob)
               Spec.assertEqWith s "and the exile pile is empty" (namesIn Zone.Exile S.bob after) []
 
+-- CR 702.58 graft, whose rule is a static ability and a triggered one: "graft N"
+-- means "this permanent enters with N +1/+1 counters on it" and "whenever another
+-- creature enters, if this permanent has a +1/+1 counter on it, you may move a
+-- +1/+1 counter from this permanent onto that creature."
+--
+-- Two printings, and the pair is what makes rule 702.58a's clauses observable:
+--
+--   * Llanowar Reborn (Land: "This land enters tapped. {T}: Add {G}. Graft 1")
+--     bears the ability while being no creature itself, so the counter it hands
+--     over cannot come back to it and its own power and toughness cannot absorb
+--     the move;
+--   * Simic Initiate ({G} Creature -- Human Mutant 0/0, "Graft 1" and nothing
+--     else) is the ENTRANT, and being a graft permanent itself is what tests
+--     "ANOTHER creature": its own entry must not fire its own ability.
+--
+-- (Names, costs, type lines, P/T and Oracle text checked against
+-- api.scryfall.com 2026-09-17; each card is transcribed whole.)
+--
+-- Every permanent ENTERS rather than being placed: S.addPermanent would stock the
+-- counter by fixture and leave rule 702.58a's CR 614.1c row unproven.
+--
+-- Numbers all distinct: the graft is 1, the Goblin Piker a printed 2/1, the Hill
+-- Giant a 3/3, and the Initiate a 0/0 that holds 2 counters once the move lands.
+graftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graftSpec s registry =
+  let newestOnBattlefield name gs =
+        Maybe.listToMaybe (reverse (filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just name) (Game.zoneMembers Zone.Battlefield S.alice gs)))
+      plusOnes oid gs = Map.findWithDefault 0 CounterKind.PlusOnePlusOne (maybe Map.empty Object.counters (Game.lookupObject oid gs))
+      -- Rule 702.58a's "you may", taken and declined. Pinned to the decision
+      -- rather than searched for, so a mutation cannot be repaired by an answerer
+      -- looking for a legal move.
+      taking :: Prompt.Prompt r -> r
+      taking p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      declining :: Prompt.Prompt r -> r
+      declining p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Declines
+        _ -> S.identityAnswer p
+      -- alice's hand holds the two creatures and a Plains; the Reborn has already
+      -- entered, so rule 702.58a's replacement has run and its counter is on the
+      -- land rather than put there by hand.
+      grafted = do
+        land <- S.printingOf s registry "Llanowar Reborn"
+        plains <- S.printingOf s registry "Plains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Hill Giant"
+        initiate <- S.printingOf s registry "Simic Initiate"
+        let (landCard, g0) = S.addHandCard land S.alice (Setup.emptyGame S.bothPlayers)
+            (pikerCard, g1) = S.addHandCard piker S.alice g0
+            (giantCard, g2) = S.addHandCard giant S.alice g1
+            (plainsCard, g3) = S.addHandCard plains S.alice g2
+            (initiateCard, g4) = S.addHandCard initiate S.alice g3
+            entered = S.runPure S.identityAnswer g4 (Event.changeZone landCard Zone.Battlefield)
+            -- RE-FOUND rather than tracked: CR 400.7 makes the permanent a NEW
+            -- object, so the hand card's id names nothing on the battlefield. The
+            -- Reborn is the only permanent there, and the first assertion below
+            -- reads its counter, so a wrong id fails loudly rather than quietly.
+            landId = Maybe.fromMaybe landCard (Maybe.listToMaybe (Game.zoneMembers Zone.Battlefield S.alice entered))
+        pure (landId, pikerCard, giantCard, plainsCard, initiateCard, entered)
+      -- The entrant arrives, CR 603.3 places what it triggered, and the ability
+      -- resolves. `placed` stops one step short, where the CR 603.4 "if" has
+      -- already decided whether anything reached the stack at all.
+      placed :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      placed answer oid gs = S.runPure answer gs (Event.changeZone oid Zone.Battlefield >> Engine.settleForPriority)
+      entersUnder :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      entersUnder answer oid gs = S.runPure answer (placed answer oid gs) Stack.resolveTop
+   in Spec.describe s "Graft" $ do
+        -- The proving case, and both halves of rule 702.58a at once: the land came
+        -- in carrying the counter, and the counter leaves it for the creature that
+        -- entered.
+        Spec.it s "CR 702.58a the land enters with its counter and hands it to an entering creature" $ do
+          (landId, pikerCard, _, _, _, board) <- grafted
+          Spec.assertEqWith s "CR 702.58a the land entered with one +1/+1 counter" (plusOnes landId board) 1
+          let after = entersUnder taking pikerCard board
+          case newestOnBattlefield (CardName.MkCardName $ Text.pack "Goblin Piker") after of
+            Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
+            Just pikerId -> do
+              Spec.assertEqWith s "CR 702.58a the counter is on the creature that entered" (plusOnes pikerId after) 1
+              Spec.assertEqWith s "CR 702.58a and off the land it was moved from" (plusOnes landId after) 0
+              Spec.assertEqWith s "so the printed 2/1 is a 3/2" (Projection.powerOf pikerId after, Projection.toughnessOf pikerId after) (Just 3, Just 2)
+        -- THE PAIR ON THE COUNTER. The same board once the counter has gone: rule
+        -- 702.58a's intervening "if" has nothing to find, so a second creature
+        -- entering takes nothing and the first keeps what it has.
+        Spec.it s "CR 603.4 with no counter left a second creature entering takes nothing" $ do
+          (landId, pikerCard, giantCard, _, _, board) <- grafted
+          let once = entersUnder taking pikerCard board
+              after = entersUnder taking giantCard once
+          case (newestOnBattlefield (CardName.MkCardName $ Text.pack "Goblin Piker") after, newestOnBattlefield (CardName.MkCardName $ Text.pack "Hill Giant") after) of
+            (Just pikerId, Just giantId) -> do
+              Spec.assertEqWith s "CR 603.4 the Hill Giant got no counter" (plusOnes giantId after) 0
+              Spec.assertEqWith s "so it is the printed 3/3" (Projection.powerOf giantId after, Projection.toughnessOf giantId after) (Just 3, Just 3)
+              Spec.assertEqWith s "the Goblin Piker kept the one it took" (plusOnes pikerId after) 1
+              Spec.assertEqWith s "and the land is still empty" (plusOnes landId after) 0
+              -- The proxy, after the behaviour: the "if" is checked as the
+              -- trigger would be PLACED, so nothing reached the stack to decline.
+              Spec.assertEqWith s "CR 603.4 no trigger was placed at all" (length (GameState.stack (placed taking giantCard once))) 0
+            _ -> Spec.assertFailure s "both creatures should have reached the battlefield"
+        -- THE PAIR ON THE ANSWER. The first board with alice's one decision
+        -- changed and nothing else: rule 702.58a's "you may" declined leaves the
+        -- counter where it was.
+        Spec.it s "CR 702.58a declining the may leaves the counter on the land" $ do
+          (landId, pikerCard, _, _, _, board) <- grafted
+          let after = entersUnder declining pikerCard board
+          case newestOnBattlefield (CardName.MkCardName $ Text.pack "Goblin Piker") after of
+            Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
+            Just pikerId -> do
+              Spec.assertEqWith s "CR 702.58a the creature got nothing" (plusOnes pikerId after) 0
+              Spec.assertEqWith s "and the land kept its counter" (plusOnes landId after) 1
+              Spec.assertEqWith s "the trigger still reached the stack -- a declined may is not a fizzle" (length (GameState.stack (placed declining pikerCard board))) 1
+        -- THE PAIR ON THE ENTRANT'S TYPE. The first board with a LAND entering
+        -- instead of a creature: rule 702.58a says "another CREATURE".
+        Spec.it s "CR 702.58a a land entering does not fire it" $ do
+          (landId, _, _, plainsCard, _, board) <- grafted
+          let after = entersUnder taking plainsCard board
+          Spec.assertEqWith s "CR 702.58a the land kept its counter" (plusOnes landId after) 1
+          Spec.assertEqWith s "and nothing was placed" (length (GameState.stack (placed taking plainsCard board))) 0
+        -- "ANOTHER" doing real work. The entrant is itself a graft permanent, so
+        -- two abilities see one entry: the Reborn's fires, and the Initiate's own
+        -- does not, it being no "another" to itself. The counters cannot tell
+        -- those apart -- CR 122.5 forbids a move from an object to itself either
+        -- way -- so the count of what alice was asked is the discriminator, and
+        -- the board's reading of it is the 2/2.
+        Spec.it s "CR 702.58a an entering graft permanent does not trigger its own ability" $ do
+          (landId, _, _, _, initiateCard, board) <- grafted
+          let after = entersUnder taking initiateCard board
+          Spec.assertEqWith s "CR 702.58a exactly one ability triggered" (length (GameState.stack (placed taking initiateCard board))) 1
+          case newestOnBattlefield (CardName.MkCardName $ Text.pack "Simic Initiate") after of
+            Nothing -> Spec.assertFailure s "the Simic Initiate did not reach the battlefield"
+            Just initiateId -> do
+              Spec.assertEqWith s "CR 702.58a it holds its own counter and the land's" (plusOnes initiateId after) 2
+              Spec.assertEqWith s "so the printed 0/0 is a 2/2" (Projection.powerOf initiateId after, Projection.toughnessOf initiateId after) (Just 2, Just 2)
+              Spec.assertEqWith s "and the land handed its one over" (plusOnes landId after) 0
+
 -- CR 702.101a: "Extort is a triggered ability. 'Extort' means 'Whenever you cast
 -- a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you gain
 -- life equal to the total life lost this way.'"
@@ -3222,6 +3356,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   echoSpec s registry
   exploitSpec s registry
   championSpec s registry
+  graftSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry

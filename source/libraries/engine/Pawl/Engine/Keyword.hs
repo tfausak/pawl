@@ -114,7 +114,9 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MorphVariant as MorphVariant
+import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
+import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
@@ -250,6 +252,14 @@ abilitiesFor keyword count = case keyword of
   Keyword.Fading _ -> List.genericReplicate count fading
   -- CR 702.68b: each instance triggers separately.
   Keyword.Frenzy n -> List.genericReplicate count (frenzy n)
+  -- CR 702.58a's SECOND ability, modular's shape below: the rule states two, the
+  -- first a replacement effect, so one trigger lands here. CR 702.58b: each
+  -- instance works separately.
+  Keyword.Graft _ -> List.genericReplicate count graft
+  -- CR 702.64a mints no ability: absorb is a static ability and its whole content
+  -- is the damage replacement `mintedReplacementsFor` writes, sunburst's shape
+  -- below.
+  Keyword.Absorb _ -> []
   -- CR 702.43a's SECOND ability, one per instance (CR 702.43b).
   Keyword.Modular _ -> List.genericReplicate count modular
   -- CR 702.44a mints no ability: sunburst is a static ability that functions as
@@ -683,6 +693,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
+  Keyword.Graft _ -> []
+  Keyword.Absorb _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -1168,6 +1180,8 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
+  Keyword.Graft _ -> []
+  Keyword.Absorb _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -1788,6 +1802,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
+  Keyword.Graft _ -> []
+  Keyword.Absorb _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -2441,6 +2457,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
+  Keyword.Graft _ -> []
+  Keyword.Absorb _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -3734,6 +3752,43 @@ mintedReplacementsFor keyword count = case keyword of
   -- instance for riot's reason, rule 702.32 stating no multiplicity clause.
   Keyword.Fading n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Fade (Quantity.Literal (toInteger n))))))
   Keyword.Frenzy _ -> []
+  -- CR 702.58a's FIRST ability, modular's row below in every respect: "this
+  -- permanent enters with N +1/+1 counters on it". `graft` mints the second.
+  --
+  -- ONE ROW PER INSTANCE, which is CR 702.58b -- "if a permanent has multiple
+  -- instances of graft, each one works separately" -- and the counters therefore
+  -- add up, as rule 702.43b makes modular's do.
+  Keyword.Graft n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n))))))
+  -- CR 702.64a: "if a source would deal damage to this creature, prevent N of
+  -- that damage". Protection's row below with the source half left open and a
+  -- CEILING in place of its blanket prevention -- Filter.And [] is "a source",
+  -- admitting every one, and Filter.IsSource in the recipient position is the
+  -- permanent the keyword is on.
+  --
+  -- DamageRewrite.PreventUpTo rather than PreventNext: rule 702.64b renews the
+  -- ceiling per source and per time rather than spending it down, which that
+  -- type's own comment sets out against CR 615.7.
+  --
+  -- ONE ROW PER INSTANCE, which is CR 702.64c.
+  Keyword.Absorb n ->
+    List.genericReplicate
+      count
+      ( ReplacementEffect.DamageR
+          DamageR.MkDamageR
+            { DamageR.matching =
+                DamagePattern.MkDamagePattern
+                  { DamagePattern.whichKind = Nothing,
+                    DamagePattern.whatSource = Filter.And [],
+                    DamagePattern.whatRecipient = Just Filter.IsSource,
+                    DamagePattern.whoRecipient = Nothing,
+                    DamagePattern.whichRecipient = Nothing,
+                    DamagePattern.whichSource = Nothing,
+                    DamagePattern.boundRecipient = Nothing
+                  },
+              DamageR.rewrite = DamageRewrite.PreventUpTo n,
+              DamageR.riders = Seq.empty
+            }
+      )
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind. One
   -- row per instance, and CR 702.43b makes them add up.
   Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n))))))
@@ -4125,6 +4180,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
+  Keyword.Graft _ -> []
+  Keyword.Absorb _ -> []
   Keyword.Modular _ -> []
   Keyword.Sunburst -> []
   Keyword.Crew _ -> []
@@ -4389,6 +4446,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
+  Keyword.Graft _ -> []
+  Keyword.Absorb _ -> []
   Keyword.Modular _ -> []
   Keyword.Sunburst -> []
   Keyword.Crew _ -> []
@@ -4679,6 +4738,8 @@ familyOf keyword = case keyword of
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
   Keyword.Fading _ -> Just KeywordFamily.Fading
   Keyword.Frenzy _ -> Just KeywordFamily.Frenzy
+  Keyword.Graft _ -> Just KeywordFamily.Graft
+  Keyword.Absorb _ -> Just KeywordFamily.Absorb
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Champion _ -> Just KeywordFamily.Champion
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
@@ -5231,6 +5292,52 @@ battleCry =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.58a's second half: "Whenever another creature enters, if this permanent
+-- has a +1/+1 counter on it, you may move a +1/+1 counter from this permanent
+-- onto that creature." Llanowar Reborn is the printing.
+--
+-- "ANOTHER" is Filter.Not Filter.IsSource on the condition -- the opposite call
+-- to evolve's below, and for the opposite reason: rule 702.100a excludes the
+-- bearer by arithmetic, where this rule prints the word.
+--
+-- The "if" is CR 603.4's intervening one, so CR 608.2a re-checks it as the
+-- ability resolves and a counter moved off in response leaves nothing to move.
+-- Quantity.ObjectCounters names no object, which is how it reads the Filter.Context's
+-- source -- the bearer.
+--
+-- The DESTINATION is the entrant, neither the bearer nor a target, reached
+-- through ObjectRef.InSlot at Binding.became; the SOURCE side is the bearer as
+-- bound (Binding.triggerSource), so CR 608.2h answers for one that has left.
+--
+-- Optionality.Optional is rule 702.58a's "you may", CR 603.3a's controller's.
+-- MoveCounters.slot is Nothing: rule 702.58a names no later clause reading how
+-- many crossed.
+graft :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+graft =
+  let effect =
+        Effect.MoveCounters
+          MoveCounters.MkMoveCounters
+            { MoveCounters.from = ObjectRef.InSlot Binding.triggerSource,
+              MoveCounters.kinds = MovedKinds.Named CounterKind.PlusOnePlusOne (Quantity.Literal 1),
+              MoveCounters.slot = Nothing,
+              MoveCounters.to = ObjectRef.InSlot Binding.became
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition =
+            TriggerCondition.PermanentEnters
+              (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsSource]),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening =
+            Just
+              ( Condition.Compares
+                  (Compares.MkCompares (Quantity.ObjectCounters CounterKind.PlusOnePlusOne) Comparison.AtLeast (Quantity.Literal 1))
+              ),
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 

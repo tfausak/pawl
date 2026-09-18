@@ -53,6 +53,17 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       (DamageRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       (DamageRewrite.PreventAllBut 1)
       " {\"type\":\"PreventAllBut\",\"value\":1} "
+  -- CR 702.64a's ceiling, the arm above read from the other end: the Natural is
+  -- what is PREVENTED rather than what survives, so the same 1 means two
+  -- different things and only the tag tells them apart.
+  -- The tag is therefore the whole of what keeps absorb 1 from Temple Altisaur's
+  -- floor of 1, which is why the two wire forms are pinned side by side.
+  Spec.it s "PreventUpTo" $
+    Common.assertCodec
+      s
+      (DamageRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (DamageRewrite.PreventUpTo 1)
+      " {\"type\":\"PreventUpTo\",\"value\":1} "
   -- CR 614.1a: a flat instead-amount.
   Spec.it s "SetAmount" $
     Common.assertCodec

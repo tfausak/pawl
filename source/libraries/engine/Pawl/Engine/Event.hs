@@ -1716,6 +1716,8 @@ applyInertly candidate rewrite event = do
     -- of its own either; a CR 615.5 rider printed beside it rides the CANDIDATE,
     -- as Fog's does below.
     DamageRewrite.PreventAllBut _ -> pure ()
+    -- CR 702.64a's ceiling stores nothing either, for the arm above's reason.
+    DamageRewrite.PreventUpTo _ -> pure ()
     -- Fog's blanket prevention likewise carries nothing beyond the prevention:
     -- CR 615.5's authored rider rides on the CANDIDATE rather than on the
     -- rewrite, so it is `loop`'s business above -- which queues it through
@@ -3003,6 +3005,22 @@ apply batch candidate event =
         if left == 0
           then pure Nothing
           else pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = left}))
+      -- CR 702.64a: absorb's ceiling on what is STOPPED, the arm above read from
+      -- the other end -- "prevent N of that damage", so what survives is the
+      -- remainder rather than a floor. An event at or under the ceiling is
+      -- prevented whole, which is CR 615.6.
+      --
+      -- No `setShield` and no arithmetic written back, for CR 615.10's reason one
+      -- rule over: CR 702.64b renews the ceiling per source and per time, so a
+      -- countdown's remainder would be the wrong state to keep.
+      DamageRewrite.PreventUpTo ceiling_ -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        let amount = DamageEvent.amount de
+            -- Total on Natural: `prevented` is a min of the two operands.
+            prevented = min ceiling_ amount
+        if prevented >= amount
+          then pure Nothing
+          else pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = amount - prevented}))
       -- CR 614.1a's "instead" with a flat amount (Galvanic Blast). Only the
       -- AMOUNT is rewritten, and that is the rule rather than economy: a
       -- replaced damage event keeps its source, its recipient and every

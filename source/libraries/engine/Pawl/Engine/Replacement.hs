@@ -575,6 +575,10 @@ unspent rewrite = case rewrite of
   -- damage from other applicable events" -- so there is nothing to spend and
   -- nothing to refuse.
   DamageRewrite.PreventAllBut _ -> True
+  -- CR 702.64b says as much of absorb's ceiling -- it "will apply separately to
+  -- damage from other sources, or to damage dealt by the same source at a
+  -- different time" -- so there is nothing to spend and nothing to refuse.
+  DamageRewrite.PreventUpTo _ -> True
   -- CR 122.1c's prevention is spent by the COUNTER going away, not by a number on
   -- the row: Projection.shieldOf mints it only while a counter is there, so a
   -- shield spent to nothing is gone from the gathered list rather than present and
@@ -612,6 +616,7 @@ admitsRecipient src rewrite de = case rewrite of
   DamageRewrite.PreventAll -> True
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventAllBut _ -> True
+  DamageRewrite.PreventUpTo _ -> True
   DamageRewrite.SetAmount _ -> True
   DamageRewrite.Scale _ -> True
   DamageRewrite.Redirect _ -> True
@@ -2481,6 +2486,9 @@ remainingOf rewrite = case rewrite of
   DamageRewrite.RedirectNext remaining _ -> Just remaining
   DamageRewrite.PreventAll -> Nothing
   DamageRewrite.PreventAllBut _ -> Nothing
+  -- CR 702.64a's ceiling stores no remainder for the same reason: rule 702.64b
+  -- renews it rather than counting it down.
+  DamageRewrite.PreventUpTo _ -> Nothing
   DamageRewrite.PreventRemovingShieldCounter -> Nothing
   DamageRewrite.SetAmount _ -> Nothing
   DamageRewrite.Scale _ -> Nothing
@@ -2530,6 +2538,7 @@ partialCoverage gs allowances candidate event = case (ReplacementCandidate.effec
       | otherwise -> Nothing
     DamageRewrite.PreventAll -> Nothing
     DamageRewrite.PreventAllBut _ -> Nothing
+    DamageRewrite.PreventUpTo _ -> Nothing
     DamageRewrite.PreventRemovingShieldCounter -> Nothing
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
@@ -2629,6 +2638,9 @@ prevents rewrite = case rewrite of
   -- Temple Altisaur says "prevent all but 1 of that damage", so CR 615.1a makes
   -- this one a prevention too -- which is the whole reason it is not SetAmount.
   DamageRewrite.PreventAllBut _ -> True
+  -- Rule 702.64a says "prevent N of that damage", so CR 615.1a makes absorb a
+  -- prevention too -- which is what keeps it out of SetAmount.
+  DamageRewrite.PreventUpTo _ -> True
   -- CR 122.1c says "prevent that damage", so CR 615.1a makes this one too.
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.SetAmount _ -> False
@@ -2670,6 +2682,10 @@ spentInertly rewrite = case rewrite of
   -- and nothing for its last clause to protect. `contestedResource` gives it no
   -- supply either, so it never reaches `hitsOf`.
   DamageRewrite.PreventAllBut _ -> False
+  -- CR 702.64a's ceiling stores nothing and carries no additional effect
+  -- either, and `contestedResource` gives it no supply, so it never reaches
+  -- `hitsOf`.
+  DamageRewrite.PreventUpTo _ -> False
   -- Fog has no resource to spend at all, so this could answer either way;
   -- `contestedResource` gives it no supply and it never reaches `hitsOf`.
   DamageRewrite.PreventAll -> False
@@ -2813,6 +2829,7 @@ redirects rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> False
   DamageRewrite.PreventAll -> False
   DamageRewrite.PreventAllBut _ -> False
+  DamageRewrite.PreventUpTo _ -> False
   DamageRewrite.PreventRemovingShieldCounter -> False
   -- CR 614.1a's two amount rewrites leave the recipient where it was, so neither
   -- deals the damage "instead to another permanent or player".
@@ -3357,6 +3374,9 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
     -- at the same time", so a batch cannot exhaust it and there is nothing to
     -- allocate.
     DamageRewrite.PreventAllBut _ -> Nothing
+    -- CR 702.64b states the same of absorb as CR 615.10 does of the shield
+    -- above: a batch cannot exhaust it, so there is nothing to allocate.
+    DamageRewrite.PreventUpTo _ -> Nothing
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing

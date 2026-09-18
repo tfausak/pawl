@@ -277,6 +277,13 @@ data Keyword
     -- number of times, and a cast trigger copying the spell once per payment,
     -- minted by Pawl.Engine.Keyword.stackTriggeredAbilitiesOf.
     Replicate (Cost.Cost Keyword)
+  | -- | 702.58a: graft N -- a static ability entering the permanent with N
+    -- +1\/+1 counters, and a triggered ability offering to move one of them onto
+    -- another creature as that creature enters. The first is minted by
+    -- Pawl.Engine.Keyword.mintedReplacementsFor and the second by
+    -- Pawl.Engine.Keyword.triggeredAbilitiesOf; CR 702.58b's several instances
+    -- each work separately, which is that function's count.
+    Graft Natural.Natural
   | -- | 702.59a: recover [cost] -- a triggered ability that functions only while
     -- the card with recover is in a player's graveyard, returning it to hand for
     -- [cost] when a creature dies and exiling it otherwise. Minted by
@@ -306,6 +313,12 @@ data Keyword
     -- upkeep, and sacrifice the permanent when the last one goes. Nothing is CR
     -- 702.63b's numberless printing, which states only the last two abilities.
     Vanishing (Maybe Natural.Natural)
+  | -- | 702.64a: absorb N -- a static ability preventing N of the damage a source
+    -- would deal to this creature, minted as a damage replacement by
+    -- Pawl.Engine.Keyword.mintedReplacementsFor. CR 702.64b's ceiling is per
+    -- event rather than a countdown, and CR 702.64c's several instances each
+    -- apply separately, which is that function's count.
+    Absorb Natural.Natural
   | -- | 702.66a: for each generic mana in this spell's total cost you may exile a
     -- card from your graveyard rather than pay that mana. Convoke's neighbour
     -- below in placement -- CR 702.66b puts it where CR 702.51b puts that one, so
