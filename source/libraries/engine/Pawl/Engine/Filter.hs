@@ -2573,6 +2573,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Disturb cost -> Keyword.Type.Disturb (rewriteCost pairs cost)
   Keyword.Type.Harmonize cost -> Keyword.Type.Harmonize (rewriteCost pairs cost)
   Keyword.Type.Cleave cost -> Keyword.Type.Cleave (rewriteCost pairs cost)
+  Keyword.Type.Awaken cost -> Keyword.Type.Awaken (rewriteCost pairs cost)
   Keyword.Type.Emerge cost -> Keyword.Type.Emerge (rewriteCost pairs cost)
   Keyword.Type.Surge cost -> Keyword.Type.Surge (rewriteCost pairs cost)
   Keyword.Type.Spectacle cost -> Keyword.Type.Spectacle (rewriteCost pairs cost)
