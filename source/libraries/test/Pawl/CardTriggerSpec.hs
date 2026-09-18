@@ -3772,8 +3772,102 @@ conjurersMantleSpec s registry =
           Spec.assertEqWith s "alice's hand is empty" (handNames S.alice after) []
           Spec.assertEqWith s "and the Mantle is still on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 3
 
+-- CR 702.110b's "a creature" read as an OBJECT rather than as an occurrence: the
+-- creature a rule 702.110a sacrifice fed to the exploiter, bound under
+-- Pawl.Engine.Binding.exploitedCreature and compared against by
+-- Filter.ToughnessLessThanBound (CR 208.1).
+--
+-- Profaner of the Dead {3}{U} Creature -- Snake Wizard 3/3 is the card, whole:
+-- "Exploit / When this creature exploits a creature, return to their owners'
+-- hands all creatures your opponents control with toughness less than the
+-- exploited creature's toughness" (name, cost, type line and Oracle text checked
+-- against api.scryfall.com, 2026-09-18).
+--
+-- TWO BOARDS DIFFERING IN THE SACRIFICE ALONE, which is what makes the bound
+-- creature's IDENTITY the thing under test: alice may exploit a Hill Giant
+-- (toughness 3) or a Goblin Piker (toughness 1), and the opponents' board is the
+-- same either way. Under the Giant the toughness-1 and toughness-2 creatures go
+-- to hand and the toughness-4 one stays; under the Piker nothing moves at all,
+-- which is also where rule 208.1's comparison being STRICT is visible -- a
+-- toughness-1 creature is not under a toughness of 1.
+--
+-- THREE SEATS, so "your opponents control" cannot collapse onto one player, and
+-- alice keeps a toughness-1 creature of her own through both legs: it is under
+-- the Giant's toughness and stays, which is the clause's "your opponents" half.
+profanerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+profanerSpec s registry =
+  let -- Takes rule 702.110a's offer and sacrifices the NAMED candidate, pinned by
+      -- id: the Profaner and alice's other creatures are all offered, so a fixture
+      -- taking the first would prove nothing about which creature the slot bound.
+      exploiting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      exploiting victim p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChoosePermanent _ _ _ offered ->
+          Maybe.fromMaybe (NonEmpty.head offered) (List.find (== victim) (NonEmpty.toList offered))
+        _ -> S.identityAnswer p
+      -- The Profaner on the stack over the shared board: alice holds the two
+      -- creatures either leg may sacrifice, bob three of distinct toughness and
+      -- carol one more, so every toughness the comparison has to separate is on
+      -- the board at once.
+      board = do
+        profaner <- S.printingOf s registry "Profaner of the Dead"
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Hill Giant"
+        gnat <- S.printingOf s registry "Gnat Miser"
+        evangel <- S.printingOf s registry "Cabal Evangel"
+        warrior <- S.printingOf s registry "Hollow Warrior"
+        mauler <- S.printingOf s registry "Dwarven Mauler"
+        let base = Setup.emptyGame S.threePlayers
+            (pikerId, withPiker) = S.addPermanent piker S.alice base
+            (giantId, withGiant) = S.addPermanent giant S.alice withPiker
+            (gnatId, withGnat) = S.addPermanent gnat S.bob withGiant
+            (evangelId, withEvangel) = S.addPermanent evangel S.bob withGnat
+            (warriorId, withWarrior) = S.addPermanent warrior S.bob withEvangel
+            (maulerId, withMauler) = S.addPermanent mauler S.carol withWarrior
+            (_, staged) = S.spellOnStack profaner S.alice withMauler
+        pure (pikerId, giantId, gnatId, evangelId, warriorId, maulerId, staged)
+      -- The Profaner resolves, rule 702.110a's entry trigger goes on the stack and
+      -- resolves, and rule 702.110b's event then puts the printed trigger on and
+      -- resolves it too.
+      played :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      played answer staged =
+        S.runPure
+          answer
+          staged
+          ( Stack.resolveTop
+              >> Engine.settleForPriority
+              >> Stack.resolveTop
+              >> Engine.settleForPriority
+              >> Stack.resolveTop
+          )
+   in Spec.describe s "Profaner of the Dead" $ do
+        Spec.it s "CR 702.110b bounces the opponents' creatures under the exploited creature's toughness" $ do
+          (pikerId, giantId, gnatId, evangelId, warriorId, maulerId, staged) <- board
+          let after = played (exploiting giantId) staged
+          Spec.assertBool s (not (S.onBattlefield gnatId after)) "CR 208.1 bob's toughness-1 creature is under the exploited Giant's 3 and went to hand"
+          Spec.assertBool s (not (S.onBattlefield evangelId after)) "and bob's toughness-2 creature did too"
+          Spec.assertBool s (not (S.onBattlefield maulerId after)) "and carol's toughness-1 creature, the other opponent's"
+          Spec.assertBool s (S.onBattlefield warriorId after) "CR 208.1 bob's toughness-4 creature is not under 3 and stayed"
+          Spec.assertBool s (S.onBattlefield pikerId after) "and alice's own toughness-1 creature stayed, the clause reaching opponents only"
+          Spec.assertEqWith s "the two bob lost are in his hand" (S.handSize S.bob after) 2
+          Spec.assertBool s (not (S.onBattlefield giantId after)) "CR 702.110a the Hill Giant alice chose really was sacrificed"
+        -- The paired board, differing in the sacrifice and nothing else: a
+        -- toughness of 1 leaves rule 208.1's strict comparison with nothing under
+        -- it, so the same trigger fires and moves nobody.
+        Spec.it s "CR 702.110b exploiting a toughness-1 creature bounces nothing" $ do
+          (pikerId, giantId, gnatId, evangelId, warriorId, maulerId, staged) <- board
+          let after = played (exploiting pikerId) staged
+          Spec.assertBool s (S.onBattlefield gnatId after) "CR 208.1 bob's toughness-1 creature is not under a toughness of 1"
+          Spec.assertBool s (S.onBattlefield evangelId after) "nor is bob's toughness-2 creature"
+          Spec.assertBool s (S.onBattlefield warriorId after) "nor bob's toughness-4 one"
+          Spec.assertBool s (S.onBattlefield maulerId after) "nor carol's toughness-1 creature"
+          Spec.assertEqWith s "bob's hand is empty" (S.handSize S.bob after) 0
+          Spec.assertBool s (S.onBattlefield giantId after) "and the Hill Giant alice did not choose stayed"
+          Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 702.110a the Goblin Piker she did choose was sacrificed"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
+  profanerSpec s registry
   ferventChargeSpec s registry
   conjurersMantleSpec s registry
   anafenzaAttackSpec s registry
