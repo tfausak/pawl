@@ -374,13 +374,12 @@ candidateCostsGiven permitted pid name oid gs =
               -- CR 702.119a and CR 702.119b: emerge, evoked's offer with rule
               -- 702.119a's two clauses attached -- the sacrifice in the candidate's
               -- components, the generic reduction in `CandidateCost.reductions`.
-              -- Offered from
-              -- every zone for bestow's reason, rule 702.119a's abilities
-              -- functioning "while the spell with emerge is on the stack", which
-              -- CR 113.6e reaches from wherever the cast begins; read off the
-              -- projection for bestow's reason and wrapped in `withAdditional` for
-              -- flashback's, rule 702.119a sending the cast through CR 601.2f-h in
-              -- its own words.
+              -- Offered from every zone for bestow's reason, rule 702.119a's
+              -- abilities functioning "while the spell with emerge is on the
+              -- stack", which CR 113.6e reaches from wherever the cast begins; read
+              -- off the projection for bestow's reason and wrapped in
+              -- `withAdditional` for flashback's, rule 702.119a sending the cast
+              -- through CR 601.2f-h in its own words.
               --
               -- THE POOL IS RULE 702.119b's [quality] WHERE THE PAYLOAD CARRIES
               -- ONE and rule 702.119a's creatures where it does not. Rule

@@ -858,6 +858,7 @@ spec s registry = do
   Pawl.Codec.EachCardInGraveyardSpec.spec s
   Pawl.Codec.EachCardInHandSpec.spec s
   Pawl.Codec.EffectSpec.spec s
+  Pawl.Codec.EmergeSpec.spec s
   Pawl.Codec.EndTurnSignalSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntersWithSpec.spec s
@@ -870,7 +871,6 @@ spec s registry = do
   Pawl.Codec.EntryRestrictionSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s
-  Pawl.Codec.EmergeSpec.spec s
   Pawl.Codec.EquipSpec.spec s
   Pawl.Codec.EventGroupSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
