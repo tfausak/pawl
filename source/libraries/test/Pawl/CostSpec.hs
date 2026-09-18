@@ -2219,6 +2219,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   zameckGuildmageCostSpec s registry
   millikinSpec s registry
   brittleEffigySpec s registry
+  exiledReliquarySpec s registry
   hanweirBattlementsSpec s registry
   ashnodsAltarSpec s registry
   reversalSpec s registry
@@ -3930,6 +3931,62 @@ brittleEffigySpec s registry = Spec.describe s "Brittle Effigy" $ do
     Spec.assertBool s (not (S.onBattlefield pikerId after)) "the targeted Piker was exiled"
     Spec.assertBool s (not (S.onBattlefield effigyId after)) "and the Effigy paid its own half"
     Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
+
+-- data/cards/synthetic-exiled-reliquary.json, "Synthetic Exiled Reliquary" {3}
+-- Artifact: "{1}, Exile this artifact: Return this card to the battlefield." and
+-- "{2}, Exile this card from your graveyard: Return this card to the
+-- battlefield." The producer for Binding.exiledCard, which is the slot CR
+-- 702.167a's craft reads: "[Cost], Exile this permanent, Exile [materials] ...:
+-- Return this card to the battlefield transformed under its owner's control."
+--
+-- SYNTHETIC because both printed producers are out of reach today. Tithing Blade
+-- // Consuming Sepulcher carries craft, which pawl cannot transcribe (#3526).
+-- Shifty Doppelganger prints the same slot read without craft -- "{3}{U}, Exile
+-- this creature: ... sacrifice that creature. If you do, return this card to the
+-- battlefield" -- and its "if you do" hangs off whether a MANDATORY instruction
+-- happened, which Pawl.Types.Clause's ifTaken cannot express (gap #3851); a
+-- transcription without that gate would return the card on a board the printing
+-- does not, which is the weaker-than-printed direction. Nothing in the CR
+-- forbids an artifact spelling the cost and the read alone, which is this card.
+--
+-- TWO abilities and not one: CostComponent's ExileThis and ExileThisFromGraveyard
+-- exile the object the cost is on from different zones (CR 113.6m,
+-- Cost.zoneFunctionedFrom) and bind the same slot, so each needs its own
+-- observer. Their mana halves differ ({1} against {2}) so that neither case can
+-- pay the other's cost.
+exiledReliquarySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exiledReliquarySpec s registry = Spec.describe s "Synthetic Exiled Reliquary" $ do
+  -- CR 400.7: the exiled card is a NEW object, and it is that object the ability
+  -- goes on to move -- so the permanent the cost exiled stays gone while a
+  -- Reliquary is on the battlefield again. THE assertion this slot exists for,
+  -- read first: a payment binding nothing leaves the card sitting in exile.
+  Spec.it s "CR 601.2h the card the cost exiled is the card the ability returns" $ do
+    reliquary <- S.printingOf s registry "Synthetic Exiled Reliquary"
+    plains <- S.printingOf s registry "Plains"
+    let (reliquaryId, g1) = S.addPermanent reliquary S.alice (Setup.emptyGame S.bothPlayers)
+        gs = (S.landsFor plains S.alice 1 g1) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice reliquaryId (abilityAt 0 reliquary) >> Stack.resolveTop)
+    Spec.assertEqWith s "a Reliquary is on the battlefield again" (S.countOnBattlefieldByName (S.printingName reliquary) S.alice after) 1
+    Spec.assertBool s (not (S.onBattlefield reliquaryId after)) "and it is a new object, the permanent the cost exiled having left (CR 400.7)"
+    Spec.assertEqWith s "with nothing left in its owner's exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+  -- The sibling component, from the other zone (CR 113.6m): the same slot, bound
+  -- off the same arrival, read by the same clause. The graveyard is empty
+  -- afterwards, which is what tells a card that never left it from one the cost
+  -- exiled and the ability brought back.
+  Spec.it s "CR 601.2h the same slot names the card exiled from a graveyard" $ do
+    reliquary <- S.printingOf s registry "Synthetic Exiled Reliquary"
+    plains <- S.printingOf s registry "Plains"
+    let (reliquaryId, g1) = S.addObjectIn Zone.Graveyard reliquary S.alice (Setup.emptyGame S.bothPlayers)
+        gs = (S.landsFor plains S.alice 2 g1) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice reliquaryId (abilityAt 1 reliquary) >> Stack.resolveTop)
+    Spec.assertEqWith s "the Reliquary is on the battlefield" (S.countOnBattlefieldByName (S.printingName reliquary) S.alice after) 1
+    Spec.assertEqWith s "and its owner's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "as is their exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+
+-- The printing's activated ability at this index, where `theAbility` above takes
+-- the first: the Reliquary prints two, one per exiling component.
+abilityAt :: Int -> Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+abilityAt n p = Face.activatedAbilities (S.combinedFace p) !! n
 
 -- CR 601.2h's order, pinned to the part that goes FIRST rather than to an index,
 -- so the two cases above differ in that part alone whatever order the card
