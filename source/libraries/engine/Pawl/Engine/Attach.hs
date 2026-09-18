@@ -23,6 +23,7 @@ module Pawl.Engine.Attach where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.AttachRestriction as AttachRestriction
@@ -30,6 +31,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -39,7 +41,8 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -81,12 +84,14 @@ import qualified Pawl.Types.Subtype as Subtype
 -- The Aura branch's first test is CR 303.4d's "an Aura that's also a creature
 -- can't enchant anything", whose state-based half is Sba.cannotBeAttached.
 -- Unreachable in this pool, written because it costs one comparison. The Equipment
--- branch has no counterpart: CR 301.5c's matching restriction carries a
--- reconfigure exception nothing here can express (gap #1823). The Fortification
--- branch DOES have one, and rule 301.6 states it outright rather than by
--- reference: "a Fortification that's also a creature (not a land) can't fortify
--- a land". No reconfigure exception attaches to it, so it is written here in
--- full.
+-- branch has the same shape with CR 301.5c's exception on it -- "an Equipment
+-- that's also a creature can't equip a creature unless that Equipment has
+-- reconfigure" -- asked as the FAMILY (CR 702.151a's cost is not part of the
+-- question) and off the projection, so a granted reconfigure counts and Humility
+-- takes it away. The Fortification branch has a third, and rule 301.6 states it
+-- outright rather than by reference: "a Fortification that's also a creature (not
+-- a land) can't fortify a land". No reconfigure exception attaches to that one,
+-- so it is written here in full.
 --
 -- The first guard -- the destination naming `src` itself -- is CR 301.5c and CR
 -- 303.4d at once. Nothing for a source that is none of the three, per CR 701.3b.
@@ -128,9 +133,12 @@ attachmentFor src destination gs
   -- CR 301.5, "it can't legally be attached to anything that isn't a creature" --
   -- which is also why a player destination falls to Nothing here rather than
   -- getting a branch of its own.
-  | Set.member Subtype.Equipment subtypes = case Recipient.objectOf destination of
-      Just oid | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
-      _ -> Nothing
+  | Set.member Subtype.Equipment subtypes =
+      if Projection.isCreatureOf src gs && not hasReconfigure
+        then Nothing
+        else case Recipient.objectOf destination of
+          Just oid | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
+          _ -> Nothing
   -- CR 301.6, the Equipment branch above with a land where that rule has a
   -- creature: "a Fortification can be attached to a land. It can't legally be
   -- attached to an object that isn't a land." A player destination falls to
@@ -166,6 +174,7 @@ attachmentFor src destination gs
   | otherwise = Nothing
   where
     subtypes = Projection.subtypesOf src gs
+    hasReconfigure = any ((== Just KeywordFamily.Reconfigure) . Keyword.familyOf) (Map.keys (Projection.keywordsOf src gs))
     -- Same object, or same player, however either was tagged. Two object tags
     -- (ToCreature / ToObject) name one object; ToPlayer is the only player tag,
     -- so those compare whole.
@@ -245,7 +254,7 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 -- answer: False for Filter.IsBound and its siblings, and TRUE for
 -- SameControllerAsBound, which widens on an absent key (#2141). No card in the
 -- pool writes one there.
-hostsFor :: PlayerId -> ObjectId -> ObjectId -> Filter.Type.Filter Keyword.Keyword -> GameState -> [ObjectId]
+hostsFor :: PlayerId -> ObjectId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 hostsFor controller source subject filter_ gs =
   let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
       context = Filter.contextFor (Game.teams gs) (Just controller) (Just source)
@@ -288,7 +297,7 @@ hostsFor controller source subject filter_ gs =
 -- CR 303.4f -- changeZoneAttaching's Aura entry -- is that same narrowing with NO
 -- card text to intersect, since there the enchant ability IS the whole restriction.
 -- So it asks hostsFor with a bare Filter.CanHostSubject rather than through here.
-turnUpHosts :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Keyword -> GameState -> [ObjectId]
+turnUpHosts :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 turnUpHosts controller aura filter_ =
   hostsFor controller aura aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject])
 

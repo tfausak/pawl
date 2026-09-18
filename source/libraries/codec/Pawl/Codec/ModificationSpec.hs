@@ -186,6 +186,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.SetCardType CardType.Land)
       " {\"type\":\"SetCardType\",\"value\":{\"type\":\"Land\"}} "
+  -- layer 4, CR 205.1a removal (CR 702.151b -> not a creature).
+  Spec.it s "LoseCardType" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.LoseCardType CardType.Creature)
+      " {\"type\":\"LoseCardType\",\"value\":{\"type\":\"Creature\"}} "
   -- layer 4, CR 205.4b grant (Leyline of Singularity -> legendary).
   Spec.it s "AddSupertype" $
     Common.assertCodec
