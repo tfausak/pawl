@@ -573,14 +573,10 @@ data Keyword
   | -- | 702.130a: whenever this creature becomes blocked, defending player loses
     -- N life; each instance triggers separately (CR 702.130b).
     Afflict Natural.Natural
-  | -- | 702.131b: a static ability whose whole content is "any time you control
-    -- ten or more permanents and you don't have the city's blessing, you get the
-    -- city's blessing for the rest of the game", read off the projection by
-    -- Pawl.Engine.PlayerDesignation rather than minted.
-    --
-    -- Not implemented: CR 702.131a, the same word on an INSTANT OR SORCERY, where
-    -- it is a spell ability checked once on resolution rather than continuously
-    -- (#3508).
+  | -- | 702.131a \/ 702.131b: "you control ten or more permanents and you don't
+    -- have the city's blessing" grants it for the rest of the game -- a spell
+    -- ability on an instant or sorcery, a static one anywhere else, both carried
+    -- out by Pawl.Engine.PlayerDesignation rather than minted.
     Ascend
   | -- | 702.133a: cast this card from your graveyard by discarding a card as an
     -- ADDITIONAL cost, and exile it as it leaves the stack.

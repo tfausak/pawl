@@ -6,19 +6,22 @@
 --
 -- Gameplay-level throughout: every case reads the mark through a CARD whose
 -- printed "as long as you have" clause is gated on it -- Skymarcher Aspirant's
--- flying and Ori, Keeper of Songs' +1/+0 and vigilance -- and the field itself is
--- read only after that, as the assertion that says WHICH of the two marks moved.
+-- flying, Ori, Keeper of Songs' +1/+0 and vigilance, and Secrets of the Golden
+-- City's third card -- and the field itself is read only after that, as the
+-- assertion that says WHICH of the two marks moved.
 --
 -- Each negative board is its positive board with exactly one permanent swapped,
 -- so what it proves is the threshold and not some other thing the board lacked.
 module Pawl.PlayerDesignationSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -28,6 +31,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Regenerability as Regenerability
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -37,9 +41,9 @@ spec s registry = Spec.describe s "PlayerDesignation" $ do
 
 ascendSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ascendSpec s registry = Spec.describe s "Ascend" $ do
-  -- CR 702.131b, and CR 702.131a's whole content on a permanent: the keyword does
-  -- nothing on its own, and the continuous check is what turns controlling ten
-  -- permanents into having the city's blessing.
+  -- CR 702.131b, ascend's STATIC half: the keyword does nothing on its own, and
+  -- the continuous check is what turns controlling ten permanents into having the
+  -- city's blessing.
   --
   -- Ten exactly: the Aspirant and nine Swamps. The flying assertion comes first,
   -- so what a broken check reddens is the behaviour and not the field that
@@ -78,6 +82,37 @@ ascendSpec s registry = Spec.describe s "Ascend" $ do
     Spec.assertEqWith s "alice now controls nine permanents" (Set.size (GameState.battlefield shrunk)) 9
     Spec.assertBool s (flies aspirantId shrunk) "the Aspirant still flies"
     Spec.assertEqWith s "alice still has the city's blessing" (marksOf S.alice shrunk) (Just (Set.singleton PlayerDesignation.CitysBlessing))
+
+  -- CR 702.131a, ascend's SPELL half, which rule 702.131b's cases above do not
+  -- reach: nothing on this board carries ascend as a permanent, so the continuous
+  -- check grants nothing and only the resolving sorcery can.
+  --
+  -- The THIRD CARD is the gameplay-level assertion, and it is what proves the
+  -- ORDER as well as the grant: CR 608.2c follows a spell's instructions in
+  -- printed order, ascend being printed above the rest, so "if you have the
+  -- city's blessing, draw three cards instead" reads a mark this same resolution
+  -- granted. A grant made after the clauses, or not at all, draws two.
+  Spec.it s "CR 702.131a Secrets of the Golden City blesses its controller and then draws three" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    secrets <- S.printingOf s registry "Secrets of the Golden City"
+    let (gs, spellId) = S.handOne secrets (stocked piker (S.landsInPlay island 10))
+        after = resolveOne gs spellId
+    Spec.assertEqWith s "CR 702.131a alice drew three cards, not two" (S.handSize S.alice after) 3
+    Spec.assertEqWith s "and holds the city's blessing once the sorcery is gone" (marksOf S.alice (settle after)) (Just (Set.singleton PlayerDesignation.CitysBlessing))
+    Spec.assertEqWith s "bob, who cast nothing, has nothing" (marksOf S.bob after) (Just Set.empty)
+  -- The board above with one Island taken away: nine permanents, so CR 702.131a's
+  -- "ten or more" is not met, the mark is not granted, and the card's own
+  -- unblessed clause draws two. Three Islands still pay {1}{U}{U}, so the
+  -- negative cannot pass for want of mana.
+  Spec.it s "CR 702.131a nine permanents leave Secrets of the Golden City drawing two" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    secrets <- S.printingOf s registry "Secrets of the Golden City"
+    let (gs, spellId) = S.handOne secrets (stocked piker (S.landsInPlay island 9))
+        after = resolveOne gs spellId
+    Spec.assertEqWith s "alice drew two cards" (S.handSize S.alice after) 2
+    Spec.assertEqWith s "and has nothing" (marksOf S.alice (settle after)) (Just Set.empty)
 
 storiedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 storiedSpec s registry = Spec.describe s "Storied" $ do
@@ -127,3 +162,16 @@ flies = hasKeyword Keyword.Flying
 
 hasKeyword :: Keyword.Keyword -> ObjectId.ObjectId -> GameState.GameState -> Bool
 hasKeyword keyword oid gs = Map.member keyword (Projection.keywordsOf oid gs)
+
+-- Four cards in alice's library, which is one more than the widest draw here --
+-- CR 104.3c would otherwise decide the game before an assertion runs.
+stocked :: Printing.Printing -> GameState.GameState -> GameState.GameState
+stocked printing base = List.foldl' (\gs _ -> snd (S.addLibraryCard printing S.alice gs)) base [1 :: Int .. 4]
+
+-- Cast the one card in alice's hand and resolve it. No mana is asked about
+-- beyond what the Islands pay, and CR 608.2b has nothing to re-validate: the
+-- sorcery targets nothing.
+resolveOne :: GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+resolveOne gs spellId =
+  let cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+   in snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
