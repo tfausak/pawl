@@ -2109,6 +2109,7 @@ causticExhaleSpec s registry =
           resolved = S.runPure (targeting victim) (S.runPure (targeting victim) gs (S.cast S.alice spell)) Stack.resolveTop
       Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
       Spec.assertBool s (all (\d -> List.elem d (Set.toList (GameState.battlefield resolved))) dragons) "CR 701.4a and the Dragon she beheld is still on the battlefield"
+      Spec.assertEqWith s "CR 701.4a choosing a permanent shows nobody anything, so nothing was revealed" (S.revealsOf resolved) []
       Spec.assertBool s (any (S.isCastOf spell) (Action.legalActions S.alice gs)) "and CR 118.3 offered the cast on this board, which is what the refusing case below differs from"
     -- CR 701.4a's hand half alone, the same cast off the other zone: alice
     -- controls no Dragon, so a battlefield-only reading would refuse it.
@@ -2121,6 +2122,7 @@ causticExhaleSpec s registry =
           resolved = S.runPure (targeting victim) (S.runPure (targeting victim) gs (S.cast S.alice spell)) Stack.resolveTop
       Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
       Spec.assertBool s (all (\d -> List.elem d (Game.zoneMembers Zone.Hand S.alice resolved)) held) "CR 701.4a and the card she revealed never left her hand"
+      Spec.assertEqWith s "CR 701.20a and the table saw it: the hand half of rule 701.4a is a reveal" (S.revealsOf resolved) [(S.alice, Set.singleton (CardName.MkCardName (Text.pack "Hoarding Dragon")))]
     -- The two halves in ONE pool, which is the whole of rule 701.4a's "or": each
     -- zone holds exactly one Dragon, so a reading that offered either zone alone
     -- would raise no prompt at all.

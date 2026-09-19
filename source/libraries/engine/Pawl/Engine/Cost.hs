@@ -1994,8 +1994,8 @@ revealFromHandCandidates = discardCandidates
 -- the rule's words on every card that prints one.
 --
 -- Matched through the same CR 613 projection on both sides, `discardCandidates`'
--- reading, and against ONE context, so the hand half and the battlefield half
--- cannot read the criterion differently.
+-- reading, and against a context built the same way on both, so the hand half and
+-- the battlefield half cannot read the criterion differently.
 beholdCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 beholdCandidates slots pid oid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
