@@ -3015,11 +3015,13 @@ modificationWrites m = case m of
   -- makes another effect's affected set depend on it.
   Modification.GrantsStationToughness -> Set.singleton Keywords
 
--- Which aspects a Modification's own QUANTITIES read -- CR 613.8a clause (b)'s
--- last limb: applying another effect can change "what it does to any of the
--- things it applies to" without touching what it applies to. Only the two
--- power/toughness arms carry a quantity, so a new arm carrying one has to be
--- classified here, or the dependency would silently stop being seen.
+-- Which aspects a Modification reads -- CR 613.8a clause (b)'s last limb:
+-- applying another effect can change "what it does to any of the things it
+-- applies to" without touching what it applies to. Two shapes reach it: a
+-- quantity, which only the two power/toughness arms carry, and a rewrite of
+-- the object's own text, which the two layer-3 arms are. A new arm of either
+-- shape has to be classified here, or the dependency would silently stop being
+-- seen.
 modificationReads :: Modification -> Set Aspect
 modificationReads m = case m of
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityReads p <> quantityReads t
@@ -3041,17 +3043,19 @@ modificationReads m = case m of
   -- Carries a payload-free family, so there is no Filter here to read anything.
   Modification.LoseKeywordFamily _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
-  -- Carries no Quantity. It does read the partner's rules text, which layer 3
-  -- writes, so CR 613.8a clause (b) can turn on this arm -- but the edge is
-  -- normally MUTUAL: the exchange replaces the whole text box of both objects in
-  -- its frozen set, so applying it changes what a text change on either of them
-  -- does in return. CR 613.8b hands a dependency loop straight back to CR
-  -- 613.7's timestamp order, which is what textBoxAt implements.
+  -- Carries no Quantity, but it reads a text box, which layer 3 writes -- the
+  -- keywords and ability lists exchangeTextBoxFrom moves, which Aspect has no
+  -- finer grain for than Keywords. Not Subtypes: CR 612.5 exchanges the RULES
+  -- TEXT, so the type line stays. The edge is normally MUTUAL, the exchange replacing the whole
+  -- text box of both objects in its frozen set, and CR 613.8b hands a
+  -- dependency loop straight back to CR 613.7's timestamp order.
   --
-  -- Not implemented: the ONE-WAY case, where the changed word appears only in
-  -- the text an object RECEIVES. The exchange is then not depended on in return,
-  -- no loop forms, and CR 613.8b really does reorder the pair (#3881).
-  Modification.ExchangeTextBoxes -> Set.empty
+  -- A REGRESSION FENCE rather than a proved behaviour: the one-way board in
+  -- Pawl.ProjectionSpec's "CR 613.8b a text change waits for the exchange that
+  -- gives it a word" turns on the text change's reads instead, the exchange
+  -- being the effect that is depended ON there, so Set.empty here leaves the
+  -- suite green.
+  Modification.ExchangeTextBoxes -> Set.singleton Keywords
   -- Carries no Quantity: two bare markers.
   Modification.AssignCombatDamageWithToughness -> Set.empty
   Modification.GrantsStationToughness -> Set.empty
@@ -3063,7 +3067,12 @@ modificationReads m = case m of
   Modification.AddEveryCreatureSubtype -> Set.empty
   Modification.LoseEveryCreatureSubtype -> Set.empty
   Modification.AddSubtype _ -> Set.empty
-  Modification.ChangeSubtypeWord {} -> Set.empty
+  -- Carries no Quantity, but CR 612.1's rewrite reads the object's own text:
+  -- the words it replaces are in the very aspects it writes, so an earlier
+  -- layer-3 effect can put the word there or take it away. Proved by
+  -- Pawl.ProjectionSpec's "CR 613.8b an earlier text change waits for the later
+  -- one it depends on".
+  Modification.ChangeSubtypeWord {} -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.empty
   Modification.SetCardType _ -> Set.empty
   Modification.LoseCardType _ -> Set.empty
@@ -3607,6 +3616,50 @@ projectDeciding admits cands =
                                         && writtenPT (uApply a view o p) /= writtenPT (uApply a afterView o p)
                                   )
                                   boards
+                          -- CR 613.8a clause (b)'s last limb again, for an
+                          -- effect that reads the TEXT of the things it applies
+                          -- to rather than a magnitude: applying `b` can change
+                          -- what `a` does to an object by changing the text `a`
+                          -- rewrites there. `a` is not consulted
+                          -- beyond where it applies, so this over-admits -- it
+                          -- does not ask whether the word `a` replaces is among
+                          -- what `b` moved. That is the safe direction here:
+                          -- over-admission makes both edges hold, and CR 613.8b
+                          -- hands a dependency loop back to CR 613.7's
+                          -- timestamp order, which is the answer an independent
+                          -- pair wants anyway.
+                          --
+                          -- The compared fields are the TEXT BOX (CR 612.1),
+                          -- not the whole record: PC.subtypeWordChanges and
+                          -- PC.textChangedKeywords are CR 612.3's bookkeeping,
+                          -- which a text change writes even when it rewrites
+                          -- nothing, so including them would make every text
+                          -- change look like a change to every other.
+                          --
+                          -- Screened on the aspects `b` WRITES before any board
+                          -- is touched, so the P/T pairs -- which pass the
+                          -- PowerA overlap above and are this loop's hot path --
+                          -- never reach the fold. Sound because the three
+                          -- PowerA-only arms (modificationWrites) write none of
+                          -- the fields textOf reads.
+                          changesText (i, _) (j, b) =
+                            let textOf p =
+                                  ( PC.keywords p,
+                                    PC.subtypes p,
+                                    PC.activatedAbilities p,
+                                    PC.triggeredAbilities p,
+                                    PC.replacementEffects p,
+                                    PC.characteristicPT p,
+                                    PC.enchant p
+                                  )
+                             in not (Set.disjoint (uWrites b) (Set.fromList [Keywords, Subtypes]))
+                                  && any
+                                    ( \(o, p, _, ans) ->
+                                        answerFor ans i
+                                          && answerFor ans j
+                                          && textOf (uApply b view o p) /= textOf p
+                                    )
+                                    boards
                           -- `b` applied to every object whose set holds it, judged
                           -- against the board as it stands (CR 613.6).
                           appliedEverywhere b =
@@ -3616,7 +3669,9 @@ projectDeciding admits cands =
                           dependsOnOne x@(i, a) y@(j, b) =
                             j /= i
                               && ( movesSet x y
-                                     || (not (Set.disjoint (uReads a) (uWrites b)) && changesMagnitude x y)
+                                     || ( not (Set.disjoint (uReads a) (uWrites b))
+                                            && (changesText x y || changesMagnitude x y)
+                                        )
                                  )
                           ready = filter (\a -> not (any (dependsOnOne a) pending)) pending
                           -- The dependency edges, built only when the whole round
