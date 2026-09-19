@@ -2786,6 +2786,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileThis -> component
   CostComponent.MillCards _ -> component
   CostComponent.ChooseOpponent -> component
+  CostComponent.Waterbend _ -> component
 
 -- CR 603.2: replace every ControlledByBound atom whose slot this environment
 -- names with the baked ControlledByPlayer arm. What makes "target creature THAT

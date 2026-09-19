@@ -36,6 +36,7 @@ import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.Face as Face
@@ -475,13 +476,13 @@ payableCostGiven aimable sources pcs = payableCostAtGiven aimable sources pcs 0
 -- announcement exposes.
 payableCostAt :: [Map.Map SlotName (Set.Set ObjectId)] -> Natural -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt aimable x stamp pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) Cost.noManaSubstitutions (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.activationManaSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven aimable sources pcs x stamp pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) Cost.noManaSubstitutions (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.activationManaSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
 
 -- CR 601.2f's totalling asked where CR 601.2c's targets do not exist yet: the
 -- predicate holds if SOME aiming this activation could still take leaves the
@@ -998,7 +999,12 @@ activateAbility pid srcId ability = do
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of
           -- an activation cost.
-          (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+          -- CR 701.67a's taps counted into the totalling the announcement
+          -- measures through, Cast.castSpellWith's posture and for its reason
+          -- (Cost.substitutedManas): a half this offer makes payable is a half
+          -- CR 601.2b leaves to the payer rather than to the fallback.
+          let totalledCost = Cost.plusComponents gathered announcedAtX
+          (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.substitutedManas (Cost.activationManaSubstitutions (Cost.Type.components totalledCost) Map.empty pid srcId gs) (Cost.totalManas gathered)) totalledCost
           chosen <- Target.chooseTargets pid abilId srcId (Maybe.fromMaybe 0 mAmount) slots sets
           if not (Target.selectionLegal (Just pid) seed srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
@@ -1061,7 +1067,14 @@ activateAbility pid srcId ability = do
               -- mis-tapped colour is a choice the engine must honour (Cost.payMana).
               -- Reject-not-repair restores the whole activation, including the
               -- ability object this function put on the stack.
-              payment <- Cost.pay Resolve.performManaAbility Nothing PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId paidCost
+              -- CR 701.67a's offer is handed to the PAYMENT rather than made
+              -- here, Cast.castSpellWith's posture and for its reason: CR
+              -- 601.2g's mana window opens first, and the payer says how much of
+              -- the waterbend cost they tap for once it closes
+              -- (Cost.paySubstituting). The bindings the substitution makes are
+              -- dropped -- no printing reads back which permanents a waterbend
+              -- cost tapped, where CR 702.51c's convoke does.
+              (payment, _) <- Cost.paySubstituting Resolve.performManaAbility Nothing PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.activationManaSubstitutions pid srcId) paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

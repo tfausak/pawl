@@ -186,4 +186,26 @@ data CostComponent keyword
     -- the payer's own call. Unpayable only where the payer has no opponent left
     -- (CR 102.2, CR 104.2a), which is what keeps it a cost rather than a no-op.
     ChooseOpponent
+  | -- | CR 701.67a as a cost / Geyser Leaper: this much of the cost's generic
+    -- mana is a waterbend cost, so the payer may tap an untapped artifact or
+    -- creature they control rather than pay each of it.
+    --
+    -- A LICENCE and not a payment. The mana is in the cost's own mana part, so
+    -- CR 601.2f's increases and reductions reach it as they reach every other
+    -- generic symbol and CR 601.2g's window pays it; `payComponent` spends
+    -- nothing for this arm, and `claimOf` states no claim -- the taps the payer
+    -- substitutes arrive as a TapPermanents component of their own
+    -- (Pawl.Engine.Cost.manaSubstitutions), which is what puts them on the
+    -- ClaimAxis beside the rest of the cost.
+    --
+    -- The NUMBER is what CR 701.67b scopes the substitution to: the offer is
+    -- capped at it even where the total cost holds other generic mana, so a
+    -- waterbend {4} taxed {2} more by Suppression Field may tap four permanents
+    -- and no more.
+    --
+    -- Not implemented: a waterbend cost in any other position -- a spell's
+    -- additional cost, a ward cost, an unless cost, an alternative cost (#3901)
+    -- -- a waterbend cost written with X (#3902), and CR 701.67c's trigger on
+    -- paying one, which nothing signals (#3904).
+    Waterbend Natural.Natural
   deriving (Eq, Ord, Show)
