@@ -2335,9 +2335,9 @@ clauseIsImpossible resolving source controller legal gs clause =
 -- Not implemented: every other opcode answers the conservative "not
 -- impossible", so an option that provably does nothing is still offered where
 -- its instruction is one of those -- a counter move off a permanent bearing
--- none of the kind, a TurnFaceUp on a face-up permanent, and the Chosen* object
--- refs, whose candidate pool is the arm's own rather than objectRefObjects
--- (#3673).
+-- none of the kind, a TurnFaceUp on a face-up permanent, a Heal of a permanent
+-- with no marked damage, and the Chosen* object refs, whose candidate pool is
+-- the arm's own rather than objectRefObjects (#3673).
 effectIsImpossible :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.DealDamage {} -> False
@@ -2543,6 +2543,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.MakeForetold {} -> False
   Effect.MakeWarped {} -> False
   Effect.ForEach {} -> False
+  Effect.Heal {} -> False
   where
     viewOf = effectViewOf source legal gs
     context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -4362,6 +4363,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MakeWarped ref ->
     State.modify' $ \gs ->
       foldr Warp.becomeWarped gs (objectRefObjects legal resolving controller source gs ref)
+  -- CR 701.69a: remove all the marked damage from each named permanent. The
+  -- victims are enumerated ONCE (CR 608.2f) off the board as it stands, so an
+  -- illegal slot (CR 608.2b), a player recipient and a set that matched nothing
+  -- all heal nothing.
+  --
+  -- A direct write and not a funnel, which is rule 702.89a's own road
+  -- (Pawl.Engine.Event's UmbraArmor arm) and CR 701.19a's: healing is no event,
+  -- so there is nothing for a replacement to be offered or a trigger to see.
+  Effect.Heal ref ->
+    State.modify' $ \gs ->
+      let heal o = o {Object.damage = 0}
+       in gs
+            { GameState.objects =
+                foldr (Map.adjust heal) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
+            }
   Effect.ForEach (ForEach.MkForEach ref slot body individually) -> do
     gs0 <- State.get
     -- CR 608.2f: WHICH members, swept ONCE from the pre-loop board and then fixed,

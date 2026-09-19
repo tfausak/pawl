@@ -717,6 +717,7 @@ effectObjectRefs effect = case effect of
   Effect.MakeWarped ref -> [ref]
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
   Effect.ForEach (ForEach.MkForEach ref _ _ _) -> [ref]
+  Effect.Heal ref -> [ref]
 
 -- Every PlayerRef this ONE effect holds in a field of its own: not the ones
 -- nested in an ObjectRef it carries (objectRefPlayerRefs), not the ones nested
@@ -879,6 +880,7 @@ effectPlayerRefs effect = case effect of
   Effect.MakeForetold {} -> []
   Effect.MakeWarped {} -> []
   Effect.ForEach {} -> []
+  Effect.Heal {} -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
 monarchTargetSlots :: MonarchTarget.MonarchTarget -> Map.Map SlotName SlotArity
@@ -1209,6 +1211,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- Everything the BODY reads. The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.
   Effect.ForEach (ForEach.MkForEach _ _ body _) -> joinSlots (fmap slotsOf (Foldable.toList body))
+  Effect.Heal _ -> Map.empty
 
 -- CR 611.2b: only ForAsLongAs carries a Quantity, through its Condition.
 durationSlots :: Duration.Duration -> Map.Map SlotName SlotArity
@@ -1734,6 +1737,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
   -- nested in the DEPTH is one slotsOf cannot see.
   Effect.ForEach (ForEach.MkForEach _ _ body _) -> all slotsAreExhaustive body
+  Effect.Heal _ -> True
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
 durationSlotsAreExhaustive :: Duration.Duration -> Bool
@@ -1927,6 +1931,7 @@ readsX =
         Effect.GrantPlayFromExile {} -> False
         -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
         Effect.ForEach (ForEach.MkForEach _ _ body _) -> readsX (Foldable.toList body)
+        Effect.Heal _ -> False
    in any effectReadsX
 
 -- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads, which
@@ -2142,6 +2147,7 @@ boundSlots effect = case effect of
   -- really does leave bound once it is over, to the union across its members
   -- (Pawl.Engine.Resolve.Effect's arm).
   Effect.ForEach (ForEach.MkForEach _ slot body _) -> Set.insert slot (foldMap boundSlots body)
+  Effect.Heal _ -> Set.empty
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
 -- only one -- nothing when the slot named none, its target became illegal, or it

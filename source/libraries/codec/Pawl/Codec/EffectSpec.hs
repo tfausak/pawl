@@ -2068,6 +2068,26 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Forage
       " {\"type\":\"Forage\"} "
+  -- CR 701.69a. Both ObjectRef arms, and not Untap, whose wire shape it shares.
+  Spec.it s "Heal round-trips both ObjectRef arms, and is not Untap" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Heal (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"Heal\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Heal (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"Heal\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+    Spec.assertBool
+      s
+      ( toJson (Effect.Heal (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+          /= toJson (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      )
+      "Heal and Untap of the same slot encode differently"
   -- CR 701.36a: nullary, rule 701.36a fixing the quality, the count and the
   -- chooser, leaving an author nothing to write.
   Spec.it s "Populate" $
