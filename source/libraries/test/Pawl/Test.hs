@@ -619,6 +619,7 @@ import qualified Pawl.StationSpec
 import qualified Pawl.SupportSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TeamSpec
+import qualified Pawl.TimeTravelSpec
 import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
@@ -1271,6 +1272,7 @@ spec s registry = do
   Pawl.CastProhibitionSpec.spec s registry
   Pawl.CastPermissionSpec.spec s registry
   Pawl.PopulateSpec.spec s registry
+  Pawl.TimeTravelSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.PreparationSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry

@@ -130,6 +130,7 @@ codec cardCodec abilityCodec =
           Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
           Arm.nullary "Forage" Effect.Forage,
           Arm.nullary "Populate" Effect.Populate,
+          Arm.nullary "TimeTravel" Effect.TimeTravel,
           Arm.nullary "Recruit" Effect.Recruit,
           Arm.nullary "Learn" Effect.Learn,
           Arm.payload "Cloak" PlayerRef.codec Effect.Cloak (\x -> case x of Effect.Cloak y -> Just y; _ -> Nothing),
@@ -267,6 +268,7 @@ tagOf x = case x of
   Effect.TemptWithTheRing {} -> "TemptWithTheRing"
   Effect.Forage {} -> "Forage"
   Effect.Populate {} -> "Populate"
+  Effect.TimeTravel {} -> "TimeTravel"
   Effect.Recruit {} -> "Recruit"
   Effect.Learn {} -> "Learn"
   Effect.Cloak {} -> "Cloak"

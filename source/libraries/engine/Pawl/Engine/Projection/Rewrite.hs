@@ -487,6 +487,7 @@ rewriteEffect pairs effect = case effect of
   Effect.TemptWithTheRing -> effect
   Effect.Forage -> effect
   Effect.Populate -> effect
+  Effect.TimeTravel -> effect
   Effect.Recruit -> effect
   Effect.Learn -> effect
   Effect.Cloak {} -> effect

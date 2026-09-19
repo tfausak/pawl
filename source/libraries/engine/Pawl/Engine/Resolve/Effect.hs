@@ -72,6 +72,7 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Engine.TimeTravel as TimeTravel
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Warp as Warp
 import qualified Pawl.Extra.Integer as Integer
@@ -2505,6 +2506,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- creature tokens when instructed to populate, you won't create a token" -- so
   -- populating is a legal no-op rather than something CR 608.2d refuses.
   Effect.Populate -> False
+  Effect.TimeTravel -> False
   -- CR 701.70a states no precondition: a player with an empty library or an
   -- empty hand recruits anyway, performing what it can, so nothing here refuses
   -- the instruction.
@@ -7685,6 +7687,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 701.36a: the resolving controller populates; the keyword action is
   -- Pawl.Engine.Populate.populate's, prompt and all.
   Effect.Populate -> Populate.populate controller resolving
+  -- CR 701.56a: the resolving controller time travels, one procedure in
+  -- Pawl.Engine.TimeTravel. Targetless: no CR 608.2b legality to re-check.
+  Effect.TimeTravel -> TimeTravel.timeTravel controller resolving
   -- CR 701.70a: the resolving controller recruits; the keyword action is
   -- Pawl.Engine.Recruit.recruit's, prompt and token alike.
   Effect.Recruit -> Recruit.recruit controller

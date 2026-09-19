@@ -311,6 +311,7 @@ manaProduced effect = case effect of
   Effect.TemptWithTheRing -> Nothing
   Effect.Forage -> Nothing
   Effect.Populate -> Nothing
+  Effect.TimeTravel -> Nothing
   Effect.Recruit -> Nothing
   Effect.Learn -> Nothing
   Effect.Cloak {} -> Nothing
@@ -520,6 +521,7 @@ movesLibraryCard effect = case effect of
   Effect.TemptWithTheRing -> False
   Effect.Forage -> False
   Effect.Populate -> False
+  Effect.TimeTravel -> False
   -- CR 701.70a's first sentence is a draw, which Effect.Draw's arm above already
   -- makes a library move; an ability that recruits is no mana ability.
   Effect.Recruit -> True

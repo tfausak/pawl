@@ -55,6 +55,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetCount as TargetCount
+import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.Zone as Zone
 
@@ -373,6 +374,15 @@ data Prompt r where
   -- that can be carried out at all (Pawl.Engine.Learn.learn); raised whenever
   -- there is one, since declining is a distinct outcome even then.
   ChooseLearn :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty LearnMode.LearnMode -> Prompt (Maybe LearnMode.LearnMode)
+  -- | CR 701.56a: which of the objects with time counters the time traveller
+  -- chooses, and which way each chosen one goes. The ObjectId is the spell or
+  -- ability resolving; the list is every candidate (Pawl.Engine.TimeTravel), and
+  -- an object absent from the answer was not chosen at all.
+  --
+  -- Raised whenever there is ONE candidate, unlike the choose-one prompts beside
+  -- it: rule 701.56a's "any number" leaves a lone candidate three outcomes, so
+  -- performing the action still decides something.
+  ChooseTimeTravel :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Map.Map ObjectId.ObjectId TimeTravelChoice.TimeTravelChoice)
   -- | CR 701.30c: which end of their own library a clashing player puts the card
   -- they revealed on. The first ObjectId is the spell or ability resolving; the
   -- second is that player's own revealed card.

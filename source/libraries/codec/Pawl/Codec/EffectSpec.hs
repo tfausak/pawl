@@ -2077,6 +2077,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Populate
       " {\"type\":\"Populate\"} "
+  -- CR 701.56a: nullary, rule 701.56a fixing the candidate set and leaving the
+  -- time traveller every choice the action has.
+  Spec.it s "TimeTravel" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.TimeTravel
+      " {\"type\":\"TimeTravel\"} "
   -- CR 701.70a: nullary, rule 701.70a fixing the draw, the discard and the
   -- token, leaving an author nothing to write.
   Spec.it s "Recruit" $

@@ -75,9 +75,10 @@ data CounterKind keyword
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. Its
     -- readers are vanishing's own three abilities and suspend's two exile-zone
     -- ones, minted by Pawl.Engine.Keyword, which count Object.counters directly
-    -- -- and a CARD's own text, which may both place them (Tidewalker's entry
-    -- rewrite) and count them (its CR 208.2a power and toughness, a
-    -- Quantity.ObjectCounters).
+    -- -- CR 701.56a's time travel, which is the one procedure that moves them in
+    -- EITHER direction (Pawl.Engine.TimeTravel) -- and a CARD's own text, which
+    -- may both place them (Tidewalker's entry rewrite) and count them (its CR
+    -- 208.2a power and toughness, a Quantity.ObjectCounters).
     Time
   | -- | CR 702.32a: the counters fading counts down. Rule 122.1 gives fade
     -- counters no lettered clause either, so rule 702.32 is the whole citation,
