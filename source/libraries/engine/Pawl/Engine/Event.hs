@@ -1067,7 +1067,7 @@ createEmblem pid card = do
 --
 -- The Context is a BARE Filter.contextFor, carrying no slot bindings even where a
 -- resolution is in flight -- and the draw-replacement caller in `apply` has none
--- to carry at all. Honest here rather than #2141's silence: CR 400.11c
+-- to carry at all. Honest rather than silent: CR 400.11c
 -- keeps a spell or ability from affecting a card outside the game, so no slot of
 -- the resolution can name one, and the candidate view below is a printed FACE
 -- with no `identity` for Filter.IsBound to compare in any case. Pawl.CardSpec's
@@ -4149,7 +4149,7 @@ putOwnCounters oid kind n = do
 -- ROW's, through Replacement.candidateContext: CR 109.5's "you" is the row's
 -- controller rather than the entrant's, and a floating row's captured slot
 -- bindings ride along, which is what a bare Filter.contextFor would have
--- dropped; see #2141 for the caller that still does.
+-- dropped.
 --
 -- The AMOUNT is CR 614.12's "how they apply", so it counts over
 -- Projection.boardAsEntering rather than the live battlefield -- Squad Captain's
@@ -5379,7 +5379,11 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 -- nobody, per CR 110.2 and CR 108.4a, exactly as the field's own
                 -- note above says.
                 let chooser = Maybe.fromMaybe pid under
-                    hosts = filter (\h -> not (Set.member h batch)) (Attach.hostsFor chooser oid oid Filter.Type.CanHostSubject gs)
+                    -- A bare Filter.contextFor: rule 303.4f's restriction is the
+                    -- Aura's own enchant ability, so there is no resolution
+                    -- whose slots the filter could name -- and CanHostSubject,
+                    -- the whole filter here, names none.
+                    hosts = filter (\h -> not (Set.member h batch)) (Attach.hostsFor (Filter.contextFor (Game.teams gs) (Just chooser) (Just oid)) oid Filter.Type.CanHostSubject gs)
                 chosen <- Attach.chooseHost chooser oid hosts
                 -- THE TAG the Aura's own enchant slot produced, never a hand-built
                 -- ToObject: Sba.stillLegalEnchant compares the (pool, tag) pair, so

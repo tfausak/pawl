@@ -2532,6 +2532,9 @@ filterReads f = case f of
   -- Reads the CANDIDATE's controller, where its sibling above reads names: the
   -- bound object's controller arrives on the Context, already projected.
   Filter.Type.SameControllerAsBound _ -> Set.singleton Controller
+  -- Reads the CANDIDATE's controller too, the atom above one link along: the
+  -- bound object's HOST's controller arrives on the Context, already projected.
+  Filter.Type.SameControllerAsHostOfBound _ -> Set.singleton Controller
   -- Reads the CANDIDATE's subtypes; the bound object's arrive on the Context.
   Filter.Type.SharesCreatureTypeWithBound _ -> Set.singleton Subtypes
   -- Reads the CANDIDATE's toughness, the atom above's shape one characteristic
@@ -2843,6 +2846,10 @@ filterReadsPeers f = case f of
   -- The bound object's controller arrives on the Context, filled by
   -- Pawl.Engine.Target.slotContext -- no peer projection is read here.
   Filter.Type.SameControllerAsBound _ -> False
+  -- The bound object's HOST's controller arrives on the Context too, filled by
+  -- Pawl.Engine.Resolve.Slots.effectContext -- the host is reached there rather
+  -- than through the candidate's `peers` view.
+  Filter.Type.SameControllerAsHostOfBound _ -> False
   Filter.Type.SharesCreatureTypeWithBound _ -> False
   Filter.Type.ToughnessLessThanBound _ -> False
   Filter.Type.HasChosenName -> False
