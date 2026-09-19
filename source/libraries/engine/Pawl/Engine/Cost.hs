@@ -53,6 +53,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Reversal as Reversal
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Summoning as Summoning
@@ -3251,6 +3252,16 @@ criteriaOf component = case component of
 -- unwinds a wider snapshot afterwards and discards what the payer kept. `pay`
 -- below says which callers are left out and why.
 --
+-- `entry` is where the mana window OPENED, which is what tells the two sides
+-- apart: the payer who declines goes back to `before` for everything the
+-- ANNOUNCEMENT wrote between it and `entry`, and stays at `closed` for
+-- everything the window wrote after. Pawl.Engine.Reversal.withoutAnnouncement
+-- composes that state, and answers Nothing where the two sides wrote one leaf
+-- differently -- which no announcement step and no mana ability does, so the
+-- fallback is a fence.
+-- A caller whose announcement writes nothing hands the same state twice, and
+-- then the composed state IS `closed` and nothing here moves.
+--
 -- CostSpec's "Reversal" group proves it at CR 118.12's payment, and
 -- Pawl.FaceDownSpec's "Reversal at a special action" group at a special
 -- action's.
@@ -3263,10 +3274,10 @@ criteriaOf component = case component of
 --
 -- The CANCELLATION HAPPENS FIRST, before the question: rule 733.1 reverses the
 -- action and cancels the payments flat, and only its last-but-one sentence
--- offers the mana abilities back. So the payer is asked against `closed`, where
--- nothing of the cost has been paid, rather than against the half-paid state the
--- refusal left -- which is what Pawl.Engine.Game.ask hands the answerer. It also
--- keeps CR 104.4b's stamp: `Game.choose` writes GameState.lastChoice, and
+-- offers the mana abilities back. So the payer is asked against the state that
+-- cancellation leaves -- the announcement undone and nothing of the cost paid --
+-- rather than against the half-paid state the refusal left, which is what
+-- Pawl.Engine.Game.ask hands the answerer. It also keeps CR 104.4b's stamp: `Game.choose` writes GameState.lastChoice, and
 -- declining now puts back nothing that could discard it.
 --
 -- Both restores go through `keepingLibraryActions` rather than a bare State.put,
@@ -3274,15 +3285,20 @@ criteriaOf component = case component of
 -- abilities performed stands even though the rest of it goes back. The
 -- no-activation arm reads the LIVE state rather than `closed`, which is what the
 -- callers it took this restore over from did.
-reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> Game ()
-reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
+reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> GameState -> Game ()
+reverseIllegal pid activated closed entry before = case NonEmpty.nonEmpty activated of
   Nothing -> restoreKeepingLibraryActions before
-  Just sources -> do
-    State.put closed
-    answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor pid closed) pid sources)
-    case answer of
-      OptionalDecision.Exercises -> State.put (keepingLibraryActions closed before)
-      OptionalDecision.Declines -> pure ()
+  Just sources -> case Reversal.withoutAnnouncement before entry closed of
+    -- No state answers "keep them", so the question is not raised and CR 733.1's
+    -- first sentence stands alone -- Pawl.Engine.Reversal says why no
+    -- announcement step and no mana ability reaches it.
+    Nothing -> restoreKeepingLibraryActions before
+    Just kept -> do
+      State.put kept
+      answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor pid kept) pid sources)
+      case answer of
+        OptionalDecision.Exercises -> State.put (keepingLibraryActions closed before)
+        OptionalDecision.Declines -> pure ()
 
 -- CR 733.1's last sentence: shuffling a library or revealing cards from one is
 -- never reversed, even where the mana ability that did it is. Restoring
@@ -3558,7 +3574,9 @@ paySubstituting perform reversible moment subject announced spending pid oid sub
 --
 -- Not implemented: rule 733.1's option to keep the mana abilities activated in
 -- the window, `pay` above and for its reason -- Pawl.Engine.Combat puts back an
--- older snapshot still when the toll goes unpaid (#3119).
+-- older snapshot still when the toll goes unpaid. Composing the state that
+-- answer needs has to descend inside an Object here, CR 508.1f's tap being one
+-- the window may take too (#3867).
 --
 -- The bound slots ride out unread. A component of a combat toll binds what
 -- payComponent binds it (Sacrifice, TapPermanents, TapForTotalPower, ExileThis
@@ -4065,7 +4083,12 @@ payManaExcept perform inFlight record subject spending pid cost = do
 -- below asks about: nothing has been substituted yet while the window is open,
 -- so CR 118.3c's question is put against the whole of it.
 payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> (ManaCost.ManaCost -> Game (ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])) -> ManaCost.ManaCost -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game ())
-payManaWindow perform inFlight record subject spending pid substituting cost =
+payManaWindow perform inFlight record subject spending pid substituting cost = do
+  -- Where the window OPENED, which is the far end of the announcement's diff:
+  -- everything between the caller's own snapshot and this is what the
+  -- announcement wrote, and everything after it is the window's. Taken here
+  -- because this is the one place that can name the boundary (`reverseIllegal`).
+  entry <- State.get
   let -- What the pool would leave if the cost were paid out of it right now.
       --
       -- CR 609.4b's clauses are resolved from the board on EVERY pass rather than
@@ -4133,7 +4156,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost =
         -- CR 106.6: the payment sees only the mana it may spend, and the rest of
         -- the pool goes back beside what it leaves (CR 106.4 -- unspent mana stays
         -- unspent, it does not vanish because one cost could not use it).
-        let undo = reverseIllegal pid (reverse activated) gs
+        let undo = reverseIllegal pid (reverse activated) gs entry
             (available, withheld) = Mana.spendableFor subject pid gs
         case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid residual gs)) residual (Mana.Type.MkMana available) of
           Nothing -> pure (False, extra, undo)
@@ -4179,7 +4202,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost =
         Just sid ->
           let recorded = gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
            in ManaRider.granted sid spent recorded
-   in window Set.empty []
+  window Set.empty []
 
 payMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payMana perform = payManaExcept perform Set.empty Nothing
