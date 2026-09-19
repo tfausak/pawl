@@ -1828,6 +1828,45 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events atEnd))) "CR 509.4: no blocker was declared on this board"
         Spec.assertBool s (S.onBattlefield guard atEnd && S.onBattlefield brigade atEnd) "and both attackers survived their copy's damage, which is what keeps the tokens alive to be exiled"
       _ -> Spec.assertFailure s "fixture should have two attackers"
+  -- CR 603.6a's "all permanents on the battlefield (including the newcomers) are
+  -- checked for any enters-the-battlefield triggers that match the event", over CR
+  -- 608.2f's batch. Mirror Match's loop is ONE action taken on the attackers, so
+  -- its tokens are put onto the battlefield by one event and each of them is among
+  -- the permanents checked against the others' arrival.
+  --
+  -- THE ATTACKERS ARE SOUL WARDENS {W} Creature -- Human Cleric 1/1, "Whenever
+  -- another creature enters, you gain 1 life" (Scryfall, 2026-09-18), which makes
+  -- the tokens Soul Wardens too and bob's life the count. Three of them, not two:
+  -- the three readings are 6 under the rule (each token sees the other two), 3
+  -- with the tokens entering one after another (the first sees two, the second
+  -- one, the last none) and 0 with no token minted, where at two attackers the
+  -- first two readings are 2 and 1 and an off-by-one anywhere reproduces either.
+  --
+  -- ALICE'S WARDENS ARE THE CONTROL, and they are why the assertion is a
+  -- DIFFERENCE rather than a life total: all three stood on the battlefield before
+  -- the spell resolved, so each sees all three arrivals however they are grouped.
+  -- Their 9 says the tokens really did enter, which is what separates a wrong
+  -- grouping from a loop that minted nothing.
+  Spec.it s "CR 603.6a / 608.2f: every Mirror Match token sees every other one enter" $ do
+    island <- S.printingOf s registry "Island"
+    warden <- S.printingOf s registry "Soul Warden"
+    mirror <- S.printingOf s registry "Mirror Match"
+    let (gs0, attackers, _) = S.combatBoardOf [warden, warden, warden] []
+        lands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) gs0 [1 :: Int, 2, 3, 4, 5, 6]
+        (_, withCard) = S.addHandCard mirror S.bob lands
+        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer withCard
+        -- Stopped at the combat damage step, where the spell has resolved and
+        -- every trigger it set off has, but CR 510.2's damage has not yet traded
+        -- the 1/1 tokens off against the 1/1 attackers they block.
+        blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) castMirrorMatch atBlockers
+        gained pid = (-) <$> S.lifeOf pid blocking <*> S.lifeOf pid atBlockers
+        liveTokens g = filter (`S.onBattlefield` g) (S.tokensOf g)
+    -- GAMEPLAY FIRST, ahead of every count below: bob's gain is one per token per
+    -- OTHER token, which only a batch that enters as one event produces.
+    Spec.assertEqWith s "CR 603.6a / 608.2f: each of the three tokens saw the other two enter, so bob gained 6" (gained S.bob) (Just 6)
+    Spec.assertEqWith s "control: alice's three Wardens were already there, so each saw all three arrivals whatever the grouping" (gained S.alice) (Just 9)
+    Spec.assertEqWith s "CR 707.1: one copy per attacker, all three alive to be counted" (length (liveTokens blocking)) 3
+    Spec.assertEqWith s "and the three Wardens they copied are still attacking" (length (filter (`S.onBattlefield` blocking) attackers)) 3
 
 -- CR 506.7b's window, "only during combat after blockers are declared", proved
 -- step by step on ONE board.

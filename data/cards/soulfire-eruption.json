@@ -104,6 +104,7 @@
                           }
                         }
                       ],
+                      "individually": true,
                       "ref": {
                         "type": "InSlot",
                         "value": "victims"
