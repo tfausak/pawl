@@ -4260,6 +4260,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   levelerSpec s registry
   supertypeSpec s registry
   exchangeTextBoxSpec s registry
+  textChangeDependencySpec s registry
 
 -- CR 612.5's two sides, pinned by id out of the offered set rather than
 -- hand-built, so CR 608.2b's re-read at resolution still finds what was named.
@@ -4318,38 +4319,72 @@ exchangeOfWordsBoard sentry sorcerer piker exchange =
       after = S.runPure (exchangeAnswer sentryId sorcererId) staged Stack.resolveTop
    in (sentryId, sorcererId, wordsId, before, after)
 
--- alice's Bog Wraith ("Creature -- Wraith 3/3, Swampwalk" and nothing else) with
--- a Magical Hack already resolved on it (Swamp -> Island, so it walks Islands),
--- her Goblin Piker as the vanilla other side, and Exchange of Words entering
+-- alice's Bog Wraith ("Creature -- Wraith 3/3, Swampwalk" and nothing else) and
+-- her Goblin Piker as the vanilla other side, with a Magical Hack (Swamp ->
+-- Island) already resolved on one of them, and Exchange of Words entering
 -- afterwards with its CR 603.6a trigger pending. Returns the Wraith, the Piker,
 -- the HACKED board before the exchange and the board after -- a pair differing
 -- in exactly the exchange, with the Hack's earlier timestamp on both.
+--
+-- `hackTarget` picks which of the two the Hack lands on out of the pair
+-- (Wraith, Piker): `fst` puts the swap on the side whose printed text carries
+-- the word, `snd` on the side that only RECEIVES it.
 hackedExchangeBoard ::
+  ((ObjectId.ObjectId, ObjectId.ObjectId) -> ObjectId.ObjectId) ->
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
-hackedExchangeBoard island wraith piker hack exchange =
+hackedExchangeBoard hackTarget island wraith piker hack exchange =
   let (wraithId, b0) = S.addPermanent wraith S.alice (S.landsInPlay island 1)
       (pikerId, b1) = S.addPermanent piker S.alice b0
       (b2, hackId) = S.handOne hack b1
+      hackedId = hackTarget (wraithId, pikerId)
       -- Inlined rather than bound, for exchangeOfWordsBoard's reason.
-      cast = S.runPure (hackAnswer wraithId) b2 (S.cast S.alice hackId)
-      hacked = S.runPure (hackAnswer wraithId) cast Stack.resolveTop
+      cast = S.runPure (hackAnswer hackedId) b2 (S.cast S.alice hackId)
+      hacked = S.runPure (hackAnswer hackedId) cast Stack.resolveTop
       (_, entered) = S.entersWithTrigger exchange S.alice hacked
       staged = S.runPure (exchangeAnswer wraithId pikerId) entered Engine.settleForPriority
       after = S.runPure (exchangeAnswer wraithId pikerId) staged Stack.resolveTop
    in (wraithId, pikerId, hacked, after)
 
+-- alice's Bog Wraith with TWO Magical Hacks resolving on it in a stated order:
+-- the earlier Island -> Forest, which finds nothing in the printed swampwalk,
+-- then the later Swamp -> Island. Returns the Wraith, the board after the
+-- first Hack alone and the board after both.
+--
+-- Two runs rather than one stateful answerer: the two ChooseLandTypeSwap
+-- prompts are structurally identical, so a pure answerer could not tell them
+-- apart, and each swap is given verbatim to its own run.
+twiceHackedBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+twiceHackedBoard island wraith hack =
+  let (wraithId, b0) = S.addPermanent wraith S.alice (S.landsInPlay island 2)
+      (b1, earlyId) = S.handOne hack b0
+      (b2, lateId) = S.handOne hack b1
+      -- Inlined rather than bound, for exchangeOfWordsBoard's reason.
+      castEarly = S.runPure (hackSwapping wraithId (Subtype.Type.Island, Subtype.Type.Forest)) b2 (S.cast S.alice earlyId)
+      early = S.runPure (hackSwapping wraithId (Subtype.Type.Island, Subtype.Type.Forest)) castEarly Stack.resolveTop
+      castLate = S.runPure (hackSwapping wraithId (Subtype.Type.Swamp, Subtype.Type.Island)) early (S.cast S.alice lateId)
+      late = S.runPure (hackSwapping wraithId (Subtype.Type.Swamp, Subtype.Type.Island)) castLate Stack.resolveTop
+   in (wraithId, early, late)
+
 -- Magical Hack's one target, pinned to the named permanent by FILTERING the
 -- offered set rather than building a recipient, and its Swamp -> Island swap
 -- given verbatim so no answerer can re-derive a legal pair after a mutation.
 hackAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-hackAnswer oid p = case p of
+hackAnswer oid = hackSwapping oid (Subtype.Type.Swamp, Subtype.Type.Island)
+
+-- hackAnswer with the swap named, for a board that casts the Hack twice.
+hackSwapping :: ObjectId.ObjectId -> (Subtype.Type.Subtype, Subtype.Type.Subtype) -> Prompt.Prompt r -> r
+hackSwapping oid swap p = case p of
   Prompt.ChooseTargets _ _ _ offers -> S.preferring (isOneOf (Set.singleton oid)) offers
-  Prompt.ChooseLandTypeSwap {} -> (Subtype.Type.Swamp, Subtype.Type.Island)
+  Prompt.ChooseLandTypeSwap {} -> swap
   _ -> S.identityAnswer p
 
 exchangeTextBoxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -4467,7 +4502,7 @@ exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     hack <- S.printingOf s registry "Magical Hack"
     exchange <- S.printingOf s registry "Exchange of Words"
-    let (wraithId, pikerId, hacked, after) = hackedExchangeBoard island wraith piker hack exchange
+    let (wraithId, pikerId, hacked, after) = hackedExchangeBoard fst island wraith piker hack exchange
         islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)
         swampwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)
     Spec.assertBool s (Projection.hasKeyword islandwalk pikerId after) "CR 612.5 the Piker receives the HACKED islandwalk"
@@ -4478,6 +4513,69 @@ exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
     -- really had islandwalk on the board the exchange was added to.
     Spec.assertEqWith s "the Hack resolved onto the Wraith" (Projection.textChangesAffecting wraithId hacked) [(Subtype.Type.Swamp, Subtype.Type.Island)]
     Spec.assertBool s (Projection.hasKeyword islandwalk wraithId hacked) "and the Wraith walked Islands before the exchange"
+
+-- CR 613.8 inside layer 3: a text-changing effect whose word only appears once
+-- ANOTHER layer-3 effect has applied depends on that effect and waits for it,
+-- which overrides CR 613.7's timestamp order. Both boards are one-way -- the
+-- other direction changes nothing the first effect reads -- so CR 613.8b's
+-- last sentence does not hand the pair back to timestamp order.
+textChangeDependencySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangeDependencySpec s registry = Spec.describe s "TextChangeDependency" $ do
+  -- Two Magical Hacks ({U} Instant, "Change the text of target spell or
+  -- permanent by replacing all instances of one basic land type with another."
+  -- -- checked against Scryfall 2026-09-19) on Bog Wraith ("Creature -- Wraith
+  -- 3/3, Swampwalk" and nothing else, same check).
+  --
+  -- The earlier Island -> Forest depends on the later Swamp -> Island: applying
+  -- the later one turns the printed swampwalk into islandwalk, which is the word
+  -- the earlier one rewrites. The later one does not depend on the earlier: the
+  -- Wraith's text holds no Island word until the later one has run. Timestamp
+  -- order leaves islandwalk; CR 613.8b leaves forestwalk.
+  Spec.it s "CR 613.8b an earlier text change waits for the later one it depends on" $ do
+    island <- S.printingOf s registry "Island"
+    wraith <- S.printingOf s registry "Bog Wraith"
+    hack <- S.printingOf s registry "Magical Hack"
+    let (wraithId, early, late) = twiceHackedBoard island wraith hack
+        forestwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Forest)
+        islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)
+        swampwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)
+    Spec.assertBool s (Projection.hasKeyword forestwalk wraithId late) "CR 613.8b the Swamp -> Island change applies first, so the Wraith walks Forests"
+    Spec.assertBool s (not (Projection.hasKeyword islandwalk wraithId late)) "and not the islandwalk CR 613.7's timestamp order would have left"
+    Spec.assertBool s (not (Projection.hasKeyword swampwalk wraithId late)) "the printed word being gone either way"
+    -- The anti-vacuity checks, after the behaviour so neither can absorb a
+    -- mutation aimed at it: the earlier Hack really resolved, and on its own it
+    -- really is the no-op the dependency argument rests on.
+    Spec.assertEqWith s "the earlier Hack resolved onto the Wraith" (Projection.textChangesAffecting wraithId early) [(Subtype.Type.Island, Subtype.Type.Forest)]
+    Spec.assertBool s (Projection.hasKeyword swampwalk wraithId early) "and found no Island word to change, the Wraith still walking Swamps"
+
+  -- Magical Hack on the side that only RECEIVES the word: the Hack resolves on
+  -- Goblin Piker ("Creature -- Goblin Warrior 2/1", no rules text at all, same
+  -- check), and Exchange of Words ({1}{U}{U}, "When this enchantment enters,
+  -- choose two target creatures. For as long as this enchantment remains on the
+  -- battlefield, exchange the text boxes of those creatures.", same check) then
+  -- exchanges the Piker's text box with Bog Wraith's.
+  --
+  -- The Hack depends on the exchange -- applying the exchange gives the Piker
+  -- the swampwalk the Hack rewrites -- and the exchange does not depend on the
+  -- Hack, since the Piker's printed text holds no basic land type for the Hack
+  -- to change. Timestamp order leaves the Piker with swampwalk; CR 613.8b
+  -- leaves islandwalk.
+  Spec.it s "CR 613.8b a text change waits for the exchange that gives it a word" $ do
+    island <- S.printingOf s registry "Island"
+    wraith <- S.printingOf s registry "Bog Wraith"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hack <- S.printingOf s registry "Magical Hack"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (wraithId, pikerId, hacked, after) = hackedExchangeBoard snd island wraith piker hack exchange
+        islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)
+        swampwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)
+    Spec.assertBool s (Projection.hasKeyword islandwalk pikerId after) "CR 613.8b the exchange applies first, so the Hack rewrites the swampwalk the Piker received"
+    Spec.assertBool s (not (Projection.hasKeyword swampwalk pikerId after)) "and not the swampwalk CR 613.7's timestamp order would have left"
+    Spec.assertBool s (not (Projection.hasKeyword islandwalk wraithId after)) "CR 612.5 while the Wraith takes the Piker's empty text box"
+    -- The anti-vacuity checks, after the behaviour: the Hack really resolved on
+    -- the Piker, and the Piker really had nothing for it to change.
+    Spec.assertEqWith s "the Hack resolved onto the Piker" (Projection.textChangesAffecting pikerId hacked) [(Subtype.Type.Swamp, Subtype.Type.Island)]
+    Spec.assertBool s (not (Projection.hasKeyword swampwalk pikerId hacked)) "which had no word for it to change before the exchange"
 
 -- The as-enters copy choice, pinned to one named permanent so a mutation cannot
 -- be repaired by an answerer that finds another legal source. Pawl.CopySpec's
