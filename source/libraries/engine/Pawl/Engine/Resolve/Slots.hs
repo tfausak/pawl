@@ -1274,8 +1274,8 @@ conditionSlots condition = case condition of
 --
 -- SYNTACTIC rather than per-reader: a slot NAME anywhere in the row's own data is
 -- an object the row refers to, whether or not the arm reading it happens to build
--- a slot-aware Filter.Context today. That is
--- what CR 609.7a asks for, and it is the safe direction for the capture.
+-- a slot-aware Filter.Context today. That is what CR 609.7a asks for, and it is
+-- the safe direction for the capture.
 --
 -- CR 614.9's printed DESTINATION is walked with the damage pattern beside it and
 -- is not a pattern: it is read in the same
@@ -2709,8 +2709,8 @@ effectContext gs controller source legal bindings =
           --
           -- Projection.controllerOf and not an owner read: CR 613.1b's layer 2
           -- is what makes the host's controller differ from its owner, and
-          -- Pawl.AuraSpec's "the host's controller and not the Aura's decides
-          -- the destinations" is the board that tells them apart.
+          -- Pawl.AuraSpec's "CR 613.1b the host's controller is the projected
+          -- one, not its owner" is the board that tells the two apart.
           Filter.slotHostControllers = fmap (foldMap (\oid -> maybe Set.empty (\host -> if Set.member host (GameState.battlefield gs) then maybe Set.empty Set.singleton (Projection.controllerOf host gs) else Set.empty) (Projection.hostOf oid gs))) objects,
           -- CR 205.3m's creature types off the same objects and the same
           -- reader, for slotNames' reason: Heirloom Blade's dead creature is

@@ -1067,8 +1067,8 @@ createEmblem pid card = do
 --
 -- The Context is a BARE Filter.contextFor, carrying no slot bindings even where a
 -- resolution is in flight -- and the draw-replacement caller in `apply` has none
--- to carry at all. Honest rather than silent: CR 400.11c
--- keeps a spell or ability from affecting a card outside the game, so no slot of
+-- to carry at all. Honest rather than silent: CR 400.11c keeps a spell or
+-- ability from affecting a card outside the game, so no slot of
 -- the resolution can name one, and the candidate view below is a printed FACE
 -- with no `identity` for Filter.IsBound to compare in any case. Pawl.CardSpec's
 -- "CR 400.11c no card asks IsBound in a wish's filter" is what keeps a card out

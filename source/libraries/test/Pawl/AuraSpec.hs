@@ -1605,12 +1605,10 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
 -- destination's own Filter.CanHostSubject conjunct -- the ruling's third clause,
 -- "it must be able to be enchanted by the Aura".
 --
-
--- | reading | offered |
--- | correct | the Hill Giant, the Berserkers |
--- | the Aura's controller | the Guildmage, the Piker |
--- | a vacuously TRUE atom | those two as well |
--- | a bare Filter.contextFor | nothing, and the Aura does not move |
+-- What each reading offers: correct, bob's Hill Giant and Berserkers; the
+-- Aura's controller, alice's Guildmage and Piker; a vacuously TRUE atom, those
+-- two as well; a bare Filter.contextFor, nothing at all, and the Aura does not
+-- move.
 --
 -- Four distinct power/toughness pairs, so no numeric coincidence can hide a
 -- wrong host: 2/4 under the Aura is 4/5, 3/3 is 5/4, 4/4 is 6/5, and the Piker
@@ -1698,7 +1696,8 @@ simicGuildmageSpec s registry =
         -- The PROJECTION read, and the reason it is a second board: bob's
         -- creatures here are OWNED by alice and controlled by bob through a CR
         -- 613.1b layer-2 effect, so an owner read of the host's controller would
-        -- offer alice's side instead. Nothing else about the board changes.
+        -- offer alice's side instead. The seats and the four creatures are the
+        -- board above's; only who OWNS bob's three differs.
         Spec.it s "CR 613.1b the host's controller is the projected one, not its owner" $ do
           island <- S.printingOf s registry "Island"
           guildmage <- S.printingOf s registry "Simic Guildmage"
