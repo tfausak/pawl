@@ -130,6 +130,8 @@ codec =
       -- CR 701.61a. One player id, the arm above's shape: the rule's two halves
       -- write their own Moved events, so the forager is all this carries.
       Arm.payload "Foraged" PlayerId.codec GameEvent.Foraged (\x -> case x of GameEvent.Foraged y -> Just y; _ -> Nothing),
+      Arm.payload "Earthbent" PlayerId.codec GameEvent.Earthbent (\x -> case x of GameEvent.Earthbent y -> Just y; _ -> Nothing),
+      Arm.payload "Waterbent" PlayerId.codec GameEvent.Waterbent (\x -> case x of GameEvent.Waterbent y -> Just y; _ -> Nothing),
       -- CR 608.2n. The source object and the ability, which is the pair CR
       -- 707.10b counts by, so the payload is the same record Pawl.Types.Source's
       -- own OfAbility arm carries.
@@ -203,4 +205,6 @@ tagOf x = case x of
   GameEvent.RingTempted {} -> "RingTempted"
   GameEvent.Blighted {} -> "Blighted"
   GameEvent.Foraged {} -> "Foraged"
+  GameEvent.Earthbent {} -> "Earthbent"
+  GameEvent.Waterbent {} -> "Waterbent"
   GameEvent.ActivatedAbilityResolved {} -> "ActivatedAbilityResolved"

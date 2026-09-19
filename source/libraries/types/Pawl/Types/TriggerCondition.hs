@@ -599,4 +599,22 @@ data TriggerCondition
     -- GameEvent.Foraged. Fires on the forage itself, so which half of rule
     -- 701.61a the forager took does not separate two forages here.
     PlayerForages PlayerRelation.PlayerRelation
+  | -- | CR 701.66b: "whenever a player earthbends"
+    -- (data\/cards\/synthetic-stonelistener-adept.json), against
+    -- GameEvent.Earthbent. Rule 701.66b puts the moment at the CREATION of rule
+    -- 701.66a's delayed triggered ability, so this fires while the earthbend is
+    -- still resolving and NOT when the land later dies and comes back.
+    --
+    -- One arm per bending keyword action, PlayerBlights' and PlayerForages'
+    -- shape, rather than one arm carrying which act was done: CR 701.65b, CR
+    -- 701.66b, CR 701.67c and CR 702.189b put the moment in four different
+    -- places, and a printing watching several of them (Avatar Aang) writes CR
+    -- 603.1b's AnyOf over these arms.
+    PlayerEarthbends PlayerRelation.PlayerRelation
+  | -- | CR 701.67c: "whenever a player waterbends"
+    -- (data\/cards\/synthetic-tidecaller-scribe.json), against
+    -- GameEvent.Waterbent. Fires on the PAYMENT, "regardless of how they paid
+    -- that cost", so a waterbend cost paid entirely in mana fires it exactly as
+    -- one paid by rule 701.67a's taps does.
+    PlayerWaterbends PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

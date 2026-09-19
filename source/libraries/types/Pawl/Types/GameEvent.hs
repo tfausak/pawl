@@ -562,6 +562,17 @@ data GameEvent
     -- both halves of rule 701.61a already write their own Moved events, and no
     -- printing reads which half a forage took.
     Foraged PlayerId.PlayerId
+  | -- | CR 701.66b: this player earthbent, written as rule 701.66a's delayed
+    -- triggered ability is CREATED rather than when it later returns the land.
+    -- Pawl.EventTriggerSpec's "CR 701.66b the Adept fires as rule 701.66a's
+    -- delayed ability is created, not when it returns the land" proves the two
+    -- moments apart.
+    Earthbent PlayerId.PlayerId
+  | -- | CR 701.67c: this player paid a waterbend cost, whichever way rule
+    -- 701.67a let them pay it. Pawl.EventTriggerSpec's "CR 701.67c and the same
+    -- cost paid entirely in mana fires it just the same" is the half a
+    -- tap-reading condition would miss.
+    Waterbent PlayerId.PlayerId
   | -- | CR 608.2n: an ACTIVATED ability RESOLVED -- the source object and the
     -- ability, which is the pair CR 707.10b's third sentence counts by. Appended
     -- by Pawl.Engine.Resolve.resolveModesWith, the one loop every ability's

@@ -174,7 +174,9 @@ codec =
           -- CR 701.68d's "whenever a player blights", RingTemptsPlayer's shape above.
           Arm.payload "PlayerBlights" PlayerRelation.codec TriggerCondition.PlayerBlights (\x -> case x of TriggerCondition.PlayerBlights y -> Just y; _ -> Nothing),
           -- CR 701.61a's "whenever you forage", the arm above's shape.
-          Arm.payload "PlayerForages" PlayerRelation.codec TriggerCondition.PlayerForages (\x -> case x of TriggerCondition.PlayerForages y -> Just y; _ -> Nothing)
+          Arm.payload "PlayerForages" PlayerRelation.codec TriggerCondition.PlayerForages (\x -> case x of TriggerCondition.PlayerForages y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerEarthbends" PlayerRelation.codec TriggerCondition.PlayerEarthbends (\x -> case x of TriggerCondition.PlayerEarthbends y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerWaterbends" PlayerRelation.codec TriggerCondition.PlayerWaterbends (\x -> case x of TriggerCondition.PlayerWaterbends y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: TriggerCondition.TriggerCondition -> String
@@ -302,3 +304,5 @@ tagOf x = case x of
   TriggerCondition.PermanentBecomesBlockedBy {} -> "PermanentBecomesBlockedBy"
   TriggerCondition.PlayerBlights {} -> "PlayerBlights"
   TriggerCondition.PlayerForages {} -> "PlayerForages"
+  TriggerCondition.PlayerEarthbends {} -> "PlayerEarthbends"
+  TriggerCondition.PlayerWaterbends {} -> "PlayerWaterbends"

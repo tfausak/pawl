@@ -16,9 +16,11 @@
 -- the delayed ability itself, which is why that lives here and is filed on
 -- Pawl.Engine.Keyword's minted roster.
 --
--- CR 701.66b's "whenever a player earthbends" has no arm anywhere, and no
--- GameEvent to hang one on. Scryfall `o:"earthbends"`, 2026-09-06, returns no
--- card; a printing worded that way is what would need one.
+-- CR 701.66b's "whenever a player earthbends" is written from
+-- Pawl.Engine.Resolve.Effect's Effect.Earthbend arm rather than from here, since
+-- rule 701.66b puts the moment at the CREATION of the delayed ability 'arm'
+-- mints and this module only describes it. GameEvent.Earthbent is the entry and
+-- TriggerCondition.PlayerEarthbends reads it.
 module Pawl.Engine.Earthbend where
 
 import qualified Data.Map.Strict as Map

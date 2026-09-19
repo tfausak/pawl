@@ -5308,9 +5308,14 @@ payComponent moment slots pid oid component = case component of
   -- cashed into a TapPermanents component of its own by the time any component
   -- is paid.
   --
-  -- Not implemented: CR 701.67c's trigger on paying a waterbend cost, which this
-  -- arm is where a signal would be written from (#3904).
-  CostComponent.Waterbend _ -> pure bindsNothing
+  -- CR 701.67c's trigger is written from here all the same, "regardless of how
+  -- they paid that cost": this arm is the one place a waterbend cost is reached
+  -- whether the generic mana went out as mana or as rule 701.67a's taps, since
+  -- the substitution `announceSubstitutions` cashed is a TapPermanents component
+  -- that says nothing about which licence bought it.
+  CostComponent.Waterbend _ -> do
+    State.modify' (Event.recordEvent (GameEvent.Waterbent pid))
+    pure bindsNothing
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.
