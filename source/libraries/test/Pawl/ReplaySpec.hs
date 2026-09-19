@@ -80,6 +80,7 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -1572,6 +1573,16 @@ combatReplaySpec s =
           -- Discriminating: a decode that ignored the response and answered the
           -- short transcript's Top would pass one leg by accident.
           Spec.assertEqWith s "and so does keeping it on top" (Replay.decode p (Replay.encode p LibraryPosition.Top)) (Just LibraryPosition.Top)
+        -- CR 701.56a: so are the objects the time traveller chose and the
+        -- direction each one takes.
+        Spec.it s "ChooseTimeTravel round-trips through the transcript" $ do
+          let p = Prompt.ChooseTimeTravel decider S.alice oid [ObjectId.MkObjectId 7, ObjectId.MkObjectId 9]
+              picked = Map.fromList [(ObjectId.MkObjectId 7, TimeTravelChoice.Add), (ObjectId.MkObjectId 9, TimeTravelChoice.Remove)]
+          -- Discriminating in three ways at once: a decode that answered the
+          -- short transcript's empty map, one that lost the direction, and one
+          -- that lost which object took which would each fail this leg.
+          Spec.assertEqWith s "adding to one and removing from the other round trips" (Replay.decode p (Replay.encode p picked)) (Just picked)
+          Spec.assertEqWith s "and so does choosing nothing" (Replay.decode p (Replay.encode p Map.empty)) (Just Map.empty)
         Spec.it s "a blight choice does not decode as a Ring-bearer choice" $ do
           -- Discriminating: fails if ChooseBlight reuses ChoseRingBearer rather than
           -- getting its own ObjectId-shaped constructor. These two are not merely

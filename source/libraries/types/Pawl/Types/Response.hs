@@ -42,6 +42,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
 import qualified Pawl.Types.Zone as Zone
 
 -- | One answer to a prompt, serialized so a DecisionLog replays the game
@@ -676,4 +677,7 @@ data Response
   | -- | CR 701.30c's answer: which end of their library the clashing player put
     -- the card they revealed on.
     ChoseClash LibraryPosition.LibraryPosition
+  | -- | CR 701.56a's answer: which objects the time traveller chose, and which
+    -- way each chosen one goes.
+    ChoseTimeTravel (Map.Map ObjectId.ObjectId TimeTravelChoice.TimeTravelChoice)
   deriving (Eq, Ord, Show)

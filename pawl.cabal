@@ -1162,6 +1162,7 @@ library engine
     Pawl.Engine.Summoning
     Pawl.Engine.Suspend
     Pawl.Engine.Target
+    Pawl.Engine.TimeTravel
     Pawl.Engine.Turn
     Pawl.Engine.UntapRestriction
     Pawl.Engine.Vanguard
@@ -1542,6 +1543,7 @@ library test
     Pawl.TargetSpec
     Pawl.TeamSpec
     Pawl.Test
+    Pawl.TimeTravelSpec
     Pawl.TransformSpec
     Pawl.TriggerSpec
     Pawl.TurnSpec
@@ -2062,6 +2064,7 @@ library types
     Pawl.Types.Teams
     Pawl.Types.Times
     Pawl.Types.Timestamp
+    Pawl.Types.TimeTravelChoice
     Pawl.Types.TokenLot
     Pawl.Types.TokenPattern
     Pawl.Types.TokenR

@@ -118,6 +118,7 @@ encode p answer = case p of
   Prompt.ChooseForage {} -> Response.ChoseForage answer
   Prompt.ChooseLearn {} -> Response.ChoseLearn answer
   Prompt.ChooseClash {} -> Response.ChoseClash answer
+  Prompt.ChooseTimeTravel {} -> Response.ChoseTimeTravel answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseKicker {} -> Response.AnnouncedKicker answer
   Prompt.ChooseBuyback {} -> Response.AnnouncedBuyback answer
@@ -562,6 +563,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseClash {} -> case response of
     Response.ChoseClash position -> Just position
+    _ -> Nothing
+  Prompt.ChooseTimeTravel {} -> case response of
+    Response.ChoseTimeTravel chosen -> Just chosen
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -1065,6 +1069,9 @@ defaultAnswer p = case p of
   -- CR 701.30a's second sentence is a "may", so leaving the revealed card on top
   -- is always legal -- and it is the answer that moves no card.
   Prompt.ChooseClash {} -> LibraryPosition.Top
+  -- CR 701.56a's "any number" reaches zero, so choosing nothing is always legal
+  -- and is the answer that moves no counter.
+  Prompt.ChooseTimeTravel {} -> Map.empty
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.
