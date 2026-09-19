@@ -254,6 +254,12 @@ data Effect card ability
     -- Scry's library rewrite over an opponent's library, that opponent chosen as
     -- the effect applies.
     Fateseal PlayerQuantity.PlayerQuantity
+  | -- | CR 701.30b: the resolving controller chooses an opponent, and the two of
+    -- them clash (Pawl.Engine.Resolve.Effect's clash). The SlotName binds 1 where
+    -- that controller won the clash (CR 701.30d) and 0 where they did not,
+    -- Effect.FlipCoin's shape, for a later clause of the same resolution to read
+    -- as Quantity's InSlot -- Pulling Teeth's "if you win" and its "otherwise".
+    Clash SlotName.SlotName
   | -- | CR 701.44a: the permanents the ObjectRef names each explore, ordered
     -- across seats by CR 701.44d.
     Explore ObjectRef.ObjectRef

@@ -1440,6 +1440,7 @@ library test
     Pawl.CastProhibitionSpec
     Pawl.CastRestrictionSpec
     Pawl.CastSpec
+    Pawl.ClashSpec
     Pawl.ClassSpec
     Pawl.CloakSpec
     Pawl.CodecIntegrationSpec

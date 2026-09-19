@@ -333,6 +333,7 @@ manaProduced effect = case effect of
   Effect.Scry {} -> Nothing
   Effect.Surveil {} -> Nothing
   Effect.Fateseal {} -> Nothing
+  Effect.Clash {} -> Nothing
   Effect.Explore {} -> Nothing
   Effect.Connive {} -> Nothing
   Effect.Discard {} -> Nothing
@@ -540,6 +541,9 @@ movesLibraryCard effect = case effect of
   -- leaves it.
   Effect.Scry {} -> False
   Effect.Fateseal {} -> False
+  -- CR 701.30a's second sentence moves the revealed card WITHIN the library, top
+  -- to bottom, which is Scry's and Fateseal's answer above and for their reason.
+  Effect.Clash {} -> False
   Effect.Discard {} -> False
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False

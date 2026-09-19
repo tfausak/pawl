@@ -1117,6 +1117,7 @@ ownCounts effect = case effect of
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.Clash {} -> []
   -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
   -- the one on top, so there is no number a card author writes.
   Effect.Explore {} -> []
@@ -1503,6 +1504,7 @@ effectNestedEffects effect = case effect of
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
+  Effect.Clash {} -> []
   Effect.Explore {} -> []
   Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
@@ -1961,6 +1963,7 @@ effectReplacements effect = case effect of
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
+  Effect.Clash {} -> []
   Effect.Explore {} -> []
   Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
@@ -2384,6 +2387,7 @@ effectMintedFaces effect = case effect of
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
+  Effect.Clash {} -> []
   Effect.Explore {} -> []
   Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
@@ -5101,6 +5105,7 @@ effectFilters effect = case effect of
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.Clash {} -> []
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as PutCounters' does.
   Effect.Explore ref -> frame SourceHostFramed (objectRefFilters ref)

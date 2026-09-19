@@ -585,6 +585,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Fateseal (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)))
       " {\"type\":\"Fateseal\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":2}}} "
+  -- Pulling Teeth's "Clash with an opponent". The payload is the slot the outcome
+  -- is bound at and nothing else: rule 701.30b fixes who clashes, and which
+  -- opponent is chosen as the effect applies.
+  Spec.it s "Clash" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Clash (SlotName.MkSlotName (Text.pack "won")))
+      " {\"type\":\"Clash\",\"value\":\"won\"} "
   -- Merfolk Branchwalker's "it explores", against the trigger-source slot, and
   -- the swept-set shape the ObjectRef also admits.
   Spec.it s "Explore" $ do
