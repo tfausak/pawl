@@ -542,6 +542,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Scry x -> Effect.Scry (rewritePlayerQuantity pairs x)
   Effect.Surveil x -> Effect.Surveil (rewritePlayerQuantity pairs x)
   Effect.Fateseal x -> Effect.Fateseal (rewritePlayerQuantity pairs x)
+  Effect.Clash {} -> effect
   Effect.Explore ref -> Effect.Explore (rewriteObjectRef pairs ref)
   Effect.ArrangeInLibrary ref -> Effect.ArrangeInLibrary (rewriteObjectRef pairs ref)
   Effect.Connive (Connive.MkConnive quantity ref) -> Effect.Connive (Connive.MkConnive (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))

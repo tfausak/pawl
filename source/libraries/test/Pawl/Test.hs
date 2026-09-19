@@ -20,6 +20,7 @@ import qualified Pawl.CastPermissionSpec
 import qualified Pawl.CastProhibitionSpec
 import qualified Pawl.CastRestrictionSpec
 import qualified Pawl.CastSpec
+import qualified Pawl.ClashSpec
 import qualified Pawl.ClassSpec
 import qualified Pawl.CloakSpec
 import qualified Pawl.Codec.AbilityAddsManaSpec
@@ -685,6 +686,7 @@ spec s registry = do
   Pawl.FilterPositionLintSpec.spec s registry
   Pawl.CardsSpec.spec s
   Pawl.CaseSpec.spec s registry
+  Pawl.ClashSpec.spec s registry
   Pawl.ClassSpec.spec s registry
   Pawl.CastSpec.spec s registry
   Pawl.CastRestrictionSpec.spec s registry

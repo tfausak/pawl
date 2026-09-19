@@ -117,6 +117,7 @@ encode p answer = case p of
   Prompt.ChooseMutateSide {} -> Response.ChoseMutateSide answer
   Prompt.ChooseForage {} -> Response.ChoseForage answer
   Prompt.ChooseLearn {} -> Response.ChoseLearn answer
+  Prompt.ChooseClash {} -> Response.ChoseClash answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseKicker {} -> Response.AnnouncedKicker answer
   Prompt.ChooseBuyback {} -> Response.AnnouncedBuyback answer
@@ -554,6 +555,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseLearn {} -> case response of
     Response.ChoseLearn mode -> Just mode
+    _ -> Nothing
+  Prompt.ChooseClash {} -> case response of
+    Response.ChoseClash position -> Just position
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -1048,6 +1052,9 @@ defaultAnswer p = case p of
   -- CR 701.48a is two "you may"s, so declining both is always legal and is what
   -- a short transcript takes.
   Prompt.ChooseLearn {} -> Nothing
+  -- CR 701.30a's second sentence is a "may", so leaving the revealed card on top
+  -- is always legal -- and it is the answer that moves no card.
+  Prompt.ChooseClash {} -> LibraryPosition.Top
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.

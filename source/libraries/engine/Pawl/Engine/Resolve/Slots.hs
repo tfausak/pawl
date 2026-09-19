@@ -585,6 +585,7 @@ effectObjectRefs effect = case effect of
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
+  Effect.Clash {} -> []
   Effect.Explore ref -> [ref]
   Effect.ArrangeInLibrary ref -> [ref]
   Effect.Connive (Connive.MkConnive _ ref) -> [ref]
@@ -763,6 +764,7 @@ effectPlayerRefs effect = case effect of
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.Clash {} -> []
   Effect.Explore {} -> []
   Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
@@ -995,6 +997,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  Effect.Clash {} -> Map.empty
   Effect.Explore _ -> Map.empty
   Effect.ArrangeInLibrary _ -> Map.empty
   Effect.Connive (Connive.MkConnive quantity _) -> quantitySlots quantity
@@ -1587,6 +1590,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Clash {} -> True
   Effect.Explore {} -> True
   Effect.ArrangeInLibrary {} -> True
   Effect.Connive (Connive.MkConnive quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -1814,6 +1818,7 @@ readsX =
         Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+        Effect.Clash {} -> False
         Effect.Explore {} -> False
         Effect.ArrangeInLibrary {} -> False
         Effect.Connive (Connive.MkConnive quantity _) -> Quantity.readsX quantity
@@ -1970,6 +1975,7 @@ boundSlots effect = case effect of
   Effect.Scry {} -> Set.empty
   Effect.Surveil {} -> Set.empty
   Effect.Fateseal {} -> Set.empty
+  Effect.Clash slot -> Set.singleton slot
   Effect.Explore {} -> Set.empty
   Effect.ArrangeInLibrary {} -> Set.empty
   Effect.Connive {} -> Set.empty
