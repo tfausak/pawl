@@ -601,6 +601,7 @@ import qualified Pawl.ReplacementSpec
 import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec
 import qualified Pawl.RestampSpec
+import qualified Pawl.ReversalSpec
 import qualified Pawl.RingSpec
 import qualified Pawl.RoomSpec
 import qualified Pawl.SacrificeRestrictionSpec
@@ -1289,6 +1290,7 @@ spec s registry = do
   Pawl.PutCounterSpec.spec s registry
   Pawl.ResolveSpec.spec s registry
   Pawl.RestampSpec.spec s registry
+  Pawl.ReversalSpec.spec s registry
   Pawl.RingSpec.spec s registry
   Pawl.RoomSpec.spec s registry
   Pawl.SetupSpec.spec s registry
