@@ -632,6 +632,46 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "CR 104.2a: bob and carol are still playing, so the game continues" (GameState.result after) Nothing
     Spec.assertEqWith s "and alice controls nothing" (Projection.controls S.alice after) []
 
+  -- CR 800.4c, the other side of the clause above and the same fixture: the
+  -- permanent is LENT to a player still in the game before its default
+  -- controller leaves, so clause 4 passes it over and the loan's end is what
+  -- orphans it.
+  --
+  -- The fixture leaves alice controlling bob's Towershell by CR 110.2a alone --
+  -- the case above proves that much. Carol then casts Ray of Command on it, so
+  -- CR 800.4a's fourth clause finds nothing of alice's when she concedes and the
+  -- permanent survives her departure under carol. The loan says "until end of
+  -- turn", so CR 514.2's cleanup sweep ends it, and CR 110.2 then has nobody in
+  -- the game to hand it back to.
+  --
+  -- The cleanup step is also where no player ordinarily receives priority, so
+  -- this pins the placement as well as the rule: CR 514.3a's own settle is what
+  -- reaches the check, and the exile it performs is what then schedules the
+  -- extra cleanup step.
+  Spec.it s "CR 800.4c a permanent lent to a surviving player is exiled when the loan ends and its default controller has left" $ do
+    towershell <- S.printingOf s registry "Meandering Towershell"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    island <- S.printingOf s registry "Island"
+    ray <- S.printingOf s registry "Ray of Command"
+    let board = stolenTowershellBoard S.threePlayerGame towershell controlMagic island
+        returned = runToTurnStep 4 (Phase.Combat CombatStep.DeclareBlockers) board
+        (rayId, withRay) = S.addHandCard ray S.carol (S.landsFor island S.carol 4 returned)
+        lent = S.runPure S.identityAnswer withRay (S.cast S.carol rayId >> Stack.resolveTop)
+        conceded = S.runPure S.identityAnswer lent (Departure.leaveGame Departure.Type.Conceded S.alice)
+        ended = runToTurnStep 5 (Phase.Beginning BeginningStep.Upkeep) conceded
+        turtleIn = soleObjectOf towershell
+    -- The setup, in the order the rule needs it: carol holds the loan, so clause
+    -- 4 has nothing of alice's to take and the permanent really does survive the
+    -- departure.
+    Spec.assertEqWith s "carol's Ray of Command took bob's Towershell from alice" (fmap (\(oid, _) -> Projection.controllerOf oid lent) (turtleIn lent)) (Just (Just S.carol))
+    Spec.assertEqWith s "so alice leaving does NOT exile it -- clause 4 finds nothing she controls" (fmap (Object.zone . snd) (turtleIn conceded)) (Just Zone.Battlefield)
+    Spec.assertEqWith s "and carol still holds it across the departure" (fmap (\(oid, _) -> Projection.controllerOf oid conceded) (turtleIn conceded)) (Just (Just S.carol))
+    -- The rule under test.
+    Spec.assertEqWith s "the loan ending EXILES it (CR 800.4c)" (fmap (Object.zone . snd) (turtleIn ended)) (Just Zone.Exile)
+    Spec.assertEqWith s "and exile really holds it, under its owner" (fmap (\(oid, _) -> List.elem oid (Game.zoneMembers Zone.Exile S.bob ended)) (turtleIn ended)) (Just True)
+    Spec.assertEqWith s "so it did NOT revert to the player who has left" (Projection.controls S.alice ended) []
+    Spec.assertEqWith s "CR 104.2a: bob and carol are still playing, so the game continues" (GameState.result ended) Nothing
+
   -- The same clause, the same fixture, and the one thing a direct write to the
   -- zone maps cannot do: CR 800.4a's exile is a permanent moving from the
   -- battlefield to exile, so CR 603.6c's leaves-the-battlefield abilities

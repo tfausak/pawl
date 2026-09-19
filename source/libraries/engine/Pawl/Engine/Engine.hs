@@ -1189,6 +1189,13 @@ performSettle = do
   -- CR 610.3's second one-shot effect, beside CR 725's for the same reason: a
   -- return zone change is not something an Expiry sweep can perform.
   movedBack <- MoveDuration.returnMoved
+  -- CR 800.4c, checked here for CR 704.3's reason and not because it is a
+  -- state-based action -- that rule says it is not. AFTER the three sweeps
+  -- above, each of which can be the control-changing effect that ends (CR
+  -- 611.2b's condition failing, a monarch's or a duration's return taking the
+  -- source of a grant), and BEFORE the SBA pass, which must see the permanent
+  -- gone rather than still attached to the Aura CR 704.5m would then bury.
+  orphaned <- Departure.exileOrphanedByEndedControl
   -- CR 702.145c/d/f/g, checked here for CR 704.3's reason and not because they are
   -- state-based actions -- both rules say they are not. Before the SBA pass, since
   -- turning a permanent over changes its power and toughness.
@@ -1227,7 +1234,7 @@ performSettle = do
   State.modify' Combat.removeChanged
   checkControlContinuity
   Ring.endOnControlChange
-  more <- if swept || returned || movedBack || dayNight || designated || sampledControl || acted || placed then performSettle else pure False
+  more <- if swept || returned || movedBack || orphaned || dayNight || designated || sampledControl || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
 -- CR 104.4b: how many events may happen with no player able to decide anything
