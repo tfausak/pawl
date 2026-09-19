@@ -5107,7 +5107,7 @@ manaOwed manaCost =
 -- `lands` Mountains, with two Mountains in her library so the ability's draw
 -- neither decks her (CR 104.3c) nor runs out; bob controls one permanent per
 -- printing in `theirs`. She has priority in her own precombat main phase, which
--- is when CR 602.2 lets her activate. Returns the Leaper, the `others` in order,
+-- is when CR 117.1b lets her activate. Returns the Leaper, the `others` in order,
 -- and that state.
 leaperBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 leaperBoard mountain leaper others theirs lands =
@@ -5137,9 +5137,11 @@ leaperBoard mountain leaper others theirs lands =
 -- Every board is LANDLESS unless the case is about CR 701.67b, convokeBoard's
 -- posture: an activation that succeeds can only have been paid by tapping.
 --
--- The Leaper is itself an untapped creature alice controls, so every board
--- offers one more candidate than the cost can take -- a prompt offered exactly
--- as many candidates as it needs is never asked.
+-- The Leaper is itself an untapped creature alice controls, so each board that
+-- pays offers more candidates than the cost can take -- a prompt offered exactly
+-- as many candidates as it needs is never asked. The boards that do NOT pay are
+-- short on purpose, and that is the one thing each varies from its pair: of
+-- eligible candidates in the first pair, of mana in the second.
 geyserLeaperSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 geyserLeaperSpec s registry = Spec.describe s "Geyser Leaper" $ do
   -- The headline. Four permanents, no land, no mana: rule 701.67a's "you may tap
@@ -5157,7 +5159,7 @@ geyserLeaperSpec s registry = Spec.describe s "Geyser Leaper" $ do
     -- out of nowhere would also have left the card in the graveyard.
     Spec.assertEqWith s "and the four permanents she tapped for it are tapped" (S.tappedCount S.alice resolved) 4
     Spec.assertBool s (not (isTapped leaperId resolved)) "and the Leaper, offered and not taken, is untapped"
-    Spec.assertBool s offered "and the activation the assertions above read was one CR 602.2 offered"
+    Spec.assertBool s offered "and the activation the assertions above read was one CR 117.1b allowed"
   -- The pair, varying what two of the four permanents ARE and nothing else: same
   -- seats, same count of permanents, same absence of mana. Rule 701.67a names an
   -- artifact or a creature, so two enchantments leave three candidates for a cost
@@ -5186,7 +5188,7 @@ geyserLeaperSpec s registry = Spec.describe s "Geyser Leaper" $ do
     (offered, resolved) <- activatingLeaper s (ManaCost.MkManaCost [ManaSymbol.Generic 2]) (take 4 tappable) leaperId gs
     Spec.assertEqWith s "CR 701.67b the taxed ability resolved: the card alice drew is in her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
     Spec.assertEqWith s "and six permanents are tapped -- four for the waterbend cost and both Mountains for the tax" (S.tappedCount S.alice resolved) 6
-    Spec.assertBool s offered "and the activation the assertions above read was one CR 602.2 offered"
+    Spec.assertBool s offered "and the activation the assertions above read was one CR 117.1b allowed"
   -- The pair, varying ONE Mountain and nothing else: the same six untapped
   -- artifacts and creatures, the same tax. Rule 701.67b caps the substitution at
   -- the waterbend cost's own {4}, so a sixth tap cannot pay the {2} and one
