@@ -4586,6 +4586,74 @@ giftSpec s registry = Spec.describe s "Gift" $ do
     Spec.assertEqWith s "CR 603.4 and bob's Bonesplitter survives" (length (namedOnBattlefield "Bonesplitter" after)) 1
     Spec.assertEqWith s "and the 4/4 entered with the stack empty" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Scrapshooter" after), length (GameState.stack after)) ([Just (4, 4)], 0)
 
+  -- CR 702.174f on Starforged Sword {4} Artifact -- Equipment, "Gift a tapped
+  -- Fish / When this Equipment enters, if the gift was promised, attach this
+  -- Equipment to target creature you control / Equipped creature gets +3/+3 and
+  -- loses flying / Equip {3}" (Oracle text checked on Scryfall, 2026-09-18). One
+  -- of the two permanent printings whose gift promises something other than a
+  -- card, and the only one for rule 702.174f.
+  --
+  -- CR 111.2 is what the controller assertion is for: the CHOSEN player creates
+  -- the token, so carol owns and controls it, not alice who controls the
+  -- Equipment and resolves the ability.
+  Spec.it s "CR 702.174f the promised opponent creates the tapped Fish" $ do
+    (swordId, board) <- starforgedBoard s registry
+    let after = castResolved (promising S.carol) swordId board
+        fish = namedOnBattlefield "Fish Token" after
+    Spec.assertEqWith s "CR 702.174f and CR 111.2 one 1/1 Fish token, under carol" (fmap (\o -> (View.controllerOf o after, S.powerToughnessOf o after)) fish) [(Just S.carol, Just (1, 1))]
+    Spec.assertEqWith s "CR 702.174f and it entered tapped" (fmap (\o -> fmap Object.tapped (Game.lookupObject o after)) fish) [Just TapState.Tapped]
+    Spec.assertEqWith s "and the Equipment entered with the stack empty" (length (namedOnBattlefield "Starforged Sword" after), length (GameState.stack after)) (1, 0)
+  -- The same board differing in exactly one thing: the answer to rule 702.174a's
+  -- "you may".
+  Spec.it s "CR 603.4 unpromised, no Fish is created" $ do
+    (swordId, board) <- starforgedBoard s registry
+    let after = castResolved declining swordId board
+    Spec.assertEqWith s "CR 702.174k no gift was promised, so no Fish token exists" (namedOnBattlefield "Fish Token" after) []
+    Spec.assertEqWith s "and the Equipment entered with the stack empty" (length (namedOnBattlefield "Starforged Sword" after), length (GameState.stack after)) (1, 0)
+  -- CR 702.174i on Octomancer {3}{G}{U} 3/3 Creature -- Frog Druid, "Gift an
+  -- Octopus / At the beginning of each end step, create a token that's a copy of
+  -- target creature token that entered the battlefield this turn" (Oracle text
+  -- checked on Scryfall, 2026-09-18). The only printing whose gift promises an
+  -- Octopus.
+  --
+  -- pawl's card omits the end-step ability entirely: no Pawl.Types.Filter arm
+  -- asks whether a permanent entered the battlefield this turn (#3878). The
+  -- omission is stricter than printed -- alice copies nothing -- and never weaker
+  -- in the controller's favour.
+  --
+  -- The 8/8 is what tells this arm from rule 702.174f's 1/1 on the same board
+  -- shape, so the assertion reads the token's power and toughness rather than its
+  -- name.
+  Spec.it s "CR 702.174i the promised opponent creates the 8/8 Octopus" $ do
+    (frogId, board) <- octomancerBoard s registry
+    let after = castResolved (promising S.carol) frogId board
+        octopus = namedOnBattlefield "Octopus Token" after
+    Spec.assertEqWith s "CR 702.174i and CR 111.2 one 8/8 Octopus token, under carol" (fmap (\o -> (View.controllerOf o after, S.powerToughnessOf o after)) octopus) [(Just S.carol, Just (8, 8))]
+    Spec.assertEqWith s "CR 702.174i and it entered untapped" (fmap (\o -> fmap Object.tapped (Game.lookupObject o after)) octopus) [Just TapState.Untapped]
+    Spec.assertEqWith s "and the 3/3 entered with the stack empty" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Octomancer" after), length (GameState.stack after)) ([Just (3, 3)], 0)
+
+-- alice on turn with four Forests, a Goblin Piker for rule 702.174f's Equipment
+-- to attach to, and Starforged Sword in hand. Three seats for scrapshooterBoard's
+-- reason.
+starforgedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+starforgedBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  sword <- S.printingOf s registry "Starforged Sword"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (swordId, gs1) = S.addHandCard sword S.alice (S.landsFor forest S.alice 4 S.threePlayerGame)
+      (_, gs2) = S.addPermanent piker S.alice gs1
+  pure (swordId, aliceOnTurn gs2)
+
+-- alice on turn with four Forests and an Island for Octomancer's {3}{G}{U}, and
+-- Octomancer in hand. Three seats for scrapshooterBoard's reason.
+octomancerBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+octomancerBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  frog <- S.printingOf s registry "Octomancer"
+  let (frogId, gs1) = S.addHandCard frog S.alice (S.landsFor island S.alice 1 (S.landsFor forest S.alice 4 S.threePlayerGame))
+  pure (frogId, aliceOnTurn gs1)
+
 -- alice on turn with three Forests and Scrapshooter in hand, bob with a
 -- Bonesplitter, and two cards in each opponent's library so that rule 702.174e's
 -- draw is a draw rather than CR 104.3c.

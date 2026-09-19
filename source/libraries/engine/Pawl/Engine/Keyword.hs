@@ -6516,8 +6516,7 @@ offspring cost = paidTokenCopies (Keyword.Offspring cost) (Quantity.Literal 1) [
 
 -- CR 702.174b's triggered ability on a permanent: "When this permanent enters,
 -- if its gift cost was paid, [effect]", the effect being whatever rule 702.174d-i
--- writes for the [something] -- CR 702.174e's card, so "the chosen player draws a
--- card".
+-- writes for the [something].
 --
 -- A REGRESSION FENCE rather than proved behaviour, unusually for an intervening
 -- "if": widening the comparison leaves Pawl.CastSpec's Gift group green, because
@@ -6540,6 +6539,8 @@ gift :: Gift.Gift -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 gift something =
   let effect = case something of
         Gift.Card -> Effect.Draw Draw.MkDraw {Draw.player = PlayerRef.ChosenPlayerOfBound Binding.triggerSource, Draw.quantity = Quantity.Literal 1, Draw.slot = Nothing}
+        Gift.TappedFish -> giftToken TapState.Tapped fishToken
+        Gift.Octopus -> giftToken TapState.Untapped octopusToken
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
@@ -6550,6 +6551,41 @@ gift something =
             Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (Keyword.Gift something)) Comparison.AtLeast (Quantity.Literal 1))),
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
+
+-- CR 702.174f's and CR 702.174i's effect: "the chosen player creates a [token]".
+-- The creator is the SAME PlayerRef rule 702.174e's draw reads, which is what CR
+-- 111.2 asks for: the chosen player creates the token, so they own and control
+-- it, rather than CR 109.5's "you".
+giftToken :: TapState.TapState -> Card -> Effect.Effect Card (GrantedAbility.GrantedAbility Card)
+giftToken tapped token =
+  Effect.Create
+    Create.MkCreate
+      { Create.quantity = Quantity.Literal 1,
+        Create.card = token,
+        Create.riders =
+          EntryRiders.MkEntryRiders
+            { EntryRiders.tapped = tapped,
+              EntryRiders.attacking = Nothing,
+              EntryRiders.blocking = Nothing,
+              EntryRiders.transformed = False,
+              EntryRiders.counters = Map.empty,
+              EntryRiders.underOwner = False,
+              EntryRiders.exiledFaceDown = False,
+              EntryRiders.attachedTo = Nothing,
+              EntryRiders.faceDown = Nothing
+            },
+        Create.slot = Nothing,
+        Create.creator = PlayerRef.ChosenPlayerOfBound Binding.triggerSource
+      }
+
+-- | CR 702.174f's token: 1\/1 blue Fish creature. Rule 702.174f's "tapped" is a
+-- rider on the CREATION and not text on the token, so it rides EntryRiders.
+fishToken :: Card
+fishToken = creatureToken (Text.pack "Fish Token") (Set.singleton Subtype.Fish) (Set.singleton Color.Blue) 1 1
+
+-- | CR 702.174i's token: 8\/8 blue Octopus creature.
+octopusToken :: Card
+octopusToken = creatureToken (Text.pack "Octopus Token") (Set.singleton Subtype.Octopus) (Set.singleton Color.Blue) 8 8
 
 -- The ability CR 702.157a and CR 702.175a share: when this enters, if the
 -- additional cost that keyword offers was paid (CR 601.2b), create `quantity`
