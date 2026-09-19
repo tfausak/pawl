@@ -891,6 +891,14 @@ gateHolds controller source chosen bindings clause = case Clause.condition claus
 -- Intelligence's Plan is the producer, and Pawl.ResolveSpec's "CR 701.55b Great
 -- Intelligence's Plan still offers the discard to an empty-handed opponent"
 -- proves it.
+--
+-- That bypass skips the WHOLE of `eligible`, which is two conjuncts: CR
+-- 701.46a's printed "if" on the sibling and rule 608.2d's impossibility. Rule
+-- 701.55b exempts only the second, so a villainous choice on a card whose
+-- sibling printed a condition would be offered a branch its "if" had already
+-- ruled out. No card states the shape -- the callers' own fence says no
+-- either-or in data/cards prints a condition at all -- and splitting `eligible`
+-- into its two halves is what it would take.
 chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> (ClauseIndex -> Game Bool) -> Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Maybe (Set PlayerId), Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex))
 chosenBranch resolving controller idx cIdx legal eligible picked clause = case Clause.orElse clause of
   Nothing -> pure (Nothing, picked)

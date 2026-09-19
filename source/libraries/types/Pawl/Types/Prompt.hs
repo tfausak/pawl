@@ -630,8 +630,10 @@ data Prompt r where
   -- announced at resolution once per group and per chooser
   -- (Pawl.Types.OrElse.chooser), before ChooseOptional. Carries only the
   -- branches CR 608.2d leaves to choose, and is elided where one or none
-  -- survives that filter (Pawl.Engine.Resolve.chosenBranch). Not ChooseModes,
-  -- which CR 700.2 fixes at cast.
+  -- survives that filter (Pawl.Engine.Resolve.chosenBranch) -- except a CR
+  -- 701.55a villainous choice (Pawl.Types.OrElse.villainous), where rule 701.55b
+  -- puts both branches and elides nothing. Not ChooseModes, which CR 700.2 fixes
+  -- at cast.
   ChooseClause :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> NonEmpty.NonEmpty ClauseIndex.ClauseIndex -> Prompt ClauseIndex.ClauseIndex
   -- | CR 608.2g: whether the player casts the card a resolving effect allows
   -- them to (CR 310.12b), the CardName being the half CR 712.11a puts on the
