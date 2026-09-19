@@ -108,6 +108,7 @@ import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
@@ -361,6 +362,7 @@ vanillaFace name typeLine =
       Face.openingHandActions = [],
       Face.specialActions = [],
       Face.additionalCosts = [],
+      Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
@@ -1378,6 +1380,10 @@ spellCostsOf :: Face.Face Card.Type.Card -> [Cost.Type.Cost Keyword.Keyword]
 spellCostsOf face =
   (Cost.Type.MkCost (Face.manaCost face) (Face.additionalCosts face) : fmap AlternativeCost.cost (Face.alternativeCosts face))
     <> Map.elems (Face.modeCosts face)
+    -- CR 118.8's choice costs, each option on its own: they are additional costs
+    -- of the same CR 601.2f total, so an X in one would bind Binding.variableX as
+    -- any other does. No printing puts an X in one.
+    <> concatMap (NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices face)
 
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
 -- every clause. A READER of X rather than a declarer: Clash of Wills' "unless its
@@ -5539,6 +5545,8 @@ activatedAbilityFilters ability =
 --     604.2's "as long as" condition gating the ability that prints it.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSlot.
 --   * `additionalCosts` -- CR 601.2f's sacrifice component.
+--   * `additionalCostChoices` -- the same components, one option's Cost at a
+--     time (CR 118.8).
 --   * `alternativeCosts` -- that same component, plus CR 604.2's "as long as"
 --     condition gating one.
 --   * `specialActions` -- CR 116.2d's ignore cost, a Cost like the two above.
@@ -5598,6 +5606,10 @@ cardFilters card =
         -- (Cost.announcedSlots), so a slot read here is answered -- Unframed's
         -- promise, kept. SlotlessCostFramed says which cost positions are not.
         <> concatMap (unframed . costComponentFilters) (Face.additionalCosts card)
+        -- CR 118.8's other carrier, Unframed for the line above's reason: a
+        -- choice's options are paid at CR 601.2h like the components beside
+        -- them, and each option is a whole Cost.
+        <> concatMap (unframed . concatMap costFilters . NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices card)
         <> concatMap (frame Unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
         <> concatMap (slotlessCost . specialActionFilters) (Face.specialActions card)
@@ -5772,6 +5784,19 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (prints Face.enchant) "the pool prints an enchant slot"
     Spec.assertBool s (prints grantedEnchantSlots) "the pool grants an enchant slot"
     Spec.assertEqWith s "no enchant slot names a slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 118.8 / 601.2b: a choice with ONE option is a mandatory additional cost,
+  -- which Face.additionalCosts already carries -- written as a choice it puts a
+  -- Prompt.ChooseCost in front of a caster with nothing to decide. The empty
+  -- choice is refused on the wire (Pawl.Codec.CostChoice), so one option is the
+  -- mistranscription left for a lint to catch.
+  Spec.it s "a choice cost offers more than one payment" $ do
+    ps <- S.allPrintings s
+    let choicesOf = concatMap Face.additionalCostChoices . Card.Type.faces . Printing.card
+        offenders = filter (any ((< 2) . length . CostChoice.unwrap) . choicesOf) ps
+    -- A guard, since a pool printing no choice cost at all would pass saying
+    -- nothing (Caustic Exhale).
+    Spec.assertBool s (not (all (null . choicesOf) ps)) "the pool prints a choice cost"
+    Spec.assertEqWith s "no choice cost offers one payment" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 706.4's "the other result", which only a TWO-die instruction has: with
   -- any other count what the roller did not choose is not one number, and
   -- Pawl.Engine.Resolve leaves the slot unbound rather than guessing which of

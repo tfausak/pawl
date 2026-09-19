@@ -1928,12 +1928,17 @@ castWhileSearching perform pid = do
 -- object is put onto the stack, so it cannot be a prompt inside the
 -- announcement.
 castSpell :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpell perform = castSpellWith perform False Nothing ManaSpending.AsProduced
+castSpell perform = castSpellWith perform False [] ManaSpending.AsProduced
 
 -- castSpell with CR 118.9's other source of an alternative cost: one "applied to
--- it from another effect" rather than listed in the spell's own text. Just c
--- REPLACES the candidate list with that one cost; Nothing is CR 601.2b's own
+-- it from another effect" rather than listed in the spell's own text. A non-empty
+-- list REPLACES the candidate list with it; the empty list is CR 601.2b's own
 -- candidates, which is every cast the rules themselves offer.
+--
+-- A LIST because one applied cost can still be several candidates: CR 118.9d
+-- keeps the face's additional costs on it, and one of those may print a CHOICE
+-- of payments (Cost.choiceVariants), which CR 601.2b announces here like any
+-- other candidate.
 --
 -- REPLACES rather than joins, and CR 118.9b is why: "an effect that allows you to
 -- cast a spell may require a certain alternative cost to be paid". CR 310.12b's
@@ -1955,7 +1960,7 @@ castSpell perform = castSpellWith perform False Nothing ManaSpending.AsProduced
 -- mana toward whatever cost the two above settled on. Joined with the exile
 -- permission's rider by `spendingWith`, one step ahead of CR 601.2a's move for
 -- `spendingFor`'s reason.
-castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Maybe CandidateCost.CandidateCost -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
+castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> [CandidateCost.CandidateCost] -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
 castSpellWith perform offered applied widened pid oid name facing = do
   -- CR 406.3a, run BEFORE `before` is read and so before CR 601.2e's rewind
   -- captures it: the turn happens just before the announcement rather than
@@ -2034,7 +2039,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
               (\candidate -> candidateAllowed pid oid (Face.name face) proposed candidate && candidateFillable pid oid name proposed candidate)
               ( fmap
                   (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
-                  (windowedCandidates pid oid name proposed (maybe (Cost.candidateCostsGiven offered pid name oid proposed) pure applied))
+                  (windowedCandidates pid oid name proposed (if null applied then Cost.candidateCostsGiven offered pid name oid proposed else applied))
               )
           -- CR 400.7g / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move
