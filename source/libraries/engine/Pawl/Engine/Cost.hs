@@ -2054,10 +2054,10 @@ evidenceCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -
 evidenceCandidates slots pid = exileCandidates slots pid (Filter.Type.And [])
 
 -- CR 202.3's mana value of one card, read off its CR 613 projection --
--- `tapPower`'s posture one zone over, and through the projection rather than the
--- printed face so that a card describing its own cost differently is measured as
--- it is. 0 where there is no value to read, CR 202.3a's own answer for an object
--- with no mana cost.
+-- `tapPower`'s posture one zone over, and through the same projection
+-- `exileCandidates` matches the criterion against, so the pool and the total
+-- describe each card the same way. 0 where there is no value to read, CR 202.3a's
+-- own answer for an object with no mana cost.
 evidenceValue :: ObjectId -> GameState -> Integer
 evidenceValue candidate gs = Maybe.fromMaybe 0 (Filter.manaValue (Projection.viewsOf gs candidate))
 
@@ -5271,9 +5271,7 @@ payComponent moment slots pid oid component = case component of
   -- CR 701.59a: the payer chooses WHICH cards and HOW MANY, so this is a prompt,
   -- and it is NEVER elided -- TapForTotalPower's posture, the number being a
   -- threshold on an aggregate rather than a count, so whether the answer is forced
-  -- is a question about subsets and eliding it would decide for the player. A
-  -- graveyard of one card is still a choice between exiling it and exiling nothing
-  -- wherever the threshold is 0.
+  -- is a question about subsets and settling it here would decide for the player.
   --
   -- Reject-not-repair, Sacrifice's posture. The total is summed over the answer as
   -- given, and the candidates are read HERE so an earlier component of the same

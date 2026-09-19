@@ -2203,10 +2203,9 @@ causticExhaleBoard swamp exhale galleon inHand onBattlefield =
 --
 -- The graveyard cards are Lightning Bolt (mana value 1) and Acidic Soil (mana
 -- value 3), neither of which is ever cast, so nothing but the payment can move
--- either. bob's Goblin Piker is the 2/1 the ability aims at; four numbers -- the
--- threshold 3, the Bolt's 1, the Soil's 3 and the Piker's 2/1 -- and the only
--- two that coincide are the threshold and the one card that alone reaches it,
--- which is the point of the second case.
+-- either. bob's Goblin Piker is the 2/1 the ability aims at. The only two
+-- numbers here that coincide are the threshold and the Soil's mana value, which
+-- is the point of the second case; everything else is distinct.
 forensicResearcherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 forensicResearcherSpec s registry =
   Spec.describe s "Forensic Researcher" $ do
@@ -2218,8 +2217,8 @@ forensicResearcherSpec s registry =
       bolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (srcId, victimId, buried, gs) = forensicResearcherBoard researcher piker [bolt, bolt, bolt]
-          after = played srcId buried victimId gs
-      Spec.assertEqWith s "CR 601.2h the ability resolved and bob's Piker is tapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Tapped)
+          (after, _) = afterCollecting srcId buried victimId gs
+      Spec.assertEqWith s "CR 701.26a the ability resolved and bob's Piker is tapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Tapped)
       Spec.assertEqWith s "CR 701.59a all three cards are in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 3
       Spec.assertEqWith s "and the graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
     -- The case that says the number is a TOTAL and not a count: ONE card of mana
@@ -2237,10 +2236,13 @@ forensicResearcherSpec s registry =
           boltId = case buried of
             only : _ -> only
             _ -> S.noSource
-          after = played srcId [soilId] victimId gs
-      Spec.assertEqWith s "CR 601.2h the ability resolved and bob's Piker is tapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Tapped)
+          (after, offers) = afterCollecting srcId [soilId] victimId gs
+      Spec.assertEqWith s "CR 701.26a the ability resolved and bob's Piker is tapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Tapped)
       Spec.assertEqWith s "CR 701.59a and the card she did not choose is still in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice after) [boltId]
       Spec.assertEqWith s "so exactly one card was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+      -- Which is the payer's choice and not the engine's: "any number" means the
+      -- whole graveyard is offered, and the Bolt stays only because she left it.
+      Spec.assertEqWith s "CR 701.59a and she was asked over her whole graveyard" (fmap List.sort offers) [List.sort buried]
     -- CR 701.59b, against the first case's board one Bolt short: two mana value 1
     -- cards total 2, and a player who cannot reach the total can't choose to
     -- collect evidence at all.
@@ -2249,8 +2251,8 @@ forensicResearcherSpec s registry =
       bolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (srcId, victimId, buried, gs) = forensicResearcherBoard researcher piker [bolt, bolt]
-          after = played srcId buried victimId gs
-      Spec.assertEqWith s "CR 118.3 the activation is not offered" (filter (collectsEvidenceFrom srcId) (Action.legalActions S.alice gs)) []
+          (after, _) = afterCollecting srcId buried victimId gs
+      Spec.assertEqWith s "CR 701.59b the activation is not offered" (filter (collectsEvidenceFrom srcId) (Action.legalActions S.alice gs)) []
       Spec.assertEqWith s "so bob's Piker is untapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Untapped)
       Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
 
@@ -2280,28 +2282,34 @@ forensicResearcherBoard researcher piker buried =
       )
 
 -- Runs one priority loop in which alice takes the collect-evidence activation
--- once, exiles exactly `picks`, and aims at `victim`.
-played :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-played srcId picks victim gs = snd (State.evalState (Engine.runGame (collecting srcId picks victim) gs Engine.priorityLoop) 0)
+-- once, exiles exactly `picks`, and aims at `victim`. The second component is
+-- every pool she was offered to collect out of, in order, so a case can say what
+-- the choice was BETWEEN and not only what it came to.
+afterCollecting :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [[ObjectId.ObjectId]])
+afterCollecting srcId picks victim gs =
+  let ((_, after), (_, offers)) = State.runState (Engine.runGame (collecting srcId picks victim) gs Engine.priorityLoop) (0, [])
+   in (after, offers)
 
--- Threaded through State rather than pure for takesOnce' reason: the payment can
--- go Unpaid and rewind, and a "take it whenever offered" answerer would then be
--- offered the same activation forever.
+-- Threaded through State rather than pure for Pawl.VanguardSpec's takesOnce'
+-- reason: the payment can go Unpaid and rewind, and a "take it whenever offered"
+-- answerer would then be offered the same activation forever.
 --
 -- The picks are FILTERED out of the offered candidates rather than built, so a
 -- mutation cannot be silently repaired by an answerer that rediscovers a legal
--- subset; the targets are filtered for Pawl.VanguardSpec's reason, CR 608.2b
+-- subset; the targets are filtered for that spec's other reason, CR 608.2b
 -- re-reading them at resolution.
-collecting :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+collecting :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State (Int, [[ObjectId.ObjectId]]) r
 collecting srcId picks victim p = case p of
   Prompt.ChooseAction _ _ actions -> do
-    taken <- State.get
+    (taken, offers) <- State.get
     case filter (collectsEvidenceFrom srcId) actions of
       offer : _ | taken == 0 -> do
-        State.put 1
+        State.put (1, offers)
         pure offer
       _ -> pure Action.Type.Pass
-  Prompt.ChooseCollectEvidence _ _ _ candidates _ -> pure (Set.fromList (filter (`List.elem` picks) candidates))
+  Prompt.ChooseCollectEvidence _ _ _ candidates _ -> do
+    State.modify' (\(taken, offers) -> (taken, offers <> [candidates]))
+    pure (Set.fromList (filter (`List.elem` picks) candidates))
   Prompt.ChooseTargets _ _ _ sets -> pure (fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets)
   _ -> pure (S.identityAnswer p)
 
