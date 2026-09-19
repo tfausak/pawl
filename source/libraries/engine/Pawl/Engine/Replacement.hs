@@ -812,6 +812,9 @@ applies gs event candidate =
         -- Read off the SOURCE, the LifeLossR arm's posture rather than DrawR's: the
         -- only producer is a permanent's static ability, whose CR 109.5 "you" is
         -- its controller as projected now.
+        (ReplacementEffect.DrawCountR pat, ProposedEvent.WouldDrawCards pid n) ->
+          n >= DrawCountR.atLeast pat
+            && matchesPlayer gs src (DrawCountR.whose pat) pid
         -- CR 701.17a / 614.1a: Bruvac the Grandiloquent watches the mill
         -- INSTRUCTION and who it names. No threshold conjunct where DrawCountR has
         -- one: rule 701.17a's "one or more" is met by every instruction that mills
@@ -822,9 +825,6 @@ applies gs event candidate =
         -- opponent" is measured against its controller as projected now.
         (ReplacementEffect.MillCountR pat, ProposedEvent.WouldMillCards pid _) ->
           matchesPlayer gs src (MillCountR.whose pat) pid
-        (ReplacementEffect.DrawCountR pat, ProposedEvent.WouldDrawCards pid n) ->
-          n >= DrawCountR.atLeast pat
-            && matchesPlayer gs src (DrawCountR.whose pat) pid
         -- CR 705.1 / 614.1a: whose coin flips the row watches (CR 109.5's "you"),
         -- which is the whole of the pattern -- rule 705.2's last sentence leaves
         -- the flipper the only seat a flip involves, and rule 705.1's flip has no
@@ -3537,6 +3537,7 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   -- The instruction class one rule up, and the same answer for the same reason:
   -- `contested` asks only about a damage batch.
   ReplacementEffect.DrawCountR {} -> Nothing
+  -- The mill instruction's class, and the same answer for the same reason.
   ReplacementEffect.MillCountR {} -> Nothing
   -- Doubling a count of coins is arithmetic on whatever arrives, and `contested`
   -- above asks only about a damage batch in any case. DrawCountR's answer.

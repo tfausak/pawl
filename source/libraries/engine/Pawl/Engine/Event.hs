@@ -4751,22 +4751,29 @@ millFrom :: PlayerId -> Natural -> Game [ObjectId]
 millFrom pid n = fmap snd (millFromReturningTaken pid n)
 
 millFromReturningTaken :: PlayerId -> Natural -> Game ([ObjectId], [ObjectId])
-millFromReturningTaken pid n = do
-  -- CR 614.1a with CR 616.1g: the INSTRUCTION is its own replaceable event and is
-  -- settled before any card moves, so the take below runs on the count this loop
-  -- leaves standing and a row that replaced the instruction outright leaves none.
-  outcome <- applyReplacements (ProposedEvent.WouldMillCards pid n)
-  case outcome >>= Replacement.asMillCount of
-    Nothing -> pure ([], [])
-    Just (miller, settled) -> do
-      gs <- State.get
-      -- CR 701.17b's "they mill as many as possible": `genericTake` clamps, which
-      -- matters because a resized count can exceed a library every caller's own
-      -- gate (Cost.canPayComponent, Pawl.Engine.Replacement.stocked) had already
-      -- measured against the printed one.
-      let cards = List.genericTake settled (Game.zoneMembers Zone.Library miller gs)
-      arrived <- fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards)
-      pure (cards, arrived)
+millFromReturningTaken pid n
+  -- No instruction, so no event: CR 701.17a's action is to put cards into a
+  -- graveyard, and a count of zero puts none. Bruvac the Grandiloquent's clause
+  -- says "one or more" for the same reason, and `applies` leans on this rather
+  -- than carrying a threshold field of its own.
+  | n == 0 = pure ([], [])
+  | otherwise = do
+      -- CR 614.1a with CR 616.1g: the INSTRUCTION is its own replaceable event and
+      -- is settled before any card moves, so the take below runs on the count this
+      -- loop leaves standing and a row that replaced it outright leaves none.
+      outcome <- applyReplacements (ProposedEvent.WouldMillCards pid n)
+      case outcome >>= Replacement.asMillCount of
+        Nothing -> pure ([], [])
+        Just (miller, settled) -> do
+          gs <- State.get
+          -- CR 701.17b's "they mill as many as possible": `genericTake` clamps,
+          -- which matters because a resized count can exceed a library every
+          -- caller's own gate (Cost.canPayComponent,
+          -- Pawl.Engine.Replacement.stocked) had already measured against the
+          -- printed one.
+          let cards = List.genericTake settled (Game.zoneMembers Zone.Library miller gs)
+          arrived <- fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards)
+          pure (cards, arrived)
 
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
 changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
