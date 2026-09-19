@@ -49,6 +49,7 @@ import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LearnMode as LearnMode
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -1563,6 +1564,14 @@ combatReplaySpec s =
           -- short transcript's decline would pass one leg by accident.
           Spec.assertEqWith s "discarding and drawing round trips" (Replay.decode p (Replay.encode p (Just LearnMode.DiscardAndDraw))) (Just (Just LearnMode.DiscardAndDraw))
           Spec.assertEqWith s "and so does declining both" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+        -- CR 701.30c: so is which end of their library a clashing player put the
+        -- card they revealed on.
+        Spec.it s "ChooseClash round-trips through the transcript" $ do
+          let p = Prompt.ChooseClash decider S.alice oid (ObjectId.MkObjectId 7) ((S.alice, ObjectId.MkObjectId 7) NonEmpty.:| [(S.bob, ObjectId.MkObjectId 9)])
+          Spec.assertEqWith s "bottoming it round trips" (Replay.decode p (Replay.encode p LibraryPosition.Bottom)) (Just LibraryPosition.Bottom)
+          -- Discriminating: a decode that ignored the response and answered the
+          -- short transcript's Top would pass one leg by accident.
+          Spec.assertEqWith s "and so does keeping it on top" (Replay.decode p (Replay.encode p LibraryPosition.Top)) (Just LibraryPosition.Top)
         Spec.it s "a blight choice does not decode as a Ring-bearer choice" $ do
           -- Discriminating: fails if ChooseBlight reuses ChoseRingBearer rather than
           -- getting its own ObjectId-shaped constructor. These two are not merely

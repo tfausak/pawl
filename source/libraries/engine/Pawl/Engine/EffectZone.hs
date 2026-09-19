@@ -166,6 +166,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Scry {} -> Nothing
   Effect.Surveil {} -> Nothing
   Effect.Fateseal {} -> Nothing
+  Effect.Clash {} -> Nothing
   Effect.Explore {} -> Nothing
   Effect.Connive {} -> Nothing
   Effect.Discard {} -> Nothing

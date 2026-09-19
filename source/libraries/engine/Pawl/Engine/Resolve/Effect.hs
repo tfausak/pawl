@@ -8,6 +8,7 @@ module Pawl.Engine.Resolve.Effect where
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -2379,6 +2380,9 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Scry {} -> False
   Effect.Surveil {} -> False
   Effect.Fateseal {} -> False
+  -- CR 701.30 states no precondition: a player with an empty library clashes
+  -- anyway, revealing nothing, so nothing here refuses the instruction.
+  Effect.Clash {} -> False
   Effect.Explore {} -> False
   Effect.Connive {} -> False
   -- "Discard THESE cards" names the cards themselves, so it is the naming-nobody
@@ -4738,6 +4742,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- ask. Rule 701.29 states no zero case of its own, unlike CR 701.22b.
         Just n | n > 0 -> fatesealOne source n pid
         _ -> pure ()
+  -- CR 701.30b: the resolving controller clashes with an opponent they choose,
+  -- and the outcome is bound at the slot for a later clause to read (Pulling
+  -- Teeth's "if you win" against its "otherwise").
+  Effect.Clash slot -> do
+    won <- clash source controller
+    State.modify' (bindAmountSlot source slot won)
   Effect.Explore ref -> do
     gs <- State.get
     -- CR 608.2c: the set is swept as this instruction is reached; an illegal slot
@@ -8707,6 +8717,94 @@ fatesealOne source n pid = do
       answer <- Game.choose (Prompt.ChooseFateseal (Decide.deciderFor pid chosen) pid owner looked)
       let (toBottom, onTop) = splitLooked looked answer
       State.modify' (reorderLibrary owner (onTop <> beneath <> toBottom))
+
+-- CR 701.30b: "Clash with an opponent" -- the controller chooses an opponent,
+-- and the two of them clash (CR 701.30c). Answers 1 where the CONTROLLER won the
+-- clash and 0 otherwise, which is what the opcode binds at its slot; rule 701.30
+-- gives the other clashing player nothing to read.
+--
+-- Every decision here is a player's, in this order: which opponent (the
+-- controller's, elided at one candidate by CR 102.2 and filtered rather than
+-- trusted -- fatesealOne's posture), then where each clashing player puts the
+-- card they revealed (their own, CR 701.30a).
+--
+-- The reveal is PUBLIC (CR 701.30c) and so rides Event.reveal, unlike scry's
+-- private look at the same position. It is also SIMULTANEOUS, which is why every
+-- card is revealed before any player is asked and why the prompt carries all of
+-- them: neither player decides from a board the other has already changed, and
+-- both see both cards.
+--
+-- The moves come after every decision, rule 701.30c's last clause ("then those
+-- cards move at the same time"). Two clashing players have two libraries, so the
+-- rewrites cannot interfere; the order is still the rule's rather than an
+-- accident of the loop.
+--
+-- An EMPTY library reveals nothing and so cannot win (CR 701.30d asks for a card
+-- that player revealed). CR 609.3 leaves the rest of the instruction to do what
+-- it can.
+clash :: ObjectId -> PlayerId -> Game Natural
+clash source controller = do
+  gs <- State.get
+  chosen <- case Game.opponentsOf controller gs of
+    [] -> pure Nothing
+    [sole] -> pure (Just sole)
+    first : second : rest -> do
+      let offered = first NonEmpty.:| (second : rest)
+      answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller source offered)
+      pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+  case chosen of
+    -- Every other seat has left (CR 104.2a): nobody to clash with, so rule
+    -- 701.30b's instruction does nothing and nobody won.
+    Nothing -> pure 0
+    Just opponent -> do
+      -- Re-read rather than reusing the state the opponent choice was made
+      -- against: a prompt is the one place this function yields.
+      before <- State.get
+      let clashers = filter (\pid -> List.elem pid [controller, opponent]) (Game.apnapOrder before)
+          topOf pid = case Game.zoneMembers Zone.Library pid before of
+            top : _ -> Just (pid, top)
+            [] -> Nothing
+          revealed = Maybe.mapMaybe topOf clashers
+      Monad.mapM_ (uncurry (Event.reveal RevealCause.Ordinary)) revealed
+      -- CR 701.30d: the comparison is against the cards as they were revealed,
+      -- read once here rather than per decision, so no player's choice can move
+      -- it. A library card has a mana value (CR 202.3), and an id nothing is
+      -- filed under has none and so wins nothing.
+      shown <- State.get
+      let -- CR 202.3a's 0 for a card with no mana cost, which is also what
+          -- Filter.manaValue answers for one; the fallback is unreachable, every
+          -- id here coming out of a library.
+          manaValueOf oid = Maybe.fromMaybe 0 (Filter.manaValue (Projection.viewOfObject oid shown))
+          valued = fmap (Bifunctor.second manaValueOf) revealed
+          others = fmap snd (filter (\(pid, _) -> pid /= controller) valued)
+          won = case lookup controller valued of
+            Nothing -> False
+            Just value -> all (value >) others
+      decisions <- case revealed of
+        [] -> pure []
+        first : rest -> do
+          let public = first NonEmpty.:| rest
+          Monad.forM revealed $ \(pid, top) -> do
+            asked <- State.get
+            -- The engine never makes the player's choice, but does not ask a
+            -- question with one answer either: a revealed card that is the whole
+            -- library is already at both ends, scryOne's elision one card over.
+            --
+            -- Not implemented: the later decider is not told what the earlier one
+            -- chose, which CR 101.4b entitles them to; this prompt carries rule
+            -- 701.30c's reveal alone (#3893).
+            let alone = length (Game.zoneMembers Zone.Library pid asked) <= 1
+            position <-
+              if alone
+                then pure LibraryPosition.Top
+                else Game.choose (Prompt.ChooseClash (Decide.deciderFor pid asked) pid source top public)
+            pure (pid, top, position)
+      Monad.forM_ decisions $ \(pid, top, position) ->
+        Monad.when (position == LibraryPosition.Bottom) $ do
+          moving <- State.get
+          let whole = Game.zoneMembers Zone.Library pid moving
+          State.modify' (reorderLibrary pid (filter (/= top) whole <> [top]))
+      pure (if won then 1 else 0)
 
 -- CR 701.44a: one permanent's explore.
 --

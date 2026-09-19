@@ -673,4 +673,7 @@ data Response
   | -- | CR 701.48a's answer: which branch of learning the learner took, or
     -- Nothing for neither.
     ChoseLearn (Maybe LearnMode.LearnMode)
+  | -- | CR 701.30c's answer: which end of their library the clashing player put
+    -- the card they revealed on.
+    ChoseClash LibraryPosition.LibraryPosition
   deriving (Eq, Ord, Show)
