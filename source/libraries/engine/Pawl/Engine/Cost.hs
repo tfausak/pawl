@@ -73,6 +73,7 @@ import qualified Pawl.Types.ClaimAxis as ClaimAxis
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CostScale as CostScale
@@ -146,6 +147,9 @@ unpayable = Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
 -- the amount the effect stated, and never Nothing, CR 118.6's unpayable cost. The
 -- additional costs ride along (CR 118.9d), and the face is the one being CAST (CR
 -- 709.3a / 712.11a).
+--
+-- The face's CHOICE costs do not ride here, one of them being more than one
+-- cost: every caller passes the result through `choiceVariants`.
 insteadOfManaCost :: ManaCost.ManaCost -> Face.Face card -> Cost Keyword.Type.Keyword
 insteadOfManaCost mana face =
   Cost.MkCost
@@ -254,6 +258,35 @@ costsFor pid name oid gs = fmap CandidateCost.cost (candidateCostsFor pid name o
 -- 702.127a's aftermath asks about the ZONE instead and needs no tag of its own.
 candidateCostsFor :: PlayerId -> CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
 candidateCostsFor = candidateCostsGiven False
+
+-- CR 118.8 / 601.2b: one candidate per way of paying this face's CHOICE costs --
+-- Caustic Exhale's "behold a Dragon or pay {1}". Folded into every candidate
+-- rather than into the printed cost alone, `withAdditional`'s reason one field
+-- over: CR 118.9d sends an additional cost through an alternative one unchanged.
+--
+-- The PRODUCT over the face's choices, which is CR 118.8a's "any number of
+-- additional costs" read at more than one: two choices on one face are four
+-- candidates, each of them a whole total for CR 601.2f to lock in.
+--
+-- Announced and not paid: the branch is settled at CR 601.2b, by
+-- Prompt.ChooseCost beside every other candidate, which is what keeps the choice
+-- the CASTER's and leaves an option the board cannot pay out of the offer (CR
+-- 118.3) instead of stranding the cast at CR 601.2h.
+--
+-- The chosen branch is not TAGGED: CandidateCost.keyword names the keyword
+-- ability that offered a cost (CR 702.34a), and a choice printed inside an
+-- additional cost is not one.
+--
+-- Not implemented: CR 701.4b's "if a [quality] was beheld", the one clause that
+-- would ask which branch was taken (#3888).
+choiceVariants :: Face.Face card -> CandidateCost.CandidateCost -> [CandidateCost.CandidateCost]
+choiceVariants face =
+  let variants candidates choice =
+        [ candidate {CandidateCost.cost = plus (CandidateCost.cost candidate) option}
+        | candidate <- candidates,
+          option <- NonEmpty.toList (CostChoice.unwrap choice)
+        ]
+   in \candidate -> List.foldl' variants [candidate] (Face.additionalCostChoices face)
 
 -- | candidateCostsFor, told whether CR 601.3's permission comes from the EFFECT
 -- rather than from the board.
@@ -572,7 +605,10 @@ candidateCostsGiven permitted pid name oid gs =
               -- 702.170d a Mulldrifter Aven Interrupter plotted is offered no evoke
               -- cost" proves it.
               ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> emerged <> surged <> spectacled <> prowled <> freerun
-           in orConverted $ case Object.zone obj of
+           in -- CR 118.8 / 601.2b: every candidate below owes this face's choice
+              -- costs, whichever of them the caster announces, so the expansion
+              -- wraps the whole list rather than any one arm of it.
+              concatMap (choiceVariants face) . orConverted $ case Object.zone obj of
                 -- Three shapes, differing in what they do to the printed cost, plus
                 -- an effect's permission. Flashback (CR 702.34a) REPLACES the mana
                 -- cost, so it is wrapped by `withAdditional`, and escape (CR

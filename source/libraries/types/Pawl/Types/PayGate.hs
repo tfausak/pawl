@@ -24,7 +24,8 @@ import qualified Pawl.Types.Quantity as Quantity
 --
 -- CR 118.12 puts the payment at RESOLUTION -- "the action [do something] is a
 -- cost, paid when the spell or ability resolves" -- which is the whole reason
--- this cannot ride Pawl.Types.Face.additionalCosts or .alternativeCosts. Those
+-- this cannot ride Pawl.Types.Face.additionalCosts, .additionalCostChoices or
+-- .alternativeCosts. Those
 -- are announced and paid at CR 601.2f-h, as the spell is cast, by its caster.
 --
 -- A field on Pawl.Types.Clause rather than an arm of Pawl.Types.Effect, for

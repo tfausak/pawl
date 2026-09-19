@@ -98,6 +98,7 @@ soldierToken =
               Face.enchant = [],
               Face.counterability = Counterability.Counterable,
               Face.additionalCosts = [],
+              Face.additionalCostChoices = [],
               Face.modeCosts = Map.empty,
               Face.maximumX = [],
               Face.alternativeCosts = [],

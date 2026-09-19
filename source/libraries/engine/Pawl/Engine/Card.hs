@@ -127,6 +127,7 @@ faceDownFace listed =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
@@ -427,6 +428,10 @@ merge2 l r =
           Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
           Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
           Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
+          -- CR 702.102b: both halves' choice costs, additionalCosts' reason -- a
+          -- fused split spell owes every additional cost both halves print, and
+          -- two choices are two announcements rather than one (CR 118.8a).
+          Face.additionalCostChoices = Face.additionalCostChoices l <> Face.additionalCostChoices r,
           -- Left-biased, with Face.spell, which merge2 also leaves as the left
           -- half's: CR 700.2h's costs index THAT half's modes, so the right
           -- half's keys would name modes this view does not have. Both sides are
@@ -1501,6 +1506,7 @@ subtractHalf face =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],

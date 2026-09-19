@@ -1,16 +1,31 @@
 {
   "faces": [
     {
-      "additionalCosts": [
-        {
-          "type": "Behold",
-          "value": {
-            "type": "HasSubtype",
-            "value": {
-              "type": "Dragon"
-            }
+      "additionalCostChoices": [
+        [
+          {
+            "components": [
+              {
+                "type": "Behold",
+                "value": {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Dragon"
+                  }
+                }
+              }
+            ],
+            "mana": []
+          },
+          {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              }
+            ]
           }
-        }
+        ]
       ],
       "manaCost": [
         {

@@ -137,6 +137,7 @@ import qualified Pawl.Codec.ConvokingSpec
 import qualified Pawl.Codec.CopyExceptionSpec
 import qualified Pawl.Codec.CopyStackObjectSpec
 import qualified Pawl.Codec.CopyTargetsSpec
+import qualified Pawl.Codec.CostChoiceSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostReductionSpec
 import qualified Pawl.Codec.CostScaleSpec
@@ -805,6 +806,7 @@ spec s registry = do
   Pawl.Codec.ControllerBecomesTargetSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
   Pawl.Codec.CopyExceptionSpec.spec s
+  Pawl.Codec.CostChoiceSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostReductionSpec.spec s
   Pawl.Codec.CostScaleSpec.spec s
