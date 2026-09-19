@@ -51,12 +51,17 @@ data ForEach effect = MkForEach
     -- Mutalith Vortex Beast is the other one in the pool, by CR 121.2 -- cards
     -- are drawn one at a time.
     --
+    -- Not implemented: rule 608.2f's unit is the ACTION, and CR 608.2e says the
+    -- same for the order, so a body of two instructions owes an answer per
+    -- instruction where this field gives one for the whole loop (#3886).
+    --
     -- Proved by Pawl.CombatCostSpec's "CR 603.6a / 608.2f: every Mirror Match
-    -- token sees every other one enter", which is the False. The True is a
-    -- REGRESSION FENCE and not a proven road: dropping it from Soulfire Eruption
-    -- leaves the whole suite green, because no printing in the pool watches a
-    -- batch of library exiles or of draws, so nothing can yet tell one event from
-    -- two there. It is stated because rule 608.2f states it.
+    -- token sees every other one enter", which is the False. The True has no
+    -- gameplay observer -- no printing in the pool watches a batch of library
+    -- exiles or of draws -- and is held instead by Pawl.CardSpec's "a ForEach
+    -- whose body draws or reads a library top says it is not simultaneous",
+    -- which is where CR 121.2 and rule 608.2f's Soulfire Eruption example are
+    -- kept as rules rather than as a card's default.
     individually :: Bool
   }
   deriving (Eq, Ord, Show)

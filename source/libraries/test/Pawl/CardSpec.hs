@@ -5732,6 +5732,37 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- nothing (Valiant Endeavor).
     Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool binds a roll's other result"
     Spec.assertEqWith s "no roll binds an other result it cannot name" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 608.2f's second sentence, kept as a rule rather than as a card's default.
+  -- Two actions in the pool can never be processed simultaneously, both because
+  -- another rule says so outright: a draw (CR 121.2, "cards may only be drawn one
+  -- at a time") and a repeated read of the top of a library, which is rule
+  -- 608.2f's own Soulfire Eruption example. A loop whose body holds either owes
+  -- ForEach.individually, and the wire key defaults to False, so without this
+  -- lint a new card gets the CR-wrong grouping by saying nothing.
+  --
+  -- The body is read TRANSITIVELY (effectWithNested), so a loop nested inside a
+  -- loop makes the outer one sequential too: the outer action contains the inner.
+  --
+  -- This is also the only observer the True arm has. Dropping the key from
+  -- soulfire-eruption.json or mutalith-vortex-beast.json reddens here and nowhere
+  -- else -- no printing in the pool watches a batch of library exiles or of
+  -- draws, so no gameplay board can yet tell one event from two there.
+  Spec.it s "a ForEach whose body draws or reads a library top says it is not simultaneous" $ do
+    ps <- S.allPrintings s
+    let loopsOf face = Maybe.mapMaybe (\effect -> case effect of Effect.ForEach loop -> Just loop; _ -> Nothing) (cardResolutionEffects face)
+        sequentialAction effect = case effect of
+          Effect.Draw {} -> True
+          Effect.MoveToZone move -> case MoveToZone.ref move of
+            ObjectRef.TopOfLibrary {} -> True
+            _ -> False
+          _ -> False
+        holdsOne loop = any (any sequentialAction . effectWithNested) (ForEach.body loop)
+        offends loop = holdsOne loop && not (ForEach.individually loop)
+        offenders = filter (anyFace (any offends . loopsOf) . Printing.card) ps
+    -- A guard, since a pool with no such loop at all would pass saying nothing
+    -- (Soulfire Eruption reads the library top, Mutalith Vortex Beast draws).
+    Spec.assertBool s (any (anyFace (any holdsOne . loopsOf) . Printing.card) ps) "the pool holds a loop whose body cannot be processed simultaneously"
+    Spec.assertEqWith s "CR 608.2f every such loop states it" (fmap (S.nameOf . Printing.card) offenders) []
   -- The REJECTING direction, against printed Auras restated rather than card
   -- files, as the hand-action lint below does it. Filter.IsBound is the atom, since
   -- Filter.boundSlots is one of the three folds targetSlotSlots joins.
