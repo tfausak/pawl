@@ -3042,12 +3042,15 @@ modificationReads m = case m of
   Modification.LoseKeywordFamily _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
   -- Carries no Quantity. It does read the partner's rules text, which layer 3
-  -- writes, so CR 613.8a clause (b) can turn on it.
+  -- writes, so CR 613.8a clause (b) can turn on this arm -- but the edge is
+  -- normally MUTUAL: the exchange replaces the whole text box of both objects in
+  -- its frozen set, so applying it changes what a text change on either of them
+  -- does in return. CR 613.8b hands a dependency loop straight back to CR
+  -- 613.7's timestamp order, which is what textBoxAt implements.
   --
-  -- Not implemented: CR 613.8's reordering for this arm. Declaring the read here
-  -- would route layer 3 through `resolve` while the partner read below still
-  -- answered by timestamp alone, so the two have to move together; until then
-  -- the arm honours CR 613.7 and not CR 613.8 (#3881).
+  -- Not implemented: the ONE-WAY case, where the changed word appears only in
+  -- the text an object RECEIVES. The exchange is then not depended on in return,
+  -- no loop forms, and CR 613.8b really does reorder the pair (#3881).
   Modification.ExchangeTextBoxes -> Set.empty
   -- Carries no Quantity: two bare markers.
   Modification.AssignCombatDamageWithToughness -> Set.empty
