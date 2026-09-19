@@ -133,6 +133,7 @@ import qualified Pawl.Types.Connive as Connive.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
+import qualified Pawl.Types.ControlSides as ControlSides
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
@@ -8144,39 +8145,57 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- CR 800.4b is not asked: a player who has left the game controls nothing, CR
   -- 800.4a's exile having already run, so neither new controller can be one.
-  Effect.ExchangeControl slot ->
+  Effect.ExchangeControl sides ->
     State.modify' $ \gs ->
-      case Maybe.mapMaybe Recipient.objectOf (legalMany slot legal) of
-        [one, two] -> case (Projection.controllerOf one gs, Projection.controllerOf two gs) of
-          -- CR 701.12b: controlled by the same player, the exchange effect does
-          -- nothing. Pawl.BoardEffectSpec's Switcheroo group is the proof.
-          (Just first, Just second)
-            | first /= second ->
-                let (ts, gs1) = Game.freshTimestamp gs
-                    -- CR 611.2c / 613.1b: one layer-2 effect per side, both at
-                    -- the one timestamp -- they affect disjoint objects, so no
-                    -- CR 613.7 order between them is observable.
-                    swap oid pid =
-                      ContinuousEffect.MkContinuousEffect
-                        { ContinuousEffect.source = source,
-                          ContinuousEffect.timestamp = ts,
-                          -- Indefinite: Expiry.arm's Duration.Indefinite answer,
-                          -- and the printed reminder ("This effect lasts
-                          -- indefinitely", Legerdemain).
-                          ContinuousEffect.expiry = Expiry.Type.Never,
-                          ContinuousEffect.modification = Modification.SetController pid,
-                          ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
-                        }
-                    sicken o = o {Object.sickness = Sickness.Sick}
-                 in gs1
-                      { GameState.continuousEffects = swap one second : swap two first : GameState.continuousEffects gs1,
-                        GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) [one, two]
-                      }
-          _ -> gs
-        -- CR 701.12a: if the entire exchange can't be completed, no part of it
-        -- occurs -- so a slot CR 608.2b has emptied to fewer than two objects,
-        -- or one holding a player, changes nothing.
-        _ -> gs
+      let twoSides = case sides of
+            ControlSides.BetweenTargets slot -> case Maybe.mapMaybe Recipient.objectOf (legalMany slot legal) of
+              [one, two] -> [one, two]
+              _ -> []
+            -- CR 113.7's source object, found through the funnel
+            -- ObjectRef.SourceAndChosenPermanent reads it by rather than off
+            -- Object.source: a permanent that is a COPY of Avarice Totem is the
+            -- side, not the card. A source no longer on the battlefield matches
+            -- nothing and so is no side at all, which is CR 701.12a again.
+            --
+            -- A slot naming the source itself needs no guard here: both sides
+            -- are then the one permanent, so the controller test below is what
+            -- CR 701.12b's "controlled by the same player" says it is.
+            ControlSides.WithSource slot ->
+              case (battlefieldMatching legal resolving controller source gs Filter.Type.IsSource, legalOne slot legal >>= Recipient.objectOf) of
+                ([self], Just other) -> [self, other]
+                _ -> []
+       in case twoSides of
+            [one, two] -> case (Projection.controllerOf one gs, Projection.controllerOf two gs) of
+              -- CR 701.12b: controlled by the same player, the exchange effect
+              -- does nothing. Pawl.BoardEffectSpec's Switcheroo group is the
+              -- proof.
+              (Just first, Just second)
+                | first /= second ->
+                    let (ts, gs1) = Game.freshTimestamp gs
+                        -- CR 611.2c / 613.1b: one layer-2 effect per side, both
+                        -- at the one timestamp -- they affect disjoint objects,
+                        -- so no CR 613.7 order between them is observable.
+                        swap oid pid =
+                          ContinuousEffect.MkContinuousEffect
+                            { ContinuousEffect.source = source,
+                              ContinuousEffect.timestamp = ts,
+                              -- Indefinite: Expiry.arm's Duration.Indefinite
+                              -- answer, and the printed reminder ("This effect
+                              -- lasts indefinitely", Legerdemain).
+                              ContinuousEffect.expiry = Expiry.Type.Never,
+                              ContinuousEffect.modification = Modification.SetController pid,
+                              ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+                            }
+                        sicken o = o {Object.sickness = Sickness.Sick}
+                     in gs1
+                          { GameState.continuousEffects = swap one second : swap two first : GameState.continuousEffects gs1,
+                            GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) [one, two]
+                          }
+              _ -> gs
+            -- CR 701.12a: if the entire exchange can't be completed, no part of
+            -- it occurs -- so a slot CR 608.2b has emptied to fewer than two
+            -- objects, or one holding a player, changes nothing.
+            _ -> gs
   Effect.TakeExtraTurn takeExtraTurn -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

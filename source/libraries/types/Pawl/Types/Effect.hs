@@ -16,6 +16,7 @@ import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
+import qualified Pawl.Types.ControlSides as ControlSides
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
@@ -478,12 +479,10 @@ data Effect card ability
     -- effect's source, and each object whose controller changed is re-Sicked (CR
     -- 302.6).
     GainControl DurationRef.DurationRef
-  | -- | CR 701.12b: the two permanents this slot names swap controllers
-    -- indefinitely (Switcheroo); one controller means the exchange does nothing.
-    --
-    -- Not implemented: the printed shape naming the SOURCE as one side and a
-    -- target as the other, Avarice Totem's (#3911).
-    ExchangeControl SlotName.SlotName
+  | -- | CR 701.12b: the two permanents the ControlSides names swap controllers
+    -- indefinitely (Switcheroo, Avarice Totem); one controller means the
+    -- exchange does nothing.
+    ExchangeControl ControlSides.ControlSides
   | -- | CR 603.7: create the delayed triggered ability this card declares under
     -- this name (Face.delayedAbilities), capturing the resolving object's
     -- bindings so CR 603.7c's "it" survives this resolution.
