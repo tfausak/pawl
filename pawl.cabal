@@ -1146,6 +1146,7 @@ library engine
     Pawl.Engine.Resolve.Effect
     Pawl.Engine.Resolve.Slots
     Pawl.Engine.Restamp
+    Pawl.Engine.Reversal
     Pawl.Engine.Ring
     Pawl.Engine.Room
     Pawl.Engine.SacrificeRestriction
@@ -1523,6 +1524,7 @@ library test
     Pawl.ReplaySpec
     Pawl.ResolveSpec
     Pawl.RestampSpec
+    Pawl.ReversalSpec
     Pawl.RingSpec
     Pawl.RoomSpec
     Pawl.SacrificeRestrictionSpec
