@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -3690,8 +3691,99 @@ cityInABottleSpec s registry =
       Spec.assertBool s (S.onBattlefield bottleId after) "and the Bottle itself survives, its own sentence saying `other`"
       Spec.assertBool s (S.onBattlefield pikerId after) "as does alice's Goblin Piker, whose name CR 206.3a does not list"
 
+-- Switcheroo ({4}{U} Sorcery, "Exchange control of two target creatures.")
+-- against CR 701.12b, whose two sentences are the two tests below: different
+-- controllers swap simultaneously, one controller does nothing at all.
+--
+-- The two boards differ in EXACTLY one thing -- who controls the second targeted
+-- creature -- so the negative is not assembled on a board of its own. Three
+-- seats, and carol's Bog Wraith is a third candidate the slot's count of two
+-- cannot take, so the targeting is a real choice rather than a forced one; the
+-- answerer FILTERS the offered set (S.preferring) rather than building
+-- recipients, so CR 608.2b's re-read at resolution still finds them.
+switcherooBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+switcherooBoard s registry secondController = do
+  switcheroo <- S.printingOf s registry "Switcheroo"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  evangel <- S.printingOf s registry "Cabal Evangel"
+  wraith <- S.printingOf s registry "Bog Wraith"
+  let withLands = List.foldl' (\gs _ -> snd (S.addPermanent island S.alice gs)) S.threePlayerGame [1 .. 5 :: Int]
+      (alicePiker, g1) = S.addPermanent piker S.alice withLands
+      (second, g2) = S.addPermanent evangel secondController g1
+      (carolWraith, g3) = S.addPermanent wraith S.carol g2
+      (g4, spellId) = S.handOne switcheroo g3
+  pure
+    ( alicePiker,
+      second,
+      carolWraith,
+      spellId,
+      g4
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- Casts nothing itself -- S.cast drives that -- but pays the mana and aims the
+-- one target slot at the two creatures `wanted` names.
+switcherooAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+switcherooAnswer wanted p =
+  let isWanted r = case r of
+        Recipient.ToCreature oid -> elem oid wanted
+        _ -> False
+   in case p of
+        Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring isWanted sets
+        _ -> S.identityAnswer p
+
+switcherooSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+switcherooSpec s registry = Spec.describe s "Switcheroo" $ do
+  -- CR 701.12b's first sentence. BOTH halves are asserted, in that order: an
+  -- implementation that moved one creature and left the other is the reading
+  -- this discriminates, and "the permanent that was controlled by the other
+  -- player" is not satisfied by either half alone.
+  Spec.it s "CR 701.12b two creatures of different controllers swap controllers" $ do
+    (alicePiker, bobEvangel, carolWraith, spellId, board) <- switcherooBoard s registry S.bob
+    let answer :: Prompt.Prompt r -> r
+        answer = switcherooAnswer [alicePiker, bobEvangel]
+        cast = S.runPure answer board (S.cast S.alice spellId)
+        after = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "bob controls what was alice's Goblin Piker" (Projection.controllerOf alicePiker after) (Just S.bob)
+    Spec.assertEqWith s "alice controls what was bob's Cabal Evangel" (Projection.controllerOf bobEvangel after) (Just S.alice)
+    Spec.assertEqWith s "carol's Bog Wraith, whom nobody targeted, is untouched" (Projection.controllerOf carolWraith after) (Just S.carol)
+    -- CR 302.6: neither creature has been under its new controller's control
+    -- since that player's most recent turn began, so neither may attack now. The
+    -- Piker could attack for alice on the board this one came from.
+    Spec.assertBool s (alicePiker `notElem` Combat.legalAttackers S.alice after) "CR 302.6 alice can no longer attack with the Piker she gave away"
+    Spec.assertBool s (bobEvangel `notElem` Combat.legalAttackers S.alice after) "CR 302.6 nor with the Evangel she just took"
+
+  -- CR 701.12b's second sentence, on the same board but for the one seat that
+  -- differs: "the exchange effect does nothing." Control cannot show that on its
+  -- own -- alice controls both either way -- so the discriminating read is CR
+  -- 302.6's: an exchange that ran would have moved control and re-Sicked both,
+  -- and alice would lose her attack.
+  Spec.it s "CR 701.12b two creatures of the SAME controller exchange nothing" $ do
+    (alicePiker, aliceEvangel, _, spellId, board) <- switcherooBoard s registry S.alice
+    let answer :: Prompt.Prompt r -> r
+        answer = switcherooAnswer [alicePiker, aliceEvangel]
+        cast = S.runPure answer board (S.cast S.alice spellId)
+        after = S.runPure answer cast Stack.resolveTop
+    Spec.assertBool s (alicePiker `elem` Combat.legalAttackers S.alice after) "CR 701.12b alice may still attack with her Goblin Piker"
+    Spec.assertBool s (aliceEvangel `elem` Combat.legalAttackers S.alice after) "CR 701.12b and with her Cabal Evangel"
+    Spec.assertEqWith s "and she still controls both" (Projection.controllerOf alicePiker after, Projection.controllerOf aliceEvangel after) (Just S.alice, Just S.alice)
+    -- The spell was really cast and really resolved, so the assertions above
+    -- cannot pass by the exchange never having been reached.
+    Spec.assertEqWith s "the Switcheroo was cast and then resolved" (length (GameState.stack cast), length (GameState.stack after)) (1, 0)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
+  switcherooSpec s registry
   plummetSpec s registry
   corrosiveGaleSpec s registry
   exhumeSpec s registry

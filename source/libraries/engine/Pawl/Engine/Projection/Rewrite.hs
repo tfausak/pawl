@@ -724,6 +724,8 @@ rewriteEffect pairs effect = case effect of
   Effect.EndTurn -> effect
   Effect.EndCombatPhase -> effect
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
+  -- A slot NAME is not a word rule 612 can swap, ExchangeLifeTotals' reason.
+  Effect.ExchangeControl _ -> effect
   -- CR 612.1 through the only half that holds printed words: CR 603.7b's stated
   -- duration, whose "for as long as" clause is text like any other. The
   -- AbilityName is the arming effect's own pointer at a delayed ability and CR

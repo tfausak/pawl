@@ -1533,6 +1533,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment))))
       " {\"type\":\"GainControl\",\"value\":{\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}}}}} "
+  Spec.it s "ExchangeControl" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeControl (SlotName.MkSlotName (Text.pack "creatures")))
+      " {\"type\":\"ExchangeControl\",\"value\":\"creatures\"} "
   Spec.it s "GrantPlayFromExile round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s

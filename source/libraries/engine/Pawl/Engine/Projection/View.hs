@@ -1758,7 +1758,7 @@ controlNames grants visited gs source a = case a of
   -- Yokes, each enchanting the other's controller, terminate by that peeling
   -- rather than by CR 613.8b's dependency-loop clause, which would apply them in
   -- timestamp order (#946). The fold's STORED half cannot reach this arm at all:
-  -- the one producer of a Modification.SetController writes an
+  -- every producer of a Modification.SetController writes an
   -- Affected.TheseObjects set (Pawl.Engine.Resolve.Effect) and no card may
   -- author one (#199), so no stored effect keeps the list from shrinking.
   --

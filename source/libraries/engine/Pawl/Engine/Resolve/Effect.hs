@@ -2457,6 +2457,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.EndTurn {} -> False
   Effect.EndCombatPhase {} -> False
   Effect.GainControl {} -> False
+  Effect.ExchangeControl {} -> False
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
   Effect.RequireBlock {} -> False
@@ -8099,6 +8100,50 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
                         GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
                       }
+  -- CR 701.12b: each of the two permanents goes to the other's controller,
+  -- simultaneously. TWO stored effects, because Modification.SetController names
+  -- one controller, and both read the PROJECTED controller off the same pre-swap
+  -- `gs`, which is what makes the two halves simultaneous rather than a chain.
+  --
+  -- CR 302.6 re-Sicks both, GainControl's arm above for the same reason; control
+  -- provably moves for each here, so the per-object question that arm asks is
+  -- already answered by the guard.
+  --
+  -- CR 800.4b is not asked: a player who has left the game controls nothing, CR
+  -- 800.4a's exile having already run, so neither new controller can be one.
+  Effect.ExchangeControl slot ->
+    State.modify' $ \gs ->
+      case Maybe.mapMaybe Recipient.objectOf (legalMany slot legal) of
+        [one, two] -> case (Projection.controllerOf one gs, Projection.controllerOf two gs) of
+          -- CR 701.12b: controlled by the same player, the exchange effect does
+          -- nothing. Pawl.BoardEffectSpec's Switcheroo group is the proof.
+          (Just first, Just second)
+            | first /= second ->
+                let (ts, gs1) = Game.freshTimestamp gs
+                    -- CR 611.2c / 613.1b: one layer-2 effect per side, both at
+                    -- the one timestamp -- they affect disjoint objects, so no
+                    -- CR 613.7 order between them is observable.
+                    swap oid pid =
+                      ContinuousEffect.MkContinuousEffect
+                        { ContinuousEffect.source = source,
+                          ContinuousEffect.timestamp = ts,
+                          -- Indefinite: Expiry.arm's Duration.Indefinite answer,
+                          -- and the printed reminder ("This effect lasts
+                          -- indefinitely", Legerdemain).
+                          ContinuousEffect.expiry = Expiry.Type.Never,
+                          ContinuousEffect.modification = Modification.SetController pid,
+                          ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+                        }
+                    sicken o = o {Object.sickness = Sickness.Sick}
+                 in gs1
+                      { GameState.continuousEffects = swap one second : swap two first : GameState.continuousEffects gs1,
+                        GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) [one, two]
+                      }
+          _ -> gs
+        -- CR 701.12a: if the entire exchange can't be completed, no part of it
+        -- occurs -- so a slot CR 608.2b has emptied to fewer than two objects,
+        -- or one holding a player, changes nothing.
+        _ -> gs
   Effect.TakeExtraTurn takeExtraTurn -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

@@ -352,8 +352,9 @@ data Modification ability
     -- 3 would take every gather-time reader with it (#3748).
     ExchangeTextBoxes
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
-    -- effect creation (CR 611.2c) by Resolve.applyEffect (GainControl) -- it is
-    -- the effect's source's controller, never chosen. Applied only by
+    -- effect creation (CR 611.2c) by Resolve.applyEffect, never chosen: the
+    -- effect's source's controller for GainControl, the OTHER permanent's
+    -- controller for CR 701.12b's ExchangeControl. Applied only by
     -- Projection.controllerOf.
     --
     -- Meant to be runtime-only, and nothing ENFORCES that in the type: the
