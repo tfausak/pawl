@@ -2063,6 +2063,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Populate
       " {\"type\":\"Populate\"} "
+  -- CR 701.70a: nullary, rule 701.70a fixing the draw, the discard and the
+  -- token, leaving an author nothing to write.
+  Spec.it s "Recruit" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Recruit
+      " {\"type\":\"Recruit\"} "
   -- CR 701.48a: nullary, rule 701.48a fixing both branches and the learner.
   Spec.it s "Learn" $
     Common.assertJsonCodec

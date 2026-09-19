@@ -61,6 +61,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
 import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, matchingFromAmong, objectRefObjects, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
 import qualified Pawl.Engine.Restamp as Restamp
@@ -2500,6 +2501,10 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- creature tokens when instructed to populate, you won't create a token" -- so
   -- populating is a legal no-op rather than something CR 608.2d refuses.
   Effect.Populate -> False
+  -- CR 701.70a states no precondition: a player with an empty library or an
+  -- empty hand recruits anyway, performing what it can, so nothing here refuses
+  -- the instruction.
+  Effect.Recruit -> False
   -- CR 701.48a is two "you may"s, and declining both is an outcome the rule
   -- states rather than an impossibility, so nothing here refuses the offer.
   Effect.Learn -> False
@@ -7653,6 +7658,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 701.36a: the resolving controller populates; the keyword action is
   -- Pawl.Engine.Populate.populate's, prompt and all.
   Effect.Populate -> Populate.populate controller resolving
+  -- CR 701.70a: the resolving controller recruits; the keyword action is
+  -- Pawl.Engine.Recruit.recruit's, prompt and token alike.
+  Effect.Recruit -> Recruit.recruit controller
   -- CR 701.48a: the resolving controller learns; the keyword action is
   -- Pawl.Engine.Learn.learn's, prompts and all. `source` is the object the
   -- card brought in from outside the game is credited to (CR 400.11c).

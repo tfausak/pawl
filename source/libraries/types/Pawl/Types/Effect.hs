@@ -647,6 +647,10 @@ data Effect card ability
     -- Pawl.Engine.Learn.learn as one procedure. Nullary, rule 701.48a fixing
     -- everything but the learner's own choices.
     Learn
+  | -- | CR 701.70a: the resolving controller recruits, performed by
+    -- Pawl.Engine.Recruit.recruit as one procedure. Nullary, rule 701.70a
+    -- fixing everything but which card is discarded.
+    Recruit
   | -- | CR 701.58a: the players the PlayerRef names each cloak the top card of
     -- their own library, performed by Pawl.Engine.Cloak.cloak as one procedure
     -- (Ransom Note's "your library", Unexplained Absence's "its controller

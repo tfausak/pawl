@@ -698,6 +698,7 @@ effectObjectRefs effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Populate -> []
+  Effect.Recruit -> []
   Effect.Learn -> []
   Effect.Cloak {} -> []
   Effect.Venture {} -> []
@@ -856,6 +857,7 @@ effectPlayerRefs effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.Forage -> []
   Effect.Populate -> []
+  Effect.Recruit -> []
   Effect.Learn -> []
   -- CR 701.58a's own reference: whose library the top card comes off.
   Effect.Cloak ref -> [ref]
@@ -950,6 +952,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.TemptWithTheRing -> Map.empty
   Effect.Forage -> Map.empty
   Effect.Populate -> Map.empty
+  Effect.Recruit -> Map.empty
   Effect.Learn -> Map.empty
   Effect.Cloak {} -> Map.empty
   Effect.Venture {} -> Map.empty
@@ -1557,6 +1560,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TemptWithTheRing -> True
   Effect.Forage -> True
   Effect.Populate -> True
+  Effect.Recruit -> True
   Effect.Learn -> True
   Effect.Cloak {} -> True
   Effect.Venture {} -> True
@@ -1783,6 +1787,7 @@ readsX =
         Effect.TemptWithTheRing -> False
         Effect.Forage -> False
         Effect.Populate -> False
+        Effect.Recruit -> False
         Effect.Learn -> False
         Effect.Cloak {} -> False
         Effect.Venture {} -> False
@@ -1999,6 +2004,7 @@ boundSlots effect = case effect of
   Effect.TemptWithTheRing -> Set.empty
   Effect.Forage -> Set.empty
   Effect.Populate -> Set.empty
+  Effect.Recruit -> Set.empty
   Effect.Learn -> Set.empty
   Effect.Cloak {} -> Set.empty
   Effect.Venture {} -> Set.empty
