@@ -25,7 +25,10 @@
                 "effects": [
                   {
                     "type": "ExchangeControl",
-                    "value": "creatures"
+                    "value": {
+                      "type": "BetweenTargets",
+                      "value": "creatures"
+                    }
                   }
                 ]
               }

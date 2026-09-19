@@ -29,6 +29,7 @@ import qualified Pawl.Codec.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Codec.Conjure as Conjure
 import qualified Pawl.Codec.Connive as Connive
 import qualified Pawl.Codec.ControlPlayer as ControlPlayer
+import qualified Pawl.Codec.ControlSides as ControlSides
 import qualified Pawl.Codec.CopyStackObject as CopyStackObject
 import qualified Pawl.Codec.Counter as Counter
 import qualified Pawl.Codec.Create as Create
@@ -205,7 +206,7 @@ codec cardCodec abilityCodec =
           Arm.nullary "EndTurn" Effect.EndTurn,
           Arm.nullary "EndCombatPhase" Effect.EndCombatPhase,
           Arm.payload "GainControl" DurationRef.codec Effect.GainControl (\x -> case x of Effect.GainControl y -> Just y; _ -> Nothing),
-          Arm.payload "ExchangeControl" SlotName.codec Effect.ExchangeControl (\x -> case x of Effect.ExchangeControl y -> Just y; _ -> Nothing),
+          Arm.payload "ExchangeControl" ControlSides.codec Effect.ExchangeControl (\x -> case x of Effect.ExchangeControl y -> Just y; _ -> Nothing),
           Arm.payload "ArmDelayedTrigger" ArmDelayedTrigger.codec Effect.ArmDelayedTrigger (\x -> case x of Effect.ArmDelayedTrigger y -> Just y; _ -> Nothing),
           Arm.payload "AffectPlayers" AffectPlayers.codec Effect.AffectPlayers (\x -> case x of Effect.AffectPlayers y -> Just y; _ -> Nothing),
           Arm.payload "RequireBlock" RequireBlock.codec Effect.RequireBlock (\x -> case x of Effect.RequireBlock y -> Just y; _ -> Nothing),

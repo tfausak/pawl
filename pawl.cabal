@@ -308,6 +308,8 @@ library codec
     Pawl.Codec.ControllerRelationSpec
     Pawl.Codec.ControlPlayer
     Pawl.Codec.ControlPlayerSpec
+    Pawl.Codec.ControlSides
+    Pawl.Codec.ControlSidesSpec
     Pawl.Codec.Convoking
     Pawl.Codec.ConvokingSpec
     Pawl.Codec.CopyException
@@ -1700,6 +1702,7 @@ library types
     Pawl.Types.ControllerBecomesTarget
     Pawl.Types.ControllerRelation
     Pawl.Types.ControlPlayer
+    Pawl.Types.ControlSides
     Pawl.Types.Convoking
     Pawl.Types.CopyException
     Pawl.Types.CopyStackObject
