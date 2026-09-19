@@ -883,6 +883,14 @@ gateHolds controller source chosen bindings clause = case Clause.condition claus
 -- Keys to the House over a Room with both doors already open. None surviving
 -- announces nothing, recorded as an empty answer map so the loser's arrival
 -- raises no prompt either.
+--
+-- CR 701.55b is the one pair that filter does NOT run over: facing a villainous
+-- choice is an exception to rule 608.2d, the chooser "may choose an option that
+-- is illegal or impossible" and then performs as much of it as is possible, so
+-- OrElse.villainous puts both limbs whatever the board can carry out. Great
+-- Intelligence's Plan is the producer, and Pawl.ResolveSpec's "CR 701.55b Great
+-- Intelligence's Plan still offers the discard to an empty-handed opponent"
+-- proves it.
 chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> (ClauseIndex -> Game Bool) -> Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Maybe (Set PlayerId), Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex))
 chosenBranch resolving controller idx cIdx legal eligible picked clause = case Clause.orElse clause of
   Nothing -> pure (Nothing, picked)
@@ -895,7 +903,7 @@ chosenBranch resolving controller idx cIdx legal eligible picked clause = case C
           Just answers -> pure (won answers, picked)
           Nothing -> do
             gs <- State.get
-            offered <- Monad.filterM eligible (NonEmpty.toList branches)
+            offered <- if OrElse.villainous orElse then pure (NonEmpty.toList branches) else Monad.filterM eligible (NonEmpty.toList branches)
             answers <- case offered of
               [] -> pure Map.empty
               [forced] -> pure (Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)))

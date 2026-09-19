@@ -505,9 +505,11 @@ spec s registry = Spec.describe s "Room" $ do
   --
   -- Keys to the House, DSK 254, {1} Artifact: "{3}, {T}, Sacrifice this
   -- artifact: Lock or unlock a door of target Room you control. Activate only as
-  -- a sorcery." The printed producer in data/cards, and the one card there whose
-  -- either-or clause pair (Pawl.Types.Clause.orElse) is MANDATORY -- it prints no
-  -- "may" over the two branches, where Twiddle and Teardrop Kami both do.
+  -- a sorcery." The printed producer in data/cards, and one of the two cards
+  -- there whose either-or clause pair (Pawl.Types.Clause.orElse) is MANDATORY --
+  -- it prints no "may" over the two branches, where Twiddle and Teardrop Kami
+  -- both do. Great Intelligence's Plan is the other, CR 701.55a's villainous
+  -- choice.
   --
   -- Starts from the board the CR 709.5e case above leaves: BOTH doors open. That
   -- is what makes the door choice a real one (rule 709.5g's "an unlocked half"
