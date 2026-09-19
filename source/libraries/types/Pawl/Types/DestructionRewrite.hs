@@ -1,10 +1,13 @@
 module Pawl.Types.DestructionRewrite where
 
--- | CR 614.8 / 701.19a: how a replacement rewrites a would-be-destroyed event.
+-- | CR 614.8 / 701.19: how a replacement rewrites a would-be-destroyed event.
 -- Under every arm the destruction itself does not happen, so nothing downstream
 -- of it (a put-into-graveyard, and therefore Rest in Peace) ever runs.
 data DestructionRewrite
-  = Regenerate
+  = -- | CR 701.19a / 701.19b: regeneration, both forms -- the two spell out the
+    -- same three instructions, and what parts them is whether the row is a
+    -- resolution's Uses.Once shield or a permanent's static ability.
+    Regenerate
   | -- | CR 122.1c: "if this permanent would be destroyed as the result of an
     -- effect, instead remove a shield counter from it". Engine-minted from the
     -- counters (Pawl.Engine.Projection.shieldOf), never authored -- the card that

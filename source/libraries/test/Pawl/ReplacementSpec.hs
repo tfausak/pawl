@@ -321,6 +321,30 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "the shield was spent" (GameState.replacements once) []
     Spec.assertBool s (not (Map.member skel (Combat.Type.attackers (GameState.combat once)))) "removed from combat by the regeneration (CR 701.19a)"
     Spec.assertBool s (not (Set.member skel (GameState.battlefield twice))) "the second destruction kills it"
+  -- CR 701.19b's other form of regeneration: Mossbridge Troll's "If this
+  -- creature would be destroyed, regenerate it." is a static ability (CR 604.1),
+  -- so CR 604.2 keeps its replacement effect active for as long as the permanent
+  -- is on the battlefield and the projection re-derives the row for every
+  -- destruction -- there is no shield to use up. The Drudge Skeletons beside it
+  -- is the discriminator: one board, one pair of destructions, and only CR
+  -- 701.19a's shield is spent by the first.
+  Spec.it s "CR 701.19b a static regeneration ability replaces every destruction, not just the next one" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mossbridgeTroll <- S.printingOf s registry "Mossbridge Troll"
+    drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
+    let base = S.landsInPlay swamp 1
+        (troll, g1) = S.addPermanent mossbridgeTroll S.alice base
+        (skel, g2) = S.addPermanent drudgeSkeletons S.alice g1
+        -- {B}: Regenerate this creature, activated and resolved, so the
+        -- Skeletons carries CR 701.19a's shield and the Troll carries nothing
+        -- but its printed text.
+        armed = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice skel (theAbility drudgeSkeletons) >> Stack.resolveTop)
+        once = S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable [troll, skel])
+        twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [troll, skel])
+    Spec.assertBool s (Set.member troll (GameState.battlefield once)) "the Troll survived the first destruction"
+    Spec.assertBool s (Set.member troll (GameState.battlefield twice)) "and the second -- CR 701.19b's static ability is not used up"
+    Spec.assertBool s (not (Set.member skel (GameState.battlefield twice))) "while CR 701.19a's shield beside it was, so the Skeletons died to the second"
+    Spec.assertEqWith s "and the only floating row on the board was the Skeletons'" (length (GameState.replacements armed)) 1
   -- CR 701.19c: "Effects that say that a permanent can't be regenerated
   -- don't preclude such abilities from being activated or such spells from
   -- being cast; rather, they cause regeneration shields to not be applied."
