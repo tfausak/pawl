@@ -1732,6 +1732,90 @@ setLifeTotalSpec s registry =
           Spec.assertEqWith s "alice's Pridemate saw her gain" (countersOn aliceMate after) (Just 1)
           Spec.assertEqWith s "bob's stayed silent" (countersOn bobMate after) (Just 0)
 
+-- Beacon of Immortality ({5}{W} Instant -- "Double target player's life total.
+-- Shuffle Beacon of Immortality into its owner's library.", Oracle text verified
+-- against Scryfall 2026-09-19).
+--
+-- CR 701.10d states doubling a life total as an arithmetic rather than a game
+-- action: the player "gains or loses an amount of life such that their new life
+-- total is twice its current value". So it needs no opcode of its own, CR
+-- 701.10b's reason in Pawl.PowerToughnessSpec's Unleash Fury group. It is CR
+-- 119.5's set -- setLifeTotalSpec above -- over Quantity.Times of 2 and the
+-- TARGET's own Quantity.LifeTotal, and the gain or loss falls out of that set.
+--
+-- Three seats at 4, 27 and 13: distinct, and no seat's double (8, 54, 26) is any
+-- seat's total or any other seat's double. So the totals falsify a reading that
+-- doubles the CONTROLLER's total, one that doubles a literal, and one that
+-- doubles every seat -- and the two cases are ONE board differing in nothing but
+-- the seat the target names.
+--
+-- bob's Ajani's Pridemate ("whenever you gain life, put a +1\/+1 counter on this
+-- creature") is what makes the claim about the life EVENT rule 701.10d names
+-- rather than about the total: a doubling written as a raw Player.life write
+-- leaves it silent while 54 still appears.
+--
+-- Only the UPWARD direction is reachable, and that is a fact about the rules
+-- rather than a gap: doubling lowers a total only from one below 0, and CR
+-- 104.3b takes a player at 0 or less out of the game the next time a player
+-- would receive priority. A total of exactly 0 doubles to itself, which CR 119.9
+-- makes no life gain event, and setLifeTotalSpec's CR 119.9 case holds that
+-- reading already.
+--
+-- Written against S.runPure rather than the Board harness, and that is the
+-- shuffle clause's doing: the harness has no vocabulary for Prompt.Shuffle,
+-- which randomness rather than any player answers (S.promptDecider), so a card
+-- that shuffles cannot be scripted through it.
+doubleLifeTotalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+doubleLifeTotalSpec s registry =
+  let -- setLifeTotalSpec's driver: cast, then settle-and-resolve until the stack
+      -- runs dry, so the spell and the life gain's trigger both resolve.
+      castAndTrigger :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      castAndTrigger answer spellId gs =
+        let step g = S.runPure answer (S.runPure answer g Engine.settleForPriority) Stack.resolveTop
+         in List.foldl' (\g _ -> step g) (S.runPure answer gs (S.cast S.alice spellId)) [1 .. 6 :: Int]
+      -- PINNED to a seat rather than searched for, so a mutation cannot be
+      -- repaired by an answerer that goes hunting for a legal target; three seats
+      -- against a count of one leaves a real choice to pin.
+      aimedAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      aimedAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer who) sets
+        _ -> S.identityAnswer p
+      -- alice holds six Plains for {5}{W} and nothing in her library, so the
+      -- shuffled Beacon is the whole of it. Nothing here draws a card, so an
+      -- empty library never reaches CR 104.3c.
+      beaconBoard = do
+        plains <- S.printingOf s registry "Plains"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        beacon <- S.printingOf s registry "Beacon of Immortality"
+        let withLands = S.landsFor plains S.alice 6 S.threePlayerGame
+            (mate, withMate) = S.addPermanent pridemate S.bob withLands
+            at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+            lifed = withMate {GameState.players = at S.alice 4 (at S.bob 27 (at S.carol 13 (GameState.players withMate)))}
+            (gs, spellId) = S.handOne beacon lifed
+        pure (mate, spellId, gs)
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+   in Spec.describe s "Beacon of Immortality" $ do
+        Spec.it s "CR 701.10d doubling a life total leaves the target at twice its OWN total, as a life gain" $ do
+          (mate, spellId, gs) <- beaconBoard
+          let after = castAndTrigger (aimedAt S.bob) spellId gs
+          Spec.assertEqWith s "bob, the target, went from 27 to 54" (S.lifeOf S.bob after) (Just 54)
+          Spec.assertEqWith s "alice, who cast it, keeps her 4: the total doubled is the TARGET's" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "carol, untargeted, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "logged as a gain of exactly bob's own 27" (lifeGains after) [(S.bob, 27)]
+          Spec.assertEqWith s "and as no loss at all" (lifeLosses after) []
+          Spec.assertEqWith s "bob's Pridemate saw the gain, so CR 119.5's gain is what happened" (countersOn mate after) (Just 1)
+          Spec.assertEqWith s "and the Beacon shuffled ITSELF into its owner's library" (namesIn Zone.Library S.alice after) [Just (CardName.MkCardName (Text.pack "Beacon of Immortality"))]
+          Spec.assertEqWith s "rather than resolving into her graveyard" (namesIn Zone.Graveyard S.alice after) []
+        -- The control twin, differing in ONE thing: the seat the target names.
+        Spec.it s "CR 701.10d the control: the same card aimed at another seat doubles THAT seat's total" $ do
+          (mate, spellId, gs) <- beaconBoard
+          let after = castAndTrigger (aimedAt S.alice) spellId gs
+          Spec.assertEqWith s "alice, now the target, went from 4 to 8" (S.lifeOf S.alice after) (Just 8)
+          Spec.assertEqWith s "bob is unmoved at 27" (S.lifeOf S.bob after) (Just 27)
+          Spec.assertEqWith s "carol is unmoved at 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "logged as a gain of exactly alice's own 4" (lifeGains after) [(S.alice, 4)]
+          Spec.assertEqWith s "and bob's Pridemate stayed silent: it was not his life" (countersOn mate after) (Just 0)
+
 -- Reverse the Sands, {6}{W}{W} Sorcery: "Redistribute any number of players'
 -- life totals. (Each of those players gets one life total back.)" CR 119.7 and
 -- CR 119.8 name the action; every seat's new total is CR 119.5's gain or loss,
@@ -2392,6 +2476,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   perRecipientAmountSpec s registry
   exchangeLifeTotalsSpec s registry
   setLifeTotalSpec s registry
+  doubleLifeTotalSpec s registry
   redistributeLifeTotalsSpec s registry
   greatestSpec s registry
   soulsMajestySpec s registry

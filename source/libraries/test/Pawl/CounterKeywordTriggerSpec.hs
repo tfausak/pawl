@@ -1375,6 +1375,11 @@ aetherjetIds gs =
 -- where renown's own counters arrive only as ITS trigger resolves -- so one
 -- connection can never both renown a creature and double it.
 --
+-- The doubling itself is CR 701.10e, and this group is what proves it: "as many
+-- of those counters as that player or permanent already has" is the 2 -> 4 below.
+-- The rule's sentence is about A kind, which is the one PutCounters carries; a
+-- card's "each kind of counter" quantifies over kinds instead; see #3913.
+--
 -- Aragorn arrives BETWEEN the two combats so the Maulers takes its two counters
 -- from printed renown 2 alone: with him out on the first swing the Maulers would
 -- hold renown 2 and a granted renown 1 at once, and CR 702.112c leaves which
