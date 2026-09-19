@@ -702,6 +702,27 @@ vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
         Spec.assertEqWith s "the centaur is untapped" (tapStateOf centaur after) (Just TapState.Untapped)
         Spec.assertEqWith s "the piker is tapped" (tapStateOf p after) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should have two attackers"
+  -- Always Watching ({1}{W}{W} Enchantment), Oracle text fetched from Scryfall
+  -- 2026-09-18: "Nontoken creatures you control get +1/+1 and have vigilance."
+  --
+  -- CR 111.1's exclusion is the point of the board: both Pikers are alice's and
+  -- both attack, and the only thing between them is that one is a token, so a
+  -- grant that ignored the "nontoken" clause leaves the token untapped too.
+  Spec.it s "CR 613.1f Always Watching's vigilance reaches alice's card Piker and not her token one" $ do
+    alwaysWatching <- S.printingOf s registry "Always Watching"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs0, mine, _) = S.combatBoardOf [piker] [piker]
+        gs1 = snd (S.addPermanent alwaysWatching S.alice gs0)
+        (tokenPiker, gs2) = S.addToken (Printing.card piker) S.alice gs1
+        after = snd (Engine.runGamePure S.aggressiveAnswer gs2 (Combat.declareAttackers S.manaPerformer S.alice))
+    case mine of
+      [cardPiker] -> do
+        Spec.assertEqWith s "CR 702.20b the card Piker has vigilance and skips CR 508.1f's tap" (tapStateOf cardPiker after) (Just TapState.Untapped)
+        Spec.assertEqWith s "CR 111.1 the token Piker is not granted vigilance and taps" (tapStateOf tokenPiker after) (Just TapState.Tapped)
+        Spec.assertEqWith s "and the +1/+1 goes the same way: the card Piker is 3 power" (Projection.powerOf cardPiker after) (Just 3)
+        Spec.assertEqWith s "while the token Piker stays 2" (Projection.powerOf tokenPiker after) (Just 2)
+        Spec.assertEqWith s "both attacking" (length (attackersOf after)) 2
+      _ -> Spec.assertFailure s "fixture should have one card Piker attacking"
   Spec.it s "CR 702.20b vigilance still attacks" $ do
     -- Vigilance is not a legality question: the creature is declared as an
     -- attacker exactly as normal. It simply skips CR 508.1f's tap.
