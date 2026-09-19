@@ -515,6 +515,13 @@ data Prompt r where
   -- | CR 406.2: which cards are exiled from the payer's graveyard to pay a
   -- cost; ChooseSacrifices' payload, posture and elision.
   ChooseExilesFromGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 701.59a: which cards are exiled from the payer\'s graveyard to collect
+  -- evidence, the Natural the TOTAL MANA VALUE they must reach rather than how
+  -- many. The arm above\'s payload read as a threshold, which is
+  -- ChooseTapsForTotalPower\'s relation to ChooseTaps -- and NEVER elided for its
+  -- reason: whether the answer is forced is a question about subsets, so eliding
+  -- it would decide for the player.
+  ChooseCollectEvidence :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 614.1c with CR 614.13a: any number of the candidates sacrificed as the
   -- permanent enters, the empty set included; asked at one candidate, skipped
   -- at zero. Answers as Response.ChoseSacrifices.

@@ -1238,6 +1238,7 @@ substituteXInComponent x component = case component of
   CostComponent.ExileThis -> component
   CostComponent.ExileCardsFromGraveyard {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
+  CostComponent.CollectEvidence _ -> component
   CostComponent.ExileCardFromHand _ -> component
   CostComponent.RevealCardFromHand _ -> component
   CostComponent.Behold _ -> component
@@ -1300,6 +1301,7 @@ componentHasVariable component = case component of
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.CollectEvidence _ -> False
   CostComponent.ExileCardFromHand _ -> False
   CostComponent.RevealCardFromHand _ -> False
   CostComponent.Behold _ -> False
@@ -1390,6 +1392,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.CollectEvidence _ -> False
   CostComponent.ExileCardFromHand _ -> False
   CostComponent.RevealCardFromHand _ -> False
   CostComponent.Behold _ -> False
@@ -1681,6 +1684,7 @@ loyaltyAmountOf component = case component of
   CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
+  CostComponent.CollectEvidence _ -> Nothing
   CostComponent.ExileCardFromHand _ -> Nothing
   CostComponent.RevealCardFromHand _ -> Nothing
   CostComponent.Behold _ -> Nothing
@@ -1754,6 +1758,7 @@ zoneOfComponent component = case component of
   -- OTHER cards.
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
+  CostComponent.CollectEvidence _ -> Nothing
   CostComponent.DiscardCards {} -> Nothing
   -- Nothing, and NOT Just Zone.Hand as DiscardThis above answers, for the same
   -- reason the arms above give: CR 113.6m asks about an ability that moves THE
@@ -1847,6 +1852,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.CollectEvidence _ -> False
   -- No cards at all, so there is no "action involving cards" to classify.
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
@@ -2038,6 +2044,23 @@ topExileCandidate :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId ->
 topExileCandidate slots pid criterion gs =
   Maybe.listToMaybe (reverse (exileCandidates slots pid criterion gs))
 
+-- The cards this player may exile to collect evidence: their WHOLE graveyard,
+-- `exileCandidates` under rule 701.59a's absent criterion -- "any number of
+-- cards from your graveyard" names no quality, so the trivial predicate is the
+-- criterion rather than a stand-in for one. `beingCast`'s exclusion rides along
+-- from there, and is CR 601.2a for the offer paths that ask before the card
+-- moves.
+evidenceCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> GameState -> [ObjectId]
+evidenceCandidates slots pid = exileCandidates slots pid (Filter.Type.And [])
+
+-- CR 202.3's mana value of one card, read off its CR 613 projection --
+-- `tapPower`'s posture one zone over, and through the same projection
+-- `exileCandidates` matches the criterion against, so the pool and the total
+-- describe each card the same way. 0 where there is no value to read, CR 202.3a's
+-- own answer for an object with no mana cost.
+evidenceValue :: ObjectId -> GameState -> Integer
+evidenceValue candidate gs = Maybe.fromMaybe 0 (Filter.manaValue (Projection.viewsOf gs candidate))
+
 -- The permanents this player may tap to pay a TapForTotalPower or TapPermanents
 -- component on `oid`: every battlefield object matching the criterion, ascending.
 --
@@ -2224,6 +2247,17 @@ claimOf slots pid oid component gs =
           claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
         CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
           claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid criterion gs)) n
+        -- The same graveyard pool and the same axis, with a count of ONE rather
+        -- than the component's number: rule 701.59a's number is a THRESHOLD on total
+        -- mana value, so how many cards a payment exiles is not settled until the
+        -- payer picks them. TapForTotalPower's arm below and for its reason -- one is
+        -- a LOWER BOUND, since a threshold above 0 needs some card with a positive
+        -- mana value, and `uncountedCeiling` caps this component at 1 so the wrong
+        -- direction never reaches `repeatsOf`. A threshold of 0 is paid by the empty
+        -- set and claims nothing.
+        CostComponent.CollectEvidence n
+          | n > 0 -> claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (evidenceCandidates slots pid gs)) 1
+          | otherwise -> Nothing
         -- A pool of at most ONE, CR 404.2's order having picked it.
         CostComponent.ExileTopFromGraveyard criterion ->
           claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate slots pid criterion gs))) 1
@@ -2638,7 +2672,7 @@ repeatsOf pid oid cost gs =
 -- for CR 107.5's {T}, CR 107.6's {Q} and CR 606.4's loyalty (CR 606.3 allows one
 -- loyalty ability per turn whatever the counters allow); an UNDERSTATEMENT for
 -- CR 107.14's energy, for a counter put on the source, for CR 701.68's blight,
--- and for TapForTotalPower (#2173).
+-- and for TapForTotalPower and CollectEvidence (#2173).
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
 uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
@@ -2674,6 +2708,11 @@ uncountedCeiling component = case component of
   -- threshold of 3 once, not four times -- and the header's direction is the
   -- other way (#2173).
   CostComponent.TapForTotalPower {} -> Just 1
+  -- 1, TapForTotalPower's arm above and for its reason one zone over: CR
+  -- 701.59a's number is a THRESHOLD on total mana value, so `claimOf` counts one
+  -- card and dividing the graveyard by that would OVERSTATE -- three one-drops
+  -- collect evidence 3 once, not three times.
+  CostComponent.CollectEvidence _ -> Just 1
   -- Counted by `objectCeiling`, on ClaimAxis.Tapping: the count is exact, so the
   -- pool of untapped candidates divided by it is how many times in a row the
   -- component can be paid. Heritage Druid's nine Elves are three activations
@@ -2821,8 +2860,9 @@ stackedManaActivations effects measure pcs pid oid cost restrictions ability gs 
 -- The same question given a board the CALLER has already walked; handing the
 -- board in changes no answer. Build `sources` with supplyManaSourcesGiven
 -- above and nothing else. ONLY the mana half gets the pre-walked board -- the
--- COMPONENTS are still asked through canPayComponent, whose Sacrifice and
--- TapForTotalPower arms make per-object walks of their own (#1448).
+-- COMPONENTS are still asked through canPayComponent, whose Sacrifice,
+-- TapForTotalPower and CollectEvidence arms make per-object walks of their own
+-- (#1448).
 canPaySomeCompletionGiven :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ substitute cost gs = case Cost.mana cost of
   Nothing -> False
@@ -2916,6 +2956,7 @@ lifeOwedByComponent component = case component of
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
+  CostComponent.CollectEvidence _ -> 0
   CostComponent.ExileCardFromHand _ -> 0
   CostComponent.RevealCardFromHand _ -> 0
   CostComponent.Behold _ -> 0
@@ -2967,6 +3008,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
+  CostComponent.CollectEvidence _ -> 0
   CostComponent.ExileCardFromHand _ -> 0
   CostComponent.RevealCardFromHand _ -> 0
   CostComponent.Behold _ -> 0
@@ -3119,6 +3161,14 @@ canPayComponent slots pid oid component gs = case component of
   -- total cost as CR 601.2f says. This component ALONE, Sacrifice's caveat.
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
     Natural.length (exileCandidates slots pid criterion gs) >= n
+  -- CR 701.59b: a player who cannot reach the total can't collect evidence at all.
+  -- The arm above read as a SUM rather than a size, TapForTotalPower's question one
+  -- zone over -- and EXACT rather than a bound, no card having a negative mana value
+  -- (CR 202.3), so the whole graveyard is the largest total any subset reaches.
+  -- ">=" because rule 701.59a says "or greater", and a threshold of 0 is paid by the
+  -- empty set with no special case.
+  CostComponent.CollectEvidence n ->
+    sum (fmap (`evidenceValue` gs) (evidenceCandidates slots pid gs)) >= toInteger n
   -- CR 118.3 again: payable only if the graveyard holds a matching card at all,
   -- since the top one is then determined.
   CostComponent.ExileTopFromGraveyard criterion ->
@@ -3254,6 +3304,9 @@ criteriaOf component = case component of
   CostComponent.ExileCardsFromGraveyard exile -> [ExileCardsFromGraveyard.whichCards exile]
   CostComponent.ExileTopFromGraveyard criterion -> [criterion]
   CostComponent.RemovePlusOneCounters remove -> [RemovePlusOneCounters.whichPermanent remove]
+  -- No criterion: rule 701.59a describes the cards by a TOTAL and by nothing else,
+  -- so this belongs with the amount-carrying arms below.
+  CostComponent.CollectEvidence _ -> []
   -- The rest carry no criterion at all: each names either the source object or
   -- a bare amount.
   CostComponent.TapThis -> []
@@ -3887,6 +3940,7 @@ paidInSecondPass component = case component of
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.CollectEvidence _ -> False
   CostComponent.ExileCardFromHand _ -> False
   -- These move no object at all.
   CostComponent.TapThis -> False
@@ -4003,6 +4057,7 @@ orderSensitive component = case component of
   CostComponent.PutCardFromHandOntoBattlefield _ -> True
   CostComponent.ExileCardsFromGraveyard {} -> True
   CostComponent.ExileTopFromGraveyard _ -> True
+  CostComponent.CollectEvidence _ -> True
   CostComponent.ExileCardFromHand _ -> True
   -- FALSE, one of the two object-choosing components that answer so: CR 701.20b
   -- leaves the card where it was, so paying this changes no other part's pool.
@@ -5209,6 +5264,29 @@ payComponent moment slots pid oid component = case component of
         then pure (Set.fromList candidates)
         else Game.choose (Prompt.ChooseExilesFromGraveyard decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
+      then do
+        Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
+        pure bindsNothing
+      else pure Payment.Unpaid
+  -- CR 701.59a: the payer chooses WHICH cards and HOW MANY, so this is a prompt,
+  -- and it is NEVER elided -- TapForTotalPower's posture, the number being a
+  -- threshold on an aggregate rather than a count, so whether the answer is forced
+  -- is a question about subsets and settling it here would decide for the player.
+  --
+  -- Reject-not-repair, Sacrifice's posture. The total is summed over the answer as
+  -- given, and the candidates are read HERE so an earlier component of the same
+  -- cost that emptied the graveyard leaves this Unpaid. The exile goes through
+  -- Event.changeZone, ExileCardsFromGraveyard's route above.
+  --
+  -- Binds nothing. Not implemented: CR 701.59c's linked "if evidence was
+  -- collected", which is what would want the collection recorded here (#3895).
+  CostComponent.CollectEvidence n -> do
+    gs <- State.get
+    let candidates = evidenceCandidates slots pid gs
+        decider = Decide.deciderFor pid gs
+    chosen <- Game.choose (Prompt.ChooseCollectEvidence decider pid oid candidates n)
+    let collected = sum (fmap (`evidenceValue` gs) (Set.toAscList chosen))
+    if Set.isSubsetOf chosen (Set.fromList candidates) && collected >= toInteger n
       then do
         Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
         pure bindsNothing

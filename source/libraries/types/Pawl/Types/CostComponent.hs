@@ -136,6 +136,18 @@ data CostComponent keyword
     -- the paying player's graveyard matching the Filter, which CR 404.2's fixed
     -- order identifies without a prompt.
     ExileTopFromGraveyard (Filter.Filter keyword)
+  | -- | CR 701.59a as a cost / Forensic Researcher: the paying player exiles any
+    -- number of cards from their own graveyard whose total mana value reaches
+    -- this number.
+    --
+    -- A THRESHOLD on an aggregate and not a count, TapForTotalPower's shape one
+    -- zone over: how many cards a payment exiles is not settled until the payer
+    -- picks them, which is why this is not ExileCardsFromGraveyard with a number.
+    -- CR 701.59b is what makes it unpayable below the threshold.
+    --
+    -- Not implemented: CR 701.59c's linked "if evidence was collected", which
+    -- needs the collection recorded for a later clause to read (#3895).
+    CollectEvidence Natural.Natural
   | -- | CR 406.2 out of a hidden zone / Cadaverous Bloom: the paying player
     -- exiles one card matching the Filter from their own hand, which the payer
     -- chooses.

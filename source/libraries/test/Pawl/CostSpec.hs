@@ -2184,6 +2184,147 @@ causticExhaleBoard swamp exhale galleon inHand onBattlefield =
           }
       )
 
+-- Forensic Researcher {2}{U} Creature -- Merfolk Detective 1/3: "{T}: Untap
+-- another target permanent you control. {T}, Collect evidence 3: Tap target
+-- creature you don't control." (Oracle checked against Scryfall 2026-09-19.)
+--
+-- The gate card for CostComponent.CollectEvidence, the first component measured
+-- by a TOTAL over the objects it takes rather than by how many -- CR 701.59a's
+-- "exile any number of cards from your graveyard with total mana value N or
+-- greater". CostComponent.TapForTotalPower is the same question one zone over.
+--
+-- alice controls the Researcher and NOTHING ELSE, which is what keeps the card's
+-- other ability out of every case: "another target permanent you control" has no
+-- legal target on these boards, so the only activation ever offered is the one
+-- that collects evidence.
+--
+-- No lands anywhere: the collect-evidence ability's mana part is empty, so no
+-- negative here can pass on unaffordable mana.
+--
+-- The graveyard cards are Lightning Bolt (mana value 1) and Acidic Soil (mana
+-- value 3), neither of which is ever cast, so nothing but the payment can move
+-- either. bob's Goblin Piker is the 2/1 the ability aims at. The only two
+-- numbers here that coincide are the threshold and the Soil's mana value, which
+-- is the point of the second case; everything else is distinct.
+forensicResearcherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+forensicResearcherSpec s registry =
+  Spec.describe s "Forensic Researcher" $ do
+    -- CR 701.59a's "any number": three mana value 1 cards total 3, so the payment
+    -- takes all three. A reading that wanted three CARDS passes this case too,
+    -- which is what the next one separates.
+    Spec.it s "CR 701.59a three one-drops total the mana value the cost asks for" $ do
+      researcher <- S.printingOf s registry "Forensic Researcher"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (srcId, victimId, buried, gs) = forensicResearcherBoard researcher piker [bolt, bolt, bolt]
+          (after, _) = afterCollecting srcId buried victimId gs
+      Spec.assertEqWith s "CR 701.26a the ability resolved and bob's Piker is tapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Tapped)
+      Spec.assertEqWith s "CR 701.59a all three cards are in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 3
+      Spec.assertEqWith s "and the graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    -- The case that says the number is a TOTAL and not a count: ONE card of mana
+    -- value 3 pays a collect evidence 3, and the Bolt beside it stays where it is.
+    -- A component that counted cards would need three and refuse this board.
+    Spec.it s "CR 701.59a one card of mana value 3 pays it, and the rest stays put" $ do
+      researcher <- S.printingOf s registry "Forensic Researcher"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      soil <- S.printingOf s registry "Acidic Soil"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (srcId, victimId, buried, gs) = forensicResearcherBoard researcher piker [bolt, soil]
+          soilId = case buried of
+            [_, only] -> only
+            _ -> S.noSource
+          boltId = case buried of
+            only : _ -> only
+            _ -> S.noSource
+          (after, offers) = afterCollecting srcId [soilId] victimId gs
+      Spec.assertEqWith s "CR 701.26a the ability resolved and bob's Piker is tapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Tapped)
+      Spec.assertEqWith s "CR 701.59a and the card she did not choose is still in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice after) [boltId]
+      Spec.assertEqWith s "so exactly one card was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+      -- Which is the payer's choice and not the engine's: "any number" means the
+      -- whole graveyard is offered, and the Bolt stays only because she left it.
+      Spec.assertEqWith s "CR 701.59a and she was asked over her whole graveyard" (fmap List.sort offers) [List.sort buried]
+    -- CR 701.59b, against the first case's board one Bolt short: two mana value 1
+    -- cards total 2, and a player who cannot reach the total can't choose to
+    -- collect evidence at all.
+    Spec.it s "CR 701.59b a graveyard totalling 2 cannot collect evidence 3" $ do
+      researcher <- S.printingOf s registry "Forensic Researcher"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (srcId, victimId, buried, gs) = forensicResearcherBoard researcher piker [bolt, bolt]
+          (after, _) = afterCollecting srcId buried victimId gs
+      Spec.assertEqWith s "CR 701.59b the activation is not offered" (filter (collectsEvidenceFrom srcId) (Action.legalActions S.alice gs)) []
+      Spec.assertEqWith s "so bob's Piker is untapped" (fmap Object.tapped (Game.lookupObject victimId after)) (Just TapState.Untapped)
+      Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+
+-- The Researcher alice's only permanent, bob's Piker the only other creature,
+-- and `buried` in alice's graveyard in the order given. No lands and no cards in
+-- hand: nothing on this board can pay mana, which is what makes the empty mana
+-- part of the ability the only cost in play.
+forensicResearcherBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  [Printing.Printing] ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+forensicResearcherBoard researcher piker buried =
+  let (srcId, withSource) = S.addPermanent researcher S.alice (Setup.emptyGame S.bothPlayers)
+      (victimId, withVictim) = S.addPermanent piker S.bob withSource
+      bury (ids, g) printing = let (oid, gN) = S.addGraveyardCard printing S.alice g in (ids <> [oid], gN)
+      (buriedIds, gs) = List.foldl' bury ([], withVictim) buried
+   in ( srcId,
+        victimId,
+        buriedIds,
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.remaining = mempty,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Runs one priority loop in which alice takes the collect-evidence activation
+-- once, exiles exactly `picks`, and aims at `victim`. The second component is
+-- every pool she was offered to collect out of, in order, so a case can say what
+-- the choice was BETWEEN and not only what it came to.
+afterCollecting :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [[ObjectId.ObjectId]])
+afterCollecting srcId picks victim gs =
+  let ((_, after), (_, offers)) = State.runState (Engine.runGame (collecting srcId picks victim) gs Engine.priorityLoop) (0, [])
+   in (after, offers)
+
+-- Threaded through State rather than pure for Pawl.VanguardSpec's takesOnce'
+-- reason: the payment can go Unpaid and rewind, and a "take it whenever offered"
+-- answerer would then be offered the same activation forever.
+--
+-- The picks are FILTERED out of the offered candidates rather than built, so a
+-- mutation cannot be silently repaired by an answerer that rediscovers a legal
+-- subset; the targets are filtered for that spec's other reason, CR 608.2b
+-- re-reading them at resolution.
+collecting :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State (Int, [[ObjectId.ObjectId]]) r
+collecting srcId picks victim p = case p of
+  Prompt.ChooseAction _ _ actions -> do
+    (taken, offers) <- State.get
+    case filter (collectsEvidenceFrom srcId) actions of
+      offer : _ | taken == 0 -> do
+        State.put (1, offers)
+        pure offer
+      _ -> pure Action.Type.Pass
+  Prompt.ChooseCollectEvidence _ _ _ candidates _ -> do
+    State.modify' (\(taken, offers) -> (taken, offers <> [candidates]))
+    pure (Set.fromList (filter (`List.elem` picks) candidates))
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets)
+  _ -> pure (S.identityAnswer p)
+
+-- Is this menu entry the activation of that permanent's COLLECT EVIDENCE ability?
+-- Read off the cost the offer carries rather than off an ability index, so the
+-- card's other {T} ability can never be mistaken for it.
+collectsEvidenceFrom :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+collectsEvidenceFrom oid action = case action of
+  Action.Type.Activate srcId ability ->
+    srcId == oid
+      && any
+        (\component -> case component of CostComponent.CollectEvidence _ -> True; _ -> False)
+        (Cost.Type.components (ActivatedAbility.cost ability))
+  _ -> False
+
 -- CR 115.4's "any target" pointed at a PLAYER, FILTERED out of the offered
 -- recipients for `targeting`'s reason: a hand-built Recipient.ToPlayer is a
 -- different recipient from the one the engine offered, and CR 608.2b's re-read
@@ -2309,6 +2450,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   cadaverousBloomSpec s registry
   livingDestinySpec s registry
   causticExhaleSpec s registry
+  forensicResearcherSpec s registry
   flingSpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry

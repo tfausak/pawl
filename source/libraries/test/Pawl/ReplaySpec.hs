@@ -703,6 +703,30 @@ combatReplaySpec s =
             "the offered prefix"
             (Replay.defaultAnswer (Prompt.ChooseExilesFromGraveyard decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
             (Set.singleton oid)
+        -- CR 701.59a SHARES Response.ChoseExilesFromGraveyard with the prompt
+        -- above, ChooseTapsForTotalPower's relation to ChooseTaps: both exile the
+        -- same cards out of the same graveyard and differ only in how the Natural
+        -- beside them is read, so a cross-decode is sound here where it is not
+        -- between the exile and the sacrifice. What the second assertion pins is
+        -- that a ChooseSacrifices entry still does not answer it.
+        Spec.it s "ChooseCollectEvidence records and replays a Set ObjectId" $ do
+          let p = Prompt.ChooseCollectEvidence decider S.alice oid [oid, ObjectId.MkObjectId 8] 3
+              answer = Set.singleton (ObjectId.MkObjectId 8)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "a ChooseSacrifices transcript entry does not answer it"
+            (Replay.decode p (Replay.encode (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
+            Nothing
+        -- CR 701.59a: the WHOLE offer, not a prefix -- the arm above takes the
+        -- first `count` because its Natural counts cards, and this one's is a
+        -- total that no prefix is guaranteed to reach.
+        Spec.it s "defaultAnswer collects the whole graveyard offered" $
+          Spec.assertEqWith
+            s
+            "every candidate"
+            (Replay.defaultAnswer (Prompt.ChooseCollectEvidence decider S.alice oid [oid, ObjectId.MkObjectId 8] 3))
+            (Set.fromList [oid, ObjectId.MkObjectId 8])
         Spec.it s "ChooseCost records and replays a Cost" $ do
           let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
               alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]
