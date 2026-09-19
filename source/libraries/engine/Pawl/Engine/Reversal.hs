@@ -28,13 +28,12 @@ import qualified Pawl.Types.GameState as GameState
 -- began, where the payment's mana window opened, and where it closed.
 --
 -- Nothing where some leaf was written by BOTH sides to two different values,
--- which is a state this function declines to invent; Pawl.Engine.Cost falls
--- back to the whole reversal there, unasked. It is a fence rather than an
--- elision: no announcement step and no mana ability writes one leaf. CR 601.2a-f
--- and CR 602.2a-b are the announcement's whole footprint -- a zone change onto
--- the stack, one minted object, the counters and the log -- and CR 605.1a keeps
--- a mana ability off a library, so the two sides meet only on the leaves whose
--- rule is named below.
+-- which is a state this function declines to invent. That is CONSERVATIVE
+-- rather than a claim of impossibility: Pawl.Engine.Cost then reverses the whole
+-- action unasked, which is what every caller did before this function existed,
+-- so the worst it can cost is the question. Nothing in the suite reaches it --
+-- CostSpec's "Reversal" groups and Pawl.FaceDownSpec's would lose their prompt
+-- if it did.
 --
 -- A TOTAL record construction, one bind per field, never a record update: a new
 -- GameState field is then a `-Wmissing-fields` error here rather than a leaf

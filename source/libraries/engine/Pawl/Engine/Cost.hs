@@ -3257,8 +3257,8 @@ criteriaOf component = case component of
 -- ANNOUNCEMENT wrote between it and `entry`, and stays at `closed` for
 -- everything the window wrote after. Pawl.Engine.Reversal.withoutAnnouncement
 -- composes that state, and answers Nothing where the two sides wrote one leaf
--- differently -- which no announcement step and no mana ability does, so the
--- fallback is a fence.
+-- differently, which falls back to the whole reversal unasked -- conservative,
+-- and reached by nothing in the suite.
 -- A caller whose announcement writes nothing hands the same state twice, and
 -- then the composed state IS `closed` and nothing here moves.
 --
@@ -3290,8 +3290,8 @@ reverseIllegal pid activated closed entry before = case NonEmpty.nonEmpty activa
   Nothing -> restoreKeepingLibraryActions before
   Just sources -> case Reversal.withoutAnnouncement before entry closed of
     -- No state answers "keep them", so the question is not raised and CR 733.1's
-    -- first sentence stands alone -- Pawl.Engine.Reversal says why no
-    -- announcement step and no mana ability reaches it.
+    -- first sentence stands alone -- the reversal every caller did before this
+    -- (Pawl.Engine.Reversal).
     Nothing -> restoreKeepingLibraryActions before
     Just kept -> do
       State.put kept
