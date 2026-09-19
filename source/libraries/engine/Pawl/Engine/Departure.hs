@@ -626,9 +626,9 @@ exileAll gs victims = Event.simultaneously (Monad.mapM_ (\oid -> Event.changeZon
 -- Stated as a predicate on the board rather than as a hook on the ending effect,
 -- because that is the same question CR 800.4a's fourth clause asks and pawl's
 -- control is DERIVED: an object whose controller reads as a departed player is
--- one whose default controller has left and whom no surviving effect has taken
--- it from. The rule's three conjuncts are those two facts, and "an effect ended"
--- is only the MOMENT -- which is why the clause-4 helper is what this reuses.
+-- one whose default controller has left and which no surviving effect gives to
+-- anybody else. The rule's three conjuncts are those two facts, and "an effect
+-- ended" is only the MOMENT -- which is why this reuses the clause-4 helper.
 --
 -- Nothing else can put an object into that state after the departure: CR 800.4b
 -- refuses to change control to a departed player and refuses to put an object

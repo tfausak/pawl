@@ -1190,11 +1190,12 @@ performSettle = do
   -- return zone change is not something an Expiry sweep can perform.
   movedBack <- MoveDuration.returnMoved
   -- CR 800.4c, checked here for CR 704.3's reason and not because it is a
-  -- state-based action -- that rule says it is not. AFTER the three sweeps
-  -- above, each of which can be the control-changing effect that ends (CR
-  -- 611.2b's condition failing, a monarch's or a duration's return taking the
-  -- source of a grant), and BEFORE the SBA pass, which must see the permanent
-  -- gone rather than still attached to the Aura CR 704.5m would then bury.
+  -- state-based action -- that rule says it is not. AFTER the three above, each
+  -- of which can be what ends a control-changing effect: the conditional sweep
+  -- drops a CR 611.2b duration outright, and either return moves a permanent a
+  -- CR 613.1b grant is derived from. Before the SBA pass, so CR 704.5m reads the
+  -- board the exile leaves rather than an Aura still attached to a permanent
+  -- that has gone.
   orphaned <- Departure.exileOrphanedByEndedControl
   -- CR 702.145c/d/f/g, checked here for CR 704.3's reason and not because they are
   -- state-based actions -- both rules say they are not. Before the SBA pass, since
