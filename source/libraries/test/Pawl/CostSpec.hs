@@ -2071,6 +2071,117 @@ revealing which p = case p of
     | List.elem which (NonEmpty.toList candidates) -> which
   _ -> S.identityAnswer p
 
+-- Caustic Exhale {B} Instant: "As an additional cost to cast this spell, behold
+-- a Dragon or pay {1}. Target creature gets -3/-3 until end of turn." (Oracle
+-- checked against Scryfall 2026-09-18.)
+--
+-- The gate card for CostComponent.Behold, the first component whose pool spans
+-- TWO zones: CR 701.4a's "reveal a [quality] card from your hand OR choose a
+-- [quality] permanent you control on the battlefield".
+--
+-- Not implemented: the "or pay {1}" half of the printed cost, which is a CHOICE
+-- of payments and not a second component -- pawl's card is STRICTER than
+-- printed, a caster with no Dragon being unable to cast it at all (#3890).
+--
+-- The Dragons are DISTINCT printings, Hoarding Dragon in hand and Exalted Dragon
+-- on the battlefield, so a case that reads the offered pool names which zone each
+-- candidate came out of. Neither is ever cast, so nothing but the behold reads
+-- either.
+--
+-- One Swamp pays {B} on EVERY board here, the refusing one included, so its
+-- refusal cannot be unaffordable mana; the Goblin Piker in hand there is what
+-- makes the negative differ from the positive in the card's SUBTYPE alone.
+--
+-- Armored Galleon is bob's 5/4, which -3\/-3 leaves a 2/1 rather than killing --
+-- four values, none of them shared, so the reading is the modification rather
+-- than a state-based action.
+causticExhaleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+causticExhaleSpec s registry =
+  Spec.describe s "Caustic Exhale" $ do
+    -- CR 701.4a's battlefield half alone: alice holds no Dragon card, so a
+    -- hand-only reading of the rule would refuse the cast outright.
+    Spec.it s "CR 701.4a a Dragon on the battlefield pays the cost" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      exhale <- S.printingOf s registry "Caustic Exhale"
+      galleon <- S.printingOf s registry "Armored Galleon"
+      dragon <- S.printingOf s registry "Exalted Dragon"
+      let (spell, victim, _, dragons, gs) = causticExhaleBoard swamp exhale galleon [] [dragon]
+          resolved = S.runPure (targeting victim) (S.runPure (targeting victim) gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
+      Spec.assertBool s (all (\d -> List.elem d (Set.toList (GameState.battlefield resolved))) dragons) "CR 701.4a and the Dragon she beheld is still on the battlefield"
+      Spec.assertBool s (any (S.isCastOf spell) (Action.legalActions S.alice gs)) "and CR 118.3 offered the cast on this board, which is what the refusing case below differs from"
+    -- CR 701.4a's hand half alone, the same cast off the other zone: alice
+    -- controls no Dragon, so a battlefield-only reading would refuse it.
+    Spec.it s "CR 701.4a a Dragon card in hand pays the cost" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      exhale <- S.printingOf s registry "Caustic Exhale"
+      galleon <- S.printingOf s registry "Armored Galleon"
+      dragon <- S.printingOf s registry "Hoarding Dragon"
+      let (spell, victim, held, _, gs) = causticExhaleBoard swamp exhale galleon [dragon] []
+          resolved = S.runPure (targeting victim) (S.runPure (targeting victim) gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
+      Spec.assertBool s (all (\d -> List.elem d (Game.zoneMembers Zone.Hand S.alice resolved)) held) "CR 701.4a and the card she revealed never left her hand"
+    -- The two halves in ONE pool, which is the whole of rule 701.4a's "or": each
+    -- zone holds exactly one Dragon, so a reading that offered either zone alone
+    -- would raise no prompt at all.
+    Spec.it s "CR 701.4a the payer is asked across both zones at once" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      exhale <- S.printingOf s registry "Caustic Exhale"
+      galleon <- S.printingOf s registry "Armored Galleon"
+      inHand <- S.printingOf s registry "Hoarding Dragon"
+      onBattlefield <- S.printingOf s registry "Exalted Dragon"
+      let (spell, _, held, dragons, gs) = causticExhaleBoard swamp exhale galleon [inHand] [onBattlefield]
+          offered :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+          offered p = case p of
+            Prompt.ChooseBehold _ _ _ candidates -> do
+              State.modify' (<> [NonEmpty.toList candidates])
+              pure (NonEmpty.head candidates)
+            _ -> pure (S.identityAnswer p)
+          asked = State.execState (Engine.runGame offered gs (S.cast S.alice spell)) []
+      Spec.assertEqWith s "CR 701.4a one ask, over the card in hand and the permanent together" (fmap List.sort asked) [List.sort (held <> dragons)]
+    -- CR 118.3 with the same mana and the same hand size: a Goblin Piker in place
+    -- of the Dragon card, so nothing in either zone answers the criterion.
+    Spec.it s "CR 118.3 neither zone holding a Dragon cannot pay" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      exhale <- S.printingOf s registry "Caustic Exhale"
+      galleon <- S.printingOf s registry "Armored Galleon"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (spell, victim, _, _, gs) = causticExhaleBoard swamp exhale galleon [piker] []
+          cast = S.runPure (targeting victim) gs (S.cast S.alice spell)
+      Spec.assertEqWith s "CR 118.3 the cast is not offered at all" (filter (S.isCastOf spell) (Action.legalActions S.alice gs)) []
+      Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack cast)) 0
+      Spec.assertEqWith s "so the Galleon is still bob's 5/4" (S.powerToughnessOf victim cast) (Just (5, 4))
+
+-- The Exhale in alice's hand over `inHand` and `onBattlefield`, with one Swamp to
+-- pay its {B} and bob's Armored Galleon to aim at. Both id lists come back so a
+-- case can name the beheld object BY IDENTITY rather than searching the offer for
+-- it.
+causticExhaleBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  [Printing.Printing] ->
+  [Printing.Printing] ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], GameState.GameState)
+causticExhaleBoard swamp exhale galleon inHand onBattlefield =
+  let base = S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers)
+      (victimId, withVictim) = S.addPermanent galleon S.bob base
+      addHand (ids, g) printing = let (oid, gN) = S.addHandCard printing S.alice g in (ids <> [oid], gN)
+      addField (ids, g) printing = let (oid, gN) = S.addPermanent printing S.alice g in (ids <> [oid], gN)
+      (heldIds, withHand) = List.foldl' addHand ([], withVictim) inHand
+      (fieldIds, withField) = List.foldl' addField ([], withHand) onBattlefield
+      (spellId, gs) = S.addHandCard exhale S.alice withField
+   in ( spellId,
+        victimId,
+        heldIds,
+        fieldIds,
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
 -- CR 115.4's "any target" pointed at a PLAYER, FILTERED out of the offered
 -- recipients for `targeting`'s reason: a hand-built Recipient.ToPlayer is a
 -- different recipient from the one the engine offered, and CR 608.2b's re-read
@@ -2195,6 +2306,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   headlessSkaabSpec s registry
   cadaverousBloomSpec s registry
   livingDestinySpec s registry
+  causticExhaleSpec s registry
   flingSpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry
