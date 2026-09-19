@@ -175,8 +175,12 @@ layer m = case m of
 -- `affected` is CR 611.2c's frozen set for the effect this modification is a
 -- part of, which CR 612.5's exchange reads to find the object on the other
 -- side; every other arm ignores it.
-applyModification :: Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Set CardType.CardType -> Affected.Affected -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
-applyModification viewOf src gs oid unitTypes affected m pc =
+-- `textBoxOf` answers CR 612.5's "the rules text of the other object" as of the
+-- moment this effect applies: layer 3 run over the partner as far as the effects
+-- strictly ahead of this one (CR 613.7). Lazy, and only the exchange arm forces
+-- it. Every other arm ignores it.
+applyModification :: (ObjectId -> ProjectedCharacteristics) -> Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Set CardType.CardType -> Affected.Affected -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
   let context = Filter.contextFor (Game.teams gs) (controllerOf src gs) (Just src)
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
@@ -396,24 +400,21 @@ applyModification viewOf src gs oid unitTypes affected m pc =
                 then pc2 {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc2))}
                 else pc2
         -- CR 612.5: the two objects in this effect's affected set exchange their
-        -- text boxes. Each side's incoming text is the OTHER side's copiable
-        -- characteristics (CR 613.2c), which is the state layer 3 begins from:
-        -- layer 1 has already stamped a copy effect's text into them and layer 2
-        -- writes no text at all. Reading them rather than re-projecting the
-        -- partner is also what keeps the mutual effect from re-entering the fold
-        -- it is running inside.
-        --
-        -- Not implemented: a text-changing effect with an EARLIER timestamp on
-        -- either creature (Magical Hack on one of them), whose output CR 613.7
-        -- puts ahead of this one within layer 3 and which the copiable read
-        -- misses (#3749).
+        -- text boxes. Each side's incoming text is the OTHER side's, read by
+        -- textBoxOf as CR 613.7 leaves it at this effect's own position in layer
+        -- 3 -- the copiable seed (CR 613.2c) plus the layer-3 effects strictly
+        -- earlier than this one, which is what stops the mutual effect from
+        -- re-entering the fold it is running inside: neither half of the
+        -- exchange is strictly earlier than itself. Proved by
+        -- Pawl.ProjectionSpec's "CR 613.7 an earlier Magical Hack is part of the
+        -- text box that moves".
         --
         -- CR 707.2 needs nothing here: the copiable values are untouched, so a
         -- Clone of either creature copies the PRINTED text. Pawl.ProjectionSpec's
         -- exchange group proves that board.
         Modification.ExchangeTextBoxes -> case exchangePartner oid affected of
           Nothing -> pc
-          Just other -> exchangeTextBoxFrom (copiableCharacteristics other gs) pc
+          Just other -> exchangeTextBoxFrom (textBoxOf other) pc
         -- CR 613.1b layer 2: controllerOf reads GameState.continuousEffects
         -- directly. Identity here to keep gather/project's walk total.
         Modification.SetController _ -> pc
@@ -2352,7 +2353,10 @@ bestowedView oid gs =
       unitTypes = List.foldl' (flip cardTypesAfter) (PC.cardTypes pc) Keyword.bestowModifications
       -- CR 702.103a's bestow grants land on the permanent itself, so the set
       -- they are applied under is that one object.
-      bestowed = List.foldl' (flip (applyModification (fullView gs) oid gs oid unitTypes (Affected.TheseObjects (Set.singleton oid)))) pc Keyword.bestowModifications
+      -- CR 702.103a's grants hold no ExchangeTextBoxes, so the partner reader is
+      -- never forced here; the copiable seed is what applyModification's own
+      -- caller would hand it for an effect with no layer-3 predecessor.
+      bestowed = List.foldl' (flip (applyModification (`copiableCharacteristics` gs) (fullView gs) oid gs oid unitTypes (Affected.TheseObjects (Set.singleton oid)))) pc Keyword.bestowModifications
    in viewOfCharacteristics (fullView gs) oid bestowed (controllerOf oid gs) (countersOf oid gs) gs
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
@@ -3037,9 +3041,16 @@ modificationReads m = case m of
   -- Carries a payload-free family, so there is no Filter here to read anything.
   Modification.LoseKeywordFamily _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
-  -- Carries no Quantity. It reads the OTHER side's copiable characteristics,
-  -- which no layer writes, so no Aspect names them and CR 613.8a's dependency
-  -- cannot turn on them.
+  -- Carries no Quantity. It does read the partner's rules text, which layer 3
+  -- writes, so CR 613.8a clause (b) can turn on this arm -- but the edge is
+  -- normally MUTUAL: the exchange replaces the whole text box of both objects in
+  -- its frozen set, so applying it changes what a text change on either of them
+  -- does in return. CR 613.8b hands a dependency loop straight back to CR
+  -- 613.7's timestamp order, which is what textBoxAt implements.
+  --
+  -- Not implemented: the ONE-WAY case, where the changed word appears only in
+  -- the text an object RECEIVES. The exchange is then not depended on in return,
+  -- no loop forms, and CR 613.8b really does reorder the pair (#3881).
   Modification.ExchangeTextBoxes -> Set.empty
   -- Carries no Quantity: two bare markers.
   Modification.AssignCombatDamageWithToughness -> Set.empty
@@ -3316,6 +3327,16 @@ projectDeciding admits cands =
       -- layers is answered exactly by the bounded view. Over-admits harmlessly.
       countingLayers = Set.fromList (fmap gLayer (filter countsItsOwnLayer cands))
       writesByLayer = Map.fromListWith Set.union (fmap (\c -> (gLayer c, modificationWrites (gModification c))) cands)
+      -- CR 612.5's "the rules text of the other object", as of an effect
+      -- timestamped `ts`: the partner projected through layer 3 with every
+      -- layer-3 candidate at or after `ts` dropped, so CR 613.7's earlier
+      -- effects are part of what moves and the exchange itself is not. Layers 1
+      -- and 2 write no rules text, so the bound costs nothing below layer 3.
+      --
+      -- WELL-FOUNDED rather than circular: the filter is STRICT, so a second
+      -- exchange on the same pair is projected against a strictly shorter
+      -- candidate list and the recursion bottoms out at the copiable seed.
+      textBoxAt ts gs o = projectWith (<= Layer.Text) (filter (\c -> gLayer c /= Layer.Text || gTimestamp c < ts) cands) o gs
       countsItsOwnLayer c = not (Set.disjoint (modificationReads (gModification c)) (Map.findWithDefault Set.empty (gLayer c) writesByLayer))
       forObject oid gs =
         let -- One grant walk per projected object, shared by every affected-set
@@ -3394,7 +3415,11 @@ projectDeciding admits cands =
                   applyUnit viewOf o pc cs =
                     let parts = NonEmpty.toList cs
                         unitTypes = List.foldl' (\ts c -> cardTypesAfter (gModification c) ts) (PC.cardTypes pc) parts
-                     in List.foldl' (\p c -> applyModification viewOf (gSource c) gs o unitTypes (gAffected c) (gModification c) p) pc parts
+                        -- CR 613.7 within layer 3, for the one arm that reads
+                        -- another object's rules text (CR 612.5). A thunk: an
+                        -- effect that never asks pays nothing.
+                        textBoxOf = textBoxAt (gTimestamp (NonEmpty.head cs)) gs
+                     in List.foldl' (\p c -> applyModification textBoxOf viewOf (gSource c) gs o unitTypes (gAffected c) (gModification c) p) pc parts
                   -- A gathered effect's parts at this layer, as CR 613.8's ordering
                   -- asks about them. The head part answers for the unit's affected
                   -- set and its timestamp (CR 613.6, CR 613.7a).
