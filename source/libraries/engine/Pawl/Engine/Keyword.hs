@@ -1623,7 +1623,10 @@ encore cost =
           ForEach.MkForEach
             { ForEach.ref = ObjectRef.EachOpponent,
               ForEach.slot = encoreOpponentSlot,
-              ForEach.body = Seq.fromList [copied, required]
+              ForEach.body = Seq.fromList [copied, required],
+              -- CR 608.2f's first sentence: one action over the opponents, so the
+              -- copies enter together (CR 603.6a).
+              ForEach.individually = False
             }
       hasted =
         Effect.ModifyTarget
@@ -5324,7 +5327,10 @@ myriad =
           ForEach.MkForEach
             { ForEach.ref = ObjectRef.Players (PlayerRef.EachOpponentExcept Binding.triggerPlayer),
               ForEach.slot = myriadOpponentSlot,
-              ForEach.body = Seq.singleton copy
+              ForEach.body = Seq.singleton copy,
+              -- CR 608.2f's first sentence: one action over the opponents, so rule
+              -- 702.116a's tokens all enter at the same time (CR 603.6a).
+              ForEach.individually = False
             }
       arm =
         Effect.ArmDelayedTrigger

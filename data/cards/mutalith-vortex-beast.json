@@ -112,6 +112,7 @@
                               }
                             }
                           ],
+                          "individually": true,
                           "ref": {
                             "type": "EachOpponent"
                           },

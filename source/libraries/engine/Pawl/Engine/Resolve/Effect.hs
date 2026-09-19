@@ -4356,7 +4356,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MakeWarped ref ->
     State.modify' $ \gs ->
       foldr Warp.becomeWarped gs (objectRefObjects legal resolving controller source gs ref)
-  Effect.ForEach (ForEach.MkForEach ref slot body) -> do
+  Effect.ForEach (ForEach.MkForEach ref slot body individually) -> do
     gs0 <- State.get
     -- CR 608.2f: WHICH members, swept ONCE from the pre-loop board and then fixed,
     -- so the body can neither shorten the batch nor add to it. Recipients rather
@@ -4424,28 +4424,45 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   resolving
                   (GameState.objects gs)
             }
+    -- CR 608.2f's FIRST sentence: the loop is one action taken on several objects,
+    -- so unless the card says its action cannot be processed simultaneously, every
+    -- event the whole loop records shares one Pawl.Types.EventGroup. That is what
+    -- makes CR 603.6a's "all permanents on the battlefield (including the
+    -- newcomers) are checked" reach a token a LATER member minted: each member's
+    -- entry is offered the sample Event.recordEvent took after the last of them,
+    -- rather than the one that existed when that member's own iteration ran.
+    --
+    -- The bracket is over the WHOLE fold and not over each member's token
+    -- creation, because rule 608.2f's unit is the action the loop states, not one
+    -- opcode of it -- and the ForEach.individually flag is the same rule's second
+    -- sentence, which Soulfire Eruption's example states outright.
+    --
+    -- Nothing here reorders the members: the bracket changes which events are one
+    -- event, never when each iteration runs, so rule 608.2f's APNAP ordering and
+    -- CR 603.12's per-member reset are untouched.
     accumulated <-
-      Monad.foldM
-        ( \acc member -> do
-            State.modify' rescope
-            -- CR 608.2c: the body's instructions in written order, per member, through
-            -- the SAME fold a clause's own instructions run through -- CR 603.12's
-            -- "happened" is a question about THIS member's iteration, so it resets at
-            -- each member rather than carrying over from the previous one. Nihiloor's
-            -- "for each opponent, tap up to one untapped creature you control. When you
-            -- do, ..." is the shape: the reflexive is that opponent's own tap, not the
-            -- previous opponent's.
-            applyClauseEffects
-              source
-              ( \eff -> do
-                  defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
-                  applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
-              )
-              (Foldable.toList body)
-            State.gets (Map.unionWith joinAcross acc . produced)
-        )
-        Map.empty
-        members
+      (if individually then id else Event.simultaneously) $
+        Monad.foldM
+          ( \acc member -> do
+              State.modify' rescope
+              -- CR 608.2c: the body's instructions in written order, per member, through
+              -- the SAME fold a clause's own instructions run through -- CR 603.12's
+              -- "happened" is a question about THIS member's iteration, so it resets at
+              -- each member rather than carrying over from the previous one. Nihiloor's
+              -- "for each opponent, tap up to one untapped creature you control. When you
+              -- do, ..." is the shape: the reflexive is that opponent's own tap, not the
+              -- previous opponent's.
+              applyClauseEffects
+                source
+                ( \eff -> do
+                    defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
+                    applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
+                )
+                (Foldable.toList body)
+              State.gets (Map.unionWith joinAcross acc . produced)
+          )
+          Map.empty
+          members
     State.modify' (bindAcross accumulated . rescope)
   Effect.Draw (Draw.MkDraw ref quantity mSlot) -> do
     gs <- State.get

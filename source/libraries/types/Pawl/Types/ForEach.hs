@@ -38,6 +38,30 @@ data ForEach effect = MkForEach
     -- whole batch -- Mirror Match's "exile those tokens", ONE delayed ability
     -- rather than one per member. Pawl.CombatCostSpec's
     -- PutOntoBattlefieldBlocking group proves it.
-    body :: Seq.Seq effect
+    body :: Seq.Seq effect,
+    -- | CR 608.2f's SECOND sentence: True where the loop's action "can't be
+    -- processed simultaneously", so each member is considered individually and
+    -- its events stand apart from the next member's. False -- rule 608.2f's "in
+    -- most cases", and what a card that says nothing gets -- runs the whole loop
+    -- inside one Pawl.Types.EventGroup, so CR 603.6a's newcomers see each other
+    -- enter.
+    --
+    -- Rule 608.2f's own example is the True: Soulfire Eruption's player "can't
+    -- exile the top card of their library multiple times at the same time".
+    -- Mutalith Vortex Beast is the other one in the pool, by CR 121.2 -- cards
+    -- are drawn one at a time.
+    --
+    -- Not implemented: rule 608.2f's unit is the ACTION, and CR 608.2e says the
+    -- same for the order, so a body of two instructions owes an answer per
+    -- instruction where this field gives one for the whole loop (#3886).
+    --
+    -- Proved by Pawl.CombatCostSpec's "CR 603.6a / 608.2f: every Mirror Match
+    -- token sees every other one enter", which is the False. The True has no
+    -- gameplay observer -- no printing in the pool watches a batch of library
+    -- exiles or of draws -- and is held instead by Pawl.CardSpec's "a ForEach
+    -- whose body draws or reads a library top says it is not simultaneous",
+    -- which is where CR 121.2 and rule 608.2f's Soulfire Eruption example are
+    -- kept as rules rather than as a card's default.
+    individually :: Bool
   }
   deriving (Eq, Ord, Show)

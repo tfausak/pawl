@@ -855,8 +855,8 @@ rewriteEffect pairs effect = case effect of
         { GrantPlayFromExile.duration = rewriteDuration pairs (GrantPlayFromExile.duration grant),
           GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant)
         }
-  Effect.ForEach (ForEach.MkForEach ref slot body) ->
-    Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) slot (fmap (rewriteEffect pairs) body))
+  Effect.ForEach (ForEach.MkForEach ref slot body individually) ->
+    Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) slot (fmap (rewriteEffect pairs) body) individually)
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.

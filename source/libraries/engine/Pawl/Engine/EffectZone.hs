@@ -290,4 +290,4 @@ zoneFunctionedFrom itself delayed effect = case effect of
   -- states, and CR 113.6m reads it. The loop's own reference names the members
   -- and is never "the object it's on", so only the body can answer at all. No
   -- card in the pool writes such a body.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
+  Effect.ForEach (ForEach.MkForEach _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
