@@ -144,6 +144,23 @@ data CostComponent keyword
     -- matching the Filter from their own hand, which the payer chooses. CR 701.20b
     -- leaves the card in the hand, so this component spends nothing.
     RevealCardFromHand (Filter.Filter keyword)
+  | -- | CR 701.4a as a cost / Caustic Exhale: the paying player beholds one object
+    -- matching the Filter, either revealing a matching card from their hand or
+    -- choosing a matching permanent they control.
+    --
+    -- A TWO-ZONE choice, which is why this is not RevealCardFromHand with a wider
+    -- criterion: rule 701.4a offers the hidden hand OR the battlefield, and the
+    -- payer picks which. Pawl.Engine.Cost.beholdCandidates is the union and
+    -- Prompt.ChooseBehold the ask.
+    --
+    -- Not implemented: CR 701.4b's "if a [quality] was beheld", which needs the
+    -- beheld object recorded for a later clause, and CR 118.8b's optional "you may
+    -- behold" (#3888).
+    --
+    -- Not implemented: beholding more than one object, and the Champion cycle's
+    -- "behold a [quality] and exile it" -- the payload is one Filter and states
+    -- neither (#3889).
+    Behold (Filter.Filter keyword)
   | -- | CR 701.17a as a cost / Millikin: the paying player mills this many cards.
     -- The only component that moves a card out of a library, which CR 605.1a reads
     -- to bar a mana ability and CR 601.2h reads to put the payment in its second

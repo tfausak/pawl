@@ -1324,6 +1324,11 @@ declaresVariable = Cost.hasVariable
 -- RevealCardFromHand arm, folded onto the spell by Pawl.Engine.Cast), so a spell
 -- whose cost has such a component may read the slot and one whose cost has not
 -- may not.
+--
+-- CostComponent.Behold is deliberately not counted, though CR 701.4a's hand half
+-- IS a reveal: its payment binds nothing (Pawl.Engine.Cost.payComponent answers
+-- bindsNothing), so a spell let through here could read a slot no payment ever
+-- writes.
 revealsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 revealsAsCost =
   let isReveal component = case component of
@@ -3184,6 +3189,9 @@ costComponentFilters component = case component of
   CostComponent.ExileCardFromHand f -> [f]
   -- CR 701.20a out of the hand: Living Destiny's "a creature card".
   CostComponent.RevealCardFromHand f -> [f]
+  -- CR 701.4a over the hand and the battlefield at once: Caustic Exhale's "a
+  -- Dragon".
+  CostComponent.Behold f -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
