@@ -2487,6 +2487,8 @@ representativeEvents cond =
         -- DISTINCT from it: an arm matching a blight here would claim the floor
         -- for the wrong keyword action.
         TriggerCondition.PlayerForages _ -> one (GameEvent.Foraged S.bob)
+        TriggerCondition.PlayerEarthbends _ -> one (GameEvent.Earthbent S.bob)
+        TriggerCondition.PlayerWaterbends _ -> one (GameEvent.Waterbent S.bob)
         -- CR 309.7's own event, and the only one this condition admits. bob
         -- rather than the perspective player, on the PlayerScries arm's reasoning.
         TriggerCondition.PlayerCompletesDungeon _ -> one (GameEvent.DungeonCompleted S.bob)
@@ -2759,7 +2761,13 @@ everyTriggerCondition =
     -- prints You, and the other two are readings a card could take.
     TriggerCondition.PlayerForages PlayerRelation.You,
     TriggerCondition.PlayerForages PlayerRelation.Opponent,
-    TriggerCondition.PlayerForages PlayerRelation.AnyPlayer
+    TriggerCondition.PlayerForages PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerEarthbends PlayerRelation.You,
+    TriggerCondition.PlayerEarthbends PlayerRelation.Opponent,
+    TriggerCondition.PlayerEarthbends PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerWaterbends PlayerRelation.You,
+    TriggerCondition.PlayerWaterbends PlayerRelation.Opponent,
+    TriggerCondition.PlayerWaterbends PlayerRelation.AnyPlayer
   ]
 
 -- CR 702.46 soulshift N, the first minted keyword ability that TARGETS A CARD IN

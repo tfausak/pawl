@@ -9,6 +9,7 @@ module Pawl.EventTriggerSpec where
 import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -29,6 +30,7 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
@@ -39,6 +41,8 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -2239,6 +2243,141 @@ blightChroniclerBoard s registry withSolemnity withOwnWatcher = do
           (g6 {GameState.phase = endStep, GameState.activePlayer = S.alice})
   pure (gnarlbarkId, S.runPure S.identityAnswer begun Engine.settleForPriority)
 
+-- CR 701.66b's earthbend as a TRIGGER EVENT, and rule 701.67c's waterbend
+-- beside it. One printing watches either act -- Avatar Aang // Aang, Master of
+-- Elements, whose front face reads "Whenever you waterbend, earthbend,
+-- firebend, or airbend, draw a card. Then if you've done all four this turn,
+-- transform Avatar Aang" (Scryfall oracle:earthbend, oracle:waterbend,
+-- oracle:airbend and oracle:firebend, every card_faces entry read, 2026-09-19;
+-- it is the only hit in any of the four that watches the act rather than
+-- performing it). Aang needs all four signals and a per-turn tally of them
+-- (#3918, #3919, #3920), so the watchers here are made up --
+-- data/cards/synthetic-stonelistener-adept.json and
+-- data/cards/synthetic-tidecaller-scribe.json, both "Whenever a player
+-- [bend]s, put a +1/+1 counter on this creature". One trigger condition over
+-- one event, and the counter is an effect the engine already had.
+--
+-- Each watcher sits under BOB while alice bends, so every case reads
+-- PlayerRelation.AnyPlayer across a seat rather than a self-scoped trigger.
+--
+-- The bender is Earthbending Lesson ({3}{G} Sorcery -- Lesson, whose whole text
+-- is "Earthbend 4") and Geyser Leaper ({4}{U} 4/3, "Flying / Waterbend {4}: Draw
+-- a card, then discard a card"); Pawl.EarthbendSpec and Pawl.CostSpec are where
+-- what those two do is proved.
+bendTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bendTriggerSpec s registry =
+  let placeTriggers gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      settle gs = S.runPure S.identityAnswer (placeTriggers gs) Stack.resolveTop
+      plus = S.counterOf CounterKind.PlusOnePlusOne
+   in Spec.describe s "Bend triggers" $ do
+        -- THE MOMENT, which is the whole of rule 701.66b: the ability triggers
+        -- when rule 701.66a's DELAYED triggered ability is created, not when
+        -- that delayed ability later returns the land. The two readings are
+        -- separated by reading the Adept twice on one board -- once while the
+        -- Lesson has only just resolved, and again after the earthbent land has
+        -- died and come back. A "when it returns" implementation answers 0 then
+        -- 1 where rule 701.66b answers 1 then 1.
+        Spec.it s "CR 701.66b the Adept fires as rule 701.66a's delayed ability is created, not when it returns the land" $ do
+          forest <- S.printingOf s registry "Forest"
+          lesson <- S.printingOf s registry "Earthbending Lesson"
+          adept <- S.printingOf s registry "Synthetic Stonelistener Adept"
+          let (adeptId, g1) = S.addPermanent adept S.bob (S.landsInPlay forest 5)
+              (g2, spell) = S.handOne lesson g1
+              target = lastLand g2
+              answer :: Prompt.Prompt r -> r
+              answer = aimedAt target
+              cast = S.runPure answer g2 (S.cast S.alice spell)
+              earthbent = settle (S.runPure answer cast Stack.resolveTop)
+              returned = settle (settle (S.settleSba (S.markDamage target 4 earthbent)))
+          Spec.assertEqWith s "CR 701.66b the earthbend put a +1/+1 counter on bob's Adept" (plus adeptId earthbent) 1
+          Spec.assertEqWith s "CR 701.66b and rule 701.66a's delayed ability returning the land puts no second one" (plus adeptId returned) 1
+          -- The proxies, after the behaviour: rule 701.66a really ran, and the
+          -- delayed ability really resolved, so neither reading above is of a
+          -- board that never moved.
+          Spec.assertEqWith s "CR 701.66a the earthbend itself put four +1/+1 counters on the land" (plus target earthbent) 4
+          Spec.assertBool s (not (S.onBattlefield target returned)) "CR 400.7 the earthbent land itself is gone"
+          Spec.assertEqWith s "CR 701.66a and the card it was came back, so alice controls five lands again" (length (Game.zoneMembers Zone.Battlefield S.alice returned)) 5
+        -- Rule 701.67c's "regardless of how they paid that cost", as the one
+        -- thing the pair varies: the same Leaper, the same waterbend {4}, paid
+        -- once entirely by rule 701.67a's taps on a landless board and once
+        -- entirely in mana off four Mountains. A condition reading the taps
+        -- would fire on the first and not the second.
+        Spec.it s "CR 701.67c a waterbend cost paid by tapping fires the Scribe" $ do
+          (scribeId, tappable, leaperId, gs) <- leaperBoard s registry 0
+          resolved <- activateLeaper s (ManaCost.MkManaCost []) tappable leaperId gs
+          Spec.assertEqWith s "CR 701.67c the waterbend put a +1/+1 counter on bob's Scribe" (plus scribeId (settle resolved)) 1
+          Spec.assertEqWith s "and the four permanents rule 701.67a tapped for it are tapped" (S.tappedCount S.alice resolved) 4
+        Spec.it s "CR 701.67c and the same cost paid entirely in mana fires it just the same" $ do
+          (scribeId, _, leaperId, gs) <- leaperBoard s registry 4
+          resolved <- activateLeaper s (ManaCost.MkManaCost [ManaSymbol.Generic 4]) [] leaperId gs
+          Spec.assertEqWith s "CR 701.67c the waterbend put a +1/+1 counter on bob's Scribe" (plus scribeId (settle resolved)) 1
+          Spec.assertEqWith s "and only the four Mountains she spent are tapped" (S.tappedCount S.alice resolved) 4
+
+-- Alice's last battlefield permanent in ObjectId order. Her battlefield holds
+-- nothing but Forests on this board, so this is one of them -- and the LAST one,
+-- which is the one paying for the Lesson cannot have tapped.
+lastLand :: GameState.GameState -> ObjectId.ObjectId
+lastLand gs = case List.sortOn Ord.Down (Game.zoneMembers Zone.Battlefield S.alice gs) of
+  oid : _ -> oid
+  [] -> S.noSource
+
+-- Aim a target slot at this permanent, PINNED rather than searched: an answerer
+-- that took whatever was legal would find another Forest after a mutation and
+-- keep the case green. FILTERED out of the offered set rather than built from
+-- the id, since CR 608.2b re-reads the recipient the pool offered.
+aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAt victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just victim) . Recipient.objectOf) offered) sets
+  _ -> S.castAnswer p
+
+-- alice controls a Geyser Leaper, two Goblin Pikers, two Crawlspaces and
+-- `lands` Mountains, with two Mountains in her library so the ability's draw
+-- neither decks her (CR 104.3c) nor runs out; bob controls the Scribe. She has
+-- priority in her own precombat main phase, which is when CR 117.1b lets her
+-- activate. Returns the Scribe, the four tappable permanents, the Leaper and
+-- that state.
+--
+-- The Leaper and the Scribe are themselves untapped creatures, so the tap prompt
+-- is offered more candidates than the cost can take and is a real choice.
+leaperBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+leaperBoard s registry lands = do
+  mountain <- S.printingOf s registry "Mountain"
+  leaper <- S.printingOf s registry "Geyser Leaper"
+  piker <- S.printingOf s registry "Goblin Piker"
+  crawlspace <- S.printingOf s registry "Crawlspace"
+  scribe <- S.printingOf s registry "Synthetic Tidecaller Scribe"
+  let (leaperId, g1) = S.addPermanent leaper S.alice (S.landsInPlay mountain lands)
+      (tappable, g2) = List.foldl' (\(ids, g) printing -> let (oid, next) = S.addPermanent printing S.alice g in (ids <> [oid], next)) ([], g1) [piker, piker, crawlspace, crawlspace]
+      (scribeId, g3) = S.addPermanent scribe S.bob g2
+      g4 = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g3 [1 :: Int .. 2]
+  pure
+    ( scribeId,
+      tappable,
+      leaperId,
+      g4
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- alice activates the Leaper's sole activated ability, taking the substitution
+-- that leaves `wanted` to pay with mana and tapping `tapped` for the rest, and
+-- the ability resolves. Both answers are FILTERED against what the engine
+-- offered rather than built, so an answer it did not offer fails the payment
+-- visibly instead of being repaired.
+activateLeaper :: (Monad m) => Spec.Spec m n -> ManaCost.ManaCost -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
+activateLeaper s wanted tapped leaperId gs = case Projection.abilitiesOf leaperId gs of
+  ability : _ ->
+    let answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter ((== Just wanted) . Cost.Type.mana) candidates)
+          Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (`elem` tapped) candidates)
+          _ -> S.identityAnswer p
+        activated = S.runPure answer gs (Activate.activateAbility S.alice leaperId ability)
+     in pure (S.runPure answer activated Stack.resolveTop)
+  [] -> Spec.assertFailure s "expected the Leaper to carry an activated ability"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   discardTriggerSpec s registry
@@ -2261,3 +2400,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   brinebornCutthroatSpec s registry
   oreskosSunGuideSpec s registry
   blightChroniclerSpec s registry
+  bendTriggerSpec s registry

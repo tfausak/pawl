@@ -7610,6 +7610,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ lands $ \land -> do
       State.modify' (bindEarthbentLand resolving land)
       applyEffectWith runSubgame resolving source controller legal chosen Earthbend.arm
+      -- CR 701.66b: the earthbend as a game event, written where the rule puts
+      -- it -- AFTER the arming opcode above, so the moment recorded is the
+      -- creation of rule 701.66a's delayed triggered ability and not that
+      -- ability's own later resolution. Pawl.EventTriggerSpec's "CR 701.66b the
+      -- Adept fires as rule 701.66a's delayed ability is created, not when it
+      -- returns the land" proves the two apart.
+      --
+      -- Inside the per-land loop: rule 701.66a arms one delayed ability per
+      -- target, so a hypothetical instruction naming two lands earthbends twice,
+      -- and one whose target CR 608.2b dropped earthbends not at all.
+      --
+      -- `controller` is CR 109.5's "you", which rule 701.66a's "target land YOU
+      -- control" and CR 603.7d's controller of the delayed ability agree on.
+      State.modify' (Event.recordEvent (GameEvent.Earthbent controller))
   -- CR 701.65a: "airbend" -- the whole keyword action, whose exile
   -- Pawl.Engine.Airbend writes as an Effect and this arm runs through the SAME
   -- executor a card's own instructions run through. Nothing here reads which

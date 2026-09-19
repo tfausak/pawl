@@ -696,6 +696,22 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Foraged (PlayerId.MkPlayerId 5))
       " {\"type\":\"Foraged\",\"value\":5} "
+  -- CR 701.66b and CR 701.67c. One player id each, Blighted's payload above: the
+  -- rules name the bending player and nothing else. DISTINCT tags, since the two
+  -- are different acts at different moments -- a shared one would let an
+  -- earthbend fire a waterbend's watcher.
+  Spec.it s "Earthbent" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Earthbent (PlayerId.MkPlayerId 6))
+      " {\"type\":\"Earthbent\",\"value\":6} "
+  Spec.it s "Waterbent" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Waterbent (PlayerId.MkPlayerId 7))
+      " {\"type\":\"Waterbent\",\"value\":7} "
   -- CR 608.2n. The source object and the ability, in that order, which is the
   -- pair CR 707.10b counts by: a swap would file the resolution under the
   -- ability's own id.

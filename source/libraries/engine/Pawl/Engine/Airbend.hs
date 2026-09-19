@@ -19,9 +19,10 @@
 -- and fixes the {2} itself; no card states either, so no opcode field carries
 -- them and 'permission' mints them here.
 --
--- CR 701.65b's "whenever a player airbends" has no arm anywhere, and no GameEvent
--- to hang one on. Scryfall `o:"airbends"`, 2026-09-18, returns no card; a
--- printing worded that way is what would need one.
+-- Not implemented: CR 701.65b's "whenever a player airbends", which has no arm
+-- anywhere and no GameEvent to hang one on. Avatar Aang is the printing that
+-- wants it (#3918); rule 701.66b's earthbend and rule 701.67c's waterbend are
+-- the siblings that have theirs.
 module Pawl.Engine.Airbend where
 
 import qualified Data.Map.Strict as Map

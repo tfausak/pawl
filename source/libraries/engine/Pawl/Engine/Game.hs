@@ -1833,6 +1833,8 @@ castOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Earthbent _ -> Nothing
+  GameEvent.Waterbent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -1907,6 +1909,8 @@ activatedAbilityResolved event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Earthbent _ -> Nothing
+  GameEvent.Waterbent _ -> Nothing
   GameEvent.ActivatedAbilityResolved activated -> Just activated
   GameEvent.CardArrived _ -> Nothing
 
@@ -1991,6 +1995,8 @@ discardOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Earthbent _ -> Nothing
+  GameEvent.Waterbent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -2103,6 +2109,8 @@ movedChange event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Earthbent _ -> Nothing
+  GameEvent.Waterbent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -2206,6 +2214,8 @@ damageDealt event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Earthbent _ -> Nothing
+  GameEvent.Waterbent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -2473,6 +2483,8 @@ lifeGainOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Earthbent _ -> Nothing
+  GameEvent.Waterbent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
