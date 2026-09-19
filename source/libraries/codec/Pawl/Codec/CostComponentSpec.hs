@@ -265,5 +265,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       CostComponent.ChooseOpponent
       " {\"type\":\"ChooseOpponent\"} "
+  -- CR 701.67a as a cost: a bare amount, which is how much of the cost's generic
+  -- mana rule 701.67b lets taps pay for.
+  Spec.it s "Waterbend" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.Waterbend 4)
+      " {\"type\":\"Waterbend\",\"value\":4} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec

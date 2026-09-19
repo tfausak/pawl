@@ -1041,18 +1041,70 @@ totalManas adjustments =
 -- half Cast.asProposed stamped. So this reads the PRINTED face, and a spell that
 -- is a copy of a convoke spell finds no convoke here -- the pre-existing bound
 -- that carrier has, see #1859, and not something this function narrows.
-manaSubstitutions :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
-manaSubstitutions slots pid oid gs manaCost =
+--
+-- The OFFERS come in two provenances and this function holds only the keywords'.
+-- CR 701.67a's waterbend is the other, and it rides the COST (CostComponent.Waterbend)
+-- rather than the object, which is what lets rule 701.67b scope it to one
+-- component of the total: `waterbendOffers` caps it at the waterbend cost's own
+-- generic amount where a keyword's offer is capped only by the symbol.
+manaSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
+manaSubstitutions components slots pid oid gs =
   let keywords = maybe Set.empty Face.keywordSet (Game.faceOf oid gs)
-      -- The cost's symbols as one entry per KIND, a Generic counting for its own
+   in substitutionsOffering (\symbol -> fmap (\substitute -> (substitute, Nothing)) (Keyword.manaSubstitutesFor symbol keywords) <> waterbendOffers components symbol) slots pid oid gs
+
+-- CR 701.67a's half of the offer alone, which is what an ACTIVATION gets: CR
+-- 702.51a, CR 702.66a and CR 702.126a all function while a SPELL is on the
+-- stack, so no keyword of the source's reaches an activation cost, where a
+-- waterbend cost is one component of the cost being paid and says so itself.
+--
+-- The answer for a cost stating no waterbend is exactly one entry substituting
+-- nothing -- `offers` is empty, so the product is the empty vector -- which is
+-- the answer every activation had before rule 701.67a arrived.
+activationManaSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
+activationManaSubstitutions components = substitutionsOffering (waterbendOffers components)
+
+-- CR 701.67a as an offer, and CR 701.67b as the CEILING on it: "for each generic
+-- mana in that cost", where `that cost` is the waterbend cost and not the total
+-- cost it is part of. Nothing where the cost states no waterbend.
+--
+-- SUMMED over the components, since two waterbend costs on one total cost would
+-- each license their own generic. Arithmetic rather than proven behaviour: no
+-- card in Scryfall `oracle:waterbend`, 2026-09-19, states two, and Waterbender
+-- Ascension would refute it by stating a second.
+waterbendOffers :: [CostComponent.CostComponent Keyword.Type.Keyword] -> ManaSymbol.ManaSymbol -> [(Keyword.Substitute, Maybe Natural)]
+waterbendOffers components symbol =
+  let allowance = sum [n | CostComponent.Waterbend n <- components]
+   in case symbol of
+        ManaSymbol.Generic _ | allowance > 0 -> [(Keyword.TapUntapped waterbendCriterion, Just allowance)]
+        _ -> []
+
+-- Rule 701.67a's "an untapped artifact or creature you control", MINTED here for
+-- Pawl.Engine.Keyword.manaSubstitutesFor's reason: the rule's own words are what
+-- say what is eligible, so CR 612.2 has no word of a card's to swap in it and
+-- Pawl.CardSpec's filter traversals never see it.
+waterbendCriterion :: Filter.Type.Filter Keyword.Type.Keyword
+waterbendCriterion =
+  Filter.Type.And
+    [ Filter.Type.Or [Filter.Type.HasCardType CardType.Artifact, Filter.Type.HasCardType CardType.Creature],
+      Filter.Type.Not Filter.Type.IsTapped,
+      Filter.Type.ControlledBy PlayerRelation.You
+    ]
+
+-- The body both offers share: one entry per set of symbols the substitutes could
+-- cover. Each offer carries its own CEILING beside the symbol's own count -- rule
+-- 701.67b's, or Nothing where the rule stating the substitute bounds it by the
+-- symbol alone.
+substitutionsOffering :: (ManaSymbol.ManaSymbol -> [(Keyword.Substitute, Maybe Natural)]) -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
+substitutionsOffering offersFor slots pid oid gs manaCost =
+  let -- The cost's symbols as one entry per KIND, a Generic counting for its own
       -- amount (CR 107.4b) where every other symbol is one mana.
       sizeOf symbol = case symbol of
         ManaSymbol.Generic n -> (ManaSymbol.Generic 1, n)
         other -> (other, 1)
       kinds = Map.toAscList (Map.fromListWith (+) (fmap sizeOf (ManaCost.unwrap manaCost)))
       offered (symbol, n) =
-        [ (symbol, n, substitute, min n (Natural.length (substituteCandidates slots pid oid substitute gs)))
-        | substitute <- Keyword.manaSubstitutesFor symbol keywords
+        [ (symbol, n, substitute, minimum (n : Natural.length (substituteCandidates slots pid oid substitute gs) : Maybe.maybeToList ceiling_))
+        | (substitute, ceiling_) <- offersFor symbol
         ]
       offers = concatMap offered kinds
       -- The cartesian product over how many of each offer is substituted for,
@@ -1063,7 +1115,9 @@ manaSubstitutions slots pid oid gs manaCost =
       -- two together rather than apiece. A FENCE: the only printing that states
       -- both is Hogaak, Arisen Necropolis, which cannot be transcribed (see
       -- Pawl.Engine.Keyword.manaSubstitutesFor), so no card in `data/cards/`
-      -- reaches a vector this drops.
+      -- reaches a vector this drops. A waterbend cost beside one of those
+      -- keywords is the other pair, and it wants the spell half rule 701.67a is
+      -- not carried in yet (#3901).
       withinCost vector = all (\(symbol, n, _, _) -> sum [k | (s, _, _, k) <- vector, s == symbol] <= n) vector
       entry vector =
         ( List.foldl' (\acc (symbol, _, _, k) -> withoutMana symbol k acc) manaCost vector,
@@ -1073,8 +1127,8 @@ manaSubstitutions slots pid oid gs manaCost =
 
 -- The objects a Keyword.Substitute may be paid with, per its arm: CR 702.51a's
 -- and CR 702.126a's out of the battlefield, CR 702.66a's out of the payer's own
--- graveyard. Read for its SIZE by manaSubstitutions above, which is how many of a
--- symbol kind the offer can reach.
+-- graveyard. Read for its SIZE by `substitutionsOffering` above, which is how
+-- many of a symbol kind the offer can reach.
 substituteCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Keyword.Substitute -> GameState -> [ObjectId]
 substituteCandidates slots pid oid substitute gs = case substitute of
   Keyword.TapUntapped criterion -> tapCandidates slots pid oid criterion gs
@@ -1090,8 +1144,10 @@ substituteComponent substitute n = case substitute of
   Keyword.TapUntapped criterion -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion)
   Keyword.ExileFromGraveyard criterion -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion)
 
--- `manaSubstitutions`' mana halves folded into a TOTALLING, which is the shape
--- Mana.announce's `total` parameter takes. That offer decides whether to ask
+-- A SUBSTITUTION's mana halves folded into a TOTALLING, which is the shape
+-- Mana.announce's `total` parameter takes. The offer arrives as a parameter
+-- because the two carriers state different ones -- `manaSubstitutions` for a
+-- cast and `activationManaSubstitutions` for an activation. That offer decides whether to ask
 -- which half of a hybrid symbol is announced, and it asks only where two halves
 -- are payable -- so a totalling blind to CR 702.51b would find NO half payable on
 -- a Merrow Skyswimmer ({3}{W/U}{W/U}, convoke) cast off nothing but creatures,
@@ -1105,14 +1161,8 @@ substituteComponent substitute n = case substitute of
 -- PROVEN, not a fence: Pawl.CostSpec's "CR 601.2b the payer announces a convoked
 -- spell's hybrid halves, both blue" reddens on a bare `total_`, Merrow Skyswimmer
 -- being the transcribable printing that states convoke beside a hybrid symbol.
-substitutedManas :: (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [ManaCost.ManaCost]
-substitutedManas total_ pid oid gs manaCost = concatMap (fmap fst . manaSubstitutions Map.empty pid oid gs) (total_ manaCost)
-
--- `manaSubstitutions`' answer for a payment no keyword offers a substitute for,
--- which every ACTIVATION is: CR 702.51a, CR 702.66a and CR 702.126a all function
--- while a SPELL is on the stack, and an activated ability's cost is not that.
-noManaSubstitutions :: ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
-noManaSubstitutions manaCost = [(manaCost, [])]
+substitutedManas :: (ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> ManaCost.ManaCost -> [ManaCost.ManaCost]
+substitutedManas substitute total_ manaCost = concatMap (fmap fst . substitute) (total_ manaCost)
 
 -- This much of ONE kind of mana taken out of a cost: a generic amount comes off
 -- the generic symbols in printed order, and any other kind drops that many
@@ -1230,6 +1280,8 @@ substituteXInComponent x component = case component of
   CostComponent.FlipCoin -> component
   -- CR 702.174a's cost names no X.
   CostComponent.ChooseOpponent -> component
+  -- CR 701.67a states no X, so nothing in this arm is a variable (#3902).
+  CostComponent.Waterbend _ -> component
   -- PayLifeX's rewrite one keyword action over: CR 107.3a gives ONE announced
   -- value to the whole cost, so Soul Immolation's "blight X" takes the same X a
   -- mana cost's {X} would have taken.
@@ -1297,6 +1349,7 @@ componentHasVariable component = case component of
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
   CostComponent.ChooseOpponent -> False
+  CostComponent.Waterbend _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1388,6 +1441,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
   CostComponent.ChooseOpponent -> False
+  CostComponent.Waterbend _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1680,6 +1734,7 @@ loyaltyAmountOf component = case component of
   CostComponent.Forage -> Nothing
   CostComponent.FlipCoin -> Nothing
   CostComponent.ChooseOpponent -> Nothing
+  CostComponent.Waterbend _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
@@ -1801,6 +1856,7 @@ zoneOfComponent component = case component of
   CostComponent.Forage -> Nothing
   CostComponent.FlipCoin -> Nothing
   CostComponent.ChooseOpponent -> Nothing
+  CostComponent.Waterbend _ -> Nothing
 
 -- CR 118.8c: does this cost include "actions involving cards with a stated
 -- quality in a hidden zone"? What Resolve.offerCast reads to decide whether a
@@ -1879,6 +1935,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
   CostComponent.ChooseOpponent -> False
+  CostComponent.Waterbend _ -> False
   -- The other hidden zone (CR 400.2), and the FIRST conjunct is satisfied where
   -- no other arm's is -- but the second is not: CR 701.17a takes the cards off
   -- the top, so "mill a card" describes no quality for a player to fail to find.
@@ -2360,6 +2417,9 @@ claimOf slots pid oid component gs =
         CostComponent.FlipCoin -> Nothing
         -- CR 702.174a's choice spends nothing, FlipCoin's answer just above.
         CostComponent.ChooseOpponent -> Nothing
+        -- No claim: rule 701.67a's taps are a component of their own once the
+        -- payer takes the offer (`manaSubstitutions`), and that one claims them.
+        CostComponent.Waterbend _ -> Nothing
         -- Nothing, Blight's arm above and for its reason one rule over: CR 701.20b
         -- leaves the revealed card in the hand, so nothing leaves any pool. CR
         -- 701.20c is what makes the shared-choice half right here too -- a card
@@ -2764,6 +2824,11 @@ uncountedCeiling component = case component of
   -- 702.174a's cost is offered once per gift ability
   -- (Pawl.Engine.Keyword.optionalCost) -- but the safe direction either way.
   CostComponent.ChooseOpponent -> Just 1
+  -- 1, and counted by none of the three totals: rule 701.67a's licence spends
+  -- nothing, so `objectCeiling` has no pool to divide. Unreachable -- a
+  -- waterbend cost carries the mana it licenses, so `repeatsOf` answers 1
+  -- before it reads this.
+  CostComponent.Waterbend _ -> Just 1
 
 -- This player's life total as an amount that could be PAID (CR 119.4), floored
 -- at zero: a player at or below 0 life can pay nothing but CR 119.4b's zero.
@@ -2788,11 +2853,13 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- `total` answers MANY totals, one per CR 118.7e resolution, and this asks `any`
 -- of them: a cost this gate refuses has to be one NO half could have paid (#595).
 --
--- `substitute` is CR 702.51b's, CR 702.66b's and CR 702.126b's offer, applied
--- AFTER `total_` because all three rules place it after the total cost is
--- determined: it answers one residual cost per set of symbols a substitute could
--- pay for, each with the components that spends (`manaSubstitutions`), and this
--- asks `any` of those too. Every caller but a CAST passes `noManaSubstitutions`.
+-- `substitute` is CR 702.51b's, CR 702.66b's, CR 702.126b's and CR 701.67a's
+-- offer, applied AFTER `total_` because every one of those rules places it after
+-- the total cost is determined: it answers one residual cost per set of symbols a
+-- substitute could pay for, each with the components that spends
+-- (`manaSubstitutions`), and this asks `any` of those too. A CAST passes
+-- `manaSubstitutions` and an ACTIVATION `activationManaSubstitutions`, which is
+-- the waterbend half alone.
 canPaySomeCompletion :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> (ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletion slots subject spending pid oid total_ substitute cost gs =
   let pcs = Projection.projectAll gs
@@ -2952,6 +3019,7 @@ lifeOwedByComponent component = case component of
   CostComponent.Forage -> 0
   CostComponent.FlipCoin -> 0
   CostComponent.ChooseOpponent -> 0
+  CostComponent.Waterbend _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -3004,6 +3072,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.Forage -> 0
   CostComponent.FlipCoin -> 0
   CostComponent.ChooseOpponent -> 0
+  CostComponent.Waterbend _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -3249,6 +3318,9 @@ canPayComponent slots pid oid component gs = case component of
   -- with none left cannot pay it. Nothing about `oid`: the choice is about the
   -- table, not about the object the cost is on.
   CostComponent.ChooseOpponent -> not (null (Game.opponentsOf pid gs))
+  -- Always payable: rule 701.67a's licence spends nothing of its own, and the
+  -- mana it scopes is the cost's own mana part, which the mana half gates.
+  CostComponent.Waterbend _ -> True
   -- CR 701.17b's last sentence, stated of costs in as many words: "the player
   -- can't pay a cost that includes milling a number of cards greater than the
   -- number of cards in their library". Not the general "as many as possible" of
@@ -3329,6 +3401,10 @@ criteriaOf component = case component of
   CostComponent.Forage -> []
   CostComponent.FlipCoin -> []
   CostComponent.ChooseOpponent -> []
+  -- The criterion the licence leads to is MINTED by `waterbendSubstitute` from
+  -- rule 701.67a's own words rather than printed, `manaSubstitutesFor`'s posture:
+  -- no word of a card's is in it, so CR 612.2 has nothing to swap.
+  CostComponent.Waterbend _ -> []
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   CostComponent.MillCards _ -> []
@@ -3479,8 +3555,8 @@ restoreKeepingLibraryActions before = do
 -- than one cost with the components folded in: CR 702.51c's record is of the
 -- creatures tapped THIS way, and Binding.tappedPermanent names every permanent
 -- any tap component of the cost took (`paySubstituting`).
-announceManaSubstitutions :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])
-announceManaSubstitutions pid oid cost = case Cost.mana cost of
+announceSubstitutions :: ([CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]) -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])
+announceSubstitutions substituting pid oid cost = case Cost.mana cost of
   -- CR 118.6: an unpayable cost states no symbol to substitute for.
   Nothing -> pure (cost, [])
   Just manaCost -> do
@@ -3488,7 +3564,7 @@ announceManaSubstitutions pid oid cost = case Cost.mana cost of
     let slots = announcedSlots (Just oid) gs
         variant (residual, extra) = (cost {Cost.mana = Just residual}, extra)
         whole (candidate, extra) = candidate {Cost.components = Cost.components candidate <> extra}
-        offered = filter (\candidate -> componentsPayable slots pid oid (Cost.components (whole candidate)) gs) (fmap variant (manaSubstitutions slots pid oid gs manaCost))
+        offered = filter (\candidate -> componentsPayable slots pid oid (Cost.components (whole candidate)) gs) (fmap variant (substituting (Cost.components cost) slots pid oid gs manaCost))
     case offered of
       -- REACHABLE, and not by the gate's measurement: this runs after CR 601.2g's
       -- window, so a mana ability may have tapped the very permanent the cost's
@@ -3969,6 +4045,7 @@ paidInSecondPass component = case component of
   -- CR 702.174a's choice moves no object and involves no random element, so
   -- neither half of rule 601.2h's first criterion reaches it.
   CostComponent.ChooseOpponent -> False
+  CostComponent.Waterbend _ -> False
   -- CR 701.20b moves nothing out of any zone, so rule 601.2h's library half has
   -- nothing to ask of it.
   CostComponent.RevealCardFromHand _ -> False
@@ -4103,6 +4180,9 @@ orderSensitive component = case component of
   -- False: rule 702.174a's choice spends nothing another part of the same cost
   -- could have spent, FlipCoin's answer just above.
   CostComponent.ChooseOpponent -> False
+  -- False: rule 701.67a's licence spends nothing another part of the same cost
+  -- could have spent, ChooseOpponent's answer just above.
+  CostComponent.Waterbend _ -> False
   -- CR 701.17a puts a card into a graveyard, which a graveyard-reading part of
   -- the same cost could then spend (Circling Vultures' "the top creature card of
   -- your graveyard"). Alone in CR 601.2h's second pass on this pool, so nothing
@@ -5219,6 +5299,13 @@ payComponent moment slots pid oid component = case component of
         answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor pid gs) pid oid offered)
         stampChosenPlayer oid (if List.elem answer (NonEmpty.toList offered) then answer else first)
         pure bindsNothing
+  -- NOTHING TO PAY. Rule 701.67a's waterbend cost is the mana this component
+  -- scopes, and that mana is in the cost's own mana part, paid by `payMana`
+  -- like every other symbol; what the component states is the licence to
+  -- substitute taps for it, which `announceSubstitutions` has already
+  -- cashed into a TapPermanents component of its own by the time any component
+  -- is paid.
+  CostComponent.Waterbend _ -> pure bindsNothing
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.

@@ -39,6 +39,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Natural as Natural.Extra
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -2487,6 +2488,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   foundryAssemblerSpec s registry
   treasureCruiseSpec s registry
   merrowSkyswimmerSpec s registry
+  geyserLeaperSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -5070,3 +5072,159 @@ merrowSkyswimmerSpec s registry = Spec.describe s "Merrow Skyswimmer" $ do
     -- Which halves were announced, which the assertion above does not see: a
     -- white half would have convoked the Palace Guard instead.
     Spec.assertBool s (not (isTapped whiteId resolved)) "and the white creature is untapped, both halves having been announced blue"
+
+-- CR 701.67a's payer answers the same two prompts CR 702.51b's does -- which
+-- residual cost the substitution leaves, and then which permanents to tap -- so
+-- this is `convoking` under the name of the rule that reaches it here.
+waterbending :: ManaCost.ManaCost -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+waterbending = convoking
+
+-- The payer who wants the ability MOST: the offer that leaves the least mana to
+-- find, and whatever permanents the engine put in front of them.
+--
+-- What the negatives below are answered with, and the reason they are not
+-- vacuous: a pinned answer naming a route the board cannot pay leaves the
+-- activation unpaid whatever the offer was, so such a case would pass against an
+-- engine that offered too much. This one fails only where NO offer pays.
+waterbendingGreedily :: Prompt.Prompt r -> r
+waterbendingGreedily p = case p of
+  -- An unpayable mana part (CR 118.6) sorts last rather than first, which is
+  -- what Ord would do with it.
+  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (List.sortOn (maybe (1 :: Int, 0) ((,) 0 . manaOwed) . Cost.Type.mana) candidates)
+  Prompt.ChooseTaps _ _ _ candidates wanted -> Set.fromList (take (Natural.Extra.toIntSaturating wanted) candidates)
+  _ -> S.identityAnswer p
+
+-- How much mana a residual cost still asks for, CR 107.4b counting a generic
+-- symbol for its own amount and every other symbol for one.
+manaOwed :: ManaCost.ManaCost -> Natural.Natural
+manaOwed manaCost =
+  let sizeOf symbol = case symbol of
+        ManaSymbol.Generic n -> n
+        _ -> 1
+   in sum (fmap sizeOf (ManaCost.unwrap manaCost))
+
+-- alice controls a Geyser Leaper, one permanent per printing in `others` and
+-- `lands` Mountains, with two Mountains in her library so the ability's draw
+-- neither decks her (CR 104.3c) nor runs out; bob controls one permanent per
+-- printing in `theirs`. She has priority in her own precombat main phase, which
+-- is when CR 602.2 lets her activate. Returns the Leaper, the `others` in order,
+-- and that state.
+leaperBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+leaperBoard mountain leaper others theirs lands =
+  let (leaperId, gs1) = S.addPermanent leaper S.alice (S.landsInPlay mountain lands)
+      (otherIds, gs2) = List.foldl' (\(ids, gs) printing -> let (oid, next) = S.addPermanent printing S.alice gs in (ids <> [oid], next)) ([], gs1) others
+      gs3 = List.foldl' (\gs printing -> snd (S.addPermanent printing S.bob gs)) gs2 theirs
+      (_, gs4) = S.addLibraryCard mountain S.alice gs3
+      (_, gs5) = S.addLibraryCard mountain S.alice gs4
+   in ( leaperId,
+        otherIds,
+        gs5
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Geyser Leaper {4}{U} Creature -- Human Warrior Ally 4/3
+-- (data/cards/geyser-leaper.json): "Flying / Waterbend {4}: Draw a card, then
+-- discard a card."
+--
+-- CR 701.67a as the WHOLE of an activation cost, which is the position most of
+-- rule 701.67's printings put it in and the only one pawl carries (#3901). The
+-- draw and the discard are what a paid cost is read off: a card in alice's
+-- graveyard cannot arrive any other way on these boards.
+--
+-- Every board is LANDLESS unless the case is about CR 701.67b, convokeBoard's
+-- posture: an activation that succeeds can only have been paid by tapping.
+--
+-- The Leaper is itself an untapped creature alice controls, so every board
+-- offers one more candidate than the cost can take -- a prompt offered exactly
+-- as many candidates as it needs is never asked.
+geyserLeaperSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+geyserLeaperSpec s registry = Spec.describe s "Geyser Leaper" $ do
+  -- The headline. Four permanents, no land, no mana: rule 701.67a's "you may tap
+  -- an untapped artifact or creature you control rather than pay that mana" pays
+  -- all four generic, and both halves of "artifact or creature" pay two each.
+  Spec.it s "CR 701.67a waterbend {4} is paid by tapping two artifacts and two creatures" $ do
+    leaper <- S.printingOf s registry "Geyser Leaper"
+    piker <- S.printingOf s registry "Goblin Piker"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    mountain <- S.printingOf s registry "Mountain"
+    let (leaperId, tappable, gs) = leaperBoard mountain leaper [piker, piker, crawlspace, crawlspace] [] 0
+    (offered, resolved) <- activatingLeaper s (ManaCost.MkManaCost []) tappable leaperId gs
+    Spec.assertEqWith s "CR 701.67a the ability resolved off no mana at all: the card alice drew is in her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+    -- The taps themselves, which the assertion above does not see: a cost paid
+    -- out of nowhere would also have left the card in the graveyard.
+    Spec.assertEqWith s "and the four permanents she tapped for it are tapped" (S.tappedCount S.alice resolved) 4
+    Spec.assertBool s (not (isTapped leaperId resolved)) "and the Leaper, offered and not taken, is untapped"
+    Spec.assertBool s offered "and the activation the assertions above read was one CR 602.2 offered"
+  -- The pair, varying what two of the four permanents ARE and nothing else: same
+  -- seats, same count of permanents, same absence of mana. Rule 701.67a names an
+  -- artifact or a creature, so two enchantments leave three candidates for a cost
+  -- that wants four.
+  Spec.it s "CR 701.67a an enchantment is not something a waterbend cost can tap" $ do
+    leaper <- S.printingOf s registry "Geyser Leaper"
+    piker <- S.printingOf s registry "Goblin Piker"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    anthem <- S.printingOf s registry "Glorious Anthem"
+    mountain <- S.printingOf s registry "Mountain"
+    let (leaperId, _, gs) = leaperBoard mountain leaper [piker, crawlspace, anthem, anthem] [] 0
+    unpaidLeaper s leaperId gs
+  -- CR 701.67b. Suppression Field taxes the activation {2} more (CR 602.2b), so
+  -- the total cost is {6} of which the waterbend cost is {4} -- and the other {2}
+  -- is mana the payer has to find, however many permanents they still have
+  -- untapped.
+  Spec.it s "CR 701.67b a waterbend cost's taps pay for its own generic mana and not for the tax on top of it" $ do
+    leaper <- S.printingOf s registry "Geyser Leaper"
+    piker <- S.printingOf s registry "Goblin Piker"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    field <- S.printingOf s registry "Suppression Field"
+    mountain <- S.printingOf s registry "Mountain"
+    let (leaperId, tappable, gs) = leaperBoard mountain leaper [piker, piker, piker, crawlspace, crawlspace, crawlspace] [field] 2
+    -- The residual rule 701.67b leaves: the {2} Suppression Field added, which no
+    -- tap may pay.
+    (offered, resolved) <- activatingLeaper s (ManaCost.MkManaCost [ManaSymbol.Generic 2]) (take 4 tappable) leaperId gs
+    Spec.assertEqWith s "CR 701.67b the taxed ability resolved: the card alice drew is in her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+    Spec.assertEqWith s "and six permanents are tapped -- four for the waterbend cost and both Mountains for the tax" (S.tappedCount S.alice resolved) 6
+    Spec.assertBool s offered "and the activation the assertions above read was one CR 602.2 offered"
+  -- The pair, varying ONE Mountain and nothing else: the same six untapped
+  -- artifacts and creatures, the same tax. Rule 701.67b caps the substitution at
+  -- the waterbend cost's own {4}, so a sixth tap cannot pay the {2} and one
+  -- Mountain is a mana short of it.
+  Spec.it s "CR 701.67b six untapped permanents do not pay a waterbend {4} taxed {2} more" $ do
+    leaper <- S.printingOf s registry "Geyser Leaper"
+    piker <- S.printingOf s registry "Goblin Piker"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    field <- S.printingOf s registry "Suppression Field"
+    mountain <- S.printingOf s registry "Mountain"
+    let (leaperId, _, gs) = leaperBoard mountain leaper [piker, piker, piker, crawlspace, crawlspace, crawlspace] [field] 1
+    unpaidLeaper s leaperId gs
+
+-- alice activates the Leaper's sole activated ability, taking the substitution
+-- that leaves `wanted` to pay with mana and tapping `tapped` for the rest, and
+-- the ability resolves. The Activate.activatable answer rides back beside the
+-- state rather than being asserted here, and every caller asserts it AFTER the
+-- gameplay assertions: it is a proxy, and a proxy ahead of the behaviour absorbs
+-- a mutation and reports itself.
+activatingLeaper :: (Monad m) => Spec.Spec m n -> ManaCost.ManaCost -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> m (Bool, GameState.GameState)
+activatingLeaper s wanted tapped leaperId gs = case Projection.abilitiesOf leaperId gs of
+  ability : _ ->
+    let answer :: Prompt.Prompt r -> r
+        answer = waterbending wanted tapped
+        activated = S.runPure answer gs (Activate.activateAbility S.alice leaperId ability)
+     in pure (Activate.activatable S.alice leaperId ability gs, S.runPure answer activated Stack.resolveTop)
+  [] -> Spec.assertFailure s "expected the Leaper to carry an activated ability"
+
+-- The negative: alice tries the same activation as greedily as the board allows,
+-- and nothing happens. Asserted at GAMEPLAY level rather than off
+-- Activate.activatable -- an unpayable cost is rewound by
+-- Activate.activateAbility, so an empty graveyard is the whole of what a player
+-- would see.
+unpaidLeaper :: (Monad m) => Spec.Spec m n -> ObjectId.ObjectId -> GameState.GameState -> m ()
+unpaidLeaper s leaperId gs = case Projection.abilitiesOf leaperId gs of
+  ability : _ -> do
+    let activated = S.runPure waterbendingGreedily gs (Activate.activateAbility S.alice leaperId ability)
+        resolved = S.runPure waterbendingGreedily activated Stack.resolveTop
+    Spec.assertEqWith s "the ability was never paid for: alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
+    Spec.assertEqWith s "and nothing of hers is tapped" (S.tappedCount S.alice resolved) 0
+  [] -> Spec.assertFailure s "expected the Leaper to carry an activated ability"

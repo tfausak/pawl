@@ -409,7 +409,8 @@ payableCostAt :: Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> O
 payableCostAt x extra spending pid oid gs cost =
   let adjustments = Cost.plusReductions extra (Cost.spellAdjustments pid oid gs)
       substituted = Cost.substituteX x cost
-      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.manaSubstitutions slots pid oid gs) (Cost.plusComponents adjustments substituted) gs
+      totalled = Cost.plusComponents adjustments substituted
+      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
    in if Cost.readsBoundSlot substituted
         then any (any ask . Target.aimings) (castAimable pid oid gs)
         else ask Map.empty
@@ -2512,7 +2513,8 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- Swamp" in view would be offered against a board that has one
                   -- Swamp too many.
                   let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments pid sid bestowedGs)
-                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.totalManas gathered) pid sid bestowedGs) (Cost.plusComponents gathered announcedAtX)
+                  let totalledCost = Cost.plusComponents gathered announcedAtX
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid bestowedGs) (Cost.totalManas gathered)) totalledCost
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.paidCosts`'s
@@ -2664,7 +2666,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                       -- CR 601.2g's mana window opens first, and the payer is
                       -- asked once it closes (Cost.paySubstituting). The list is
                       -- the same one the gate above measured.
-                      (payment, substitutedBindings) <- Cost.paySubstituting perform Nothing PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid (Cost.announceManaSubstitutions pid sid) paidCost
+                      (payment, substitutedBindings) <- Cost.paySubstituting perform Nothing PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid (Cost.announceSubstitutions Cost.manaSubstitutions pid sid) paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed
