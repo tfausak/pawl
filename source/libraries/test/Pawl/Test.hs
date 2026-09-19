@@ -594,6 +594,7 @@ import qualified Pawl.ProjectionSpec
 import qualified Pawl.PrototypeSpec
 import qualified Pawl.PutCounterSpec
 import qualified Pawl.RadSpec
+import qualified Pawl.RecruitSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
 import qualified Pawl.ReplacementSpec
@@ -1272,6 +1273,7 @@ spec s registry = do
   Pawl.ProjectionSpec.spec s registry
   Pawl.PrototypeSpec.spec s registry
   Pawl.RadSpec.spec s registry
+  Pawl.RecruitSpec.spec s registry
   Pawl.RegistrySpec.spec s
   -- CR 616.1's termination guards, where a regression hangs rather than fails.
   -- Wired here like every other spec since #3284 took away their own 5s budget;

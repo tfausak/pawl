@@ -487,6 +487,7 @@ rewriteEffect pairs effect = case effect of
   Effect.TemptWithTheRing -> effect
   Effect.Forage -> effect
   Effect.Populate -> effect
+  Effect.Recruit -> effect
   Effect.Learn -> effect
   Effect.Cloak {} -> effect
   -- CR 612.2's gate, and this arm is where it bites rather than where it is
