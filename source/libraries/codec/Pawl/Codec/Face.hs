@@ -31,6 +31,7 @@ import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
 import qualified Pawl.Codec.Cost as Cost
+import qualified Pawl.Codec.CostChoice as CostChoice
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.CostReduction as CostReduction
 import qualified Pawl.Codec.CounterRestriction as CounterRestriction
@@ -145,6 +146,10 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
   blockCosts <- Fields.defaulted "blockCosts" [] (Common.list BlockCost.codec) Face.blockCosts
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
+  -- CR 118.8 / 601.2b: an additional cost whose payment offers the caster a
+  -- choice, each option a whole Cost because an option can be mana
+  -- (Pawl.Types.CostChoice).
+  additionalCostChoices <- Fields.defaulted "additionalCostChoices" [] (Common.list CostChoice.codec) Face.additionalCostChoices
   -- CR 700.2h: the cost printed before a mode's effect, keyed by that mode's
   -- index into `spell` -- an object rather than an array so a card lists only
   -- the modes that print one (Pawl.Types.Face).
@@ -207,6 +212,7 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
         Face.attackCosts = attackCosts,
         Face.blockCosts = blockCosts,
         Face.additionalCosts = additionalCosts,
+        Face.additionalCostChoices = additionalCostChoices,
         Face.modeCosts = modeCosts,
         Face.maximumX = maximumX,
         Face.alternativeCosts = alternativeCosts,

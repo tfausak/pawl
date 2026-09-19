@@ -32,6 +32,7 @@ import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
@@ -304,6 +305,21 @@ data Face card = MkFace
     -- why a cost naming cards of a stated quality in a hidden zone (Magmatic
     -- Insight's discarded land) excuses a cast an effect instructs "if able".
     additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
+    -- | CR 118.8 / 601.2b: this face's printed additional costs whose payment
+    -- offers the caster a CHOICE -- Caustic Exhale's "behold a Dragon or pay
+    -- {1}". Read off the card beside 'additionalCosts' above and for its
+    -- reasons.
+    --
+    -- A SECOND field rather than a shape on the one above, because an option can
+    -- be MANA: CR 601.2f splits a cost into a mana part and the non-mana
+    -- components, a CostComponent is the second half alone, and "or pay {1}" is
+    -- the first. Pawl.Types.CostChoice carries the argument.
+    --
+    -- Every option applies on top of whichever candidate cost the caster
+    -- announced, exactly as 'additionalCosts' does (CR 118.9d), which is why
+    -- Pawl.Engine.Cost.candidateCostsGiven expands the whole candidate list
+    -- rather than the printed cost alone.
+    additionalCostChoices :: [CostChoice.CostChoice],
     -- | CR 700.2h: the additional cost printed before a mode's effect, keyed by
     -- that mode's index into 'spell' -- CR 702.172a's spree and CR 702.183a's
     -- tiered are the two keywords that print them. Absent for a mode that lists

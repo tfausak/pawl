@@ -37,6 +37,7 @@ import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -163,6 +164,7 @@ baseFace =
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.additionalCosts = [],
+      Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
@@ -204,6 +206,7 @@ minimalFace =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
       Face.alternativeCosts = [],
@@ -278,6 +281,7 @@ populatedFace =
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller],
       Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))],
       Face.additionalCosts = [CostComponent.TapThis],
+      Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [Quantity.ManaValue],
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
@@ -422,6 +426,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "additionalCosts (CR 118.8) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.additionalCosts <$> decodeFace v) (Right [])
+    Spec.it s "additionalCostChoices (CR 118.8) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.additionalCostChoices <$> decodeFace v) (Right [])
     Spec.it s "alternativeCosts (CR 118.9) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.alternativeCosts <$> decodeFace v) (Right [])
@@ -605,6 +612,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.additionalCosts = [CostComponent.TapThis]}
         (init baseFaceJson <> ",\"additionalCosts\":[{\"type\":\"TapThis\"}]}")
+    Spec.it s "additionalCostChoices" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.additionalCostChoices = [CostChoice.MkCostChoice (Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.TapThis] NonEmpty.:| [Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []])]}
+        (init baseFaceJson <> ",\"additionalCostChoices\":[[{\"components\":[{\"type\":\"TapThis\"}],\"mana\":[]},{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}]]}")
     Spec.it s "alternativeCosts" $
       Common.assertJsonCodec
         s

@@ -1091,13 +1091,20 @@ offerCastOnce context named caster optionality offer = do
             -- records it as Object.castUsing exactly as a printed alternative does.
             -- CastOffer.offeredBy is Nothing for every other offer, which is
             -- Cost.untagged's own value.
-            applied
+            --
+            -- One offer can still be SEVERAL candidates, and CR 118.8's choice
+            -- costs are why: the face's additional costs ride the applied cost,
+            -- and one of them may offer the caster a choice of payments, which
+            -- Cost.choiceVariants expands here exactly as it does for a cast the
+            -- board itself offers.
+            appliedOne
               | CastOffer.withoutPayingManaCost offer = Just (CandidateCost.plain (CastOffer.offeredBy offer) (Cost.withoutPayingManaCost face))
               | otherwise = fmap (\c -> CandidateCost.plain (CastOffer.offeredBy offer) (c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face})) (CastOffer.payingInstead offer)
+            applied = concatMap (Cost.choiceVariants face) (Maybe.maybeToList appliedOne)
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
-            candidates = maybe (Cost.candidateCostsGiven True caster name oid proposed) pure applied
+            candidates = if null applied then Cost.candidateCostsGiven True caster name oid proposed else applied
          in -- CR 702.85a's second condition, asked of THIS HALF: the offer may
             -- state a quality the resulting spell must have, and CR 709.3a makes
             -- that a per-half question like the two above. Against the face's own

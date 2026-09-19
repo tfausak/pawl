@@ -2078,20 +2078,24 @@ revealing which p = case p of
 --
 -- The gate card for CostComponent.Behold, the first component whose pool spans
 -- TWO zones: CR 701.4a's "reveal a [quality] card from your hand OR choose a
--- [quality] permanent you control on the battlefield".
---
--- Not implemented: the "or pay {1}" half of the printed cost, which is a CHOICE
--- of payments and not a second component -- pawl's card is STRICTER than
--- printed, a caster with no Dragon being unable to cast it at all (#3890).
+-- [quality] permanent you control on the battlefield". It is also the gate card
+-- for Face.additionalCostChoices, CR 118.8's other half: the "or pay {1}" makes
+-- the payment a CHOICE, announced at CR 601.2b as one candidate cost per option
+-- (Pawl.Engine.Cost.choiceVariants).
 --
 -- The Dragons are DISTINCT printings, Hoarding Dragon in hand and Exalted Dragon
 -- on the battlefield, so a case that reads the offered pool names which zone each
 -- candidate came out of. Neither is ever cast, so nothing but the behold reads
 -- either.
 --
--- One Swamp pays {B} on EVERY board here, the refusing one included, so its
--- refusal cannot be unaffordable mana; the Goblin Piker in hand there is what
--- makes the negative differ from the positive in the card's SUBTYPE alone.
+-- ONE Swamp on the behold boards, which is exactly {B}: the {1} option is
+-- unpayable there, so those cases read rule 701.4a's half alone and the engine
+-- asks nothing. The choice cases get a SECOND Swamp and differ from the refusing
+-- case in that one land, which is what makes the {1} the reason a cast the
+-- refusing board denies goes through.
+--
+-- The Goblin Piker in hand is what makes a negative differ from the positive in
+-- the card's SUBTYPE alone.
 --
 -- Armored Galleon is bob's 5/4, which -3\/-3 leaves a 2/1 rather than killing --
 -- four values, none of them shared, so the reading is the modification rather
@@ -2106,7 +2110,7 @@ causticExhaleSpec s registry =
       exhale <- S.printingOf s registry "Caustic Exhale"
       galleon <- S.printingOf s registry "Armored Galleon"
       dragon <- S.printingOf s registry "Exalted Dragon"
-      let (spell, victim, _, dragons, gs) = causticExhaleBoard swamp exhale galleon [] [dragon]
+      let (spell, victim, _, dragons, gs) = causticExhaleBoard 1 swamp exhale galleon [] [dragon]
           resolved = S.runPure (targeting victim) (S.runPure (targeting victim) gs (S.cast S.alice spell)) Stack.resolveTop
       Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
       Spec.assertBool s (all (\d -> List.elem d (Set.toList (GameState.battlefield resolved))) dragons) "CR 701.4a and the Dragon she beheld is still on the battlefield"
@@ -2119,7 +2123,7 @@ causticExhaleSpec s registry =
       exhale <- S.printingOf s registry "Caustic Exhale"
       galleon <- S.printingOf s registry "Armored Galleon"
       dragon <- S.printingOf s registry "Hoarding Dragon"
-      let (spell, victim, held, _, gs) = causticExhaleBoard swamp exhale galleon [dragon] []
+      let (spell, victim, held, _, gs) = causticExhaleBoard 1 swamp exhale galleon [dragon] []
           resolved = S.runPure (targeting victim) (S.runPure (targeting victim) gs (S.cast S.alice spell)) Stack.resolveTop
       Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
       Spec.assertBool s (all (\d -> List.elem d (Game.zoneMembers Zone.Hand S.alice resolved)) held) "CR 701.4a and the card she revealed never left her hand"
@@ -2133,7 +2137,7 @@ causticExhaleSpec s registry =
       galleon <- S.printingOf s registry "Armored Galleon"
       inHand <- S.printingOf s registry "Hoarding Dragon"
       onBattlefield <- S.printingOf s registry "Exalted Dragon"
-      let (spell, _, held, dragons, gs) = causticExhaleBoard swamp exhale galleon [inHand] [onBattlefield]
+      let (spell, _, held, dragons, gs) = causticExhaleBoard 1 swamp exhale galleon [inHand] [onBattlefield]
           offered :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
           offered p = case p of
             Prompt.ChooseBehold _ _ _ candidates -> do
@@ -2149,25 +2153,58 @@ causticExhaleSpec s registry =
       exhale <- S.printingOf s registry "Caustic Exhale"
       galleon <- S.printingOf s registry "Armored Galleon"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (spell, victim, _, _, gs) = causticExhaleBoard swamp exhale galleon [piker] []
+      let (spell, victim, _, _, gs) = causticExhaleBoard 1 swamp exhale galleon [piker] []
           cast = S.runPure (targeting victim) gs (S.cast S.alice spell)
       Spec.assertEqWith s "CR 118.3 the cast is not offered at all" (filter (S.isCastOf spell) (Action.legalActions S.alice gs)) []
       Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack cast)) 0
       Spec.assertEqWith s "so the Galleon is still bob's 5/4" (S.powerToughnessOf victim cast) (Just (5, 4))
+    -- CR 118.8's other option, on the case above's board plus ONE Swamp: nothing
+    -- in either zone is a Dragon, so the only route to this cast is the {1}.
+    Spec.it s "CR 118.8 the {1} pays where no Dragon can" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      exhale <- S.printingOf s registry "Caustic Exhale"
+      galleon <- S.printingOf s registry "Armored Galleon"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (spell, victim, _, _, gs) = causticExhaleBoard 2 swamp exhale galleon [piker] []
+          resolved = S.runPure (targeting victim) (S.runPure (targeting victim) gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
+      Spec.assertEqWith s "CR 601.2g both Swamps paid, the {B} and the {1}" (length (filter (\oid -> isTapped oid resolved) (Game.zoneMembers Zone.Battlefield S.alice resolved))) 2
+    -- CR 601.2b with BOTH options open -- a Dragon card in hand and two Swamps --
+    -- so the answer is the caster's and nothing else differs between the two
+    -- runs. The reveal is what tells the answers apart: rule 701.4a's hand half
+    -- shows the table a card, and paying the {1} shows it nothing.
+    Spec.it s "CR 601.2b which payment is made is the caster's" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      exhale <- S.printingOf s registry "Caustic Exhale"
+      galleon <- S.printingOf s registry "Armored Galleon"
+      dragon <- S.printingOf s registry "Hoarding Dragon"
+      let (spell, victim, _, _, gs) = causticExhaleBoard 2 swamp exhale galleon [dragon] []
+          resolve :: Bool -> GameState.GameState
+          resolve beholding = S.runPure (announcing beholding victim) (S.runPure (announcing beholding victim) gs (S.cast S.alice spell)) Stack.resolveTop
+          beheld = resolve True
+          paid = resolve False
+      Spec.assertEqWith s "CR 701.4a the caster who beheld revealed the Dragon" (S.revealsOf beheld) [(S.alice, Set.singleton (CardName.MkCardName (Text.pack "Hoarding Dragon")))]
+      Spec.assertEqWith s "CR 118.8 the caster who paid the {1} revealed nothing" (S.revealsOf paid) []
+      Spec.assertEqWith s "and either way the Galleon is a 2/1" (fmap (S.powerToughnessOf victim) [beheld, paid]) [Just (2, 1), Just (2, 1)]
 
--- The Exhale in alice's hand over `inHand` and `onBattlefield`, with one Swamp to
--- pay its {B} and bob's Armored Galleon to aim at. Both id lists come back so a
--- case can name the beheld object BY IDENTITY rather than searching the offer for
--- it.
+-- The Exhale in alice's hand over `inHand` and `onBattlefield`, with `lands`
+-- Swamps to pay its cost and bob's Armored Galleon to aim at. Both id lists come
+-- back so a case can name the beheld object BY IDENTITY rather than searching the
+-- offer for it.
+--
+-- The land count is the CASE's, not the fixture's: one Swamp is {B} and closes
+-- the "or pay {1}" option, two open it, and a pair of cases differing in that
+-- number alone is how each option is shown to be a payment of its own.
 causticExhaleBoard ::
+  Int ->
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
   [Printing.Printing] ->
   [Printing.Printing] ->
   (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], GameState.GameState)
-causticExhaleBoard swamp exhale galleon inHand onBattlefield =
-  let base = S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers)
+causticExhaleBoard lands swamp exhale galleon inHand onBattlefield =
+  let base = S.landsFor swamp S.alice lands (Setup.emptyGame S.bothPlayers)
       (victimId, withVictim) = S.addPermanent galleon S.bob base
       addHand (ids, g) printing = let (oid, gN) = S.addHandCard printing S.alice g in (ids <> [oid], gN)
       addField (ids, g) printing = let (oid, gN) = S.addPermanent printing S.alice g in (ids <> [oid], gN)
@@ -2184,6 +2221,18 @@ causticExhaleBoard swamp exhale galleon inHand onBattlefield =
             GameState.priority = Just S.alice
           }
       )
+
+-- Which of CR 118.8's two payments the caster announces at CR 601.2b, FILTERED
+-- out of the candidates the engine offered rather than hand-built: the two are
+-- told apart by whether the cost states rule 701.4a's behold, which is the only
+-- component either of them carries. Targets like `targeting` everywhere else, so
+-- a run that was never asked which cost to pay still reaches resolution and is
+-- read by the case's own assertion rather than by an unexpected-prompt failure.
+announcing :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+announcing beholding victim p = case p of
+  Prompt.ChooseCost _ _ _ candidates
+    | Just cost <- List.find (\c -> not (null (Cost.Type.components c)) == beholding) candidates -> cost
+  _ -> targeting victim p
 
 -- Forensic Researcher {2}{U} Creature -- Merfolk Detective 1/3: "{T}: Untap
 -- another target permanent you control. {T}, Collect evidence 3: Tap target
