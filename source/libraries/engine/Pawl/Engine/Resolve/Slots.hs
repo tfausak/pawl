@@ -651,6 +651,7 @@ effectObjectRefs effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl (DurationRef.MkDurationRef _ ref) -> [ref]
+  Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
   -- CR 509.1a's two sides, the creature required to block and what it blocks.
@@ -816,6 +817,7 @@ effectPlayerRefs effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl {} -> []
+  Effect.ExchangeControl {} -> []
   Effect.ArmDelayedTrigger {} -> []
   -- CR 400.1's zone reference, which lives inside the permission payloads rather
   -- than in a field of the opcode -- so the walk is
@@ -1131,6 +1133,9 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.EndTurn -> Map.empty
   Effect.EndCombatPhase -> Map.empty
   Effect.GainControl {} -> Map.empty
+  -- BetweenTargets' reason (exchangeSidesSlots): both permanents come out of
+  -- one instance of the word "target" (CR 601.2c), so the whole set is read.
+  Effect.ExchangeControl slot -> Map.singleton slot SlotArity.Many
   Effect.ArmDelayedTrigger {} -> Map.empty
   -- Two reads, on the two halves of one opcode: the seat AffectedPlayers.Named
   -- names, and CR 601.2c's RECIPIENT a stored damage-pattern effect names
@@ -1674,6 +1679,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
   Effect.GainControl (DurationRef.MkDurationRef duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  Effect.ExchangeControl _ -> True
   -- CR 603.7c: the armed ability inherits this object's whole environment.
   Effect.ArmDelayedTrigger {} -> False
   -- GainControl's reason for the Duration.
@@ -1883,6 +1889,7 @@ readsX =
         Effect.EndTurn -> False
         Effect.EndCombatPhase -> False
         Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
+        Effect.ExchangeControl _ -> False
         Effect.ArmDelayedTrigger {} -> False
         Effect.AffectPlayers {} -> False
         Effect.RequireBlock {} -> False
@@ -2107,6 +2114,7 @@ boundSlots effect = case effect of
   Effect.EndTurn -> Set.empty
   Effect.EndCombatPhase -> Set.empty
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
+  Effect.ExchangeControl _ -> Set.empty
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.RequireBlock {} -> Set.empty

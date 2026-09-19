@@ -319,6 +319,7 @@ ownQuantities effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationQuantities duration
+  Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationQuantities duration
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationQuantities duration
@@ -1316,6 +1317,7 @@ effectObjectRefs effect =
         Effect.EndTurn -> []
         Effect.EndCombatPhase -> []
         Effect.GainControl (DurationRef.MkDurationRef _ ref) -> read_ [ref]
+        Effect.ExchangeControl _ -> []
         Effect.ArmDelayedTrigger {} -> []
         Effect.AffectPlayers {} -> []
         Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
