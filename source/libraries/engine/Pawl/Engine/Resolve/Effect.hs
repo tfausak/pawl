@@ -4608,11 +4608,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- The VIEWS stay on the pre-effect `gs` for the reason above: CR 400.7 has
     -- minted new ids for the cards themselves, and `milled` holds the library
     -- ones. So the mill's OWN slot, bound just above off the arrival ids, names
-    -- nothing this fold can match -- Filter.IsBound over it is False here whatever
-    -- the map holds. Not implemented, and not what the rule says: CR 400.7j makes
-    -- a card the same effect moved to a PUBLIC zone findable by the rest of that
-    -- effect, and a graveyard is one, so the False is this fold's pre-move views
-    -- rather than a rule-sanctioned answer (gap #2141).
+    -- nothing this fold can match -- Filter.IsBound over it is False here
+    -- whatever the map holds. Unwritable rather than unimplemented: the tally
+    -- folds over exactly the cards that slot was bound to, so the atom asks
+    -- whether a milled card is one of the milled cards, and no card can say
+    -- anything with it. CR 400.7j is about a LATER part of the effect finding
+    -- them, which the binding answers off the arrival ids. The tally's other
+    -- slot reads are unaffected: an EARLIER clause's slot over a library card
+    -- matches the pre-move ids these views carry, and Filter.SameNameAsBound
+    -- reads names off the arrival ids through CR 608.2h's last-known reader.
     --
     -- The chosen-name half is PROVED (Pawl.ResolveSpec's "Predict's mill tally
     -- reads the name its own first clause chose"); the SLOT half is a regression
@@ -6696,7 +6700,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- otherwise would answer CR 303.4j on the player's behalf. CR 609.3
           -- when Attach.hostsFor is empty. The elision at one candidate is
           -- Attach.chooseHost's, not re-derived for an optional attach.
-          destination <- Attach.chooseHost controller subject (Attach.hostsFor controller source subject filter_ gs)
+          --
+          -- Through effectContext and NOT Filter.contextFor, so this
+          -- resolution's own reads answer here as they do at its other
+          -- positions (CR 608.2c) -- Simic Guildmage's destination asks who
+          -- controls the permanent its TARGET slot's Aura is attached to
+          -- (Filter.SameControllerAsHostOfBound), which a bare context could
+          -- not answer.
+          destination <- Attach.chooseHost controller subject (Attach.hostsFor (effectContext gs controller source legal (slotBindings resolving gs)) subject filter_ gs)
           -- Proposed as a bare ToObject; Event.attach re-tags it the way the
           -- subject's own enchant slot references it, and applies CR 303.4j's
           -- refusal. Always a different object than the current host, so CR
@@ -6717,7 +6728,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Nothing -> pure ()
         Just subject -> do
           gs <- State.get
-          destination <- Attach.arbitrate subject (Attach.hostsFor controller source subject filter_ gs)
+          destination <- Attach.arbitrate subject (Attach.hostsFor (effectContext gs controller source legal (slotBindings resolving gs)) subject filter_ gs)
           Monad.mapM_ (Event.attach subject . Recipient.ToObject) destination
       _ -> pure ()
   -- CR 701.3a's third arrangement, and the one the other two cannot spell: the

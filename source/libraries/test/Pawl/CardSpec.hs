@@ -4129,6 +4129,9 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.SameOwnerAsSource -> []
   -- Reads the whole set too, one field further over.
   Filter.Type.SameControllerAsBound _ -> []
+  -- Reads the whole set too, off its own field: a slot naming a group answers
+  -- with every member's host's controller.
+  Filter.Type.SameControllerAsHostOfBound _ -> []
   -- Reads the whole set too, off its own field.
   Filter.Type.SharesCreatureTypeWithBound _ -> []
   -- The second arm with an answer, IsControllerOfBound's below: CR 208.1's
@@ -4826,7 +4829,7 @@ data Framing
     -- among, and one of the positions a CARD may write CR 201.4's chosen name in:
     -- Pawl.Engine.Resolve.Effect's Effect.Mill arm builds its context through
     -- Resolve.Slots.effectContext, which fills Filter.Context.sourceChosenNames,
-    -- exactly as the Effect.Search arm does (Predict, see #2141).
+    -- exactly as the Effect.Search arm does (Predict).
     --
     -- Not SearchFramed, whose other promise this position does not keep:
     -- Filter.View.canAttachToSubject is unfilled here, so CR 701.3a's atom would

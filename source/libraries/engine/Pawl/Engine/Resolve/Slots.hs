@@ -1274,8 +1274,8 @@ conditionSlots condition = case condition of
 --
 -- SYNTACTIC rather than per-reader: a slot NAME anywhere in the row's own data is
 -- an object the row refers to, whether or not the arm reading it happens to build
--- a slot-aware Filter.Context today (#2141 names the caller that does not). That is
--- what CR 609.7a asks for, and it is the safe direction for the capture.
+-- a slot-aware Filter.Context today. That is what CR 609.7a asks for, and it is
+-- the safe direction for the capture.
 --
 -- CR 614.9's printed DESTINATION is walked with the damage pattern beside it and
 -- is not a pattern: it is read in the same
@@ -2693,6 +2693,25 @@ effectContext gs controller source legal bindings =
           -- creature" is a reference the spell already made rather than a target
           -- CR 608.2b re-checks.
           Filter.slotNames = fmap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs)) objects,
+          -- CR 110.2 asked of what those objects are ATTACHED TO (CR 303.4b),
+          -- for the one atom that compares a candidate's controller against it
+          -- (Filter.SameControllerAsHostOfBound) -- Simic Guildmage's "another
+          -- permanent with the same controller", whose 2006-05-01 ruling reads
+          -- the antecedent as the Aura's host rather than the Aura.
+          --
+          -- LIVE and narrowed to the BATTLEFIELD, which is where it parts from
+          -- its neighbours' CR 608.2h reader: a host is a permanent, and the
+          -- ruling asks who controls it as the ability resolves. The narrowing
+          -- is Filter.attachedToView's, so the two cannot disagree about which
+          -- host a slot's object has -- an Aura attached to a player (CR
+          -- 303.4b's other destination) or to a host that has left or phased out
+          -- gets an empty set from both, and the atom is False.
+          --
+          -- Projection.controllerOf and not an owner read: CR 613.1b's layer 2
+          -- is what makes the host's controller differ from its owner, and
+          -- Pawl.AuraSpec's "CR 613.1b the host's controller is the projected
+          -- one, not its owner" is the board that tells the two apart.
+          Filter.slotHostControllers = fmap (foldMap (\oid -> maybe Set.empty (\host -> if Set.member host (GameState.battlefield gs) then maybe Set.empty Set.singleton (Projection.controllerOf host gs) else Set.empty) (Projection.hostOf oid gs))) objects,
           -- CR 205.3m's creature types off the same objects and the same
           -- reader, for slotNames' reason: Heirloom Blade's dead creature is
           -- read as it last existed (CR 603.10a), and a face-down one has none

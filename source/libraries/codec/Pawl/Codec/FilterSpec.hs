@@ -308,6 +308,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.SameControllerAsBound (SlotName.MkSlotName (Text.pack "from")))
       " {\"type\":\"SameControllerAsBound\",\"value\":\"from\"} "
+  Spec.it s "SameControllerAsHostOfBound" $ do
+    Common.assertCodec
+      s
+      codec
+      (Filter.SameControllerAsHostOfBound (SlotName.MkSlotName (Text.pack "target")))
+      " {\"type\":\"SameControllerAsHostOfBound\",\"value\":\"target\"} "
+    Spec.assertNeWith s "CR 303.4b's host is not the bound object itself" (Codec.encode codec (Filter.SameControllerAsHostOfBound (SlotName.MkSlotName (Text.pack "target")))) (Codec.encode codec (Filter.SameControllerAsBound (SlotName.MkSlotName (Text.pack "target"))))
   Spec.it s "SharesCreatureTypeWithBound" $
     Common.assertCodec
       s

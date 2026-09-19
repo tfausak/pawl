@@ -238,6 +238,18 @@ data Filter keyword
     -- no card asks SameControllerAsBound outside a mode's target slot" is what
     -- keeps the atom out of the positions with no joint check behind them.
     SameControllerAsBound SlotName.SlotName
+  | -- | CR 110.2 with CR 303.4b: the candidate has the same controller as the
+    -- permanent the object this slot holds is ATTACHED TO -- Simic Guildmage's
+    -- "another permanent with the same controller", whose 2006-05-01 ruling
+    -- settles the antecedent as the host rather than the Aura.
+    --
+    -- VACUOUSLY FALSE where the slot names no object, or names one attached to
+    -- nothing, to a player (CR 303.4b's other destination) or to a host that is
+    -- no longer on the battlefield -- SameControllerAsBound's opposite. That
+    -- atom widens only because Pawl.Engine.Target.selectionLegal's joint check
+    -- narrows afterwards, and no such check stands behind an attach
+    -- destination.
+    SameControllerAsHostOfBound SlotName.SlotName
   | -- | CR 205.3m: the candidate shares a creature type with the object this slot holds.
     SharesCreatureTypeWithBound SlotName.SlotName
   | -- | CR 208.1 compared against a BOUND OBJECT rather than the source or a

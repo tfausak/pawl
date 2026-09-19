@@ -320,8 +320,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
   -- the game is never one -- rule 400.11c keeps every spell and ability from
   -- affecting it, and nothing mints an object for it until `bringInto` does. So
   -- the bare Filter.contextFor `eligible` builds is honest: handing it the
-  -- resolution's slots could not change an answer here, which is why this
-  -- position is not one of #2141's. Pawl.CardSpec's "CR 400.11c no card asks
+  -- resolution's slots could not change an answer here. Pawl.CardSpec's
+  -- "CR 400.11c no card asks
   -- IsBound in a wish's filter" is what keeps a card out of the position.
   --
   -- The pair differs in exactly one thing: the same board, the same bound slot,
