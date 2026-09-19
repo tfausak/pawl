@@ -67,6 +67,7 @@ codec keywordCodec =
       Arm.payload "ExileTopFromGraveyard" (Filter.codec keywordCodec) CostComponent.ExileTopFromGraveyard (\x -> case x of CostComponent.ExileTopFromGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ExileCardFromHand" (Filter.codec keywordCodec) CostComponent.ExileCardFromHand (\x -> case x of CostComponent.ExileCardFromHand y -> Just y; _ -> Nothing),
       Arm.payload "RevealCardFromHand" (Filter.codec keywordCodec) CostComponent.RevealCardFromHand (\x -> case x of CostComponent.RevealCardFromHand y -> Just y; _ -> Nothing),
+      Arm.payload "Behold" (Filter.codec keywordCodec) CostComponent.Behold (\x -> case x of CostComponent.Behold y -> Just y; _ -> Nothing),
       Arm.payload "MillCards" Common.natural CostComponent.MillCards (\x -> case x of CostComponent.MillCards y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseOpponent" CostComponent.ChooseOpponent
     ]
@@ -103,5 +104,6 @@ tagOf x = case x of
   CostComponent.ExileTopFromGraveyard {} -> "ExileTopFromGraveyard"
   CostComponent.ExileCardFromHand {} -> "ExileCardFromHand"
   CostComponent.RevealCardFromHand {} -> "RevealCardFromHand"
+  CostComponent.Behold {} -> "Behold"
   CostComponent.MillCards {} -> "MillCards"
   CostComponent.ChooseOpponent {} -> "ChooseOpponent"

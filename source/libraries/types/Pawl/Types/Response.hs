@@ -182,6 +182,13 @@ data Response
     -- (every creature its chooser controls), so nothing but a distinct
     -- constructor keeps a transcript of one from replaying as the other.
     ChoseBlight ObjectId.ObjectId
+  | -- | CR 701.4a: the object a paying player beheld.
+    --
+    -- Its own constructor for ChoseBolster's reason, and it could not reuse any
+    -- of the object choices above in any case: behold's pool spans two zones at
+    -- once, so a card in a hand and a permanent on the battlefield are both
+    -- answers to it and to nothing else here.
+    ChoseBehold ObjectId.ObjectId
   | -- | CR 118.1 as a cost: the permanent a paying player chose to take the
     -- +1\/+1 counters off.
     --

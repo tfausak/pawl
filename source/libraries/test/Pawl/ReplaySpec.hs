@@ -1509,6 +1509,19 @@ combatReplaySpec s =
           -- Discriminating: a decode that ignored the response and returned the
           -- head would pass one leg by accident.
           Spec.assertEqWith s "blighting the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        -- CR 701.4a: which object a paying player beheld is a decision, so it has
+        -- to survive a transcript like any other.
+        Spec.it s "ChooseBehold round-trips through the transcript" $ do
+          let inHand = ObjectId.MkObjectId 11
+              onBattlefield = ObjectId.MkObjectId 13
+              p = Prompt.ChooseBehold decider S.alice oid (inHand NonEmpty.:| [onBattlefield])
+          Spec.assertEqWith s "beholding the permanent round trips" (Replay.decode p (Replay.encode p onBattlefield)) (Just onBattlefield)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "beholding the card in hand round trips" (Replay.decode p (Replay.encode p inHand)) (Just inHand)
+          -- Discriminating: fails if ChooseBehold reuses ChoseBlight rather than
+          -- getting its own ObjectId-shaped constructor.
+          Spec.assertEqWith s "and a blight transcript does not decode as one" (Replay.decode p (Response.ChoseBlight inHand)) Nothing
         -- CR 701.61a: which half of forage the forager took is a decision, so it
         -- has to survive a transcript like any other.
         Spec.it s "ChooseForage round-trips through the transcript" $ do

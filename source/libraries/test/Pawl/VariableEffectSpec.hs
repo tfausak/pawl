@@ -701,9 +701,9 @@ minusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOn
 --
 -- WHY MORCANT and not Champion of the Weird, which #1491's body nominates: that
 -- card's "As an additional cost to cast this spell, behold a Goblin and exile it"
--- is CR 701.4's keyword action, which pawl does not have (gap #3551). Dropping an
--- additional cost would leave pawl's card WEAKER than printed, which disqualifies
--- it.
+-- beholds AND exiles what it beheld, and CostComponent.Behold does the first half
+-- alone (gap #3889). Dropping the exile would leave pawl's card WEAKER than
+-- printed, which disqualifies it.
 --
 -- THREE SEATS, because "each opponent" and "every player but you" and "the one
 -- other seat" are the same set on a two-player board. alice is the active player,

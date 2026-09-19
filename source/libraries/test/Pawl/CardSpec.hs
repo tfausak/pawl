@@ -3180,6 +3180,9 @@ costComponentFilters component = case component of
   CostComponent.ExileCardFromHand f -> [f]
   -- CR 701.20a out of the hand: Living Destiny's "a creature card".
   CostComponent.RevealCardFromHand f -> [f]
+  -- CR 701.4a over the hand and the battlefield at once: Caustic Exhale's "a
+  -- Dragon".
+  CostComponent.Behold f -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
