@@ -15,8 +15,8 @@
 --
 -- The harness has no vocabulary for Prompt.ChooseClash, so these cases run the
 -- engine under a test-local answerer in State.State, which records who was asked
--- and what each was shown -- the APNAP order and rule 701.30c's public
--- reveal are assertions about the QUESTIONS, not about the board.
+-- and what each was shown: the APNAP order is an assertion about the QUESTIONS,
+-- while rule 701.30c's public reveal is read off the event log.
 module Pawl.ClashSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -86,6 +86,9 @@ clashing p = case p of
   Prompt.ChooseClash _ pid _ own public -> do
     State.modify' (<> [(pid, own, NonEmpty.toList public)])
     pure (if pid == S.alice then LibraryPosition.Bottom else LibraryPosition.Top)
+  -- CR 701.30b's opponent, taken from the offered set rather than built: with
+  -- three seats it is a real choice, and the case is about bob rather than carol.
+  Prompt.ChooseOpponent _ _ _ opponents -> pure (Maybe.fromMaybe (NonEmpty.head opponents) (List.find (S.bob ==) (NonEmpty.toList opponents)))
   Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((==) (Just S.carol) . Recipient.playerOf) sets)
   _ -> pure (S.castAnswer p)
 

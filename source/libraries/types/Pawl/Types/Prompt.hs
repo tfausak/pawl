@@ -379,9 +379,9 @@ data Prompt r where
   --
   -- The NonEmpty carries EVERY card revealed in the clash beside the player who
   -- revealed it, because rule 701.30c's reveal is simultaneous and public: a
-  -- decider sees the other card as well as their own. It is the reveal and not
-  -- the decisions, which rule 701.30c has follow it -- so nothing here shows one
-  -- clashing player what the other decided.
+  -- decider sees the other card as well as their own. It is the reveal alone,
+  -- which rule 701.30c has the decisions follow; what that leaves out is stated
+  -- at Pawl.Engine.Resolve.Effect's clash (#3893).
   --
   -- Asked of each clashing player in APNAP order (CR 101.4), and elided only
   -- where the revealed card is that player's whole library: both ends are then
