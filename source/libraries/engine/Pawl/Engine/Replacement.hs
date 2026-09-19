@@ -2503,7 +2503,10 @@ amplifiableFromHand pid types gs =
 -- CR 614.3: a floating replacement whose `uses` is Once is spent by being
 -- applied. A permanent's STATIC replacement ability has no use count at all --
 -- it is re-derived from the battlefield every iteration -- so only the floating
--- store is touched here.
+-- store is touched here. Pawl.ReplacementSpec's "CR 701.19b a static
+-- regeneration ability replaces every destruction, not just the next one" is
+-- what proves the difference: a Mossbridge Troll and a Drudge Skeletons take the
+-- same two destructions, and only the Skeletons' shield is spent.
 consume :: CandidateId -> Game ()
 consume identity_ = case identity_ of
   CandidateId.OfPermanent {} -> pure ()
