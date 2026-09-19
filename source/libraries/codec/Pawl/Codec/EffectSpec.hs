@@ -44,6 +44,7 @@ import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
+import qualified Pawl.Types.ControlSides as ControlSides
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Count as Count
@@ -1533,13 +1534,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment))))
       " {\"type\":\"GainControl\",\"value\":{\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}}}}} "
-  Spec.it s "ExchangeControl" $
+  Spec.it s "ExchangeControl round-trips both ControlSides arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ExchangeControl (SlotName.MkSlotName (Text.pack "creatures")))
-      " {\"type\":\"ExchangeControl\",\"value\":\"creatures\"} "
+      (Effect.ExchangeControl (ControlSides.BetweenTargets (SlotName.MkSlotName (Text.pack "creatures"))))
+      " {\"type\":\"ExchangeControl\",\"value\":{\"type\":\"BetweenTargets\",\"value\":\"creatures\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeControl (ControlSides.WithSource (SlotName.MkSlotName (Text.pack "permanent"))))
+      " {\"type\":\"ExchangeControl\",\"value\":{\"type\":\"WithSource\",\"value\":\"permanent\"}} "
   Spec.it s "GrantPlayFromExile round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s

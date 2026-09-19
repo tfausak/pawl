@@ -3781,9 +3781,101 @@ switcherooSpec s registry = Spec.describe s "Switcheroo" $ do
     -- cannot pass by the exchange never having been reached.
     Spec.assertEqWith s "the Switcheroo was cast and then resolved" (length (GameState.stack cast), length (GameState.stack after)) (1, 0)
 
+-- Avarice Totem ({1} Artifact, "{5}: Exchange control of this artifact and
+-- target nonland permanent.") against CR 701.12b's OTHER printed shape: one side
+-- is CR 113.7's source object rather than a second target.
+--
+-- Switcheroo's board one type over, and for its reasons: three seats, the two
+-- boards differing in EXACTLY one thing -- who controls the targeted Evangel --
+-- and carol's Bog Wraith a candidate nobody names, so the slot's one target is a
+-- real choice. The five Islands are lands and so are not candidates; the Totem
+-- itself is one, which is why the answerer FILTERS rather than building a
+-- recipient.
+avariceTotemBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  m (Printing.Printing, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+avariceTotemBoard s registry evangelController = do
+  totem <- S.printingOf s registry "Avarice Totem"
+  island <- S.printingOf s registry "Island"
+  evangel <- S.printingOf s registry "Cabal Evangel"
+  wraith <- S.printingOf s registry "Bog Wraith"
+  let withLands = List.foldl' (\gs _ -> snd (S.addPermanent island S.alice gs)) S.threePlayerGame [1 .. 5 :: Int]
+      (totemId, g1) = S.addPermanent totem S.alice withLands
+      (evangelId, g2) = S.addPermanent evangel evangelController g1
+      (wraithId, g3) = S.addPermanent wraith S.carol g2
+  pure
+    ( totem,
+      totemId,
+      evangelId,
+      wraithId,
+      g3
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- Pays the {5} off whatever mana source comes first and aims the one target slot
+-- at `wanted`. A Permanents pool offers Recipient.ToObject, so that is the tag
+-- filtered on.
+avariceTotemAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+avariceTotemAnswer wanted p =
+  let isWanted r = case r of
+        Recipient.ToObject oid -> oid == wanted
+        _ -> False
+   in case p of
+        Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring isWanted sets
+        _ -> S.identityAnswer p
+
+avariceTotemSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+avariceTotemSpec s registry = Spec.describe s "AvariceTotem" $ do
+  -- CR 701.12b's first sentence, with the source as one side. Both halves are
+  -- asserted, in that order: the reading this discriminates is one that moved the
+  -- targeted permanent and left the source where it was.
+  Spec.it s "CR 701.12b the source and its one target swap controllers" $ do
+    (totem, totemId, bobEvangel, carolWraith, board) <- avariceTotemBoard s registry S.bob
+    case soleActivatedAbility totem of
+      Nothing -> Spec.assertFailure s "Avarice Totem should print exactly one activated ability"
+      Just ability -> do
+        let answer :: Prompt.Prompt r -> r
+            answer = avariceTotemAnswer bobEvangel
+            after = S.runPure answer board (Activate.activateAbility S.alice totemId ability >> Stack.resolveTop)
+        Spec.assertEqWith s "bob controls the Totem alice activated" (Projection.controllerOf totemId after) (Just S.bob)
+        Spec.assertEqWith s "alice controls what was bob's Cabal Evangel" (Projection.controllerOf bobEvangel after) (Just S.alice)
+        Spec.assertEqWith s "carol's Bog Wraith, whom nobody targeted, is untouched" (Projection.controllerOf carolWraith after) (Just S.carol)
+        -- CR 302.6 re-Sicks the Evangel under its new controller, so alice cannot
+        -- attack with what she just took. It could attack for bob on the board
+        -- this one came from.
+        Spec.assertBool s (bobEvangel `notElem` Combat.legalAttackers S.alice after) "CR 302.6 alice cannot attack with the Evangel she just took"
+
+  -- CR 701.12b's second sentence for this shape: the target is the ACTIVATOR's
+  -- own creature, so both sides are hers and "the exchange effect does nothing".
+  -- Control cannot show that on its own -- alice holds both either way -- so the
+  -- discriminating read is CR 302.6's, which an exchange that ran would have
+  -- spent on both sides.
+  Spec.it s "CR 701.12b the source and a target of the SAME controller exchange nothing" $ do
+    (totem, totemId, aliceEvangel, _, board) <- avariceTotemBoard s registry S.alice
+    case soleActivatedAbility totem of
+      Nothing -> Spec.assertFailure s "Avarice Totem should print exactly one activated ability"
+      Just ability -> do
+        let answer :: Prompt.Prompt r -> r
+            answer = avariceTotemAnswer aliceEvangel
+            activated = S.runPure answer board (Activate.activateAbility S.alice totemId ability)
+            after = S.runPure answer activated Stack.resolveTop
+        Spec.assertBool s (aliceEvangel `elem` Combat.legalAttackers S.alice after) "CR 701.12b alice may still attack with her Cabal Evangel"
+        Spec.assertEqWith s "and she still controls both" (Projection.controllerOf totemId after, Projection.controllerOf aliceEvangel after) (Just S.alice, Just S.alice)
+        -- The ability was really activated and really resolved, so the assertions
+        -- above cannot pass by the exchange never having been reached.
+        Spec.assertEqWith s "the ability was activated and then resolved" (length (GameState.stack activated), length (GameState.stack after)) (1, 0)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   switcherooSpec s registry
+  avariceTotemSpec s registry
   plummetSpec s registry
   corrosiveGaleSpec s registry
   exhumeSpec s registry

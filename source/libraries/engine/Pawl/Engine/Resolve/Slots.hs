@@ -54,6 +54,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
+import qualified Pawl.Types.ControlSides as ControlSides
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Count as Count.Type
@@ -898,6 +899,14 @@ exchangeSidesSlots sides = case sides of
   ExchangeSides.WithController slot -> Map.singleton slot SlotArity.One
   ExchangeSides.BetweenTargets slot -> Map.singleton slot SlotArity.Many
 
+-- exchangeSidesSlots one type over: BetweenTargets takes both permanents out of
+-- one instance of the word "target" (CR 601.2c) and so must see the whole set,
+-- where WithSource reads the one permanent beside CR 113.7's source object.
+controlSidesSlots :: ControlSides.ControlSides -> Map.Map SlotName SlotArity
+controlSidesSlots sides = case sides of
+  ControlSides.BetweenTargets slot -> Map.singleton slot SlotArity.Many
+  ControlSides.WithSource slot -> Map.singleton slot SlotArity.One
+
 -- The one legitimate home of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1). slotsOf is the read half of the dataflow lint;
 -- X is not one of its reads, readsX below being X's own half.
@@ -1135,9 +1144,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.EndTurn -> Map.empty
   Effect.EndCombatPhase -> Map.empty
   Effect.GainControl {} -> Map.empty
-  -- BetweenTargets' reason (exchangeSidesSlots): both permanents come out of
-  -- one instance of the word "target" (CR 601.2c), so the whole set is read.
-  Effect.ExchangeControl slot -> Map.singleton slot SlotArity.Many
+  Effect.ExchangeControl sides -> controlSidesSlots sides
   Effect.ArmDelayedTrigger {} -> Map.empty
   -- Two reads, on the two halves of one opcode: the seat AffectedPlayers.Named
   -- names, and CR 601.2c's RECIPIENT a stored damage-pattern effect names
