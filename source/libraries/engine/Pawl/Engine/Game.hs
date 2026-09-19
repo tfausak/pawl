@@ -1714,6 +1714,30 @@ turnOrderFrom start gs =
   let order = GameState.turnOrder gs
    in dropWhile (/= start) order <> takeWhile (/= start) order
 
+-- CR 800.4h: if a rule requires a player who has left the game to make a choice,
+-- the next player in turn order makes that choice. A player still in the game is
+-- their own chooser, so a site where a RULE asks somebody funnels through this
+-- rather than testing survival itself.
+--
+-- turnOrderFrom's walk, which starts WITH `pid` and wraps, so the first survivor
+-- it finds is either `pid` or the rule's own "next player in turn order" -- a
+-- specific seat, not any survivor. The seating roster is what gives a departed
+-- seat a position to count from (CR 800.5), and it is never shortened.
+--
+-- Nothing when no seat is left to take the choice, which the rule does not cover
+-- because CR 104.2a has ended the game by then. A caller meeting it asks nobody
+-- rather than making the choice itself.
+--
+-- NOT CR 800.4g, which reassigns the choice an OBJECT requires: that one goes to
+-- the object's controller, who names a substitute
+-- (Pawl.Engine.Resolve.Effect.askedChooser). Not CR 800.4a's priority walk
+-- either (Pawl.Engine.Engine.nextStillPlaying), which always leaves the seat it
+-- counts from and is total.
+ruleChooser :: GameState -> PlayerId -> Maybe PlayerId
+ruleChooser gs pid =
+  let playing = stillPlaying gs
+   in List.find (\p -> List.elem p playing) (turnOrderFrom pid gs)
+
 -- CR 701.24a: shuffling randomises an ORDER, so it is a permutation -- the
 -- cards that were there are the cards that are there.
 --

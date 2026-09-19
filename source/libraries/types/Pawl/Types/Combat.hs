@@ -282,13 +282,15 @@ data Combat = MkCombat
     -- precisely the combat phase.
     --
     -- Empty also means NO ATTACK IS POSSIBLE, which is the right answer and
-    -- not a fallback: a turn whose active player has left the game never
-    -- performs the action. CR 800.4h would give that choice to the next player
-    -- in turn order; pawl skips it instead, resolving it silently rather than
-    -- reassigning it (#3862). The divergence is UNOBSERVABLE, not vacuous: the
-    -- field would be written and never read, because CR 506.2 makes the
-    -- attacking player the active player and after CR 800.4a a departed player
-    -- controls no creature.
+    -- not a fallback: it is what CR 507.1 leaves behind with no candidate to
+    -- choose. A turn whose active player has left still fills the field --
+    -- CR 800.4h gives that choice to the next player in turn order -- and what
+    -- is written there is never read, because CR 506.2 makes the attacking
+    -- player the active player and after CR 800.4a a departed player controls
+    -- no creature; CR 506.3b bars anyone else's creature from entering the
+    -- combat attacking. Pawl.CombatSpec's "CR 800.4h a turn whose active player
+    -- has left puts the choice to the next player in turn order" is what proves
+    -- the seat.
     --
     -- Read through Pawl.Engine.Defender.defendingPlayers rather than directly,
     -- which is where CR 802.2a's narrowing to one is made explicit at each site

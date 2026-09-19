@@ -580,15 +580,17 @@ nonCardStackObjectsCease pid gs =
 -- own existence check is what drops one that a replacement effect moved
 -- elsewhere in the meantime.
 --
--- Not implemented: CR 800.4h, which gives a choice this move puts to the
--- departing player to the next seat in turn order. The funnel's CR 616.1 loop
--- asks the affected object's controller, who here is the player leaving, and
--- rule 616.1 is a RULE requiring a choice rather than an object requiring one --
--- CR 800.4g is the other rule, and its answer is the controller picking a
--- substitute (Pawl.Engine.Resolve.Effect.askedChooser). A board with two
--- applicable rewrites would put the race to the departing player; no card in
--- `data/cards/` replaces a permanent being exiled, so no board reaches it
--- (#3862).
+-- CR 800.4h reaches this move through Replacement.chooserOf: the funnel's CR
+-- 616.1 loop asks the affected object's controller, who here is the player
+-- leaving, and rule 616.1 is a RULE requiring a choice rather than an object
+-- requiring one -- CR 800.4g is the other rule, and its answer is the controller
+-- picking a substitute (Pawl.Engine.Resolve.Effect.askedChooser).
+--
+-- Not implemented: that reassignment firing HERE. `depart` flips the status
+-- after these clauses, so the departing player is still Status.Playing while the
+-- exile runs and Game.ruleChooser answers them rather than the next seat. A
+-- board with two applicable rewrites would show it; no card in `data/cards/`
+-- replaces a permanent being exiled, so no board reaches it (#3875).
 --
 -- IN BATCH and in ONE event group, against that same board, for the reason the
 -- first clause files its last known information against it: "those objects are
