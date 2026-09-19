@@ -21,6 +21,7 @@ module Pawl.ClashSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Engine as Engine
@@ -111,8 +112,11 @@ spec s registry = Spec.describe s "Clash" $ do
     -- "if you win" clause ran and carol discarded TWO.
     Spec.assertEqWith s "CR 701.30d the winner's clause discards two" (length (Game.zoneMembers Zone.Graveyard S.carol after)) 2
     -- CR 701.30c's reveal, which is PUBLIC and so is in the log rather than only
-    -- in the prompt: both clashing players showed the card they revealed.
-    Spec.assertEqWith s "CR 701.30c both clashing players revealed their top card" (fmap (fmap (: [])) (revealedIn after)) [(S.alice, aliceTop), (S.bob, bobTop)]
+    -- in the prompt: both clashing players showed the card they revealed. SORTED,
+    -- because rule 701.30c reveals them at the same time and an order between
+    -- them is not a thing the rule states -- the APNAP order below is about the
+    -- DECISIONS, and asserting one here would absorb that case's mutation.
+    Spec.assertEqWith s "CR 701.30c both clashing players revealed their top card" (List.sort (fmap (fmap (: [])) (revealedIn after))) (List.sort [(S.alice, aliceTop), (S.bob, bobTop)])
     -- CR 701.30c's decisions, in APNAP order and each shown BOTH revealed cards:
     -- alice is the active player, so she decides first, and neither question
     -- carries what the other player decided.
