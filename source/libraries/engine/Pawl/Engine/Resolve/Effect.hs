@@ -8116,7 +8116,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       case Maybe.mapMaybe Recipient.objectOf (legalMany slot legal) of
         [one, two] -> case (Projection.controllerOf one gs, Projection.controllerOf two gs) of
           -- CR 701.12b: controlled by the same player, the exchange effect does
-          -- nothing. Pawl.BoardEffectSpec's ExchangeControl group is the proof.
+          -- nothing. Pawl.BoardEffectSpec's Switcheroo group is the proof.
           (Just first, Just second)
             | first /= second ->
                 let (ts, gs1) = Game.freshTimestamp gs
