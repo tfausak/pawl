@@ -53,10 +53,10 @@ data ForEach effect = MkForEach
     --
     -- Proved by Pawl.CombatCostSpec's "CR 603.6a / 608.2f: every Mirror Match
     -- token sees every other one enter", which is the False. The True is a
-    -- REGRESSION FENCE and not a proven road: dropping it from either card leaves
-    -- the whole suite green, because no printing in the pool watches a batch of
-    -- library exiles or of draws, so nothing can yet tell one event from two
-    -- there. It is stated because rule 608.2f states it.
+    -- REGRESSION FENCE and not a proven road: dropping it from Soulfire Eruption
+    -- leaves the whole suite green, because no printing in the pool watches a
+    -- batch of library exiles or of draws, so nothing can yet tell one event from
+    -- two there. It is stated because rule 608.2f states it.
     individually :: Bool
   }
   deriving (Eq, Ord, Show)
