@@ -102,7 +102,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause Nothing Nothing (Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) (PlayerRef.Relative PlayerRelation.You))) Optionality.Mandatory Nothing Seq.empty)
+      (Clause.MkClause Nothing Nothing (Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) (PlayerRef.Relative PlayerRelation.You) False)) Optionality.Mandatory Nothing Seq.empty)
       " {\"orElse\":{\"sibling\":1}} "
   -- CR 118.12a: Mana Leak's "unless its controller pays {3}" is what the
   -- payGate key encodes, and it is emitted only when there is one.

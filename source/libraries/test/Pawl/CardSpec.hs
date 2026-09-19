@@ -2094,17 +2094,18 @@ cardBranchesAreAsymmetric = any (any modeBranchesOffend . Modal.modes) . faceMod
 -- somebody else. So does a pair whose two halves name different CHOOSERS, the
 -- announcement being made once at whichever branch the resolution reaches first
 -- (Pawl.Engine.Resolve.chosenBranch) -- the loser's own chooser would be data
--- nothing reads.
+-- nothing reads. And so does a pair whose halves disagree about CR 701.55a's
+-- villainous flag, which is read at the same single announcement.
 modeBranchesOffend :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modeBranchesOffend mode =
   let indexed = zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))
       byIndex = Map.fromList indexed
-      names cIdx chooser = Just (Just (OrElse.MkOrElse cIdx chooser))
+      names cIdx chooser villainous = Just (Just (OrElse.MkOrElse cIdx chooser villainous))
       offends (cIdx, clause) = case Clause.orElse clause of
         Nothing -> False
         Just orElse ->
           OrElse.sibling orElse == cIdx
-            || fmap Clause.orElse (Map.lookup (OrElse.sibling orElse) byIndex) /= names cIdx (OrElse.chooser orElse)
+            || fmap Clause.orElse (Map.lookup (OrElse.sibling orElse) byIndex) /= names cIdx (OrElse.chooser orElse) (OrElse.villainous orElse)
    in any offends indexed
 
 -- Do these slot-name sets overlap? True when any name appears in more than one
@@ -5917,9 +5918,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let branching = any (any (Maybe.isJust . Clause.orElse) . Mode.clauses) . Modal.modes
         offenders = filter (anyFace cardBranchesAreAsymmetric . Printing.card) ps
     -- Guards against passing vacuously: a pool where no clause branches at all
-    -- could not offend whatever the lint said. Twiddle, Teardrop Kami and Keys to
-    -- the House make it real -- a spell and two activated abilities, and Keys is
-    -- the one whose pair carries no "may".
+    -- could not offend whatever the lint said. Twiddle, Teardrop Kami, Keys to
+    -- the House, Worms of the Earth and Great Intelligence's Plan all carry one
+    -- -- spells, activated abilities and a triggered one -- and Keys and the
+    -- Plan are the pairs printing no "may" over the branches.
     Spec.assertBool s (any (anyFace (any branching . faceModals) . Printing.card) ps) "the pool has a clause carrying an either-or"
     Spec.assertEqWith s "no half-named branch" (fmap (S.nameOf . Printing.card) offenders) []
   -- And the rejecting direction, against Twiddle misauthored on purpose -- never
@@ -5939,16 +5941,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- Twiddle's own chooser, the unmarked "you" (CR 405.4): every offender
         -- below keeps it, so each assertion fails for the arm it names rather
         -- than for the chooser half.
-        branchTo n = Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex n) (PlayerRef.Relative PlayerRelation.You))
-        selfNaming, dangling, disagreeing :: [(Int, Maybe OrElse.OrElse)]
+        branchTo n = Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex n) (PlayerRef.Relative PlayerRelation.You) False)
+        selfNaming, dangling, disagreeing, halfVillainous :: [(Int, Maybe OrElse.OrElse)]
         selfNaming = [(0, branchTo 0), (1, branchTo 1)]
         dangling = [(0, branchTo 7), (1, branchTo 7)]
-        disagreeing = [(0, Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) PlayerRef.EachPlayer))]
+        disagreeing = [(0, Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) PlayerRef.EachPlayer False))]
+        halfVillainous = [(0, Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) (PlayerRef.Relative PlayerRelation.You) True))]
     Spec.assertBool s (not (cardBranchesAreAsymmetric face)) "Twiddle's tap and untap name each other, and are accepted"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite [(1, Nothing)])) "a branch whose sibling names nobody back is rejected"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite selfNaming)) "two branches each naming themselves are rejected"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite dangling)) "branches naming an ordinal no clause has are rejected"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite disagreeing)) "and a pair whose halves name different choosers is rejected"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite halfVillainous)) "CR 701.55a a pair only one half of which is villainous is rejected"
   -- The filing convention, now that no lookup enforces it (#649): a file's stem
   -- must be the slug Registry.filedAs derives from the card inside it.
   --

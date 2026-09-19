@@ -39,6 +39,28 @@ data OrElse = MkOrElse
     -- Both halves of a pair must name the SAME chooser, the announcement being
     -- made once at whichever branch the resolution reaches first; Pawl.CardSpec
     -- holds the corpus to that alongside the symmetry.
-    chooser :: PlayerRef.PlayerRef
+    chooser :: PlayerRef.PlayerRef,
+    -- | CR 701.55a: this pair is a VILLAINOUS CHOICE, which rule 701.55b makes
+    -- an exception to rule 608.2d -- the chooser "may choose an option that is
+    -- illegal or impossible", performing as much of it as is possible. So
+    -- Pawl.Engine.Resolve.chosenBranch offers both branches here rather than
+    -- filtering them through clauseIsImpossible first, and a chooser facing one
+    -- impossible limb is still asked. Great Intelligence's Plan is the producer,
+    -- and Pawl.ResolveSpec's "CR 701.55b Great Intelligence's Plan still offers
+    -- the discard to an empty-handed opponent" is what proves it.
+    --
+    -- A marker on the CR 608.2d pair rather than an opcode of its own: rule
+    -- 701.55a's "chooses [A] or [B], then all actions in the chosen option are
+    -- performed" IS that rule's either-or, announced by somebody other than the
+    -- resolving controller, and Pawl.Types.Effect is first-order so a branch
+    -- carrying its own effect list could not sit in one.
+    --
+    -- Both halves of a pair must agree on it, for `sibling`'s reason.
+    --
+    -- Not implemented: rule 701.55c's replacement of one facing by several,
+    -- The Valeyard's (#3898); nor rule 701.55d's exception to rule 608.2e, which
+    -- runs the whole choose-then-perform process per player one at a time where
+    -- chosenBranch asks every chooser and then runs the branch once (#3899).
+    villainous :: Bool
   }
   deriving (Eq, Ord, Show)
