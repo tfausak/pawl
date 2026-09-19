@@ -19,10 +19,11 @@
 -- vocabularies of durations, and dropAtTurnOf is the only sweep either can
 -- reach. See clearedDetentions and clearedGoads.
 --
--- Not implemented: CR 800.4c. When a sweep here ends a control-changing effect
--- and the object's CR 110.2 default controller has left the game, the object
--- should be exiled as the effect ends; no sweep asks. Every sweep is a site,
--- dropAtCleanup the one an Act of Treason reaches (#3858).
+-- CR 800.4c is NOT asked here, and deliberately: a sweep that ends a
+-- control-changing effect leaves the object reading as controlled by its CR
+-- 110.2 default controller, and Pawl.Engine.Departure.exileOrphanedByEndedControl
+-- answers the rule off that board at the next CR 117.5 settle. Nothing can
+-- observe the gap, the cleanup step included (CR 514.3a).
 module Pawl.Engine.Expiry where
 
 import qualified Control.Monad as Monad

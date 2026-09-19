@@ -600,12 +600,69 @@ nonCardStackObjectsCease pid gs =
 remainingControlledExiled :: PlayerId -> Game ()
 remainingControlledExiled pid = do
   gs <- State.get
-  -- Projection.controls already hoists the control-grant list once rather than
-  -- rebuilding it per battlefield object. The stack is short enough that the
-  -- plain query is not worth a second hoist.
+  exileAll gs (controlledBy pid gs)
+
+-- The objects a player controls, over the two zones CR 109.4 gives a controller
+-- one in. Projection.controls already hoists the control-grant list once rather
+-- than rebuilding it per battlefield object; the stack is short enough that the
+-- plain query is not worth a second hoist.
+controlledBy :: PlayerId -> GameState -> [ObjectId]
+controlledBy pid gs =
   let onStack = filter (\oid -> Projection.controllerOf oid gs == Just pid) (GameState.stack gs)
-      theirs = Projection.controls pid gs <> onStack
-  Event.simultaneously (Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Exile) theirs)
+   in Projection.controls pid gs <> onStack
+
+-- One writer for both exiles this rule asks for, and for the reason
+-- remainingControlledExiled's own comment gives: the victims are fixed from the
+-- board BEFORE the first move, and they go in ONE event group so that neither a
+-- member's CR 608.2h record nor its CR 616.1 candidate list reads a board its
+-- siblings have already left.
+exileAll :: GameState -> [ObjectId] -> Game ()
+exileAll gs victims = Event.simultaneously (Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Exile) victims)
+
+-- CR 800.4c: when an effect giving a player still in the game control of an
+-- object ends, no other effect gives control of it to a player in the game, and
+-- the player who controlled it BY DEFAULT has left, the object is exiled.
+--
+-- Stated as a predicate on the board rather than as a hook on the ending effect,
+-- because that is the same question CR 800.4a's fourth clause asks and pawl's
+-- control is DERIVED: an object whose controller reads as a departed player is
+-- one whose default controller has left and which no surviving effect gives to
+-- anybody else. The rule's three conjuncts are those two facts, and "an effect
+-- ended" is only the MOMENT -- which is why this reuses the clause-4 helper.
+--
+-- Nothing else can put an object into that state after the departure: CR 800.4b
+-- refuses to change control to a departed player and refuses to put an object
+-- onto the battlefield or the stack under one, and CR 800.4d refuses to create
+-- an object they would own. So a hit here is always a loan that has just ended.
+--
+-- Not a state-based action, and Pawl.Engine.Engine.performSettle is where it
+-- runs anyway, beside CR 702.145c's day/night check and CR 701.54a's ring for
+-- the same CR 704.3 reason: a player receiving priority is the coarsest moment
+-- anything can observe the control that ended, and the cleanup step reaches this
+-- through CR 514.3a's own settle rather than skipping it.
+--
+-- Gated by continuesAfterDeparture for that predicate's own reason, and here it
+-- is not vacuous: a two-player game whose loser was decked (CR 104.3c) is still
+-- READ after CR 104.2a ended it -- Pawl.RingSpec settles such a board and asserts
+-- on the loser's permanents, and a subgame is funnelled back out of one
+-- (Setup.funnelBack). CR 800.4a's clauses did not run there, so there is no
+-- ended loan for this rule to answer for either.
+--
+-- Reports whether it moved anything, since the exile is a zone change that can
+-- fire CR 603.6c's leaves-the-battlefield abilities and the settle must loop.
+exileOrphanedByEndedControl :: Game Bool
+exileOrphanedByEndedControl = do
+  gs <- State.get
+  let playing = Game.stillPlaying gs
+      -- GameState.turnOrder is the roster the game began with, so the players
+      -- missing from it are exactly those who have left.
+      departed = filter (\pid -> List.notElem pid playing) (GameState.turnOrder gs)
+      victims = concatMap (\pid -> controlledBy pid gs) departed
+  if not (continuesAfterDeparture gs) || null victims
+    then pure False
+    else do
+      exileAll gs victims
+      pure True
 
 -- CR 104.2a: a player still in the game wins if their opponents have all left.
 --
