@@ -3148,10 +3148,12 @@ apply batch candidate event =
       DestructionRewrite.Regenerate -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         -- Rule 701.19a's three instructions in the order it prints them: remove
-        -- all marked damage, tap it, then remove it from combat. The ORDER is
-        -- observable now that the middle one records an event -- a trigger
-        -- gathered off the tap reads the board as it stands, and doing the combat
-        -- removal first would show it a creature already out of combat.
+        -- all marked damage, tap it, then remove it from combat. Rule 701.19b's
+        -- static form spells out the same three, which is why one arm serves
+        -- both. The ORDER is observable now that the middle one records an event
+        -- -- a trigger gathered off the tap reads the board as it stands, and
+        -- doing the combat removal first would show it a creature already out of
+        -- combat.
         --
         -- Three statements rather than one write because `tap` is a Game action;
         -- the funnel is what makes a regeneration a becomes-tapped event like any
@@ -6074,8 +6076,9 @@ destroyInBatch asOf cause regenerability oids = Monad.void (destroyIn (Just asOf
 -- CR 122.1c is the first DestructionR for which (1) is not vacuous: a shield
 -- counter's replacement is minted from the permanent holding the counter
 -- (Projection.shieldOf), so the destruction loop finds it on the FROZEN board rather
--- than on the live one. Every other DestructionR in the pool is a regeneration
--- shield in the floating store, which the frozen board does not hold at all.
+-- than on the live one. CR 701.19b's static regeneration (Mossbridge Troll) and
+-- CR 702.89a's umbra armor read the same way: each row belongs to a permanent,
+-- so the loop finds it on the frozen board too.
 --
 -- The whole body is ONE event, which is what `simultaneously` stamps on
 -- everything it records: CR 608.2f makes an action taken on multiple objects
