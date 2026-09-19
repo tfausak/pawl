@@ -16,9 +16,12 @@ import qualified Pawl.Types.ForEach as ForEach
 -- Pawl.Types.ForEach gives: the record is parametric in the effect so that
 -- neither module has to name the other.
 --
--- Every field is REQUIRED, unlike Pawl.Codec.PreventNextDamage's rider: a loop
--- with no body and a loop with no name for its member are both an author's
--- mistake rather than a shorter way of saying something.
+-- The three structural fields are REQUIRED, unlike Pawl.Codec.PreventNextDamage's
+-- rider: a loop with no body and a loop with no name for its member are both an
+-- author's mistake rather than a shorter way of saying something. `individually`
+-- is not one of them: CR 608.2f says simultaneous processing is what happens "in
+-- most cases", so its False is the rule's own default and a card states only the
+-- exception.
 codec ::
   (Typeable.Typeable effect) =>
   Codec.Codec effect ->
@@ -27,9 +30,11 @@ codec effectCodec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec ForEach.ref
   slot <- Fields.required "slot" SlotName.codec ForEach.slot
   body <- Fields.required "body" (Common.seq effectCodec) ForEach.body
+  individually <- Fields.defaulted "individually" False Common.boolean ForEach.individually
   pure
     ForEach.MkForEach
       { ForEach.ref = ref,
         ForEach.slot = slot,
-        ForEach.body = body
+        ForEach.body = body,
+        ForEach.individually = individually
       }

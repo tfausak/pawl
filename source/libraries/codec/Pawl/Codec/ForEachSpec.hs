@@ -27,10 +27,13 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
       ( ForEach.MkForEach
           { ForEach.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victims")),
             ForEach.slot = SlotName.MkSlotName (Text.pack "victim"),
-            ForEach.body = Seq.fromList [Text.pack "first", Text.pack "second"]
+            ForEach.body = Seq.fromList [Text.pack "first", Text.pack "second"],
+            -- CR 608.2f's second sentence, which that rule's Soulfire Eruption
+            -- example states outright.
+            ForEach.individually = True
           }
       )
-      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"victims\"},\"slot\":\"victim\",\"body\":[\"first\",\"second\"]} "
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"victims\"},\"slot\":\"victim\",\"body\":[\"first\",\"second\"],\"individually\":true} "
   -- An empty body is representable rather than rejected: the codec's `required`
   -- keys are about a key being ABSENT, and CR 101.3 already makes an
   -- instruction that does nothing a no-op rather than an error.
@@ -41,7 +44,10 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
       ( ForEach.MkForEach
           { ForEach.ref = ObjectRef.EachPlayer,
             ForEach.slot = SlotName.MkSlotName (Text.pack "victim"),
-            ForEach.body = Seq.empty
+            ForEach.body = Seq.empty,
+            -- The default CR 608.2f's "in most cases" gives, so the key is absent
+            -- from the wire.
+            ForEach.individually = False
           }
       )
       " {\"ref\":{\"type\":\"EachPlayer\"},\"slot\":\"victim\",\"body\":[]} "

@@ -610,7 +610,7 @@ objectRefPositions =
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
         ("make-foretold", Effect.MakeForetold (MakeForetold.MkMakeForetold (plantedRef "mf") Nothing), [plantedRef "mf"]),
         ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
-        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])
+        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty False), [plantedRef "fe"])
       ]
 
 -- The ref plantedRef at one position, named for it so a position answering with
@@ -1253,7 +1253,7 @@ ownCounts effect = case effect of
   Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectCounts body
+  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectCounts body
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -1453,7 +1453,7 @@ effectNestedEffects effect = case effect of
   -- CR 615.8's shield carries no rider at all.
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body, run once per member of the fold.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> Foldable.toList body
+  Effect.ForEach (ForEach.MkForEach _ _ body _) -> Foldable.toList body
   Effect.Create {} -> []
   Effect.Conjure {} -> []
   Effect.CreateCopy {} -> []
@@ -1979,7 +1979,7 @@ effectReplacements effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectReplacements body
+  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectReplacements body
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics hold no replacement effect (gap #1667).
   Effect.TurnFaceDown _ -> []
@@ -2402,7 +2402,7 @@ effectMintedFaces effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectMintedFaces body
+  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectMintedFaces body
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
   -- existing object's, and Pawl.Engine.Card.faceDownFace supplies every field
@@ -5300,7 +5300,7 @@ effectFilters effect = case effect of
   Effect.GrantPlayFromExile grant -> frame Unframed (durationFilters (GrantPlayFromExile.duration grant)) <> frame SourceHostFramed (objectRefFilters (GrantPlayFromExile.ref grant))
   -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
   -- list is exactly what this traversal must not stop at.
-  Effect.ForEach (ForEach.MkForEach ref _ body) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
+  Effect.ForEach (ForEach.MkForEach ref _ body _) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
