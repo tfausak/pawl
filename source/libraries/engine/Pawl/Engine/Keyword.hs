@@ -5063,7 +5063,9 @@ familyOf keyword = case keyword of
   Keyword.Menace -> Nothing
   Keyword.Renown _ -> Just KeywordFamily.Renown
   Keyword.Changeling -> Nothing
-  -- CR 701.56a's time travel is what would name the family.
+  -- CR 701.56a's time travel asks "has suspend" of the keyword itself
+  -- (Pawl.Engine.TimeTravel.suspendedCandidates), so the family stays what a CARD
+  -- would name.
   Keyword.Suspend _ -> Just KeywordFamily.Suspend
   Keyword.SplitSecond -> Nothing
   Keyword.Devoid -> Nothing
