@@ -3,9 +3,6 @@
     {
       "keywords": [
         {
-          "type": "Flash"
-        },
-        {
           "type": "Equip",
           "value": {
             "cost": {
@@ -18,6 +15,9 @@
             },
             "quality": null
           }
+        },
+        {
+          "type": "Flash"
         }
       ],
       "manaCost": [
