@@ -304,6 +304,9 @@ data Face card = MkFace
     -- CR 118.8c reads these through Pawl.Engine.Cost.statesHiddenQuality, which is
     -- why a cost naming cards of a stated quality in a hidden zone (Magmatic
     -- Insight's discarded land) excuses a cast an effect instructs "if able".
+    --
+    -- MANDATORY, every one of them: an additional cost whose payment offers the
+    -- caster a choice rides 'additionalCostChoices' below.
     additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
     -- | CR 118.8 / 601.2b: this face's printed additional costs whose payment
     -- offers the caster a CHOICE -- Caustic Exhale's "behold a Dragon or pay

@@ -5533,6 +5533,8 @@ activatedAbilityFilters ability =
 --     604.2's "as long as" condition gating the ability that prints it.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSlot.
 --   * `additionalCosts` -- CR 601.2f's sacrifice component.
+--   * `additionalCostChoices` -- the same components, one option's Cost at a
+--     time (CR 118.8).
 --   * `alternativeCosts` -- that same component, plus CR 604.2's "as long as"
 --     condition gating one.
 --   * `specialActions` -- CR 116.2d's ignore cost, a Cost like the two above.

@@ -2168,7 +2168,7 @@ causticExhaleSpec s registry =
       let (spell, victim, _, _, gs) = causticExhaleBoard 2 swamp exhale galleon [piker] []
           resolved = S.runPure (targeting victim) (S.runPure (targeting victim) gs (S.cast S.alice spell)) Stack.resolveTop
       Spec.assertEqWith s "CR 601.2f the spell resolved and the Galleon is a 2/1" (S.powerToughnessOf victim resolved) (Just (2, 1))
-      Spec.assertEqWith s "CR 601.2g both Swamps paid, the {B} and the {1}" (length (filter (\oid -> isTapped oid resolved) (Game.zoneMembers Zone.Battlefield S.alice resolved))) 2
+      Spec.assertEqWith s "CR 601.2h both Swamps paid, the {B} and the {1}" (S.tappedCount S.alice resolved) 2
     -- CR 601.2b with BOTH options open -- a Dragon card in hand and two Swamps --
     -- so the answer is the caster's and nothing else differs between the two
     -- runs. The reveal is what tells the answers apart: rule 701.4a's hand half
