@@ -294,3 +294,4 @@ zoneFunctionedFrom itself delayed effect = case effect of
   -- and is never "the object it's on", so only the body can answer at all. No
   -- card in the pool writes such a body.
   Effect.ForEach (ForEach.MkForEach _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
+  Effect.Heal _ -> Nothing

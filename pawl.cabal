@@ -1487,6 +1487,7 @@ library test
     Pawl.ForageSpec
     Pawl.GameSpec
     Pawl.GoadSpec
+    Pawl.HealSpec
     Pawl.InitiativeSpec
     Pawl.InvestigateSpec
     Pawl.KeywordTriggerSpec

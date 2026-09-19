@@ -285,8 +285,9 @@ data View = MkView
     -- forces it unless a Filter contains DealtDamageThisTurn.
     --
     -- Deliberately not Object.damage: CR 120.6 removes marked damage on a
-    -- regeneration and CR 120.3d/120.3e mark none at all for a wither or infect
-    -- source, so the marks are a strict subset of what was dealt.
+    -- regeneration, CR 701.69a heals it away and CR 120.3d/120.3e mark none at
+    -- all for a wither or infect source, so the marks are a strict subset of
+    -- what was dealt.
     dealtDamageThisTurn :: Bool,
     -- CR 702.122c: which objects did this candidate crew earlier this turn? The
     -- same log the three fields above read, and LAZY for their reason -- nothing

@@ -762,4 +762,7 @@ data Effect card ability
     -- applies itself across the set, so reach for those first. Ordered APNAP,
     -- then by the resolving controller's choice.
     ForEach (ForEach.ForEach (Effect card ability))
+  | -- | CR 701.69a: remove all marked damage from the permanents the ObjectRef
+    -- names.
+    Heal ObjectRef.ObjectRef
   deriving (Eq, Ord, Show)

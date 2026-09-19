@@ -613,9 +613,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 701.17a / 608.2i: the same log, read for the mills.
       Filter.milledThisTurn = any (milledIt oid . LoggedEvent.event) (GameState.events gs),
       -- CR 120.1 / 608.2i: the same log again, read for the damage. Never
-      -- Object.damage -- CR 120.6 removes the marks on a regeneration and CR
-      -- 120.3d/120.3e mark none at all for wither or infect, and either creature
-      -- was still dealt damage this turn.
+      -- Object.damage -- CR 120.6 removes the marks on a regeneration, CR
+      -- 701.69a heals them away and CR 120.3d/120.3e mark none at all for wither
+      -- or infect, and any such creature was still dealt damage this turn.
       Filter.dealtDamageThisTurn = any ((== Just oid) . Game.damagedObject . LoggedEvent.event) (GameState.events gs),
       -- CR 702.122c / 608.2i: the same log once more, read for the crewings this
       -- candidate paid for. The VEHICLES, which is the half of the relation a

@@ -246,7 +246,8 @@ codec cardCodec abilityCodec =
           Arm.payload "MakePlotted" ObjectRef.codec Effect.MakePlotted (\x -> case x of Effect.MakePlotted y -> Just y; _ -> Nothing),
           Arm.payload "MakeForetold" MakeForetold.codec Effect.MakeForetold (\x -> case x of Effect.MakeForetold y -> Just y; _ -> Nothing),
           Arm.payload "MakeWarped" ObjectRef.codec Effect.MakeWarped (\x -> case x of Effect.MakeWarped y -> Just y; _ -> Nothing),
-          Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing)
+          Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing),
+          Arm.payload "Heal" ObjectRef.codec Effect.Heal (\x -> case x of Effect.Heal y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: Effect.Effect card ability -> String
@@ -386,3 +387,4 @@ tagOf x = case x of
   Effect.MakeForetold {} -> "MakeForetold"
   Effect.MakeWarped {} -> "MakeWarped"
   Effect.ForEach {} -> "ForEach"
+  Effect.Heal {} -> "Heal"
