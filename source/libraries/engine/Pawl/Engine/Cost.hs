@@ -3259,8 +3259,11 @@ criteriaOf component = case component of
 -- composes that state, and answers Nothing where the two sides wrote one leaf
 -- differently, which falls back to the whole reversal unasked -- conservative,
 -- and reached by nothing in the suite.
--- A caller whose announcement writes nothing hands the same state twice, and
--- then the composed state IS `closed` and nothing here moves.
+-- A caller whose announcement writes no leaf this function reverses hands down
+-- two states the composition cannot tell apart, and then the composed state IS
+-- `closed` and nothing here moves. That is every caller today: they differ only
+-- in GameState.lastChoice and, at Pawl.Engine.Companion.take, in
+-- GameState.nextObjectId, both of which ride at `closed`'s value by rule.
 --
 -- CostSpec's "Reversal" group proves it at CR 118.12's payment, and
 -- Pawl.FaceDownSpec's "Reversal at a special action" group at a special
@@ -3289,9 +3292,10 @@ reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> GameState 
 reverseIllegal pid activated closed entry before = case NonEmpty.nonEmpty activated of
   Nothing -> restoreKeepingLibraryActions before
   Just sources -> case Reversal.withoutAnnouncement before entry closed of
-    -- No state answers "keep them", so the question is not raised and CR 733.1's
-    -- first sentence stands alone -- the reversal every caller did before this
-    -- (Pawl.Engine.Reversal).
+    -- Not implemented: rule 733.1's question where no state answers "keep
+    -- them". The whole action goes back unasked, which is the reversal every
+    -- caller did before this and so costs at most the question
+    -- (Pawl.Engine.Reversal) (#3119).
     Nothing -> restoreKeepingLibraryActions before
     Just kept -> do
       State.put kept

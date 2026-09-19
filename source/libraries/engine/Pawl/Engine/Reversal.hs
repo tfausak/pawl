@@ -232,13 +232,20 @@ withoutAnnouncement before entry closed = do
     seqOf field = Just (Seq.fromList (elements (Foldable.toList (field before)) (Foldable.toList (field entry)) (Foldable.toList (field closed))))
     zoneOf :: (Ord k, Eq a) => (GameState -> Map.Map k (Seq.Seq a)) -> Maybe (Map.Map k (Seq.Seq a))
     zoneOf field = mapWith (\b e c -> Just (Seq.fromList (elements (Foldable.toList b) (Foldable.toList e) (Foldable.toList c)))) (field before) (field entry) (field closed)
-    -- CR 733.1's last sentence: a shuffle is never reversed. Where the
-    -- announcement moved no library card -- which the window cannot do at all,
-    -- CR 605.1a disqualifying an ability whose cost or effect moves one -- the
-    -- membership is unchanged and the window's ORDER stands. Where it differs
-    -- the announcement itself took a card out (Panglacial Wurm), which CR
-    -- 733.1's first sentence does reverse, and the ordinary element rule runs.
-    -- The same trade Pawl.Engine.Cost.keepingLibraryActions already makes.
+    -- CR 733.1's last sentence: a shuffle is never reversed. Where neither side
+    -- moved a library card the membership is unchanged and the window's ORDER
+    -- stands -- which is every board this is reached on today, the
+    -- announcement's whole diff being empty for every caller that gets here
+    -- (Pawl.Engine.Cost.reverseIllegal).
+    --
+    -- Not implemented: where a card DID move, the element rule below runs and a
+    -- shuffle performed beside that move goes back with it -- as does the move
+    -- itself, which rule 733.1's last sentence forbids reversing as well. Both
+    -- sides can make one. The announcement can cast from a library (Panglacial
+    -- Wurm), and the window can too: CR 605.1a disqualifies an activated ability
+    -- whose cost or effect MOVES a library card, which a shuffle does not
+    -- (synthetic-shuffling-tomb), and CR 605.1b states no library clause at all,
+    -- so a triggered mana ability resolved inline may even mill (#3119).
     libraries :: (Ord k, Ord a) => (GameState -> Map.Map k (Seq.Seq a)) -> Maybe (Map.Map k (Seq.Seq a))
     libraries field = mapWith ordering (field before) (field entry) (field closed)
       where
