@@ -2620,6 +2620,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseMutateSide decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseForage decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLearn decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseTimeTravel decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseClash decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEntwine decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBuyback decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2756,6 +2757,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseMutateSide {} -> "ChooseMutateSide"
   Prompt.ChooseForage {} -> "ChooseForage"
   Prompt.ChooseLearn {} -> "ChooseLearn"
+  Prompt.ChooseTimeTravel {} -> "ChooseTimeTravel"
   Prompt.ChooseClash {} -> "ChooseClash"
   Prompt.ChooseEntwine {} -> "ChooseEntwine"
   Prompt.ChooseBuyback {} -> "ChooseBuyback"

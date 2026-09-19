@@ -141,6 +141,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.TemptWithTheRing -> Nothing
   Effect.Forage -> Nothing
   Effect.Populate -> Nothing
+  Effect.TimeTravel -> Nothing
   Effect.Recruit -> Nothing
   Effect.Learn -> Nothing
   Effect.Cloak {} -> Nothing

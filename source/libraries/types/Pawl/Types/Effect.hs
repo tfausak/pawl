@@ -653,6 +653,10 @@ data Effect card ability
     -- Pawl.Engine.Learn.learn as one procedure. Nullary, rule 701.48a fixing
     -- everything but the learner's own choices.
     Learn
+  | -- | CR 701.56a: the resolving controller time travels, performed by
+    -- Pawl.Engine.TimeTravel.timeTravel as one procedure. Nullary, rule 701.56a
+    -- fixing everything but which objects are chosen and which way each goes.
+    TimeTravel
   | -- | CR 701.70a: the resolving controller recruits, performed by
     -- Pawl.Engine.Recruit.recruit as one procedure. Nullary, rule 701.70a
     -- fixing everything but which card is discarded.
