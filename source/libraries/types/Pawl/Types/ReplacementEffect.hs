@@ -9,6 +9,7 @@ import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.LifeGainR as LifeGainR
 import qualified Pawl.Types.LifeLossR as LifeLossR
+import qualified Pawl.Types.MillCountR as MillCountR
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -160,6 +161,16 @@ data ReplacementEffect card ability effect
     -- instruction is settled before any draw inside it -- so a board carrying
     -- both rows applies each once.
     DrawCountR DrawCountR.DrawCountR
+  | -- | CR 701.17a / 614.1a: "if an opponent would mill one or more cards, they
+    -- mill twice that many cards instead" (Bruvac the Grandiloquent). Its own arm
+    -- because a mill is its own event class: rule 701.17a's action moves cards
+    -- from a library to a graveyard as one batch, and a ZoneChangeR watching those
+    -- moves sees each card separately and cannot change how many there are.
+    --
+    -- The INSTRUCTION and not the individual moves, DrawCountR's split: a row here
+    -- resizes the count before any card is looked at, which is what CR 701.17d's
+    -- "if more than one card is milled due to replacement effects" is about.
+    MillCountR MillCountR.MillCountR
   | -- | CR 705.1 / 614.1a: "if you would flip a coin, instead flip two coins and
     -- ignore one" (Krark's Thumb). Its own arm because rule 705.1's flip is its
     -- own event class: nothing else in the rules asks for a random two-way

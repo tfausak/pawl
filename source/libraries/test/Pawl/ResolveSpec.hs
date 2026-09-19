@@ -2170,6 +2170,34 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "bob milled the top card of his library, and only it"
       (namesIn Zone.Graveyard S.bob settled)
       [nameOf "Crucible of Worlds"]
+  -- Bruvac the Grandiloquent -- "If an opponent would mill one or more cards, they
+  -- mill twice that many cards instead" -- under the same Predict. CR 701.17d is
+  -- the reading: an effect asking after the milled card is answered by EACH card a
+  -- replacement made the mill take.
+  --
+  -- The board is the case ABOVE with one thing added, so the doubling is the whole
+  -- difference: bob's library is in the order that mills the chosen name SECOND,
+  -- where the case above drew one card because the first milled card was the other
+  -- one. An engine that asked only about the card the printed instruction would
+  -- have milled draws one here too.
+  Spec.it s "CR 701.17d Bruvac doubles the mill, and Predict is answered by the second milled card too" $ do
+    settled <- resolveBruvacPredict s registry ["Crucible of Worlds", "Chromatic Star", "Goblin Piker"]
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    -- The gameplay assertion, and FIRST: CR 701.17d's several answers. Only the
+    -- SECOND milled card carries the chosen name, so a tally reading one milled
+    -- card counts zero and alice draws one Piker instead of two.
+    Spec.assertEqWith
+      s
+      "the second milled card carried the chosen name, so alice drew two cards"
+      (namesIn Zone.Hand S.alice settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
+    -- CR 614.1a: the instruction was resized from one card to two. The third card
+    -- is what keeps this from reading as "bob's library emptied".
+    Spec.assertEqWith
+      s
+      "bob milled two cards where Predict names one, and kept the third"
+      (namesIn Zone.Graveyard S.bob settled, namesIn Zone.Library S.bob settled)
+      ([nameOf "Crucible of Worlds", nameOf "Chromatic Star"], [nameOf "Goblin Piker"])
   -- Petra Sphinx -- "{T}: Target player chooses a card name, then reveals the top
   -- card of their library. If that card has the chosen name, that player puts it
   -- into their hand. If it doesn't, the player puts it into their graveyard." The
@@ -3588,6 +3616,22 @@ predictBoard s registry top = do
 resolvePredict :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m GameState.GameState
 resolvePredict s registry top = do
   (gs, spellId) <- predictBoard s registry top
+  pure (S.runPure predictAnswer gs (S.cast S.alice spellId >> Stack.resolveTop))
+
+-- predictBoard with alice's Bruvac the Grandiloquent standing beside her Islands.
+-- Bob is her opponent, so CR 614.1a's row watches the mill Predict instructs him
+-- to take; nothing else about the board moves.
+bruvacBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m (GameState.GameState, ObjectId.ObjectId)
+bruvacBoard s registry top = do
+  bruvac <- S.printingOf s registry "Bruvac the Grandiloquent"
+  (gs, spellId) <- predictBoard s registry top
+  pure (snd (S.addPermanent bruvac S.alice gs), spellId)
+
+-- resolvePredict over that board: one cast and one resolution, the narrowest path
+-- that shows the doubled mill being asked about twice.
+resolveBruvacPredict :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m GameState.GameState
+resolveBruvacPredict s registry top = do
+  (gs, spellId) <- bruvacBoard s registry top
   pure (S.runPure predictAnswer gs (S.cast S.alice spellId >> Stack.resolveTop))
 
 -- atBobAnswer with CR 201.4's name read off the CHOOSER the prompt names. Bob is

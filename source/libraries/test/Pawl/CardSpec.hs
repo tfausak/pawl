@@ -1867,6 +1867,7 @@ replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
+  ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
@@ -1892,6 +1893,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
+  ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
@@ -1915,6 +1917,7 @@ replacementMintedCards replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
+  ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
@@ -4502,6 +4505,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> []
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.Dredge _)) -> []
   ReplacementEffect.DrawCountR {} -> []
+  ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.PhaseR _ -> []
 

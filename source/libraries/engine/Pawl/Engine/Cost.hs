@@ -4836,21 +4836,19 @@ payComponent moment slots pid oid component = case component of
   CostComponent.PayEnergyX -> pure Payment.Unpaid
   -- CR 701.17a: the top `n` cards of the PAYING player's own library (CR 400.3),
   -- moved to their graveyard. `canPayComponent` above has already refused a cost
-  -- milling more than the library holds (CR 701.17b), so the take is exact rather
-  -- than an "as many as possible".
+  -- milling more than the library holds (CR 701.17b); a MillCountR row resizing
+  -- the instruction can still take it past that, which is why the funnel clamps.
   --
-  -- Through Event.changeZoneReturning, the CR 400.7 funnel, and then recorded as
-  -- the mill it was -- Resolve's Effect.Mill arm's two steps, since CR 701.17a
-  -- makes this a mill wherever it happens and a watcher of one cannot tell a cost
-  -- from a resolution. ONE entry for the batch, that arm's reading of rule
-  -- 701.17a, and none at all where every move was cancelled.
+  -- Through Event.millFrom, which is CR 614.1a's road as well as CR 400.7's: rule
+  -- 701.17a makes this a mill wherever it happens, so Bruvac the Grandiloquent
+  -- sees a cost's mill exactly as it sees a resolution's. Then recorded as the
+  -- mill it was -- ONE entry for the batch, Resolve's Effect.Mill arm's reading of
+  -- rule 701.17a, and none at all where every move was cancelled.
   --
   -- Binds NO slot: CR 701.17c's look-back is for a later clause of the same
   -- resolution, and a cost has none -- see Pawl.Types.CostComponent's arm.
   CostComponent.MillCards n -> do
-    gs <- State.get
-    let cards = List.genericTake n (Game.zoneMembers Zone.Library pid gs)
-    arrived <- fmap (concatMap Foldable.toList) (Monad.mapM (\card -> Event.changeZoneReturning card Zone.Graveyard) cards)
+    arrived <- Event.millFrom pid n
     Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
     pure bindsNothing
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a

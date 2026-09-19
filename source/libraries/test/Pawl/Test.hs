@@ -297,6 +297,8 @@ import qualified Pawl.Codec.MeldSourceSpec
 import qualified Pawl.Codec.MeldSpec
 import qualified Pawl.Codec.MentoredSpec
 import qualified Pawl.Codec.MergeComponentSpec
+import qualified Pawl.Codec.MillCountRSpec
+import qualified Pawl.Codec.MillCountRewriteSpec
 import qualified Pawl.Codec.MillSpec
 import qualified Pawl.Codec.MillTallySpec
 import qualified Pawl.Codec.MilledSpec
@@ -965,6 +967,8 @@ spec s registry = do
   Pawl.Codec.ExploitedSpec.spec s
   Pawl.Codec.MentoredSpec.spec s
   Pawl.Codec.MergeComponentSpec.spec s
+  Pawl.Codec.MillCountRSpec.spec s
+  Pawl.Codec.MillCountRewriteSpec.spec s
   Pawl.Codec.MillSpec.spec s
   Pawl.Codec.MillTallySpec.spec s
   Pawl.Codec.MilledSpec.spec s

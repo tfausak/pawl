@@ -480,6 +480,7 @@ idleTokenRowOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -536,6 +537,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
 
 -- Every replacement shape the codec accepts and no card may author, for
@@ -588,6 +590,7 @@ engineOnlyOffends replacement = case replacement of
   -- engine-only. LifeLossR's answer, and for its reason.
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.TurnUpR {} -> False
 
@@ -670,6 +673,7 @@ turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -702,6 +706,7 @@ riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -746,6 +751,7 @@ shufflingOutsideLibraryOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
