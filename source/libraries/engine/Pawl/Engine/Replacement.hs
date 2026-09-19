@@ -2105,8 +2105,20 @@ at xs i fallback = case List.genericDrop i xs of
 -- is honoured a level up, where a whole batch of simultaneous events can present
 -- choices to two players at once: `orderBatch` sorts the batch by this
 -- function's answer before any of it is asked.
+--
+-- CR 800.4h is applied over the answer: rule 616.1 is a RULE requiring a choice,
+-- so one falling to a player who has left goes to the next player in turn order
+-- instead (Game.ruleChooser), and Nothing when no seat is left to take it.
+-- Nothing in the suite observes that wrapper: the only race a departed player
+-- can face is the one inside CR 800.4a's own exile, and #3875 is what keeps that
+-- out of reach. Written because rule 800.4h says so, and a green suite is not
+-- coverage of it.
 chooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
-chooserOf gs event = case event of
+chooserOf gs event = affectedChooserOf gs event >>= Game.ruleChooser gs
+
+-- CR 616.1's own question, before rule 800.4h is applied to the answer.
+affectedChooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
+affectedChooserOf gs event = case event of
   ProposedEvent.WouldChangeZone zc -> Projection.controllerOf (ZoneChange.object zc) gs
   -- CR 616.1's affected object's controller, read LIVE off the materialized
   -- permanent -- which for an entry is the player it WOULD enter under, and

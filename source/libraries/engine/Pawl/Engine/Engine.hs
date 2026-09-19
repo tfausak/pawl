@@ -444,9 +444,15 @@ runTurnBasedActions phase = do
   -- defending player and CR 703.4p's sweep is the GAME's action, so neither is
   -- guarded.
   --
-  -- Not implemented: CR 800.4h, which reaches the CHOICES on that list -- a choice
-  -- a rule requires of a departed player is made by the next player in turn order
-  -- (#3862). Only the defending-player choice is real, and unobservable.
+  -- CR 800.4h reaches the CHOICES on that list -- a choice a rule requires of a
+  -- departed player is made by the next player in turn order -- and only the
+  -- defending-player one survives it: after CR 800.4a the departed player owns no
+  -- card and controls no permanent, so which permanents untap (CR 703.4c), which
+  -- creatures attack (CR 703.4i) and which cards are discarded (CR 703.4n) are
+  -- each chosen from an empty set whoever is asked, and the draw (CR 703.4d) is
+  -- no choice at all. Combat.designateDefenders is where the one that is left
+  -- gets reassigned, which is why the beginning of combat arm below takes no
+  -- guard.
   hasActive <- State.gets (List.elem active . Game.stillPlaying)
   case phase of
     Phase.Beginning BeginningStep.Untap -> do
@@ -470,10 +476,10 @@ runTurnBasedActions phase = do
       skip <- State.gets skipsDraw
       Monad.unless skip (Event.drawCard active)
     -- CR 703.4h: choose the defending player. The active player's action (CR
-    -- 507.1), so it takes the same guard -- redundantly, Combat.designateDefenders
-    -- computing the identical test, and kept so this arm still reads off CR
-    -- 800.4j's enumeration above.
-    Phase.Combat CombatStep.BeginningOfCombat -> Monad.when hasActive Combat.designateDefenders
+    -- 507.1), and the one item on the list CR 800.4h hands to another seat rather
+    -- than dropping, so it is NOT guarded here -- designateDefenders asks
+    -- Game.ruleChooser who makes the choice.
+    Phase.Combat CombatStep.BeginningOfCombat -> Combat.designateDefenders
     Phase.Combat CombatStep.DeclareAttackers -> Monad.when hasActive (Combat.declareAttackers Resolve.performManaAbility active)
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers Resolve.performManaAbility
     Phase.Combat CombatStep.CombatDamage -> do

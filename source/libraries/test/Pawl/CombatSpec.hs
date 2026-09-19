@@ -733,42 +733,49 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
             []
     Spec.assertEqWith s "nobody defends" (Combat.Type.defenders (GameState.combat after)) []
     Spec.assertEqWith s "nobody was asked" asked []
-  Spec.it s "CR 800.4h #3862 a turn whose active player has left chooses no defending player, diverging from the next-seat reassignment" $ do
-    -- CR 800.4j: the turn continues without an active player, so the action
-    -- the rules assign to the active player has no subject. CR 800.4j is a
-    -- priority rule and licenses no more than that; CR 800.4h would hand the
-    -- choice to the next player in turn order rather than drop it, so what is
-    -- asserted here is pawl's unobservable divergence from CR 800.4h (#3862),
-    -- not a rules-required outcome. THREE seats, so that two opponents survive and the choice would
-    -- otherwise be a real prompt -- at two seats the elision would hide the
-    -- guard entirely.
+  Spec.it s "CR 800.4h a turn whose active player has left puts the choice to the next player in turn order" $ do
+    -- CR 800.4j: the turn continues without an active player, and CR 800.4h is
+    -- what says the choice it leaves behind is not dropped -- the next player in
+    -- turn order makes it. THREE seats, so that two opponents survive alice's
+    -- departure: the choice is a real prompt (#169's elision cannot suppress
+    -- it), and "the next player in turn order" differs from "some survivor" --
+    -- bob is asked, and he answers carol, so the asked seat differs from the
+    -- chosen one.
     --
-    -- This drives Engine.runTurnBasedActions, and the guard exists at BOTH
-    -- ends of that call (Engine.hs's hasActive and designateDefenders's own test),
-    -- so this case passes with either one alone and isolates neither. The
-    -- sibling case below is the one that isolates designateDefenders's; the
-    -- engine-side copy is redundant on this path and has nothing to isolate.
+    -- CR 507.1's branch, which is the only one with a choice in it to reassign:
+    -- S.oneDefendingPlayer turns CR 802.2 off, the case below being the board
+    -- that leaves it on. The CANDIDATES are untouched by the reassignment --
+    -- still alice's opponents (CR 507.1, CR 506.2) -- so bob is asked about a
+    -- list he is himself on, which is what makes his answer of carol
+    -- discriminating.
+    let gone = S.departs Departure.Type.Conceded S.alice (S.oneDefendingPlayer S.threePlayerGame)
+        (after, asked) =
+          State.runState
+            (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
+            []
+    Spec.assertEqWith s "bob, the next player in turn order, is who was asked" asked [S.bob]
+    Spec.assertEqWith s "and carol, his answer, is the defending player" (Combat.Type.defenders (GameState.combat after)) [S.carol]
+  Spec.it s "CR 800.4h designateDefenders called directly reassigns the same way" $ do
+    -- The same rule reached WITHOUT Engine.runTurnBasedActions, so that only
+    -- designateDefenders's own Game.ruleChooser call can be responsible.
+    let gone = S.departs Departure.Type.Conceded S.alice (S.oneDefendingPlayer S.threePlayerGame)
+        (after, asked) =
+          State.runState
+            (fmap snd (Engine.runGame (choosesDefender S.carol) gone Combat.designateDefenders))
+            []
+    Spec.assertEqWith s "bob, the next player in turn order, is who was asked" asked [S.bob]
+    Spec.assertEqWith s "and carol, his answer, is the defending player" (Combat.Type.defenders (GameState.combat after)) [S.carol]
+  Spec.it s "CR 802.2 a departed active player's opponents still all become defending players, with nothing asked" $ do
+    -- The other half of the board above: CR 802.2 settles the whole group as an
+    -- ACTION, so there is no choice for CR 800.4h to reassign and the turn-based
+    -- action runs to the same answer it would have with alice still seated. The
+    -- default settings (CR 806.2b) are what make this the ordinary case.
     let gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         (after, asked) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
-    Spec.assertEqWith s "no defending player" (Combat.Type.defenders (GameState.combat after)) []
-    Spec.assertEqWith s "and nobody was asked" asked []
-  Spec.it s "CR 800.4j designateDefenders called directly still chooses nobody" $ do
-    -- The same rule at the other end of the call, reached WITHOUT
-    -- Engine.runTurnBasedActions so that only designateDefenders's own membership
-    -- test can be responsible. Discriminating exactly that line: with it gone,
-    -- alice -- who has left the game -- is asked, and carol becomes the
-    -- defending player on a turn CR 800.4j says has no active player to choose
-    -- one. Three seats again, so two candidates survive alice's departure and
-    -- the single-candidate elision (#169) cannot be what suppresses the ask.
-    let gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
-        (after, asked) =
-          State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.carol) gone Combat.designateDefenders))
-            []
-    Spec.assertEqWith s "no defending player" (Combat.Type.defenders (GameState.combat after)) []
+    Spec.assertEqWith s "both survivors defend" (Combat.Type.defenders (GameState.combat after)) [S.bob, S.carol]
     Spec.assertEqWith s "and nobody was asked" asked []
   Spec.it s "CR 507.1 an answer that is not one of the candidates falls back to the first" $ do
     -- A broken interpreter, not a game state: it names the ACTIVE player.

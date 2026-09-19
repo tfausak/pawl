@@ -1621,13 +1621,17 @@ designateDefenders :: Game ()
 designateDefenders = do
   gs <- State.get
   let pid = GameState.activePlayer gs
-  -- Not implemented: CR 800.4h's handing of this choice to the next player in turn
-  -- order on a turn whose active player has left (CR 800.4j) (#3862).
+  -- CR 800.4h: on a turn whose active player has left (CR 800.4j) the choice is
+  -- not skipped -- the next player in turn order makes it. The CANDIDATES are
+  -- untouched by that: CR 507.1 offers the attacking player's opponents whoever
+  -- is asked, and the attacking player is the active seat (CR 506.2). Nothing is
+  -- chosen when no seat is left to choose, which CR 104.2a has already ended the
+  -- game before.
   --
-  -- Engine.runTurnBasedActions binds the identical test before calling this, so on
-  -- the engine's path this guard is redundant. Do NOT delete it: a direct caller
-  -- -- a spec, or a second combat phase spliced by an effect -- depends on it.
-  Monad.when (List.elem pid (Game.stillPlaying gs)) $
+  -- Engine.runTurnBasedActions calls this WITHOUT its own membership test, so
+  -- this is the only site that decides who is asked; a direct caller -- a spec,
+  -- or a second combat phase spliced by an effect -- gets the same answer.
+  Monad.forM_ (Game.ruleChooser gs pid) $ \chooser ->
     case NonEmpty.nonEmpty (attackableOpponents gs) of
       Nothing -> pure ()
       Just candidates -> do
@@ -1639,8 +1643,10 @@ designateDefenders = do
             else case candidates of
               only NonEmpty.:| [] -> pure [only]
               _ -> do
-                let decider = Decide.deciderFor pid gs
-                answer <- Game.choose (Prompt.ChooseDefender decider pid candidates)
+                -- CR 723.1 on top of CR 800.4h: the reassigned seat is who the
+                -- rule asks, and a player controlling THEM answers for them.
+                let decider = Decide.deciderFor chooser gs
+                answer <- Game.choose (Prompt.ChooseDefender decider chooser candidates)
                 pure
                   [ if List.elem answer (NonEmpty.toList candidates)
                       then answer
