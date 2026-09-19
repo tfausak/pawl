@@ -4381,6 +4381,11 @@ entryOptionFilters option = concatMap keywordFilters (Set.toList (EntryOption.ke
 -- carries a fifth, through the keyword it grants (a landwalk's). CR 614.1c's
 -- as-enters exile carries a sixth, over a CARD IN A GRAVEYARD (Living Lore's "an
 -- instant or sorcery card"). None of the six is framed.
+--
+-- The as-enters host choice is the seventh axis and the one that IS framed:
+-- Grifter's Blade's "a creature you control it could be attached to" is
+-- evaluated by Pawl.Engine.Attach.hostsFor, the same function the two attach
+-- opcodes' destinations go through, so it is AttachDestination.
 entryRewriteFilters :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> unframed [f]
@@ -4390,6 +4395,11 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- (Living Lore's "an instant or sorcery card"), the reveal's axis one zone over
   -- and unframed with it.
   EntryRewrite.ExileFromGraveyard f -> unframed [f]
+  -- CR 614.1c's as-enters host choice, evaluated by Pawl.Engine.Attach.hostsFor
+  -- against a view whose `canHostSubject` is filled in -- the same position
+  -- Effect.AttachTarget's destination is, so the same Framing. The one arm of
+  -- this walk that is framed.
+  EntryRewrite.EntersAttachedTo f -> [(AttachDestination, f)]
   -- CR 707.5's eligible set -- Clone's "any creature", Copy Enchantment's "any
   -- enchantment" -- is a criterion over permanents on the battlefield, so it
   -- belongs in this walk. So do CR 707.9's exceptions beside it, which reach a
@@ -4624,9 +4634,10 @@ blockPermissionFilters permission =
 -- is why this is a tag on the position rather than a Bool.
 --
 --   * AttachDestination -- the destination of Effect.AttachTarget or
---     Effect.AttachTargetToEach, the positions evaluated against a view whose
---     `canHostSubject` is filled in (Pawl.Engine.Attach.hostsFor). CR 701.3a's
---     atom belongs here and nowhere else.
+--     Effect.AttachTargetToEach, and EntryRewrite.EntersAttachedTo's host
+--     choice, the positions evaluated against a view whose `canHostSubject` is
+--     filled in (Pawl.Engine.Attach.hostsFor). CR 701.3a's atom belongs here and
+--     nowhere else.
 --   * InTargetSlot -- a MODE's target slot filter, the one position matched by
 --     Pawl.Engine.Target.admittedGiven, which is the one site that fills
 --     Filter.Context.slotControllers and one of the callers that fill
@@ -5021,7 +5032,8 @@ manaRiderFilters rider = [ManaRider.condition rider]
 
 -- Every Filter one effect carries, paired with its Framing. Two arms answer
 -- AttachDestination -- Effect.AttachTarget's destination and
--- Effect.AttachTargetToEach's, which are the only CARD-AUTHORED Filter positions
+-- Effect.AttachTargetToEach's, which with EntryRewrite.EntersAttachedTo's host
+-- choice (entryRewriteFilters) are the CARD-AUTHORED Filter positions
 -- evaluated against a view whose `canHostSubject` is filled in
 -- (Pawl.Engine.Attach.hostsFor, from attachmentFor). TurnUpRewrite.MayAttachTo reaches the same evaluator and is
 -- still unframed, deliberately: CR 303.4k's enchant-ability conjunct is added by

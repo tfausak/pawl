@@ -2525,6 +2525,72 @@ apply batch candidate event =
               State.modify' $ \gs2 ->
                 gs2 {GameState.exiledWith = foldr (\arrival -> Map.insert arrival oid) (GameState.exiledWith gs2) arrivals}
             pure (Just event)
+      -- CR 614.1c with CR 301.5e: "as this Equipment enters, choose a creature
+      -- you control it could be attached to. If you do, it enters attached to
+      -- that creature" (Grifter's Blade).
+      --
+      -- NOT changeZoneAttaching's CR 303.4f branch widened. That branch is a RULE
+      -- about every Aura arriving with no host named, runs before CR 616.1's loop
+      -- and buries the card when it finds none (CR 303.4g). This is the card's own
+      -- static ability (CR 603.6d, CR 614.1c): it is ordered against the entry's
+      -- other replacements, a copy of the Blade gets it (CR 707.5), it goes when
+      -- the ability goes, and CR 301.5e has the Equipment enter unattached where
+      -- no candidate exists.
+      --
+      -- WRITTEN ONTO THE MATERIALIZED OBJECT rather than handed back as a seed:
+      -- this loop runs after `mkObj` has minted the incarnation, so there is no
+      -- seed left to fill. The BecameAttached record further down reads
+      -- Object.attachedTo back off the entered object for that reason.
+      --
+      -- THE CONTROLLER is read LIVE (Projection.controllerOf) rather than off the
+      -- move's `under`, so an EntryRewrite.UnderSourceControl applied earlier in
+      -- this same CR 616.1 loop decides whose "you control" this is.
+      --
+      -- MINUS `batch` and minus GameState.enteringSubjects, which is CR 614.12a:
+      -- the choice is made before the permanent enters, so a creature entering
+      -- beside it is no candidate. hostsFor sweeps GameState.battlefield, which
+      -- already holds the materialized siblings, so the exclusion has to be
+      -- written -- the SacrificeAnyNumber arm's point above. Unproven on a
+      -- board: reaching it needs one effect putting an Equipment and a creature
+      -- onto the battlefield together, and no test here drives that. Written
+      -- because rule 614.12a requires it, not because a board shows it.
+      --
+      -- A bare Filter.contextFor: an entry replacement has no resolution behind
+      -- it, so the filter can name no slot (Resolve.Slots.entryRewriteReads
+      -- reports it all the same, for the lint that asks).
+      --
+      -- Filter.CanHostSubject comes off the CARD here, where CR 303.4k's
+      -- Attach.turnUpHosts adds it by rule: Grifter's Blade prints "it could be
+      -- attached to", so the card writes the atom.
+      --
+      -- THE TAG the enchant slot produced, through Attach.attachmentFor and never
+      -- a hand-built ToObject, for the CR 303.4f branch's reason:
+      -- Sba.stillLegalEnchant compares the (pool, tag) pair.
+      EntryRewrite.EntersAttachedTo filter_ -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arms above's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner. Enters unattached rather than
+          -- guessing whose "you control" this is, which is where CR 301.5e lands
+          -- anyway.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            let entering oid2 = Set.member oid2 batch || Set.member oid2 (GameState.enteringSubjects gs)
+                hosts = filter (not . entering) (Attach.hostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) oid filter_ gs)
+            chosen <- Attach.chooseHost controller oid hosts
+            -- CR 301.5e: no candidate leaves the Equipment on the battlefield
+            -- unattached, and attachmentFor answering Nothing lands in the same
+            -- place. The latter is unreachable rather than a second reading --
+            -- the card's own Filter.CanHostSubject conjunct is that same
+            -- function -- but a card omitting the atom would reach it, and this
+            -- is the direction rule 301.5e names.
+            Monad.forM_ (chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs) $ \recipient ->
+              State.modify' $ \gs2 ->
+                let seat obj = obj {Object.attachedTo = Just recipient}
+                 in gs2 {GameState.objects = Map.adjust seat oid (GameState.objects gs2)}
+            pure (Just event)
       -- CR 702.155b / 714.3b: read ahead's two intrinsic abilities, applied as
       -- one rewrite -- choose a number between one and this Saga's final chapter
       -- number, then enter with that many lore counters.
@@ -5704,7 +5770,16 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- Carries `newId`, the CR 400.7 incarnation, rather than the id the
               -- Aura spell had on the stack: that is the object a trigger scan
               -- will find attached.
-              Monad.forM_ (if dest == Zone.Battlefield then entrySeed else Nothing) $ \host ->
+              --
+              -- Read back off the ENTERED object rather than off `entrySeed`,
+              -- which is what widened this line: the seed decides how the
+              -- incarnation is minted, and the EntryRewrite.EntersAttachedTo arm
+              -- writes Object.attachedTo during the CR 616.1 loop afterwards, so
+              -- the seed alone would miss a permanent that arrived attached by
+              -- its own static ability. Every seeded road still reaches it --
+              -- `mkObj` writes the seed into this same field.
+              settledHost <- State.gets (\gs2 -> Game.lookupObject newId gs2 >>= Object.attachedTo)
+              Monad.forM_ (if dest == Zone.Battlefield then settledHost else Nothing) $ \host ->
                 State.modify'
                   . recordEvent
                   $ GameEvent.BecameAttached

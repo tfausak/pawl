@@ -296,6 +296,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       (EntryRewrite.ExileFromGraveyard (Filter.Or [Filter.HasCardType CardType.Instant, Filter.HasCardType CardType.Sorcery]))
       " {\"type\":\"ExileFromGraveyard\",\"value\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Instant\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}}]}} "
+  -- CR 614.1c / 301.5e: an as-enters host choice, carrying the filter the host
+  -- must match -- Grifter's Blade's "a creature you control it could be attached
+  -- to", CR 701.3a's atom written by the card.
+  Spec.it s "EntersAttachedTo (Grifter's Blade)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryRewrite.EntersAttachedTo (Filter.And [Filter.HasCardType CardType.Creature, Filter.CanHostSubject]))
+      " {\"type\":\"EntersAttachedTo\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"CanHostSubject\"}]}} "
   -- CR 614.1c: the rewrite that runs an effect -- Monstrous War-Leech's "mill
   -- four cards". Its "if it was kicked" is NOT here: that clause rides
   -- Pawl.Types.PrintedReplacement one level up (CR 604.2).

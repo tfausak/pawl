@@ -996,6 +996,11 @@ admitsEntry gs oid rewrite = case rewrite of
   -- graveyard is nothing to exile rather than a row that does not apply, which CR
   -- 101.3 settles in Pawl.Engine.Event's arm rather than here.
   EntryRewrite.ExileFromGraveyard _ -> True
+  -- CR 614.1c states no condition of its own: "as this Equipment enters, choose a
+  -- creature you control it could be attached to" is unconditional. No candidate
+  -- is CR 301.5e -- it enters unattached -- rather than a row that does not
+  -- apply, which Pawl.Engine.Event's arm settles rather than this one.
+  EntryRewrite.EntersAttachedTo _ -> True
   -- CR 702.155b states no condition of its own -- a Saga with read ahead always
   -- has both intrinsic abilities -- so this admits every entry the row is
   -- collected for. CR 702.155a's turn-scoped narrowing is not a condition on the
@@ -1649,6 +1654,9 @@ bucketOfEffect re = case re of
   -- graveyard is neither whose the permanent is, what it copies nor which face is
   -- up.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ExileFromGraveyard _)) -> ReplacementBucket.Other
+  -- CR 616.1e for the arm above's reason: what the permanent arrives ATTACHED to
+  -- is neither whose it is, what it copies nor which face is up.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.EntersAttachedTo _)) -> ReplacementBucket.Other
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
   -- CR 616.1e for CR 702.155b's reason: read ahead rewrites how many lore
@@ -1810,6 +1818,12 @@ readsApplier re = case re of
   -- CR 614.12a's moment, and the criterion rides the effect. Two such rows would
   -- offer the same player the same cards.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ExileFromGraveyard _)) -> False
+  -- CR 614.1c: NO, for the arm above's reason. The chooser is the ENTERING
+  -- object's controller -- "you control" in an ability the permanent prints
+  -- about itself -- read live off the board at CR 614.12a's moment, and the
+  -- filter rides the effect. Two such rows would offer the same player the same
+  -- creatures.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.EntersAttachedTo _)) -> False
   -- CR 702.155b: the chooser is the ENTERING Saga's controller, read live off
   -- the board for riot's reason below, and the bound is the entering Saga's own
   -- final chapter number (CR 714.2d) rather than anything the row carries -- so

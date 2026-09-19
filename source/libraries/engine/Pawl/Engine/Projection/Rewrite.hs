@@ -1361,6 +1361,11 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- reason -- that EntryR matches Filter.IsSource, and CR 400.7 forbids carrying a
   -- text change onto the permanent before it entered.
   EntryRewrite.ExileFromGraveyard f -> EntryRewrite.ExileFromGraveyard (Filter.rewrite pairs f)
+  -- CR 614.1c's "a creature you control it could be attached to": Grifter's
+  -- Blade's names a card type CR 612.1 reaches. Latent for the arm above's
+  -- reason -- that EntryR matches Filter.IsSource, and CR 400.7 forbids carrying
+  -- a text change onto the permanent before it entered.
+  EntryRewrite.EntersAttachedTo f -> EntryRewrite.EntersAttachedTo (Filter.rewrite pairs f)
   -- CR 702.38a carries no Filter and no subtype of its own, so there is nothing
   -- here for CR 612.1 to change. A text change to the entering object's own
   -- creature types still reaches the offer, which Pawl.Engine.Event reads off
