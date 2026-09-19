@@ -2244,8 +2244,8 @@ blightChroniclerBoard s registry withSolemnity withOwnWatcher = do
   pure (gnarlbarkId, S.runPure S.identityAnswer begun Engine.settleForPriority)
 
 -- CR 701.66b's earthbend as a TRIGGER EVENT, and rule 701.67c's waterbend
--- beside it. One printing watches either act -- Avatar Aang // Aang, Master of
--- Elements, whose front face reads "Whenever you waterbend, earthbend,
+-- beside it. ONE printing watches either act, and it is the same one -- Avatar
+-- Aang // Aang, Master of Elements, whose front face reads "Whenever you waterbend, earthbend,
 -- firebend, or airbend, draw a card. Then if you've done all four this turn,
 -- transform Avatar Aang" (Scryfall oracle:earthbend, oracle:waterbend,
 -- oracle:airbend and oracle:firebend, every card_faces entry read, 2026-09-19;
@@ -2313,9 +2313,10 @@ bendTriggerSpec s registry =
           Spec.assertEqWith s "CR 701.67c the waterbend put a +1/+1 counter on bob's Scribe" (plus scribeId (settle resolved)) 1
           Spec.assertEqWith s "and only the four Mountains she spent are tapped" (S.tappedCount S.alice resolved) 4
 
--- Alice's last battlefield permanent in ObjectId order. Her battlefield holds
--- nothing but Forests on this board, so this is one of them -- and the LAST one,
--- which is the one paying for the Lesson cannot have tapped.
+-- alice's last battlefield permanent in ObjectId order. Her battlefield holds
+-- nothing but Forests on this board, so this is one of them; rule 701.66a's
+-- "target land you control" asks nothing about whether paying for the Lesson
+-- tapped it.
 lastLand :: GameState.GameState -> ObjectId.ObjectId
 lastLand gs = case List.sortOn Ord.Down (Game.zoneMembers Zone.Battlefield S.alice gs) of
   oid : _ -> oid
