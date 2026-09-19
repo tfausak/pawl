@@ -533,6 +533,12 @@ data Response
     -- pay a cost. A separate constructor from ChoseSacrifices above, for
     -- ChoseTaps' reason below: replaying a transcript against the wrong one
     -- would sacrifice what it should have exiled.
+    --
+    -- Shared by Prompt.ChooseExilesFromGraveyard and Prompt.ChooseCollectEvidence,
+    -- which is ChoseTaps' relation to its two prompts: the two ask for the same
+    -- cards out of the same zone and differ only in whether the Natural beside
+    -- them counts the cards or totals their mana values, so a transcript replayed
+    -- against the other exiles from the graveyard either way.
     ChoseExilesFromGraveyard (Set.Set ObjectId.ObjectId)
   | -- | CR 702.122a: the permanents a player chose to TAP to pay a cost measured
     -- by their total power. A separate constructor from ChoseSacrifices above,

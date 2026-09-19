@@ -213,6 +213,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.ExileTopFromGraveyard (Filter.HasCardType CardType.Creature))
       " {\"type\":\"ExileTopFromGraveyard\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 701.59a: a bare total mana value, no criterion beside it.
+  Spec.it s "CollectEvidence" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.CollectEvidence 3)
+      " {\"type\":\"CollectEvidence\",\"value\":3} "
   -- CR 406.2 out of the hand: a bare criterion, one card.
   Spec.it s "ExileCardFromHand" $
     Common.assertCodec

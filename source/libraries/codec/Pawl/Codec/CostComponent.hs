@@ -64,6 +64,7 @@ codec keywordCodec =
       Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
       Arm.nullary "ExileThis" CostComponent.ExileThis,
       Arm.payload "ExileCardsFromGraveyard" (ExileCardsFromGraveyard.codec keywordCodec) CostComponent.ExileCardsFromGraveyard (\x -> case x of CostComponent.ExileCardsFromGraveyard y -> Just y; _ -> Nothing),
+      Arm.payload "CollectEvidence" Common.natural CostComponent.CollectEvidence (\x -> case x of CostComponent.CollectEvidence y -> Just y; _ -> Nothing),
       Arm.payload "ExileTopFromGraveyard" (Filter.codec keywordCodec) CostComponent.ExileTopFromGraveyard (\x -> case x of CostComponent.ExileTopFromGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ExileCardFromHand" (Filter.codec keywordCodec) CostComponent.ExileCardFromHand (\x -> case x of CostComponent.ExileCardFromHand y -> Just y; _ -> Nothing),
       Arm.payload "RevealCardFromHand" (Filter.codec keywordCodec) CostComponent.RevealCardFromHand (\x -> case x of CostComponent.RevealCardFromHand y -> Just y; _ -> Nothing),
@@ -101,6 +102,7 @@ tagOf x = case x of
   CostComponent.ExileThisFromGraveyard {} -> "ExileThisFromGraveyard"
   CostComponent.ExileThis {} -> "ExileThis"
   CostComponent.ExileCardsFromGraveyard {} -> "ExileCardsFromGraveyard"
+  CostComponent.CollectEvidence {} -> "CollectEvidence"
   CostComponent.ExileTopFromGraveyard {} -> "ExileTopFromGraveyard"
   CostComponent.ExileCardFromHand {} -> "ExileCardFromHand"
   CostComponent.RevealCardFromHand {} -> "RevealCardFromHand"

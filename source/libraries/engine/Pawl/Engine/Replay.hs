@@ -153,6 +153,7 @@ encode p answer = case p of
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
   Prompt.ChooseExilesFromGraveyard {} -> Response.ChoseExilesFromGraveyard answer
+  Prompt.ChooseCollectEvidence {} -> Response.ChoseExilesFromGraveyard answer
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
   Prompt.ChooseAnyNumberToReveal {} -> Response.ChoseReveals answer
   Prompt.ChooseAnyNumberOfPermanents {} -> Response.ChoseAnyNumberOfPermanents answer
@@ -469,6 +470,9 @@ decode p response = case p of
     Response.ChoseSacrifices ids -> Just ids
     _ -> Nothing
   Prompt.ChooseExilesFromGraveyard {} -> case response of
+    Response.ChoseExilesFromGraveyard ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseCollectEvidence {} -> case response of
     Response.ChoseExilesFromGraveyard ids -> Just ids
     _ -> Nothing
   Prompt.ChooseAnyNumberToSacrifice {} -> case response of
@@ -945,6 +949,12 @@ defaultAnswer p = case p of
   -- CR 406.2: the first `count` candidates, the arm above's rule over the
   -- graveyard pool the engine offers in that zone's own order.
   Prompt.ChooseExilesFromGraveyard _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  -- CR 701.59a: every candidate, ChooseTapsForTotalPower's maximal subset and
+  -- for its reason read over mana values -- no card has a NEGATIVE mana value
+  -- (CR 202.3), so dragging every one in can only raise the total, and the whole
+  -- graveyard is a legal answer whenever the cost is payable at all. A
+  -- deterministic fallback, not a recommendation.
+  Prompt.ChooseCollectEvidence _ _ _ candidates _ -> Set.fromList candidates
   -- Every candidate. The maximal subset, mirroring the arm above taking the first
   -- `count` rather than the last: a deterministic fallback, not a recommendation.
   Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList candidates
