@@ -12,6 +12,11 @@ import qualified Pawl.Types.Quantity as Quantity
 -- makes such a set a description and never a target, which is exactly the
 -- distinction that type draws.
 --
+-- ONE kind per instruction, which is all CR 701.10e's sentence asks for and what
+-- Aragorn, Hornburg Hero writes; a card's "each kind of counter" (Vorel of the
+-- Hull Clade) has no quantifier over the kinds a permanent happens to carry
+-- (gap #3913).
+--
 -- Each named permanent gets its OWN call to Event.putCounters, because CR 614.16
 -- replaces one placement at a time: a Hardened Scales seeing three creatures gets
 -- three opportunities, not one.
