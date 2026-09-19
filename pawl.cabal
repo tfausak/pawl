@@ -642,6 +642,10 @@ library codec
     Pawl.Codec.MergeComponent
     Pawl.Codec.MergeComponentSpec
     Pawl.Codec.Mill
+    Pawl.Codec.MillCountR
+    Pawl.Codec.MillCountRewrite
+    Pawl.Codec.MillCountRewriteSpec
+    Pawl.Codec.MillCountRSpec
     Pawl.Codec.Milled
     Pawl.Codec.MilledSpec
     Pawl.Codec.MillSpec
@@ -1884,6 +1888,8 @@ library types
     Pawl.Types.Mentored
     Pawl.Types.MergeComponent
     Pawl.Types.Mill
+    Pawl.Types.MillCountR
+    Pawl.Types.MillCountRewrite
     Pawl.Types.Milled
     Pawl.Types.MillTally
     Pawl.Types.Modal

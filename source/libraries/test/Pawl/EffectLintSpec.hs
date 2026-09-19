@@ -480,6 +480,7 @@ idleTokenRowOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -536,6 +537,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
 
 -- Every replacement shape the codec accepts and no card may author, for
@@ -588,6 +590,7 @@ engineOnlyOffends replacement = case replacement of
   -- engine-only. LifeLossR's answer, and for its reason.
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.TurnUpR {} -> False
 
@@ -670,6 +673,7 @@ turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -702,6 +706,7 @@ riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -746,6 +751,7 @@ shufflingOutsideLibraryOffends replacement = case replacement of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -1800,14 +1806,14 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]
           Effect.Reveal (Reveal.MkReveal ref mSlot) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
-          -- CR 701.17c's slot, whose plurality is the mill's DEPTH rather than an
-          -- ObjectRef's: a mill of one card binds the singular shape and any
-          -- deeper mill may bind a group, so only a literal 1 is singular here.
-          -- The depth is per miller, so a ref naming several seats is plural at
-          -- any depth -- movesAtMostOne's own reading of a TopOfLibrary.
-          Effect.Mill (Mill.MkMill player quantity _ mSlot)
-            | not (takesAtMostOne player quantity) ->
-                Maybe.maybeToList mSlot
+          -- CR 701.17c's slot, plural at every depth and every seat count: a
+          -- MillCountR row resizes the INSTRUCTION (Bruvac the Grandiloquent
+          -- doubles it), so even a literal 1 can reach Resolve's `several ->
+          -- bindObjectsSlot` arm and a singular reader over that slot would
+          -- answer unanswered. No count test and no seat test, the destruction's
+          -- shape -- where the draw's arm below keeps both, since a DrawCountR row
+          -- replaces the instruction outright rather than resizing it.
+          Effect.Mill (Mill.MkMill _ _ _ mSlot) -> Maybe.maybeToList mSlot
           -- CR 121.1's slot, whose plurality is read exactly as the mill's is:
           -- Pawl.Engine.Resolve's Draw arm binds the singular shape only when one
           -- card was drawn across every drawer.

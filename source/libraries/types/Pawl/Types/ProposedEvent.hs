@@ -188,6 +188,22 @@ data ProposedEvent
     -- instruction to draw multiple; the second runs before any replacement effect
     -- can exist, so the two readings are indistinguishable there.
     WouldDrawCards PlayerId.PlayerId Natural.Natural
+  | -- | CR 701.17a \/ 614.1a: a player would be instructed to mill this many
+    -- cards. Raised by Pawl.Engine.Event.millFrom, the one funnel every mill in
+    -- the engine goes through -- Resolve's Effect.Mill arm, a MillCards cost
+    -- component and dredge's replacement alike, since rule 701.17a makes all
+    -- three a mill and Bruvac the Grandiloquent's clause names none of them.
+    --
+    -- The count is the number the instruction NAMES, never the library's size,
+    -- WouldDrawCards' currency and for its reason: a row resizing it leaves CR
+    -- 616.2's next iteration a differently-numbered instruction, and CR 701.17b's
+    -- "as many as possible" is then read off the resized count when the cards are
+    -- taken.
+    --
+    -- ONE event for the whole instruction, where a draw of several cards raises
+    -- WouldDraw per card as well: rule 701.17a puts them into the graveyard at
+    -- once, so there is no individual mill for an inner event to be about.
+    WouldMillCards PlayerId.PlayerId Natural.Natural
   | -- | CR 705.1 / 614.1a: this player would flip a coin, and this many coins
     -- would be flipped to settle it. Raised by Pawl.Engine.Event.flipOneCoin,
     -- the one funnel every flip in the engine goes through -- Effect.FlipCoin's

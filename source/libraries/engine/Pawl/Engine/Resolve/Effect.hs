@@ -1479,6 +1479,7 @@ referentsOfReplacement re = case re of
   ReplacementEffect.LifeGainR _ -> []
   ReplacementEffect.DrawR _ -> []
   ReplacementEffect.DrawCountR _ -> []
+  ReplacementEffect.MillCountR _ -> []
   ReplacementEffect.CoinFlipR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
@@ -4542,27 +4543,34 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         context = effectContext gs controller source legal (slotBindings resolving gs)
         -- An illegal slot (CR 608.2b) or a reference naming nobody mills nothing.
         millers = playerRefPlayers legal controller gs ref
-        -- CR 701.17/701.17b: top min(n, library) of each miller's library, which is
-        -- why the tally below counts THESE cards rather than the number asked for.
-        -- PER MILLER (evaluateForRecipient), off the one pre-effect `gs`.
-        milledBy =
+        -- The number each miller is INSTRUCTED to mill, before CR 614.1a has had a
+        -- say and before CR 701.17b's library is looked at. PER MILLER
+        -- (evaluateForRecipient), off the one pre-effect `gs`, so a seat milling
+        -- first cannot change what a later seat is told to mill.
+        wanted =
           Maybe.mapMaybe
             ( \pid -> case evaluateForRecipient viewOf context gs resolving source pid quantity of
-                Just n | n > 0 -> Just (pid, List.genericTake n (Game.zoneMembers Zone.Library pid gs))
+                Just n | n > 0 -> Just (pid, Integer.toNaturalSaturating n)
                 _ -> Nothing
             )
             millers
-        milled = concatMap snd milledBy
-    -- Funnelled so each move mints a new incarnation, then recorded as the mill it
-    -- was (CR 701.17a). GameEvent.Milled carries the ids the funnel ANSWERED, not
-    -- the ones in the library (CR 400.7, CR 701.17c); a cancelled move is no card
-    -- milled. ONE entry per miller, holding that player's whole batch, since rule
-    -- 701.17a mills them at once -- and recorded even for a card a replacement
-    -- diverted elsewhere, since it was milled wherever it ended up.
-    arrivals <- fmap concat . Monad.forM milledBy $ \(pid, cards) -> do
-      arrived <- concatMap Foldable.toList <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
+    -- Through Event.millFromReturningTaken, the one mill funnel: it settles the
+    -- instruction under CR 616.1g (Bruvac the Grandiloquent doubles it), clamps to
+    -- CR 701.17b's library, and moves each card through the CR 400.7 funnel so
+    -- every arrival is a fresh incarnation. It answers both the LIBRARY ids taken,
+    -- which the tally below asks its characteristics of, and the ids the moves
+    -- ANSWERED, which CR 701.17c's binding holds.
+    --
+    -- Then recorded as the mill it was (CR 701.17a): a cancelled move is no card
+    -- milled, so ONE entry per miller holding that player's whole batch, since
+    -- rule 701.17a mills them at once -- and recorded even for a card a
+    -- replacement diverted elsewhere, since it was milled wherever it ended up.
+    milledBy <- Monad.forM wanted $ \(pid, n) -> do
+      (taken, arrived) <- Event.millFromReturningTaken pid n
       Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
-      pure arrived
+      pure (taken, arrived)
+    let milled = concatMap fst milledBy
+        arrivals = concatMap snd milledBy
     -- CR 701.17c: a later clause naming the milled cards -- Midnight Tilling's
     -- "from among them" -- finds them in the graveyard they moved to, so the
     -- binding holds the ids the funnel ANSWERED rather than the library ids the

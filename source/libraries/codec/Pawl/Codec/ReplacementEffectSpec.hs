@@ -38,6 +38,8 @@ import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
 import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
+import qualified Pawl.Types.MillCountR as MillCountR
+import qualified Pawl.Types.MillCountRewrite as MillCountRewrite
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -211,6 +213,13 @@ spec s =
             codec
             (ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR ControllerRelation.Opponents 2 DrawCountRewrite.EachDrawOne))
             " {\"type\":\"DrawCountR\",\"value\":{\"whose\":{\"type\":\"Opponents\"},\"atLeast\":2,\"rewrite\":{\"type\":\"EachDrawOne\"}}} "
+        -- CR 701.17a: Bruvac the Grandiloquent, the one MillCountR producer.
+        Spec.it s "MillCountR (Bruvac the Grandiloquent)" $
+          Common.assertCodec
+            s
+            codec
+            (ReplacementEffect.MillCountR (MillCountR.MkMillCountR ControllerRelation.Opponents (MillCountRewrite.Scaled (Scaling.Multiply 2))))
+            " {\"type\":\"MillCountR\",\"value\":{\"whose\":{\"type\":\"Opponents\"},\"rewrite\":{\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}}}} "
         -- CR 705.1: Krark's Thumb, the one CoinFlipR producer.
         Spec.it s "CoinFlipR (Krark's Thumb)" $
           Common.assertCodec

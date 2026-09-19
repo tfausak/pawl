@@ -142,6 +142,8 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.MergeComponent as MergeComponent
+import qualified Pawl.Types.MillCountR as MillCountR
+import qualified Pawl.Types.MillCountRewrite as MillCountRewrite
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
@@ -1681,6 +1683,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -3425,6 +3428,23 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits DrawCountR only against WouldDrawCards.
     (ReplacementEffect.DrawCountR {}, _) -> pure (Just event)
+    -- CR 614.1a / 701.17a: Bruvac the Grandiloquent's "they mill twice that many
+    -- cards instead". The event is left STANDING at a rewritten count rather than
+    -- cancelled, the LifeGainR arm above for its reason: CR 616.2's next iteration
+    -- re-collects against it, so a second Bruvac quadruples.
+    --
+    -- The seat is the one the EVENT named -- rule 701.17a's "they" is the milling
+    -- player, never the row's controller.
+    (ReplacementEffect.MillCountR (MillCountR.MkMillCountR _ rewrite), ProposedEvent.WouldMillCards pid n) -> case rewrite of
+      -- The proposed count IS the whole input: the scaling is stated on the
+      -- instruction and not on the library, so nothing is read off the board.
+      -- CR 701.17b's "as many as possible" is applied where the cards are taken,
+      -- not here, so a doubled count exceeding the library is not clamped yet.
+      MillCountRewrite.Scaled scaling -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldMillCards pid (Replacement.scale scaling n)))
+    -- Unreachable: `applies` admits MillCountR only against WouldMillCards.
+    (ReplacementEffect.MillCountR {}, _) -> pure (Just event)
     -- CR 705.1 / 614.1a: Krark's Thumb's "instead flip two coins and ignore one".
     -- The event is left STANDING at a doubled count rather than cancelled, the
     -- resizing arms above for their reason: CR 616.2's next iteration re-collects
@@ -4717,16 +4737,43 @@ changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just as
 -- CR 701.17a: move the top `n` cards of a player's own library (CR 400.3) to
 -- their graveyard, answering the ids that ARRIVED. The caller records the CR
 -- 701.17a event, because what counts as one mill is the caller's question --
--- Pawl.Engine.Cost's MillCards component writes the same two steps.
+-- Pawl.Engine.Cost's MillCards component and Resolve's Effect.Mill arm each write
+-- their own.
 --
--- An exact take rather than an "as many as possible": every caller has already
--- refused a count the library cannot meet (Cost.canPayComponent,
--- Pawl.Engine.Replacement.stocked), which is rule 702.52b for the dredge road.
+-- ONE funnel for every mill in the engine, which is what lets a MillCountR row
+-- (Bruvac the Grandiloquent) see a cost's mill and dredge's alike: rule 701.17a
+-- makes all three a mill and the printed clause names none of them.
+--
+-- `millFromReturningTaken` answers the LIBRARY ids taken as well, for the tally
+-- CR 728.1 asks about -- those cards have moved by the time it is read, so the
+-- pre-move ids are the only handle on what they were.
 millFrom :: PlayerId -> Natural -> Game [ObjectId]
-millFrom pid n = do
-  gs <- State.get
-  let cards = List.genericTake n (Game.zoneMembers Zone.Library pid gs)
-  fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards)
+millFrom pid n = fmap snd (millFromReturningTaken pid n)
+
+millFromReturningTaken :: PlayerId -> Natural -> Game ([ObjectId], [ObjectId])
+millFromReturningTaken pid n
+  -- No instruction, so no event: CR 701.17a's action is to put cards into a
+  -- graveyard, and a count of zero puts none. Bruvac the Grandiloquent's clause
+  -- says "one or more" for the same reason, and `applies` leans on this rather
+  -- than carrying a threshold field of its own.
+  | n == 0 = pure ([], [])
+  | otherwise = do
+      -- CR 614.1a with CR 616.1g: the INSTRUCTION is its own replaceable event and
+      -- is settled before any card moves, so the take below runs on the count this
+      -- loop leaves standing and a row that replaced it outright leaves none.
+      outcome <- applyReplacements (ProposedEvent.WouldMillCards pid n)
+      case outcome >>= Replacement.asMillCount of
+        Nothing -> pure ([], [])
+        Just (miller, settled) -> do
+          gs <- State.get
+          -- CR 701.17b's "they mill as many as possible": `genericTake` clamps,
+          -- which matters because a resized count can exceed a library every
+          -- caller's own gate (Cost.canPayComponent,
+          -- Pawl.Engine.Replacement.stocked) had already measured against the
+          -- printed one.
+          let cards = List.genericTake settled (Game.zoneMembers Zone.Library miller gs)
+          arrived <- fmap (concatMap Foldable.toList) (Monad.mapM (\card -> changeZoneReturning card Zone.Graveyard) cards)
+          pure (cards, arrived)
 
 changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
 changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False

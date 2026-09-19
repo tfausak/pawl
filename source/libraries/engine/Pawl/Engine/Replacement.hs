@@ -97,6 +97,8 @@ import qualified Pawl.Types.LifeGainRewrite as LifeGainRewrite
 import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
 import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
+import qualified Pawl.Types.MillCountR as MillCountR
+import qualified Pawl.Types.MillCountRewrite as MillCountRewrite
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
@@ -162,6 +164,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 -- Every replacement effect instance in the game, in the engine's canonical
@@ -812,6 +815,16 @@ applies gs event candidate =
         (ReplacementEffect.DrawCountR pat, ProposedEvent.WouldDrawCards pid n) ->
           n >= DrawCountR.atLeast pat
             && matchesPlayer gs src (DrawCountR.whose pat) pid
+        -- CR 701.17a / 614.1a: Bruvac the Grandiloquent watches the mill
+        -- INSTRUCTION and who it names. No threshold conjunct where DrawCountR has
+        -- one: rule 701.17a's "one or more" is met by every instruction that mills
+        -- at all, since `millFrom` raises this event only for a positive count.
+        --
+        -- Read off the SOURCE, the DrawCountR arm's posture and for its reason:
+        -- the only producer is a permanent's static ability, whose CR 109.5 "an
+        -- opponent" is measured against its controller as projected now.
+        (ReplacementEffect.MillCountR pat, ProposedEvent.WouldMillCards pid _) ->
+          matchesPlayer gs src (MillCountR.whose pat) pid
         -- CR 705.1 / 614.1a: whose coin flips the row watches (CR 109.5's "you"),
         -- which is the whole of the pattern -- rule 705.2's last sentence leaves
         -- the flipper the only seat a flip involves, and rule 705.1's flip has no
@@ -840,6 +853,7 @@ applies gs event candidate =
         (ReplacementEffect.LifeGainR {}, _) -> False
         (ReplacementEffect.DrawR {}, _) -> False
         (ReplacementEffect.DrawCountR {}, _) -> False
+        (ReplacementEffect.MillCountR {}, _) -> False
         (ReplacementEffect.CoinFlipR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
@@ -1708,6 +1722,9 @@ bucketOfEffect re = case re of
   -- CR 616.1a-d are all about entering the battlefield and copying; an instruction
   -- to draw cards is neither, so CR 616.1e.
   ReplacementEffect.DrawCountR {} -> ReplacementBucket.Other
+  -- CR 616.1a-d are all about entering the battlefield and copying; an instruction
+  -- to mill cards is neither, so CR 616.1e.
+  ReplacementEffect.MillCountR {} -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entering the battlefield and copying; flipping a
   -- coin is neither, so CR 616.1e.
   ReplacementEffect.CoinFlipR {} -> ReplacementBucket.Other
@@ -1954,6 +1971,11 @@ readsApplier re = case re of
   -- under different controllers are told apart, and the drawer chooses" is what
   -- proves the drawer is asked which one applies.
   ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR _ _ DrawCountRewrite.EachDrawOne) -> True
+  -- CR 701.17a: Bruvac the Grandiloquent's "they mill twice that many cards" names
+  -- the MILLING player and nobody else, so the resized instruction is the same
+  -- whichever candidate carries it. LifeGainRewrite.Scaled's answer, and for its
+  -- reason.
+  ReplacementEffect.MillCountR (MillCountR.MkMillCountR _ (MillCountRewrite.Scaled _)) -> False
   -- The coins are flipped by the seat the EVENT named and the doubling is the
   -- effect's own field, so two rows alike in `effect` leave the same flipper the
   -- same number of coins whoever holds them. LifeGainR's answer, and for its
@@ -2002,6 +2024,7 @@ readsSource effect = case effect of
   ReplacementEffect.LifeLossR {} -> False
   ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawCountR {} -> False
+  ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
@@ -2174,6 +2197,9 @@ affectedChooserOf gs event = case event of
   -- CR 616.1 / 121.2a: the instruction is addressed to that same player, so
   -- the seat that chooses among applicable rows is the one it names.
   ProposedEvent.WouldDrawCards pid _ -> Just pid
+  -- CR 616.1 / 701.17a: DrawCountR's answer one keyword action over -- the
+  -- instruction names the milling player, so that is the seat that chooses.
+  ProposedEvent.WouldMillCards pid _ -> Just pid
   -- CR 616.1's affected player is the one the event happens to, and CR 705.2's
   -- last sentence says who that is outright: "only the player who flips the coin
   -- wins or loses the flip; no other players are involved".
@@ -3511,6 +3537,8 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   -- The instruction class one rule up, and the same answer for the same reason:
   -- `contested` asks only about a damage batch.
   ReplacementEffect.DrawCountR {} -> Nothing
+  -- The mill instruction's class, and the same answer for the same reason.
+  ReplacementEffect.MillCountR {} -> Nothing
   -- Doubling a count of coins is arithmetic on whatever arrives, and `contested`
   -- above asks only about a damage batch in any case. DrawCountR's answer.
   ReplacementEffect.CoinFlipR {} -> Nothing
@@ -3532,6 +3560,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
@@ -3550,6 +3579,7 @@ asDestruction event = case event of
   ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 -- asDestruction's twin one event class over: the permanent that actually becomes
@@ -3570,6 +3600,7 @@ asUntap event = case event of
   ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 -- asUntap's twin one event class over: the player who actually draws a card, or
@@ -3578,6 +3609,7 @@ asDraw :: ProposedEvent -> Maybe PlayerId
 asDraw event = case event of
   ProposedEvent.WouldDraw pid -> Just pid
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
@@ -3598,6 +3630,7 @@ asDraw event = case event of
 asDrawCount :: ProposedEvent -> Maybe (PlayerId, Natural)
 asDrawCount event = case event of
   ProposedEvent.WouldDrawCards pid n -> Just (pid, n)
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
@@ -3616,10 +3649,33 @@ asDrawCount event = case event of
 -- CR 705.1: the flipper and the number of coins one flip is settled with, off a
 -- proposed event that survived CR 616.1's loop. asDrawCount's shape one event
 -- class over.
+-- asDrawCount's twin one keyword action over (CR 701.17a): who was instructed to
+-- mill and how many cards the instruction names once CR 616.1's loop has settled
+-- it, or Nothing when a row replaced the instruction outright.
+asMillCount :: ProposedEvent -> Maybe (PlayerId, Natural)
+asMillCount event = case event of
+  ProposedEvent.WouldMillCards pid n -> Just (pid, n)
+  ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldFlipCoin {} -> Nothing
+  ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
+
 asCoinFlip :: ProposedEvent -> Maybe (PlayerId, Natural)
 asCoinFlip event = case event of
   ProposedEvent.WouldFlipCoin pid n -> Just (pid, n)
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
@@ -3650,6 +3706,7 @@ asCounters event = case event of
   ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 -- asCounters' player half. The CAUSE is dropped by both, for the same reason: what
@@ -3671,6 +3728,7 @@ asPlayerCounters event = case event of
   ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 -- asPlayerCounters' sibling one event class over: the player who would lose life
@@ -3694,6 +3752,7 @@ asLifeLoss event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 -- asLifeLoss the other direction: the player who would gain life and how much of
@@ -3714,6 +3773,7 @@ asLifeGain event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 asTokens :: ProposedEvent -> Maybe (PlayerId, Seq.Seq TokenLot.TokenLot)
@@ -3732,6 +3792,7 @@ asTokens event = case event of
   ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
 
 -- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
@@ -3927,4 +3988,5 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing

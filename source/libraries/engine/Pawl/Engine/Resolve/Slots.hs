@@ -1310,6 +1310,9 @@ replacementRowReads re = case re of
   -- A DrawCountR is one ControllerRelation, one threshold and one nullary rewrite.
   -- DrawR's answer, and for its reason.
   ReplacementEffect.DrawCountR {} -> ([], [])
+  -- A MillCountR is one ControllerRelation and one scaling. DrawCountR's answer,
+  -- and for its reason.
+  ReplacementEffect.MillCountR {} -> ([], [])
   -- One ControllerRelation and one nullary rewrite: no read at all, DrawCountR's
   -- answer and for its reason.
   ReplacementEffect.CoinFlipR {} -> ([], [])
@@ -1448,6 +1451,7 @@ replacementRowEffects re = case re of
   ReplacementEffect.LifeGainR _ -> []
   ReplacementEffect.DrawR _ -> []
   ReplacementEffect.DrawCountR _ -> []
+  ReplacementEffect.MillCountR _ -> []
   ReplacementEffect.CoinFlipR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
