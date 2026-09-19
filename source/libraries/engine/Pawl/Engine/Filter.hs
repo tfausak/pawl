@@ -1062,13 +1062,13 @@ data Context = MkContext
     -- Quantity.AgainstSlot) is then vacuously False or Nothing rather than
     -- raising. That is honest wherever no announcement is in flight -- the layer
     -- fold, trigger matching, a cost paid with nothing announced, combat
-    -- declarations, duration expiry -- but it is NOT honest of every
-    -- in-resolution caller. Pawl.Engine.Projection.freezeQuantities was one
-    -- until it took its context from the caller, Resolve's Effect.Search arm
-    -- until it did the same, its Effect.Mill tally after that, and
-    -- Pawl.Engine.Attach.hostsFor last -- which now takes a Context in place of
-    -- a controller and a source, so its two resolution callers hand over
-    -- effectContext and its two standing callers a bare contextFor.
+    -- declarations, duration expiry -- and it was not honest of every
+    -- in-resolution caller until each took its context from the caller instead:
+    -- Pawl.Engine.Projection.freezeQuantities first, then Resolve's
+    -- Effect.Search arm, its Effect.Mill tally, and Pawl.Engine.Attach.hostsFor
+    -- last, which takes a Context in place of a controller and a source, so its
+    -- two resolution callers hand over effectContext and its two standing
+    -- callers a bare contextFor.
     --
     -- Pawl.Engine.Event.eligible is a further in-resolution caller and is
     -- honest for a reason of its own rather than for the
@@ -1080,7 +1080,8 @@ data Context = MkContext
     -- other readers cannot reach it either: SameNameAsBound reads slotNames
     -- rather than this map and carries its own lint, SameControllerAsBound reads
     -- slotControllers and carries one that matters MORE, its vacuous direction
-    -- being True, IsControllerOfBound and ControlledByBound are False wherever
+    -- being True, SameControllerAsHostOfBound reads slotHostControllers and
+    -- refuses on an absent key, IsControllerOfBound and ControlledByBound are False wherever
     -- `matches` reaches them, and no Filter atom carries a Quantity.
     -- Pawl.CardSpec's "CR 400.11c no card asks IsBound
     -- in a wish's filter" is what keeps a card out of that position, and
