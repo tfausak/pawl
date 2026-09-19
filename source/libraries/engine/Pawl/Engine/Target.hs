@@ -390,6 +390,11 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- A THUNK, like its siblings: one projection per bound object, paid
             -- for only by a filter that names the atom.
             Filter.slotControllers = fmap (foldMap (foldMap (foldMap (maybe Set.empty Set.singleton . Filter.controller) . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
+            -- Empty for slotCreatureTypes' reason below, and one of the two the
+            -- lints have to be read together for: this atom is a silent False
+            -- here where slotControllers' is a silent True, so a card writing it
+            -- in a target slot admits nothing rather than everything.
+            Filter.slotHostControllers = Map.empty,
             -- Empty: CR 205.3m's comparison is filled only in a resolution's
             -- own positions, and Pawl.FilterPositionLintSpec's lint refuses a
             -- card that writes it in a target slot.

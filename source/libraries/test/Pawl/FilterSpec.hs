@@ -938,6 +938,40 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches (controlledBy [0]) noController (Filter.Type.SameControllerAsBound slot))) "no candidate controller"
       Spec.assertBool s (not (Filter.matches (controlledBy [0]) aPlayer (Filter.Type.SameControllerAsBound slot))) "player"
 
+  -- CR 110.2 asked of the bound object's HOST (CR 303.4b). The atom above's
+  -- board with the comparison one link along, and the DIRECTION reversed: an
+  -- unanswered slot refuses here where it widens there, since no joint check
+  -- stands behind an attach destination to narrow a widened offer.
+  Spec.describe s "SameControllerAsHostOfBound" $ do
+    let slot = SlotName.MkSlotName (Text.pack "target")
+        player = PlayerId.MkPlayerId
+        atom = Filter.Type.SameControllerAsHostOfBound slot
+        hostControlledBy pids = self {Filter.slotHostControllers = Map.singleton slot (Set.fromList (fmap player pids))}
+    Spec.it s "matches a candidate the HOST's controller controls" $
+      Spec.assertBool s (Filter.matches (hostControlledBy [0]) blackCreature atom) "the same controller"
+
+    Spec.it s "does not match a candidate under another player" $
+      Spec.assertBool s (not (Filter.matches (hostControlledBy [1]) blackCreature atom)) "another player's"
+
+    -- The pair that separates this atom from SameControllerAsBound above: the
+    -- same two contexts, and both refuse. A key that is present and EMPTY is a
+    -- bound object attached to nothing, to a player (CR 303.4b) or to a host
+    -- that has left the battlefield.
+    Spec.it s "CR 608.2d an unanswered slot admits nothing rather than everything" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature atom)) "no key at all"
+      Spec.assertBool s (not (Filter.matches (hostControlledBy []) blackCreature atom)) "a bound key naming no host controller"
+      Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.SameControllerAsBound slot)) "where its sibling widens on the same context"
+
+    Spec.it s "a candidate with no controller matches nothing" $ do
+      let noController = blackCreature {Filter.controller = Nothing}
+      Spec.assertBool s (not (Filter.matches (hostControlledBy [0]) noController atom)) "no candidate controller"
+      Spec.assertBool s (not (Filter.matches (hostControlledBy [0]) aPlayer atom)) "player"
+
+    Spec.it s "the atom reports its slot as one the filter reads" $ do
+      let buried f = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not f]]
+      Spec.assertEqWith s "at the top" (Filter.boundSlots atom) (Set.singleton slot)
+      Spec.assertEqWith s "and buried under every combinator" (Filter.boundSlots (buried atom)) (Set.singleton slot)
+
   -- CR 206.3: the candidate's names against the set that rule DEFINES for an
   -- expansion, which is what City in a Bottle, Golgothian Sylex and Apocalypse
   -- Chime each ask. One listed and one unlisted name per expansion, so a catalog

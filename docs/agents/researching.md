@@ -238,9 +238,10 @@ The expressibility check passes on cards whose opcodes are inert TOGETHER,
 because what an atom answers depends on the path it is reached by. The symptom
 is a VACUOUS ATOM: one that cannot be false, or cannot be true, because the
 field it reads was never filled on this path. It compiles, the codec
-round-trips, the card loads, and nothing is red. The live issue for the
-remaining callers is **#2141** --- cite that, not the PR that fixed the first
-instance.
+round-trips, the card loads, and nothing is red. Every in-resolution caller
+takes its context from `Resolve.Slots.effectContext` today, so a vacuous atom
+now means a position no resolution reaches --- name the builder, and file the
+gap against it.
 
 For each opcode the producer needs:
 

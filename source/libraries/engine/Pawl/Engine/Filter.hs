@@ -1062,17 +1062,16 @@ data Context = MkContext
     -- Quantity.AgainstSlot) is then vacuously False or Nothing rather than
     -- raising. That is honest wherever no announcement is in flight -- the layer
     -- fold, trigger matching, a cost paid with nothing announced, combat
-    -- declarations, duration expiry -- but it is NOT honest of every
-    -- in-resolution caller: Pawl.Engine.Attach.hostsFor builds a bare contextFor
-    -- while a resolution's bindings do exist (#2141), and its signature is shared
-    -- with a Pawl.Engine.Event caller that has no resolution behind it, so fixing
-    -- it means splitting the function rather than changing the context in place.
-    -- Pawl.Engine.Projection.freezeQuantities was another until it took its
-    -- context from the caller, Resolve's Effect.Search arm until it did the same,
-    -- and its Effect.Mill tally last.
+    -- declarations, duration expiry -- and it was not honest of every
+    -- in-resolution caller until each took its context from the caller instead:
+    -- Pawl.Engine.Projection.freezeQuantities first, then Resolve's
+    -- Effect.Search arm, its Effect.Mill tally, and Pawl.Engine.Attach.hostsFor
+    -- last, which takes a Context in place of a controller and a source, so its
+    -- two resolution callers hand over effectContext and its two standing
+    -- callers a bare contextFor.
     --
     -- Pawl.Engine.Event.eligible is a further in-resolution caller and is
-    -- NOT one of #2141's, honest for a reason of its own rather than for the
+    -- honest for a reason of its own rather than for the
     -- reason above: its candidates are cards outside the game, which CR 400.11c
     -- keeps every spell and ability from affecting, so no slot of the resolution
     -- can name one. Pawl.Engine.Projection.View.viewOfCard fills no `identity` --
@@ -1081,7 +1080,8 @@ data Context = MkContext
     -- other readers cannot reach it either: SameNameAsBound reads slotNames
     -- rather than this map and carries its own lint, SameControllerAsBound reads
     -- slotControllers and carries one that matters MORE, its vacuous direction
-    -- being True, IsControllerOfBound and ControlledByBound are False wherever
+    -- being True, SameControllerAsHostOfBound reads slotHostControllers and
+    -- refuses on an absent key, IsControllerOfBound and ControlledByBound are False wherever
     -- `matches` reaches them, and no Filter atom carries a Quantity.
     -- Pawl.CardSpec's "CR 400.11c no card asks IsBound
     -- in a wish's filter" is what keeps a card out of that position, and
@@ -1110,11 +1110,9 @@ data Context = MkContext
     -- sourcePower's reason -- this module holds no game state and cannot read an
     -- object's names -- and by two callers: Pawl.Engine.Target.admittedGiven,
     -- where a target slot's Filter is matched, and
-    -- Pawl.Engine.Resolve.Slots.effectContext, which is what all but one of a
-    -- resolution's positions go through (Bifurcate's search filter, Hour of
-    -- Glory's hand sweep). The one that does not is slotObjects' Attach.hostsFor
-    -- above, and is its elision rather than this field's: a caller building a
-    -- bare contextFor has neither map.
+    -- Pawl.Engine.Resolve.Slots.effectContext, which is what every one of a
+    -- resolution's positions goes through (Bifurcate's search filter, Hour of
+    -- Glory's hand sweep, an attach destination).
     --
     -- Separate from `slotObjects` above rather than derived from it, and that is
     -- the same division sourcePower makes against `source`: an id is not a name
@@ -1155,6 +1153,28 @@ data Context = MkContext
     -- controller at all (CR 108.4's card in a library). The atom widens on the
     -- first and refuses on the second.
     slotControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
+    -- CR 110.2 with CR 303.4b: the controllers of the permanents the objects the
+    -- resolution's slots hold are ATTACHED TO, for the one atom that compares a
+    -- candidate's controller against them (SameControllerAsHostOfBound, Simic
+    -- Guildmage's "another permanent with the same controller"). One question
+    -- further along than `slotControllers` above -- that field asks who controls
+    -- the bound object, this one who controls what the bound object enchants --
+    -- and a separate field rather than a read through `slotObjects` for that
+    -- field's reason: an id is neither a host nor a controller until a board has
+    -- been asked.
+    --
+    -- `slotCreatureTypes` below in every other respect: lazy, filled by the one
+    -- caller Pawl.Engine.Resolve.Slots.effectContext, empty elsewhere where the
+    -- atom is a silent False, and Pawl.FilterPositionLintSpec's "CR 110.2 no
+    -- card asks SameControllerAsHostOfBound outside a resolution's own
+    -- positions" to keep a card out of those.
+    --
+    -- Read LIVE rather than through CR 608.2h's last-known reader, which is the
+    -- one place it parts from its neighbours: the bound object's HOST is a
+    -- battlefield permanent, and "the permanent the Aura is attached to" is a
+    -- question about the board as the ability resolves. CR 608.2b has already
+    -- dropped a target Aura that left.
+    slotHostControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
     -- CR 205.3m: the CREATURE TYPES of the objects the resolution's slots hold,
     -- for SharesCreatureTypeWithBound -- Heirloom Blade's "shares a creature type
     -- with it", and through Binding.triggerSource a kinship card's "with this
@@ -1473,7 +1493,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1511,7 +1531,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1784,6 +1804,13 @@ matches context view predicate = case predicate of
   Filter.SameControllerAsBound slot -> case Map.lookup slot (slotControllers context) of
     Nothing -> True
     Just pids -> maybe False (`Set.member` pids) (controller view)
+  -- CR 110.2 asked of the bound object's HOST (CR 303.4b), the atom above's
+  -- comparison one link along and with the opposite vacuous direction: an
+  -- absent key answers False, since an attach destination has no joint check
+  -- behind it to narrow a widened offer. A key that is present and EMPTY is a
+  -- bound object attached to nothing, to a player, or to a host that has left
+  -- the battlefield, and nothing shares a controller with any of those.
+  Filter.SameControllerAsHostOfBound slot -> maybe False (`Set.member` Map.findWithDefault Set.empty slot (slotHostControllers context)) (controller view)
   -- CR 205.3m at both ends, SameNameAsBound's intersection: the context holds
   -- only the bound objects' creature types, so a shared land type (Dryad Arbor's
   -- Forest) is not a match, and an unfilled slot answers False.
@@ -2190,6 +2217,7 @@ rewrite pairs predicate = case predicate of
   Filter.SameNameAsSource -> predicate
   Filter.SameOwnerAsSource -> predicate
   Filter.SameControllerAsBound _ -> predicate
+  Filter.SameControllerAsHostOfBound _ -> predicate
   Filter.SharesCreatureTypeWithBound _ -> predicate
   Filter.ToughnessLessThanBound _ -> predicate
   Filter.HasChosenName -> predicate
@@ -2877,6 +2905,7 @@ bakeBound players predicate = case predicate of
   Filter.SameNameAsSource -> predicate
   Filter.SameOwnerAsSource -> predicate
   Filter.SameControllerAsBound _ -> predicate
+  Filter.SameControllerAsHostOfBound _ -> predicate
   Filter.SharesCreatureTypeWithBound _ -> predicate
   Filter.ToughnessLessThanBound _ -> predicate
   Filter.HasChosenName -> predicate
@@ -3042,6 +3071,7 @@ manaValueThresholds predicate = case predicate of
   Filter.SameNameAsSource -> []
   Filter.SameOwnerAsSource -> []
   Filter.SameControllerAsBound _ -> []
+  Filter.SameControllerAsHostOfBound _ -> []
   Filter.SharesCreatureTypeWithBound _ -> []
   Filter.ToughnessLessThanBound _ -> []
   Filter.HasChosenName -> []
@@ -3198,6 +3228,7 @@ statesAQuality predicate = case predicate of
   Filter.SameNameAsSource -> True
   Filter.SameOwnerAsSource -> True
   Filter.SameControllerAsBound _ -> True
+  Filter.SameControllerAsHostOfBound _ -> True
   Filter.SharesCreatureTypeWithBound _ -> True
   Filter.ToughnessLessThanBound _ -> True
   -- CR 701.23b's "stated quality" for HasName's reason, one indirection along: the
@@ -3318,6 +3349,10 @@ overBoundSlots f predicate = case predicate of
   -- 601.2c's joint check is the whole of what enforces this atom (the offer
   -- widens for it).
   Filter.SameControllerAsBound slot -> fmap Filter.SameControllerAsBound (f slot)
+  -- Named for the arm above's reason, one Context field over. NOT behavioural
+  -- here: this atom's offer never widens, so CR 601.2c's joint check has
+  -- nothing to narrow, and the report is the dataflow lint's alone.
+  Filter.SameControllerAsHostOfBound slot -> fmap Filter.SameControllerAsHostOfBound (f slot)
   -- Named for SameNameAsBound's reason, one Context field over. A regression
   -- fence until a card names a mode-declared slot with it, as Killer's "shares
   -- a creature type with it" would: the reserved slots it names today are

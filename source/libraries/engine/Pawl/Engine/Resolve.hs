@@ -1150,8 +1150,8 @@ payGatePaid resolving source controller idx cIdx legal announced gate = do
 -- payer faces.
 --
 -- Measured against the RESOLUTION, not against the payer: the context is the
--- resolving controller's (`effectContext`, never Filter.contextFor -- see
--- #2141), so Rakshasa's Disdain's "for each card in your graveyard" counts the
+-- resolving controller's (`effectContext`, never Filter.contextFor), so
+-- Rakshasa's Disdain's "for each card in your graveyard" counts the
 -- graveyard of the player who cast it while the payer is the targeted spell's
 -- controller. The quantity is evaluated against the ability's SOURCE through
 -- `effectViewOf`, so CR 113.7a's last known record answers for a source that has

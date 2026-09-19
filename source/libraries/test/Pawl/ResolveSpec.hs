@@ -2120,7 +2120,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- Predict -- "{1}{U} Instant: Choose a card name, then target player mills a
   -- card. If a card with the chosen name was milled this way, you draw two cards.
   -- Otherwise, you draw a card." The whole-card proof that a MILL's TALLY reads
-  -- the resolution it sits in (#2141): the tally's filter is CR 201.4's
+  -- the resolution it sits in: the tally's filter is CR 201.4's
   -- HasChosenName, and until the tally took its Context from
   -- Pawl.Engine.Resolve.Slots.effectContext it was matched in a bare
   -- Filter.contextFor, where the atom is an empty intersection and the count is

@@ -1176,6 +1176,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   fortificationSpec s registry
   unattachableSpec s registry
   reattachSpec s registry
+  simicGuildmageSpec s registry
   arbitrationSpec s registry
   auraGraftSpec s registry
   miracleWorkerSpec s registry
@@ -1579,6 +1580,154 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         Spec.assertBool s (Projection.hasKeyword Keyword.Trample mine moved) "with trample (CR 702.19)"
         Spec.assertEqWith s "and the Piker is a plain 2/1" (S.powerToughnessOf host moved) (Just (2, 1))
       _ -> Spec.assertFailure s "the fixture wanted one Aura on the Piker, one Crown on the battlefield, and one printed ability"
+
+-- Simic Guildmage {G/U}{G/U} Creature -- Elf Wizard 2/2. Second ability, Oracle
+-- text and rulings re-fetched from Scryfall this session: "{1}{U}: Attach target
+-- Aura attached to a permanent to another permanent with the same controller."
+--
+-- CR 110.2 through CR 303.4b: the 2006-05-01 ruling settles the antecedent --
+-- the destination "must be controlled by the player who controls the permanent
+-- the Aura is attached to", and "it doesn't matter who controls the Aura". So
+-- the atom is Filter.SameControllerAsHostOfBound over the target slot, answered
+-- off Filter.Context.slotHostControllers, which
+-- Pawl.Engine.Resolve.Slots.effectContext fills and which reaches the
+-- destination filter only because Pawl.Engine.Attach.hostsFor takes its Context
+-- from the caller.
+--
+-- THE BOARD, and why each element. The Aura is ALICE's and its host is BOB's, so
+-- the ruled-out reading (the Aura's own controller) and the right one name
+-- disjoint sets -- one seat holding both would collapse them. TWO of bob's
+-- creatures are legal destinations, since Attach.chooseHost elides the prompt at
+-- one candidate and the offered set would then be unreadable. Alice keeps a
+-- creature of her own beside the Guildmage, so the vacuously-TRUE reading has
+-- something to offer that the right one does not. Bob keeps an ISLAND, which is
+-- what CR 608.2d's "can't choose an option that's illegal" excludes through the
+-- destination's own Filter.CanHostSubject conjunct -- the ruling's third clause,
+-- "it must be able to be enchanted by the Aura".
+--
+-- What each reading offers: correct, bob's Hill Giant and Berserkers; the
+-- Aura's controller, alice's Guildmage and Piker; a vacuously TRUE atom, those
+-- two as well; a bare Filter.contextFor, nothing at all, and the Aura does not
+-- move.
+--
+-- Four distinct power/toughness pairs, so no numeric coincidence can hide a
+-- wrong host: 2/4 under the Aura is 4/5, 3/3 is 5/4, 4/4 is 6/5, and the Piker
+-- stays 2/1.
+simicGuildmageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+simicGuildmageSpec s registry =
+  let -- The destination choice by INDEX into what was offered, never by naming
+      -- an object: an answerer that searched for a legal option would find the
+      -- right one again after a mutation.
+      pickBy :: (NonEmpty.NonEmpty ObjectId.ObjectId -> ObjectId.ObjectId) -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      pickBy choose aura p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject aura))) sets
+        Prompt.ChooseAttachment _ _ _ offered -> choose offered
+        _ -> S.identityAnswer p
+      board island guildmage piker brigade giant berserkers unholy =
+        let base = S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers)
+            (mage, g1) = S.addPermanent guildmage S.alice base
+            (decoy, g2) = S.addPermanent piker S.alice g1
+            (host, g3) = S.addPermanent brigade S.bob g2
+            (firstDest, g4) = S.addPermanent giant S.bob g3
+            (secondDest, g5) = S.addPermanent berserkers S.bob g4
+            g6 = S.landsFor island S.bob 1 g5
+            (aura, g7) = S.addPermanent unholy S.alice g6
+         in (mage, decoy, host, firstDest, secondDest, aura, (S.attach aura host g7) {GameState.priority = Just S.alice})
+      -- The printed second ability, which is the one this unit is about; the
+      -- first is Bioshift's counter move.
+      secondAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
+        [_, ability] -> Just ability
+        _ -> Nothing
+   in Spec.describe s "Simic Guildmage" $ do
+        Spec.it s "CR 110.2 the destination is controlled by the host's controller, not the Aura's" $ do
+          island <- S.printingOf s registry "Island"
+          guildmage <- S.printingOf s registry "Simic Guildmage"
+          piker <- S.printingOf s registry "Goblin Piker"
+          brigade <- S.printingOf s registry "Foriysian Brigade"
+          giant <- S.printingOf s registry "Hill Giant"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          let (mage, decoy, host, firstDest, secondDest, aura, gs) = board island guildmage piker brigade giant berserkers unholy
+          case secondAbility guildmage of
+            Nothing -> Spec.assertFailure s "Simic Guildmage should print two activated abilities"
+            Just ability -> do
+              let run choose =
+                    let answer :: Prompt.Prompt r -> r
+                        answer = pickBy choose aura
+                        activated = S.runPure answer gs (Activate.activateAbility S.alice mage ability)
+                     in S.runPure answer activated Stack.resolveTop
+                  taking = run NonEmpty.head
+                  takingLast = run NonEmpty.last
+              Spec.assertEqWith s "before, bob's enchanted 2/4 carries the +2/+1" (S.powerToughnessOf host gs) (Just (4, 5))
+              -- THE gameplay-level assertion, ahead of every proxy: the FIRST
+              -- thing offered is bob's Hill Giant. Under the ruled-out reading
+              -- and under a vacuously TRUE atom alike it would be alice's
+              -- Guildmage, and under a bare context there would be nothing to
+              -- offer at all.
+              Spec.assertEqWith s "the first destination offered is bob's Hill Giant" (fmap Object.attachedTo (Game.lookupObject aura taking)) (Just (Just (Recipient.ToCreature firstDest)))
+              Spec.assertEqWith s "and the LAST is bob's Berserkers" (fmap Object.attachedTo (Game.lookupObject aura takingLast)) (Just (Just (Recipient.ToCreature secondDest)))
+              -- The bonus moving is what "the Aura moved" means observably.
+              Spec.assertEqWith s "the Hill Giant is 5/4 under the Aura" (S.powerToughnessOf firstDest taking) (Just (5, 4))
+              Spec.assertEqWith s "the Berserkers are 6/5 under it in the other leg" (S.powerToughnessOf secondDest takingLast) (Just (6, 5))
+              Spec.assertEqWith s "the old host is back to a plain 2/4" (S.powerToughnessOf host taking) (Just (2, 4))
+              Spec.assertEqWith s "alice's own creature is untouched in both legs" (S.powerToughnessOf decoy taking, S.powerToughnessOf decoy takingLast) (Just (2, 1), Just (2, 1))
+              Spec.assertEqWith s "and so is the Guildmage" (S.powerToughnessOf mage taking) (Just (2, 2))
+        -- The same board, and the ONE thing that differs is the answer: alice
+        -- names her own creature. Attach.chooseHost filters what it is handed, so
+        -- a destination the atom excluded cannot be reached by answering for it.
+        Spec.it s "CR 608.2d naming a permanent that was never offered does not move the Aura there" $ do
+          island <- S.printingOf s registry "Island"
+          guildmage <- S.printingOf s registry "Simic Guildmage"
+          piker <- S.printingOf s registry "Goblin Piker"
+          brigade <- S.printingOf s registry "Foriysian Brigade"
+          giant <- S.printingOf s registry "Hill Giant"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          let (mage, decoy, _, firstDest, _, aura, gs) = board island guildmage piker brigade giant berserkers unholy
+          case secondAbility guildmage of
+            Nothing -> Spec.assertFailure s "Simic Guildmage should print two activated abilities"
+            Just ability -> do
+              let answer :: Prompt.Prompt r -> r
+                  answer = pickBy (const decoy) aura
+                  activated = S.runPure answer gs (Activate.activateAbility S.alice mage ability)
+                  after = S.runPure answer activated Stack.resolveTop
+              Spec.assertEqWith s "the Aura went to the first offered destination instead" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature firstDest)))
+              Spec.assertEqWith s "alice's creature carries nothing" (S.powerToughnessOf decoy after) (Just (2, 1))
+        -- The PROJECTION read, and the reason it is a second board: bob's
+        -- creatures here are OWNED by alice and controlled by bob through a CR
+        -- 613.1b layer-2 effect, so an owner read of the host's controller would
+        -- offer alice's side instead. The seats and the four creatures are the
+        -- board above's; only who OWNS bob's three differs.
+        Spec.it s "CR 613.1b the host's controller is the projected one, not its owner" $ do
+          island <- S.printingOf s registry "Island"
+          guildmage <- S.printingOf s registry "Simic Guildmage"
+          piker <- S.printingOf s registry "Goblin Piker"
+          brigade <- S.printingOf s registry "Foriysian Brigade"
+          giant <- S.printingOf s registry "Hill Giant"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          let base = S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers)
+              (mage, g1) = S.addPermanent guildmage S.alice base
+              (decoy, g2) = S.addPermanent piker S.alice g1
+              (host, g3) = S.addPermanent brigade S.alice g2
+              (firstDest, g4) = S.addPermanent giant S.alice g3
+              (secondDest, g5) = S.addPermanent berserkers S.alice g4
+              (aura, g6) = S.addPermanent unholy S.alice g5
+              granted = S.giveControl secondDest S.bob (S.giveControl firstDest S.bob (S.giveControl host S.bob g6))
+              gs = (S.attach aura host granted) {GameState.priority = Just S.alice}
+          case secondAbility guildmage of
+            Nothing -> Spec.assertFailure s "Simic Guildmage should print two activated abilities"
+            Just ability -> do
+              let answer :: Prompt.Prompt r -> r
+                  answer = pickBy NonEmpty.head aura
+                  activated = S.runPure answer gs (Activate.activateAbility S.alice mage ability)
+                  after = S.runPure answer activated Stack.resolveTop
+              Spec.assertEqWith s "bob controls the host although alice owns it" (Projection.controllerOf host gs) (Just S.bob)
+              Spec.assertEqWith s "the Aura moved to a permanent bob controls" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature firstDest)))
+              Spec.assertEqWith s "the Hill Giant is 5/4" (S.powerToughnessOf firstDest after) (Just (5, 4))
+              Spec.assertEqWith s "alice's remaining creature is untouched" (S.powerToughnessOf decoy after) (Just (2, 1))
+              Spec.assertEqWith s "and the Guildmage is a plain 2/2" (S.powerToughnessOf mage after) (Just (2, 2))
+              Spec.assertBool s (secondDest /= firstDest) "the two destinations are distinct objects"
 
 -- CR 303.4d's last two sentences, and CR 301.5c's, which are the same rule
 -- written twice: "an Aura can't enchant more than one object or player. If a

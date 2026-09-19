@@ -253,6 +253,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.SameNameAsSource -> 0
   Filter.Type.SameOwnerAsSource -> 0
   Filter.Type.SameControllerAsBound _ -> 0
+  Filter.Type.SameControllerAsHostOfBound _ -> 0
   Filter.Type.SharesCreatureTypeWithBound _ -> 0
   Filter.Type.ToughnessLessThanBound _ -> 0
   Filter.Type.HasChosenName -> 0
@@ -653,8 +654,8 @@ sameNameAsBoundTag = Text.pack "SameNameAsBound"
 -- search filter (Bifurcate) or a CR 608.2c hand sweep's (Hour of Glory) -- and
 -- how many anywhere else. The second number is the offence.
 --
--- An ALLOWLIST rather than "wherever Filter.Context.slotNames is filled", which
--- since #2141's search half is the wider set: every position a resolution
+-- An ALLOWLIST rather than "wherever Filter.Context.slotNames is filled",
+-- which is the wider set: every position a resolution
 -- reaches through Pawl.Engine.Resolve.Slots.effectContext has the names -- an
 -- ObjectRef's own affected set among them, which is SourceHostFramed inside an
 -- effect (Resolve.battlefieldMatching). So this rejects the atom in positions
@@ -738,6 +739,30 @@ toughnessLessThanBoundOffends :: Face.Face Card.Type.Card -> Bool
 toughnessLessThanBoundOffends card =
   let (framed, elsewhere) = toughnessLessThanBoundCounts card
    in elsewhere /= 0 || framed + elsewhere /= jsonAtoms toughnessLessThanBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The CR 110.2 / 303.4b tag, spelled once.
+sameControllerAsHostOfBoundTag :: Text.Text
+sameControllerAsHostOfBoundTag = Text.pack "SameControllerAsHostOfBound"
+
+-- How many CR 110.2-of-the-host atoms this card carries in a resolution's own
+-- positions and how many anywhere else, toughnessLessThanBoundCounts' shape one
+-- Filter.Context field over -- Pawl.Engine.Resolve.Slots.effectContext is the
+-- one filler of Filter.Context.slotHostControllers too. The ATTACH DESTINATION
+-- is admitted alongside its siblings and they do not admit it: that position
+-- became a resolution's own when Pawl.Engine.Attach.hostsFor started taking its
+-- Context from the caller, and it is the only one of these six a card writes
+-- this atom in (Simic Guildmage). The second number is the offence.
+sameControllerAsHostOfBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
+sameControllerAsHostOfBoundCounts card =
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameControllerAsHostOfBoundTag f) (filter (\(framing, _) -> elem framing [AttachDestination, SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed] == wanted) (cardFilters card)))
+   in (total True, total False)
+
+-- The atom outside those positions, or the traversal and the codec disagreeing
+-- about how many the card holds -- sharesCreatureTypeOffends' two offences.
+sameControllerAsHostOfBoundOffends :: Face.Face Card.Type.Card -> Bool
+sameControllerAsHostOfBoundOffends card =
+  let (framed, elsewhere) = sameControllerAsHostOfBoundCounts card
+   in elsewhere /= 0 || framed + elsewhere /= jsonAtoms sameControllerAsHostOfBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- The CR 110.2 tag, spelled once.
 sameControllerAsBoundTag :: Text.Text
@@ -980,11 +1005,20 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Synthetic Aura Diffusion's atom is framed by its CR 303.4d attach"
       (canHostSubjectCounts (S.combinedFace diffusion))
       (1, 0)
+    -- The third, and the one whose atom the CARD's own ruling asks for rather
+    -- than an engine rule: Simic Guildmage's destination "must be able to be
+    -- enchanted by the Aura" (CR 608.2d).
+    guildmage <- S.printingOf s registry "Simic Guildmage"
     Spec.assertEqWith
       s
-      "and those two cards are the whole of data/cards' authorship of it"
+      "Simic Guildmage's atom is framed by its attach too"
+      (canHostSubjectCounts (S.combinedFace guildmage))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those three cards are the whole of data/cards' authorship of it"
       (sum (fmap (uncurry (+) . canHostSubjectCounts . S.combinedFace) ps))
-      2
+      3
     -- The traversal reaches a Filter position no effect, target slot or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
     -- card. Its absence would not show up in the sweep above, because Ash Barrens
@@ -1233,6 +1267,25 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- a static restriction's affected set, read through a bare contextFor.
     Spec.assertBool s (toughnessLessThanBoundOffends restricted) "the atom in an affected set offends"
     Spec.assertEqWith s "counted outside the admitted positions" (toughnessLessThanBoundCounts restricted) (1, 1)
+  -- CR 110.2 asked of the bound object's HOST (CR 303.4b), the arm above's frame
+  -- one Filter.Context field over and one position wider: effectContext fills
+  -- Filter.Context.slotHostControllers, and the attach destination is one of its
+  -- positions now that Pawl.Engine.Attach.hostsFor takes its Context from the
+  -- caller. See sameControllerAsHostOfBoundOffends for the two offences.
+  Spec.it s "CR 110.2 no card asks SameControllerAsHostOfBound outside a resolution's own positions" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace sameControllerAsHostOfBoundOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only where the resolution fills the hosts' controllers" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the card that does is ACCEPTED.
+    guildmage <- S.printingOf s registry "Simic Guildmage"
+    let face = S.combinedFace guildmage
+        atom = Filter.Type.SameControllerAsHostOfBound (SlotName.MkSlotName (Text.pack "target"))
+        restricted = face {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching atom) Nothing]}
+    Spec.assertEqWith s "Simic Guildmage's one atom is in its attach destination" (sameControllerAsHostOfBoundCounts face) (1, 0)
+    -- The lint's own proof, the pair differing in one position: the same atom in
+    -- a static restriction's affected set, read through a bare contextFor.
+    Spec.assertBool s (sameControllerAsHostOfBoundOffends restricted) "the atom in an affected set offends"
+    Spec.assertEqWith s "counted outside the admitted positions" (sameControllerAsHostOfBoundCounts restricted) (1, 1)
   -- CR 110.2's Filter.SameControllerAsBound is CR 709.4a's atom one characteristic
   -- over, in the same position and with the STAKES reversed: it is vacuously TRUE
   -- where Filter.Context.slotControllers has no key for its slot, so an atom
@@ -1250,11 +1303,19 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Bioshift's one atom is in its second target slot"
       (sameControllerAsBoundCounts (S.combinedFace bioshift))
       (1, 0)
+    -- Simic Guildmage's FIRST ability is the same sentence as Bioshift's, and
+    -- its atom sits in the same position.
+    guildmageAtom <- S.printingOf s registry "Simic Guildmage"
     Spec.assertEqWith
       s
-      "and it is the pool's only one"
+      "Simic Guildmage's is in its first ability's second target slot"
+      (sameControllerAsBoundCounts (S.combinedFace guildmageAtom))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those two are the pool's whole authorship of it"
       (sum (fmap (uncurry (+) . sameControllerAsBoundCounts . S.combinedFace) ps))
-      1
+      2
     -- The REJECTING direction, hand-built for the reason every sibling lint's is:
     -- a card that offends must not be loadable, so no file can carry one. Buried
     -- under all three combinators, so an implementation reading only the top of a
@@ -1576,7 +1637,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- THE THIRD POSITION, and the one this case gained after #2881: a CR 118.12
     -- gate's cost is paid through Pawl.Engine.Filter.contextFor, which fills no
     -- slots, so the same buried atom is as unanswerable there as in a wish's
-    -- filter. The shape is the #2141 widening -- Not (IsBound "target") reads as
+    -- filter. The shape is the empty-slot widening -- Not (IsBound "target") reads as
     -- "each OTHER creature", and against an empty slot map it is vacuously true
     -- of every creature including the bound one.
     --
@@ -2731,7 +2792,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "a buried atom in a search's filter is accepted"
       (hasChosenNameOffends searched, hasChosenNameCounts searched)
       (False, (1, 0))
-    -- The second accepting position, grafted the same way (#2141): the mill arm's
+    -- The second accepting position, grafted the same way: the mill arm's
     -- tally reads the resolution's own context, so its filter answers exactly as
     -- the search's does.
     let tallied = base {Face.spell = spellOf [Effect.Mill (Mill.MkMill (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) (Just (MillTally.MkMillTally slot buried)) Nothing)] Map.empty}

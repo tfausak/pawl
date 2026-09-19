@@ -244,20 +244,24 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 -- ASCENDING, so both the single-candidate elision at chooseHost and a transcript
 -- are deterministic.
 --
--- The filter Context is the ASKING ability's -- CR 109.5's "you" is `controller`
--- and IsSource is `source` -- rather than the subject's, because the destination
--- filter is that ability's card text. The two coincide for CR 303.4k, where the
--- Aura's own rider is asking about the Aura.
+-- The filter Context is the CALLER's, and it is the ASKING ability's -- CR
+-- 109.5's "you" is its perspective and IsSource its source -- rather than the
+-- subject's, because the destination filter is that ability's card text. The two
+-- coincide for CR 303.4k, where the Aura's own rider is asking about the Aura.
 --
--- Not implemented: it carries no slot bindings, so a destination filter naming a
--- slot the calling resolution bound takes its empty-slot value rather than an
--- answer: False for Filter.IsBound and its siblings, and TRUE for
--- SameControllerAsBound, which widens on an absent key (#2141). No card in the
--- pool writes one there.
-hostsFor :: PlayerId -> ObjectId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-hostsFor controller source subject filter_ gs =
+-- Passed in rather than built here because the two kinds of caller need
+-- different ones and this function cannot tell them apart: a RESOLUTION hands
+-- over Pawl.Engine.Resolve.Slots.effectContext, so a destination filter naming a
+-- slot an earlier clause bound is answered (CR 608.2c) -- Simic Guildmage's
+-- "with the same controller" over its target Aura's host; CR 303.4f's entry and
+-- turnUpHosts below hand over a bare Filter.contextFor, which is honest there
+-- because an Aura's own enchant ability and its CR 303.4k rider are card text
+-- with no resolution's slots behind them. Threading a resolution's `legal` map
+-- and bindings through here for the two callers that have neither is what the
+-- shared signature would otherwise force.
+hostsFor :: Filter.Context -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+hostsFor context subject filter_ gs =
   let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
-      context = Filter.contextFor (Game.teams gs) (Just controller) (Just source)
       viewOf oid =
         (Projection.viewOfObject oid gs)
           { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
@@ -297,9 +301,13 @@ hostsFor controller source subject filter_ gs =
 -- CR 303.4f -- changeZoneAttaching's Aura entry -- is that same narrowing with NO
 -- card text to intersect, since there the enchant ability IS the whole restriction.
 -- So it asks hostsFor with a bare Filter.CanHostSubject rather than through here.
+--
+-- A bare Filter.contextFor, built here rather than taken from the caller: the
+-- rider is the Aura's OWN card text (CR 303.4k), so there is no resolution whose
+-- slots it could name.
 turnUpHosts :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-turnUpHosts controller aura filter_ =
-  hostsFor controller aura aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject])
+turnUpHosts controller aura filter_ gs =
+  hostsFor (Filter.contextFor (Game.teams gs) (Just controller) (Just aura)) aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject]) gs
 
 -- Which of the offered destinations the player picks, or Nothing when the text
 -- admits none (CR 609.3: the effect does as much as it can, and that is nothing).
