@@ -4035,6 +4035,30 @@ millikinSpec s registry =
       Spec.assertBool s (all milledThisTurn (Game.zoneMembers Zone.Graveyard S.alice after)) "which answers CR 701.17a's look-back"
       Spec.assertBool s (not (any milledThisTurn (Game.zoneMembers Zone.Library S.alice after))) "where the two cards it left in the library do not"
 
+    -- CR 614.1a reaching a COST's mill. Bruvac the Grandiloquent -- "if an
+    -- opponent would mill one or more cards, they mill twice that many cards
+    -- instead" -- names no road, and CR 701.17a makes this a mill wherever it
+    -- happens, so the row resizes the instruction Millikin's cost states.
+    --
+    -- Bruvac sits under BOB, so alice, the payer, is the opponent its CR 109.5
+    -- relation names; a Bruvac beside the Millikin would not apply.
+    --
+    -- CR 701.17b twice over: `canPayComponent` measured the PRINTED one card, so
+    -- the ability is offered, and the doubled take is then clamped to the
+    -- library. Three cards stocked, so the assertion reads the resized count and
+    -- not an emptied library.
+    Spec.it s "CR 614.1a a replacement resizes a mill paid as a cost" $ do
+      millikin <- S.printingOf s registry "Millikin"
+      bruvac <- S.printingOf s registry "Bruvac the Grandiloquent"
+      let (millikinId, board) = millikinBoard millikin 3
+          withBruvac = snd (S.addPermanent bruvac S.bob board)
+          after = S.runPure S.identityAnswer withBruvac (Activate.activateAbility S.alice millikinId (theAbility millikin))
+      Spec.assertEqWith
+        s
+        "Millikin's cost names one card, and alice milled two of her three"
+        (length (Game.zoneMembers Zone.Graveyard S.alice after), length (Game.zoneMembers Zone.Library S.alice after))
+        (2, 1)
+
 -- Millikin on the battlefield, settled and untapped, with `cards` copies of it
 -- in alice's library, and alice holding priority in her own precombat main
 -- phase. Nothing else is on the board, so a refusal below is the library's.
