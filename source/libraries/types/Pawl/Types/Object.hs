@@ -134,7 +134,8 @@ data Object = MkObject
     exileLookers :: Set.Set ExileLooker.ExileLooker,
     -- | CR 120.3e: damage dealt to a creature is MARKED on it. A count and not a
     -- list of tagged units, every damage rider being consumed at deal time and CR
-    -- 704.5g reading only the total. Removed at cleanup (CR 514.2), and
+    -- 704.5g reading only the total. Removed at cleanup (CR 514.2), by a
+    -- regeneration (CR 701.19a) and by a heal (CR 701.69a), and
     -- per-incarnation: reset by newIncarnation.
     damage :: Natural.Natural,
     -- | CR 302.6, carrying WHICH player the permanent settled under -- the rule's

@@ -435,6 +435,7 @@ manaProduced effect = case effect of
   -- mana for each ..." being the ManaAddition COUNT rather than a repeated body
   -- (Pawl.Types.ManaAddition).
   Effect.ForEach (ForEach.MkForEach _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
+  Effect.Heal _ -> Nothing
 
 -- CR 605.1a's fourth clause, asked of one effect: does it move a card to or from
 -- a library? The 2026-08-07 update added the clause, and `isManaAbility` folds
@@ -669,6 +670,7 @@ movesLibraryCard effect = case effect of
   -- Descended into for `manaProduced`'s reason: rule 608.2f's body runs as part
   -- of THIS effect.
   Effect.ForEach (ForEach.MkForEach _ _ body _) -> any movesLibraryCard body
+  Effect.Heal _ -> False
 
 -- Which zone an ObjectRef reaches, asked of libraries alone: does the ref name
 -- cards that may be IN one? movesLibraryCard's shared half, since CR 605.1a's
