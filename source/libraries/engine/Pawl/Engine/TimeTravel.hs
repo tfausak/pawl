@@ -115,8 +115,11 @@ candidates pid gs = List.sort (permanentCandidates pid gs <> suspendedCandidates
 -- (Event.putCounters, Event.removeCounters), where CR 614's counter replacements
 -- get their opportunity.
 --
--- CounterCause.ByEffect, the one provenance this action has: no printing pays a
--- time travel as a cost, so every caller is a resolving effect.
+-- CounterCause.ByEffect, the one provenance this action has, which is the whole
+-- difference from Pawl.Engine.Blight's three: Scryfall @o:"time travel"@,
+-- 2026-09-19, puts the action in a spell's or ability's EFFECT on every printing
+-- -- Rotating Fireplace's "{4}, {T}: Time travel." charges the mana and the tap
+-- and time travels on resolution -- so every caller is a resolving effect.
 timeTravel :: PlayerId -> ObjectId -> Game ()
 timeTravel pid resolving = do
   gs <- State.get
