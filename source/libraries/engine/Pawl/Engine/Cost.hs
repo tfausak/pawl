@@ -3531,18 +3531,22 @@ restoreKeepingLibraryActions before = do
   gs <- State.get
   State.put (keepingLibraryActions gs before)
 
--- CR 702.51b / 702.66b / 702.126b: the payer picks which of `manaSubstitutions`'
--- entries this cast takes -- after CR 601.2f locked the total cost in, which is
--- where all three rules say the ability applies, and before CR 601.2h's payment.
+-- CR 702.51b / 702.66b / 702.126b / 701.67a: the payer picks which of
+-- `substituting`'s entries this cast or activation takes -- after CR 601.2f
+-- locked the total cost in, which is where every one of those rules says the
+-- substitution applies, and before CR 601.2h's payment. WHICH offer is the
+-- caller's: a cast passes `manaSubstitutions` and an activation
+-- `activationManaSubstitutions`.
 --
 -- FILTERED, NOT TRUSTED. CR 118.3 is the filter: an entry whose taps or exiles
 -- the board cannot satisfy together is never offered. An unrecognised answer reads as the
--- FIRST entry, which `manaSubstitutions` makes the substitute-nothing one -- a
+-- FIRST entry, which both offers make the substitute-nothing one -- a
 -- fallback must not tap a creature the payer did not offer up.
 --
 -- ELIDED where one entry is left, which is every cast by a spell with none of
--- the keywords and every board with no eligible object: rule 702.51a's "you may"
--- then has nothing to ask.
+-- the keywords, every activation of a cost stating no waterbend, and every board
+-- with no eligible object: rule 702.51a's and rule 701.67a's "you may" then have
+-- nothing to ask.
 --
 -- RUN INSIDE THE PAYMENT, once CR 601.2g's window has closed and before a symbol
 -- is spent -- the order the reminder text describes ("each artifact you tap
@@ -5305,6 +5309,9 @@ payComponent moment slots pid oid component = case component of
   -- substitute taps for it, which `announceSubstitutions` has already
   -- cashed into a TapPermanents component of its own by the time any component
   -- is paid.
+  --
+  -- Not implemented: CR 701.67c's trigger on paying a waterbend cost, which this
+  -- arm is where a signal would be written from (#3904).
   CostComponent.Waterbend _ -> pure bindsNothing
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.

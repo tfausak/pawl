@@ -205,6 +205,7 @@ data CostComponent keyword
     --
     -- Not implemented: a waterbend cost in any other position -- a spell's
     -- additional cost, a ward cost, an unless cost, an alternative cost (#3901)
-    -- -- and a waterbend cost written with X (#3902).
+    -- -- a waterbend cost written with X (#3902), and CR 701.67c's trigger on
+    -- paying one, which nothing signals (#3904).
     Waterbend Natural.Natural
   deriving (Eq, Ord, Show)
