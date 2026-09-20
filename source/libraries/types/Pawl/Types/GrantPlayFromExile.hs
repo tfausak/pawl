@@ -3,6 +3,7 @@ module Pawl.Types.GrantPlayFromExile where
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRef as PlayerRef
 
 -- | The payload of Pawl.Types.Effect's GrantPlayFromExile arm: which objects the
 -- permission covers, how long it lasts, and how its holder may pay for what they
@@ -25,8 +26,20 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- Extract Power. It rides the grant for `spending`'s reason: the waiver is the
 -- granting effect's, so the same card played under some other permission pays.
 -- Pawl.Types.ExilePlayPermission's field of the same name is where it lands.
+--
+-- `player` is WHO may play, CR 601.3's "that player" -- Elkin Lair's "THE
+-- PLAYER may play that card this turn", the upkeep player the trigger bound,
+-- not the Lair's controller. Pawl.Types.OfferCast's `caster` is the same field
+-- one opcode over, and takes the same default: CR 109.5's "you", the resolving
+-- controller, which is what every other producer in the pool prints.
+--
+-- ONE seat, since Pawl.Types.ExilePlayPermission holds one (CR 715.3d: "that
+-- card ... that player"), so a reference naming nobody or naming several grants
+-- nothing -- PlayerRef.InSlot's own collapse, and it is where
+-- Pawl.Engine.Resolve.Effect's arm reads it.
 data GrantPlayFromExile = MkGrantPlayFromExile
   { duration :: Duration.Duration,
+    player :: PlayerRef.PlayerRef,
     ref :: ObjectRef.ObjectRef,
     spending :: ManaSpending.ManaSpending,
     withoutPayingManaCost :: Bool

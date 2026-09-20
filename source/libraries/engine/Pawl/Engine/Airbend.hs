@@ -14,10 +14,10 @@
 -- incarnation in exile.
 --
 -- The SECOND is rule 701.65a's standing permission, and that is the one thing
--- this module cannot write as card data. Effect.GrantPlayFromExile grants to CR
--- 109.5's "you" and states no amount, where rule 701.65a names the card's OWNER
--- and fixes the {2} itself; no card states either, so no opcode field carries
--- them and 'permission' mints them here.
+-- this module cannot write as card data. Effect.GrantPlayFromExile names a
+-- player with a PlayerRef and states no amount, where rule 701.65a names the
+-- card's OWNER -- whom no slot holds -- and fixes the {2} itself; no card states
+-- either, so no opcode field carries them and 'permission' mints them here.
 --
 -- Not implemented: CR 701.65b's "whenever a player airbends", which has no arm
 -- anywhere and no GameEvent to hang one on. Avatar Aang is the printing that

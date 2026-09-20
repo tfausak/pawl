@@ -9,6 +9,8 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -21,6 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
       GrantPlayFromExile.codec
       ( GrantPlayFromExile.MkGrantPlayFromExile
           { GrantPlayFromExile.duration = Duration.UntilEndOfTurn,
+            GrantPlayFromExile.player = PlayerRef.Relative PlayerRelation.You,
             GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
             GrantPlayFromExile.spending = ManaSpending.AsProduced,
             GrantPlayFromExile.withoutPayingManaCost = False
@@ -34,6 +37,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
       GrantPlayFromExile.codec
       ( GrantPlayFromExile.MkGrantPlayFromExile
           { GrantPlayFromExile.duration = Duration.UntilEndOfTurn,
+            GrantPlayFromExile.player = PlayerRef.Relative PlayerRelation.You,
             GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
             GrantPlayFromExile.spending = ManaSpending.AnyType,
             GrantPlayFromExile.withoutPayingManaCost = False
@@ -48,19 +52,36 @@ spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
       GrantPlayFromExile.codec
       ( GrantPlayFromExile.MkGrantPlayFromExile
           { GrantPlayFromExile.duration = Duration.Indefinite,
+            GrantPlayFromExile.player = PlayerRef.Relative PlayerRelation.You,
             GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
             GrantPlayFromExile.spending = ManaSpending.AsProduced,
             GrantPlayFromExile.withoutPayingManaCost = True
           }
       )
       " {\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"withoutPayingManaCost\":true} "
-  Spec.it s "a missing spending or withoutPayingManaCost key decodes as the default" $
+  -- Elkin Lair's: CR 601.3's permission for a seat a slot holds rather than for
+  -- the resolving controller, and no other rider.
+  Spec.it s "MkGrantPlayFromExile, CR 601.3's grantee" $
+    Common.assertCodec
+      s
+      GrantPlayFromExile.codec
+      ( GrantPlayFromExile.MkGrantPlayFromExile
+          { GrantPlayFromExile.duration = Duration.UntilEndOfTurn,
+            GrantPlayFromExile.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer")),
+            GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
+            GrantPlayFromExile.spending = ManaSpending.AsProduced,
+            GrantPlayFromExile.withoutPayingManaCost = False
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
+  Spec.it s "a missing player, spending or withoutPayingManaCost key decodes as the default" $
     Common.assertFromJson
       s
       (Codec.decode GrantPlayFromExile.codec)
       "{\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}"
       ( GrantPlayFromExile.MkGrantPlayFromExile
           { GrantPlayFromExile.duration = Duration.Indefinite,
+            GrantPlayFromExile.player = PlayerRef.Relative PlayerRelation.You,
             GrantPlayFromExile.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
             GrantPlayFromExile.spending = ManaSpending.AsProduced,
             GrantPlayFromExile.withoutPayingManaCost = False

@@ -4430,43 +4430,49 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
       offerCast context named pid optionality repetition copied offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
-  -- as CR 109.5's "you" and the stated duration.
+  -- for the player the PlayerRef names and the stated duration.
   --
   -- NOT gated on the object being in exile: CR 601.3's permissions are not
   -- zone-scoped, so a zone test would be the rules core reading the effect.
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile duration ref spending free) ->
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile duration player ref spending free) ->
     State.modify' $ \gs ->
       -- The sweep every ObjectRef-taking opcode shares: a player recipient, an
       -- illegal slot (CR 608.2b) and a set that matched nothing all arrive empty.
       case objectRefObjects legal resolving controller source gs ref of
         [] -> gs
-        targets -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
-          -- CR 611.2b: the duration never started, so no permission is stored.
-          Nothing -> gs
-          Just expiry ->
-            let permission =
-                  ExilePlayPermission.MkExilePlayPermission
-                    { ExilePlayPermission.player = controller,
-                      ExilePlayPermission.source = source,
-                      ExilePlayPermission.expiry = expiry,
-                      -- CR 118.14, carried from the opcode unread;
-                      -- Pawl.Engine.Mana is the only thing that acts on it.
-                      ExilePlayPermission.spending = spending,
-                      -- CR 118.9, carried from the opcode unread;
-                      -- Pawl.Engine.Cost is the only thing that acts on it. The
-                      -- opcode's Bool is the waiver alone -- an alternative cost
-                      -- of nothing -- where the permission's field holds any
-                      -- amount (CR 118.9a), which is what rule 701.65a's {2}
-                      -- needs; no card states an amount here, so no opcode field
-                      -- carries one.
-                      ExilePlayPermission.alternativeManaCost = if free then Just (ManaCost.MkManaCost []) else Nothing,
-                      -- CR 715.3d's "other effects that allow a player to cast
-                      -- it": a card said this, not rule 715.3d, so the Adventure
-                      -- exclusion does not reach it.
-                      ExilePlayPermission.origin = PlayPermissionOrigin.Granted
-                    }
-                grant o = o {Object.playableFromExile = Just permission}
-             in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}
+        targets -> case playerRefPlayers legal controller gs player of
+          -- CR 715.3d's "that player" is ONE seat and
+          -- Object.playableFromExile holds one, so a reference naming nobody --
+          -- or naming several -- grants nothing, PlayerRef.InSlot's own
+          -- collapse.
+          [holder] -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+            -- CR 611.2b: the duration never started, so no permission is stored.
+            Nothing -> gs
+            Just expiry ->
+              let permission =
+                    ExilePlayPermission.MkExilePlayPermission
+                      { ExilePlayPermission.player = holder,
+                        ExilePlayPermission.source = source,
+                        ExilePlayPermission.expiry = expiry,
+                        -- CR 118.14, carried from the opcode unread;
+                        -- Pawl.Engine.Mana is the only thing that acts on it.
+                        ExilePlayPermission.spending = spending,
+                        -- CR 118.9, carried from the opcode unread;
+                        -- Pawl.Engine.Cost is the only thing that acts on it. The
+                        -- opcode's Bool is the waiver alone -- an alternative cost
+                        -- of nothing -- where the permission's field holds any
+                        -- amount (CR 118.9a), which is what rule 701.65a's {2}
+                        -- needs; no card states an amount here, so no opcode field
+                        -- carries one.
+                        ExilePlayPermission.alternativeManaCost = if free then Just (ManaCost.MkManaCost []) else Nothing,
+                        -- CR 715.3d's "other effects that allow a player to cast
+                        -- it": a card said this, not rule 715.3d, so the Adventure
+                        -- exclusion does not reach it.
+                        ExilePlayPermission.origin = PlayPermissionOrigin.Granted
+                      }
+                  grant o = o {Object.playableFromExile = Just permission}
+               in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}
+          _ -> gs
   -- CR 406.3: write the look permission onto every object the ObjectRef names,
   -- as CR 109.5's "you", plus CR 702.75a's ExileLooker.TheExiler where the
   -- payload asks for it. BOTH, and rule 702.75a's hideaway wants both: the
