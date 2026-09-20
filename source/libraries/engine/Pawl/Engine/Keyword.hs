@@ -59,6 +59,7 @@ import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.Cycling as Cycling
@@ -305,6 +306,9 @@ abilitiesFor keyword count = case keyword of
   -- payment buys is a clause of the card (CR 702.166c, CR 702.194b).
   Keyword.Bargain -> []
   Keyword.Teamwork _ -> []
+  -- CR 702.167a states an ACTIVATED ability and no triggered one, so
+  -- battlefieldAbilitiesFor is its roster.
+  Keyword.Craft _ -> []
   -- CR 702.188a and CR 702.190a state one static ability each, and it is an
   -- alternative cost (Pawl.Engine.Cost.candidateCostsGiven) rather than an
   -- ability this roster mints -- evoke's shape.
@@ -648,6 +652,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
+  Keyword.Craft _ -> []
   Keyword.Teamwork _ -> []
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
@@ -904,6 +909,64 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 transmute :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 transmute cost = searchForSameManaValue (cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]}) Filter.ManaValueEqualToSource SearchDestination.RevealThenHand
 
+-- CR 702.167a's whole ability: "[Cost], Exile this permanent, Exile [materials]
+-- from among permanents you control and\/or cards in your graveyard: Return this
+-- card to the battlefield transformed under its owner's control. Activate only
+-- as a sorcery."
+--
+-- TWO COMPONENTS appended in rule 702.167a's own order: ExileThis first, so that
+-- by the time the materials are chosen the crafted permanent has left the
+-- battlefield. Its own exile is what binds Binding.exiledCard, which is the name
+-- rule 702.167a's "this card" has -- CR 400.7 makes it a new object the ability
+-- could not otherwise refer to -- and the materials component binds nothing.
+--
+-- THE RETURN names Zone.Exile as its origin (CR 113.6m) and rides
+-- EntryRiders.transformed and EntryRiders.underOwner, which are rule 702.167a's
+-- "transformed under its owner's control".
+craft :: Craft.Craft Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+craft spec =
+  let printed = Craft.cost spec
+      returned =
+        Effect.MoveToZone
+          MoveToZone.MkMoveToZone
+            { MoveToZone.ref = ObjectRef.InSlot Binding.exiledCard,
+              MoveToZone.zone = Zone.Battlefield,
+              MoveToZone.riders =
+                EntryRiders.MkEntryRiders
+                  { EntryRiders.tapped = TapState.Untapped,
+                    EntryRiders.attacking = Nothing,
+                    EntryRiders.blocking = Nothing,
+                    EntryRiders.transformed = True,
+                    EntryRiders.counters = Map.empty,
+                    EntryRiders.underOwner = True,
+                    EntryRiders.exiledFaceDown = False,
+                    EntryRiders.attachedTo = Nothing,
+                    EntryRiders.faceDown = Nothing
+                  },
+              MoveToZone.slot = Nothing,
+              MoveToZone.origin = Just Zone.Exile,
+              MoveToZone.placement = LibraryPlacement.defaultValue,
+              MoveToZone.duration = Nothing
+            }
+      clause = Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton returned)
+   in ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = printed {Cost.components = Cost.components printed <> [CostComponent.ExileThis, CostComponent.ExileMaterials (Craft.materials spec)]},
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          -- CR 602.5d, rule 702.167a's "Activate only as a sorcery" -- scavenge's
+          -- restriction.
+          ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          -- Nothing on every keyword-minted ability, unearth's reason.
+          ActivatedAbility.name = Nothing,
+          -- Written by `mintedBy` at the roster, unearth's reason.
+          ActivatedAbility.keyword = Nothing
+        }
+
 -- CR 702.71a's whole ability, transmute's above one zone over: the cost
 -- sacrifices this permanent instead of discarding this card, the search is
 -- narrowed to a creature card, and the card found goes onto the battlefield
@@ -1152,6 +1215,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
+  Keyword.Craft _ -> []
   Keyword.Teamwork _ -> []
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
@@ -1776,6 +1840,9 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
+  -- CR 702.167a states a whole self-contained ability, so one per instance,
+  -- transfigure's reading below.
+  Keyword.Craft spec -> List.genericReplicate count (craft spec)
   Keyword.Teamwork _ -> []
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
@@ -2456,6 +2523,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
+  Keyword.Craft _ -> []
   Keyword.Teamwork _ -> []
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
@@ -4142,6 +4210,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
+  Keyword.Craft _ -> []
   Keyword.Teamwork _ -> []
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
@@ -4483,6 +4552,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
+  Keyword.Craft _ -> []
   Keyword.Teamwork _ -> []
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
@@ -4778,6 +4848,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Recover _ -> []
   Keyword.Casualty _ -> []
   Keyword.Bargain -> []
+  Keyword.Craft _ -> []
   Keyword.Teamwork _ -> []
   Keyword.WebSlinging _ -> []
   Keyword.Sneak _ -> []
@@ -4996,6 +5067,7 @@ familyOf keyword = case keyword of
   -- CR 702.166a carries no parameter, so there is no family to name it by.
   Keyword.Bargain -> Nothing
   Keyword.Teamwork _ -> Just KeywordFamily.Teamwork
+  Keyword.Craft _ -> Just KeywordFamily.Craft
   Keyword.WebSlinging _ -> Just KeywordFamily.WebSlinging
   Keyword.Sneak _ -> Just KeywordFamily.Sneak
   Keyword.Foretell _ -> Just KeywordFamily.Foretell

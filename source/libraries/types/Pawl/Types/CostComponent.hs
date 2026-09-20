@@ -4,6 +4,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
@@ -132,6 +133,20 @@ data CostComponent keyword
     -- matching the Filter from the paying player's own graveyard (CR 400.3, CR
     -- 108.4), which the payer chooses.
     ExileCardsFromGraveyard (ExileCardsFromGraveyard.ExileCardsFromGraveyard keyword)
+  | -- | CR 702.167a's [materials] / Tithing Blade: exile this many objects
+    -- matching the Filter from among the permanents the paying player controls
+    -- and the cards in their own graveyard, which the payer chooses.
+    --
+    -- A TWO-ZONE choice, Behold's shape below one zone over, and that is why this
+    -- is not ExileCardsFromGraveyard with a wider criterion: rule 702.167b makes
+    -- ONE criterion read over the battlefield and the graveyard at once, an
+    -- exception to rule 109.2. Pawl.Engine.Cost.materialCandidates is the union
+    -- and Prompt.ChooseMaterials the ask.
+    --
+    -- Binds nothing, unlike ExileThis above. Not implemented: CR 702.167c's "the
+    -- exiled cards used to craft it", which is what would want the exiled
+    -- materials bound here (#3931).
+    ExileMaterials (ExileMaterials.ExileMaterials keyword)
   | -- | CR 406.2 in its fixed form / Circling Vultures: exile the topmost card of
     -- the paying player's graveyard matching the Filter, which CR 404.2's fixed
     -- order identifies without a prompt.

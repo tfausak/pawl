@@ -526,6 +526,12 @@ data Prompt r where
   -- | CR 406.2: which cards are exiled from the payer's graveyard to pay a
   -- cost; ChooseSacrifices' payload, posture and elision.
   ChooseExilesFromGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 702.167a: which objects are exiled as a craft ability's [materials],
+  -- the arm above's payload, posture and elision over TWO zones at once -- the
+  -- payer's battlefield and their graveyard, which CR 702.167b reads one
+  -- criterion across. Its own constructor rather than the arm above, whose name
+  -- states a zone this pool is not confined to.
+  ChooseMaterials :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 701.59a: which cards are exiled from the payer\'s graveyard to collect
   -- evidence, the Natural the TOTAL MANA VALUE they must reach rather than how
   -- many. The arm above\'s payload read as a threshold, which is

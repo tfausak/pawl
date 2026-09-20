@@ -328,4 +328,7 @@ data KeywordFamily
   | -- | CR 702.151a: reconfigure [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Reconfigure
+  | -- | CR 702.167a: craft with [materials] [cost]. No card in the pool asks yet,
+    -- and it is owed at the keyword rather than at the first asker.
+    Craft
   deriving (Bounded, Enum, Eq, Ord, Show)

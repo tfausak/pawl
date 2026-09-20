@@ -3,6 +3,7 @@ module Pawl.Types.Keyword where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.Emerge as Emerge
@@ -714,6 +715,15 @@ data Keyword
     -- CR 702.166c's "if it was bargained" clauses are the card's own, gated on
     -- Quantity.TimesPaid (Archon's Glory).
     Bargain
+  | -- | 702.167a: craft with [materials] [cost] -- an activated ability paying
+    -- [cost], exiling this permanent and [materials] from among permanents you
+    -- control and cards in your graveyard, and returning this card to the
+    -- battlefield transformed under its owner's control at sorcery speed. Minted
+    -- by Pawl.Engine.Keyword.craft.
+    --
+    -- Not implemented: CR 702.167c's "the exiled cards used to craft it", which
+    -- needs the materials recorded for a later clause to read (#3931).
+    Craft (Craft.Craft Keyword)
   | -- | 702.168a: disguise [cost] -- Morph's twin, casting the card as a 2\/2
     -- face-down creature with ward {2} for {3}; the Cost is what CR 702.168d
     -- charges to turn the permanent face up.

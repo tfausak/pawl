@@ -566,11 +566,13 @@ precombatMainOf pid gs =
 -- the rider itself is Pawl.Types.EntryRiders' `transformed`, which
 -- Pawl.Engine.Resolve's MoveToZone arm hands to that door without reading.
 --
--- The producer is Befriending the Moths // Imperial Moth, a Kamigawa: Neon
--- Dynasty Saga whose chapter III reads "Exile this Saga, then return it to the
--- battlefield transformed under your control" -- CR 712.14a's wording on a card
--- rather than on a spell, which is what makes it this rule's producer and not CR
--- 712.13a's. Its back face is a 2/4 white Enchantment Creature -- Insect with
+-- The producer this group uses is Befriending the Moths // Imperial Moth, a
+-- Kamigawa: Neon Dynasty Saga whose chapter III reads "Exile this Saga, then
+-- return it to the battlefield transformed under your control" -- CR 712.14a's
+-- wording on a card rather than on a spell, which is what makes it this rule's
+-- producer and not CR 712.13a's. It is no longer the pool's only one: CR
+-- 702.167a's craft mints the same instruction in the engine
+-- (Pawl.Engine.Keyword.craft), which Pawl.ActivateSpec's Craft group proves. Its back face is a 2/4 white Enchantment Creature -- Insect with
 -- flying, and every one of those readings belongs to that face alone: the front
 -- face is a Saga enchantment with no power, no toughness, no flying and no
 -- creature type. A case that passed with the FRONT face up would fail every line.

@@ -9,11 +9,13 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DevourCount as DevourCount
 import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
+import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Keyword as Keyword
@@ -1584,6 +1586,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Tiered
       " {\"type\":\"Tiered\"} "
     Spec.assertNeWith s "CR 702.183a is not CR 702.172a: two payload-free arms must not share one tag" (Codec.encode Keyword.codec Keyword.Tiered) (Codec.encode Keyword.codec Keyword.Spree)
+  -- CR 702.167a: Tithing Blade's "Craft with creature {4}{B}" -- the payload is
+  -- the cost AND the materials, which is what tells this tag from every other
+  -- cost-carrying arm.
+  Spec.it s "Craft carries its cost and its materials" $ do
+    let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, ManaSymbol.OfType (ManaType.Colored Color.Black)])) []
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Craft (Craft.MkCraft cost (ExileMaterials.MkExileMaterials 1 (Filter.HasCardType CardType.Creature))))
+      " {\"type\":\"Craft\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":4},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}]},\"materials\":{\"count\":1,\"whichObjects\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}} "
   Spec.it s "Scavenge carries its cost" $ do
     Common.assertCodec
       s

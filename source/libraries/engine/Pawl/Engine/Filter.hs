@@ -14,6 +14,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Devour as Devour
@@ -21,6 +22,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -2733,6 +2735,12 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Encore cost -> Keyword.Type.Encore (rewriteCost pairs cost)
   Keyword.Type.Transmute cost -> Keyword.Type.Transmute (rewriteCost pairs cost)
   Keyword.Type.Transfigure cost -> Keyword.Type.Transfigure (rewriteCost pairs cost)
+  -- CR 702.167a's payload is the only one that is not a bare Cost: its cost and
+  -- its [materials] criterion are both printed, so both halves descend.
+  Keyword.Type.Craft crafting ->
+    let materials = Craft.materials crafting
+        swapped = ExileMaterials.MkExileMaterials (ExileMaterials.count materials) (rewrite pairs (ExileMaterials.whichObjects materials))
+     in Keyword.Type.Craft (Craft.MkCraft (rewriteCost pairs (Craft.cost crafting)) swapped)
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is
@@ -2769,7 +2777,8 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
 -- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents,
--- ExileCardFromHand, RevealCardFromHand, Behold, RemovePlusOneCounters and
+-- ExileCardFromHand, RevealCardFromHand, Behold, ExileMaterials,
+-- RemovePlusOneCounters and
 -- PutCardFromHandOntoBattlefield arms
 -- are a regression
 -- fence: no printing pairs any of them with a basic land type, so no test can
@@ -2784,6 +2793,7 @@ rewriteComponent pairs component = case component of
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion))
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n criterion) -> CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   -- Untouched: CR 701.59a describes the cards by a total and states no card type,
   -- so rule 612.1 finds no word in this component to swap.

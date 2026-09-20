@@ -401,7 +401,8 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
 -- CARDS in a starting deck, which Pawl.Engine.Projection.View.viewOfCard answers
 -- off the printed face with no gate to apply, so both readings agree there. The
 -- Enigma Jewel's "four or more nonlands with activated abilities" would ask it of
--- a permanent, but it is a craft cost and craft is unimplemented (gap #3526).
+-- a permanent; craft itself is implemented (CR 702.167), but that cost's count is
+-- a lower bound where Pawl.Types.ExileMaterials' is exact (gap #3933).
 --
 -- bob owns the Piker so that Paladin Class's own level-2 section -- "Creatures you
 -- control get +1/+1" -- cannot reach it, leaving the audit the only thing that

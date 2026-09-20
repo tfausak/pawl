@@ -542,6 +542,13 @@ data Response
     -- them counts the cards or totals their mana values, so a transcript replayed
     -- against the other exiles from the graveyard either way.
     ChoseExilesFromGraveyard (Set.Set ObjectId.ObjectId)
+  | -- | CR 702.167a: the objects a player chose to exile as a craft ability's
+    -- [materials]. A separate constructor from ChoseExilesFromGraveyard above,
+    -- and not the sharing that arm describes: rule 702.167a's pool spans the
+    -- battlefield as well as the graveyard, so a transcript replayed against the
+    -- other would exile a permanent where the graveyard prompt promises it
+    -- exiles a card.
+    ChoseMaterials (Set.Set ObjectId.ObjectId)
   | -- | CR 702.122a: the permanents a player chose to TAP to pay a cost measured
     -- by their total power. A separate constructor from ChoseSacrifices above,
     -- though the payload has the same shape: replaying a transcript against the

@@ -4266,12 +4266,16 @@ brittleEffigySpec s registry = Spec.describe s "Brittle Effigy" $ do
 -- data/cards/synthetic-exiled-reliquary.json, "Synthetic Exiled Reliquary" {3}
 -- Artifact: "{1}, Exile this artifact: Return this card to the battlefield." and
 -- "{2}, Exile this card from your graveyard: Return this card to the
--- battlefield." The producer for Binding.exiledCard, which is the slot CR
+-- battlefield." An observer for Binding.exiledCard, which is the slot CR
 -- 702.167a's craft reads: "[Cost], Exile this permanent, Exile [materials] ...:
 -- Return this card to the battlefield transformed under its owner's control."
 --
--- SYNTHETIC because both printed producers are out of reach today. Tithing Blade
--- // Consuming Sepulcher carries craft, which pawl cannot transcribe (#3526).
+-- SYNTHETIC for the GRAVEYARD half, whose printed producer is out of reach today.
+-- The battlefield half now has one -- craft appends ExileThis and reads this slot
+-- back, which Tithing Blade // Consuming Sepulcher prints and Pawl.ActivateSpec's
+-- Craft group proves -- so the first case below is a second observer rather than
+-- the only one.
+--
 -- Shifty Doppelganger prints the same slot read without craft -- "{3}{U}, Exile
 -- this creature: ... sacrifice that creature. If you do, return this card to the
 -- battlefield" -- and its "if you do" hangs off whether a MANDATORY instruction

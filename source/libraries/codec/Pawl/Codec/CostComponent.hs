@@ -3,6 +3,7 @@ module Pawl.Codec.CostComponent where
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.DiscardCards as DiscardCards
 import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Codec.ExileMaterials as ExileMaterials
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Codec.ReturnPermanents as ReturnPermanents
@@ -64,6 +65,7 @@ codec keywordCodec =
       Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
       Arm.nullary "ExileThis" CostComponent.ExileThis,
       Arm.payload "ExileCardsFromGraveyard" (ExileCardsFromGraveyard.codec keywordCodec) CostComponent.ExileCardsFromGraveyard (\x -> case x of CostComponent.ExileCardsFromGraveyard y -> Just y; _ -> Nothing),
+      Arm.payload "ExileMaterials" (ExileMaterials.codec keywordCodec) CostComponent.ExileMaterials (\x -> case x of CostComponent.ExileMaterials y -> Just y; _ -> Nothing),
       Arm.payload "CollectEvidence" Common.natural CostComponent.CollectEvidence (\x -> case x of CostComponent.CollectEvidence y -> Just y; _ -> Nothing),
       Arm.payload "ExileTopFromGraveyard" (Filter.codec keywordCodec) CostComponent.ExileTopFromGraveyard (\x -> case x of CostComponent.ExileTopFromGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ExileCardFromHand" (Filter.codec keywordCodec) CostComponent.ExileCardFromHand (\x -> case x of CostComponent.ExileCardFromHand y -> Just y; _ -> Nothing),
@@ -103,6 +105,7 @@ tagOf x = case x of
   CostComponent.ExileThisFromGraveyard {} -> "ExileThisFromGraveyard"
   CostComponent.ExileThis {} -> "ExileThis"
   CostComponent.ExileCardsFromGraveyard {} -> "ExileCardsFromGraveyard"
+  CostComponent.ExileMaterials {} -> "ExileMaterials"
   CostComponent.CollectEvidence {} -> "CollectEvidence"
   CostComponent.ExileTopFromGraveyard {} -> "ExileTopFromGraveyard"
   CostComponent.ExileCardFromHand {} -> "ExileCardFromHand"

@@ -354,6 +354,8 @@ library codec
     Pawl.Codec.CounterSubject
     Pawl.Codec.CounterSubjectSpec
     Pawl.Codec.CountSpec
+    Pawl.Codec.Craft
+    Pawl.Codec.CraftSpec
     Pawl.Codec.Create
     Pawl.Codec.CreateCopy
     Pawl.Codec.CreateCopySpec
@@ -483,6 +485,8 @@ library codec
     Pawl.Codec.ExileHauntingSpec
     Pawl.Codec.ExileLooker
     Pawl.Codec.ExileLookerSpec
+    Pawl.Codec.ExileMaterials
+    Pawl.Codec.ExileMaterialsSpec
     Pawl.Codec.ExilePlayPermission
     Pawl.Codec.ExilePlayPermissionSpec
     Pawl.Codec.Expansion
@@ -1731,6 +1735,7 @@ library types
     Pawl.Types.CounterR
     Pawl.Types.CounterRestriction
     Pawl.Types.CounterSubject
+    Pawl.Types.Craft
     Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.CreatureBecomesBlockedByAtLeast
@@ -1801,6 +1806,7 @@ library types
     Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
     Pawl.Types.ExileLooker
+    Pawl.Types.ExileMaterials
     Pawl.Types.ExilePlayPermission
     Pawl.Types.Expansion
     Pawl.Types.Expiry
