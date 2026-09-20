@@ -243,6 +243,11 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 -- cannot disagree. Lazy, so a filter that never names Filter.CanHostSubject pays
 -- nothing for it.
 --
+-- The Context gets the one field a CALLER cannot fill for the mirror reason:
+-- Filter.subjectHostCardTypes is a reading of the subject's own host (CR 205.2a
+-- with CR 303.4b, Enchantment Alteration's "another permanent of that type"),
+-- the same for every candidate, and the caller's Context is the asking ability's.
+--
 -- ASCENDING, so both the single-candidate elision at chooseHost and a transcript
 -- are deterministic.
 --
@@ -269,9 +274,16 @@ hostsFor context subject filter_ gs =
         (Projection.viewOfObject oid gs)
           { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
           }
+      -- CR 205.2a with CR 303.4b: the subject's CURRENT host, which only this
+      -- function knows -- the caller's Context is the asking ability's and holds
+      -- no subject. Read here rather than per candidate for the division
+      -- Filter.Context's own note draws, and off the PROJECTION (CR 613), so a
+      -- host animated into a creature answers as one. Empty for a subject
+      -- attached to nothing or to a player, and LAZY like the field it fills.
+      subjectContext = context {Filter.subjectHostCardTypes = maybe Set.empty (`Projection.cardTypesOf` gs) host}
    in List.sort
         ( filter
-            (\oid -> Just oid /= host && Filter.matches context (viewOf oid) filter_)
+            (\oid -> Just oid /= host && Filter.matches subjectContext (viewOf oid) filter_)
             (Set.toList (GameState.battlefield gs))
         )
 

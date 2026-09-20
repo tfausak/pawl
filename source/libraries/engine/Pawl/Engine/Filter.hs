@@ -1198,6 +1198,29 @@ data Context = MkContext
     -- question about the board as the ability resolves. CR 608.2b has already
     -- dropped a target Aura that left.
     slotHostControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
+    -- CR 205.2a with CR 303.4b: the CARD TYPES of the permanent the SUBJECT of
+    -- the attach now being performed is attached to, for the one atom that asks
+    -- about them (HostOfSubjectHasCardType, Enchantment Alteration's "another
+    -- permanent of that type").
+    --
+    -- Here rather than in the per-candidate View, where `canHostSubject` is, for
+    -- the division that field's own note draws: this is one reading of the
+    -- subject's host, the same for every candidate in the match, which is
+    -- `sourcePower`'s side of it. Keyed by nothing, because the subject is not a
+    -- slot the caller bound but the permanent Pawl.Engine.Attach.hostsFor was
+    -- handed -- so hostsFor fills it into the Context it took from its caller
+    -- rather than the caller filling it, and hostsFor is the one filler.
+    --
+    -- EMPTY everywhere else, where the atom is a silent False, and
+    -- Pawl.FilterPositionLintSpec's "CR 205.2a no card asks
+    -- HostOfSubjectHasCardType outside a position an attach frames" keeps a card
+    -- out of those. Empty is also an honest answer inside an attach: a subject
+    -- attached to nothing, or to a player (CR 303.4b), has no host card type.
+    --
+    -- Read through the PROJECTION (CR 613), not the printed face: a creature
+    -- animated into a land, and a land Song of the Dryads has turned into one,
+    -- are the type the rule asks about.
+    subjectHostCardTypes :: Set.Set CardType.CardType,
     -- CR 205.3m: the CREATURE TYPES of the objects the resolution's slots hold,
     -- for SharesCreatureTypeWithBound -- Heirloom Blade's "shares a creature type
     -- with it", and through Binding.triggerSource a kinship card's "with this
@@ -1516,7 +1539,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1554,7 +1577,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -2044,6 +2067,10 @@ matches context view predicate = case predicate of
   -- CR 701.3a read from the candidate's side, computed by the caller that knows
   -- which host the instruction fixed. Vacuously False outside a search.
   Filter.CanAttachToSubject -> canAttachToSubject view
+  -- CR 205.2a read of the attach SUBJECT's host rather than of the candidate,
+  -- filled by the caller that knows what is moving. Vacuously False outside an
+  -- attach, where the set is empty.
+  Filter.HostOfSubjectHasCardType cardType -> Set.member cardType (subjectHostCardTypes context)
   -- CR 111.6: a token isn't a card. A live read of what the object is
   -- represented by (Object.source), never a stamp on the candidate -- and unlike
   -- the two arms above it cannot change while the game runs, because CR 111.3
@@ -2301,6 +2328,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
+  Filter.HostOfSubjectHasCardType _ -> predicate
   Filter.IsCommander -> predicate
   Filter.IsToken -> predicate
   Filter.IsActivatedAbility -> predicate
@@ -3010,6 +3038,7 @@ bakeBound players predicate = case predicate of
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
+  Filter.HostOfSubjectHasCardType _ -> predicate
   Filter.IsCommander -> predicate
   Filter.IsToken -> predicate
   Filter.IsActivatedAbility -> predicate
@@ -3173,6 +3202,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsHostOfSource -> []
   Filter.CanHostSubject -> []
   Filter.CanAttachToSubject -> []
+  Filter.HostOfSubjectHasCardType _ -> []
   Filter.IsCommander -> []
   Filter.IsToken -> []
   Filter.IsActivatedAbility -> []
@@ -3338,6 +3368,11 @@ statesAQuality predicate = case predicate of
   Filter.IsHostOfSource -> True
   Filter.CanHostSubject -> True
   Filter.CanAttachToSubject -> True
+  -- True for the two atoms above's reason and not because it describes the
+  -- candidate: it does not, and what CR 701.23b asks is only whether the
+  -- predicate is trivially true, which no atom is. Unreachable from a search
+  -- either way, the lint keeping this one at an attach's destination.
+  Filter.HostOfSubjectHasCardType _ -> True
   Filter.IsCommander -> True
   Filter.IsToken -> True
   Filter.IsActivatedAbility -> True

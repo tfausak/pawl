@@ -462,6 +462,24 @@ data Filter keyword
     -- (Auratouched Mage) or a slot the resolution bound (Sovereigns of Lost
     -- Alara's "that creature").
     CanAttachToSubject
+  | -- | CR 205.2a with CR 303.4b: the permanent the SUBJECT of the surrounding
+    -- attach is currently attached to has this card type -- Enchantment
+    -- Alteration's "attached to a creature or land . . . another permanent of
+    -- that type", where the antecedent is the HOST's type and not the
+    -- candidate's.
+    --
+    -- Says nothing about the candidate, which is the whole shape of it: "of that
+    -- type" is a conjunction of two independent reads, and the candidate's half
+    -- is HasCardType above. A card pairs them per type -- @Or [And [HasCardType
+    -- Creature, HostOfSubjectHasCardType Creature], And [HasCardType Land,
+    -- HostOfSubjectHasCardType Land]]@ -- rather than intersecting the two
+    -- type sets, which would let an artifact land and an artifact creature match
+    -- on a type the card never named.
+    --
+    -- VACUOUSLY FALSE outside an attach, CanHostSubject's posture: there is no
+    -- subject for the question to be about, and Pawl.FilterPositionLintSpec
+    -- rejects the atom in every Filter position but an attach's destination.
+    HostOfSubjectHasCardType CardType.CardType
   | -- | CR 111.6: the candidate is a token; "nontoken" is @Not IsToken@ (#163).
     -- Uncharacteristic and immutable, CR 111.3 making a token's effect-defined
     -- values equivalent to printed ones, which is what lets

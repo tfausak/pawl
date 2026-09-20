@@ -126,6 +126,7 @@ codec keywordCodec =
       Arm.nullary "IsHostOfSource" Filter.IsHostOfSource,
       Arm.nullary "CanHostSubject" Filter.CanHostSubject,
       Arm.nullary "CanAttachToSubject" Filter.CanAttachToSubject,
+      Arm.payload "HostOfSubjectHasCardType" CardType.codec Filter.HostOfSubjectHasCardType (\x -> case x of Filter.HostOfSubjectHasCardType y -> Just y; _ -> Nothing),
       Arm.nullary "IsCommander" Filter.IsCommander,
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsActivatedAbility" Filter.IsActivatedAbility,
@@ -231,6 +232,7 @@ tagOf x = case x of
   Filter.IsHostOfSource {} -> "IsHostOfSource"
   Filter.CanHostSubject {} -> "CanHostSubject"
   Filter.CanAttachToSubject {} -> "CanAttachToSubject"
+  Filter.HostOfSubjectHasCardType {} -> "HostOfSubjectHasCardType"
   Filter.IsCommander {} -> "IsCommander"
   Filter.IsToken {} -> "IsToken"
   Filter.IsActivatedAbility {} -> "IsActivatedAbility"

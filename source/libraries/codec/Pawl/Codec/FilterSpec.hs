@@ -501,6 +501,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.CanAttachToSubject
       " {\"type\":\"CanAttachToSubject\"} "
+  Spec.it s "HostOfSubjectHasCardType" $ do
+    Common.assertCodec
+      s
+      codec
+      (Filter.HostOfSubjectHasCardType CardType.Creature)
+      " {\"type\":\"HostOfSubjectHasCardType\",\"value\":{\"type\":\"Creature\"}} "
+    Spec.assertNeWith s "CR 205.2a's read is of the host, not of the candidate" (Codec.encode codec (Filter.HostOfSubjectHasCardType CardType.Creature)) (Codec.encode codec (Filter.HasCardType CardType.Creature))
   Spec.it s "IsCommander" $
     Common.assertCodec
       s
