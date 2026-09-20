@@ -204,6 +204,7 @@ import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
@@ -5790,9 +5791,22 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- 201.5's "the object it's on" is the copy -- a copy of
                 -- Chronomantic Escape exiles the copy, which CR 707.10a then
                 -- ceases to exist rather than the original on the stack below it.
+                --
+                -- CR 602.2a's thisAbility slot goes the other way: it names the
+                -- ability's OWN object rather than its source, and CR 707.10's
+                -- last sentence makes the copy an ability of its own, so the
+                -- copy's printed "this ability" is the copy. Re-stamped for the
+                -- same reason `you` is -- Pawl.Engine.Activate wrote the
+                -- original's id there as it went on the stack -- and not a
+                -- decision CR 707.10 copies. Pawl.CopySpec's Forsworn Paladin case
+                -- proves the aim moved, and its Stifle case that it answers once
+                -- the original has left the stack.
+                --
+                -- Not implemented: the same slot on a copy of a TRIGGERED ability,
+                -- which no borne trigger carries to begin with (#3815).
                 stampSelf = case kind of
                   StackObjectKind.Spell -> Binding.setTriggerSource copyId
-                  StackObjectKind.ActivatedAbility -> id
+                  StackObjectKind.ActivatedAbility -> Binding.setThisAbility copyId
                   StackObjectKind.TriggeredAbility -> id
                 copy =
                   obj
@@ -5814,15 +5828,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- CR 707.10 copies the alternative cost, but a copy isn't
                       -- CAST, so it keeps evoke's record and not escape's.
                       Object.castUsing = Keyword.copiedCastUsing (Object.castUsing obj),
-                      -- CR 109.5's "you" is RE-STAMPED, and it is the one binding
-                      -- that must be: Pawl.Engine.Cast and Pawl.Engine.Activate
-                      -- write the caster or activator into it as the original goes
-                      -- on the stack, and CR 707.10 makes the copy's controller the
-                      -- seat `copier` named instead. Every other binding is
-                      -- a DECISION, which CR 707.10 copies verbatim -- including an
-                      -- ability's self slot, so CR 707.10b's "the copy refers to
-                      -- that same object" needs no write of its own -- while a
-                      -- SPELL's is re-stamped, `stampSelf`'s sentence above.
+                      -- CR 400.7d's record of what PAID, which CR 707.10 does not
+                      -- carry across: the copy is neither cast nor activated, and
+                      -- the rule's objects-used-to-pay sentence stops at objects --
+                      -- its own example says a copy of Dawnglow Infusion gains no
+                      -- life "because mana isn't an object". Forsworn Paladin's "if
+                      -- mana from a Treasure was spent to activate this ability" is
+                      -- the reader, and Pawl.CopySpec's Forsworn Paladin case the
+                      -- proof.
+                      --
+                      -- Not implemented: CR 702.150a's compleated, whose record of
+                      -- the life paid for a Phyrexian symbol the copy still
+                      -- inherits (#3935).
+                      Object.manaSpent = Mana.Type.MkMana [],
+                      -- CR 109.5's "you" is RE-STAMPED: Pawl.Engine.Cast and
+                      -- Pawl.Engine.Activate write the caster or activator into it
+                      -- as the original goes on the stack, and CR 707.10 makes the
+                      -- copy's controller the seat `copier` named instead. The
+                      -- RESERVED slots are the ones that can need a write of their
+                      -- own, this one and `stampSelf`'s two above -- every other
+                      -- binding is a DECISION, which CR 707.10 copies verbatim,
+                      -- including an ability's self slot, so CR 707.10b's "the copy
+                      -- refers to that same object" needs no write.
                       -- CR 707.10d's and CR 707.10e's targets, where the effect
                       -- chose them, over the decisions CR 707.10 copied. Empty
                       -- for the other two answers, which leave every one of them
