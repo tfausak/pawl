@@ -4694,9 +4694,10 @@ giftSpec s registry = Spec.describe s "Gift" $ do
   -- represents is a SPELL ability, not the enters trigger the permanents above
   -- carry, so the Fish appears without anything reaching the stack.
   --
-  -- The fight is what proves the card's own text ran too: alice's 2\/2 is 3\/3
-  -- when the gift was promised, which is exactly the toughness bob's 3\/3 needs
-  -- to kill and exactly the power needed to kill it back.
+  -- The fight is what proves the card's own "if the gift was promised" clause ran
+  -- too: alice's 2\/2 is a 3\/3 only when it did, and 3 is exactly the power bob's
+  -- 3\/3 needs taken to die. alice's creature dies either way, so the discriminator
+  -- is bob's.
   Spec.it s "CR 702.174b a gift sorcery gives the promised opponent the Fish as it resolves" $ do
     (brawlId, board) <- longstalkBoard s registry
     let after = castResolved (promising S.carol) brawlId board

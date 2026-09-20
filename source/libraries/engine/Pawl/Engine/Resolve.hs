@@ -557,9 +557,11 @@ resolveSpellWith runSubgame oid = do
 --
 -- "If this spell's gift cost was paid" is Object.paidCosts, the record CR 601.2b's
 -- payment writes and the one Quantity.TimesPaid reads for the permanent half's
--- intervening "if" (Pawl.Engine.Keyword.gift). Read off the spell's own object, so
--- a copy of the spell -- which CR 707.2 gives no paidCosts -- promised nobody
--- anything and gives no gift.
+-- intervening "if" (Pawl.Engine.Keyword.gift). Read off the spell's own object,
+-- which for a COPY of the spell is the copy's own -- and CR 707.2 carries a stack
+-- object's cast-time choices to its copy ("whether it was kicked"), so a copy of a
+-- promised gift spell gives the gift again. That is the opposite of the permanent
+-- half's answer one rule over, where CR 707.2 copies no such record onto a Clone.
 --
 -- That guard is a REGRESSION FENCE too, and for the reason
 -- Pawl.Engine.Keyword.gift's intervening "if" is: widening it to admit an unpaid
