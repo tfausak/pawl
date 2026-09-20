@@ -537,6 +537,25 @@ tappedForTotalPower = SlotName.MkSlotName (Text.pack "thatTappedForTotalPower")
 revealedCard :: SlotName
 revealedCard = SlotName.MkSlotName (Text.pack "thatRevealedCard")
 
+-- CR 701.4a: the reserved slot under which the object a CostComponent.Behold
+-- payment beheld is bound -- what CR 701.4b's "if a [quality] was beheld" asks
+-- after (Osseous Exhale). revealedCard's route exactly: Pawl.Engine.Cast folds
+-- the payment's bound slots onto the spell, and no printing puts this component
+-- on an activation cost.
+--
+-- Read by Quantity.WasBound and by nothing else, which is what rule 701.4b asks
+-- for: the phrase is about whether the action was taken, not about the object,
+-- so the reader must not go back to the board for the quality it had. That is
+-- also why the binding spans both of rule 701.4a's zones without a reader
+-- needing to know which one it came out of.
+--
+-- SINGULAR: rule 701.4a beholds one object, so Binding.onlyOne answers it.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as the slots above.
+beheldObject :: SlotName
+beheldObject = SlotName.MkSlotName (Text.pack "thatBeheldObject")
+
 -- CR 702.122b: the reserved slot under which the VEHICLE a creature just crewed
 -- is bound -- the "that Vehicle" in Gearshift Ace's "whenever this creature crews
 -- a Vehicle, that Vehicle gains first strike until end of turn". Stamped by

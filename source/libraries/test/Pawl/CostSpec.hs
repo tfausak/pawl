@@ -2251,6 +2251,92 @@ announcing beholding victim p = case p of
     | Just cost <- List.find (\c -> not (null (Cost.Type.components c)) == beholding) candidates -> cost
   _ -> targeting victim p
 
+-- Osseous Exhale {1}{W} Instant: "As an additional cost to cast this spell, you
+-- may behold a Dragon. Osseous Exhale deals 5 damage to target attacking or
+-- blocking creature. If a Dragon was beheld, you gain 2 life." (Oracle checked
+-- against Scryfall 2026-09-20.)
+--
+-- The gate card for CR 701.4b's "if a [quality] was beheld", which is what
+-- Binding.beheldObject and Quantity.WasBound exist for, and for CR 118.8b's
+-- optional additional cost -- written as a Pawl.Types.CostChoice whose second
+-- option is the empty cost, which every board can pay.
+--
+-- alice attacks with a Hill Giant and then aims her own spell at it: rule
+-- 701.4a's pool is read off HER zones and the card's target filter says nothing
+-- about who controls the creature, so one attacker is the whole of the combat
+-- these cases need. Two Plains is exactly {1}{W}, so the mana window has nothing
+-- to decide.
+--
+-- Each case puts exactly ONE Dragon in reach, so Prompt.ChooseBehold is elided
+-- and the only answer a case gives about the cost is CR 601.2b's choice of
+-- WHICH option to pay -- which is the one thing the positive and negative boards
+-- differ in.
+--
+-- The numbers are distinct: 5 damage into a 3/3, 2 life onto a 20, two Plains.
+osseousExhaleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+osseousExhaleSpec s registry =
+  Spec.describe s "Osseous Exhale" $ do
+    -- CR 701.4b's battlefield half: the beheld object is a permanent alice
+    -- controls, and the linked clause reads that she beheld it at all.
+    Spec.it s "CR 701.4b beholding a Dragon permanent gains the 2 life" $ do
+      plains <- S.printingOf s registry "Plains"
+      exhale <- S.printingOf s registry "Osseous Exhale"
+      giant <- S.printingOf s registry "Hill Giant"
+      dragon <- S.printingOf s registry "Exalted Dragon"
+      let (spell, victim, gs) = osseousExhaleBoard plains exhale giant [] [dragon]
+          resolved = S.runPure (announcing True victim) (S.runPure (announcing True victim) gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 701.4b a Dragon was beheld, so alice gained the 2 life" (S.lifeOf S.alice resolved) (Just 22)
+      Spec.assertEqWith s "CR 601.2f and the spell resolved: 5 damage is marked on the Giant" (S.damageOf victim resolved) (Just 5)
+    -- The discriminating twin: the SAME board, the other CR 118.8 option
+    -- announced. Nothing differs but the caster's answer, so the life total is
+    -- the whole of what the record buys.
+    Spec.it s "CR 118.8b declining to behold gains nothing" $ do
+      plains <- S.printingOf s registry "Plains"
+      exhale <- S.printingOf s registry "Osseous Exhale"
+      giant <- S.printingOf s registry "Hill Giant"
+      dragon <- S.printingOf s registry "Exalted Dragon"
+      let (spell, victim, gs) = osseousExhaleBoard plains exhale giant [] [dragon]
+          resolved = S.runPure (announcing False victim) (S.runPure (announcing False victim) gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 701.4b no Dragon was beheld, so alice gained nothing" (S.lifeOf S.alice resolved) (Just 20)
+      Spec.assertEqWith s "and the spell resolved all the same: 5 damage is marked on the Giant" (S.damageOf victim resolved) (Just 5)
+    -- CR 701.4a's other half, which is where a reader that went back to the
+    -- BOARD for the beheld object would come apart: the card is in a hidden zone
+    -- (CR 400.2), so CR 400.7j's find is refused there and only the binding
+    -- itself still answers.
+    Spec.it s "CR 701.4b beholding a Dragon card in hand gains the 2 life too" $ do
+      plains <- S.printingOf s registry "Plains"
+      exhale <- S.printingOf s registry "Osseous Exhale"
+      giant <- S.printingOf s registry "Hill Giant"
+      dragon <- S.printingOf s registry "Hoarding Dragon"
+      let (spell, victim, gs) = osseousExhaleBoard plains exhale giant [dragon] []
+          resolved = S.runPure (announcing True victim) (S.runPure (announcing True victim) gs (S.cast S.alice spell)) Stack.resolveTop
+      Spec.assertEqWith s "CR 701.4b the Dragon beheld out of her hand counts" (S.lifeOf S.alice resolved) (Just 22)
+      Spec.assertEqWith s "CR 701.20a and the table saw it" (S.revealsOf resolved) [(S.alice, Set.singleton (CardName.MkCardName (Text.pack "Hoarding Dragon")))]
+
+-- alice's Hill Giant attacking, her Exhale in hand over `inHand` and
+-- `onBattlefield`, and the two Plains that pay for it. The attacker comes back
+-- as the victim: it is the only creature CR 508.1k leaves the card's target
+-- filter, so `targeting` has one recipient to filter down to.
+osseousExhaleBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  [Printing.Printing] ->
+  [Printing.Printing] ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+osseousExhaleBoard plains exhale giant inHand onBattlefield =
+  let (combat, ours, _) = S.combatBoardOf [giant] []
+      giantId = case ours of
+        a : _ -> a
+        [] -> S.noSource
+      addHand (ids, g) printing = let (oid, gN) = S.addHandCard printing S.alice g in (ids <> [oid], gN)
+      addField (ids, g) printing = let (oid, gN) = S.addPermanent printing S.alice g in (ids <> [oid], gN)
+      (_, withHand) = List.foldl' addHand ([] :: [ObjectId.ObjectId], combat) inHand
+      (_, withField) = List.foldl' addField ([] :: [ObjectId.ObjectId], withHand) onBattlefield
+      (spellId, withSpell) = S.addHandCard exhale S.alice withField
+      withLands = S.landsFor plains S.alice 2 withSpell
+   in (spellId, giantId, S.runPure (attackingWith giantId) withLands (Combat.declareAttackers S.manaPerformer S.alice))
+
 -- Forensic Researcher {2}{U} Creature -- Merfolk Detective 1/3: "{T}: Untap
 -- another target permanent you control. {T}, Collect evidence 3: Tap target
 -- creature you don't control." (Oracle checked against Scryfall 2026-09-19.)
@@ -2517,6 +2603,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   cadaverousBloomSpec s registry
   livingDestinySpec s registry
   causticExhaleSpec s registry
+  osseousExhaleSpec s registry
   forensicResearcherSpec s registry
   flingSpec s registry
   frailExhumationSpec s registry

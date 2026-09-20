@@ -45,6 +45,15 @@ data Quantity
     -- Nothing when it holds no amount. CR 601.2b's X is this arm, at
     -- Pawl.Engine.Binding.variableX.
     InSlot SlotName.SlotName
+  | -- | CR 701.4b: 1 if that slot of the surrounding announcement names at least
+    -- one object, else 0 -- Osseous Exhale's "if a Dragon was beheld".
+    --
+    -- Reads the BINDING and never the board, which is rule 701.4b's whole point:
+    -- a Count over Scope.OverBound asks the same question through CR 400.7j and
+    -- so answers no for a beheld permanent bounced in response, and for one
+    -- beheld out of a hand at all (CR 400.2). The QUALITY is not re-checked
+    -- either, the cost's own Filter having settled it at payment time.
+    WasBound SlotName.SlotName
   | -- | CR 208.2 / 208.2a: the printed star -- notation, which the projection
     -- seed substitutes (Projection.baseCharacteristics) and evaluate answers
     -- Nothing for.

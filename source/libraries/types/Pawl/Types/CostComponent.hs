@@ -180,9 +180,10 @@ data CostComponent keyword
     -- payer picks which. Pawl.Engine.Cost.beholdCandidates is the union and
     -- Prompt.ChooseBehold the ask.
     --
-    -- Not implemented: CR 701.4b's "if a [quality] was beheld", which needs the
-    -- beheld object recorded for a later clause, and CR 118.8b's optional "you may
-    -- behold" (#3888).
+    -- BINDS the beheld object under Pawl.Engine.Binding.beheldObject, which is
+    -- what CR 701.4b's "if a [quality] was beheld" is read off through
+    -- Quantity.WasBound; CR 118.8b's optional "you may behold" is an option of a
+    -- Pawl.Types.CostChoice whose other option is empty.
     --
     -- Not implemented: beholding more than one object, and the Champion cycle's
     -- "behold a [quality] and exile it" -- the payload is one Filter and states
