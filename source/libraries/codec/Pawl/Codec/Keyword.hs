@@ -157,6 +157,7 @@ codec =
       Arm.nullary "LivingWeapon" Keyword.LivingWeapon,
       Arm.nullary "Undying" Keyword.Undying,
       Arm.nullary "Evolve" Keyword.Evolve,
+      Arm.payload "Tribute" Common.natural Keyword.Tribute (\x -> case x of Keyword.Tribute y -> Just y; _ -> Nothing),
       Arm.nullary "Dethrone" Keyword.Dethrone,
       Arm.nullary "Extort" Keyword.Extort,
       Arm.nullary "Fuse" Keyword.Fuse,
@@ -347,6 +348,7 @@ tagOf x = case x of
   Keyword.LivingWeapon {} -> "LivingWeapon"
   Keyword.Undying {} -> "Undying"
   Keyword.Evolve {} -> "Evolve"
+  Keyword.Tribute {} -> "Tribute"
   Keyword.Dethrone {} -> "Dethrone"
   Keyword.Extort {} -> "Extort"
   Keyword.Fuse {} -> "Fuse"

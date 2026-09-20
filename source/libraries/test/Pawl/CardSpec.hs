@@ -3004,6 +3004,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.54a names no quality either: "an opponent" is a player and the +1/+1
   -- counters are the rule's own noun, so neither reaches a Filter.
   Keyword.Bloodthirst _ -> []
+  Keyword.Tribute _ -> []
   -- CR 702.55a names no quality either: its minted ability's bare "target
   -- creature" pool carries no Filter at all.
   Keyword.Haunt -> []
@@ -3528,6 +3529,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.DesignationValue _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
+  Quantity.Type.TributeWasPaid -> []
   Quantity.Type.TimesPaid {} -> []
   Quantity.Type.CastUsing {} -> []
   Quantity.Type.TagWasSpent {} -> []
@@ -4520,6 +4522,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.Unleash -> []
   EntryRewrite.Sunburst -> []
   EntryRewrite.Bloodthirst _ -> []
+  EntryRewrite.Tribute _ -> []
   EntryRewrite.Compleated _ -> []
   EntryRewrite.Tapped -> []
   EntryRewrite.PayLifeOrTapped _ -> []

@@ -818,6 +818,7 @@ mintCard pid under printingId dest position gs =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1016,6 +1017,7 @@ createEmblem pid card = do
                 Object.designations = Set.empty,
                 Object.designationValues = Map.empty,
                 Object.paidCosts = Map.empty,
+                Object.tributePaid = False,
                 Object.bestowed = False,
                 Object.mutating = False,
                 Object.prototyped = False,
@@ -2728,6 +2730,62 @@ apply batch candidate event =
             case answer of
               OptionalDecision.Exercises -> addEnteringCounters oid CounterKind.PlusOnePlusOne 1
               OptionalDecision.Declines -> pure ()
+            pure (Just event)
+      -- CR 702.104a / 614.1c: tribute N on Snake of the Golden Grove. The arm
+      -- above's offer made to somebody else, in TWO steps: rule 702.104a has the
+      -- controller choose an opponent, and that opponent alone decides whether the
+      -- counters go on.
+      --
+      -- Both steps are prompts, and neither is the engine's to settle: the
+      -- decisions are a 4/4 with the card's trigger against a 7/7 without it.
+      -- The opponent choice is elided at ONE opponent, ChooseCardNames' posture in
+      -- this same loop -- one option is one outcome -- and the second question is
+      -- asked at every board, since Exercises and Declines always differ.
+      --
+      -- The ANSWER is stamped on Object.tributePaid, not the counters read back:
+      -- CR 702.104b defines "tribute wasn't paid" by the opponent's DECISION, so a
+      -- later counter-placing effect must not change it.
+      --
+      -- Through addEnteringCounters for riot's reason: the pending map is what puts
+      -- these counters in the entry's own CR 616.1 pool, so CR 614.16's multipliers
+      -- reach them.
+      EntryRewrite.Tribute n -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the reason riot's arm gives above.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            -- CR 102.1's seats still in the game, Game.opponentsOf's own read --
+            -- a player who has left (CR 104.3a) is nobody's opponent and cannot be
+            -- offered the choice.
+            chosen <- case Game.opponentsOf controller gs of
+              -- No opponent left to ask, a board CR 104.2a has already ended the
+              -- game on. Nobody decides, so tribute is not paid -- the state rule
+              -- 702.104b's condition reads as true.
+              [] -> pure Nothing
+              -- CR 102.2: one opponent is one option, and the engine decides
+              -- nothing by not asking.
+              [sole] -> pure (Just sole)
+              first : second : rest -> do
+                let offered = first NonEmpty.:| (second : rest)
+                answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid offered)
+                -- FILTERED, NOT TRUSTED, ChooseCardNames' posture above: an answer
+                -- naming somebody who is not an opponent would otherwise hand the
+                -- decision to a player rule 702.104a never asks.
+                pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+            case chosen of
+              Nothing -> pure ()
+              Just opponent -> do
+                gs2 <- State.get
+                answer <- Game.choose (Prompt.ChooseTribute (Decide.deciderFor opponent gs2) opponent oid n)
+                case answer of
+                  OptionalDecision.Declines -> pure ()
+                  OptionalDecision.Exercises -> do
+                    addEnteringCounters oid CounterKind.PlusOnePlusOne n
+                    State.modify' $ \g ->
+                      let stamp o = o {Object.tributePaid = True}
+                       in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
             pure (Just event)
       -- CR 702.54a via CR 614.1c: bloodthirst N on Bloodrage Vampire. The
       -- WithCounters arm above with the kind fixed at +1/+1 by rule 702.54a, and
@@ -6794,6 +6852,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.designations = Set.empty,
                       Object.designationValues = Map.empty,
                       Object.paidCosts = Map.empty,
+                      Object.tributePaid = False,
                       Object.bestowed = False,
                       Object.mutating = False,
                       Object.prototyped = False,
@@ -7025,6 +7084,7 @@ meld controller victims resultCard = do
                 Object.designations = Set.empty,
                 Object.designationValues = Map.empty,
                 Object.paidCosts = Map.empty,
+                Object.tributePaid = False,
                 Object.bestowed = False,
                 Object.mutating = False,
                 Object.prototyped = False,

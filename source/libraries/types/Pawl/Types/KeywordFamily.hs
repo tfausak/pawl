@@ -167,6 +167,10 @@ data KeywordFamily
     -- level up" names, as against level up {W}; no card in the pool asks yet, and
     -- it is owed at the keyword rather than at the first asker.
     LevelUp
+  | -- | CR 702.104a: tribute N. The family "a creature with tribute" names, as
+    -- against tribute 3; no card in the pool asks yet, and it is owed at the
+    -- keyword rather than at the first asker.
+    Tribute
   | -- | CR 702.107a: outlast [cost].
     Outlast
   | -- | CR 702.109a: dash [cost]; the family Quantity.CastUsing names.

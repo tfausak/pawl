@@ -260,6 +260,10 @@ viewOfCard face =
           -- printed face.
           Filter.classLevel = Nothing,
           Filter.paidCosts = Map.empty,
+          -- CR 702.104a's ability functions as a PERMANENT enters, and this
+          -- builder describes a printed face -- `designations` above, same
+          -- sentence.
+          Filter.tributePaid = False,
           Filter.castUsing = Nothing,
           -- CR 601.2h pays the cost of a SPELL, and this builder describes a
           -- printed face.
@@ -778,6 +782,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- lastKnownView overrides this with LastKnown.paidCosts, so the CR 608.2h
       -- path answers "kicked" for a kicked spell that has left the stack.
       Filter.paidCosts = foldMap Object.paidCosts (Game.lookupObject oid gs),
+      -- CR 702.104b: read live off the object, with no last-known override --
+      -- `castUsing` below's posture, for the reason the field's own comment in
+      -- Pawl.Engine.Filter gives.
+      Filter.tributePaid = any Object.tributePaid (Game.lookupObject oid gs),
       -- CR 400.7d: read live off the object, with no last-known override.
       Filter.castUsing = Object.castUsing =<< Game.lookupObject oid gs,
       -- CR 400.7d / CR 107.4h: read live off the object like `castUsing`, and

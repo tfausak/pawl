@@ -1083,6 +1083,9 @@ admitsEntry gs oid rewrite = case rewrite of
   -- announcement is recorded on the SPELL and this function is handed the
   -- permanent.
   EntryRewrite.Compleated _ -> Map.findWithDefault 0 CounterKind.Loyalty (enteringCountersOf gs oid) > 0
+  -- CR 702.104a states no condition at all: the ability functions as the creature
+  -- enters, and both of the questions it asks are players'.
+  EntryRewrite.Tribute _ -> True
   EntryRewrite.Tapped -> True
   EntryRewrite.PayLifeOrTapped _ -> True
   EntryRewrite.RevealOrTapped _ -> True
@@ -1673,6 +1676,9 @@ bucketOfEffect re = case re of
   -- what the permanent enters WITH. Its condition does not change the bucket --
   -- `admitsEntry` has already kept an unsatisfied row out of the collection.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> ReplacementBucket.Other
+  -- CR 702.104a is none of CR 616.1a-d for bloodthirst's reason above: tribute
+  -- rewrites what the permanent enters WITH.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Tribute _)) -> ReplacementBucket.Other
   -- CR 616.1a-d name self-replacement, control on entry, copy on entry and back
   -- face up; CR 702.150a is none of them -- compleated rewrites HOW MANY loyalty
   -- counters the permanent enters with. So CR 616.1e, the same bucket CR 614.16's
@@ -1852,6 +1858,10 @@ readsApplier re = case re of
   -- for the same reason: Pawl.Engine.Event reads its sum off that controller's
   -- opponents, and two X rows on one permanent read one number.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> False
+  -- CR 702.104a: the choosers are the ENTERING object's controller and the opponent
+  -- they name, read live off the board rather than off the candidate -- so two
+  -- tribute rows on one permanent ask the same pair of questions in either order.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Tribute _)) -> False
   -- CR 702.150a: no chooser at all, and the symbol count rides the effect.
   -- Applying it reads the row's payload and the entering object's pending
   -- counters, nothing off the candidate -- so two compleated rows of equal count

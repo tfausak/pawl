@@ -203,6 +203,18 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       s
       (Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst Nothing) /= Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst (Just 0)))
       "rule 702.54b's X is not bloodthirst 0"
+  -- CR 702.104a: tribute's rewrite, whose payload is rule 702.104a's printed N.
+  -- Bloodthirst's shape above with no Nothing in it, tribute having no X form.
+  Spec.it s "Tribute (Snake of the Golden Grove)" $ do
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryRewrite.Tribute 3)
+      " {\"type\":\"Tribute\",\"value\":3} "
+    Spec.assertBool
+      s
+      (Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Tribute 3) /= Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst (Just 3)))
+      "tribute 3 is not bloodthirst 3"
   -- CR 702.150a: compleated's rewrite, whose payload is the number of PHYREXIAN
   -- MANA SYMBOLS life was paid for rather than the counters subtracted -- rule
   -- 702.150a's "two" is the rule's. Encoded distinctly from Bloodthirst, which
