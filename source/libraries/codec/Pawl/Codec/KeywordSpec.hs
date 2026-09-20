@@ -380,6 +380,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (Keyword.Cleave (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []))
       " {\"type\":\"Cleave\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
+  -- CR 702.96a's payload is a whole Cost too, Cyclonic Rift's {6}{U}.
+  Spec.it s "Overload carries its cost" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Overload (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 6])) []))
+      " {\"type\":\"Overload\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":6}]}} "
   -- CR 702.113a's payload is a whole Cost, cleave's shape -- Part the Waterveil's
   -- {6}{U}{U}{U}. Rule 702.113a's N is not in the payload: the spell ability the
   -- rule's second half states rides the card's own clause.

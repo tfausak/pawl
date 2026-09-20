@@ -2628,6 +2628,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Disturb cost -> Keyword.Type.Disturb (rewriteCost pairs cost)
   Keyword.Type.Harmonize cost -> Keyword.Type.Harmonize (rewriteCost pairs cost)
   Keyword.Type.Cleave cost -> Keyword.Type.Cleave (rewriteCost pairs cost)
+  Keyword.Type.Overload cost -> Keyword.Type.Overload (rewriteCost pairs cost)
   Keyword.Type.Awaken cost -> Keyword.Type.Awaken (rewriteCost pairs cost)
   -- CR 702.119b's quality rides the payload beside the cost, so both halves
   -- take rule 612.2's swap.

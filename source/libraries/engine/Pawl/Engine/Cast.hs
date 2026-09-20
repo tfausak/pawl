@@ -312,11 +312,17 @@ flashOn oid face gs =
 -- 702.140a's spell "targets a non-Human creature", so a mutate candidate is
 -- announceable only where such a creature is, and the slot exists only on the
 -- board that announcement produces (`proposedFor` again).
-targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
-targetable pid oid name gs = case proposedFace oid name gs of
+targetable :: Maybe Keyword -> PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+targetable castFor pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
-    let modal = Face.spell face
+    let -- CR 702.96b: the overload candidate's spell requires no targets, so
+        -- there is nothing here for it to fail to fill -- a board whose only
+        -- nonland permanent has hexproof is one Cyclonic Rift's overload cost is
+        -- castable on and its printed cost is not. The candidate's own tag
+        -- answers it, which is why this gate is asked per candidate
+        -- (candidateFillable below); the MODES are still judged.
+        modal = (if Keyword.castOverloaded castFor then Modal.untargeted else id) (Face.spell face)
         given = Map.union (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) (Card.mutateSlotMapGiven (maybe False Object.mutating (Game.lookupObject oid gs)))
      in Modal.selectionPossible (Target.fillableModes (Just pid) Map.empty oid given modal gs) (Modal.Type.selection modal)
 
@@ -921,7 +927,7 @@ candidateAllowed pid oid name proposed candidate =
 -- proper (Cast.castProposed) against what the whole announcement chose.
 candidateFillable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
 candidateFillable pid oid name proposed candidate =
-  targetable pid oid name (proposedFor oid (CandidateCost.keyword candidate) proposed)
+  targetable (CandidateCost.keyword candidate) pid oid name (proposedFor oid (CandidateCost.keyword candidate) proposed)
 
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
 -- canonical order -- what castableSpells scans, and the list castableZones
@@ -2160,7 +2166,19 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
   let candidates = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate)) candidateCosts
       decider = Decide.deciderFor pid gs
       modal = Face.spell face
-      legal = Target.fillableModes (Just pid) Map.empty sid (Card.enchantSlotMap face) modal gs
+      fillable m = Target.fillableModes (Just pid) Map.empty sid (Card.enchantSlotMap face) m gs
+      -- CR 700.2a asked one step before CR 601.2b's cost is announced, which is
+      -- the order rule 601.2b fixes -- modes, then the cost. CR 702.96b's spell
+      -- requires no targets, so a mode unfillable as printed is still choosable
+      -- while an overload candidate is on offer, and the announcement below is
+      -- what settles whether the slots exist at all: a player who then picks the
+      -- printed cost finds no legal target and CR 601.2e takes the cast back.
+      -- Cyclonic Rift over a lone hexproof creature is the board that separates
+      -- the two.
+      legal =
+        if any (Keyword.castOverloaded . CandidateCost.keyword) candidateCosts
+          then Set.union (fillable modal) (fillable (Modal.untargeted modal))
+          else fillable modal
       -- CR 601.2e: an illegal proposal returns the game to the moment before the
       -- casting was proposed, which is the state before CR 601.2a's move. CR
       -- 601.6 says the same for a permission lost after the proposal completes.
@@ -2435,7 +2453,16 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- filter one step up, which runs before the stamp exists, stamps a
               -- copy of its own per candidate (proposedFor).
               bestowedGs <- State.get
-              let slots = Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes face
+              let -- CR 702.96b: the overload candidate's spell "won't require any
+                  -- targets", so CR 601.2c announces none -- read off the tag
+                  -- stamped one step up rather than off the face, which prints
+                  -- the word "target" either way (Pawl.Types.Keyword's
+                  -- Overload). Pawl.Engine.Resolve.Effect.targetSlotsOf drops
+                  -- the same slots at CR 608.2b.
+                  slots =
+                    if Keyword.castOverloaded castFor
+                      then Map.empty
+                      else Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes face
                   -- CR 101.1: the ceiling this card's own words put on the value
                   -- about to be announced -- "X can't be greater than the
                   -- greatest toughness among creatures you control". Read HERE
