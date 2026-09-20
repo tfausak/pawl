@@ -239,6 +239,11 @@ data Quantity
     -- graveyard from the battlefield this turn -- gravestorm's count (CR
     -- 702.69a).
     PermanentsDiedThisTurn
+  | -- | CR 100.6a \/ 729.1a: how many subgames have begun this match, counting one
+    -- in progress -- Shahrazad and Sindbad's "if there haven't been any subgames
+    -- this match", which is this compared to 0. Read off
+    -- GameState.subgamesThisMatch, the only match-scoped record pawl keeps.
+    SubgamesThisMatch
   | -- | CR 309.7: how many dungeons that player has completed
     -- (Player.completedDungeons).
     DungeonsCompleted PlayerRef.PlayerRef

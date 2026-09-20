@@ -261,6 +261,9 @@ emptyGame order =
           GameState.exiledWith = Map.empty,
           GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],
+          -- CR 100.6a: pawl models no match around this game, so the match it
+          -- belongs to has had no subgame yet.
+          GameState.subgamesThisMatch = 0,
           GameState.turnAnchor = Nothing
         }
 
@@ -811,6 +814,11 @@ restartGame perform exempt starter = do
             -- CR 727.1: the game that scheduled them has ended, so no extra
             -- turn survives into the new one.
             GameState.extraTurns = [],
+            -- CR 100.6a / 727.1: a restart begins a new game of the SAME match,
+            -- so the match's subgame tally carries across it. Kept where every
+            -- other per-game record above is cleared, for the reason
+            -- nextTimestamp is preserved: the question is not about this game.
+            GameState.subgamesThisMatch = GameState.subgamesThisMatch gs,
             GameState.turnAnchor = Nothing
           }
   startGameFromCards perform exempt
@@ -1022,6 +1030,11 @@ subgameStateFrom starter parent =
           -- sits untouched in the outer frame, still waiting when the subgame
           -- ends.
           GameState.extraTurns = [],
+          -- CR 100.6a: the subgame is a separate GAME (CR 729.1a) but not a
+          -- separate match, so it inherits the tally -- already counting
+          -- itself, Engine.playSubgame having raised it before building this
+          -- state. CR 729.6's nested subgame therefore counts them all.
+          GameState.subgamesThisMatch = GameState.subgamesThisMatch parent,
           GameState.turnAnchor = Nothing
         }
 
@@ -1403,5 +1416,10 @@ funnelBack finalSub parent =
           -- parent's players could not act -- they were playing the subgame.
           -- Cleared to the merged supply so the main game resumes owing nobody a
           -- choice, rather than inheriting a gap the subgame ran up.
-          GameState.lastChoice = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub)
+          GameState.lastChoice = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub),
+          -- CR 100.6a / 729.6: a subgame the subgame itself started is still a
+          -- subgame of this match, so the resumed main game takes the deeper
+          -- tally -- nextTimestamp's treatment, and monotone for its reason,
+          -- subgameStateFrom having inherited the parent's raised value.
+          GameState.subgamesThisMatch = max (GameState.subgamesThisMatch parent) (GameState.subgamesThisMatch finalSub)
         }

@@ -160,6 +160,7 @@ codec =
       Arm.nullary "TimesResolvedThisTurn" Quantity.TimesResolvedThisTurn,
       Arm.nullary "SpellsCastBefore" Quantity.SpellsCastBefore,
       Arm.nullary "PermanentsDiedThisTurn" Quantity.PermanentsDiedThisTurn,
+      Arm.nullary "SubgamesThisMatch" Quantity.SubgamesThisMatch,
       -- CR 309.7's tally, with only a PlayerRef on the wire for
       -- CardsDiscardedThisTurn's reason above -- read off the player rather than
       -- the log, since a completion outlives the turn it happened in. The
@@ -247,6 +248,7 @@ tagOf x = case x of
   Quantity.TimesResolvedThisTurn {} -> "TimesResolvedThisTurn"
   Quantity.SpellsCastBefore {} -> "SpellsCastBefore"
   Quantity.PermanentsDiedThisTurn {} -> "PermanentsDiedThisTurn"
+  Quantity.SubgamesThisMatch {} -> "SubgamesThisMatch"
   Quantity.DungeonsCompleted {} -> "DungeonsCompleted"
   Quantity.CompletedDungeon {} -> "CompletedDungeon"
   Quantity.EnteredThisTurn {} -> "EnteredThisTurn"

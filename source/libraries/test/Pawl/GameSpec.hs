@@ -1273,13 +1273,9 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   -- card, discard it.", IS transcribed; Pawl.ZoneChangeSpec is where it is
   -- proven.
   --
-  -- Not transcribed on pawl's card, and a gap rather than a rules equivalence:
-  -- the intervening "if there haven't been any subgames this match", which pawl
-  -- has no match to count over (gap #1898). That one runs the other direction --
-  -- the trigger fires on every
-  -- connection where the printed one fires at most once a match -- and CR 729.1b
-  -- charges the controller alongside everyone else who does not win, so what it
-  -- repeats favours no seat.
+  -- The intervening "if there haven't been any subgames this match" (CR 603.4)
+  -- IS transcribed, over GameState.subgamesThisMatch; the case below this one is
+  -- what proves it, as the same board with the tally already at 1.
   --
   -- "An opponent" is not transcribed either, and that one IS a rules equivalence:
   -- CR 508.1a lets only the active player's creatures attack, CR 506.2 and CR
@@ -1291,17 +1287,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   Spec.it s "CR 729.1a/729.1b #137 gameplay: a TRIGGERED ability plays the subgame, and CR 729.1b's winner is bound" $ do
     mountain <- S.printingOf s registry "Mountain"
     sindbad <- S.printingOf s registry "Shahrazad and Sindbad"
-    let (gs0, _, _, _) = S.threePlayerCombat [sindbad] [] []
-        -- Straight onto each library, never through poolToLibraryG: that sweeps
-        -- every object its player owns off the battlefield, which would take the
-        -- attacking Sindbad with it.
-        stocked = addToLibraryG mountain 8 S.carol (addToLibraryG mountain 4 S.bob (addToLibraryG mountain 6 S.alice gs0))
-        atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
-        before = atLife S.carol 9 (atLife S.bob 13 (atLife S.alice 20 stocked))
-        atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) sindbadAnswer before
-        fought = S.runPure sindbadAnswer atDamage Damage.dealCombatDamage
-        placed = S.runPure sindbadAnswer fought Engine.settleForPriority
-        after = S.runPure sindbadAnswer placed Engine.priorityLoop
+    let (before, placed, after) = sindbadCombat mountain sindbad 0
         isRoll r = case r of
           Response.DeterminedFirstPlayer _ -> True
           _ -> False
@@ -1323,6 +1309,29 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "and carol's" (librarySize S.carol after) 8
     Spec.assertEqWith s "the trigger resolved and left the stack" (GameState.stack after) []
     Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing
+    Spec.assertEqWith s "CR 100.6a: the subgame it played is on the match's books, in the resumed main game" (GameState.subgamesThisMatch after) 1
+
+  -- CR 603.4 over CR 100.6a: the SAME board as the case above with exactly one
+  -- thing different -- the match has already had a subgame -- so Shahrazad and
+  -- Sindbad's intervening "if there haven't been any subgames this match" is
+  -- false and the ability does not trigger at all. Same combat, same damage,
+  -- same mana and the same three libraries, so nothing but the tally can be
+  -- what stops it.
+  Spec.it s "CR 603.4/100.6a gameplay: Shahrazad and Sindbad does not trigger once the match has had a subgame" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    sindbad <- S.printingOf s registry "Shahrazad and Sindbad"
+    let (before, placed, after) = sindbadCombat mountain sindbad 1
+        isRoll r = case r of
+          Response.DeterminedFirstPlayer _ -> True
+          _ -> False
+        rolls = length (filter isRoll (snd (Replay.record sindbadAnswer placed Engine.priorityLoop)))
+    Spec.assertEqWith s "the fixture's own tally: one subgame already played this match" (GameState.subgamesThisMatch before) 1
+    -- THE proving assertion, at gameplay level: nobody paid the CR 729.1b half,
+    -- because no subgame was played. bob is on 10, the combat damage alone.
+    Spec.assertEqWith s "CR 603.4: no subgame, so no player halves their life" (S.lifeOf S.alice after, S.lifeOf S.bob after, S.lifeOf S.carol after) (Just 20, Just 10, Just 9)
+    Spec.assertEqWith s "CR 729.2: no subgame determined a first player" rolls 0
+    Spec.assertEqWith s "CR 100.6a: the tally stands where it started" (GameState.subgamesThisMatch after) 1
+    Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
 
   Spec.it s "CR 729.1a #153: a question names the game it came from, so a subgame's is not a main-game one" $ do
     -- The same cast-a-subgame fixture as the two cases around this one, run
@@ -1446,6 +1455,9 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "CR 729.1b: bob lost 3 to the level-1 subgame's follow-on" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "the top-level subgame spell left the stack" (GameState.stack after) []
     Spec.assertEqWith s "CR 729.6: two nested subgame levels each shuffle on setup and funnel-back (measured; a flat gate yields 4)" shuffles 8
+    -- CR 100.6a: a subgame started INSIDE a subgame is still a subgame of this
+    -- match, so the resumed top-level game counts both (Setup.funnelBack).
+    Spec.assertEqWith s "CR 729.6/100.6a: both levels are on the match's books" (GameState.subgamesThisMatch after) 2
 
   Spec.it s "a subgame replays deterministically (the reason Prompt.PlaySubgame was rejected, CR 729 / M0's determinism criterion)" $ do
     -- A Prompt would run the subgame INSIDE the answer function, below
@@ -2653,6 +2665,26 @@ sindbadAnswer p = case p of
   Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer S.bob) (NonEmpty.toList options))
   Prompt.DeclareBlockers {} -> Map.empty
   _ -> S.aggressiveAnswer p
+
+-- The Shahrazad and Sindbad combat board the two CR 729.1b cases share: three
+-- seats, three distinct life totals and three distinct library sizes, with the
+-- match's CR 100.6a subgame tally as the one dial between them. Returns the
+-- board, the state the trigger was placed from (what Replay.record re-runs) and
+-- the state the priority loop leaves.
+sindbadCombat :: Printing.Printing -> Printing.Printing -> Natural -> (GameState.GameState, GameState.GameState, GameState.GameState)
+sindbadCombat mountain sindbad subgamesSoFar =
+  let (gs0, _, _, _) = S.threePlayerCombat [sindbad] [] []
+      -- Straight onto each library, never through poolToLibraryG: that sweeps
+      -- every object its player owns off the battlefield, which would take the
+      -- attacking Sindbad with it.
+      stocked = addToLibraryG mountain 8 S.carol (addToLibraryG mountain 4 S.bob (addToLibraryG mountain 6 S.alice gs0))
+      atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
+      before = (atLife S.carol 9 (atLife S.bob 13 (atLife S.alice 20 stocked))) {GameState.subgamesThisMatch = subgamesSoFar}
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) sindbadAnswer before
+      fought = S.runPure sindbadAnswer atDamage Damage.dealCombatDamage
+      placed = S.runPure sindbadAnswer fought Engine.settleForPriority
+      after = S.runPure sindbadAnswer placed Engine.priorityLoop
+   in (before, placed, after)
 
 -- #153: what one question said about the game that raised it. A depth and two
 -- booleans rather than the GameStates themselves, so a failure prints something

@@ -181,6 +181,7 @@ codec resolve = Fields.object $ do
   exiledWith <- Fields.defaulted "exiledWith" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.exiledWith
   exilePiles <- Fields.defaulted "exilePiles" Map.empty (Common.naturalMap ObjectId.codec Timestamp.codec) GameState.exilePiles
   extraTurns <- Fields.defaulted "extraTurns" [] (Common.list ExtraTurn.codec) GameState.extraTurns
+  subgamesThisMatch <- Fields.defaulted "subgamesThisMatch" 0 Common.natural GameState.subgamesThisMatch
   turnAnchor <- Fields.defaulted "turnAnchor" Nothing (Common.maybe PlayerId.codec) GameState.turnAnchor
   pure
     GameState.MkGameState
@@ -262,6 +263,7 @@ codec resolve = Fields.object $ do
         GameState.exiledWith = exiledWith,
         GameState.exilePiles = exilePiles,
         GameState.extraTurns = extraTurns,
+        GameState.subgamesThisMatch = subgamesThisMatch,
         GameState.turnAnchor = turnAnchor,
         -- Derived rather than written: see the note above.
         GameState.printingIds = invert printings

@@ -157,6 +157,21 @@
               "type": "Opponent"
             }
           },
+          "intervening": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "Exactly"
+              },
+              "measured": {
+                "type": "SubgamesThisMatch"
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 0
+              }
+            }
+          },
           "modal": {
             "modes": [
               {

@@ -3347,6 +3347,7 @@ oneMountainState mountain ph =
           GameState.exiledWith = Map.empty,
           GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],
+          GameState.subgamesThisMatch = 0,
           GameState.turnAnchor = Nothing
         }
 

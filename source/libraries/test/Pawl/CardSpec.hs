@@ -3555,6 +3555,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.TimesResolvedThisTurn -> []
   Quantity.Type.SpellsCastBefore -> []
   Quantity.Type.PermanentsDiedThisTurn -> []
+  Quantity.Type.SubgamesThisMatch -> []
   Quantity.Type.DungeonsCompleted _ -> []
   Quantity.Type.CompletedDungeon {} -> []
   Quantity.Type.EnteredThisTurn -> []

@@ -369,6 +369,13 @@ data GameState = MkGameState
     -- | CR 500.7: the extra turns created and not yet taken, most recently
     -- created first, each carrying the steps that turn skips (CR 500.11).
     extraTurns :: [ExtraTurn.ExtraTurn],
+    -- | CR 100.6a / 729.1a: how many subgames have begun this match, counting
+    -- one in progress. The only match-scoped field: CR 729.1b keeps a subgame's
+    -- effects out of the main game, but a match is a series of games, so this
+    -- is inherited by the subgame (Setup.subgameStateFrom) and kept across CR
+    -- 727.1's restart, which begins a new game of the SAME match. Pawl models
+    -- no match beyond it, so a game built by Setup.emptyGame starts at 0.
+    subgamesThisMatch :: Natural.Natural,
     -- | CR 500.7 / 103.1: while an extra turn is under way, the seat the
     -- ordinary turn order resumes from; Nothing on an ordinary turn.
     turnAnchor :: Maybe PlayerId.PlayerId
