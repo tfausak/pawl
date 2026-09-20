@@ -56,6 +56,7 @@ codec abilityCodec effectCodec =
       Arm.payload "RevealOrTapped" (Filter.codec Keyword.codec) EntryRewrite.RevealOrTapped (\x -> case x of EntryRewrite.RevealOrTapped y -> Just y; _ -> Nothing),
       Arm.payload "SacrificeAnyNumber" SacrificeAnyNumber.codec EntryRewrite.SacrificeAnyNumber (\x -> case x of EntryRewrite.SacrificeAnyNumber y -> Just y; _ -> Nothing),
       Arm.payload "ExileFromGraveyard" (Filter.codec Keyword.codec) EntryRewrite.ExileFromGraveyard (\x -> case x of EntryRewrite.ExileFromGraveyard y -> Just y; _ -> Nothing),
+      Arm.payload "EntersAttachedTo" (Filter.codec Keyword.codec) EntryRewrite.EntersAttachedTo (\x -> case x of EntryRewrite.EntersAttachedTo y -> Just y; _ -> Nothing),
       Arm.payload "RunEffects" (Common.seq effectCodec) EntryRewrite.RunEffects (\x -> case x of EntryRewrite.RunEffects y -> Just y; _ -> Nothing)
     ]
 
@@ -86,4 +87,5 @@ tagOf x = case x of
   EntryRewrite.RevealOrTapped {} -> "RevealOrTapped"
   EntryRewrite.SacrificeAnyNumber {} -> "SacrificeAnyNumber"
   EntryRewrite.ExileFromGraveyard {} -> "ExileFromGraveyard"
+  EntryRewrite.EntersAttachedTo {} -> "EntersAttachedTo"
   EntryRewrite.RunEffects {} -> "RunEffects"

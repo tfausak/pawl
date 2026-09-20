@@ -351,10 +351,11 @@ hostFramed framing = case framing of
   -- host overlay.
   ClauseGateFramed -> False
 
--- How many CR 701.3a atoms this card carries in an attach opcode's destination
--- filter -- Effect.AttachTarget's or Effect.AttachTargetToEach's -- and how many
--- anywhere else. The second number is the offence; the first is what Aura Graft
--- and Synthetic Aura Diffusion legitimately have one of each.
+-- How many CR 701.3a atoms this card carries in a position framed by an attach
+-- -- Effect.AttachTarget's destination, Effect.AttachTargetToEach's, or CR
+-- 614.1c's EntryRewrite.EntersAttachedTo host choice -- and how many anywhere
+-- else. The second number is the offence; the first is what Aura Graft,
+-- Synthetic Aura Diffusion and Grifter's Blade legitimately have one of each.
 canHostSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canHostSubjectCounts card =
   let total wanted = sum (fmap (\(_, f) -> canHostSubjects f) (filter (\(framing, _) -> (framing == AttachDestination) == wanted) (cardFilters card)))
@@ -979,13 +980,14 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- object or player it couldn't enchant, equip, or fortify, respectively." The
   -- atom that asks that question is answerable only where an attach frames the
   -- match, and vacuously False everywhere else. Not implemented: the atom at a
-  -- CHOICE, where Takklemaggot's "chooses a creature that this card could
-  -- enchant" writes it (#3312). See canHostSubjectOffends for the
+  -- RESOLUTION-TIME choice, where Infectious Rage's "choose a creature at random
+  -- this Aura can enchant. Return this card to the battlefield attached to that
+  -- creature" writes it (#3871). See canHostSubjectOffends for the
   -- two offences this one predicate covers.
-  Spec.it s "CR 701.3a no card asks CanHostSubject outside an attach's destination" $ do
+  Spec.it s "CR 701.3a no card asks CanHostSubject outside a position an attach frames" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace canHostSubjectOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only in an attach opcode's destination" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "the atom sits only where an attach frames it" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous: the pool authors the atom, and the cards that do are ACCEPTED
     -- here rather than skipped. Aura Graft's "another permanent it can enchant"
     -- is the legal use, so a lint that swept past it would be indistinguishable
@@ -1014,11 +1016,21 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Simic Guildmage's atom is framed by its attach too"
       (canHostSubjectCounts (S.combinedFace guildmage))
       (1, 0)
+    -- The fourth, and the one whose atom sits in an ENTRY replacement rather
+    -- than in a resolving effect: Grifter's Blade's "a creature you control it
+    -- could be attached to" (CR 614.1c). A forgotten entryRewriteFilters arm
+    -- would report (0, 0) here rather than the (1, 0) below.
+    blade <- S.printingOf s registry "Grifter's Blade"
     Spec.assertEqWith
       s
-      "and those three cards are the whole of data/cards' authorship of it"
+      "Grifter's Blade's atom is framed by its CR 614.1c entry choice"
+      (canHostSubjectCounts (S.combinedFace blade))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those four cards are the whole of data/cards' authorship of it"
       (sum (fmap (uncurry (+) . canHostSubjectCounts . S.combinedFace) ps))
-      3
+      4
     -- The traversal reaches a Filter position no effect, target slot or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
     -- card. Its absence would not show up in the sweep above, because Ash Barrens

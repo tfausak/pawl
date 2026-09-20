@@ -2,11 +2,13 @@
 -- the same answer: Pawl.Engine.Event.attach, which every CR 701.3 move goes
 -- through, Pawl.Engine.Resolve's two attach-the-target opcodes, its Effect.Search
 -- arm and putFound -- CR 701.3a asked from the CANDIDATE's side, where the host is
--- fixed and the Aura varies (Filter.CanAttachToSubject) -- and two arms of
--- Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face up, and
+-- fixed and the Aura varies (Filter.CanAttachToSubject) -- and three arms of
+-- Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face up,
 -- changeZoneAttaching's CR 303.4f host choice for an Aura entering the battlefield
--- by any means other than resolving as an Aura spell. Event sits BELOW Resolve, so
--- the shared half cannot live in Resolve where it started.
+-- by any means other than resolving as an Aura spell, and the
+-- EntryRewrite.EntersAttachedTo row a card prints about its own entry (CR
+-- 614.1c, Grifter's Blade). Event sits BELOW Resolve, so the shared half cannot
+-- live in Resolve where it started.
 --
 -- WHAT MAY BE ATTACHED WHERE, and never the move itself: rule 701.3b's write is
 -- Pawl.Engine.Event.attach, beside the other funnels that record an event, since
@@ -253,9 +255,10 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 -- different ones and this function cannot tell them apart: a RESOLUTION hands
 -- over Pawl.Engine.Resolve.Slots.effectContext, so a destination filter naming a
 -- slot an earlier clause bound is answered (CR 608.2c) -- Simic Guildmage's
--- "with the same controller" over its target Aura's host; CR 303.4f's entry and
--- turnUpHosts below hand over a bare Filter.contextFor, which is honest there
--- because an Aura's own enchant ability and its CR 303.4k rider are card text
+-- "with the same controller" over its target Aura's host; CR 303.4f's entry, CR
+-- 614.1c's EntryRewrite.EntersAttachedTo row and turnUpHosts below hand over a
+-- bare Filter.contextFor, which is honest there because an Aura's own enchant
+-- ability, an entry replacement's own text and a CR 303.4k rider are card text
 -- with no resolution's slots behind them. Threading a resolution's `legal` map
 -- and bindings through here for the two callers that have neither is what the
 -- shared signature would otherwise force.

@@ -13,6 +13,7 @@ module Pawl.ReplacementSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
@@ -40,6 +41,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CoinFace as CoinFace
@@ -1263,6 +1265,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   entryBudgetSpec s registry
   warLeechSpec s registry
   faerieSquadronSpec s registry
+  grifterBladeSpec s registry
   hyenaUmbraSpec s registry
   darkblastSpec s registry
 
@@ -2828,6 +2831,112 @@ inAliceGraveyard :: Printing.Printing -> GameState.GameState -> Int
 inAliceGraveyard printing gs =
   let wanted oid = fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing)
    in length (filter wanted (Game.zoneMembers Zone.Graveyard S.alice gs))
+
+-- Grifter's Blade {3} Artifact -- Equipment, whole text: "Flash / As this
+-- Equipment enters, choose a creature you control it could be attached to. If
+-- you do, it enters attached to that creature. / Equipped creature gets +1/+1. /
+-- Equip {1}". Oracle text and both rulings verified against Scryfall
+-- (2026-09-19); the rulings are the two branches below -- "must enter attached
+-- to a creature you control, if possible" and "if you don't control a creature
+-- Grifter's Blade could be attached to, it simply enters unattached".
+--
+-- The pool's only producer for EntryRewrite.EntersAttachedTo, CR 614.1c's
+-- as-enters host choice. Flash is carried but unexercised here: the entry
+-- replacement runs the same whatever the timing permission was.
+grifterBladeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+grifterBladeSpec s registry = Spec.describe s "Grifter's Blade (CR 614.1c)" $ do
+  -- Three seats' worth of roles on two: alice's two creatures against bob's, so
+  -- "a creature you control" is told apart from a bare creature filter. The
+  -- answer is pinned to the SECOND candidate, and bob's creature is added FIRST
+  -- so it holds the LOWEST id -- which makes one pair of readings separate three
+  -- wrong implementations at once. An elided or defaulted choice lands on the
+  -- Piker; an offer that forgot "you control" makes index 1 the Piker too; only
+  -- the right offer puts the Blade on the Sorcerer.
+  Spec.it s "CR 614.1c the Blade enters attached to the creature its controller chose" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    sorcererPrinting <- S.printingOf s registry "Prodigal Sorcerer"
+    blade <- S.printingOf s registry "Grifter's Blade"
+    let (_, g1) = S.addPermanent pikerPrinting S.bob (S.landsInPlay mountain 3)
+        (piker, g2) = S.addPermanent pikerPrinting S.alice g1
+        (sorcerer, g3) = S.addPermanent sorcererPrinting S.alice g2
+        (g4, held) = S.handOne blade g3
+        after = S.runPure (attachesTo 1) g4 (S.cast S.alice held >> Stack.resolveTop)
+    -- FIRST, and the assertion this case exists for: the chosen creature is
+    -- wearing the Blade, read off its projected body (CR 613 layer 7c) rather
+    -- than off the attachment field, so a Blade that arrived unattached or
+    -- attached elsewhere shows here.
+    Spec.assertEqWith s "the Sorcerer alice chose is a 2/2" (S.powerToughnessOf sorcerer after) (Just (2, 2))
+    Spec.assertEqWith s "and the Piker she passed over is still a printed 2/1" (S.powerToughnessOf piker after) (Just (2, 1))
+    -- A permanent that ARRIVES attached became attached, which is the half
+    -- Event.attach cannot record -- there is no CR 701.3 move here, so the
+    -- record is written at the entry (Pawl.Engine.Event, where the reasoning
+    -- sits). Read off the LOG rather than through a
+    -- trigger because nothing in data/cards/ prints one that would fire: a grep
+    -- for TriggerCondition.SelfBecomesAttachedBy (2026-09-19) finds only Bramble
+    -- Elemental, whose filter is HasSubtype Aura, and the attachment-side
+    -- SelfBecomesAttachedTo only Enormous Energy Blade, which is not this card.
+    -- So the line this guards is a regression fence rather than a gameplay-level
+    -- proof.
+    Spec.assertBool
+      s
+      (any (\event -> case event of GameEvent.BecameAttached record -> Recipient.objectOf (BecameAttached.host record) == Just sorcerer; _ -> False) (S.eventsOf after))
+      "and the arrival recorded one BecameAttached naming the Sorcerer"
+  -- The pair's other half, differing in exactly one thing: the same board with a
+  -- creature the Blade CANNOT legally be attached to in place of bob's. Goblin
+  -- Brawler is added FIRST, so it is the lower id and the answer below takes the
+  -- first candidate -- which means dropping the card's Filter.CanHostSubject
+  -- conjunct puts the Blade on the Brawler, where Attach.attachmentFor then
+  -- refuses it and the Piker stays a printed 2/1. This is the only board that
+  -- separates the atom from a plain creature filter.
+  Spec.it s "CR 701.3a a creature the Blade could not be attached to is not offered" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    brawlerPrinting <- S.printingOf s registry "Goblin Brawler"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    blade <- S.printingOf s registry "Grifter's Blade"
+    let (brawler, g1) = S.addPermanent brawlerPrinting S.alice (S.landsInPlay mountain 3)
+        (piker, g2) = S.addPermanent pikerPrinting S.alice g1
+        (g3, held) = S.handOne blade g2
+        after = S.runPure (attachesTo 0) g3 (S.cast S.alice held >> Stack.resolveTop)
+    Spec.assertEqWith s "the Piker, the one legal host, is a 3/2" (S.powerToughnessOf piker after) (Just (3, 2))
+    Spec.assertEqWith s "and the Brawler, which can't be equipped, is a printed 2/2" (S.powerToughnessOf brawler after) (Just (2, 2))
+    -- One candidate, so CR 614.12a's choice is elided (Attach.chooseHost): no
+    -- prompt was raised at all, which is also what says the Brawler was never
+    -- in the offer. A PROXY, and ordered after the two readings above for that
+    -- reason.
+    Spec.assertBool s (not (wasAskedForAttachment (answersFor (attachesTo 0) g3 (S.cast S.alice held >> Stack.resolveTop)))) "with one legal host nothing was asked"
+  -- CR 301.5e's branch, on the same mana as the two boards above so a failure to
+  -- cast cannot pass for it.
+  Spec.it s "CR 301.5e with no creature to attach to, the Blade enters unattached" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    blade <- S.printingOf s registry "Grifter's Blade"
+    let (g1, held) = S.handOne blade (S.landsInPlay mountain 3)
+        after = S.runPure (attachesTo 0) g1 (S.cast S.alice held >> Stack.resolveTop)
+    case newestNamed (CardName.MkCardName $ Text.pack "Grifter's Blade") after of
+      Nothing -> Spec.assertFailure s "the Blade did not reach the battlefield"
+      Just bladeId -> do
+        Spec.assertBool s (Set.member bladeId (GameState.battlefield after)) "the Blade is on the battlefield rather than left in its zone"
+        Spec.assertEqWith s "and it is attached to nothing" (Game.lookupObject bladeId after >>= Object.attachedTo) Nothing
+
+-- Answer every Prompt.ChooseAttachment with the candidate at this index,
+-- counting from zero, falling back to the last where the offer is shorter.
+--
+-- PINNED BY INDEX rather than searched for: an answerer that looked for a legal
+-- host would find the right one again after a mutation widened the offer.
+attachesTo :: Int -> Prompt.Prompt r -> r
+attachesTo i p = case p of
+  Prompt.ChooseAttachment _ _ _ candidates -> case drop i (NonEmpty.toList candidates) of
+    chosen : _ -> chosen
+    [] -> NonEmpty.last candidates
+  _ -> S.identityAnswer p
+
+-- wasAskedForEntryOption one prompt over.
+wasAskedForAttachment :: [Response.Response] -> Bool
+wasAskedForAttachment responses =
+  let isAttachment r = case r of
+        Response.ChoseAttachment _ -> True
+        _ -> False
+   in any isAttachment responses
 
 -- CR 702.89a: "If enchanted permanent would be destroyed, instead remove all
 -- damage marked on it and destroy this Aura." A destruction replacement whose

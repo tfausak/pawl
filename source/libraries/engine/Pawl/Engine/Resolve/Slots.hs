@@ -1375,6 +1375,11 @@ entryRewriteReads rewrite = case rewrite of
   -- entering object's projection, never a Filter a resolution could bind.
   EntryRewrite.Amplify _ -> ([], [])
   EntryRewrite.ExileFromGraveyard filter_ -> ([filter_], [])
+  -- The destinations the entering permanent may arrive attached to, the arm
+  -- above's shape one zone over: a Filter over battlefield permanents, reported
+  -- here although an entry replacement has no resolution whose slots it could
+  -- name (Pawl.Engine.Event evaluates it under a bare Filter.contextFor).
+  EntryRewrite.EntersAttachedTo filter_ -> ([filter_], [])
   EntryRewrite.Riot -> ([], [])
   EntryRewrite.ReadAhead -> ([], [])
   EntryRewrite.Unleash -> ([], [])
@@ -1482,6 +1487,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.SacrificeAnyNumber _ -> []
   EntryRewrite.Amplify _ -> []
   EntryRewrite.ExileFromGraveyard _ -> []
+  EntryRewrite.EntersAttachedTo _ -> []
   EntryRewrite.Riot -> []
   EntryRewrite.ReadAhead -> []
   EntryRewrite.Unleash -> []
