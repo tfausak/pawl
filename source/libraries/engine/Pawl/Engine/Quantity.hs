@@ -775,10 +775,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- EnteredThisTurn's posture. An object that is not an activated ability reads 0,
         -- no other Source being a key in this log.
         --
-        -- Not implemented: the aim for a COPY of the ability whose ORIGINAL has left the
-        -- stack. CR 602.2a's thisAbility slot on a copy still holds the original's id, so
-        -- the read finds nothing and the clause is silently False -- stricter than
-        -- printed (#3816).
+        -- A COPY of the ability answers off its OWN id, CR 707.10's last sentence making
+        -- it an ability of its own: Resolve.Effect's CopyStackObject arm re-stamps CR
+        -- 602.2a's thisAbility slot, so the read still lands on an object once the
+        -- original has been countered out from under it. Pawl.CopySpec's Stifle case over
+        -- Ashling the Pilgrim is what proves that.
         Quantity.TimesResolvedThisTurn -> do
           oid <- mOid
           obj <- Game.lookupObject oid gs <|> Map.lookup oid (GameState.stackArchive gs)
