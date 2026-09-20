@@ -10,6 +10,7 @@ module Pawl.EntryReplacementSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -401,6 +402,93 @@ unleashSpec s registry = Spec.describe s "Unleash (CR 702.98)" $ do
                 -- creature on the board.
                 Spec.assertBool s (Combat.canBlock S.alice bystander counted) "the Spider with the same counter still blocks"
       _ -> Spec.assertFailure s "fixture did not deal a card"
+
+-- CR 702.104: tribute, on Snake of the Golden Grove ({4}{G} 4/4 Snake, "Tribute
+-- 3 / When this creature enters, if tribute wasn't paid, you gain 4 life" and
+-- nothing else; Oracle text verified on Scryfall 2026-09-20). The only entry
+-- rewrite whose choices belong to TWO different seats: rule 702.104a has the
+-- controller name an opponent, and that opponent alone decides whether the
+-- counters go on.
+--
+-- THREE SEATS, for the reason bloodthirstBoard takes them and one more: rule
+-- 702.104a's "choose an opponent" is a real choice only where there are two to
+-- choose between, and a two-seat board cannot tell the seat alice NAMED from the
+-- only seat there was.
+--
+-- ONE BOARD for every case, differing in nothing but the two answers. The Snake
+-- ENTERS in every case, so what the assertions tell apart is "entered with
+-- counters and no trigger" from "entered without and gained 4".
+--
+-- Distinct numbers throughout, so no two readings coincide: tribute 3 on a
+-- printed 4/4 shows as a 7/7, the trigger gains 4, and alice's life goes 20 to 24.
+-- A reading that put the counters on AND ran the trigger would show 7/7 at 24,
+-- and one that ran neither 4/4 at 20 -- both of which every case below excludes.
+tributeBoard :: Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+tributeBoard forest snake =
+  let lands = S.landsFor forest S.alice 5 S.threePlayerGame
+      (held, gs) = S.addHandCard snake S.alice lands
+   in (readyForAlice gs, held)
+
+-- Name `who` as rule 702.104a's opponent, and take the counters only when the
+-- seat being asked is `payer`.
+--
+-- FILTERED, not conjured: the opponent is taken from the offered set, so an
+-- answer this fixture could not legally give falls back to the head rather than
+-- reaching the engine's own filter and passing for the wrong reason.
+tributeAnswer :: PlayerId.PlayerId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+tributeAnswer who payer p = case p of
+  Prompt.ChooseOpponent _ _ _ offered ->
+    if List.elem who (NonEmpty.toList offered) then who else NonEmpty.head offered
+  Prompt.ChooseTribute _ asked _ _ ->
+    if asked == payer then OptionalDecision.Exercises else OptionalDecision.Declines
+  _ -> S.identityAnswer p
+
+tributeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tributeSpec s registry =
+  let snakeIn = newestNamed (CardName.MkCardName $ Text.pack "Snake of the Golden Grove")
+      play held = S.cast S.alice held >> Stack.resolveTop >> Engine.placePendingTriggers >> Stack.resolveTop
+   in Spec.describe s "Tribute (CR 702.104)" $ do
+        -- THE PAIR THAT MAKES THE DECISION REAL is this case and the one below.
+        Spec.it s "CR 702.104b the chosen opponent declines, so tribute wasn't paid and the trigger gains 4" $ do
+          forest <- S.printingOf s registry "Forest"
+          snake <- S.printingOf s registry "Snake of the Golden Grove"
+          let (gs, held) = tributeBoard forest snake
+              after = S.runPure (tributeAnswer S.bob S.carol) gs (play held)
+          Spec.assertEqWith s "CR 702.104b alice gained 4 life" (S.lifeOf S.alice after) (Just 24)
+          case snakeIn after of
+            Nothing -> Spec.assertFailure s "Snake of the Golden Grove did not reach the battlefield"
+            Just snakeId -> do
+              Spec.assertEqWith s "CR 702.104a and it is still a 4/4" (Projection.powerOf snakeId after) (Just 4)
+              Spec.assertEqWith s "with no +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne snakeId after) 0
+        Spec.it s "CR 702.104a the chosen opponent pays, so it enters a 7/7 and the trigger does not gain" $ do
+          forest <- S.printingOf s registry "Forest"
+          snake <- S.printingOf s registry "Snake of the Golden Grove"
+          let (gs, held) = tributeBoard forest snake
+              after = S.runPure (tributeAnswer S.bob S.bob) gs (play held)
+          case snakeIn after of
+            Nothing -> Spec.assertFailure s "Snake of the Golden Grove did not reach the battlefield"
+            Just snakeId -> do
+              Spec.assertEqWith s "CR 702.104a it entered a 7/7" (Projection.powerOf snakeId after) (Just 7)
+              Spec.assertEqWith s "CR 702.104b and alice's life is untouched, so the trigger did not resolve" (S.lifeOf S.alice after) (Just 20)
+              Spec.assertEqWith s "with rule 702.104a's three +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne snakeId after) 3
+        -- CR 702.104a: it is THE CHOSEN OPPONENT who decides. One board, one
+        -- payer, and the only difference is which opponent alice named -- so a
+        -- reading that asked every opponent, or asked the controller, or asked
+        -- the first seat in turn order, produces the same answer for both runs
+        -- and fails one of them.
+        Spec.it s "CR 702.104a only the opponent alice named is asked" $ do
+          forest <- S.printingOf s registry "Forest"
+          snake <- S.printingOf s registry "Snake of the Golden Grove"
+          let (gs, held) = tributeBoard forest snake
+              namingCarol = S.runPure (tributeAnswer S.carol S.carol) gs (play held)
+              namingBob = S.runPure (tributeAnswer S.bob S.carol) gs (play held)
+          Spec.assertEqWith s "naming carol, who pays, leaves alice's life alone" (S.lifeOf S.alice namingCarol) (Just 20)
+          Spec.assertEqWith s "naming bob, who declines, gains alice 4 although carol would have paid" (S.lifeOf S.alice namingBob) (Just 24)
+          case (snakeIn namingCarol, snakeIn namingBob) of
+            (Just paid, Just unpaid) -> do
+              Spec.assertEqWith s "and the counters follow the named seat's answer" (Projection.powerOf paid namingCarol) (Just 7)
+              Spec.assertEqWith s "not the other opponent's" (Projection.powerOf unpaid namingBob) (Just 4)
+            _ -> Spec.assertFailure s "Snake of the Golden Grove did not reach the battlefield"
 
 -- alice controls three untapped Swamps on a THREE-SEAT board and holds one
 -- Bloodrage Vampire, in her precombat main phase with priority; bob controls one
@@ -2669,6 +2757,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   riotSpec s registry
   unleashSpec s registry
+  tributeSpec s registry
   bloodthirstSpec s registry
   amplifySpec s registry
   sunburstSpec s registry

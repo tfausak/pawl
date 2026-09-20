@@ -401,6 +401,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.DesignationValue {} -> False
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
+  Quantity.Type.TributeWasPaid -> False
   Quantity.Type.TimesPaid {} -> False
   Quantity.Type.CastUsing {} -> False
   Quantity.Type.TagWasSpent {} -> False

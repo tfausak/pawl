@@ -1386,6 +1386,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.Riot -> rewrite
   EntryRewrite.Unleash -> rewrite
   EntryRewrite.Bloodthirst _ -> rewrite
+  EntryRewrite.Tribute _ -> rewrite
   -- CR 702.44a states sunburst whole as well, and its count is the entering
   -- object's CR 400.7d mana record rather than card text, so there is no word
   -- here for CR 612.1 to reach either.
@@ -1770,6 +1771,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.DesignationValue _ -> quantity
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
+  Quantity.Type.TributeWasPaid -> quantity
   -- A LEAF like WasKicked above, and the Keyword it names is deliberately NOT
   -- rewritten: Pawl.Engine.Cast keys the record it stamps off the PRINTED face
   -- (Game.faceOf), so rewriting the identifier here would ask about a keyword

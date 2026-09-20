@@ -468,6 +468,12 @@ data Keyword
   | -- | 702.102a: a player casting this split card from their hand may cast both
     -- halves as one fused split spell (CR 702.102b-d).
     Fuse
+  | -- | 702.104a: tribute N -- as this creature enters, its controller chooses an
+    -- opponent, and that opponent may put N additional +1/+1 counters on it; a CR
+    -- 614.1c entry replacement, minted by
+    -- Pawl.Engine.Keyword.mintedReplacementsFor. CR 702.104b's "if tribute wasn't
+    -- paid" reads the opponent's answer back off Object.tributePaid.
+    Tribute Natural.Natural
   | -- | 702.105a: whenever this creature attacks the player with the most life or
     -- tied for most life, put a +1/+1 counter on it; each instance triggers
     -- separately (CR 702.105b).

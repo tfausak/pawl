@@ -555,6 +555,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- 702.157a's "for each time", which are one read: how many times THIS
         -- ability's cost was declared, zero for one the spell's controller declined
         -- and for one the card does not print.
+        -- CR 702.104b's yes-or-no as a 0/1, WasKicked's arm two above in every
+        -- respect. The object it reads is the PERMANENT the tribute creature is,
+        -- which the card's own enters trigger asks about at CR 603.4 and again at
+        -- CR 608.2a.
+        Quantity.TributeWasPaid -> fmap (\view -> if Filter.tributePaid view then 1 else 0) mView
         Quantity.TimesPaid keyword -> fmap (toInteger . Map.findWithDefault 0 keyword . Filter.paidCosts) mView
         -- CR 601.2b / 400.7d: was the candidate this object was cast for
         -- offered by that family's keyword? Off the view, WasKicked's read.
@@ -1182,6 +1187,7 @@ objectSlots quantity = case quantity of
   Quantity.DesignationValue _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
+  Quantity.TributeWasPaid -> Set.empty
   -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
   -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
   -- the spell's own record by equality, never an instruction this traversal
@@ -1438,6 +1444,7 @@ readsX quantity = case quantity of
   Quantity.DesignationValue _ -> False
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
+  Quantity.TributeWasPaid -> False
   -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
   -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
   -- the spell's own record by equality, never an instruction this traversal

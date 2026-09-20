@@ -446,6 +446,12 @@ data Prompt r where
   -- | CR 702.98a / 614.1c: whether unleash takes the +1\/+1 counter; its own
   -- constructor so a transcript cannot answer one as-enters "may" as another.
   ChooseUnleash :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 702.104a \/ 614.1c: whether tribute N is paid, asked of the OPPONENT the
+  -- entering creature's controller chose rather than of the controller -- the arm
+  -- above's shape with the decider and the answering seat moved. Never elided:
+  -- the two answers are a bigger creature against the card's own
+  -- tribute-wasn't-paid trigger.
+  ChooseTribute :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt OptionalDecision.OptionalDecision
   -- | CR 614.1c with CR 119.4: whether N life is paid as the permanent enters
   -- so it enters untapped; not asked below N life, a zero amount excepted (CR
   -- 119.4b).

@@ -635,6 +635,13 @@ data View = MkView
     -- for a permanent a kicked spell became, which is CR 400.7d's exception to
     -- the forgetting (see Pawl.Types.Object).
     paidCosts :: Map.Map Keyword.Type.Keyword Natural.Natural,
+    -- CR 702.104b: did the opponent rule 702.104a's tribute ability let this
+    -- candidate's controller choose have it enter with the +1/+1 counters? Read
+    -- off Object.tributePaid, and False where there is no live object -- rule
+    -- 702.104a's ability functions only as the creature ENTERS, so the only
+    -- reader (Pawl.Engine.Quantity's TributeWasPaid arm, answering Snake of the
+    -- Golden Grove's intervening "if") asks it of a permanent that is still there.
+    tributePaid :: Bool,
     -- CR 601.2b / 400.7d: the keyword whose candidate cost this candidate was
     -- cast for, read off Object.castUsing, and Nothing where there is no live
     -- object, since Pawl.Types.LastKnown keeps no such record.
@@ -882,6 +889,9 @@ playerView pid =
       -- not one -- `designations` above, same sentence.
       classLevel = Nothing,
       paidCosts = Map.empty,
+      -- CR 702.104a's tribute is a creature's static ability, and a player is not
+      -- one -- `designations` above, same sentence.
+      tributePaid = False,
       castUsing = Nothing,
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
@@ -2467,6 +2477,8 @@ rewriteKeyword pairs keyword = case keyword of
   -- arrives there instead (Pawl.Engine.Projection.mintedTriggeredAbilitiesOf).
   Keyword.Type.Soulshift _ -> keyword
   Keyword.Type.Dredge _ -> keyword
+  -- CR 702.104a's N is a number and not a word, so CR 612.2 has nothing to swap.
+  Keyword.Type.Tribute _ -> keyword
   -- CR 702.54a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "+1/+1 counter" is the rule's own noun and no card prints it.
   Keyword.Type.Bloodthirst _ -> keyword

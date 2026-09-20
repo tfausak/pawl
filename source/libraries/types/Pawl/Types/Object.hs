@@ -511,6 +511,23 @@ data Object = MkObject
     -- 702.33e's payoff needs, so Pawl.Engine.Event.changeZoneAttaching carries it
     -- across that one move, and Pawl.Types.LastKnown keeps it for CR 608.2h.
     paidCosts :: Map.Map Keyword.Keyword Natural.Natural,
+    -- | CR 702.104b: was tribute paid -- did the opponent this permanent's
+    -- controller chose have it enter with the +1/+1 counters rule 702.104a's
+    -- tribute ability specifies? Stamped by Pawl.Engine.Event's EntryRewrite.Tribute
+    -- arm, and read by Quantity.TributeWasPaid.
+    --
+    -- Its own field rather than `paidCosts` above, which it otherwise resembles:
+    -- that map records a SPELL controller's CR 601.2b cost declarations, where this
+    -- records an OPPONENT's CR 614.1c as-enters answer, on the battlefield
+    -- incarnation.
+    --
+    -- A Bool and not a count off `counters`: rule 702.104b asks after the
+    -- DECISION, so an effect that adds or removes +1/+1 counters afterwards leaves
+    -- the answer alone.
+    --
+    -- Per-incarnation, and not copiable (CR 707.2): it records a choice rather
+    -- than a characteristic, `paidCosts`'s argument.
+    tributePaid :: Bool,
     -- | CR 702.103b: is this object BESTOWED? Stamped by Pawl.Engine.Cast at CR
     -- 601.2b, and read by Pawl.Engine.Projection.bestowGathered, which mints the
     -- three modifications that rule names on every projection.
@@ -849,6 +866,10 @@ newIncarnation object =
       designations = Set.empty,
       designationValues = Map.empty,
       paidCosts = Map.empty,
+      -- CR 702.104b's record is written back by nothing: rule 702.104a's ability
+      -- functions only as the creature ENTERS, and the permanent it produces is
+      -- the incarnation the answer was stamped on.
+      tributePaid = False,
       -- CR 702.103b's record is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move that
       -- keeps it, `paidCosts` above's route.

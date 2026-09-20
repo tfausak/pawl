@@ -1426,6 +1426,7 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.Unleash -> ([], [])
   EntryRewrite.Sunburst -> ([], [])
   EntryRewrite.Bloodthirst _ -> ([], [])
+  EntryRewrite.Tribute _ -> ([], [])
   EntryRewrite.Compleated _ -> ([], [])
   EntryRewrite.Tapped -> ([], [])
   EntryRewrite.PayLifeOrTapped _ -> ([], [])
@@ -1534,6 +1535,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.Unleash -> []
   EntryRewrite.Sunburst -> []
   EntryRewrite.Bloodthirst _ -> []
+  EntryRewrite.Tribute _ -> []
   EntryRewrite.Compleated _ -> []
   EntryRewrite.Tapped -> []
   EntryRewrite.PayLifeOrTapped _ -> []

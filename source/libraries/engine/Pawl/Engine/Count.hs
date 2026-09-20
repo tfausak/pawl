@@ -1148,6 +1148,10 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- above, same sentence.
       Filter.classLevel = Nothing,
       Filter.paidCosts = Map.empty,
+      -- CR 702.104b's record is a field of an OBJECT, which a
+      -- ProjectedCharacteristics does not carry -- `designations` above, same
+      -- sentence -- so a past event reports none.
+      Filter.tributePaid = False,
       Filter.castUsing = Nothing,
       -- CR 400.7d's mana record is a field of an OBJECT, which a
       -- ProjectedCharacteristics does not carry -- `designations` above, same

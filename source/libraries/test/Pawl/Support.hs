@@ -953,6 +953,7 @@ addObjectIn zone printing pid gs =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1206,6 +1207,7 @@ addToken card pid gs =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1275,6 +1277,7 @@ addLibraryCard printing pid gs =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1349,6 +1352,7 @@ addGraveyardCard printing pid gs =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1427,6 +1431,7 @@ addExiledCard printing pid gs =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1510,6 +1515,7 @@ addHandCard printing pid gs =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1602,6 +1608,7 @@ landsFor land pid n base =
                   Object.designations = Set.empty,
                   Object.designationValues = Map.empty,
                   Object.paidCosts = Map.empty,
+                  Object.tributePaid = False,
                   Object.bestowed = False,
                   Object.mutating = False,
                   Object.prototyped = False,
@@ -1670,6 +1677,7 @@ handOne printing base =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -1744,6 +1752,7 @@ pikerInHand land piker n ph =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -2634,6 +2643,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseEntryOption decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseRiot decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseUnleash decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseTribute decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDredge decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePayLifeOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseRevealOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2772,6 +2782,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseEntryOption {} -> "ChooseEntryOption"
   Prompt.ChooseRiot {} -> "ChooseRiot"
   Prompt.ChooseUnleash {} -> "ChooseUnleash"
+  Prompt.ChooseTribute {} -> "ChooseTribute"
   Prompt.ChooseDredge {} -> "ChooseDredge"
   Prompt.ChoosePayLifeOnEntry {} -> "ChoosePayLifeOnEntry"
   Prompt.ChooseRevealOnEntry {} -> "ChooseRevealOnEntry"
@@ -3251,6 +3262,7 @@ oneMountainState mountain ph =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -3474,6 +3486,7 @@ spellOnStack printing pid gs =
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,
@@ -3613,6 +3626,7 @@ stubView table oid =
                 Filter.designationValues = Map.empty,
                 Filter.classLevel = Nothing,
                 Filter.paidCosts = Map.empty,
+                Filter.tributePaid = False,
                 Filter.castUsing = Nothing,
                 Filter.manaSpentTagColors = Map.empty,
                 Filter.manaSpentAmount = 0,
