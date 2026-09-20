@@ -1244,6 +1244,9 @@ durationSlots duration = case duration of
   Duration.Perpetual -> Map.empty
   Duration.UntilYourNextTurn -> Map.empty
   Duration.UntilEndOfYourNextTurn -> Map.empty
+  -- The seat the window is counted against, read exactly as every other
+  -- PlayerRef position is (CR 601.2c).
+  Duration.UntilEndOfNextTurnOf ref -> playerRefSlots ref
   Duration.ForAsLongAs condition -> conditionSlots condition
   -- A Cost reads no slot: the activation cost of an ability is not walked by
   -- modeSlots either, and CR 116.2c's price is paid outside any resolution, so
@@ -1781,6 +1784,9 @@ durationSlotsAreExhaustive duration = case duration of
   Duration.Perpetual -> True
   Duration.UntilYourNextTurn -> True
   Duration.UntilEndOfYourNextTurn -> True
+  -- playerRefSlots' answer is complete for every arm: a PlayerRef names at
+  -- most one slot and nothing nested inside it names another.
+  Duration.UntilEndOfNextTurnOf _ -> True
   Duration.ForAsLongAs condition -> conditionSlotsAreExhaustive condition
   -- durationSlots' answer: a Cost reads no slot, so its enumeration is complete.
   Duration.UntilPaid _ -> True

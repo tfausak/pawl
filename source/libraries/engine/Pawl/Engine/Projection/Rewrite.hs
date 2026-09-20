@@ -1707,6 +1707,9 @@ rewriteDuration pairs duration = case duration of
   Duration.Perpetual -> duration
   Duration.UntilYourNextTurn -> duration
   Duration.UntilEndOfYourNextTurn -> duration
+  -- A PlayerRef names its seat structurally -- by slot or by relation -- and
+  -- carries no word CR 612.1 can swap, so the reference is left alone.
+  Duration.UntilEndOfNextTurnOf _ -> duration
   Duration.UntilEndOfCombat -> duration
   -- CR 116.2c's price, which is a Cost and not a Condition. An activated
   -- ability's own cost is left alone by this descent for the same reason: no

@@ -3,8 +3,9 @@
 
 -- Covers Pawl.Engine.Expiry and Pawl.Types.Expiry: the printed Duration -> stored Expiry
 -- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 500.5, 611.2a,
--- 611.2b), and the four gate cards (Master Thief, Hag of Inner Weakness, Jade
--- Statue, and Soulfire Eruption for "until the END of your next turn").
+-- 611.2b), and the gate cards: Master Thief, Hag of Inner Weakness, Jade
+-- Statue, Soulfire Eruption for "until the END of your next turn", and Suspend
+-- Aggression for that same window counted against a seat a reference names.
 --
 -- Alchemy's "perpetually" is here too, at the bottom of the file: it is a
 -- duration in card data like any other, and its producer is Pearl Collector.
@@ -1455,6 +1456,100 @@ soulfireSpec s registry = Spec.describe s "SoulfireEruption" $ do
     Spec.assertEqWith s "the card itself is untouched, still in exile" (Game.zoneMembers Zone.Exile S.alice afterwards) [pikerId]
     Spec.assertEqWith s "and alice cannot play it on turn 5 either" (S.creaturesInPlay S.alice later, Game.zoneMembers Zone.Exile S.alice later) (0, [pikerId])
 
+-- Suspend Aggression {1}{R}{W} Instant (Secrets of Strixhaven,
+-- data/cards/suspend-aggression.json; name, cost, type line and Oracle text
+-- checked against api.scryfall.com) -- "Exile target nonland permanent and the
+-- top card of your library. For each of those cards, its owner may play it
+-- until the end of their next turn."
+--
+-- The pool's producer of CR 611.2a's window counted against a seat a REFERENCE
+-- names, which Soulfire Eruption above is the exact contrast for: that card's
+-- "until the end of YOUR next turn" is CR 109.5's controller and can only ever
+-- be the caster's, where this one is the exiled card's owner and so is bob's on
+-- the leg alice aims at him.
+--
+-- "Its owner" is written as PlayerRef.ControllerOfBound: CR 108.4 leaves a card
+-- in exile with no controller and CR 108.4a then answers with its owner, so the
+-- two readings cannot come apart for a card this spell has already moved.
+--
+-- ALICE CASTS ON BOB'S TURN, which is what makes the two readings disagree at
+-- gameplay level. The spell resolves on turn 2, so the window is bob's turn 4
+-- under the printed reading and alice's turn 3 under a reading that took CR
+-- 109.5's "you" -- and bob's own sorcery-speed cast of the exiled creature is
+-- offered on turn 4 under the first and never under the second.
+--
+-- TWO EXILED CARDS with DIFFERENT owners, which is the whole of what the
+-- reference buys: the same clause grants bob the permission on one card and
+-- alice on the other, off one Duration that reads its own slot.
+suspendAggressionBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+suspendAggressionBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  plains <- S.printingOf s registry "Plains"
+  suspend <- S.printingOf s registry "Suspend Aggression"
+  piker <- S.printingOf s registry "Goblin Piker"
+  wraith <- S.printingOf s registry "Bog Wraith"
+  let stockedWith printing pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 :: Int .. 9]
+      -- {1}{R}{W} for alice, and {2}{R} for the Goblin Piker bob recasts out of
+      -- exile on turn 4.
+      g1 = S.landsFor plains S.alice 2 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+      g2 = S.landsFor mountain S.bob 3 g1
+      -- TWO nonland permanents for bob, so CR 601.2c's choice is a real one
+      -- rather than a prompt elided for having exactly as many candidates as it
+      -- needs. The Bog Wraith is never targeted and stays on the battlefield,
+      -- which is what the creature counts below are stated against.
+      (targetId, g3) = S.addPermanent piker S.bob g2
+      (_, g4) = S.addPermanent wraith S.bob g3
+      g5 = stockedWith mountain S.bob (stockedWith mountain S.alice g4)
+      (withSpell, spell) = S.handOne suspend g5
+      -- BOB'S TURN, so the window the reference names is a different turn from
+      -- the one CR 109.5's "you" would have named.
+      bobsTurn = runToTurn S.identityAnswer 2 withSpell
+      cast = S.runPure (aimedAtObject targetId) bobsTurn (S.cast S.alice spell)
+      resolved = S.runPure (aimedAtObject targetId) cast Engine.priorityLoop
+  pure
+    ( case Game.zoneMembers Zone.Exile S.bob resolved of
+        [oid] -> oid
+        oids -> error ("Pawl.ExpirySpec: expected one card exiled from bob, got " <> show (length oids)),
+      case Game.zoneMembers Zone.Exile S.alice resolved of
+        [oid] -> oid
+        oids -> error ("Pawl.ExpirySpec: expected one card exiled from alice, got " <> show (length oids)),
+      resolved
+    )
+
+suspendAggressionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+suspendAggressionSpec s registry = Spec.describe s "SuspendAggression" $ do
+  -- The proving case. Turn 3 is alice's and is played out with nothing cast, so
+  -- the card bob plays is played on HIS next turn and not on the caster's.
+  Spec.it s "CR 611.2a the window is counted against the seat the reference names, and that player plays the card on their next turn" $ do
+    (pikerId, _, resolved) <- suspendAggressionBoard s registry
+    let bobsNext = runToTurn S.identityAnswer 4 resolved
+        played = runToTurn (castingFromExile pikerId) 5 bobsNext
+    -- The behaviour first: a window armed against alice instead is already over
+    -- by here, and bob is offered no cast at all.
+    Spec.assertEqWith s "bob played the exiled card during his next turn, beside the Bog Wraith he kept" (S.creaturesInPlay S.bob played) 2
+    Spec.assertEqWith s "so it is no longer in exile" (Game.zoneMembers Zone.Exile S.bob played) []
+    -- Proxies, after the behaviour so neither can absorb a mutation ahead of it.
+    Spec.assertEqWith s "turn 4 is bob's" (GameState.activePlayer bobsNext, GameState.turnNumber bobsNext) (S.bob, 4)
+    Spec.assertEqWith s "and the permission that survived into it is his" (permissionOn pikerId bobsNext) (Just S.bob)
+  -- CR 514.2: the same window ends at the end of that turn, and no later turn of
+  -- bob's reopens it. The same board and the same answerer as the case above,
+  -- differing only in which turn the cast is attempted on.
+  Spec.it s "CR 611.2a / 514.2 it ends as that player's next turn ends" $ do
+    (pikerId, _, resolved) <- suspendAggressionBoard s registry
+    let afterwards = runToTurn S.identityAnswer 5 resolved
+        later = runToTurn (castingFromExile pikerId) 7 afterwards
+    Spec.assertEqWith s "bob cannot play it on turn 6 either, and the card is untouched" (S.creaturesInPlay S.bob later, Game.zoneMembers Zone.Exile S.bob later) (1, [pikerId])
+    Spec.assertEqWith s "turn 5 began, so bob's next turn is over" (GameState.activePlayer afterwards, GameState.turnNumber afterwards) (S.alice, 5)
+    Spec.assertEqWith s "the permission is gone" (permissionOn pikerId afterwards) Nothing
+  -- ONE clause, TWO seats: the reference is read per slot, so the leg over the
+  -- card alice exiled from her own library names her and the leg over bob's
+  -- permanent names him. A duration that took CR 109.5's "you" would name alice
+  -- on both.
+  Spec.it s "CR 108.4a each leg names the owner of its own exiled card" $ do
+    (pikerId, mineId, resolved) <- suspendAggressionBoard s registry
+    Spec.assertEqWith s "bob's permanent is bob's to play" (permissionOn pikerId resolved) (Just S.bob)
+    Spec.assertEqWith s "and the card off alice's library is hers" (permissionOn mineId resolved) (Just S.alice)
+
 -- Dovin, Hand of Control ({2}{W/U} Legendary Planeswalker -- Dovin, loyalty 5,
 -- War of the Spark; name, cost, type line and Oracle text checked against
 -- api.scryfall.com): "Artifact, instant, and sorcery spells your opponents cast
@@ -1793,6 +1888,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   hagSpec s registry
   endOfNextTurnSpec s
   soulfireSpec s registry
+  suspendAggressionSpec s registry
   dovinSpec s registry
   oldFatSpiderSpec s registry
   lingeringSpec s registry

@@ -31,7 +31,9 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- PLAYER may play that card this turn", the upkeep player the trigger bound,
 -- not the Lair's controller. Pawl.Types.OfferCast's `caster` is the same field
 -- one opcode over, and takes the same default: CR 109.5's "you", the resolving
--- controller, which is what every other producer in the pool prints.
+-- controller. Suspend Aggression's "its owner" is the third spelling, and the
+-- one that needs no "you" at all -- CR 108.4a answers the controller of a card
+-- already in exile with its owner, so PlayerRef.ControllerOfBound says it.
 --
 -- ONE seat, since Pawl.Types.ExilePlayPermission holds one (CR 715.3d: "that
 -- card ... that player"). So Pawl.Engine.Resolve.Effect's arm grants nothing for
