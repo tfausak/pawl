@@ -20,6 +20,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Pairing as Pairing
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
@@ -786,7 +787,23 @@ data Object = MkObject
     -- `kw:exhaust`, 2026-09-06, 40 printings: none grants its exhaust ability to
     -- another permanent, and none prints the same exhaust line twice. A card that
     -- gave another creature "Exhaust -- [cost]: [effect]" would refute it.
-    activatedOnce :: Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))
+    activatedOnce :: Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)),
+    -- | CR 702.95b: the creature this one is paired with, and the seat the
+    -- soulbond ability that paired them was controlled by; Nothing for every
+    -- unpaired creature, which is nearly all of them.
+    --
+    -- A Maybe and not a Set, which is CR 702.95d: "a creature can be paired with
+    -- only one other creature". Stored on BOTH creatures, so that CR 702.95b's
+    -- questions are answerable from either side -- see Pawl.Types.Pairing for why
+    -- the seat rides along, and Pawl.Engine.Soulbond, the one writer that keeps
+    -- the two rows in step.
+    --
+    -- NOT a copiable value (CR 707.2), ringBearerFor's posture: a Clone of a
+    -- paired creature arrives unpaired, CR 707.2 snapshotting
+    -- ProjectedCharacteristics rather than an Object. Per-incarnation: cleared by
+    -- newIncarnation, which is CR 702.95e's "leaves the battlefield" for the
+    -- leaver, the sweep supplying it for the creature left behind.
+    paired :: Maybe Pairing.Pairing
   }
   deriving (Eq, Ord, Show)
 
@@ -895,5 +912,11 @@ newIncarnation object =
       exertedBy = Set.empty,
       -- CR 400.7 over CR 602.5b: the object that comes back has activated
       -- nothing, so its once-only abilities are available again.
-      activatedOnce = Set.empty
+      activatedOnce = Set.empty,
+      -- CR 702.95e's third ending said for the leaver: a creature that leaves the
+      -- battlefield is unpaired, and the object that comes back was never paired
+      -- with anything. Pawl.Engine.Soulbond.endWhenBroken supplies the same
+      -- ending for the creature LEFT BEHIND, which no incarnation of its own
+      -- clears.
+      paired = Nothing
     }

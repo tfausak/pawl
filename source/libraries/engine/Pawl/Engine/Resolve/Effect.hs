@@ -70,6 +70,7 @@ import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Soulbond as Soulbond
 import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.TimeTravel as TimeTravel
@@ -536,6 +537,27 @@ apnapPlayersOf ref legal controller gs =
 -- villainousPass) both go through apnapPlayersOf above, which answers a SET off
 -- Game.stillPlaying and so has already dropped a departed seat rather than
 -- reassigning its answer.
+
+-- CR 608.2d's singular battlefield choice, hoisted so that every opcode making
+-- one asks it the same way: the candidates are the ability's own reading of the
+-- Filter whoever chooses, the ask is skipped at no candidate (CR 101.3) and at
+-- one (CR 608.2d admitting one legal announcement), and the answer is FILTERED
+-- rather than trusted (#222).
+chosenPermanentOf :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerRef -> Game [ObjectId]
+chosenPermanentOf legal resolving controller source filter_ chooser = do
+  gs <- State.get
+  case battlefieldMatching legal resolving controller source gs filter_ of
+    [] -> pure []
+    [only] -> pure [only]
+    first : second : more -> do
+      asked <- askedChooser source controller legal chooser
+      case asked of
+        Just who -> do
+          let offered = first NonEmpty.:| (second : more)
+          answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor who gs) who source offered)
+          pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+        Nothing -> pure []
+
 askedChooser :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerRef -> Game (Maybe PlayerId)
 askedChooser source controller legal ref = do
   gs <- State.get
@@ -2583,6 +2605,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Untap ref -> noneNamedIs TapState.Tapped ref
   Effect.Detain {} -> False
   Effect.Goad {} -> False
+  Effect.Pair {} -> False
   Effect.DoesNotUntapNext {} -> False
   Effect.Transform {} -> False
   Effect.Convert {} -> False
@@ -3997,19 +4020,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- reading; it is read AFTER the two elided cases, since neither asks
         -- anybody anything, and through askedChooser, so CR 800.4g hands the
         -- choice on where the seat it names has left the game.
-        chosenPermanent filter_ chooser = do
-          gs <- State.get
-          case battlefieldMatching legal resolving controller source gs filter_ of
-            [] -> pure []
-            [only] -> pure [only]
-            first : second : more -> do
-              asked <- askedChooser source controller legal chooser
-              case asked of
-                Just who -> do
-                  let offered = first NonEmpty.:| (second : more)
-                  answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor who gs) who source offered)
-                  pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-                Nothing -> pure []
+        chosenPermanent = chosenPermanentOf legal resolving controller source
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
@@ -8042,6 +8053,22 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- An already-goaded permanent goaded again by the same player keeps one
       -- entry, which is CR 701.15d -- see Object.goadedBy.
       foldr (Goad.goad controller) gs (objectRefObjects legal resolving controller source gs ref)
+  Effect.Pair ref -> do
+    -- CR 702.95a: pair this effect's SOURCE with the permanent the ObjectRef
+    -- names, under this resolution's controller (CR 109.5). Exactly one partner,
+    -- rule 702.95a naming one creature -- a ref that named none, or several,
+    -- pairs nothing, which is CR 101.3. CR 702.95c's recheck and CR 702.95d's
+    -- limit are Soulbond.pair's, read off the board as the effect applies rather
+    -- than off anything the trigger captured.
+    --
+    -- The CHOSEN ref goes through chosenPermanentOf and not the pure sweep: CR
+    -- 608.2d's choice is an ask, which objectRefObjects cannot make.
+    partners <- case ref of
+      ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ chooser) -> chosenPermanentOf legal resolving controller source filter_ chooser
+      _ -> fmap (\gs -> objectRefObjects legal resolving controller source gs ref) State.get
+    State.modify' $ \gs -> case partners of
+      [partner] -> Soulbond.pair controller source partner gs
+      _ -> gs
   Effect.DoesNotUntapNext ref ->
     State.modify' $ \gs ->
       -- CR 502.3's untap prohibition, as a one-shot; the victims are enumerated

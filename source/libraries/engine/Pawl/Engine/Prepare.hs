@@ -198,6 +198,7 @@ mint oid gs =
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Just oid,
                 Object.ringBearerFor = Nothing,
+                Object.paired = Nothing,
                 Object.protector = Nothing,
                 Object.ventureRoom = Nothing,
                 Object.classLevel = Nothing,

@@ -405,6 +405,11 @@ data Effect card ability
     -- of this resolution's controller; CR 701.15b's two requirements are one
     -- opcode.
     Goad ObjectRef.ObjectRef
+  | -- | CR 702.95a: pair this effect's source with the one permanent the
+    -- ObjectRef names, under the resolution's controller. CR 702.95c's recheck
+    -- and CR 702.95d's "only one other creature" are the opcode's own gate, in
+    -- Pawl.Engine.Soulbond.
+    Pair ObjectRef.ObjectRef
   | -- | CR 502.3 / 611.2: the permanents the ObjectRef names don't untap during
     -- their controller's next untap step (Elvish Hunter). CR 701.43a's exert is
     -- a different clause, riding Object.exertedBy.

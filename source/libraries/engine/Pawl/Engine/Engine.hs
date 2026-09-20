@@ -55,6 +55,7 @@ import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Soulbond as Soulbond
 import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Suspend as Suspend
@@ -967,6 +968,7 @@ placeBorne srcId pending = do
             Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
+            Object.paired = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
             Object.classLevel = Nothing,
@@ -1222,6 +1224,14 @@ performSettle = do
   -- matter -- a change any later step here makes is seen on the next pass, and a
   -- pass on which nothing acted is one on which control did not move.
   State.modify' Exile.accrueLookers
+  -- CR 702.95e, checked here for CR 704.3's reason and not because it is a
+  -- state-based action -- rule 704.5 lists it nowhere, rule 702.95a giving the
+  -- pairing its own duration. BEFORE the SBA pass, unlike the three samples
+  -- below: a pairing ending turns off the continuous effects that read it, so a
+  -- creature that was only alive at its paired size must die on THIS pass rather
+  -- than survive to the next. Inside the recursion guard for the same reason as
+  -- PlayerDesignation.settle -- an ending makes work.
+  unpaired <- Soulbond.endWhenBroken
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   -- Last, and for the same reason the conditional sweep runs first: all three read
@@ -1237,7 +1247,7 @@ performSettle = do
   State.modify' Combat.removeChanged
   checkControlContinuity
   Ring.endOnControlChange
-  more <- if swept || returned || movedBack || orphaned || dayNight || designated || sampledControl || acted || placed then performSettle else pure False
+  more <- if swept || returned || movedBack || orphaned || dayNight || designated || sampledControl || unpaired || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
 -- CR 104.4b: how many events may happen with no player able to decide anything

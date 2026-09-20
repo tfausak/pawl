@@ -573,6 +573,22 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsRingBearer
       " {\"type\":\"IsRingBearer\"} "
+  Spec.it s "IsPaired" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsPaired
+      " {\"type\":\"IsPaired\"} "
+  -- CR 702.95b's two questions differ by the tag alone, both being nullary, so
+  -- the pair is asserted together: a codec that confused them would read Wolfir
+  -- Silverheart's "each of those creatures" as "every paired creature".
+  Spec.it s "IsPairedWithSource, which is not IsPaired" $ do
+    Common.assertCodec
+      s
+      codec
+      Filter.IsPairedWithSource
+      " {\"type\":\"IsPairedWithSource\"} "
+    Spec.assertBool s (Codec.encode codec Filter.IsPairedWithSource /= Codec.encode codec Filter.IsPaired) "IsPairedWithSource and IsPaired encode differently"
   Spec.it s "HasNonManaActivatedAbility" $
     Common.assertCodec
       s
