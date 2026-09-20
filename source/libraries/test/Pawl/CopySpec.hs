@@ -104,6 +104,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.ManaSymbolSpec as ManaSymbolSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -131,6 +132,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -2178,6 +2180,15 @@ pinTarget recipient p = case p of
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
   _ -> S.identityAnswer p
 
+-- pinTarget one step looser: the recipient is named by the OBJECT it holds, for a
+-- slot whose pool decides which of CR 115.1's shapes it offers -- a Pool.Creatures
+-- slot offers Recipient.ToCreature where a Pool.Abilities one offers
+-- Recipient.ToObject, and an answerer naming the wrong shape aims at nothing.
+aimedAtObject :: ObjectId -> Prompt.Prompt r -> r
+aimedAtObject wanted p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> S.preferring ((== Just wanted) . Recipient.objectOf) asked
+  _ -> S.identityAnswer p
+
 -- CR 707.10c's prompt answered by the SEAT it asks, which is the only way a pure
 -- answerer can tell the copy's controller from the copying effect's: bob, the
 -- copied spell's controller, sends the copy at carol, and any other seat sends it
@@ -3141,7 +3152,11 @@ handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 --
 -- CR 707.10's "a copy of an activated ability isn't activated" rides on the first
 -- case as alice's energy: the cost was paid once, by the activation, and the copy
--- pays nothing.
+-- pays nothing. Its other half -- the copy carries no record of what the
+-- activation SPENT, the rule's Dawnglow Infusion example putting mana outside the
+-- objects-used-to-pay sentence -- is Forsworn Paladin's case below, which is also
+-- where CR 602.2a's thisAbility slot is shown naming the copy; the Stifle case
+-- beside it is that slot answering once the original has left the stack.
 copyAbilityOnStackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- TWO Cubs, alike in everything but which one's ability was copied, which is
@@ -3220,6 +3235,101 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             -- nothing, leaving two counters standing.
             Spec.assertEqWith s "the copy resolved before the original and was only the second time" (S.counterOf CounterKind.PlusOnePlusOne ashlingId afterCopy) 2
             Spec.assertEqWith s "and bob was untouched at that point" (S.lifeOf S.bob afterCopy) (Just 20)
+      _ -> Spec.assertFailure s "Ashling the Pilgrim should declare one activated ability, and Lithoform Engine a {2} one"
+  -- CR 602.2a's thisAbility slot on the COPY, which is where the rule's two
+  -- halves meet: "a copy of an activated ability isn't activated" (CR 707.10),
+  -- and the example under that rule -- "because mana isn't an object, a copy of
+  -- Dawnglow Infusion won't cause you to gain any life, no matter what mana was
+  -- spent to cast the original spell" -- which is what keeps CR 707.10's
+  -- objects-used-to-pay sentence from carrying the payment record across.
+  --
+  -- Forsworn Paladin's "{2}{B}: Target creature gets +2/+0 until end of turn. If
+  -- mana from a Treasure was spent to activate this ability, that creature also
+  -- gains deathtouch until end of turn" is the reader (Oracle text verified
+  -- Scryfall 2026-09-19). TWO Pikers, alike in everything but which ability aimed
+  -- at them: the original's target gains deathtouch and the copy's does not, so a
+  -- copy reading the original's record is a readable wrong answer rather than an
+  -- unobservable one.
+  --
+  -- The unconditional pump runs on both, which is the setup check below: a board
+  -- where the copy never resolved reads 2/1 on the second Piker instead.
+  Spec.it s "CR 707.10 a copied activated ability was not activated, so no mana was spent to activate it" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    engine <- S.printingOf s registry "Lithoform Engine"
+    paladin <- S.printingOf s registry "Forsworn Paladin"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case Face.activatedAbilities (S.combinedFace paladin) of
+      makeTreasure : pump : _ -> do
+        -- Two for the Treasure's {1}{B}, two beside the Treasure for the pump's
+        -- {2}{B}, and two for the Engine's {2}.
+        let (engineId, withEngine) = S.addPermanent engine S.alice (S.landsInPlay swamp 6)
+            (paladinId, withPaladin) = S.addPermanent paladin S.alice withEngine
+            (aimedByOriginal, withFirst) = S.addPermanent piker S.bob withPaladin
+            (aimedByCopy, board) = S.addPermanent piker S.bob withFirst
+            armed = S.runPure S.identityAnswer board (Activate.activateAbility S.alice paladinId makeTreasure *> Stack.resolveTop)
+            treasure = ManaSymbolSpec.treasureIn armed
+            onStack = S.runPure (ManaSymbolSpec.aimedAtSpending aimedByOriginal treasure) armed {GameState.priority = Just S.alice} (Activate.activateAbility S.alice paladinId pump)
+        case (topOfStack onStack, engineAbilityCopyingAbilities engineId onStack) of
+          (Just abilId, Just copier) -> do
+            let staged = S.runPure (pinTarget (Recipient.ToObject abilId)) onStack {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId copier)
+                -- The Engine's ability, whose resolution raises CR 707.10c's
+                -- offer and aims the copy at the other Piker; then the copy;
+                -- then the Paladin's own activation.
+                afterEngine = resolveOne (aimedAtObject aimedByCopy) staged
+                afterCopy = resolveOne S.identityAnswer afterEngine
+                afterBoth = resolveOne S.identityAnswer afterCopy
+            Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch aimedByCopy afterBoth)) "CR 707.10 the copy was not activated and mana is no object, so the copy's own target gains no deathtouch"
+            Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch aimedByOriginal afterBoth) "and the activation the Treasure really paid for still grants it to the target it named"
+            -- Supporting, and after the reads above so it can absorb no mutation
+            -- they should catch: the copy resolved and ran its unconditional
+            -- clause, so both Pikers are 4/1.
+            Spec.assertEqWith s "setup: both the copy and the original ran their unconditional pump" (S.powerToughnessOf aimedByCopy afterBoth, S.powerToughnessOf aimedByOriginal afterBoth) (Just (4, 1), Just (4, 1))
+            Spec.assertBool s (not (Set.member treasure (GameState.battlefield afterBoth))) "setup: the Treasure really was spent on the original activation"
+          _ -> Spec.assertFailure s "the Paladin's pump should be on the stack, and Lithoform Engine should declare a {2} ability"
+      _ -> Spec.assertFailure s "Forsworn Paladin should print two activated abilities"
+  -- The same slot's OTHER reader, on the board that tells the copy's id from the
+  -- original's: Stifle counters the original while the copy is still on the
+  -- stack, so an aim that named the original names nothing by the time the copy
+  -- resolves. CR 707.10b's third sentence still counts the copy, the two sharing
+  -- a Source, but the clause has to be able to ASK.
+  --
+  -- TWO resolutions first, so the copy is the third; bob at 17 and a dead Ashling
+  -- are the two places the board says the clause held. A copy whose read answers
+  -- nothing leaves bob at 20 and Ashling alive under three counters.
+  Spec.it s "CR 707.10b a copy of an activated ability still counts once the original has been countered" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    engine <- S.printingOf s registry "Lithoform Engine"
+    ashling <- S.printingOf s registry "Ashling the Pilgrim"
+    stifle <- S.printingOf s registry "Stifle"
+    -- Eight Mountains: six for three activations of Ashling and two for the
+    -- Engine's {2}. bob's one Island casts the Stifle.
+    let (engineId, withEngine) = S.addPermanent engine S.alice (S.landsFor island S.bob 1 (S.landsInPlay mountain 8))
+        (ashlingId, withAshling) = S.addPermanent ashling S.alice withEngine
+        (stifleId, board) = S.addHandCard stifle S.bob withAshling
+    case (Maybe.listToMaybe (Projection.abilitiesOf ashlingId board), engineAbilityCopyingAbilities engineId board) of
+      (Just pump, Just copier) -> do
+        let activate gs = S.runPure S.identityAnswer gs {GameState.priority = Just S.alice} (Activate.activateAbility S.alice ashlingId pump)
+            twice = List.foldl' (\gs _ -> resolveOne S.identityAnswer (activate gs)) board [1 .. (2 :: Int)]
+            thrice = activate twice
+        case topOfStack thrice of
+          Nothing -> Spec.assertFailure s "Ashling's third activation should be on the stack"
+          Just abilId -> do
+            let staged = S.runPure (pinTarget (Recipient.ToObject abilId)) thrice {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId copier)
+                -- The Engine's ability resolves, leaving the copy above the
+                -- original; bob's Stifle then goes on top of both and counters
+                -- the original out from under the copy.
+                afterEngine = resolveOne S.identityAnswer staged
+                cast = S.runPure (pinTarget (Recipient.ToObject abilId)) afterEngine {GameState.priority = Just S.bob} (S.cast S.bob stifleId)
+                stifled = resolveOne S.identityAnswer cast
+                afterCopy = resolveOne S.identityAnswer stifled
+            Spec.assertEqWith s "CR 707.10b the copy was still the third resolution, so the 3 counters came off and each player took 3" (S.lifeOf S.bob afterCopy) (Just 17)
+            Spec.assertEqWith s "and Ashling met its own 3 damage as a 1/1 once they came off" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Ashling the Pilgrim")) S.alice afterCopy) 0
+            -- Supporting, and after the reads above: the original really was
+            -- countered before the copy resolved, so the read could not have
+            -- found it.
+            Spec.assertBool s (notElem abilId (GameState.stack stifled)) "setup: the Stifle countered the original while the copy was still on the stack"
+            Spec.assertBool s (elem abilId (GameState.stack afterEngine)) "setup: and the original was under the copy before the Stifle resolved"
       _ -> Spec.assertFailure s "Ashling the Pilgrim should declare one activated ability, and Lithoform Engine a {2} one"
   -- CR 707.10c on an ABILITY, where the offer is a real choice: the copy is aimed
   -- at alice and the original stays on bob, so the two seats' life totals are
