@@ -1772,7 +1772,11 @@ modalSlotsOffend abilityBound modal =
             -- Plus what this mode's own CR 603.5 "may" binds: the players who
             -- took it, which is how "each player may search THEIR library" says
             -- "they" (Binding.mayPlayers).
-            defined = Set.unions [Resolve.definedSlots effects, Resolve.gateDefinedSlots mode, Resolve.mayDefinedSlots mode]
+            -- Plus what this mode's own CR 701.55d pass binds: the seat whose
+            -- villainous option is being performed, which is how "that player
+            -- sacrifices a creature of their choice" says "that player"
+            -- (Binding.facingPlayers).
+            defined = Set.unions [Resolve.definedSlots effects, Resolve.gateDefinedSlots mode, Resolve.mayDefinedSlots mode, Resolve.orElseDefinedSlots mode]
             -- The whole MODE's reads, not just its effect list's: CR 118.12a's
             -- "unless [a player] pays" names its payer by slot too.
             wanted = Map.keysSet (Resolve.modeSlots mode)
@@ -2114,7 +2118,8 @@ cardBranchesAreAsymmetric = any (any modeBranchesOffend . Modal.modes) . faceMod
 -- to choose between), and so does one whose named sibling is missing or names
 -- somebody else. So does a pair whose two halves name different CHOOSERS, the
 -- announcement being made once at whichever branch the resolution reaches first
--- (Pawl.Engine.Resolve.chosenBranch) -- the loser's own chooser would be data
+-- (Pawl.Engine.Resolve.chosenBranch, or villainousPass for a CR 701.55a pair)
+-- -- the loser's own chooser would be data
 -- nothing reads. And so does a pair whose halves disagree about CR 701.55a's
 -- villainous flag, which is read at the same single announcement.
 modeBranchesOffend :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
@@ -2265,6 +2270,7 @@ reservedSlots =
       Binding.triggerPlayer,
       Binding.gatePlayers,
       Binding.mayPlayers,
+      Binding.facingPlayers,
       Binding.became,
       Binding.departedPermanent,
       Binding.earthbentLand,

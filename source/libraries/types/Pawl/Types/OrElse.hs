@@ -30,7 +30,9 @@ data OrElse = MkOrElse
     -- offered to -- see Pawl.Engine.Resolve.chosenBranch, which hands that set
     -- to `exercises` and `payGateAdmits` rather than binding it to a slot: a
     -- slot bound here would be invisible to those two, which read the bindings
-    -- captured before the branch was announced.
+    -- captured before the branch was announced. A VILLAINOUS pair is the
+    -- exception, and CR 701.55d is why it can be: its per-seat pass re-reads the
+    -- bindings after each seat is bound, so `villainous` below does bind a slot.
     --
     -- Not implemented: a chooser who wants neither branch still announces one
     -- and declines the rider that follows it, so the decline is a second
@@ -43,9 +45,9 @@ data OrElse = MkOrElse
     -- | CR 701.55a: this pair is a VILLAINOUS CHOICE, which rule 701.55b makes
     -- an exception to rule 608.2d -- the chooser "may choose an option that is
     -- illegal or impossible", performing as much of it as is possible. So
-    -- Pawl.Engine.Resolve.chosenBranch offers both branches here rather than
+    -- Pawl.Engine.Resolve.villainousPass offers both branches here rather than
     -- filtering them through clauseIsImpossible first, and a chooser facing one
-    -- impossible limb is still asked. Great Intelligence's Plan is the producer,
+    -- impossible limb is still asked. Great Intelligence's Plan is one producer,
     -- and Pawl.ResolveSpec's "CR 701.55b Great Intelligence's Plan still offers
     -- the discard to an empty-handed opponent" is what proves it.
     --
@@ -57,10 +59,16 @@ data OrElse = MkOrElse
     --
     -- Both halves of a pair must agree on it, for `sibling`'s reason.
     --
+    -- Rule 701.55d's exception to rule 608.2e is why this marker steers
+    -- resolution rather than only widening the offer: a pair carrying it is
+    -- chosen AND performed one player at a time by
+    -- Pawl.Engine.Resolve.villainousPass, never by chosenBranch, and the seat
+    -- whose option is running is bound under Binding.facingPlayers.
+    -- Pawl.ResolveSpec's "CR 701.55d two opponents each taking The Dalek
+    -- Emperor's token limb make two tokens" is what proves it.
+    --
     -- Not implemented: rule 701.55c's replacement of one facing by several,
-    -- The Valeyard's (#3898); nor rule 701.55d's exception to rule 608.2e, which
-    -- runs the whole choose-then-perform process per player one at a time where
-    -- chosenBranch asks every chooser and then runs the branch once (#3899).
+    -- The Valeyard's (#3898).
     villainous :: Bool
   }
   deriving (Eq, Ord, Show)
