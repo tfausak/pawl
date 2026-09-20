@@ -8,8 +8,7 @@ module Pawl.Types.Gift where
 -- card prints the word and Pawl.Engine.Keyword mints the effect.
 --
 -- Not implemented: CR 702.174d's Food, CR 702.174g's extra turn and CR 702.174h's
--- Treasure (#3833). Every printing of those three is an instant or a sorcery, so
--- they wait on rule 702.174b's spell-ability half, see #3834.
+-- Treasure (#3833).
 data Gift
   = -- | CR 702.174e: "Gift a card" -- the chosen player draws a card.
     Card

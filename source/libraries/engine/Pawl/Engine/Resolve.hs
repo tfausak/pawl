@@ -407,11 +407,17 @@ resolveSpellWith runSubgame oid = do
               then Event.changeZone oid Zone.Graveyard
               else do
                 let effectController = spellController obj oid gs
-                -- CR 702.131a's spell ability, FIRST: ascend is printed above the
-                -- card's other text, and CR 608.2c follows a spell's instructions
-                -- in printed order -- Secrets of the Golden City's "if you have
-                -- the city's blessing, draw three cards instead" reads the mark
-                -- this line may just have granted.
+                -- CR 702.174j's spell ability, ahead of everything else the card
+                -- says: "the effect of a gift ability always happens before any
+                -- other spell abilities of the card". Ahead of ascend's line
+                -- below is a REGRESSION FENCE -- no printing carries both
+                -- keywords.
+                giftOnSpellResolution runSubgame oid effectController
+                -- CR 702.131a's spell ability, ahead of the modes: ascend is
+                -- printed above the card's other text, and CR 608.2c follows a
+                -- spell's instructions in printed order -- Secrets of the Golden
+                -- City's "if you have the city's blessing, draw three cards
+                -- instead" reads the mark this line may just have granted.
                 PlayerDesignation.ascendOnSpellResolution oid effectController
                 Monad.forM_ (modesOf oid gs) $ \(mi, mode) -> withDefinedSlots oid mi mode $ do
                   let idx = ModeInstance.index mi
@@ -529,6 +535,66 @@ resolveSpellWith runSubgame oid = do
                     indexedClauses
                 applyEpic oid effectController
                 finishSpell oid face effectController
+
+-- CR 702.174b's instant-and-sorcery half: "If this spell's gift cost was paid,
+-- [effect]". A SPELL ability, where rule 702.174b's permanent half is a triggered
+-- one, so it is performed here as the spell resolves rather than minted by
+-- Pawl.Engine.Keyword.abilitiesFor -- nothing mints a spell ability from a
+-- keyword, and CR 702.131a's ascend is the sibling that answers the same shape
+-- the same way.
+--
+-- The keyword AND the card types come off the PROJECTION, ascendOnSpellResolution's
+-- reading of CR 613.1f and CR 613.1d: a spell granted gift by a text-changing
+-- effect gives one, and one whose text was blanked does not. The type test is what
+-- rule 702.174b's two halves are told apart by.
+--
+-- That type test is a REGRESSION FENCE rather than proved behaviour: Stack's
+-- resolve dispatches on the PRINTED face, sending every permanent spell down the
+-- entry branch instead, so nothing on any board reaches this line carrying a
+-- permanent's types and dropping the test leaves the suite green. Rule 702.174b's
+-- own wording is what it rests on -- and what the projection adds over the printed
+-- face is CR 613.1d's type change.
+--
+-- "If this spell's gift cost was paid" is Object.paidCosts, the record CR 601.2b's
+-- payment writes and the one Quantity.TimesPaid reads for the permanent half's
+-- intervening "if" (Pawl.Engine.Keyword.gift). Read off the spell's own object, so
+-- a copy of the spell -- which CR 707.2 gives no paidCosts -- promised nobody
+-- anything and gives no gift.
+--
+-- That guard is a REGRESSION FENCE too, and for the reason
+-- Pawl.Engine.Keyword.gift's intervening "if" is: widening it to admit an unpaid
+-- gift leaves Pawl.CastSpec's Gift group green, because the effect's only read is
+-- the chosen player and Object.chosenPlayer is empty in exactly the case rule
+-- 702.174k excludes. What would tell them apart is CR 702.174c's "whenever a
+-- player gives a gift" (#3945).
+--
+-- Rule 702.174j's second sentence -- "if the spell is countered or otherwise
+-- leaves the stack before resolving, the gift effect doesn't happen" -- needs no
+-- code: a countered spell never reaches resolveSpellWith at all, and CR 608.2b's
+-- fizzle takes the branch above this one.
+--
+-- CR 702.174j's position -- ahead of the modes -- is a fence on the same footing:
+-- no gift printing's own text can observe the gift's product, since CR 601.2c
+-- fixed its targets before the token or card existed. Moving this call past the
+-- mode loop leaves the suite green.
+--
+-- Both slot maps are the SPELL's own bindings and carry no mode's target slots:
+-- rule 702.174b's effect targets nothing, and the one slot it reads is CR 113.7a's
+-- `self`, which Pawl.Engine.Cast.castSpell stamps on the spell alongside the
+-- chosen seat -- Resolve.Slots' ChosenPlayerOfBound arm reads Object.chosenPlayer
+-- off whatever that slot names.
+--
+-- Not implemented: CR 702.174c's "whenever a player gives a gift", which watches
+-- both this and the permanent half resolve (#3945).
+giftOnSpellResolution :: Game Result -> ObjectId -> PlayerId -> Game ()
+giftOnSpellResolution runSubgame oid controller = do
+  gs <- State.get
+  let object = Game.lookupObject oid gs
+      promised = maybe Map.empty Object.paidCosts object
+      slots = maybe Map.empty (Binding.targetsOf . Object.bindings) object
+      gifts = [something | Keyword.Gift something <- Map.keys (Projection.keywordsOf oid gs), Map.findWithDefault 0 (Keyword.Gift something) promised > 0]
+      give something = applyEffectWith runSubgame oid oid controller slots slots (Keyword.Engine.giftEffect something)
+  Monad.when (Keyword.Engine.isSpellCard (Projection.cardTypesOf oid gs)) (Monad.forM_ gifts give)
 
 -- CR 702.50a's two SPELL abilities, performed as the last part of the spell's
 -- resolution and ahead of finishSpell's move: "for the rest of the game, you

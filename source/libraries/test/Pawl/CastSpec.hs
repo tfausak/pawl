@@ -4686,6 +4686,50 @@ giftSpec s registry = Spec.describe s "Gift" $ do
     Spec.assertEqWith s "CR 702.174i and it entered untapped" (fmap (\o -> fmap Object.tapped (Game.lookupObject o after)) octopus) [Just TapState.Untapped]
     Spec.assertEqWith s "and the 3/3 entered with the stack empty" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Octomancer" after), length (GameState.stack after)) ([Just (3, 3)], 0)
 
+  -- CR 702.174b's OTHER half on Longstalk Brawl {G} Sorcery, "Gift a tapped Fish
+  -- / Choose target creature you control and target creature you don't control.
+  -- Put a +1\/+1 counter on the creature you control if the gift was promised.
+  -- Then those creatures fight each other." (Oracle text checked on Scryfall,
+  -- 2026-09-20.) On an instant or a sorcery the second ability rule 702.174a
+  -- represents is a SPELL ability, not the enters trigger the permanents above
+  -- carry, so the Fish appears without anything reaching the stack.
+  --
+  -- The fight is what proves the card's own text ran too: alice's 2\/2 is 3\/3
+  -- when the gift was promised, which is exactly the toughness bob's 3\/3 needs
+  -- to kill and exactly the power needed to kill it back.
+  Spec.it s "CR 702.174b a gift sorcery gives the promised opponent the Fish as it resolves" $ do
+    (brawlId, board) <- longstalkBoard s registry
+    let after = castResolved (promising S.carol) brawlId board
+        fish = namedOnBattlefield "Fish Token" after
+    Spec.assertEqWith s "CR 702.174b and CR 111.2 one 1/1 Fish token, under carol" (fmap (\o -> (View.controllerOf o after, S.powerToughnessOf o after)) fish) [(Just S.carol, Just (1, 1))]
+    Spec.assertEqWith s "CR 702.174f and it entered tapped" (fmap (\o -> fmap Object.tapped (Game.lookupObject o after)) fish) [Just TapState.Tapped]
+    Spec.assertEqWith s "CR 702.174k the gift was promised, so the counter went on and bob's 3/3 died" (length (namedOnBattlefield "Hill Giant" after), length (namedOnBattlefield "Cabal Evangel" after)) (0, 0)
+  -- The same board differing in exactly one thing: the answer to rule 702.174a's
+  -- "you may". bob's 3/3 surviving is the counter's absence, and no Fish is the
+  -- spell ability's.
+  Spec.it s "CR 603.4 unpromised, a gift sorcery gives nothing" $ do
+    (brawlId, board) <- longstalkBoard s registry
+    let after = castResolved declining brawlId board
+    Spec.assertEqWith s "CR 702.174k no gift was promised, so no Fish token exists" (namedOnBattlefield "Fish Token" after) []
+    Spec.assertEqWith s "and no counter went on, so bob's 3/3 survives and alice's 2/2 does not" (length (namedOnBattlefield "Hill Giant" after), length (namedOnBattlefield "Cabal Evangel" after)) (1, 0)
+
+-- alice on turn with one Forest and Longstalk Brawl in hand, her own Cabal
+-- Evangel 2/2 for the spell's "target creature you control" and bob's Hill Giant
+-- 3/3 for "target creature you don't control". Three seats for
+-- scrapshooterBoard's reason, and carol -- the promised seat -- controls no
+-- creature, so each target slot offers exactly one candidate and no answerer can
+-- pick a different one.
+longstalkBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+longstalkBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  brawl <- S.printingOf s registry "Longstalk Brawl"
+  evangel <- S.printingOf s registry "Cabal Evangel"
+  giant <- S.printingOf s registry "Hill Giant"
+  let (brawlId, gs1) = S.addHandCard brawl S.alice (S.landsFor forest S.alice 1 S.threePlayerGame)
+      (_, gs2) = S.addPermanent evangel S.alice gs1
+      (_, gs3) = S.addPermanent giant S.bob gs2
+  pure (brawlId, aliceOnTurn gs3)
+
 -- alice on turn with four Forests, a Goblin Piker for rule 702.174f's Equipment
 -- to attach to, and Starforged Sword in hand. Three seats for scrapshooterBoard's
 -- reason.

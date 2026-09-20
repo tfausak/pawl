@@ -509,8 +509,10 @@ abilitiesFor keyword count = case keyword of
   -- Rule 702.174 states no redundancy clause and no printing carries two gift
   -- abilities, which makes the collapse a fence rather than proved behaviour.
   --
-  -- Not implemented: rule 702.174b's INSTANT AND SORCERY half, a spell ability
-  -- rather than a triggered one (#3834).
+  -- Rule 702.174b's INSTANT AND SORCERY half is a spell ability rather than a
+  -- triggered one, so nothing is minted for it here; it is performed by
+  -- Pawl.Engine.Resolve.giftOnSpellResolution as the spell resolves. Minting the
+  -- enters trigger for one anyway is harmless -- an instant never enters.
   Keyword.Gift something -> List.genericReplicate (min 1 count) (gift something)
   Keyword.Foretell _ -> []
   Keyword.Companion _ -> []
@@ -6643,7 +6645,7 @@ offspring cost = paidTokenCopies (Keyword.Offspring cost) (Quantity.Literal 1) [
 -- the only thing the effect reads is the chosen player and that seat is empty in
 -- exactly the case rule 603.4 excludes. What would tell them apart is CR
 -- 702.174c's "whenever a player gives a gift", which watches the ability resolve
--- (#3834).
+-- (#3945).
 --
 -- The intervening "if" is CR 603.4's, evoke's and paidTokenCopies' reading:
 -- Quantity.TimesPaid reads Object.paidCosts, which CR 707.2 does not copy and CR
@@ -6657,20 +6659,27 @@ offspring cost = paidTokenCopies (Keyword.Offspring cost) (Quantity.Literal 1) [
 -- that clears the spell's bindings.
 gift :: Gift.Gift -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 gift something =
-  let effect = case something of
-        Gift.Card -> Effect.Draw Draw.MkDraw {Draw.player = PlayerRef.ChosenPlayerOfBound Binding.triggerSource, Draw.quantity = Quantity.Literal 1, Draw.slot = Nothing}
-        Gift.TappedFish -> giftToken TapState.Tapped fishToken
-        Gift.Octopus -> giftToken TapState.Untapped octopusToken
-   in TriggeredAbility.MkTriggeredAbility
-        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
-          TriggeredAbility.modal =
-            Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
-              (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening =
-            Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (Keyword.Gift something)) Comparison.AtLeast (Quantity.Literal 1))),
-          TriggeredAbility.limit = TriggerLimit.Unlimited
-        }
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (giftEffect something)))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening =
+        Just (Condition.Compares (Compares.MkCompares (Quantity.TimesPaid (Keyword.Gift something)) Comparison.AtLeast (Quantity.Literal 1))),
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
+
+-- CR 702.174d-i's "[effect]": what the [something] the card printed means, which
+-- rule 702.174b then hangs off whichever of its two abilities the object is --
+-- `gift` above's triggered one on a permanent, and
+-- Pawl.Engine.Resolve.giftOnSpellResolution's spell ability on an instant or a
+-- sorcery. One function so the two halves cannot promise different things.
+giftEffect :: Gift.Gift -> Effect.Effect Card (GrantedAbility.GrantedAbility Card)
+giftEffect something = case something of
+  Gift.Card -> Effect.Draw Draw.MkDraw {Draw.player = PlayerRef.ChosenPlayerOfBound Binding.triggerSource, Draw.quantity = Quantity.Literal 1, Draw.slot = Nothing}
+  Gift.TappedFish -> giftToken TapState.Tapped fishToken
+  Gift.Octopus -> giftToken TapState.Untapped octopusToken
 
 -- CR 702.174f's and CR 702.174i's effect: "the chosen player creates a [token]".
 -- The creator is the SAME PlayerRef rule 702.174e's draw reads, which is what CR
