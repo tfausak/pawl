@@ -6,8 +6,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
 -- | The payload of Pawl.Types.Effect's GrantPlayFromExile arm: which objects the
--- permission covers, how long it lasts, and how its holder may pay for what they
--- cast under it.
+-- permission covers, whose it is, how long it lasts, and how its holder may pay
+-- for what they cast under it.
 --
 -- SPUN OUT of Pawl.Types.DurationRef, which that type's own haddock asks for as
 -- soon as one sharer needs a field the others do not (#1305): GainControl has
@@ -34,9 +34,9 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- controller, which is what every other producer in the pool prints.
 --
 -- ONE seat, since Pawl.Types.ExilePlayPermission holds one (CR 715.3d: "that
--- card ... that player"), so a reference naming nobody or naming several grants
--- nothing -- PlayerRef.InSlot's own collapse, and it is where
--- Pawl.Engine.Resolve.Effect's arm reads it.
+-- card ... that player"). So Pawl.Engine.Resolve.Effect's arm grants nothing for
+-- a reference naming nobody, and nothing for one naming several --
+-- PlayerRef.InSlot's own collapse.
 data GrantPlayFromExile = MkGrantPlayFromExile
   { duration :: Duration.Duration,
     player :: PlayerRef.PlayerRef,
