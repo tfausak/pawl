@@ -3258,8 +3258,9 @@ backupSpec s registry =
         Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter ((== Just victim) . Recipient.objectOf) rs) sets
         _ -> S.aggressiveAnswer p
       plusOnes oid gs = Map.findWithDefault 0 CounterKind.PlusOnePlusOne (maybe Map.empty Object.counters (Game.lookupObject oid gs))
-      -- CR 706.2's copy choice, then rule 702.165a's target: one answerer, since
-      -- the two prompts are of different shapes.
+      -- The Clone's copy choice, then rule 702.165a's target: one answerer, since
+      -- the two prompts are of different shapes. The copy target is pinned by ID
+      -- so the Clone cannot repair the test by copying the Piker instead.
       copying :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
       copying model victim p = case p of
         Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== model) legal

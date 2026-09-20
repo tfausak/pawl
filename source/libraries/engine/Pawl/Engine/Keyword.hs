@@ -487,7 +487,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Decayed -> List.genericReplicate count decayed
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
-  -- CR 702.165b: each instance triggers separately (Conclave Sledge-Captain prints three).
+  -- CR 702.165a states ONE triggered ability, so an instance held N times is N of
+  -- them; Conclave Sledge-Captain prints "backup 1, backup 1, backup 1".
   Keyword.Backup n -> List.genericReplicate count (backup n)
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []

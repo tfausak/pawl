@@ -8353,9 +8353,14 @@ bindEarthbentLand resolving land gs =
 -- CR 702.165a's grant, expanded as the ability RESOLVES: one ordinary
 -- modification per ability the source carries, so what is stored outlives the
 -- creature with backup exactly as "until end of turn" says it must. Every other
--- modification passes through as the one it already is, which is why this is a
--- list rather than a Maybe -- an expansion that found nothing to grant stores
--- nothing, where CR 611.2 would otherwise leave an effect with no content.
+-- modification passes through as the one it already is.
+--
+-- A LIST, so a source with nothing to grant stores no effect at all rather than
+-- one with no content, and so the arm never has to reach the projection: each
+-- grant becomes a GainKeyword or a GainAbility that CR 613.7 timestamps and CR
+-- 613.1f applies like any other. Several timestamps where the rule states one
+-- effect, which no board can tell apart -- every part of this grant is an
+-- APPEND to a layer-6 list, and appends do not compete for order.
 --
 -- Read off the COPIABLE characteristics (CR 707.2), never the printed face: CR
 -- 702.165b grants what a permanent that entered as a copy of a card with backup
