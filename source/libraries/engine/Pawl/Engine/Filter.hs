@@ -2812,7 +2812,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- its [materials] criterion are both printed, so both halves descend.
   Keyword.Type.Craft crafting ->
     let materials = Craft.materials crafting
-        swapped = ExileMaterials.MkExileMaterials (ExileMaterials.count materials) (rewrite pairs (ExileMaterials.whichObjects materials))
+        swapped = ExileMaterials.MkExileMaterials (ExileMaterials.count materials) (ExileMaterials.orMore materials) (rewrite pairs (ExileMaterials.whichObjects materials))
      in Keyword.Type.Craft (Craft.MkCraft (rewriteCost pairs (Craft.cost crafting)) swapped)
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
@@ -2866,7 +2866,7 @@ rewriteComponent pairs component = case component of
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion))
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
-  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n criterion) -> CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n (rewrite pairs criterion))
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore criterion) -> CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   -- Untouched: CR 701.59a describes the cards by a total and states no card type,
   -- so rule 612.1 finds no word in this component to swap.

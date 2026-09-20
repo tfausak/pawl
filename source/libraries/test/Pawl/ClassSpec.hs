@@ -401,8 +401,9 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
 -- CARDS in a starting deck, which Pawl.Engine.Projection.View.viewOfCard answers
 -- off the printed face with no gate to apply, so both readings agree there. The
 -- Enigma Jewel's "four or more nonlands with activated abilities" would ask it of
--- a permanent; craft itself is implemented (CR 702.167), but that cost's count is
--- a lower bound where Pawl.Types.ExileMaterials' is exact (gap #3933).
+-- a permanent; craft and its lower-bound count are both implemented (CR 702.167),
+-- but its back face is "Locus of Enlightenment has each activated ability of the
+-- exiled cards used to craft it", which is CR 702.167c (gap #3931).
 --
 -- bob owns the Piker so that Paladin Class's own level-2 section -- "Creatures you
 -- control get +1/+1" -- cannot reach it, leaving the audit the only thing that

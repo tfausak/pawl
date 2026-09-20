@@ -3264,7 +3264,7 @@ costComponentFilters component = case component of
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard _ f) -> [f]
   -- CR 702.167a over the battlefield and the graveyard at once: Tithing Blade's
   -- "a creature", which CR 702.167b reads in both zones.
-  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials _ f) -> [f]
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials _ _ f) -> [f]
   -- CR 406.2 again: Circling Vultures' "the top creature card of your
   -- graveyard".
   CostComponent.ExileTopFromGraveyard f -> [f]

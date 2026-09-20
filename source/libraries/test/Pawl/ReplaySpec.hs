@@ -734,7 +734,7 @@ combatReplaySpec s =
         -- replayed across would exile a permanent where the graveyard prompt
         -- promises it exiles a card.
         Spec.it s "ChooseMaterials records and replays a Set ObjectId" $ do
-          let p = Prompt.ChooseMaterials decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
+          let p = Prompt.ChooseMaterials decider S.alice oid [oid, ObjectId.MkObjectId 8] 1 False
               answer = Set.singleton (ObjectId.MkObjectId 8)
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
           Spec.assertEqWith
@@ -746,7 +746,7 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "the offered prefix"
-            (Replay.defaultAnswer (Prompt.ChooseMaterials decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
+            (Replay.defaultAnswer (Prompt.ChooseMaterials decider S.alice oid [oid, ObjectId.MkObjectId 8] 1 False))
             (Set.singleton oid)
         Spec.it s "ChooseCost records and replays a Cost" $ do
           let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
