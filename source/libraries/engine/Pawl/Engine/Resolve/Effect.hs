@@ -5938,11 +5938,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- mana from a Treasure was spent to activate this ability" is
                       -- the reader, and Pawl.CopySpec's Forsworn Paladin case the
                       -- proof.
-                      --
-                      -- Not implemented: CR 702.150a's compleated, whose record of
-                      -- the life paid for a Phyrexian symbol the copy still
-                      -- inherits (#3935).
                       Object.manaSpent = Mana.Type.MkMana [],
+                      -- CR 601.2b's record of how many Phyrexian symbols were
+                      -- announced for life, dropped for a reason of its own rather
+                      -- than the one above: rule 702.150a's compleated asks about
+                      -- "the player who cast it", and CR 707.10's first sentence
+                      -- says a copy of a spell isn't cast -- so there is no such
+                      -- player and the clause cannot hold, whether or not CR
+                      -- 707.2's "choices made when casting" reaches the
+                      -- announcement. `announcedX` beside it is carried because CR
+                      -- 707.10 names the value of X outright, and CR 107.3m reads
+                      -- it off the spell without asking who cast it.
+                      -- Pawl.CopySpec's Tamiyo, Compleated Sage case is the proof.
+                      Object.phyrexianLifePaid = 0,
                       -- CR 109.5's "you" is RE-STAMPED: Pawl.Engine.Cast and
                       -- Pawl.Engine.Activate write the caster or activator into it
                       -- as the original goes on the stack, and CR 707.10 makes the
