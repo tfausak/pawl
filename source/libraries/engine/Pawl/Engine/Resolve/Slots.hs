@@ -722,7 +722,7 @@ effectObjectRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> [ref]
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _) -> [ref]
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ ref _ _) -> [ref]
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _) -> [ref]
   Effect.GrantLookAtExiled grant -> [GrantLookAtExiled.cards grant]
   Effect.MakePlotted ref -> [ref]
   Effect.MakeForetold x -> [MakeForetold.cards x]
@@ -887,7 +887,8 @@ effectPlayerRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _) -> [caster]
-  Effect.GrantPlayFromExile {} -> []
+  -- CR 601.3's "that player", the seat the permission is written for.
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ player _ _ _) -> [player]
   Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
   Effect.MakeForetold {} -> []

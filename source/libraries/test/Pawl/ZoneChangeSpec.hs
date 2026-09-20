@@ -2335,10 +2335,11 @@ soulsMajestySpec s registry = Spec.describe s "SoulsMajesty" $ do
 -- 2026-09-11, one hit), so Effect.MoveToZone's gather asking randomCardsInHand
 -- is what this card is here to exercise.
 --
--- Not implemented: "The player may play that card this turn" (#3842) and the
--- delayed end-step move that follows it (#3843). The exiled card simply stays in
--- exile, which leaves pawl's Elkin Lair stricter than printed for every seat
--- alike -- the trigger is symmetric, so the omission favours nobody.
+-- Not implemented: "at the beginning of the next end step, if the player hasn't
+-- played the card, they put it into their graveyard" (#3843). An unplayed card
+-- stays in exile instead of reaching a graveyard, which leaves pawl's Elkin Lair
+-- stricter than printed for every seat alike -- the trigger is symmetric, so the
+-- omission favours nobody.
 --
 -- TWO SEATS, and ALICE controls the enchantment while BOB takes the upkeep:
 -- "that player" and "the resolving controller" are the same seat on a one-seat
@@ -2400,6 +2401,32 @@ elkinLairSpec s registry =
           let after = runBobsUpkeep (rolling 0) (board lair [bolt] ps)
           Spec.assertEqWith s "the FIRST card this time" (namesIn Zone.Exile S.bob after) [named "Goblin Piker"]
           Spec.assertEqWith s "and the other two stay in hand" (namesIn Zone.Hand S.bob after) [named "Bog Wraith", named "Bird Maiden"]
+        -- The SECOND clause, and WHOSE it is: "THE PLAYER may play that card
+        -- this turn" is the upkeep player the trigger bound, not CR 109.5's
+        -- "you". An instant is what the roll names, so CR 601.3's window is open
+        -- during the upkeep for both seats alike.
+        --
+        -- ONE MOUNTAIN EACH, which is what makes the negative about the
+        -- PERMISSION rather than about mana: alice has exactly the {R} the
+        -- Lightning Bolt asks for and still may not cast it, where before this
+        -- clause was transcribed the permission was hers and not bob's.
+        Spec.it s "CR 601.3 the upkeep player may cast the card the trigger exiled, and the Lair's controller may not" $ do
+          lair <- S.printingOf s registry "Elkin Lair"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          ps <- traverse (S.printingOf s registry) ["Lightning Bolt", "Bog Wraith", "Bird Maiden"]
+          let withMana g = snd (S.addPermanent mountain S.bob (snd (S.addPermanent mountain S.alice g)))
+              after = runBobsUpkeep (rolling 0) (withMana (board lair [piker] ps))
+          case Game.zoneMembers Zone.Exile S.bob after of
+            [exiledId] -> do
+              Spec.assertBool s (S.castable S.bob exiledId after) "bob, whom the trigger bound, may cast the Lightning Bolt it exiled from his hand"
+              Spec.assertBool s (not (S.castable S.alice exiledId after)) "alice controls the Lair and holds the same untapped Mountain, and may not"
+              -- Proxies, AFTER both behavioural assertions so neither can absorb
+              -- a mutation: the card in exile is the one the roll named, and
+              -- alice's Mountain is still untapped and so still able to pay.
+              Spec.assertEqWith s "the Lightning Bolt is the card in exile" (namesIn Zone.Exile S.bob after) [named "Lightning Bolt"]
+              Spec.assertEqWith s "and alice has tapped nothing" (S.tappedCount S.alice after) 0
+            _ -> Spec.assertFailure s "bob's upkeep should exile exactly one card"
 
 -- Randomness over CR 400.2's PUBLIC zone, the pair of cards that exercise
 -- Pawl.Types.ObjectRef.RandomCardInGraveyard. Ghoulraiser {1}{B}{B} Creature --

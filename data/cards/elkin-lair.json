@@ -51,8 +51,25 @@
                               }
                             }
                           },
+                          "slot": "exiled",
                           "zone": {
                             "type": "Exile"
+                          }
+                        }
+                      },
+                      {
+                        "type": "GrantPlayFromExile",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "player": {
+                            "type": "InSlot",
+                            "value": "thatPlayer"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "exiled"
                           }
                         }
                       }

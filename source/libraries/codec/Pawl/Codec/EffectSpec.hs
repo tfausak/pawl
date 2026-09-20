@@ -1554,13 +1554,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AsProduced False))
+      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AsProduced False))
       " {\"type\":\"GrantPlayFromExile\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) ManaSpending.AsProduced False))
+      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.Indefinite (PlayerRef.Relative PlayerRelation.You) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) ManaSpending.AsProduced False))
       " {\"type\":\"GrantPlayFromExile\",\"value\":{\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}} "
   -- CR 118.14's rider, through the ARM rather than through the payload codec
   -- alone: the Effect layer is what a card's JSON actually goes through, and
@@ -1570,8 +1570,18 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AnyType False))
+      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AnyType False))
       " {\"type\":\"GrantPlayFromExile\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"spending\":{\"type\":\"AnyType\"}}} "
+  -- CR 601.3's "that player", through the ARM for the rider above's reason:
+  -- Elkin Lair's clause names the upkeep player a slot holds, and the key has to
+  -- survive the Effect layer a card's JSON goes through.
+  Spec.it s "GrantPlayFromExile round-trips a grantee other than the resolving controller" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AsProduced False))
+      " {\"type\":\"GrantPlayFromExile\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
   -- CR 406.3's look permission, whose record carries CR 702.75a's rider besides.
   -- It must not collapse into MakePlotted below on the wire: the two write
   -- different fields of the same exiled object.
@@ -1609,7 +1619,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     Spec.assertBool
       s
       ( toJson (Effect.MakePlotted (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "plotted"))))
-          /= toJson (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.Indefinite (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "plotted"))) ManaSpending.AsProduced False))
+          /= toJson (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.Indefinite (PlayerRef.Relative PlayerRelation.You) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "plotted"))) ManaSpending.AsProduced False))
       )
       "MakePlotted and GrantPlayFromExile of the same slot encode differently"
   -- CR 702.143d's designation, MakePlotted's sibling with a cost. The two write

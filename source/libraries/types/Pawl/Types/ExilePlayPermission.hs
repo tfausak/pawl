@@ -24,10 +24,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- was granted. Usually CR 109.5's "you", the controller of the spell or ability
 -- whose resolution granted it -- Victor Mancha, Runaway prints "YOU may play it"
 -- -- and rule 701.65a's airbend is the other reading in the tree, granting to the
--- exiled card's OWNER. No opcode FIELD names either, because no card in this pool
--- asks for a third party and rule 701.65a states its own beneficiary:
--- Effect.GrantPlayFromExile's arm writes the controller and
--- Pawl.Engine.Airbend.permission writes the owner.
+-- exiled card's OWNER. Pawl.Types.GrantPlayFromExile's `player` is what a card
+-- names when it means neither, Elkin Lair's upkeep player; rule 701.65a states
+-- its own beneficiary and needs no field, so Pawl.Engine.Airbend.permission
+-- writes the owner outright.
 --
 -- `source` is the object the granting effect came from, and it is load-bearing
 -- rather than bookkeeping: Pawl.Engine.Expiry.sweepConditional evaluates an
