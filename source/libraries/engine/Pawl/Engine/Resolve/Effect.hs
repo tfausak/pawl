@@ -537,6 +537,7 @@ apnapPlayersOf ref legal controller gs =
 -- villainousPass) both go through apnapPlayersOf above, which answers a SET off
 -- Game.stillPlaying and so has already dropped a departed seat rather than
 -- reassigning its answer.
+
 -- CR 608.2d's singular battlefield choice, hoisted so that every opcode making
 -- one asks it the same way: the candidates are the ability's own reading of the
 -- Filter whoever chooses, the ask is skipped at no candidate (CR 101.3) and at

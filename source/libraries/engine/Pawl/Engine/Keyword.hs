@@ -5718,6 +5718,7 @@ graft =
 --
 -- Effect.Evolve rather than Effect.PutCounters, which is rule 702.100b: one opcode
 -- is what ties the "evolves" marker to the placement. Renegade Krasis reads it.
+
 -- CR 702.95a: soulbond, two triggered abilities. Bushido's shape -- one keyword,
 -- two conditions, and a TriggeredAbility carries one each -- with the pair of
 -- them minted together so that the roster arm reads as one keyword.
@@ -5799,9 +5800,21 @@ soulbondSelfEnters =
 -- that creature with this creature".
 --
 -- The entrant needs no choosing, so the partner is the slot the trigger bound;
--- "both are unpaired" splits into this creature's half, shared with the first
--- ability, and the entrant's, asked over CR 400.7j's bound slot rather than the
+-- the condition splits into this creature's half, shared with the first ability,
+-- and the entrant's, asked over CR 400.7j's bound slot rather than the
 -- battlefield, since the rule names THAT creature and not any matching one.
+--
+-- BOTH HALVES ASK THE SAME THREE THINGS -- a creature, under this ability's
+-- controller, unpaired -- because CR 603.4 checks the condition again as the
+-- ability resolves, and an entrant an opponent has taken in the meantime makes
+-- it false. Asking the bound slot only whether it is unpaired left the ability
+-- on the stack and put rule 702.95a's "you may" to a player the rule had stopped
+-- asking; Pawl.KeywordTriggerSpec's "CR 603.4 an entrant alice no longer
+-- controls is not asked about" is what proves it does not. Creature-ness is the
+-- one of the three CR 702.95c would also have caught, and it is asked here
+-- rather than left to that rule because the two answers are then
+-- indistinguishable -- the pairing does not happen either way -- so there is
+-- nothing to put to anybody.
 soulbondOtherEnters :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 soulbondOtherEnters =
   let clause =
@@ -5829,7 +5842,9 @@ soulbondOtherEnters =
             Just
               ( Condition.All
                   [ soulbondSelfEligible,
-                    atLeastOneMatching (Scope.OverBound Binding.became) (Filter.Not Filter.IsPaired)
+                    atLeastOneMatching
+                      (Scope.OverBound Binding.became)
+                      (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsPaired])
                   ]
               ),
           TriggeredAbility.limit = TriggerLimit.Unlimited

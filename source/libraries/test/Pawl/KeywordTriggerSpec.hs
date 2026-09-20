@@ -3106,6 +3106,7 @@ championSpec s registry =
 --
 -- Numbers all distinct: the graft is 1, the Goblin Piker a printed 2/1, the Hill
 -- Giant a 3/3, and the Initiate a 0/0 that holds 2 counters once the move lands.
+
 -- CR 702.95 soulbond, whose rule 702.95a is two triggered abilities, rule 702.95c
 -- and rule 702.95d a gate on the pairing, and rule 702.95e three endings.
 --
@@ -3200,6 +3201,41 @@ soulbondSpec s registry =
             Nothing -> Spec.assertFailure s "the Hill Giant did not reach the battlefield"
             Just giantId -> Spec.assertEqWith s "CR 702.95a and the creature that entered is 7/7" (S.powerToughnessOf giantId after) (Just (7, 7))
           Spec.assertEqWith s "the Goblin Piker, which was on the battlefield already, is its printed 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+        -- CR 603.4's SECOND check, which is about the PROMPT rather than the
+        -- board: the condition is re-read as the ability resolves, and an entrant
+        -- alice no longer controls makes it false, so the ability leaves the stack
+        -- without asking her anything. Soulbond.pair would refuse the pairing
+        -- either way (CR 702.95c), so the board cannot tell the two apart -- only
+        -- the count of "you may" asks can.
+        --
+        -- A pair of boards differing in exactly one thing, whether bob takes the
+        -- entrant while the trigger waits. Counted through State rather than a
+        -- pure answerer, which cannot report what it was asked.
+        Spec.it s "CR 603.4 an entrant alice no longer controls is not asked about" $ do
+          wolfir <- S.printingOf s registry "Wolfir Silverheart"
+          giant <- S.printingOf s registry "Hill Giant"
+          let counting :: Prompt.Prompt r -> State.State Int r
+              counting p = case p of
+                Prompt.ChooseOptional {} -> do
+                  State.modify' (+ 1)
+                  pure OptionalDecision.Exercises
+                _ -> pure (S.identityAnswer p)
+              gs0 = Setup.emptyGame S.bothPlayers
+              (wolfirId, withWolfir) = S.addPermanent wolfir S.alice gs0
+              (_, staged) = S.spellOnStack giant S.alice withWolfir
+              -- The Giant has entered and rule 702.95a's second trigger is on the
+              -- stack, unresolved.
+              waiting = S.runPure S.identityAnswer staged (Stack.resolveTop >> Engine.settleForPriority)
+              asks board = State.execState (Engine.runGame counting board (Stack.resolveTop >> Engine.settleForPriority)) 0
+          case onBattlefield giantName waiting of
+            Nothing -> Spec.assertFailure s "the Hill Giant did not reach the battlefield"
+            Just giantId -> do
+              Spec.assertEqWith s "CR 603.4 bob having taken the entrant, alice is asked nothing" (asks (S.giveControl giantId S.bob waiting)) 0
+              -- The same board with the entrant left alone: one real "may", which
+              -- is what says the zero above is the condition failing and not a
+              -- trigger that never fired.
+              Spec.assertEqWith s "and with the entrant still hers, one" (asks waiting) 1
+              Spec.assertEqWith s "CR 702.95c the Wolfir stays its printed 4/4 either way" (S.powerToughnessOf wolfirId (snd (State.evalState (Engine.runGame counting (S.giveControl giantId S.bob waiting) (Stack.resolveTop >> Engine.settleForPriority)) 0))) (Just (4, 4))
 
 graftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graftSpec s registry =
