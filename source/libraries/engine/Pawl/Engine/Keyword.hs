@@ -909,18 +909,6 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 transmute :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 transmute cost = searchForSameManaValue (cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]}) Filter.ManaValueEqualToSource SearchDestination.RevealThenHand
 
--- CR 702.71a's whole ability, transmute's above one zone over: the cost
--- sacrifices this permanent instead of discarding this card, the search is
--- narrowed to a creature card, and the card found goes onto the battlefield
--- rather than into a hand.
---
--- THE SACRIFICE is a cost component for the discard's reason, and reads back the
--- same way: CR 701.21a has already put the permanent in a graveyard as a new
--- object (CR 400.7), so "the same mana value as this permanent" is a CR 608.2h
--- reading of the sacrificed permanent, which effectContext's sourceManaValue is.
---
--- NO REVEAL in the destination, unlike transmute's: rule 702.71a states none,
--- and CR 701.23e's reveal is only what a rule's own sentence asks for.
 -- CR 702.167a's whole ability: "[Cost], Exile this permanent, Exile [materials]
 -- from among permanents you control and\/or cards in your graveyard: Return this
 -- card to the battlefield transformed under its owner's control. Activate only
