@@ -1203,7 +1203,9 @@ library executable
     pawl:json,
     pawl:json-codec,
     pawl:json-schema,
+    pawl:registry,
     pawl:test,
+    text ^>=2.1.3,
 
   hs-source-dirs: source/libraries/executable
   -- cabal-gild: discover source/libraries/executable
@@ -1382,6 +1384,7 @@ library registry
   other-modules: Paths_pawl
   -- cabal-gild: discover source/libraries/registry
   exposed-modules:
+    Pawl.DeckList
     Pawl.Registry
 
 -- Converts text (card names) into slugs, which can be used for convenient file
@@ -1481,6 +1484,7 @@ library test
     Pawl.DamageSpec
     Pawl.DaytimeSpec
     Pawl.DecideSpec
+    Pawl.DeckListSpec
     Pawl.DepartureSpec
     Pawl.DetainSpec
     Pawl.DevotionSpec

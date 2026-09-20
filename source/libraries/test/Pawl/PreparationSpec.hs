@@ -35,7 +35,8 @@
 -- needs. Rule 722.3d's second sentence is not observable: no card in data/cards/
 -- refers to a spell cast as a prepare spell.
 --
--- CR 722.5's alternative name is #679's.
+-- CR 722.5's alternative name needs nothing here, for Pawl.FlipSpec's CR 710.5
+-- reason: Prompt.ChooseCardName offers no candidate list.
 module Pawl.PreparationSpec where
 
 import qualified Control.Monad as Monad
