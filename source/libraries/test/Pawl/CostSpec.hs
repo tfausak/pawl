@@ -2638,6 +2638,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   siegeWurmSpec s registry
   veneratedLoxodonSpec s registry
   convokeWindowSpec s registry
+  assistSpec s registry
   foundryAssemblerSpec s registry
   treasureCruiseSpec s registry
   merrowSkyswimmerSpec s registry
@@ -5525,3 +5526,96 @@ kataraBoard mountain katara piker others =
             GameState.priority = Just S.alice
           }
       )
+
+-- alice holds `card`, controls one Forest and seven Mountains, and bob controls
+-- seven Plains; she has priority in her own precombat main phase so a creature
+-- spell is castable (CR 302.1). Returns the spell, the Forest, bob's Plains and
+-- that state.
+--
+-- EIGHT sources for alice, where the cast below spends one: CR 601.2's
+-- announcement is gated on what the CASTER can pay (#3959), so the assist has to
+-- save her mana rather than afford her the spell. Her other seven are Mountains
+-- and bob's are Plains, so each window's answer is named by its printing and no
+-- counting is needed to keep the two apart.
+assistBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+assistBoard forest mountain plains card =
+  let place printing who n gs = List.foldl' (\(ids, acc) _ -> let (oid, next) = S.addPermanent printing who acc in (ids <> [oid], next)) ([], gs) (replicate n ())
+      (forestId, gs1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
+      (_, gs2) = place mountain S.alice 7 gs1
+      (plainsIds, gs3) = place plains S.bob 7 gs2
+      (spell, gs4) = S.addHandCard card S.alice gs3
+   in ( spell,
+        forestId,
+        plainsIds,
+        gs4
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Charging Binox {7}{G} Creature -- Beast 7/5: "Assist. Trample."
+--
+-- CR 702.132a's whole sentence on the cheapest printing that states assist and
+-- nothing else: no entry trigger, no target, no second keyword that touches the
+-- cast.
+--
+-- The two cases are ONE board answered two ways -- alice floats a single {G}
+-- either way -- so the only thing that differs is whether she named bob.
+assistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+assistSpec s registry = Spec.describe s "Charging Binox" $ do
+  Spec.it s "CR 702.132a the player alice chose pays seven of the Binox's generic mana" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, forestId, plainsIds, gs) = assistBoard forest mountain plains binox
+        answer :: Prompt.Prompt r -> r
+        answer = assisting (Just S.bob) 7 forestId plainsIds
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    -- THE BEHAVIOUR. alice floated one green mana against a total cost of
+    -- {7}{G}, so the spell is on the battlefield only because rule 702.132a's
+    -- chosen player paid the other seven.
+    Spec.assertEqWith s "the Binox resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Charging Binox")) S.alice resolved) 1
+    -- WHOSE mana paid, which the assertion above does not see: alice tapped the
+    -- one Forest and left her seven Mountains alone.
+    Spec.assertEqWith s "alice tapped one land of her eight" (S.tappedCount S.alice resolved) 1
+    Spec.assertEqWith s "and bob's seven Plains are what paid the rest" (S.tappedCount S.bob resolved) 7
+  -- The control, the same board and the same floats: rule 702.132a's first
+  -- choice is the caster's, and a caster who names nobody opens no second window
+  -- and gets no help.
+  Spec.it s "CR 702.132a a caster who chooses nobody pays the whole cost alone" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, forestId, plainsIds, gs) = assistBoard forest mountain plains binox
+        answer :: Prompt.Prompt r -> r
+        answer = assisting Nothing 7 forestId plainsIds
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "the Binox is nowhere: CR 601.2h's payment failed and CR 601.2e took the cast back" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Charging Binox")) S.alice resolved) 0
+    Spec.assertEqWith s "and bob's Plains were never offered a window" (S.tappedCount S.bob resolved) 0
+
+-- Answer CR 702.132a's two prompts with `helper` and `amount`, and each mana
+-- window with the lands that window's player is meant to tap -- alice the one
+-- Forest, bob every Plains.
+--
+-- FILTERED against the offer, `convoking`'s posture and for its reason: an
+-- answer the engine did not offer reads as declining, so the assertions stay
+-- about the engine's own candidates. alice's Forest drops out of her offer once
+-- it is tapped, which is what closes her window after one mana without anything
+-- here having to count.
+assisting :: Maybe PlayerId.PlayerId -> Natural.Natural -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+assisting helper amount forestId plainsIds p =
+  let wanted who = if who == S.bob then plainsIds else [forestId]
+      pick who candidates = List.find (`elem` wanted who) (NonEmpty.toList candidates)
+   in case p of
+        Prompt.ChooseAssistant _ _ _ candidates -> case helper of
+          Just who | elem who (NonEmpty.toList candidates) -> Just who
+          _ -> Nothing
+        Prompt.ChooseAssistAmount {} -> amount
+        Prompt.ChooseManaSource _ who candidates -> pick who candidates
+        Prompt.ChooseExtraManaSource _ who candidates -> pick who candidates
+        _ -> S.identityAnswer p

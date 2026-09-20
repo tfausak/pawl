@@ -408,6 +408,18 @@ data Prompt r where
   -- and before ChooseCost (CR 601.2b); the Cost is what buying back adds (CR
   -- 601.2f).
   ChooseBuyback :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt BuybackDecision.BuybackDecision
+  -- | CR 702.132a: which other player assists the spell, asked of the caster
+  -- before CR 601.2g's mana window; the candidates are the other players still
+  -- in the game, and Nothing declines. Raised even for a single candidate,
+  -- declining being an answer on every board, and not raised where the total
+  -- cost holds no generic mana.
+  ChooseAssistant :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt (Maybe PlayerId.PlayerId)
+  -- | CR 702.132a: how much of the generic mana in the spell's total cost the
+  -- assisting player pays, asked of THEM once CR 601.2g's windows have closed;
+  -- the Natural is the most their pool pays, enforced (CR 118.3), and zero
+  -- declines. Not raised for a bound of 0, where zero is the only payable
+  -- amount.
+  ChooseAssistAmount :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 903.9a: whether the owner returns their commander from a graveyard or
   -- exile; declining leaves it until it moves there afresh.
   ReturnCommander :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt CommandZoneDecision.CommandZoneDecision

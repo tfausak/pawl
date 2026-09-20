@@ -2720,6 +2720,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Miracle cost -> Keyword.Type.Miracle (rewriteCost pairs cost)
   Keyword.Type.Ascend -> keyword
   Keyword.Type.Storied -> keyword
+  -- CR 702.132a names no quality and carries no cost: the mana it speaks about
+  -- is the spell's own total cost, so CR 612.2 has nothing here to swap.
+  Keyword.Type.Assist -> keyword
   -- CR 702.177a names no quality and carries no cost: what it adds is a rider on
   -- the ability printed after it, so CR 612.2 has nothing here to swap.
   Keyword.Type.Exhaust -> keyword
