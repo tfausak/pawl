@@ -151,6 +151,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -2985,15 +2986,16 @@ rollickersOn printing gs =
     (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing))
     (Game.zoneMembers Zone.Battlefield S.alice gs)
 
--- alice casts the Rollicker (`casting` decides bestowed or printed), then -- CR
+-- alice casts `spellId` (`casting` answers its announcements -- bestowed or
+-- printed for the Rollicker, CR 601.2b's Phyrexian route for Tamiyo), then -- CR
 -- 117.3c, still holding priority -- activates the Engine's {4} ability at it and
--- resolves the ability. Returns the board with [copy, Rollicker] on the stack.
+-- resolves the ability. Returns the board with [copy, spell] on the stack.
 --
 -- The {4} ability is picked by its cost rather than by index, so a reordering of
 -- the card file cannot silently aim the {3} one at a creature spell and have the
 -- activation refuse for want of a target.
-copyRollicker :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> ObjectId -> GameState.GameState -> Maybe GameState.GameState
-copyRollicker casting engineId spellId board =
+copyPermanentSpell :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> ObjectId -> GameState.GameState -> Maybe GameState.GameState
+copyPermanentSpell casting engineId spellId board =
   let cast = S.runPure casting board (S.cast S.alice spellId)
       ready = cast {GameState.priority = Just S.alice}
    in do
@@ -3021,7 +3023,7 @@ permanentCopySpec s registry =
         -- settling -- resolveOne settles.
         Spec.it s "CR 707.10f a copy of a creature spell resolves as a token creature beside the card" $ do
           (rollicker, (engineId, _, host, spellId, _, board)) <- boardOf
-          case copyRollicker (printedRollicker host) engineId spellId board of
+          case copyPermanentSpell (printedRollicker host) engineId spellId board of
             Nothing -> Spec.assertFailure s "the Rollicker never reached the stack, or the Engine offered no {4} ability"
             Just copied -> do
               let afterCopy = resolveOne S.identityAnswer copied
@@ -3065,7 +3067,7 @@ permanentCopySpec s registry =
         -- carried rather than re-made.
         Spec.it s "CR 702.103c a copy of a bestowed Rollicker resolves as a token Aura attached to the same host" $ do
           (rollicker, (engineId, bystander, host, spellId, _, board)) <- boardOf
-          case copyRollicker (bestowingRollicker host) engineId spellId board of
+          case copyPermanentSpell (bestowingRollicker host) engineId spellId board of
             Nothing -> Spec.assertFailure s "the Rollicker never reached the stack, or the Engine offered no {4} ability"
             Just copied -> do
               let afterCopy = resolveOne S.identityAnswer copied
@@ -3099,7 +3101,7 @@ permanentCopySpec s registry =
         -- above's plus one Bolt at the host after the ability has resolved.
         Spec.it s "CR 702.103e a bestowed copy whose host died resolves as a token creature" $ do
           (rollicker, (engineId, bystander, host, spellId, boltId, board)) <- boardOf
-          case copyRollicker (bestowingRollicker host) engineId spellId board of
+          case copyPermanentSpell (bestowingRollicker host) engineId spellId board of
             Nothing -> Spec.assertFailure s "the Rollicker never reached the stack, or the Engine offered no {4} ability"
             Just copied -> do
               let bolted = S.runPure (pinTarget (Recipient.ToCreature host)) copied {GameState.priority = Just S.alice} (S.cast S.alice boltId)
@@ -3124,11 +3126,46 @@ permanentCopySpec s registry =
                 "CR 608.3b: the card resolved as a creature beside it"
                 (List.sort (fmap (\oid -> Game.isToken oid afterBoth) (rollickersOn rollicker afterBoth)))
                 [False, True]
+        -- CR 702.150a asks whether "the player who cast it chose to pay life",
+        -- and CR 707.10's first sentence says a copy of a spell isn't cast, so
+        -- there is no such player for the clause to be true of -- whether or not
+        -- CR 707.2's "choices made when casting" reaches CR 601.2b's announcement
+        -- at all. However the original was paid for, the copy's token enters with
+        -- the printed loyalty.
+        --
+        -- Its own board rather than lithoformBoard's: Tamiyo, Compleated Sage is
+        -- data/cards/'s compleated card (`"Compleated"` over data/cards/,
+        -- 2026-09-20 -- Ajani, Sleeper Agent would refute it).
+        --
+        -- Eight lands, four of each colour --
+        -- {2}{G}{U} and 2 life for her, then {4} for the Engine. The mana route
+        -- is payable too ({2}{G}{G}{U} off five), so CR 601.2b's announcement is
+        -- a real choice and the life route is ANSWERED rather than forced; the
+        -- life assertion is what says so.
+        Spec.it s "CR 707.10/702.150a a copy of a compleated planeswalker spell enters with the printed loyalty" $ do
+          forest <- S.printingOf s registry "Forest"
+          island <- S.printingOf s registry "Island"
+          engine <- S.printingOf s registry "Lithoform Engine"
+          tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+          let (engineId, lands) = S.addPermanent engine S.alice (ManaSymbolSpec.mixedLands forest island 4 4)
+              (board, spellId) = S.handOne tamiyo lands
+          case copyPermanentSpell (ManaSymbolSpec.announcesBoth PhyrexianPayment.PaysLife ManaSymbolSpec.greenMana) engineId spellId board of
+            Nothing -> Spec.assertFailure s "Tamiyo never reached the stack, or the Engine offered no {4} ability"
+            Just copied -> do
+              let afterCopy = resolveOne S.identityAnswer copied
+                  tamiyos = printedOnBattlefield "Tamiyo, Compleated Sage" afterCopy
+              Spec.assertEqWith
+                s
+                "CR 702.150a: nobody cast the copy, so it enters with her printed 5"
+                (fmap (\oid -> S.counterOf CounterKind.Loyalty oid afterCopy) tamiyos)
+                [5]
+              Spec.assertEqWith s "CR 707.10f: and the one that entered is the token" (fmap (\oid -> Game.isToken oid afterCopy) tamiyos) [True]
+              Spec.assertEqWith s "CR 107.4f: the original really was cast for 2 life, the card still on the stack" (S.lifeOf S.alice afterCopy) (Just 18)
 
 -- Lithoform Engine's {2} ability, picked by its COST rather than by index, so a
 -- reordering of the card file cannot silently aim these cases at the
 -- spell-copying legs and have the activation refuse for want of a target --
--- copyRollicker's reason, one ability along.
+-- copyPermanentSpell's reason, one ability along.
 engineAbilityCopyingAbilities :: ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 engineAbilityCopyingAbilities engineId gs =
   List.find
