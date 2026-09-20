@@ -20,6 +20,7 @@ import qualified Pawl.Codec.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Codec.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.CastFromZone as CastFromZone
 import qualified Pawl.Codec.Combat as Combat
 import qualified Pawl.Codec.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Codec.CounterKind as CounterKind
@@ -165,6 +166,7 @@ codec resolve = Fields.object $ do
   landsPlayed <- Fields.defaulted "landsPlayed" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.landsPlayed
   drawsThisTurn <- Fields.defaulted "drawsThisTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.drawsThisTurn
   activatedThisTurn <- Fields.defaulted "activatedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec)))) GameState.activatedThisTurn
+  castPermissionsUsedThisTurn <- Fields.defaulted "castPermissionsUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set CastFromZone.codec)) GameState.castPermissionsUsedThisTurn
   triggeredThisGame <- Fields.defaulted "triggeredThisGame" Set.empty (Common.set AbilityTriggered.codec) GameState.triggeredThisGame
   pendingControl <- Fields.defaulted "pendingControl" Map.empty (Common.naturalMap PlayerId.codec Decider.codec) GameState.pendingControl
   control <- Fields.defaulted "control" Map.empty (Common.naturalMap PlayerId.codec (Common.nonEmpty PlayerControl.codec)) GameState.control
@@ -245,6 +247,7 @@ codec resolve = Fields.object $ do
         GameState.landsPlayed = landsPlayed,
         GameState.drawsThisTurn = drawsThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
+        GameState.castPermissionsUsedThisTurn = castPermissionsUsedThisTurn,
         GameState.triggeredThisGame = triggeredThisGame,
         GameState.pendingControl = pendingControl,
         GameState.control = control,

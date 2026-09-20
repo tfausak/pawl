@@ -8,6 +8,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
@@ -22,7 +23,8 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
       CastFromZone.codec
       ( CastFromZone.MkCastFromZone
           { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Graveyard, InZone.player = PlayerRef.Relative PlayerRelation.You},
-            CastFromZone.matching = Filter.And []
+            CastFromZone.matching = Filter.And [],
+            CastFromZone.limit = PermissionLimit.Unlimited
           }
       )
       " {\"from\":{\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"matching\":{\"type\":\"And\",\"value\":[]}} "
@@ -33,8 +35,23 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
       CastFromZone.codec
       ( CastFromZone.MkCastFromZone
           { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Hand, InZone.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "opponent"))},
-            CastFromZone.matching = Filter.HasCardType CardType.Creature
+            CastFromZone.matching = Filter.HasCardType CardType.Creature,
+            CastFromZone.limit = PermissionLimit.Unlimited
           }
       )
       " {\"from\":{\"zone\":{\"type\":\"Hand\"},\"player\":{\"type\":\"InSlot\",\"value\":\"opponent\"}},\"matching\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- Johann, Apprentice Sorcerer's shape: the top of your own library, once each
+  -- turn. The key the two cases above omit, which is what says the default is a
+  -- default and not the only value that decodes.
+  Spec.it s "a once-each-turn budget" $
+    Common.assertCodec
+      s
+      CastFromZone.codec
+      ( CastFromZone.MkCastFromZone
+          { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Library, InZone.player = PlayerRef.Relative PlayerRelation.You},
+            CastFromZone.matching = Filter.And [],
+            CastFromZone.limit = PermissionLimit.OnceEachTurn
+          }
+      )
+      " {\"from\":{\"zone\":{\"type\":\"Library\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"matching\":{\"type\":\"And\",\"value\":[]},\"limit\":{\"type\":\"OnceEachTurn\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CastFromZone.codec

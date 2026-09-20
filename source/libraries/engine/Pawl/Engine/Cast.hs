@@ -35,6 +35,7 @@ import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Convoking as Convoking
@@ -2070,6 +2071,12 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- move that forgets the card -- and consumed by castProposed only once
           -- the announcement has succeeded, so a rejection spends nothing.
           spent = PlayerEffect.spentByCast pid oid proposed
+          -- CR 601.3: the once-each-turn permission this cast spends, asked of
+          -- the same PROPOSED state and for `spent`'s reason -- the permission
+          -- the gate offered the cast under is the one consumed, and a rejected
+          -- announcement consumes nothing. Nothing where the zone was open
+          -- without a budget, which castPermissionSpentBy answers.
+          permission = castFrom >>= \zone -> PlayerEffect.castPermissionSpentBy pid zone oid proposed
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -2112,7 +2119,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
-          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent before
+          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permission before
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
 -- effect can find the new object that card becomes after it moves to the stack as
@@ -2160,8 +2167,11 @@ followIntoSpell permission old new gs = case permission of
 -- `preparedFor` is CR 722.3c's prepared permanent, asked of the pre-move state
 -- for the same reason and spent beside the CR 601.2i event for `spent`'s: that
 -- rule's own words are "at the time the spell becomes cast".
-castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> GameState -> Game ()
-castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent before = do
+--
+-- `permission` is CR 601.3's once-each-turn budget the cast spends, asked of the
+-- pre-move state for `spent`'s reason and spent beside it.
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> Maybe (ObjectId, CastFromZone.CastFromZone) -> GameState -> Game ()
+castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permission before = do
   gs <- State.get
   let candidates = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate)) candidateCosts
       decider = Decide.deciderFor pid gs
@@ -2801,6 +2811,11 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- CR 611.2a: the grants this cast spends, for the
                           -- event's own reason -- nothing past this line rejects.
                           State.modify' (PlayerEffect.consume spent)
+                          -- CR 601.3: the once-each-turn permission this cast
+                          -- spends, for the line above's reason -- nothing past
+                          -- here rejects, and CR 733.1's reversal restores the
+                          -- whole field (Pawl.Engine.Reversal).
+                          State.modify' (PlayerEffect.spendCastPermission permission)
                           -- CR 601.2c: each chosen object became a target of this
                           -- spell, which is what CR 702.21a's ward watches. Here
                           -- rather than beside `chosen` above for CR 601.2i's

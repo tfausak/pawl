@@ -3,9 +3,11 @@ module Pawl.Types.CastFromZone where
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PermissionLimit as PermissionLimit
 
 -- | The payload of Pawl.Types.PlayerEffect's CastFrom arm: whose copy of which
--- zone the permission opens, and which cards in it it covers.
+-- zone the permission opens, which cards in it it covers, and how often it may
+-- be used.
 --
 -- SPUN OUT rather than left as two fields on the arm, Pawl.Types.GrantPlayFromExile
 -- being the precedent one type over -- that grant is the other CR 601.3 permission
@@ -19,8 +21,13 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- The Filter reads the PRINTED card in the zone, so a continuous effect changing
 -- a card's own characteristics there is invisible to the narrowing (#1859).
+-- The LIMIT is the permission's own, which is what makes the whole record the
+-- key Pawl.Types.GameState.castPermissionsUsedThisTurn spends: two Assemble the
+-- Players grant two budgets, and the source object beside this value is what
+-- tells them apart.
 data CastFromZone = MkCastFromZone
   { from :: InZone.InZone,
-    matching :: Filter.Filter Keyword.Keyword
+    matching :: Filter.Filter Keyword.Keyword,
+    limit :: PermissionLimit.PermissionLimit
   }
   deriving (Eq, Ord, Show)
