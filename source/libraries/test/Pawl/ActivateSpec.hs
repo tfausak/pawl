@@ -145,6 +145,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   graveyardEffectZoneSpec s registry
   unearthSpec s registry
   scavengeSpec s registry
+  craftSpec s registry
   encoreSpec s registry
   transmuteSpec s registry
   transfigureSpec s registry
@@ -5503,3 +5504,122 @@ printedActivationOnlyOnceEachTurnSpec s registry = Spec.describe s "PrintedActiv
         guardedNext = nextTurnOfAlice (S.runPure onlyOnceAnswer guarded Engine.priorityLoop)
     Spec.assertEqWith s "the once-each-turn ability is offered again on alice's next turn" (length (filter isOnlyOnceEachTurn (activationsOf swarmId (Action.legalActions S.alice next)))) 1
     Spec.assertEqWith s "and the once-per-game ability is still refused after the same handoff" (filter isOnlyOnce (activationsOf guardianId (Action.legalActions S.alice guardedNext))) []
+
+-- CR 702.167: craft, the one keyword whose ability exiles out of two zones at
+-- once --- "[Cost], Exile this permanent, Exile [materials] from among
+-- permanents you control and/or cards in your graveyard: Return this card to the
+-- battlefield transformed under its owner's control. Activate only as a
+-- sorcery."
+--
+-- Tithing Blade // Consuming Sepulcher {1}{B} Artifact, "Craft with creature
+-- {4}{B}", whose back face is Consuming Sepulcher (Oracle text checked against
+-- Scryfall, 2026-09-19). Its front face also prints "When this artifact enters,
+-- each opponent sacrifices a creature of their choice"; that clause is not
+-- transcribed (#3932), which leaves pawl's card STRICTER than printed and
+-- touches nothing below --- no case here puts the Blade onto the battlefield by
+-- an entry.
+--
+-- The BATTLEFIELD material is a Goblin Piker and the GRAVEYARD one an Armored
+-- Galleon, distinct printings, so a case that reads what was exiled names which
+-- zone it came out of. Each zone holds exactly one, so a reading that offered
+-- either zone alone would raise no prompt at all and the elision at one
+-- candidate would settle the choice.
+--
+-- Five Swamps, which is exactly {4}{B}.
+craftBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Printing.Printing -> Printing.Printing -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+craftBoard s registry onBattlefield inGraveyard = do
+  blade <- S.printingOf s registry "Tithing Blade"
+  swamp <- S.printingOf s registry "Swamp"
+  let (bladeId, g0) = S.addPermanent blade S.alice (S.landsInPlay swamp 5)
+      (thereId, g1) = S.addPermanent onBattlefield S.alice g0
+      (gyId, g2) = S.addGraveyardCard inGraveyard S.alice g1
+  pure
+    ( bladeId,
+      thereId,
+      gyId,
+      g2
+        { GameState.priority = Just S.alice,
+          GameState.activePlayer = S.alice,
+          GameState.phase = Phase.PostcombatMain
+        }
+    )
+
+-- The one object the payer exiles as rule 702.167a's [materials], picked out of
+-- the offer BY FILTERING it rather than by building a set of its own, so an
+-- answer naming something the engine never offered cannot repair the assertion.
+craftExiling :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+craftExiling oid p = case p of
+  Prompt.ChooseMaterials _ _ _ candidates _ -> Set.fromList (filter (== oid) candidates)
+  _ -> S.identityAnswer p
+
+-- The names alice's battlefield shows, read through the projection: the card a
+-- craft returns is a NEW object (CR 400.7), so nothing below can name it by the
+-- id it had as a Tithing Blade, and CR 712.8a makes the face that is UP the only
+-- honest reading of which side came back.
+craftBattlefieldNames :: GameState.GameState -> Set.Set CardName.CardName
+craftBattlefieldNames gs = Set.unions (fmap (\o -> Projection.namesOf o gs) (Game.zoneMembers Zone.Battlefield S.alice gs))
+
+-- The printed names of alice's cards in a hidden-from-nobody zone, CR 400.7's
+-- new objects again -- a material the cost exiled is not the object it was on
+-- the battlefield or in the graveyard.
+craftNamesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
+craftNamesIn zone gs = List.sort (Maybe.mapMaybe (\o -> fmap S.nameOf (Game.cardOf o gs)) (Game.zoneMembers zone S.alice gs))
+
+tithingBlade, consumingSepulcher, goblinPiker, armoredGalleon :: CardName.CardName
+tithingBlade = CardName.MkCardName (Text.pack "Tithing Blade")
+consumingSepulcher = CardName.MkCardName (Text.pack "Consuming Sepulcher")
+goblinPiker = CardName.MkCardName (Text.pack "Goblin Piker")
+armoredGalleon = CardName.MkCardName (Text.pack "Armored Galleon")
+
+craftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
+  -- CR 702.167b's battlefield half: "creature" without the word "card" admits a
+  -- permanent, which is that rule's exception to CR 109.2.
+  Spec.it s "CR 702.167a a permanent you control pays the [materials]" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    galleon <- S.printingOf s registry "Armored Galleon"
+    (bladeId, pikerId, _, gs) <- craftBoard s registry piker galleon
+    case Activate.abilitiesFor bladeId gs of
+      [ability] -> do
+        let after = S.runPure (craftExiling pikerId) gs (Activate.activateAbility S.alice bladeId ability >> Stack.resolveTop)
+        -- THE GAMEPLAY ASSERTION, ahead of every other read: the material the
+        -- payer chose left the BATTLEFIELD, which no one-zone component reaches.
+        Spec.assertEqWith s "CR 702.167a the Piker the payer chose is the only card in exile" (craftNamesIn Zone.Exile after) [goblinPiker]
+        Spec.assertEqWith s "CR 702.167a and the graveyard's Galleon, which the payer did not choose, is still there" (craftNamesIn Zone.Graveyard after) [armoredGalleon]
+        Spec.assertBool s (Set.member consumingSepulcher (craftBattlefieldNames after)) "CR 702.167a the card the cost exiled came back TRANSFORMED, as Consuming Sepulcher"
+        Spec.assertBool s (not (Set.member tithingBlade (craftBattlefieldNames after))) "and its front face is not what is up"
+      abilities -> Spec.assertFailure s ("expected one craft ability, got " <> show (length abilities))
+
+  -- CR 702.167a's other half on the SAME board: only the payer's answer differs,
+  -- so a pool confined to the battlefield and a pool confined to the graveyard
+  -- are each refuted by one of this pair.
+  Spec.it s "CR 702.167a a card in your graveyard pays the [materials]" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    galleon <- S.printingOf s registry "Armored Galleon"
+    (bladeId, _, gyId, gs) <- craftBoard s registry piker galleon
+    case Activate.abilitiesFor bladeId gs of
+      [ability] -> do
+        let after = S.runPure (craftExiling gyId) gs (Activate.activateAbility S.alice bladeId ability >> Stack.resolveTop)
+        Spec.assertEqWith s "CR 702.167a the Galleon the payer chose is the only card in exile" (craftNamesIn Zone.Exile after) [armoredGalleon]
+        Spec.assertEqWith s "CR 702.167a and the graveyard it came out of is empty" (craftNamesIn Zone.Graveyard after) []
+        Spec.assertBool s (Set.member goblinPiker (craftBattlefieldNames after)) "CR 702.167a and the Piker, which the payer did not choose, is still on the battlefield"
+        Spec.assertBool s (Set.member consumingSepulcher (craftBattlefieldNames after)) "CR 702.167a the card the cost exiled came back TRANSFORMED, as Consuming Sepulcher"
+      abilities -> Spec.assertFailure s ("expected one craft ability, got " <> show (length abilities))
+
+  -- CR 118.3 and CR 602.5d, on a board differing from the pair above in the two
+  -- printings alone: the same Blade, the same five Swamps, one noncreature
+  -- artifact where the Piker stood and one land card where the Galleon lay.
+  Spec.it s "CR 118.3 / 602.5d no material in either zone is not offered, and neither is craft at instant speed" $ do
+    bauble <- S.printingOf s registry "Conjurer's Bauble"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    galleon <- S.printingOf s registry "Armored Galleon"
+    (bladeId, _, _, barren) <- craftBoard s registry bauble swamp
+    (craftable, _, _, stocked) <- craftBoard s registry piker galleon
+    Spec.assertEqWith s "CR 118.3 with no creature in either zone the craft ability is not offered" (filter (isActivationOf bladeId) (Action.legalActions S.alice barren)) []
+    Spec.assertBool s (any (isActivationOf craftable) (Action.legalActions S.alice stocked)) "and it IS offered on the board that differs only in those two printings"
+    Spec.assertEqWith
+      s
+      "CR 602.5d and not in the end step"
+      (filter (isActivationOf craftable) (Action.legalActions S.alice (stocked {GameState.phase = Phase.Ending EndingStep.EndStep})))
+      []

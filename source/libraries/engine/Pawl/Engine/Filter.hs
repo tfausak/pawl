@@ -14,6 +14,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Devour as Devour
@@ -21,6 +22,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -2729,6 +2731,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Rebound -> keyword
   -- CR 702.97a's and CR 702.141a's costs are printed, so their components take
   -- the same descent embalm's does.
+  Keyword.Type.Craft spec -> Keyword.Type.Craft (Craft.MkCraft (rewriteCost pairs (Craft.cost spec)) (ExileMaterials.MkExileMaterials (ExileMaterials.count (Craft.materials spec)) (rewrite pairs (ExileMaterials.whichObjects (Craft.materials spec)))))
   Keyword.Type.Scavenge cost -> Keyword.Type.Scavenge (rewriteCost pairs cost)
   Keyword.Type.Encore cost -> Keyword.Type.Encore (rewriteCost pairs cost)
   Keyword.Type.Transmute cost -> Keyword.Type.Transmute (rewriteCost pairs cost)
@@ -2784,6 +2787,7 @@ rewriteComponent pairs component = case component of
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion))
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n criterion) -> CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   -- Untouched: CR 701.59a describes the cards by a total and states no card type,
   -- so rule 612.1 finds no word in this component to swap.

@@ -2,6 +2,7 @@ module Pawl.Codec.Keyword where
 
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Cost as Cost
+import qualified Pawl.Codec.Craft as Craft
 import qualified Pawl.Codec.Cycling as Cycling
 import qualified Pawl.Codec.Devour as Devour
 import qualified Pawl.Codec.Emerge as Emerge
@@ -207,6 +208,7 @@ codec =
       Arm.payload "Firebending" Common.natural Keyword.Firebending (\x -> case x of Keyword.Firebending y -> Just y; _ -> Nothing),
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines,
       Arm.nullary "Bargain" Keyword.Bargain,
+      Arm.payload "Craft" (Craft.codec codec) Keyword.Craft (\x -> case x of Keyword.Craft y -> Just y; _ -> Nothing),
       Arm.nullary "Spree" Keyword.Spree,
       Arm.nullary "JobSelect" Keyword.JobSelect,
       Arm.nullary "Tiered" Keyword.Tiered,
@@ -392,6 +394,7 @@ tagOf x = case x of
   Keyword.Firebending {} -> "Firebending"
   Keyword.StartYourEngines {} -> "StartYourEngines"
   Keyword.Bargain {} -> "Bargain"
+  Keyword.Craft {} -> "Craft"
   Keyword.Spree {} -> "Spree"
   Keyword.JobSelect {} -> "JobSelect"
   Keyword.Tiered {} -> "Tiered"

@@ -728,6 +728,26 @@ combatReplaySpec s =
             "every candidate"
             (Replay.defaultAnswer (Prompt.ChooseCollectEvidence decider S.alice oid [oid, ObjectId.MkObjectId 8] 3))
             (Set.fromList [oid, ObjectId.MkObjectId 8])
+        -- CR 702.167a does NOT share Response.ChoseExilesFromGraveyard with the
+        -- two prompts above, unlike the pair just above each other: its pool
+        -- spans the battlefield as well as the graveyard, so a transcript
+        -- replayed across would exile a permanent where the graveyard prompt
+        -- promises it exiles a card.
+        Spec.it s "ChooseMaterials records and replays a Set ObjectId" $ do
+          let p = Prompt.ChooseMaterials decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
+              answer = Set.singleton (ObjectId.MkObjectId 8)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "a ChooseExilesFromGraveyard transcript entry does not answer it"
+            (Replay.decode p (Replay.encode (Prompt.ChooseExilesFromGraveyard decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
+            Nothing
+        Spec.it s "defaultAnswer exiles the first `count` materials offered, in order" $
+          Spec.assertEqWith
+            s
+            "the offered prefix"
+            (Replay.defaultAnswer (Prompt.ChooseMaterials decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
+            (Set.singleton oid)
         Spec.it s "ChooseCost records and replays a Cost" $ do
           let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
               alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]

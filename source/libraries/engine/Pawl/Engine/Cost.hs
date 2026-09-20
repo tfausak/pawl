@@ -83,6 +83,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -1325,6 +1326,7 @@ substituteXInComponent x component = case component of
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileThis -> component
   CostComponent.ExileCardsFromGraveyard {} -> component
+  CostComponent.ExileMaterials {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
   CostComponent.CollectEvidence _ -> component
   CostComponent.ExileCardFromHand _ -> component
@@ -1389,6 +1391,7 @@ componentHasVariable component = case component of
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
+  CostComponent.ExileMaterials {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.CollectEvidence _ -> False
   CostComponent.ExileCardFromHand _ -> False
@@ -1481,6 +1484,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
+  CostComponent.ExileMaterials {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.CollectEvidence _ -> False
   CostComponent.ExileCardFromHand _ -> False
@@ -1774,6 +1778,7 @@ loyaltyAmountOf component = case component of
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
+  CostComponent.ExileMaterials {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.CollectEvidence _ -> Nothing
   CostComponent.ExileCardFromHand _ -> Nothing
@@ -1848,6 +1853,7 @@ zoneOfComponent component = case component of
   -- Nothing, and NOT Just Zone.Graveyard: rule 113.6m again, and these move
   -- OTHER cards.
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
+  CostComponent.ExileMaterials {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.CollectEvidence _ -> Nothing
   CostComponent.DiscardCards {} -> Nothing
@@ -1943,6 +1949,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.ReturnPermanents {} -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
+  CostComponent.ExileMaterials {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.CollectEvidence _ -> False
   -- No cards at all, so there is no "action involving cards" to classify.
@@ -2125,6 +2132,28 @@ exileCandidates slots pid criterion gs =
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> not (beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Graveyard pid gs)
+
+-- The objects this player may exile to pay an ExileMaterials component on `oid`:
+-- CR 702.167a's "from among permanents you control and\/or cards in your
+-- graveyard" as one list, `beholdCandidates`' union with the graveyard where that
+-- one reads the hand, and `exileCandidates`' graveyard half verbatim.
+--
+-- ONE criterion read over both halves, through the same CR 613 projection and a
+-- context built the same way on both, which is CR 702.167b's exception to rule
+-- 109.2: "creature" admits a creature on the battlefield and a creature card in
+-- the graveyard, and the two halves cannot read the criterion differently.
+--
+-- `oid` IS EXCLUDED from the battlefield half, unlike `exileCandidates`' graveyard
+-- pool: rule 702.167a exiles this permanent as part of the same cost, so it is
+-- never among its own [materials] -- a payment that took it as a material would
+-- leave the ExileThis component nothing to exile.
+materialCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+materialCandidates slots pid oid criterion gs =
+  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
+      viewOf = Projection.viewsOf gs
+      matches candidate = candidate /= oid && Filter.matches context (viewOf candidate) criterion
+   in filter matches (List.sort (Projection.controls pid gs))
+        <> exileCandidates slots pid criterion gs
 
 -- The one card an ExileTopFromGraveyard component takes: the TOP matching card
 -- of this player's graveyard, or Nothing where it holds none.
@@ -2465,6 +2494,11 @@ claimOf slots pid oid component gs =
         -- both of CR 701.4a's halves: neither revealing a card nor choosing a permanent
         -- takes anything out of any pool.
         CostComponent.Behold _ -> Nothing
+        -- Nothing, Forage's arm above and for its reason: CR 702.167a's pool spans the
+        -- battlefield and the payer's graveyard, two DIFFERENT axes, and a Claim names
+        -- one. A FENCE, no cost in `data/cards/` printing this component beside a
+        -- second one that draws on either zone.
+        CostComponent.ExileMaterials {} -> Nothing
 
 -- CR 118.3's "fully", asked of a cost's components TOGETHER rather than one at a
 -- time: CR 601.2h pays them in any order, so the question is whether SOME
@@ -2783,6 +2817,10 @@ uncountedCeiling component = case component of
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
   CostComponent.ExileCardFromHand _ -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
+  -- 1, and counted by none of the three totals: `claimOf` states no claim for
+  -- this component either, Forage's answer below and for its reason. An
+  -- UNDERSTATEMENT and the header's safe direction.
+  CostComponent.ExileMaterials {} -> Just 1
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileThis -> Nothing
@@ -3059,6 +3097,7 @@ lifeOwedByComponent component = case component of
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
+  CostComponent.ExileMaterials {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
   CostComponent.CollectEvidence _ -> 0
   CostComponent.ExileCardFromHand _ -> 0
@@ -3112,6 +3151,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
+  CostComponent.ExileMaterials {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
   CostComponent.CollectEvidence _ -> 0
   CostComponent.ExileCardFromHand _ -> 0
@@ -3266,6 +3306,11 @@ canPayComponent slots pid oid component gs = case component of
   -- total cost as CR 601.2f says. This component ALONE, Sacrifice's caveat.
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
     Natural.length (exileCandidates slots pid criterion gs) >= n
+  -- CR 118.3: the arm above over CR 702.167a's two pools at once, so that a craft
+  -- ability is not OFFERED where the battlefield and the graveyard together hold
+  -- too few materials.
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n criterion) ->
+    Natural.length (materialCandidates slots pid oid criterion gs) >= n
   -- CR 701.59b: a player who cannot reach the total can't collect evidence at all.
   -- The arm above read as a SUM rather than a size, TapForTotalPower's question one
   -- zone over -- and EXACT rather than a bound, no card having a negative mana value
@@ -3410,6 +3455,7 @@ criteriaOf component = case component of
   CostComponent.RevealCardFromHand criterion -> [criterion]
   CostComponent.Behold criterion -> [criterion]
   CostComponent.ExileCardsFromGraveyard exile -> [ExileCardsFromGraveyard.whichCards exile]
+  CostComponent.ExileMaterials materials -> [ExileMaterials.whichObjects materials]
   CostComponent.ExileTopFromGraveyard criterion -> [criterion]
   CostComponent.RemovePlusOneCounters remove -> [RemovePlusOneCounters.whichPermanent remove]
   -- No criterion: rule 701.59a describes the cards by a TOTAL and by nothing else,
@@ -4055,6 +4101,7 @@ paidInSecondPass component = case component of
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
+  CostComponent.ExileMaterials {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.CollectEvidence _ -> False
   CostComponent.ExileCardFromHand _ -> False
@@ -4173,6 +4220,7 @@ orderSensitive component = case component of
   CostComponent.DiscardThis _ -> True
   CostComponent.PutCardFromHandOntoBattlefield _ -> True
   CostComponent.ExileCardsFromGraveyard {} -> True
+  CostComponent.ExileMaterials {} -> True
   CostComponent.ExileTopFromGraveyard _ -> True
   CostComponent.CollectEvidence _ -> True
   CostComponent.ExileCardFromHand _ -> True
@@ -5396,6 +5444,26 @@ payComponent moment slots pid oid component = case component of
       if Natural.length candidates <= n
         then pure (Set.fromList candidates)
         else Game.choose (Prompt.ChooseExilesFromGraveyard decider pid oid candidates n)
+    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
+      then do
+        Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
+        pure bindsNothing
+      else pure Payment.Unpaid
+  -- CR 702.167a's [materials]: the arm above over the battlefield and the
+  -- graveyard at once, with `materialCandidates` for the pool and
+  -- Prompt.ChooseMaterials for the ask. Elided only when forced, and
+  -- reject-not-repair, both that arm's posture verbatim.
+  --
+  -- Binds nothing. Not implemented: CR 702.167c's "the exiled cards used to craft
+  -- it", which is what would want the materials bound here (#3931).
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n criterion) -> do
+    gs <- State.get
+    let candidates = materialCandidates slots pid oid criterion gs
+        decider = Decide.deciderFor pid gs
+    chosen <-
+      if Natural.length candidates <= n
+        then pure (Set.fromList candidates)
+        else Game.choose (Prompt.ChooseMaterials decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)

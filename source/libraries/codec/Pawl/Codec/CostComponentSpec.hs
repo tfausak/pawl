@@ -10,6 +10,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
@@ -207,6 +208,14 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard 1 (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"ExileCardsFromGraveyard\",\"value\":{\"count\":1,\"whichCards\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- CR 702.167a's [materials], which CR 702.167b reads across two zones -- a
+  -- separate tag from the arm above, whose pool is the graveyard alone.
+  Spec.it s "ExileMaterials" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials 1 (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"ExileMaterials\",\"value\":{\"count\":1,\"whichObjects\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "ExileTopFromGraveyard" $
     Common.assertCodec
       s

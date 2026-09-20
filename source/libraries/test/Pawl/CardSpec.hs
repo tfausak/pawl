@@ -120,6 +120,7 @@ import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.CrewRestriction as CrewRestriction
@@ -157,6 +158,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Facing as Facing
@@ -3171,6 +3173,10 @@ keywordPayloadFilters keyword = case keyword of
   -- candidate Pawl.Engine.Cost.candidateCostsGiven mints, retrace's position.
   Keyword.Disturb cost -> costFilters cost
   Keyword.Harmonize cost -> costFilters cost
+  -- CR 702.167a's payload is a Cost AND the [materials] criterion, which no
+  -- other keyword's is: rule 702.167a writes the materials into the ability's
+  -- cost, so both halves are the card's own words.
+  Keyword.Craft crafting -> costFilters (Craft.cost crafting) <> [ExileMaterials.whichObjects (Craft.materials crafting)]
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
@@ -3210,6 +3216,9 @@ costComponentFilters component = case component of
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents _ f) -> [f]
   -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard _ f) -> [f]
+  -- CR 702.167a over the battlefield and the graveyard at once: Tithing Blade's
+  -- "a creature", which CR 702.167b reads in both zones.
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials _ f) -> [f]
   -- CR 406.2 again: Circling Vultures' "the top creature card of your
   -- graveyard".
   CostComponent.ExileTopFromGraveyard f -> [f]

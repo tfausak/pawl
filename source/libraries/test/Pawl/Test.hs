@@ -155,6 +155,7 @@ import qualified Pawl.Codec.CounterSpec
 import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
+import qualified Pawl.Codec.CraftSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
 import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
@@ -219,6 +220,7 @@ import qualified Pawl.Codec.ExchangeSidesSpec
 import qualified Pawl.Codec.ExileCardsFromGraveyardSpec
 import qualified Pawl.Codec.ExileHauntingSpec
 import qualified Pawl.Codec.ExileLookerSpec
+import qualified Pawl.Codec.ExileMaterialsSpec
 import qualified Pawl.Codec.ExilePlayPermissionSpec
 import qualified Pawl.Codec.ExpansionSpec
 import qualified Pawl.Codec.ExpirySpec
@@ -888,7 +890,9 @@ spec s registry = do
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExcessDestinationSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
+  Pawl.Codec.CraftSpec.spec s
   Pawl.Codec.ExileCardsFromGraveyardSpec.spec s
+  Pawl.Codec.ExileMaterialsSpec.spec s
   Pawl.Codec.ExileHauntingSpec.spec s
   Pawl.Codec.ExileLookerSpec.spec s
   Pawl.Codec.ExilePlayPermissionSpec.spec s
