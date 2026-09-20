@@ -3175,6 +3175,7 @@ quantityReads q = case q of
   Quantity.Type.TimesResolvedThisTurn -> Set.empty
   Quantity.Type.SpellsCastBefore -> Set.empty
   Quantity.Type.PermanentsDiedThisTurn -> Set.empty
+  Quantity.Type.SubgamesThisMatch -> Set.empty
   Quantity.Type.DungeonsCompleted _ -> Set.empty
   Quantity.Type.CompletedDungeon {} -> Set.empty
   Quantity.Type.EnteredThisTurn -> Set.empty

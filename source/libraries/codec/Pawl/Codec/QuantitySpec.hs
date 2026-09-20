@@ -536,6 +536,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.PermanentsDiedThisTurn
       " {\"type\":\"PermanentsDiedThisTurn\"} "
+  -- CR 100.6a with nothing on the wire: the tally is the match's, so it names
+  -- neither a player nor an object.
+  Spec.it s "SubgamesThisMatch is nullary" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.SubgamesThisMatch
+      " {\"type\":\"SubgamesThisMatch\"} "
   -- CR 309.7, on CardsDiscardedThisTurn's terms again: a PlayerRef and nothing
   -- else. Gloom Stalker writes the Relative You arm, which is the only spelling
   -- any printing uses -- "as long as YOU'VE completed a dungeon"; the InSlot arm

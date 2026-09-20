@@ -2071,7 +2071,14 @@ playSubgame = do
         answer <- Game.ask (Prompt.RandomFirstPlayer order)
         -- Filtered, not trusted: a subgame cannot start with an unseated player.
         pure (if List.elem answer (NonEmpty.toList order) then answer else NonEmpty.head order)
-  let sub0 = Setup.subgameStateFrom starter parent
+  -- CR 100.6a: the one match-scoped tally, raised BEFORE the subgame is built
+  -- so the subgame it counts is inside its own answer (Shahrazad and Sindbad's
+  -- "if there haven't been any subgames this match" is false inside the subgame
+  -- it started), and raised on the PARENT, which is the state the main game
+  -- resumes from under CR 729.5.
+  State.modify' (\g -> g {GameState.subgamesThisMatch = 1 + GameState.subgamesThisMatch g})
+  counted <- State.get
+  let sub0 = Setup.subgameStateFrom starter counted
   -- CR 729.1a: every question the subgame raises passes outward through this
   -- frame, the one place that knows both games, so this is where the parent is
   -- pushed onto the tag -- once per level a nested question climbs (CR 729.6).

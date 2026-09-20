@@ -181,6 +181,7 @@ overSlots f quantity =
         Quantity.TimesResolvedThisTurn -> pure quantity
         Quantity.SpellsCastBefore -> pure quantity
         Quantity.PermanentsDiedThisTurn -> pure quantity
+        Quantity.SubgamesThisMatch -> pure quantity
         -- And another again, CR 309.7's completion tally having nothing beside its
         -- PlayerRef either -- nor the named read beside it, whose CardName is a printed
         -- name rather than anything a slot could bind.
@@ -333,6 +334,7 @@ nestedRefs quantity = case quantity of
   Quantity.TimesResolvedThisTurn -> Set.empty
   Quantity.SpellsCastBefore -> Set.empty
   Quantity.PermanentsDiedThisTurn -> Set.empty
+  Quantity.SubgamesThisMatch -> Set.empty
   Quantity.DungeonsCompleted ref -> Set.singleton (Left ref)
   Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref _) -> Set.singleton (Left ref)
   Quantity.EnteredThisTurn -> Set.empty
@@ -435,6 +437,7 @@ nestedCounts quantity = case quantity of
   Quantity.TimesResolvedThisTurn -> []
   Quantity.SpellsCastBefore -> []
   Quantity.PermanentsDiedThisTurn -> []
+  Quantity.SubgamesThisMatch -> []
   Quantity.DungeonsCompleted _ -> []
   Quantity.CompletedDungeon {} -> []
   Quantity.EnteredThisTurn -> []
@@ -568,6 +571,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.TimesResolvedThisTurn -> quantity
         Quantity.SpellsCastBefore -> quantity
         Quantity.PermanentsDiedThisTurn -> quantity
+        Quantity.SubgamesThisMatch -> quantity
         Quantity.DungeonsCompleted ref -> Quantity.DungeonsCompleted (f ref)
         Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref name) -> Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon (f ref) name)
         Quantity.EnteredFrom z -> Quantity.EnteredFrom z {InZone.player = f (InZone.player z)}

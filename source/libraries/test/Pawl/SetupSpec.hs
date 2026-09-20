@@ -462,6 +462,18 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
         Spec.assertEqWith s "and both cards are in her deck" (filter (\c -> elem (Source.OfCard c) (sourcesOf (deckOf control) control)) components) components
       _ -> Spec.assertFailure s "the Hanweir pair should meld into a permanent representing two cards"
 
+  -- CR 100.6a against CR 727.1: a restart begins a new GAME of the same MATCH,
+  -- so the match's subgame tally is the one record that crosses it. Asserted
+  -- beside a per-game record that does not, on the same board and the same
+  -- restart, so "nothing was cleared at all" cannot pass for it.
+  Spec.it s "CR 100.6a/727.1: a restart keeps the match's subgame tally and still resets the game's own turn count" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let g0 = addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
+        played = g0 {GameState.subgamesThisMatch = 2, GameState.turnNumber = 5}
+        after = snd (Engine.runGamePure S.identityAnswer played (Setup.restartGame S.performer Set.empty S.alice))
+    Spec.assertEqWith s "CR 100.6a: the two subgames are still this match's" (GameState.subgamesThisMatch after) 2
+    Spec.assertEqWith s "CR 727.1: while the restarted game is back on turn 1" (GameState.turnNumber after) 1
+
   Spec.it s "CR 727.1a: the starting player is the restart's controller, at the head of the turn order" $ do
     -- Two restarts of the same board, controlled by different players: the
     -- active player and the head of the turn order follow the controller.

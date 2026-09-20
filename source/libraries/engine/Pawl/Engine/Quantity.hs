@@ -813,6 +813,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- at no object at all, nothing here being read off one.
         Quantity.PermanentsDiedThisTurn ->
           Just (toInteger (length (Maybe.mapMaybe (Game.diedChange . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
+        -- CR 100.6a / 729.1a: how many subgames have begun this match. Read off the
+        -- stored tally and not the log, PermanentsDiedThisTurn's arm's opposite on
+        -- that point: GameState.events is cleared at turn handoff and a subgame
+        -- outlives it, and CR 729.1b keeps the subgame's own log out of this one
+        -- entirely.
+        --
+        -- Always a number, never Nothing: nothing here is read off an object, so an
+        -- evaluation aimed at none still answers, and a match with no subgame is 0.
+        Quantity.SubgamesThisMatch -> Just (toInteger (GameState.subgamesThisMatch gs))
         -- CR 309.7: how many dungeons that player has completed. LifeTotal's arm in
         -- ARITY -- one player's tally, so a reference naming several answers "whose?"
         -- rather than a sum -- and in SOURCE: read straight off the player, because
@@ -1180,6 +1189,7 @@ objectSlots quantity = case quantity of
   Quantity.TimesResolvedThisTurn -> Set.empty
   Quantity.SpellsCastBefore -> Set.empty
   Quantity.PermanentsDiedThisTurn -> Set.empty
+  Quantity.SubgamesThisMatch -> Set.empty
   Quantity.DungeonsCompleted _ -> Set.empty
   Quantity.CompletedDungeon {} -> Set.empty
   Quantity.EnteredThisTurn -> Set.empty
@@ -1432,6 +1442,7 @@ readsX quantity = case quantity of
   Quantity.TimesResolvedThisTurn -> False
   Quantity.SpellsCastBefore -> False
   Quantity.PermanentsDiedThisTurn -> False
+  Quantity.SubgamesThisMatch -> False
   Quantity.DungeonsCompleted _ -> False
   Quantity.CompletedDungeon {} -> False
   Quantity.EnteredThisTurn -> False
