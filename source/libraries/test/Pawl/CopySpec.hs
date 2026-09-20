@@ -77,6 +77,12 @@
 -- Grinder's one copy per candidate (zadaSpec) and Ivy, Gleeful Spellthief's one
 -- copy on a stated new target (ivySpec), the second of which is where "the copy
 -- isn't created" is read off an illegal one.
+--
+-- And CR 707.12's copy of a CARD, made in the zone that card is in and then cast
+-- (Pawl.Engine.Resolve.Effect's castableCopy, under Pawl.Types.OfferCast's
+-- `copied`): Mizzix's Mastery, whose exiled instant stays in exile while the copy
+-- goes on the stack, and whose declined copy is swept by CR 704.5e
+-- (castCopySpec).
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -3939,3 +3945,76 @@ flamerushRiderSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
       [(Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just TapState.Tapped, Just (AttackTarget.OfPlayer S.bob))]
     Spec.assertEqWith s "CR 510.1b bob takes 3 from the Rider, 2 from the Piker and 2 from its copy" (S.lifeOf S.bob after) (Just 13)
     Spec.assertEqWith s "CR 603.7c the token named by the trigger is exiled at end of combat" (S.tokensOf after) []
+
+-- CR 707.12 on Mizzix's Mastery {3}{R} Sorcery, "Exile target card that's an
+-- instant or sorcery from your graveyard. For each card exiled this way, copy
+-- it, and you may cast the copy without paying its mana cost. Exile Mizzix's
+-- Mastery. / Overload {5}{R}{R}{R}" (Oracle text checked on Scryfall,
+-- 2026-09-20).
+--
+-- THE CARD ITSELF NEVER MOVES PAST EXILE, which is the whole of rule 707.12 --
+-- "the copy is created in the same zone the object is in and then cast" -- and
+-- the assertion that tells this apart from Effect.OfferCast's every other
+-- producer, each of which puts the named card on the stack. An engine that
+-- offered the Bolt CARD deals bob the same three damage and leaves the Bolt in
+-- alice's graveyard, so the life total is read in the same assertion as the
+-- zones rather than ahead of them.
+--
+-- THE PAIR is the two legs' one difference: the offer taken and the offer
+-- declined. The declined leg is CR 704.5e on a copy of a card -- "if a copy of a
+-- card is in any zone other than the stack or the battlefield, it ceases to
+-- exist" -- so the copy that was made is gone by the next check and exile holds
+-- the Bolt card and the Mastery alone.
+--
+-- FOUR MOUNTAINS, which is exactly the printed {3}{R} and three short of the
+-- overload {5}{R}{R}{R}: the leg below is rule 707.12 on the targeted clause,
+-- and the card's overloaded clause is unreached on this board.
+castCopySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+castCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
+  Spec.it s "CR 707.12 Mizzix's Mastery casts a copy of the exiled Bolt, which the card itself never becomes" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mastery <- S.printingOf s registry "Mizzix's Mastery"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, gs0) = S.addGraveyardCard bolt S.alice (S.landsInPlay mountain 4)
+        (masteryId, gs1) = S.addHandCard mastery S.alice gs0
+        board =
+          gs1
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        leg decision =
+          let afterCast = S.runPure (burningDown S.bob decision) board (S.cast S.alice masteryId)
+           in S.runPure (burningDown S.bob decision) afterCast (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+        -- BY NAME and not by the id the fixture handed back: CR 400.7 made the
+        -- exiled card a new object, so the id that named it in the graveyard
+        -- names nothing once the first clause has moved it.
+        exiled gs = List.sort (concatMap (\oid -> Set.toList (PC.names (Projection.project oid gs))) (Game.zoneMembers Zone.Exile S.alice gs))
+        zones gs = (S.lifeOf S.bob gs, exiled gs, length (Game.zoneMembers Zone.Graveyard S.alice gs))
+    Spec.assertEqWith
+      s
+      "CR 707.12 the copy was cast and dealt bob three, while the Bolt CARD is still in exile and alice's graveyard is empty"
+      (zones (leg OptionalDecision.Exercises))
+      (Just 17, exileAfterMastery, 0)
+    Spec.assertEqWith
+      s
+      "CR 704.5e the same board with the offer declined: bob is untouched and the copy has ceased to exist, leaving the same two cards in exile"
+      (zones (leg OptionalDecision.Declines))
+      (Just 20, exileAfterMastery, 0)
+
+-- What alice's exile holds once Mizzix's Mastery has resolved: the card its
+-- first clause exiled and the Mastery its last clause exiled, and nothing else.
+-- The copy is on neither leg -- cast on one, swept by CR 704.5e on the other.
+exileAfterMastery :: [CardName.CardName]
+exileAfterMastery = List.sort [CardName.MkCardName (Text.pack "Lightning Bolt"), CardName.MkCardName (Text.pack "Mizzix's Mastery")]
+
+-- Takes or declines CR 601.3's offer as `decision` says, and aims every target
+-- slot at `victim` where he is offered -- the copy's own "any target", which is
+-- the only slot on either board with more than one candidate. Mizzix's Mastery's
+-- own graveyard slot has exactly one legal card, so S.preferring's fallback is
+-- what answers it and no choice is being hidden.
+burningDown :: PlayerId.PlayerId -> OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+burningDown victim decision p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer victim) sets
+  Prompt.OfferedCast {} -> decision
+  _ -> S.identityAnswer p

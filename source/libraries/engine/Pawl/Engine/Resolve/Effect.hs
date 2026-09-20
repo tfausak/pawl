@@ -997,16 +997,81 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 -- Mandatory repeats too, and terminates for the same reason: each round casts a
 -- different card, and a card the rules will not let them cast never reaches the
 -- offer (question 4 below).
-offerCast :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastRepetition.CastRepetition -> CastOffer.CastOffer -> Game ()
-offerCast context named caster optionality repetition offer = case repetition of
-  CastRepetition.Once -> Monad.void (offerCastOnce context named caster optionality offer)
-  CastRepetition.AnyNumber -> again named
+-- CR 707.12's copy is minted BEFORE the first round rather than at the cast, and
+-- once for the whole offer rather than once per round: rule 707.12a's "an effect
+-- that creates multiple copies and says a player 'may cast' those objects" makes
+-- the creation one act and the casting a decision per object, so a repeated
+-- offer asks about the same copies over again. A copy nobody casts is left where
+-- it was made, for CR 704.5e to sweep at the next check (Pawl.Engine.Sba).
+offerCast :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastRepetition.CastRepetition -> Bool -> CastOffer.CastOffer -> Game ()
+offerCast context named caster optionality repetition copied offer = do
+  subjects <- if copied then Maybe.catMaybes <$> traverse (castableCopy caster) named else pure named
+  case repetition of
+    CastRepetition.Once -> Monad.void (offerCastOnce context subjects caster optionality offer)
+    CastRepetition.AnyNumber -> again subjects
   where
     again remaining = do
       taken <- offerCastOnce context remaining caster optionality offer
       case taken of
         Nothing -> pure ()
         Just oid -> again (filter (/= oid) remaining)
+
+-- CR 707.12: "the copy is created in the same zone the object is in and then
+-- cast". The copy this mints is what `offerCast` above offers in the original's
+-- place, so the original stays where it lies -- Mizzix's Mastery's exiled card
+-- is still in exile once the copy has been cast, which is what
+-- Pawl.CopySpec's Mizzix's Mastery case proves.
+--
+-- Source.OfCardCopy and not OfCard, which is CR 704.5e's whole distinction: this
+-- copy ceases to exist anywhere but the stack and the battlefield, where the card
+-- it copies does not. CR 722.3c's prepare copy is the other minter of that source
+-- and the road the cast itself already travels.
+--
+-- The SAME PRINTING as the original rather than an interned one of its own
+-- (Pawl.Engine.Prepare.mint's road), because nothing is narrowed here: CR 707.12
+-- copies the object whole, so the copy's card is the copied card. Its copiable
+-- values ride along the same way -- an original carrying a CR 707.2 snapshot
+-- hands that snapshot on (a copy of a copy has the copied values, not the
+-- printed ones), and an original carrying none leaves the copy reading its
+-- printing, which is what Pawl.Engine.Projection.View.copiableCharacteristics
+-- answers for both.
+--
+-- Object.newIncarnation for everything else, CR 400.7's forgetting: the copy is
+-- a new object, so no counter, designation or announced cost of the original's
+-- rides onto it, and a field added to Object is reset here by construction.
+--
+-- Its OWNER is the caster, CR 112.2a's "the owner of the spell is the player
+-- under whose control it was put on the stack", read ahead of the cast because
+-- pawl indexes a zone by seat and the copy has to be removable from the one it
+-- was put in.
+--
+-- No zone-change event, Pawl.Engine.Prepare.mint's reason: the copy is CREATED
+-- in that zone rather than moved there, so nothing was exiled or discarded and
+-- no zone-change trigger has an event to watch.
+--
+-- Nothing for an object that has left (CR 400.7) and for one with no card behind
+-- it (Game.printingIdOfSource): an offer over a copy that cannot be made is not
+-- made, which is offerCastOnce's own posture for a reference that named nothing.
+castableCopy :: PlayerId -> ObjectId -> Game (Maybe ObjectId)
+castableCopy caster original = do
+  gs <- State.get
+  case Game.lookupObject original gs of
+    Nothing -> pure Nothing
+    Just obj -> case Game.printingIdOfSource (Object.source obj) of
+      Nothing -> pure Nothing
+      Just printingId -> do
+        let (copyId, gs1) = Game.freshObjectId gs
+            (ts, gs2) = Game.freshTimestamp gs1
+            copy =
+              (Object.newIncarnation obj)
+                { Object.source = Source.OfCardCopy printingId,
+                  Object.owner = caster,
+                  Object.zone = Object.zone obj,
+                  Object.timestamp = ts,
+                  Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (Binding.copyOf (Object.bindings obj))
+                }
+        State.put (Game.insertIntoZone (Object.zone obj) LibraryPosition.Top caster copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
+        pure (Just copyId)
 
 -- One round of the offer above: CR 601.3's choice among the cards `named` still
 -- holds, and the cast if it is taken. Answers the id of the card that was cast,
@@ -4343,7 +4408,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let named = Set.fromList (playerRefPlayers legal controller gs ref)
     Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) Event.shuffleLibrary
-  Effect.OfferCast (OfferCast.MkOfferCast ref caster optionality offer repetition) -> do
+  Effect.OfferCast (OfferCast.MkOfferCast ref caster optionality offer repetition copied) -> do
     gs <- State.get
     -- The sweep every ObjectRef-taking opcode shares, read HERE rather than
     -- inside offerCast so that one function takes the objects and never the
@@ -4357,7 +4422,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
     -- cast to nobody.
     Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
-      offerCast context named pid optionality repetition offer
+      offerCast context named pid optionality repetition copied offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
   -- as CR 109.5's "you" and the stated duration.
   --

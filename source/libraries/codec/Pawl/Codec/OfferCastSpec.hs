@@ -28,7 +28,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
             OfferCast.optionality = CastObligation.Optional,
             OfferCast.offer = CastOffer.defaultValue,
-            OfferCast.repetition = CastRepetition.Once
+            OfferCast.repetition = CastRepetition.Once,
+            OfferCast.copied = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
@@ -50,7 +51,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                   CastOffer.Type.restriction = Nothing,
                   CastOffer.Type.offeredBy = Nothing
                 },
-            OfferCast.repetition = CastRepetition.Once
+            OfferCast.repetition = CastRepetition.Once,
+            OfferCast.copied = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}} "
@@ -73,7 +75,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                   CastOffer.Type.restriction = Nothing,
                   CastOffer.Type.offeredBy = Nothing
                 },
-            OfferCast.repetition = CastRepetition.Once
+            OfferCast.repetition = CastRepetition.Once,
+            OfferCast.copied = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"revealed\"},\"caster\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"optionality\":{\"type\":\"Mandatory\"},\"offer\":{\"withoutPayingManaCost\":true}} "
@@ -88,8 +91,24 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
             OfferCast.optionality = CastObligation.Optional,
             OfferCast.offer = CastOffer.defaultValue,
-            OfferCast.repetition = CastRepetition.AnyNumber
+            OfferCast.repetition = CastRepetition.AnyNumber,
+            OfferCast.copied = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"repetition\":{\"type\":\"AnyNumber\"}} "
+  -- CR 707.12's key, Mizzix's Mastery's "copy it, and you may cast the copy".
+  Spec.it s "MkOfferCast, copied written" $
+    Common.assertCodec
+      s
+      OfferCast.codec
+      ( OfferCast.MkOfferCast
+          { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
+            OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+            OfferCast.optionality = CastObligation.Optional,
+            OfferCast.offer = CastOffer.defaultValue,
+            OfferCast.repetition = CastRepetition.Once,
+            OfferCast.copied = True
+          }
+      )
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"copied\":true} "
   Spec.it s "has a schema" $ Common.assertHasSchema s OfferCast.codec

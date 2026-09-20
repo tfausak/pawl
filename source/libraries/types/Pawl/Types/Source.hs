@@ -98,13 +98,15 @@ data Source
     -- spell acquires only as CR 707.10f's permanent is put onto the battlefield
     -- (Pawl.Engine.Event's zone-change funnel rewrites it there).
     OfSpellCopy PrintingId.PrintingId
-  | -- | CR 707.10a's other copy: a copy of a CARD, which CR 722.3c is the only
-    -- rule in pawl that mints -- "its controller creates a copy of that object in
-    -- exile, except that copy has only the characteristics of that permanent's
-    -- prepare spell". Names an interned printing holding those characteristics as
-    -- its one face, that rule's "those characteristics become the copy's normal
-    -- characteristics" being why the printing is a normal one-faced card rather
-    -- than the preparation card again.
+  | -- | CR 707.10a's other copy: a copy of a CARD. Two rules mint one. CR 722.3c
+    -- -- "its controller creates a copy of that object in exile, except that copy
+    -- has only the characteristics of that permanent's prepare spell" -- names an
+    -- interned printing holding those characteristics as its one face, that
+    -- rule's "those characteristics become the copy's normal characteristics"
+    -- being why the printing is a normal one-faced card rather than the
+    -- preparation card again. CR 707.12's copy, which an effect creates in the
+    -- zone the copied card is in and then casts, narrows nothing and so names
+    -- the COPIED card's own printing.
     --
     -- ITS OWN CONSTRUCTOR and not OfSpellCopy, though the two share a printing
     -- payload and a projection road, because CR 704.5e states them as two
@@ -115,7 +117,8 @@ data Source
     -- the cast copy a card in a graveyard for ever.
     --
     -- CR 722.3c's exception to rule 704.5e is what keeps one in EXILE, and
-    -- Pawl.Engine.Sba reads Object.preparedCopyOf for it.
+    -- Pawl.Engine.Sba reads Object.preparedCopyOf for it. A CR 707.12 copy has
+    -- no such exception, so one nobody casts is swept on that same pass.
     OfCardCopy PrintingId.PrintingId
   | -- | CR 725.2 / CR 702.179d: a triggered ability with no object source, which
     -- Pawl.Types.InherentTriggerSource carries and documents.

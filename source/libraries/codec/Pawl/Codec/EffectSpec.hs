@@ -1088,7 +1088,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.defaultValue,
-              OfferCast.repetition = CastRepetition.Once
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = False
             }
       )
       " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
@@ -1111,7 +1112,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
                     CastOffer.Type.restriction = Nothing,
                     CastOffer.Type.offeredBy = Nothing
                   },
-              OfferCast.repetition = CastRepetition.Once
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = False
             }
       )
       " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}}} "

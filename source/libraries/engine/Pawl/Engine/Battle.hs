@@ -325,7 +325,8 @@ siegeDefeat =
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing},
               -- rule 310.12b's "cast it": one card, the one the slot names.
-              OfferCast.repetition = CastRepetition.Once
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = False
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,

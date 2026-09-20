@@ -157,7 +157,7 @@ printingOf pid gs = Map.lookup pid (GameState.printings gs)
 -- path: this hands back the Maybe the table lookup already built, where cardOf
 -- fmaps Printing.card into a SECOND one. A caller that goes straight on to read
 -- a field of the card wants this and pays for the unwrap in nothing.
--- Enumerated rather than delegated to printingOfSource below, and the duplication
+-- Enumerated rather than delegated to printingIdOfSource below, and the duplication
 -- is deliberate: routing this through it measured 130376 -> 167528 bytes per
 -- permanent on Pawl.PerformanceSpec's Sorcerer board, which is the whole
 -- optimisation. No wildcard arm, so -Werror still reports both sites when a
@@ -179,8 +179,8 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   Just (Source.OfTrigger _) -> Nothing
   Just (Source.OfEmblem pid) -> printingOf pid gs
   Just (Source.OfSpellCopy pid) -> printingOf pid gs
-  -- CR 722.3c: the printing Pawl.Engine.Prepare interned for the prepare
-  -- spell's characteristics, which is this copy's whole card.
+  -- The printing this copy's whole card comes off: CR 722.3c's interned prepare
+  -- spell, or CR 707.12's copied card's own.
   Just (Source.OfCardCopy pid) -> printingOf pid gs
   Just (Source.OfInherentTrigger _) -> Nothing
 
@@ -522,13 +522,37 @@ cardOfSource gs mSource = case mSource of
     -- together.
     Source.OfSpellCopy pid -> cardOfPrinting pid gs
     -- CR 722.3c's "those characteristics become the copy's normal
-    -- characteristics": the interned one-faced printing IS the copy's card, so
-    -- unlike OfSpellCopy above there is no snapshot layered over it.
+    -- characteristics": the interned one-faced printing IS that copy's card. CR
+    -- 707.12's copy names the copied card's printing instead, and carries a
+    -- snapshot only where the card it copied had one.
     Source.OfCardCopy pid -> cardOfPrinting pid gs
     Source.OfInherentTrigger _ -> Nothing
 
 cardOfPrinting :: PrintingId.PrintingId -> GameState -> Maybe Card
 cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
+
+-- `cardOfSource` above as an ID rather than as the card it interns, for the one
+-- caller that has to hand the same printing to a NEW object rather than read a
+-- field off it: CR 707.12's copy of a card, which
+-- Pawl.Engine.Resolve.Effect.castableCopy mints. Naming the copied object's own
+-- printing is what makes the copy's card the copied card.
+--
+-- The same arms and the same answers as `cardOfSource`, so a source with no card
+-- and no interned characteristics behind it -- an activated ability, a triggered
+-- ability, CR 725.2's inherent trigger (CR 113.7a) -- answers Nothing and there
+-- is nothing to copy.
+printingIdOfSource :: Source.Source -> Maybe PrintingId.PrintingId
+printingIdOfSource source = case source of
+  Source.OfCard pid -> Just pid
+  Source.OfMeld meld -> Just (MeldSource.result meld)
+  Source.OfMerge components -> Just (printingOfComponent (NonEmpty.head components))
+  Source.OfToken pid -> Just pid
+  Source.OfAbility _ -> Nothing
+  Source.OfTrigger _ -> Nothing
+  Source.OfEmblem pid -> Just pid
+  Source.OfSpellCopy pid -> Just pid
+  Source.OfCardCopy pid -> Just pid
+  Source.OfInherentTrigger _ -> Nothing
 
 -- Which cards represent this object, for the rules that look past the
 -- characteristics `cardOfSource` answers with to the cards themselves. Empty for
@@ -959,8 +983,10 @@ mergeComponentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
 mergeComponentsOf source = case source of
   Source.OfMerge components -> fmap printingOfComponent (Seq.fromList (NonEmpty.toList components))
   Source.OfMeld _ -> Seq.empty
-  -- CR 722.3c: such a copy is never on the battlefield to be merged INTO, which
-  -- is Pawl.Engine.Event.mergeComponents' own arm for it.
+  -- No copy of a card pawl mints is on the battlefield to be merged INTO: CR
+  -- 722.3c's stays in exile, and CR 707.12's producers in data/cards/ copy
+  -- instant and sorcery cards alone. A card offering a copy of a PERMANENT card
+  -- would refute that. Pawl.Engine.Event.mergeComponents' own arm for it.
   Source.OfCardCopy _ -> Seq.empty
   Source.OfCard _ -> Seq.empty
   Source.OfToken _ -> Seq.empty

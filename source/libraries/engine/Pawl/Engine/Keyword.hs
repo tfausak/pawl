@@ -7460,7 +7460,8 @@ miracle cost =
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing},
               -- rule 702.94a's "cast it": one card, the one the slot names.
-              OfferCast.repetition = CastRepetition.Once
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = False
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfRevealedForMiracle,
@@ -7943,7 +7944,8 @@ cascade =
                     CastOffer.offeredBy = Nothing
                   },
               -- Rule 702.85a's "cast IT": one card, the one the walk stopped at.
-              OfferCast.repetition = CastRepetition.Once
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = False
             }
       rest =
         Effect.MoveToZone
@@ -8049,7 +8051,8 @@ ripple n =
                     CastOffer.offeredBy = Nothing
                   },
               -- Rule 702.60a's "cast ANY OF those cards".
-              OfferCast.repetition = CastRepetition.AnyNumber
+              OfferCast.repetition = CastRepetition.AnyNumber,
+              OfferCast.copied = False
             }
       rest =
         Effect.MoveToZone
@@ -8174,7 +8177,8 @@ suspendLastCounter ability =
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just (Keyword.Suspend ability)},
               -- rule 702.62a's "cast it": one card, the one the slot names.
-              OfferCast.repetition = CastRepetition.Once
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = False
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
@@ -8250,7 +8254,8 @@ reboundUpkeep =
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just Keyword.Rebound},
               -- rule 702.88a's "cast it": one card, the one the slot names.
-              OfferCast.repetition = CastRepetition.Once
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = False
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
@@ -8395,7 +8400,8 @@ madnessCast cost =
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Just (Keyword.Madness cost)},
               -- rule 702.35a's "cast it": one card, the one the slot names.
-              OfferCast.repetition = CastRepetition.Once
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = False
             }
       -- Rule 702.35a's last sentence. No riders and no slot: the destination is
       -- a graveyard, which CR 400.3 makes the owner's, and nothing reads the
