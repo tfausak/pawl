@@ -2652,6 +2652,9 @@ rewriteKeyword pairs keyword = case keyword of
   -- 612.1 to change.
   Keyword.Type.Prototype _ -> keyword
   Keyword.Type.Toxic _ -> keyword
+  -- CR 702.165a names no word CR 612.2 can swap: the payload is a number, and
+  -- what it counts is written into what Pawl.Engine.Keyword mints.
+  Keyword.Type.Backup _ -> keyword
   -- CR 702.168a states a cost, so rewriteCost reaches it as morph's does. The
   -- ward {2} rule 702.168b lists is NOT reached from here: that keyword is on the
   -- face-down object's own characteristics (Pawl.Types.FaceDownCharacteristics),

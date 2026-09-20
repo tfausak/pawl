@@ -110,6 +110,7 @@ layer m = case m of
   -- types.
   Modification.GainEnchant _ -> Layer.Ability
   Modification.GainAbility _ -> Layer.Ability
+  Modification.GainAbilitiesOfSource -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
   -- CR 613.1f again, and the same layer as the wipe above: what differs is the
   -- SCOPE of the removal, never when it applies.
@@ -227,6 +228,12 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
             pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
           GrantedAbility.Triggered t ->
             pc {PC.triggeredAbilities = PC.triggeredAbilities pc <> [t]}
+        -- CR 702.165a's grant never reaches a STORED effect: Resolve.Effect's
+        -- expandGrant turns it into the ordinary GainKeyword and GainAbility arms
+        -- above as the ability resolves, so nothing with this modification is ever
+        -- put in GameState.continuousEffects. The identity keeps the walk total,
+        -- which is the posture SetController's arm below takes.
+        Modification.GainAbilitiesOfSource -> pc
         -- CR 604.3: a CDA is a static ability, so this loses it too.
         Modification.LoseAllAbilities ->
           pc
@@ -506,6 +513,7 @@ cardTypesAfter m types = case m of
   Modification.GainFlashbackAtManaCost -> types
   Modification.GainEnchant _ -> types
   Modification.GainAbility _ -> types
+  Modification.GainAbilitiesOfSource -> types
   Modification.LoseAllAbilities -> types
   Modification.LoseNamedAbility _ -> types
   Modification.LoseKeyword _ -> types
@@ -1071,6 +1079,7 @@ freezeQuantities gs announcedOn source context m =
         -- The granted ability's own quantities are NOT frozen: CR 611.2d fixes a
         -- variable in this effect, not in a quoted ability's own future one.
         Modification.GainAbility _ -> Just m
+        Modification.GainAbilitiesOfSource -> Just m
         Modification.LoseAllAbilities -> Just m
         Modification.LoseNamedAbility _ -> Just m
         Modification.LoseKeyword _ -> Just m
@@ -1115,6 +1124,7 @@ quantitiesOf m = case m of
   Modification.GainEnchant _ -> []
   -- The layer fold evaluates nothing inside a quoted ability.
   Modification.GainAbility _ -> []
+  Modification.GainAbilitiesOfSource -> []
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
   Modification.LoseKeyword _ -> []
@@ -1158,6 +1168,7 @@ setsLandSubtype m = case m of
   Modification.AddLandSubtype _ -> False
   -- An ability grant is layer 6 and sets no subtype at all.
   Modification.GainAbility _ -> False
+  Modification.GainAbilitiesOfSource -> False
   Modification.GainKeyword _ -> False
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
@@ -1966,6 +1977,7 @@ removesAbilities m = case m of
   -- own answer is a regression fence -- flipping it to True leaves the suite
   -- green.
   Modification.GainAbility _ -> False
+  Modification.GainAbilitiesOfSource -> False
   -- CR 305.7 strips a land's rules text, but as a layer-4 type change performed
   -- by setLandSubtypeTo and the two gates beside it, never a layer-6 removal.
   -- setsLandSubtype is the classification; this one answers CR 613.1f.
@@ -2955,6 +2967,7 @@ modificationWrites m = case m of
   -- Pawl.ProjectionSpec's "CR 613.8a a granted activated ability puts the
   -- creature into the Ascent's set" proves it.
   Modification.GainAbility _ -> Set.singleton Keywords
+  Modification.GainAbilitiesOfSource -> Set.singleton Keywords
   Modification.LoseAllAbilities -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities, which Aspect has no finer
   -- grain for than Keywords -- Filter.HasNonManaActivatedAbility, the atom that
@@ -3042,6 +3055,7 @@ modificationReads m = case m of
   Modification.GainEnchant _ -> Set.empty
   -- A quoted ability's quantities are read at ITS resolution.
   Modification.GainAbility _ -> Set.empty
+  Modification.GainAbilitiesOfSource -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
   -- Carries a name, which is not a Quantity.
   Modification.LoseNamedAbility _ -> Set.empty
@@ -4558,6 +4572,7 @@ grantsKeywordWhere p m = case m of
   Modification.GainEnchant _ -> False
   -- Hands out an ability but never a KEYWORD, which is all the callers ask about.
   Modification.GainAbility _ -> False
+  Modification.GainAbilitiesOfSource -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   -- Take keywords AWAY, which is the opposite of what this asks.
@@ -4631,6 +4646,7 @@ grantsMintingType m = case m of
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
   Modification.GainAbility _ -> False
+  Modification.GainAbilitiesOfSource -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False
