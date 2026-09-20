@@ -1565,9 +1565,9 @@ targetsOfStackObject gs obj
           declared = case Object.source obj of
             Source.OfCard _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
             Source.OfSpellCopy _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
-            -- CR 722.3c's cast copy is card-backed the way the two arms above
-            -- are: its interned printing has one face, whose target slots are the
-            -- prepare spell's.
+            -- A cast copy of a card is card-backed the way the two arms above
+            -- are, so its printing's face answers: CR 722.3c's interned one-faced
+            -- prepare spell, or the card CR 707.12 copied.
             Source.OfCardCopy _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
             Source.OfAbility src -> ofModal (ActivatedAbility.modal (ActivatedAbilitySource.ability src))
             Source.OfTrigger src -> ofModal (TriggeredAbility.modal (TriggeredAbilitySource.ability src))

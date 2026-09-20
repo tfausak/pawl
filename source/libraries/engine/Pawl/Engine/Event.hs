@@ -7290,9 +7290,11 @@ mergeComponents source = case source of
   Source.OfTrigger _ -> Nothing
   Source.OfEmblem _ -> Nothing
   Source.OfSpellCopy _ -> Nothing
-  -- CR 722.3c's copy is never on the battlefield to be merged INTO, and CR
-  -- 702.140c's mutating spell is a creature spell rather than a copy of a card,
-  -- so no road reaches this arm.
+  -- No copy of a card pawl mints is on the battlefield to be merged INTO -- CR
+  -- 722.3c's stays in exile, and CR 707.12's producers in data/cards/ copy
+  -- instant and sorcery cards alone -- and CR 702.140c's mutating spell is a
+  -- creature spell rather than a copy of a card, so no road reaches this arm. A
+  -- card offering a copy of a PERMANENT card would refute the first half.
   Source.OfCardCopy _ -> Nothing
   Source.OfInherentTrigger _ -> Nothing
 
@@ -7314,10 +7316,11 @@ mergingComponent :: Source.Source -> Maybe MergeComponent.MergeComponent
 mergingComponent source = case source of
   Source.OfCard pid -> Just (MergeComponent.OfCard pid)
   Source.OfSpellCopy pid -> Just (MergeComponent.OfSpellCopy pid)
-  -- CR 722.3c's copy of a card is a spell once cast, but it "has only the
-  -- characteristics of that permanent's prepare spell", so rule 702.140a's
-  -- mutate is not among them and no such spell is ever a mutating creature
-  -- spell. CR 730.2's list names a card and a copy and no third thing.
+  -- A copy of a card is a spell once cast, and no such spell pawl mints is a
+  -- mutating creature spell: CR 722.3c's "has only the characteristics of that
+  -- permanent's prepare spell" leaves rule 702.140a's mutate out, and CR 707.12's
+  -- producers in data/cards/ copy instant and sorcery cards alone. CR 730.2's
+  -- list names a card and a copy and no third thing.
   Source.OfCardCopy _ -> Nothing
   Source.OfMeld _ -> Nothing
   Source.OfMerge _ -> Nothing
