@@ -2731,11 +2731,16 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Rebound -> keyword
   -- CR 702.97a's and CR 702.141a's costs are printed, so their components take
   -- the same descent embalm's does.
-  Keyword.Type.Craft spec -> Keyword.Type.Craft (Craft.MkCraft (rewriteCost pairs (Craft.cost spec)) (ExileMaterials.MkExileMaterials (ExileMaterials.count (Craft.materials spec)) (rewrite pairs (ExileMaterials.whichObjects (Craft.materials spec)))))
   Keyword.Type.Scavenge cost -> Keyword.Type.Scavenge (rewriteCost pairs cost)
   Keyword.Type.Encore cost -> Keyword.Type.Encore (rewriteCost pairs cost)
   Keyword.Type.Transmute cost -> Keyword.Type.Transmute (rewriteCost pairs cost)
   Keyword.Type.Transfigure cost -> Keyword.Type.Transfigure (rewriteCost pairs cost)
+  -- CR 702.167a's payload is the only one that is not a bare Cost: its cost and
+  -- its [materials] criterion are both printed, so both halves descend.
+  Keyword.Type.Craft crafting ->
+    let materials = Craft.materials crafting
+        swapped = ExileMaterials.MkExileMaterials (ExileMaterials.count materials) (rewrite pairs (ExileMaterials.whichObjects materials))
+     in Keyword.Type.Craft (Craft.MkCraft (rewriteCost pairs (Craft.cost crafting)) swapped)
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is
@@ -2772,7 +2777,8 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
 -- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents,
--- ExileCardFromHand, RevealCardFromHand, Behold, RemovePlusOneCounters and
+-- ExileCardFromHand, RevealCardFromHand, Behold, ExileMaterials,
+-- RemovePlusOneCounters and
 -- PutCardFromHandOntoBattlefield arms
 -- are a regression
 -- fence: no printing pairs any of them with a basic land type, so no test can

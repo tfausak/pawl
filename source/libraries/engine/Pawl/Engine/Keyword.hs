@@ -305,8 +305,10 @@ abilitiesFor keyword count = case keyword of
   -- ability at all: their optional additional cost is optionalCost's, and what a
   -- payment buys is a clause of the card (CR 702.166c, CR 702.194b).
   Keyword.Bargain -> []
-  Keyword.Craft _ -> []
   Keyword.Teamwork _ -> []
+  -- CR 702.167a states an ACTIVATED ability and no triggered one, so
+  -- battlefieldAbilitiesFor is its roster.
+  Keyword.Craft _ -> []
   -- CR 702.188a and CR 702.190a state one static ability each, and it is an
   -- alternative cost (Pawl.Engine.Cost.candidateCostsGiven) rather than an
   -- ability this roster mints -- evoke's shape.
@@ -5076,8 +5078,8 @@ familyOf keyword = case keyword of
   Keyword.Casualty _ -> Just KeywordFamily.Casualty
   -- CR 702.166a carries no parameter, so there is no family to name it by.
   Keyword.Bargain -> Nothing
-  Keyword.Craft _ -> Just KeywordFamily.Craft
   Keyword.Teamwork _ -> Just KeywordFamily.Teamwork
+  Keyword.Craft _ -> Just KeywordFamily.Craft
   Keyword.WebSlinging _ -> Just KeywordFamily.WebSlinging
   Keyword.Sneak _ -> Just KeywordFamily.Sneak
   Keyword.Foretell _ -> Just KeywordFamily.Foretell

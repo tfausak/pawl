@@ -1853,9 +1853,12 @@ zoneOfComponent component = case component of
   -- Nothing, and NOT Just Zone.Graveyard: rule 113.6m again, and these move
   -- OTHER cards.
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
-  CostComponent.ExileMaterials {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.CollectEvidence _ -> Nothing
+  -- Nothing for the arms above's reason and one more: CR 702.167a's component
+  -- moves objects out of TWO zones, so there is no single zone to name even if
+  -- rule 113.6m asked about them.
+  CostComponent.ExileMaterials {} -> Nothing
   CostComponent.DiscardCards {} -> Nothing
   -- Nothing, and NOT Just Zone.Hand as DiscardThis above answers, for the same
   -- reason the arms above give: CR 113.6m asks about an ability that moves THE
