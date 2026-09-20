@@ -256,6 +256,15 @@ mayDefinedSlots mode
       Optionality.Mandatory -> False
       Optionality.Optional _ -> True
 
+-- The same for CR 701.55d's villainous pass: the seat whose option is being
+-- performed (Binding.facingPlayers, stamped by villainousPass). A mode printing
+-- no villainous either-or binds nothing, so a card reading that name outside one
+-- is still caught by the dataflow lint.
+orElseDefinedSlots :: Mode.Mode card ability -> Set SlotName
+orElseDefinedSlots mode
+  | any (maybe False OrElse.villainous . Clause.orElse) (Mode.clauses mode) = Set.singleton Binding.facingPlayers
+  | otherwise = Set.empty
+
 -- CR 700.2d: run ONE chosen instance's clauses with its own namespace for the
 -- slots its mode DEFINES mid-resolution -- Effect.MoveToZone's CR 400.7
 -- incarnation, Effect.Create's minted tokens, Effect.Destroy's count, Effect
@@ -422,6 +431,26 @@ resolveSpellWith runSubgame oid = do
                           (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) legalNow)
                           (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) chosenNow)
                           eff
+                      -- CR 701.55d's per-player limb, the callback villainousPass
+                      -- drives. Everything it reads is re-read HERE rather than
+                      -- taken from the fold's own snapshot, which is the whole
+                      -- point of rule 701.55d: a later chooser's limb runs against
+                      -- the board an earlier chooser's limb left.
+                      performLimb limbIdx facing (answers, ran) = case lookup limbIdx indexedClauses of
+                        Nothing -> pure (answers, ran)
+                        Just limb -> do
+                          gateBindings <- State.gets (liveBindings obj oid)
+                          let instanceView = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode)
+                              legalHere = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
+                              boundHere = Map.keysSet (instanceView gateBindings)
+                          gated <- gateHolds effectController oid (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
+                          taken <- if gated then exercises oid oid effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
+                          (admitted, answers2) <-
+                            if taken
+                              then payGateAdmits oid oid effectController idx limbIdx (instanceView (Map.mapWithKey legalSlot (Binding.targetsOf (Object.bindings obj)))) (Just facing) answers limb
+                              else pure (False, answers)
+                          Monad.when admitted (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects limb)))
+                          pure (answers2, recordTaken admitted limbIdx ran)
                   -- CR 608.2e's clause is the unit all four gates cover, so each
                   -- is asked once per clause. The fold carries this mode
                   -- INSTANCE's CR 118.12 answers and the clauses whose
@@ -459,31 +488,41 @@ resolveSpellWith runSubgame oid = do
                               Just sibling -> do
                                 held <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) gateBindings sibling
                                 State.gets (\gsNow -> held && not (clauseIsImpossible oid oid effectController legalNowForMay gsNow sibling))
-                        (announced, picked2) <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay eligible picked clause else pure (Just Set.empty, picked)
-                        let branch = maybe True (not . Set.null) announced
-                        taken <- if branch then exercises oid oid effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
-                        -- CR 118.12: then the cost paid on resolution, against the
-                        -- START-of-resolution targets to match CR 608.2b's single
-                        -- re-validation. Both maps are projected into THIS
-                        -- instance's view (CR 700.2d) after legality is decided,
-                        -- since deciding it after the rename would miss in `slots`.
-                        (admitted, answers2) <-
-                          if taken
-                            then
-                              let chosenAtStart = Binding.targetsOf (Object.bindings obj)
-                               in payGateAdmits
-                                    oid
-                                    oid
-                                    effectController
-                                    idx
-                                    cIdx
-                                    (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
-                                    announced
-                                    answers
-                                    clause
-                            else pure (False, answers)
-                        Monad.when admitted (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause)))
-                        pure (answers2, picked2, recordTaken admitted cIdx ran)
+                        -- CR 701.55d's exception to rule 608.2e, ahead of the
+                        -- ordinary either-or: a villainous pair is chosen AND
+                        -- performed for one player before the next player is
+                        -- asked, so the whole pair happens here and the sibling's
+                        -- own arrival finds it already answered.
+                        case facedVillainously picked cIdx clause of
+                          Just (orElse, limbs) | gated -> do
+                            (answers2, ran2) <- villainousPass oid effectController idx legalNowForMay orElse limbs performLimb (answers, ran)
+                            pure (answers2, Map.insert (NonEmpty.head limbs) Map.empty picked, ran2)
+                          _ -> do
+                            (announced, picked2) <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay eligible picked clause else pure (Just Set.empty, picked)
+                            let branch = maybe True (not . Set.null) announced
+                            taken <- if branch then exercises oid oid effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
+                            -- CR 118.12: then the cost paid on resolution, against the
+                            -- START-of-resolution targets to match CR 608.2b's single
+                            -- re-validation. Both maps are projected into THIS
+                            -- instance's view (CR 700.2d) after legality is decided,
+                            -- since deciding it after the rename would miss in `slots`.
+                            (admitted, answers2) <-
+                              if taken
+                                then
+                                  let chosenAtStart = Binding.targetsOf (Object.bindings obj)
+                                   in payGateAdmits
+                                        oid
+                                        oid
+                                        effectController
+                                        idx
+                                        cIdx
+                                        (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
+                                        announced
+                                        answers
+                                        clause
+                                else pure (False, answers)
+                            Monad.when admitted (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause)))
+                            pure (answers2, picked2, recordTaken admitted cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
@@ -715,6 +754,21 @@ resolveModesWith runSubgame stackId srcId modes = do
                     let chosenNow = Binding.targetsOf bindingsNow
                         legalNow = Map.mapWithKey legalSlot chosenNow
                     applyEffectWith runSubgame stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
+                  -- CR 701.55d's per-player limb, the spell loop's twin: the
+                  -- callback villainousPass drives, re-reading the live bindings
+                  -- so a later chooser's limb runs against the board an earlier
+                  -- chooser's limb left.
+                  performLimb limbIdx facing (answers, ran) = case lookup limbIdx indexedClauses of
+                    Nothing -> pure (answers, ran)
+                    Just limb -> do
+                      gateBindings <- State.gets (liveBindings obj stackId)
+                      let legalHere = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
+                          boundHere = Map.keysSet (instanceView gateBindings)
+                      gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
+                      taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
+                      (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) answers limb else pure (False, answers)
+                      Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects limb)))
+                      pure (answers2, recordTaken admitted limbIdx ran)
                in -- CR 608.2e's clause is what each gate covers. Run only when
                   -- `fizzles` is False.
                   Monad.foldM_
@@ -755,14 +809,24 @@ resolveModesWith runSubgame stackId srcId modes = do
                               Just sibling -> do
                                 held <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings sibling
                                 State.gets (\gsNow -> held && not (clauseIsImpossible stackId srcId effectController legalNowForMay gsNow sibling))
-                        (announced, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay eligible picked clause else pure (Just Set.empty, picked)
-                        let branch = maybe True (not . Set.null) announced
-                        taken <- if branch then exercises stackId srcId effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
-                        -- CR 118.12: then the cost paid on resolution, against the
-                        -- START-of-resolution slots.
-                        (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
-                        Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause)))
-                        pure (answers2, picked2, recordTaken admitted cIdx ran)
+                        -- CR 701.55d's exception to rule 608.2e, ahead of the
+                        -- ordinary either-or and off the same helper the spell
+                        -- loop uses: the pair is chosen AND performed one player
+                        -- at a time, so it happens here and the sibling's own
+                        -- arrival finds it already answered.
+                        case facedVillainously picked cIdx clause of
+                          Just (orElse, limbs) | gated -> do
+                            (answers2, ran2) <- villainousPass stackId effectController idx legalNowForMay orElse limbs performLimb (answers, ran)
+                            pure (answers2, Map.insert (NonEmpty.head limbs) Map.empty picked, ran2)
+                          _ -> do
+                            (announced, picked2) <- if gated then chosenBranch stackId effectController idx cIdx legalNowForMay eligible picked clause else pure (Just Set.empty, picked)
+                            let branch = maybe True (not . Set.null) announced
+                            taken <- if branch then exercises stackId srcId effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
+                            -- CR 118.12: then the cost paid on resolution, against the
+                            -- START-of-resolution slots.
+                            (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) announced answers clause else pure (False, answers)
+                            Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause)))
+                            pure (answers2, picked2, recordTaken admitted cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
@@ -884,34 +948,24 @@ gateHolds controller source chosen bindings clause = case Clause.condition claus
 -- announces nothing, recorded as an empty answer map so the loser's arrival
 -- raises no prompt either.
 --
--- CR 701.55b is the one pair that filter does NOT run over: facing a villainous
--- choice is an exception to rule 608.2d, the chooser "may choose an option that
--- is illegal or impossible" and then performs as much of it as is possible, so
--- OrElse.villainous puts both limbs whatever the board can carry out. Great
--- Intelligence's Plan is the producer, and Pawl.ResolveSpec's "CR 701.55b Great
--- Intelligence's Plan still offers the discard to an empty-handed opponent"
--- proves it.
---
--- That bypass skips the WHOLE of `eligible`, which is two conjuncts: CR
--- 701.46a's printed "if" on the sibling and rule 608.2d's impossibility. Rule
--- 701.55b exempts only the second, so a villainous choice on a card whose
--- sibling printed a condition would be offered a branch its "if" had already
--- ruled out. No card states the shape -- the callers' own fence says no
--- either-or in data/cards prints a condition at all -- and splitting `eligible`
--- into its two halves is what it would take.
+-- A VILLAINOUS pair never reaches the unanswered half of this function: CR
+-- 701.55d takes it out of rule 608.2e altogether, so both callers route it to
+-- `villainousPass` instead and file an empty answer map here, which is how the
+-- sibling's own arrival is turned into the no-op above. Rule 608.2d's filter is
+-- therefore unconditional here, rule 701.55b's exemption from it living at that
+-- pass.
 chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> (ClauseIndex -> Game Bool) -> Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Maybe (Set PlayerId), Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex))
 chosenBranch resolving controller idx cIdx legal eligible picked clause = case Clause.orElse clause of
   Nothing -> pure (Nothing, picked)
   Just orElse ->
-    let other = OrElse.sibling orElse
-        branches = if cIdx == other then NonEmpty.singleton cIdx else NonEmpty.sort (cIdx NonEmpty.:| [other])
+    let branches = orElseLimbs cIdx orElse
         key = NonEmpty.head branches
         won answers = Just (Map.keysSet (Map.filter (== cIdx) answers))
      in case Map.lookup key picked of
           Just answers -> pure (won answers, picked)
           Nothing -> do
             gs <- State.get
-            offered <- if OrElse.villainous orElse then pure (NonEmpty.toList branches) else Monad.filterM eligible (NonEmpty.toList branches)
+            offered <- Monad.filterM eligible (NonEmpty.toList branches)
             answers <- case offered of
               [] -> pure Map.empty
               [forced] -> pure (Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)))
@@ -926,6 +980,84 @@ chosenBranch resolving controller idx cIdx legal eligible picked clause = case C
                       Map.empty
                       (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
             pure (won answers, Map.insert key answers picked)
+
+-- CR 608.2d's pair, in CR 608.2c's printed order. A clause naming ITSELF is one
+-- limb rather than two -- Pawl.CardSpec's cardBranchesAreAsymmetric is what
+-- keeps the corpus from writing it -- and the head is the ordinal the pair's
+-- answer is filed under, which both limbs compute alike.
+orElseLimbs :: ClauseIndex -> OrElse.OrElse -> NonEmpty.NonEmpty ClauseIndex
+orElseLimbs cIdx orElse =
+  let other = OrElse.sibling orElse
+   in if cIdx == other then NonEmpty.singleton cIdx else NonEmpty.sort (cIdx NonEmpty.:| [other])
+
+-- CR 701.55a: is this clause half of a villainous pair whose process has not yet
+-- been performed? An empty answer map filed under the pair's ordinal is what
+-- `villainousPass` leaves behind, so the sibling's arrival answers Nothing here
+-- and falls through to chosenBranch's memo, which skips it.
+facedVillainously :: Map.Map ClauseIndex (Map.Map PlayerId ClauseIndex) -> ClauseIndex -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe (OrElse.OrElse, NonEmpty.NonEmpty ClauseIndex)
+facedVillainously picked cIdx clause = case Clause.orElse clause of
+  Just orElse
+    | OrElse.villainous orElse,
+      let limbs = orElseLimbs cIdx orElse,
+      Map.notMember (NonEmpty.head limbs) picked ->
+        Just (orElse, limbs)
+  _ -> Nothing
+
+-- CR 701.55d, an exception to rule 608.2e: "if more than one player is
+-- instructed to face a villainous choice, the entire process described in rule
+-- 701.55a is performed for each of those players one at a time in APNAP order".
+-- So this is NOT chosenBranch's shape -- ask the table, then run each limb once
+-- for the seats that announced it -- but a loop that asks ONE seat and performs
+-- that seat's whole option before the next seat is asked. The Dalek Emperor's
+-- "each opponent faces a villainous choice -- that player sacrifices a creature
+-- of their choice, or you create a 3/3 black Dalek artifact creature token with
+-- menace" is the producer: two opponents taking the token limb make TWO tokens,
+-- where one run of the limb for both of them would make one.
+--
+-- CR 101.4's order over the seats OrElse.chooser names, read off the board as
+-- the process begins: the instruction names its players once, and a seat that
+-- leaves mid-pass is dropped by its own limb's reads rather than by re-asking
+-- who was instructed.
+--
+-- CR 701.55b is why both limbs are always offered and rule 608.2d's filter never
+-- runs: the chooser "may choose an option that is illegal or impossible" and
+-- then performs as much of it as is possible. Great Intelligence's Plan is the
+-- producer, and Pawl.ResolveSpec's "CR 701.55b Great Intelligence's Plan still
+-- offers the discard to an empty-handed opponent" is what proves it.
+--
+-- The answer is FILTERED back through the limbs rather than trusted, the posture
+-- every choose-don't-target prompt takes.
+--
+-- Rule 701.55b exempts a villainous choice from rule 608.2d's impossibility and
+-- from nothing else, so a limb printing CR 701.46a's "if" is still OFFERED here
+-- although its condition has already ruled it out; the callback checks that
+-- condition again before performing the limb, so choosing it does nothing. No
+-- card states the shape -- the callers' own fence says no either-or in
+-- data/cards prints a condition at all -- and telling the two conjuncts apart in
+-- the offer is what it would take. CR 608.2c's "If you do" is the same: a limb
+-- hanging off an earlier clause is not a shape any either-or prints.
+--
+-- The seat is bound under Binding.facingPlayers before its limb runs, which is
+-- how a limb says "that player". A slot and not chosenBranch's plain set,
+-- because rule 701.55d's per-seat pass is the one shape where the binding IS
+-- readable: the limb's reads are re-taken after the bind, where chosenBranch's
+-- callers had captured theirs before the question was put.
+--
+-- Not implemented: rule 701.55c's replacement of one facing by several, which
+-- would run this body's inner step more than once for the same seat (#3898).
+villainousPass :: ObjectId -> PlayerId -> ModeIndex -> Map.Map SlotName (Set Recipient) -> OrElse.OrElse -> NonEmpty.NonEmpty ClauseIndex -> (ClauseIndex -> Set PlayerId -> acc -> Game acc) -> acc -> Game acc
+villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
+  gs <- State.get
+  Monad.foldM
+    ( \acc chooser -> do
+        gs1 <- State.get
+        answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs)
+        let chosen = if elem answered limbs then answered else NonEmpty.head limbs
+        State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
+        performLimb chosen (Set.singleton chooser) acc
+    )
+    acc0
+    (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made
@@ -1394,7 +1526,8 @@ liveBindings obj oid gs = case Game.lookupObject oid gs of
     departed = maybe (Object.bindings obj) Object.bindings (Map.lookup oid (GameState.stackArchive gs))
 
 -- bindPlayerSlot's plural: bind SEVERAL players a resolution named into `slot` on
--- `holder`. CR 118.12a's per-player gate is the one caller, and the set is
+-- `holder` -- CR 118.12a's per-player gate, CR 603.5's printed "may", and CR
+-- 701.55d's per-seat villainous pass are the callers. The set is
 -- written even when it is EMPTY -- Binding.toRecipients turns that into an
 -- unbound slot, so a branch nobody took leaves the previous clause's answer
 -- unreadable rather than standing.
