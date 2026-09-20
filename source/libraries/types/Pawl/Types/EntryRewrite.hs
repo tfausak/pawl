@@ -153,6 +153,16 @@ data EntryRewrite ability effect
     -- Filter.SharesCreatureTypeWithBound names a resolution's slot, and an entry
     -- replacement has none.
     Amplify Natural.Natural
+  | -- | CR 702.104a via CR 614.1c: tribute N, minted from the projection --
+    -- Unleash's offer made to somebody else. The entering permanent's controller
+    -- chooses an opponent (CR 702.104a), and THAT opponent decides whether the N
+    -- counters go on -- the one arm here whose "may" is answered by somebody other
+    -- than the entering permanent's controller.
+    --
+    -- The opponent's answer is stamped on Object.tributePaid rather than read back
+    -- off the counters: CR 702.104b defines "tribute wasn't paid" by the DECISION,
+    -- so a later counter-placing effect must not change the answer.
+    Tribute Natural.Natural
   | -- | CR 702.150a via CR 614.1c: compleated, minted from the projection. The
     -- payload is the number of Phyrexian mana symbols life was paid for (CR
     -- 118.13a), rule 702.150a's "two" being the rule's own.

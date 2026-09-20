@@ -131,6 +131,7 @@ encode p answer = case p of
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.ChooseRiot {} -> Response.ChoseRiot answer
   Prompt.ChooseUnleash {} -> Response.ChoseUnleash answer
+  Prompt.ChooseTribute {} -> Response.ChoseTribute answer
   Prompt.ChooseDredge {} -> Response.ChoseDredge answer
   Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
   Prompt.ChooseRevealOnEntry {} -> Response.ChoseRevealOnEntry answer
@@ -402,6 +403,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseUnleash {} -> case response of
     Response.ChoseUnleash d -> Just d
+    _ -> Nothing
+  Prompt.ChooseTribute {} -> case response of
+    Response.ChoseTribute d -> Just d
     _ -> Nothing
   Prompt.ChooseDredge {} -> case response of
     Response.ChoseDredge d -> Just d
@@ -877,6 +881,9 @@ defaultAnswer p = case p of
   -- CR 702.98a: declining, for ChooseRiot's reason -- it is the half that puts no
   -- counter on the board.
   Prompt.ChooseUnleash {} -> OptionalDecision.Declines
+  -- CR 702.104a: declining, for ChooseRiot's reason -- it is the half that puts no
+  -- counter on the board.
+  Prompt.ChooseTribute {} -> OptionalDecision.Declines
   -- CR 702.52a: declining, for ChooseRiot's reason -- it is the half that moves
   -- nothing, so a transcript that ran out mills nobody's library.
   Prompt.ChooseDredge {} -> OptionalDecision.Declines

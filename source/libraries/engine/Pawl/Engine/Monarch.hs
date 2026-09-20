@@ -223,6 +223,7 @@ placeInherent pending = do
             Object.designations = Set.empty,
             Object.designationValues = Map.empty,
             Object.paidCosts = Map.empty,
+            Object.tributePaid = False,
             Object.bestowed = False,
             Object.mutating = False,
             Object.prototyped = False,

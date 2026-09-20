@@ -336,6 +336,7 @@ abilitiesFor keyword count = case keyword of
   -- spell on the stack, read at CR 601.2b by Pawl.Engine.Cast.
   Keyword.Spree -> []
   Keyword.Tiered -> []
+  Keyword.Tribute _ -> []
   -- CR 702.105b: each instance triggers separately.
   Keyword.Dethrone -> List.genericReplicate count dethrone
   Keyword.Fuse -> []
@@ -676,6 +677,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
+  Keyword.Tribute _ -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -1239,6 +1241,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
+  Keyword.Tribute _ -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -1872,6 +1875,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
+  Keyword.Tribute _ -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp cost -> List.genericReplicate count (levelUp cost)
@@ -2553,6 +2557,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
+  Keyword.Tribute _ -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -4262,6 +4267,12 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
+  -- CR 702.104a via CR 614.1c: tribute's static ability is an entry replacement,
+  -- Bloodthirst's shape above -- one row per instance, which CR 616.1 then orders.
+  --
+  -- The count rides across UNREAD: who is asked and what they answer is the
+  -- board's, read where the row applies (Pawl.Engine.Event).
+  Keyword.Tribute n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.Tribute n)))
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -4607,6 +4618,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
+  Keyword.Tribute _ -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -4906,6 +4918,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Exploit -> []
+  Keyword.Tribute _ -> []
   Keyword.Dethrone -> []
   Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
@@ -5174,6 +5187,7 @@ familyOf keyword = case keyword of
   Keyword.BattleCry -> Nothing
   Keyword.Evolve -> Nothing
   Keyword.Exploit -> Nothing
+  Keyword.Tribute _ -> Just KeywordFamily.Tribute
   Keyword.Dethrone -> Nothing
   Keyword.Fuse -> Nothing
   Keyword.LevelUp _ -> Just KeywordFamily.LevelUp

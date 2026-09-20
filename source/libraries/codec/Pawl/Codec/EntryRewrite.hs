@@ -48,6 +48,7 @@ codec abilityCodec effectCodec =
       -- Optional for Pawl.Codec.Keyword's reason: rule 702.54b's X is the absent
       -- "value" key, and the payload is that keyword's carried through.
       Arm.optionalPayload "Bloodthirst" Common.natural EntryRewrite.Bloodthirst (\x -> case x of EntryRewrite.Bloodthirst y -> Just y; _ -> Nothing),
+      Arm.payload "Tribute" Common.natural EntryRewrite.Tribute (\x -> case x of EntryRewrite.Tribute y -> Just y; _ -> Nothing),
       Arm.payload "Amplify" Common.natural EntryRewrite.Amplify (\x -> case x of EntryRewrite.Amplify y -> Just y; _ -> Nothing),
       Arm.payload "Compleated" Common.natural EntryRewrite.Compleated (\x -> case x of EntryRewrite.Compleated y -> Just y; _ -> Nothing),
       Arm.nullary "Tapped" EntryRewrite.Tapped,
@@ -79,6 +80,7 @@ tagOf x = case x of
   EntryRewrite.Unleash {} -> "Unleash"
   EntryRewrite.Sunburst {} -> "Sunburst"
   EntryRewrite.Bloodthirst {} -> "Bloodthirst"
+  EntryRewrite.Tribute {} -> "Tribute"
   EntryRewrite.Amplify {} -> "Amplify"
   EntryRewrite.Compleated {} -> "Compleated"
   EntryRewrite.Tapped {} -> "Tapped"

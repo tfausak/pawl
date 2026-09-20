@@ -920,6 +920,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Bloodthirst Nothing) /= Codec.encode Keyword.codec (Keyword.Bloodthirst (Just 0)))
       "bloodthirst X is not bloodthirst 0"
+  -- CR 702.104a's N is a count of +1/+1 counters too, so it must not collide with
+  -- a same-numbered keyword either.
+  Spec.it s "Tribute carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Tribute 3)
+      " {\"type\":\"Tribute\",\"value\":3} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Tribute 3) /= Codec.encode Keyword.codec (Keyword.Bloodthirst (Just 3)))
+      "tribute 3 is not bloodthirst 3"
   -- CR 702.55a's haunt writes no payload at all -- the haunted object is board
   -- state (GameState.haunting), not a field of the keyword.
   Spec.it s "Haunt" $

@@ -270,6 +270,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.WasKicked
       " {\"type\":\"WasKicked\"} "
+  -- CR 702.104b, with nothing on the wire for WasKicked's reason: the object is
+  -- whichever one the quantity is evaluated against.
+  Spec.it s "TributeWasPaid" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.TributeWasPaid
+      " {\"type\":\"TributeWasPaid\"} "
   -- CR 702.33f, with the KEYWORD on the wire: which of the spell's additional
   -- costs is asked about is the whole of what the card names, the object being
   -- whichever one the quantity is evaluated against.

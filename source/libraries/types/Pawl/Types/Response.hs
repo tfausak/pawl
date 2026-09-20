@@ -415,6 +415,11 @@ data Response
     -- ChoseRiot and ChosePayLifeOnEntry for their reason: a transcript that
     -- answered one as-enters "may" must not silently answer a different one.
     ChoseUnleash OptionalDecision.OptionalDecision
+  | -- | CR 702.104a: whether the chosen opponent had a tribute creature enter with
+    -- the +1/+1 counters (Exercises) or not (Declines). Distinct from the
+    -- as-enters answers above for their reason, and answered by a different seat
+    -- than any of them.
+    ChoseTribute OptionalDecision.OptionalDecision
   | -- | CR 702.52a: whether a draw was replaced by dredge (Exercises) or left
     -- standing (Declines). Distinct from the as-enters answers above for their
     -- reason: a transcript that answered one "may" must not silently answer a

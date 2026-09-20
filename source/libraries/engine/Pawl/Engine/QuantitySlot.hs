@@ -151,6 +151,7 @@ overSlots f quantity =
         Quantity.DesignationValue _ -> pure quantity
         Quantity.ClassLevel -> pure quantity
         Quantity.WasKicked -> pure quantity
+        Quantity.TributeWasPaid -> pure quantity
         -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
         -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
         -- the spell's own record by equality, never an instruction this traversal
@@ -318,6 +319,7 @@ nestedRefs quantity = case quantity of
   Quantity.DesignationValue _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
+  Quantity.TributeWasPaid -> Set.empty
   -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
   -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
   -- the spell's own record by equality, never an instruction this traversal
@@ -417,6 +419,7 @@ nestedCounts quantity = case quantity of
   Quantity.DesignationValue _ -> []
   Quantity.ClassLevel -> []
   Quantity.WasKicked -> []
+  Quantity.TributeWasPaid -> []
   -- CR 601.2b's per-keyword tally reads a Keyword off the spell's own
   -- announcement, and no traversal of this type can carry a Keyword;
   -- Pawl.FilterPositionLintSpec's timesPaidOffends checks that field off the
@@ -616,6 +619,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.DesignationValue _ -> quantity
         Quantity.ClassLevel -> quantity
         Quantity.WasKicked -> quantity
+        Quantity.TributeWasPaid -> quantity
         -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
         -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
         -- the spell's own record by equality, never an instruction this traversal

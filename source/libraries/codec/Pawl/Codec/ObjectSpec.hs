@@ -96,6 +96,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.designations = Set.empty,
           Object.designationValues = Map.empty,
           Object.paidCosts = Map.empty,
+          Object.tributePaid = False,
           Object.bestowed = False,
           Object.mutating = False,
           Object.prototyped = False,
@@ -200,6 +201,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
             Map.singleton
               (Keyword.Squad Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 24]), Cost.components = []})
               25,
+          Object.tributePaid = True,
           Object.bestowed = True,
           Object.mutating = True,
           Object.prototyped = True,
@@ -252,6 +254,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"
           <> ",\"designationValues\":[{\"designation\":{\"type\":\"Monstrous\"},\"value\":26}]"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Squad\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]}},\"value\":25}]"
+          <> ",\"tributePaid\":true"
           <> ",\"bestowed\":true"
           <> ",\"mutating\":true"
           <> ",\"prototyped\":true"
