@@ -742,17 +742,24 @@ effectObjectRefs effect = case effect of
 -- themselves, so they cannot come to disagree about which opcodes hold one. The
 -- test a reader can apply: no arm of either names a PlayerRef field.
 --
--- No wildcard, and the arms that hold a reference destructure positionally: a
--- new opcode the compiler forces, and so does a new FIELD on a payload that
--- already holds one. What neither the compiler nor this shape catches is an
--- existing field WIDENED to a PlayerRef; slotsOf's corpus lints pay for that,
--- since a reference dropped here stops being reported there, and so does
--- Pawl.CardSpec's planted playerRefPositions.
+-- No wildcard: a new opcode the compiler forces. The arms that hold a reference
+-- in a field of their own read it through the payload's ACCESSOR, so a new field
+-- beside it cannot be absorbed in argument order. What neither the compiler nor
+-- this shape catches is an existing field WIDENED to a PlayerRef; slotsOf's
+-- corpus lints pay for that, since a reference dropped here stops being reported
+-- there, and so does Pawl.CardSpec's planted playerRefPositions.
+--
+-- A reference nested in a DURATION is the third half, beside the one nested in
+-- an ObjectRef: the arms carrying a Duration join durationPlayerRefs in exactly
+-- where slotsOf joins durationSlots. The arms that do NOT are the ones with
+-- nothing to join -- ownSlotsAreExhaustive already refuses a slot-naming
+-- duration on eight of them, and ArmDelayedTrigger captures the whole
+-- environment (CR 603.7c) rather than enumerating it.
 effectPlayerRefs :: Effect card ability -> [PlayerRef]
 effectPlayerRefs effect = case effect of
   Effect.DealDamage {} -> []
   Effect.Fight {} -> []
-  Effect.ModifyTarget {} -> []
+  Effect.ModifyTarget x -> durationPlayerRefs (ModifyTarget.duration x)
   Effect.ChangeText {} -> []
   Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref _) -> [ref]
@@ -794,14 +801,14 @@ effectPlayerRefs effect = case effect of
   Effect.Create (Create.MkCreate _ _ _ _ creator) -> [creator]
   Effect.Conjure {} -> []
   Effect.CreateCopy {} -> []
-  Effect.BecomeCopy {} -> []
+  Effect.BecomeCopy x -> foldMap durationPlayerRefs (BecomeCopy.duration x)
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ _ copier _) -> [copier]
-  Effect.Replace {} -> []
+  Effect.Replace x -> durationPlayerRefs (Replace.duration x)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref _) -> [ref]
-  Effect.PreventNextDamage {} -> []
-  Effect.PreventAllDamage {} -> []
-  Effect.PreventNextDamageInstance {} -> []
-  Effect.RedirectDamage {} -> []
+  Effect.PreventNextDamage x -> durationPlayerRefs (PreventNextDamage.duration x)
+  Effect.PreventAllDamage x -> durationPlayerRefs (PreventAllDamage.duration x)
+  Effect.PreventNextDamageInstance x -> durationPlayerRefs (PreventNextDamageInstance.duration x)
+  Effect.RedirectDamage x -> durationPlayerRefs (RedirectDamage.duration x)
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
@@ -888,7 +895,7 @@ effectPlayerRefs effect = case effect of
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _) -> [caster]
   -- CR 601.3's "that player", the seat the permission is written for.
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ player _ _ _) -> [player]
+  Effect.GrantPlayFromExile x -> durationPlayerRefs (GrantPlayFromExile.duration x) <> [GrantPlayFromExile.player x]
   Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
   Effect.MakeForetold {} -> []
@@ -1236,6 +1243,26 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ForEach (ForEach.MkForEach _ _ body _) -> joinSlots (fmap slotsOf (Foldable.toList body))
   Effect.Heal _ -> Map.empty
 
+-- Every PlayerRef nested in a Duration: the seat CR 611.2a's window is counted
+-- against, which only UntilEndOfNextTurnOf states. durationSlots' twin one type
+-- over, and read by effectPlayerRefs rather than here, so the slot it names
+-- reaches Pawl.EffectLintSpec's singly-read classification the way every other
+-- reference does.
+durationPlayerRefs :: Duration.Duration -> [PlayerRef]
+durationPlayerRefs duration = case duration of
+  Duration.UntilEndOfNextTurnOf ref -> [ref]
+  Duration.UntilEndOfTurn -> []
+  Duration.Indefinite -> []
+  Duration.Perpetual -> []
+  Duration.UntilYourNextTurn -> []
+  Duration.UntilEndOfYourNextTurn -> []
+  -- A Condition's own references are Quantity.bakePlayerRef's half, reached
+  -- through conditionSlots rather than through a list of references.
+  Duration.ForAsLongAs _ -> []
+  Duration.UntilPaid _ -> []
+  Duration.UntilEndOfCombat -> []
+  Duration.UntilUsed -> []
+
 -- CR 611.2b: only ForAsLongAs carries a Quantity, through its Condition.
 durationSlots :: Duration.Duration -> Map.Map SlotName SlotArity
 durationSlots duration = case duration of
@@ -1244,6 +1271,9 @@ durationSlots duration = case duration of
   Duration.Perpetual -> Map.empty
   Duration.UntilYourNextTurn -> Map.empty
   Duration.UntilEndOfYourNextTurn -> Map.empty
+  -- The seat the window is counted against, read exactly as every other
+  -- PlayerRef position is (CR 601.2c).
+  Duration.UntilEndOfNextTurnOf ref -> playerRefSlots ref
   Duration.ForAsLongAs condition -> conditionSlots condition
   -- A Cost reads no slot: the activation cost of an ability is not walked by
   -- modeSlots either, and CR 116.2c's price is paid outside any resolution, so
@@ -1781,6 +1811,9 @@ durationSlotsAreExhaustive duration = case duration of
   Duration.Perpetual -> True
   Duration.UntilYourNextTurn -> True
   Duration.UntilEndOfYourNextTurn -> True
+  -- playerRefSlots' answer is complete for every arm: a PlayerRef names at
+  -- most one slot and nothing nested inside it names another.
+  Duration.UntilEndOfNextTurnOf _ -> True
   Duration.ForAsLongAs condition -> conditionSlotsAreExhaustive condition
   -- durationSlots' answer: a Cost reads no slot, so its enumeration is complete.
   Duration.UntilPaid _ -> True

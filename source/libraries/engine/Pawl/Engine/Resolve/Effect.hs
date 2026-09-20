@@ -1303,8 +1303,8 @@ offerCastOnce context named caster optionality offer = do
 -- instance or CR 614.9's redirection -- Scryfall `o:"prevent the next"
 -- o:"sources"`, 2026-08-27, no hit -- so those three opcodes carry no such
 -- field.
-installDamageRow :: Map.Map SlotName PlayerId -> Map.Map SlotName (Set ObjectId) -> PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Uses.Uses -> Maybe PreventionRider.PreventionRider -> Filter.Type.Filter Keyword.Type.Keyword -> (Maybe (Filter.Type.Filter Keyword.Type.Keyword), Maybe PlayerRelation.PlayerRelation) -> GameState -> (Maybe Recipient, Maybe (Filter.Type.Filter Keyword.Type.Keyword, ObjectId)) -> GameState
-installDamageRow players slots controller source duration kind rewrite uses rider printed describedRecipient g (recipient, sourceChoice) = case Expiry.arm players controller source duration g of
+installDamageRow :: Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set ObjectId) -> PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Uses.Uses -> Maybe PreventionRider.PreventionRider -> Filter.Type.Filter Keyword.Type.Keyword -> (Maybe (Filter.Type.Filter Keyword.Type.Keyword), Maybe PlayerRelation.PlayerRelation) -> GameState -> (Maybe Recipient, Maybe (Filter.Type.Filter Keyword.Type.Keyword, ObjectId)) -> GameState
+installDamageRow targets slots controller source duration kind rewrite uses rider printed describedRecipient g (recipient, sourceChoice) = case Expiry.arm targets controller source duration g of
   -- CR 611.2b: the duration never started, so no shield is installed.
   Nothing -> g
   Just expiry ->
@@ -2844,7 +2844,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- 608.2b, a set that matched nothing) arrives as the empty list.
       case objectRefObjects legal resolving controller source gs ref of
         [] -> gs
-        targets -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+        targets -> case Expiry.arm legal controller source duration gs of
           -- CR 611.2b: the duration never started, so nothing is stored.
           Nothing -> gs
           Just expiry ->
@@ -2897,7 +2897,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- CR 611.2a: no stated duration, so Duration.Indefinite, armed through
           -- Expiry like the other storing arms. Indefinite always arms; the
           -- Nothing branch is written out only because arm is total.
-          case Expiry.arm (Binding.playersIn legal) controller source Duration.Indefinite gs of
+          case Expiry.arm legal controller source Duration.Indefinite gs of
             Nothing -> gs
             Just expiry ->
               -- CR 611 / 612: a continuous effect over the one target, with the
@@ -4445,7 +4445,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Object.playableFromExile holds one, so a reference naming nobody --
           -- or naming several -- grants nothing, PlayerRef.InSlot's own
           -- collapse.
-          [holder] -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+          [holder] -> case Expiry.arm legal controller source duration gs of
             -- CR 611.2b: the duration never started, so no permission is stored.
             Nothing -> gs
             Just expiry ->
@@ -5741,7 +5741,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- onto the subject itself (Binding.setCopy) and nothing has to
                 -- remember them.
                 Nothing -> gs {GameState.objects = foldr write (GameState.objects gs) subjects}
-                Just stated -> case Expiry.arm (Binding.playersIn legal) controller source stated gs of
+                Just stated -> case Expiry.arm legal controller source stated gs of
                   -- CR 611.2b: the duration never started, so nothing is stored.
                   Nothing -> gs
                   Just expiry ->
@@ -5991,7 +5991,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- the OUTER Maybe is the card printing no duration; the inner one is
             -- Expiry.arm reporting that a printed duration never STARTED (CR
             -- 611.2b).
-            State.put (Event.armDelayed ability source controller captured onset (duration >>= \d -> Expiry.arm (Binding.playersIn legal) controller source d gs) gs)
+            State.put (Event.armDelayed ability source controller captured onset (duration >>= \d -> Expiry.arm legal controller source d gs) gs)
   Effect.Replace (Replace.MkReplace duration uses origin condition re) ->
     -- CR 614.3 / 615.3: install the floating replacement. Targetless and
     -- unprompted. CR 113.7: the SOURCE is this effect's source, which with the
@@ -5999,7 +5999,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- travels with the row rather than being re-derived.
     State.modify' $ \gs ->
       let context = effectContext gs controller source legal (slotBindings resolving gs)
-       in case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+       in case Expiry.arm legal controller source duration gs of
             -- CR 611.2b: the duration never started.
             Nothing -> gs
             Just expiry ->
@@ -6110,7 +6110,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             _ ->
               State.modify' $ \g0 ->
                 let amount = Integer.toNaturalSaturating n
-                 in List.foldl' (installDamageRow (Binding.playersIn legal) (Filter.slotObjects context) controller source duration kind (DamageRewrite.PreventNext amount) Uses.Unlimited rider (Filter.Type.And []) describedRecipient) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
+                 in List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration kind (DamageRewrite.PreventNext amount) Uses.Unlimited rider (Filter.Type.And []) describedRecipient) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref whatRecipient direction sourceFilter printedSource riderEffects) -> do
     -- CR 615.1 / 615.3: one floating shield per object the ref names, with no
     -- amount to count down. PreventNextDamage's row but for its rewrite, hence
@@ -6186,7 +6186,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- over the ids the ref named, and each row bakes CR 601.2c's source beside
       -- the live predicate.
       DamageDirection.DealtBy ->
-        State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll Uses.Unlimited rider printedSource (whatRecipient, Nothing)) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
+        State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll Uses.Unlimited rider printedSource (whatRecipient, Nothing)) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
       DamageDirection.DealtTo ->
         -- No row is CR 608.2b's gone target -- a named recipient that left -- so
         -- there is nothing to shield and CR 609.7a's choice, a choice existing
@@ -6205,7 +6205,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- stricter than printed rather than weaker, which a row watching
             -- every source would be.
             (Just _, Nothing) -> pure ()
-            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll Uses.Unlimited rider printedSource (whatRecipient, Nothing)) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
+            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll Uses.Unlimited rider printedSource (whatRecipient, Nothing)) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
   Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration ref sourceFilter) -> do
     -- CR 615.8: install a shield that prevents ONE instance of damage from the
     -- chosen source. The rewrite is PreventAll -- "regardless of how much damage
@@ -6238,7 +6238,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- installed -- stricter than printed rather than weaker, which a row
         -- watching every source would be.
         Nothing -> pure ()
-        Just _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) (Filter.slotObjects context) controller source duration Nothing DamageRewrite.PreventAll Uses.Once Nothing (Filter.Type.And []) (Nothing, Nothing)) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
+        Just _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration Nothing DamageRewrite.PreventAll Uses.Once Nothing (Filter.Type.And []) (Nothing, Nothing)) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind amount srcRef whatRecipient whoRecipient destRef sourceFilter) -> do
     -- CR 614.9: install a floating redirection effect. BOTH sides are baked here,
     -- both being known only at resolution: the source side into
@@ -6297,7 +6297,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- than printed rather than weaker, which a row watching every source
             -- would be.
             (Just _, Nothing) -> pure ()
-            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) (Filter.slotObjects context) controller source duration kind rewrite Uses.Unlimited Nothing (Filter.Type.And []) describedRecipient) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
+            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow legal (Filter.slotObjects context) controller source duration kind rewrite Uses.Unlimited Nothing (Filter.Type.And []) describedRecipient) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
       _ -> pure ()
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref selector) -> do
     -- CR 614.1b: "skip" is a replacement effect, installed floating because a
@@ -6350,7 +6350,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- re-resolved on every read. A NAMED set is baked, the bindings that answer a
     -- target slot (CR 601.2c) being gone once this resolution is over; an
     -- unfilled or illegal slot stores nothing (CR 608.2b).
-    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -6399,7 +6399,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- two refs name, rule 509.1c counting requirements PER CREATURE. Both sets are
     -- enumerated ONCE, for the CR 608.2f simultaneity objectRefObjects buys; an
     -- illegal slot (CR 608.2b) stores nothing, which is provoke's fizzle.
-    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -6427,7 +6427,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Nothing is written onto the permanent itself. CR 701.19c makes this a
     -- property the DESTRUCTION acquires, so the row is read at
     -- Event.resolveDestruction and never by a projection.
-    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -6455,7 +6455,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 613.11 keeps a restriction on a declaration out of the layers, so the row
     -- is read at Pawl.Engine.CombatRestriction.blockProhibited and never by a
     -- projection.
-    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -6484,7 +6484,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 613.11 keeps a prohibition on an activation out of the layers, so the row
     -- is read at Pawl.Engine.ActivationProhibition.cantActivate and never by a
     -- projection.
-    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -6523,7 +6523,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 613.11 keeps a restriction on a declaration out of the layers, so the row
     -- is read at Pawl.Engine.CombatRestriction.attackProhibited (or, aimed, at
     -- Pawl.Engine.CombatRestriction.cantAttackPlayer) and never by a projection.
-    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -6551,7 +6551,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- above is the twin, and its arguments carry over: both sets are enumerated
     -- ONCE for CR 608.2f's simultaneity, and an illegal slot (CR 608.2b) stores
     -- nothing, which is Alluring Siren's fizzle.
-    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -8287,7 +8287,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           | List.notElem controller (Game.stillPlaying gs) -> gs
           -- CR 611.2b's condition is baked against `legal` rather than `chosen`,
           -- so a slot CR 608.2b has emptied never starts the duration.
-          | otherwise -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+          | otherwise -> case Expiry.arm legal controller source duration gs of
               -- CR 611.2b: the duration never started, so nothing is stored and
               -- control never changed.
               Nothing -> gs

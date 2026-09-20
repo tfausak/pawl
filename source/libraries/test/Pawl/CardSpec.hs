@@ -662,6 +662,14 @@ playerRefPositions =
         ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue CastRepetition.Once False), [plantedPlayer "oc-caster"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedPlayer "gp-player") (plantedRef "gp-ref") ManaSpending.AsProduced False), [plantedPlayer "gp-player"]),
+        -- CR 611.2a's reference nested in the DURATION rather than in a field of
+        -- the opcode -- the seat the window is counted against (Suspend
+        -- Aggression). Planted on this opcode because it is the one a card writes
+        -- it on; Resolve.durationPlayerRefs is the traversal, and the arms that
+        -- join it in are the same ones slotsOf joins durationSlots in --
+        -- ModifyTarget, BecomeCopy, Replace, the three prevention opcodes,
+        -- RedirectDamage and this one.
+        ("grant-play-from-exile-duration", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile (Duration.UntilEndOfNextTurnOf (plantedPlayer "gp-duration")) (plantedPlayer "gp-player") (plantedRef "gp-ref") ManaSpending.AsProduced False), [plantedPlayer "gp-duration", plantedPlayer "gp-player"]),
         -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
         -- the opcode -- the two CR 601.3 / 305.1 permissions that name whose zone
         -- (Sen Triplets). Both are planted, since Pawl.Engine.PlayerEffect's
@@ -772,6 +780,8 @@ durationConditions duration = case duration of
   Duration.Perpetual -> []
   Duration.UntilYourNextTurn -> []
   Duration.UntilEndOfYourNextTurn -> []
+  -- A PlayerRef carries no Condition, and so no Count.
+  Duration.UntilEndOfNextTurnOf _ -> []
   Duration.ForAsLongAs condition -> [condition]
   Duration.UntilEndOfCombat -> []
   -- CR 116.2c's price is a Cost, whose Filters are swept by durationFilters
@@ -3599,6 +3609,7 @@ durationFilters duration =
           Duration.Perpetual -> []
           Duration.UntilYourNextTurn -> []
           Duration.UntilEndOfYourNextTurn -> []
+          Duration.UntilEndOfNextTurnOf _ -> []
           Duration.ForAsLongAs _ -> []
           Duration.UntilEndOfCombat -> []
           Duration.UntilUsed -> []
