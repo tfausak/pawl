@@ -800,6 +800,9 @@ modificationCounts modification = case modification of
   Modification.GainAbility granted -> case granted of
     GrantedAbility.Activated ability -> activatedAbilityCounts ability
     GrantedAbility.Triggered ability -> triggeredAbilityCounts ability
+  -- Payload-free: rule 702.165a's grant names the source and carries no text of
+  -- its own, so there is nothing here to sweep.
+  Modification.GainAbilitiesOfSource -> []
   Modification.LoseAllAbilities -> []
   -- Carries a name, which reaches no Count.
   Modification.LoseNamedAbility _ -> []
@@ -3134,6 +3137,7 @@ keywordPayloadFilters keyword = case keyword of
   -- Filter, and rule 702.160a's ability names no quality.
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  Keyword.Backup _ -> []
   -- CR 702.184a is payload-free: the "another untapped creature you control" the
   -- cost taps is written into the ability Pawl.Engine.Keyword.station mints, not
   -- into the keyword.
@@ -3595,6 +3599,8 @@ modificationFilters modification = case modification of
   -- here would flatten them to unframed and lose CR 701.3a's attach-destination
   -- distinction.
   Modification.GainAbility _ -> []
+  -- Payload-free, so no Filter of its own -- see modificationCounts.
+  Modification.GainAbilitiesOfSource -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []

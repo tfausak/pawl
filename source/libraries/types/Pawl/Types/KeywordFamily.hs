@@ -207,6 +207,10 @@ data KeywordFamily
   | -- | CR 702.164a: toxic N. The family Flensing Raptor's "another target
     -- creature you control with toxic" names.
     Toxic
+  | -- | CR 702.165a: backup N. The family a card writing "a creature with
+    -- backup" would name, as against backup 1; no card in the pool asks yet, and
+    -- it is owed at the keyword rather than at the first asker.
+    Backup
   | -- | CR 702.168a: disguise [cost]. CR 702.168d writes this family in the CR's
     -- own voice -- "a face-down permanent you control with A DISGUISE ABILITY" --
     -- and CR 701.58d names it again; no card in the pool asks yet, and it is owed

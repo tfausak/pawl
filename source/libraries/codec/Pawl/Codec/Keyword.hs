@@ -194,6 +194,7 @@ codec =
       Arm.payload "Prototype" Prototype.codec Keyword.Prototype (\x -> case x of Keyword.Prototype y -> Just y; _ -> Nothing),
       Arm.nullary "ForMirrodin" Keyword.ForMirrodin,
       Arm.payload "Toxic" Common.natural Keyword.Toxic (\x -> case x of Keyword.Toxic y -> Just y; _ -> Nothing),
+      Arm.payload "Backup" Common.natural Keyword.Backup (\x -> case x of Keyword.Backup y -> Just y; _ -> Nothing),
       Arm.payload "Disguise" (Cost.codec codec) Keyword.Disguise (\x -> case x of Keyword.Disguise y -> Just y; _ -> Nothing),
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot (\x -> case x of Keyword.Plot y -> Just y; _ -> Nothing),
       Arm.payload "Foretell" (Cost.codec codec) Keyword.Foretell (\x -> case x of Keyword.Foretell y -> Just y; _ -> Nothing),
@@ -380,6 +381,7 @@ tagOf x = case x of
   Keyword.Prototype {} -> "Prototype"
   Keyword.ForMirrodin {} -> "ForMirrodin"
   Keyword.Toxic {} -> "Toxic"
+  Keyword.Backup {} -> "Backup"
   Keyword.Disguise {} -> "Disguise"
   Keyword.Plot {} -> "Plot"
   Keyword.Foretell {} -> "Foretell"

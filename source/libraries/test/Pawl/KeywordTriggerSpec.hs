@@ -3217,6 +3217,143 @@ graftSpec s registry =
               Spec.assertEqWith s "so the printed 0/0 is a 2/2" (Projection.powerOf initiateId after, Projection.toughnessOf initiateId after) (Just 2, Just 2)
               Spec.assertEqWith s "and the land handed its one over" (plusOnes landId after) 0
 
+-- CR 702.165a: "Backup N" means "When this creature enters, put N +1/+1
+-- counters on target creature. If that's another creature, it also gains the
+-- non-backup abilities of this creature printed below this one until end of
+-- turn."
+--
+-- Archpriest of Shadows, {3}{B}{B} Creature -- Human Warlock 4/4, is the
+-- producer, and it is the one that makes BOTH halves of the grant observable:
+-- what it prints below its backup line is a KEYWORD (deathtouch) and a
+-- TRIGGERED ABILITY (its combat-damage reanimation), which travel through two
+-- different arms of Pawl.Engine.Resolve.Effect's expandGrant. (Name, cost, type
+-- line, P/T and Oracle text checked against api.scryfall.com 2026-09-20; the
+-- trigger's "or battle" is the one clause pawl's card omits -- #3940.)
+--
+-- Goblin Piker ({1}{R} Creature -- Goblin 2/1, no abilities) is the recipient,
+-- so every keyword and every ability it shows below is one backup gave it.
+--
+-- Jedit Ojanen ({4}{G}{G} Creature -- Cat Warrior 5/5, no abilities) is bob's
+-- blocker, and its toughness is what makes DEATHTOUCH the discriminator rather
+-- than the +1/+1 counter: neither the printed 2 nor the backed-up 3 damage
+-- destroys a 5/5 on its own.
+--
+-- Hill Giant ({3}{R} Creature -- Giant 3/3, no abilities) waits in alice's
+-- graveyard as the thing the granted trigger returns.
+backupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+backupSpec s registry =
+  let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      giantName = CardName.MkCardName (Text.pack "Hill Giant")
+      -- Pinned by FILTERING the offered set rather than by building a
+      -- Recipient, so CR 608.2b's re-read at resolution sees the recipient the
+      -- prompt actually offered.
+      targeting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      targeting victim p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter ((== Just victim) . Recipient.objectOf) rs) sets
+        _ -> S.identityAnswer p
+      -- The same pin, with combat switched on, for the granted trigger's own
+      -- target -- the card in the graveyard, not the creature that connected.
+      attacking :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      attacking victim p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter ((== Just victim) . Recipient.objectOf) rs) sets
+        _ -> S.aggressiveAnswer p
+      plusOnes oid gs = Map.findWithDefault 0 CounterKind.PlusOnePlusOne (maybe Map.empty Object.counters (Game.lookupObject oid gs))
+      -- CR 706.2's copy choice, then rule 702.165a's target: one answerer, since
+      -- the two prompts are of different shapes.
+      copying :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      copying model victim p = case p of
+        Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== model) legal
+        _ -> targeting victim p
+      -- The Archpriest ENTERS rather than being placed: rule 702.165a's ability
+      -- is a CR 603.6a entry trigger, so a fixture that put the permanent there
+      -- would prove nothing. CR 603.3 places what the entry triggered and the
+      -- ability then resolves.
+      entersTargeting :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      entersTargeting victim card gs =
+        S.runPure (targeting victim) gs (Event.changeZone card Zone.Battlefield >> Engine.settleForPriority >> Stack.resolveTop)
+   in Spec.describe s "Backup" $ do
+        -- THE KEYWORD HALF, at gameplay level. The Piker connects with a 5/5 and
+        -- destroys it, which only deathtouch (CR 702.2b) can do at three damage.
+        Spec.it s "CR 702.165a the backed-up creature kills a 5/5 with the granted deathtouch" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          jedit <- S.printingOf s registry "Jedit Ojanen"
+          archpriest <- S.printingOf s registry "Archpriest of Shadows"
+          case S.combatBoardOf [piker] [jedit] of
+            (gs0, [pikerId], [jeditId]) -> do
+              let (card, staged) = S.addHandCard archpriest S.alice gs0
+                  backed = entersTargeting pikerId card staged
+                  after = S.runCombat S.aggressiveAnswer backed
+              Spec.assertBool s (not (S.onBattlefield jeditId after)) "CR 702.165a the 5/5 blocker was destroyed by the granted deathtouch"
+              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Deathtouch pikerId backed) "and the Piker did hold deathtouch before damage"
+              Spec.assertEqWith s "with rule 702.165a's one +1/+1 counter on it" (plusOnes pikerId backed) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Jedit Ojanen"
+        -- THE PAIR, differing in one thing: rule 702.165a's target. Aimed at the
+        -- Archpriest itself the "if that's another creature" is false, so the
+        -- Piker is the printed 2/1 with no deathtouch and the 5/5 lives.
+        Spec.it s "CR 702.165a aiming the trigger at itself grants nothing" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          jedit <- S.printingOf s registry "Jedit Ojanen"
+          archpriest <- S.printingOf s registry "Archpriest of Shadows"
+          case S.combatBoardOf [piker] [jedit] of
+            (gs0, [pikerId], [jeditId]) -> do
+              let (card, staged) = S.addHandCard archpriest S.alice gs0
+                  -- RE-FOUND after the entry, CR 400.7 having made the permanent
+                  -- a new object; the hand card's id names nothing to target.
+                  placed = S.runPure S.identityAnswer staged (Event.changeZone card Zone.Battlefield)
+                  selfId = Maybe.fromMaybe card (Maybe.listToMaybe (reverse (Game.zoneMembers Zone.Battlefield S.alice placed)))
+                  backed = S.runPure (targeting selfId) placed (Engine.settleForPriority >> Stack.resolveTop)
+                  after = S.runCombat S.aggressiveAnswer backed
+              -- CR 702.165a's "if that's another creature" doing the work: the
+              -- Archpriest already prints deathtouch, so a grant it made to
+              -- ITSELF would be a SECOND instance (CR 613.1f counts them), which
+              -- is the one reading of this board a relaxed condition produces.
+              Spec.assertEqWith s "CR 702.165a the Archpriest holds its one printed deathtouch and no granted second" (Map.lookup Keyword.Type.Deathtouch (Projection.keywordsOf selfId backed)) (Just 1)
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Deathtouch pikerId backed)) "and the Piker gained nothing"
+              Spec.assertBool s (S.onBattlefield jeditId after) "so the 5/5 blocker survived the three damage"
+              Spec.assertEqWith s "and the counters went on the Archpriest itself" (plusOnes selfId backed) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Jedit Ojanen"
+        -- THE ABILITY HALF, at gameplay level, and CR 113.7 with it: the granted
+        -- trigger is the PIKER's, so "this creature" is the Piker and "your
+        -- graveyard" is the Piker's controller's. The Archpriest never attacks,
+        -- being summoning sick, so the reanimation is the copy's.
+        Spec.it s "CR 702.165a the backed-up creature's combat damage fires the granted trigger" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          archpriest <- S.printingOf s registry "Archpriest of Shadows"
+          case S.combatBoardOf [piker] [] of
+            (gs0, [pikerId], _) -> do
+              let (giantCard, buried) = S.addGraveyardCard giant S.alice gs0
+                  (card, staged) = S.addHandCard archpriest S.alice buried
+                  backed = entersTargeting pikerId card staged
+                  after = S.runCombat (attacking giantCard) backed
+              Spec.assertEqWith s "CR 702.165a the granted trigger returned the Hill Giant to the battlefield" (S.countOnBattlefieldByName giantName S.alice after) 1
+              Spec.assertEqWith s "the Piker's three damage reached bob" (S.lifeOf S.bob after) (Just 17)
+              Spec.assertEqWith s "and the Piker is still there to have dealt it" (S.countOnBattlefieldByName pikerName S.alice after) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Piker"
+        -- THE PROJECTION TRIPWIRE. Nothing alice controls PRINTS backup: her
+        -- creature is a Clone, and the keyword and the abilities it hands over
+        -- come off CR 707.2's copiable values (CR 702.165b). A read of the
+        -- printed card anywhere on this road answers "Clone" and grants nothing.
+        Spec.it s "CR 702.165b a Clone of the Archpriest grants what it copied" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          jedit <- S.printingOf s registry "Jedit Ojanen"
+          archpriest <- S.printingOf s registry "Archpriest of Shadows"
+          clone <- S.printingOf s registry "Clone"
+          let cloneCopying printing = case S.combatBoardOf [piker] [printing] of
+                (gs0, [pikerId], [modelId]) ->
+                  let (_, staged) = S.spellOnStack clone S.alice gs0
+                   in Just (pikerId, S.runPure (copying modelId pikerId) staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop))
+                _ -> Nothing
+          case (cloneCopying archpriest, cloneCopying jedit) of
+            (Just (pikerId, copied), Just (otherPiker, vanilla)) -> do
+              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Deathtouch pikerId copied) "CR 702.165b the Clone's backup granted the copied card's deathtouch"
+              Spec.assertEqWith s "and its one +1/+1 counter" (plusOnes pikerId copied) 1
+              -- THE PAIR: the same Clone copying a card with no backup at all,
+              -- so a Piker that gained deathtouch here would have gained it from
+              -- something other than rule 702.165a.
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Deathtouch otherPiker vanilla)) "where a Clone of the 5/5 grants nothing"
+            _ -> Spec.assertFailure s "fixture should give alice a Piker"
+
 -- CR 702.101a: "Extort is a triggered ability. 'Extort' means 'Whenever you cast
 -- a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you gain
 -- life equal to the total life lost this way.'"
@@ -3430,6 +3567,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   exploitSpec s registry
   championSpec s registry
   graftSpec s registry
+  backupSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry

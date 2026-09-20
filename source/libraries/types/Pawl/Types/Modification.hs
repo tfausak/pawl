@@ -125,6 +125,34 @@ data Modification ability
     -- ModifyTarget -- would carry both. The sum lives one module out
     -- instead, in Pawl.Types.GrantedAbility.
     GainAbility ability
+  | -- | layer 6, CR 613.1f \/ 702.165a: this object gains the non-backup
+    -- abilities of THIS effect's SOURCE, the grant backup's minted trigger makes
+    -- ("it also gains the non-backup abilities of this creature").
+    --
+    -- NULLARY, and the source is read rather than named, for
+    -- SetControllerToSource's reason: a keyword's mint is card-independent data
+    -- and cannot name the abilities of a card it has not met.
+    --
+    -- EXPANDED AS THE ABILITY RESOLVES, by Pawl.Engine.Resolve.Effect's
+    -- ModifyTarget arm, into one ordinary GainKeyword or GainAbility per ability
+    -- the source's COPIABLE characteristics (CR 707.2) carry. So this arm never
+    -- reaches Pawl.Engine.Projection, and the grant outlives the source: a
+    -- projection-time read would evaporate when the creature with backup died,
+    -- where CR 702.165a's "until end of turn" keeps it.
+    --
+    -- The copiable values and not the printed face, which is CR 702.165b and CR
+    -- 702.165c together: a permanent that entered as a COPY of a card with
+    -- backup grants what it copied, and an ability a layer-6 effect afterwards
+    -- gave the creature with backup is not granted. Pawl.KeywordTriggerSpec's Backup group
+    -- proves the first half.
+    --
+    -- Not implemented: a static ability, a player static ability or a special
+    -- action of the source. Those three are gathered from the object's copiable
+    -- characteristics rather than from the projection
+    -- (Pawl.Engine.Projection.View's staticAbilitiesOf), so a granted one would
+    -- go on generating its effect from the source instead (#3748). Streetwise
+    -- Negotiator is the card with backup that needs it.
+    GainAbilitiesOfSource
   | LoseAllAbilities -- layer 6 (Humility)
   | -- | layer 6, CR 613.1f: this object loses the abilities carrying this name
     -- -- "this creature loses this ability", the clause every Licid prints ahead

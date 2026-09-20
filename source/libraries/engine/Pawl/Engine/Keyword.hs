@@ -484,6 +484,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Decayed -> List.genericReplicate count decayed
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  -- CR 702.165b: each instance triggers separately (Conclave Sledge-Captain prints three).
+  Keyword.Backup n -> List.genericReplicate count (backup n)
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   -- CR 702.157a's and CR 702.175a's enters triggers, one per distinct keyword:
@@ -744,6 +746,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Training -> []
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  Keyword.Backup _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Ravenous -> []
@@ -1299,6 +1302,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Training -> []
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  Keyword.Backup _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Ravenous -> []
@@ -1936,6 +1940,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Training -> []
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  Keyword.Backup _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Ravenous -> []
@@ -2647,6 +2652,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Training -> []
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  Keyword.Backup _ -> []
   -- CR 702.168a grants NO permission, and it is the near miss worth stating: the
   -- ability "functions in any zone FROM WHICH YOU COULD PLAY THE CARD it's on",
   -- so it widens no zone -- CR 702.168b's "you can use a disguise ability to cast
@@ -4334,6 +4340,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Training -> []
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  Keyword.Backup _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   -- CR 702.156a's replacement half, CR 614.1c: Protean Hydra's printed row,
@@ -4617,6 +4624,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Training -> []
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  Keyword.Backup _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Ravenous -> []
@@ -4911,6 +4919,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Training -> []
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
+  Keyword.Backup _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Ravenous -> []
@@ -5054,6 +5063,7 @@ familyOf keyword = case keyword of
   -- inset frame's cost and box.
   Keyword.Prototype _ -> Just KeywordFamily.Prototype
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
+  Keyword.Backup _ -> Just KeywordFamily.Backup
   Keyword.Disguise _ -> Just KeywordFamily.Disguise
   Keyword.Plot _ -> Just KeywordFamily.Plot
   Keyword.Ravenous -> Nothing
@@ -6919,6 +6929,74 @@ fabricate n =
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
+
+-- CR 702.165a: "When this creature enters, put N +1\/+1 counters on target
+-- creature. If that's another creature, it also gains the non-backup abilities
+-- of this creature printed below this one until end of turn." Fabricate's mint
+-- over CR 603.6a's entry event, so the condition is TriggerCondition.SelfEnters.
+--
+-- TWO CLAUSES and one target slot, which is how the sentence is punctuated: the
+-- counters land whatever the target turns out to be, and only the grant carries
+-- the "if". Mandatory throughout -- rule 702.165a prints no "may".
+--
+-- "IF THAT'S ANOTHER CREATURE" rides the second clause's own condition rather
+-- than the trigger's intervening "if" (CR 603.4), because the sentence prints it
+-- mid-instruction: CR 608.2c applies the clauses in the order written, so the
+-- test is made after the counters are on. It is a count of the bound slot,
+-- Filter.Not Filter.IsSource being the "another" and the card type being the
+-- "creature" -- a target that stopped being a creature while the trigger waited
+-- gains nothing, which is rule 702.165a's word read plainly.
+--
+-- THE GRANT is Modification.GainAbilitiesOfSource, whose header carries the rest
+-- of the rule: what it reads off the source, when, and what it cannot reach.
+backup :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+backup n =
+  let slot = TargetSlot.required Pool.Creatures Nothing
+      counters =
+        Effect.PutCounters
+          ( PutCounters.MkPutCounters
+              CounterKind.PlusOnePlusOne
+              (Quantity.Literal (toInteger n))
+              (ObjectRef.InSlot backupTarget)
+          )
+      grant =
+        Effect.ModifyTarget
+          ModifyTarget.MkModifyTarget
+            { ModifyTarget.duration = Duration.UntilEndOfTurn,
+              ModifyTarget.modification = Modification.GainAbilitiesOfSource,
+              ModifyTarget.ref = ObjectRef.InSlot backupTarget
+            }
+      another =
+        Condition.Compares
+          Compares.MkCompares
+            { Compares.measured =
+                Quantity.Count
+                  ( Count.MkCount
+                      (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                      (Filter.And [Filter.IsBound backupTarget, Filter.HasCardType CardType.Creature, Filter.Not Filter.IsSource])
+                      Aggregation.Members
+                  ),
+              Compares.comparison = Comparison.AtLeast,
+              Compares.threshold = Quantity.Literal 1
+            }
+      clauses =
+        Seq.fromList
+          [ Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton counters),
+            Clause.MkClause Nothing (Just another) Nothing Optionality.Mandatory Nothing (Seq.singleton grant)
+          ]
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode clauses (Map.singleton backupTarget slot)))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- The slot rule 702.165a's one target is chosen into, mentorTarget's position.
+backupTarget :: SlotName.SlotName
+backupTarget = SlotName.MkSlotName (Text.pack "backupRecipient")
 
 -- CR 702.110a in one clause: "When this creature enters, you may sacrifice a
 -- creature." The "may" is CR 603.5's printed one, so it rides

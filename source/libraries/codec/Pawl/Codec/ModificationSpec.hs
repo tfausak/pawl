@@ -253,6 +253,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.AddChosenColor
       " {\"type\":\"AddChosenColor\"} "
+  -- layer 6, CR 702.165a: the abilities come off the effect's SOURCE, so the arm
+  -- itself is payload-free.
+  Spec.it s "GainAbilitiesOfSource" $
+    Common.assertCodec
+      s
+      codec
+      Modification.GainAbilitiesOfSource
+      " {\"type\":\"GainAbilitiesOfSource\"} "
   -- layer 3, CR 612.5: the two sides come from the effect's affected set, so
   -- the arm itself is payload-free.
   Spec.it s "ExchangeTextBoxes" $
