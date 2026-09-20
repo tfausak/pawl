@@ -222,6 +222,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
+import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -666,7 +667,7 @@ playerRefPositions =
         -- (Sen Triplets). Both are planted, since Pawl.Engine.PlayerEffect's
         -- traversal is what the AffectPlayers arm delegates to and a missing arm
         -- there answers [] rather than failing to compile.
-        ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []))), [plantedPlayer "ap-cast"]),
+        ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []) PermissionLimit.Unlimited)), [plantedPlayer "ap-cast"]),
         ("affect-players-play-lands-from", affecting (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (plantedPlayer "ap-land"))), [plantedPlayer "ap-land"]),
         -- And an arm carrying none, so the traversal is shown answering nothing where
         -- there is nothing to answer.

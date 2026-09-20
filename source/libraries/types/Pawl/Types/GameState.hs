@@ -19,6 +19,7 @@ import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -277,6 +278,21 @@ data GameState = MkGameState
     -- identically worded twin is the caveat Object.activatedOnce's haddock states
     -- about the same key.
     activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
+    -- | CR 601.3: which once-each-turn cast permissions have been used this
+    -- turn, read by PermissionLimit.OnceEachTurn alone; cleared at turn handoff,
+    -- which is the whole of "each turn". Keyed by the object granting the
+    -- permission and then by the permission itself, so two copies of one
+    -- enchantment grant two budgets and one permanent printing two permissions
+    -- spends them separately -- the grain activatedThisTurn above uses for CR
+    -- 602.5b's activation-side twin, and for that rule's reason: the budget is
+    -- the ability's and survives a change of control.
+    --
+    -- The permission BY VALUE, so a CR 612.1 word swap that changed this
+    -- permission's own filter mid-turn would leave a spent budget unfound --
+    -- the caveat activatedThisTurn's key carries too. No text change reaches
+    -- one: Pawl.Engine.Projection.Rewrite swaps subtype words, and the pool's
+    -- one budgeted permission narrows by card type.
+    castPermissionsUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set CastFromZone.CastFromZone),
     -- | The printed rider "This ability triggers only once"
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
     -- ability carrying that rider, as the same record CR 603.3b's log carries.
