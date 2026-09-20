@@ -3132,6 +3132,9 @@ keywordPayloadFilters keyword = case keyword of
   -- permanents the rules state, which no Filter this value carries reaches.
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  -- CR 702.132a is payload-free: what it names is the generic mana in the
+  -- spell's own total cost, which no Filter this value carries reaches.
+  Keyword.Assist -> []
   -- CR 702.177a is payload-free: the rider it adds is the rules', and the ability
   -- it modifies is the CARD's own, so any Filter in it is swept there.
   Keyword.Exhaust -> []

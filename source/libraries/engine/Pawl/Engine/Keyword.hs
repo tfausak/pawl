@@ -524,6 +524,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
@@ -769,6 +770,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Exert -> []
@@ -1325,6 +1327,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Exert -> []
@@ -1965,6 +1968,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
@@ -2696,6 +2700,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Exert -> []
@@ -4394,6 +4399,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
@@ -4673,6 +4679,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
@@ -4970,6 +4977,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
   Keyword.Storied -> []
+  Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Exert -> []
@@ -5234,6 +5242,7 @@ familyOf keyword = case keyword of
   Keyword.StartYourEngines -> Nothing
   Keyword.Ascend -> Nothing
   Keyword.Storied -> Nothing
+  Keyword.Assist -> Nothing
   -- CR 702.177a's exhaust is NULLARY, so it has no family: the keyword itself
   -- is what Pawl.Types.KeywordDesignator.OfNullary names.
   Keyword.Exhaust -> Nothing

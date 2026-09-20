@@ -2633,6 +2633,8 @@ promptDecider prompt = case prompt of
   Prompt.ChooseClash decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEntwine decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBuyback decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseAssistant decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseAssistAmount decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseKicker decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ReturnCommander decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLibraryEnd decider _ _ -> Just (Decider.unwrap decider)
@@ -2771,6 +2773,8 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseClash {} -> "ChooseClash"
   Prompt.ChooseEntwine {} -> "ChooseEntwine"
   Prompt.ChooseBuyback {} -> "ChooseBuyback"
+  Prompt.ChooseAssistant {} -> "ChooseAssistant"
+  Prompt.ChooseAssistAmount {} -> "ChooseAssistAmount"
   Prompt.ChooseKicker {} -> "ChooseKicker"
   Prompt.ReturnCommander {} -> "ReturnCommander"
   Prompt.ChooseLibraryEnd {} -> "ChooseLibraryEnd"

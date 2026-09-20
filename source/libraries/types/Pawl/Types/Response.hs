@@ -663,6 +663,18 @@ data Response
     -- spell's buyback cost, which is what rule 702.27a's second static ability
     -- reads as the spell resolves.
     AnnouncedBuyback BuybackDecision.BuybackDecision
+  | -- | CR 702.132a's answer: which other player the caster chose to assist the
+    -- spell, Nothing where they chose nobody.
+    ChoseAssistant (Maybe PlayerId.PlayerId)
+  | -- | CR 702.132a's answer: how much of the generic mana in the total cost the
+    -- assisting player paid.
+    --
+    -- Its own constructor and not ChosePaidEnergy or ChoseX, though all three
+    -- carry one Natural, for ChosePaidEnergy's reason: this one is made by the
+    -- ASSISTING player once the mana windows have closed, and a transcript of
+    -- one replaying as another would be a silently wrong answer rather than a
+    -- desync.
+    ChoseAssistAmount Natural.Natural
   | -- | CR 903.9a's answer: whether the commander goes to the command zone.
     ReturnedCommander CommandZoneDecision.CommandZoneDecision
   | -- | CR 401.2's answer: the end of their library an owner picked for one card.

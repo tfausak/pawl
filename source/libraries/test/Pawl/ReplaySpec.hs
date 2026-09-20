@@ -1661,6 +1661,30 @@ combatReplaySpec s =
         Spec.it s "a short paid-energy transcript pays nothing" $
           -- Paying nothing is legal on any board, whatever the payer holds.
           Spec.assertEqWith s "zero" (Replay.defaultAnswer (Prompt.ChoosePaidEnergy decider S.alice oid 5)) 0
+        -- CR 702.132a: both of assist's answers are decisions, so each has to
+        -- survive a transcript like any other.
+        Spec.it s "ChooseAssistant round-trips through the transcript" $ do
+          let p = Prompt.ChooseAssistant decider S.alice oid (S.bob NonEmpty.:| [])
+          Spec.assertEqWith s "naming bob round trips" (Replay.decode p (Replay.encode p (Just S.bob))) (Just (Just S.bob))
+          -- Discriminating: a decode that ignored the response and answered
+          -- nobody would pass the declining leg by accident.
+          Spec.assertEqWith s "naming nobody round trips" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+        Spec.it s "a short assistant transcript names nobody" $
+          -- Choosing nobody is legal on any board (CR 702.132a's "may").
+          Spec.assertEqWith s "nobody" (Replay.defaultAnswer (Prompt.ChooseAssistant decider S.alice oid (S.bob NonEmpty.:| []))) Nothing
+        Spec.it s "ChooseAssistAmount round-trips through the transcript" $ do
+          let p = Prompt.ChooseAssistAmount decider S.bob oid 7
+          Spec.assertEqWith s "paying five round trips" (Replay.decode p (Replay.encode p 5)) (Just 5)
+          Spec.assertEqWith s "paying nothing round trips" (Replay.decode p (Replay.encode p 0)) (Just 0)
+        Spec.it s "an assist amount does not decode as a paid-energy amount" $
+          -- Discriminating: fails if ChooseAssistAmount reuses ChosePaidEnergy
+          -- rather than getting its own Natural-shaped constructor. CR 702.132a's
+          -- amount is named by the ASSISTING player as a spell is cast, so a
+          -- transcript of one replaying as the other is a silent wrong answer.
+          Spec.assertEqWith s "mismatch" (Replay.decode (Prompt.ChooseAssistAmount decider S.bob oid 7) (Response.ChosePaidEnergy 5)) Nothing
+        Spec.it s "a short assist-amount transcript pays nothing" $
+          -- Paying nothing is legal on any board (CR 702.132a's second "may").
+          Spec.assertEqWith s "zero" (Replay.defaultAnswer (Prompt.ChooseAssistAmount decider S.bob oid 7)) 0
         -- CR 608.2d: which card the resolving controller took out of a graveyard
         -- is a decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseCardInGraveyard round-trips through the transcript" $ do

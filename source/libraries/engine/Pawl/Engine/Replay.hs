@@ -122,6 +122,8 @@ encode p answer = case p of
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseKicker {} -> Response.AnnouncedKicker answer
   Prompt.ChooseBuyback {} -> Response.AnnouncedBuyback answer
+  Prompt.ChooseAssistant {} -> Response.ChoseAssistant answer
+  Prompt.ChooseAssistAmount {} -> Response.ChoseAssistAmount answer
   Prompt.ReturnCommander {} -> Response.ReturnedCommander answer
   Prompt.ChooseLibraryEnd {} -> Response.ChoseLibraryEnd answer
   Prompt.ArrangeLibraryArrivals {} -> Response.ArrangedLibraryArrivals answer
@@ -579,6 +581,12 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseBuyback {} -> case response of
     Response.AnnouncedBuyback decision -> Just decision
+    _ -> Nothing
+  Prompt.ChooseAssistant {} -> case response of
+    Response.ChoseAssistant helper -> Just helper
+    _ -> Nothing
+  Prompt.ChooseAssistAmount {} -> case response of
+    Response.ChoseAssistAmount amount -> Just amount
     _ -> Nothing
   Prompt.ReturnCommander {} -> case response of
     Response.ReturnedCommander decision -> Just decision
@@ -1090,6 +1098,13 @@ defaultAnswer p = case p of
   -- CR 702.27a: buyback is a "may" too, so declining is always legal and costs no
   -- mana -- entwine's reason above.
   Prompt.ChooseBuyback {} -> BuybackDecision.Declines
+  -- CR 702.132a: choosing a player is a "may", so choosing nobody is always
+  -- legal -- entwine's reason above -- and it is the answer that opens no second
+  -- window.
+  Prompt.ChooseAssistant {} -> Nothing
+  -- CR 702.132a's second "may", and zero is its decline: an assisting player who
+  -- pays nothing leaves the whole total cost with the caster.
+  Prompt.ChooseAssistAmount {} -> 0
   -- CR 903.9a is a "may", so leaving the commander where it is is always legal
   -- and is the answer that changes nothing.
   Prompt.ReturnCommander {} -> CommandZoneDecision.Leaves

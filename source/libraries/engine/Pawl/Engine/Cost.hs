@@ -4548,6 +4548,131 @@ chooseSource covered pid candidates gs = do
     Just oid | List.elem oid (NonEmpty.toList candidates) -> Just oid
     _ -> Nothing
 
+-- CR 107.4b: how much GENERIC mana a cost states -- the amount CR 702.132a's
+-- chosen player may pay any part of. Only the generic symbol: CR 107.4e's {2/B}
+-- is one symbol two mana pay rather than a generic component, and rule 702.132a
+-- names the component.
+genericMana :: Cost Keyword.Type.Keyword -> Natural
+genericMana cost = sum (fmap genericOf (foldMap ManaCost.unwrap (Cost.mana cost)))
+
+-- genericMana's per-symbol half, enumerated rather than defaulted so that a new
+-- CR 107.4 symbol has to say whether it is generic.
+genericOf :: ManaSymbol.ManaSymbol -> Natural
+genericOf symbol = case symbol of
+  ManaSymbol.Generic n -> n
+  ManaSymbol.OfType _ -> 0
+  ManaSymbol.Hybrid _ -> 0
+  ManaSymbol.MonocoloredHybrid _ -> 0
+  ManaSymbol.Phyrexian _ -> 0
+  ManaSymbol.HybridPhyrexian _ -> 0
+  -- CR 107.4h's {S} demands mana from a snow source, which is a fact about
+  -- where the mana came from rather than a generic component.
+  ManaSymbol.Snow -> 0
+  -- CR 107.3: {X} is already the announced value by the time a total cost is
+  -- read (`substituteX`), so this arm is the UNannounced symbol and counts for
+  -- nothing rather than guessing one.
+  ManaSymbol.Variable -> 0
+
+-- CR 702.132a's first three sentences: before the caster activates mana
+-- abilities they may choose another player, and that player then has a chance to
+-- activate mana abilities of their own. Answers WHO was chosen; `payAssist`
+-- below is the rule's last sentence.
+--
+-- Asked only where the total cost holds generic mana, which is rule 702.132a's
+-- own condition -- a cost with none leaves the chosen player nothing to pay and
+-- the rule offers no choice.
+--
+-- The candidates are every OTHER player still in the game (CR 104.2a), not the
+-- caster's opponents: rule 702.132a says "another player", and a teammate is one
+-- (CR 102.3).
+--
+-- NEVER ELIDED for a lone candidate, `chooseSource`'s posture: declining is an
+-- answer on every board, and a player who is asked gets a mana window the
+-- caster's board can see. FILTERED, NOT TRUSTED for the same reason -- an
+-- unrecognised answer reads as choosing nobody, since the fallback must not
+-- draft a player into the cast.
+--
+-- The chosen player's window is `payManaWindow` over an EMPTY cost: rule 702.132a
+-- gives them a chance to activate mana abilities and nothing yet to pay, so the
+-- loop is the ordinary CR 605.3a one and its settlement spends no symbol. It runs
+-- HERE, ahead of the caster's, which is the order rule 702.132a states.
+--
+-- Not implemented: rule 733.1's option to keep the mana abilities this window
+-- activated when the cast is reversed -- its undo is discarded and the cast
+-- unwinds whole, `paySubstituting`'s reason (#3119).
+--
+-- Not implemented: a cast this keyword ENABLES. CR 601.2's announcement runs
+-- whether or not the caster can pay, where Pawl.Engine.Cast gates it on
+-- `payableCost` over the caster's own sources -- so an assisted cast can save
+-- the caster mana and never afford them a spell (#3959).
+offerAssist :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set Keyword.Type.Keyword -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Maybe PlayerId)
+offerAssist perform keywords subject pid sid cost
+  | not (Set.member Keyword.Type.Assist keywords) = pure Nothing
+  | genericMana cost == 0 = pure Nothing
+  | otherwise = do
+      gs <- State.get
+      case NonEmpty.nonEmpty (filter (/= pid) (Game.stillPlaying gs)) of
+        Nothing -> pure Nothing
+        Just candidates -> do
+          answer <- Game.choose (Prompt.ChooseAssistant (Decide.deciderFor pid gs) pid sid candidates)
+          let chosen = case answer of
+                Just helper | List.elem helper (NonEmpty.toList candidates) -> Just helper
+                _ -> Nothing
+          Monad.forM_
+            chosen
+            ( \helper ->
+                Monad.void (payManaWindow perform Set.empty Nothing subject ManaSpending.AsProduced helper (\mc -> pure (mc, [])) (ManaCost.MkManaCost []))
+            )
+          pure chosen
+
+-- CR 702.132a's last sentence: before the caster begins to pay the total cost,
+-- the player they chose may pay for any amount of the generic mana in it.
+-- Answers the cost that is LEFT for the caster.
+--
+-- Run at the seam rule 702.132a names and CR 601.2g fixes -- both windows shut,
+-- no symbol of the cost spent -- which is where `paySubstituting` already runs CR
+-- 702.51b's substitution offer, so this rides that hook
+-- (Pawl.Engine.Cast.castProposed) rather than opening a seam of its own.
+--
+-- The BOUND offered is what their pool actually pays, walked up from one rather
+-- than named as a ceiling: CR 118.3 governs what a player may pay, and a generic
+-- demand any unit serves makes the payable amounts a prefix.
+--
+-- CLAMPED, not rejected -- Prompt.ChoosePaidEnergy's posture: rule 702.132a
+-- states an amount a player may pay rather than an announcement the cast rests
+-- on, so an answer past the bound is enforced down to it.
+--
+-- CR 118.14's permission is the CASTER's and is not extended here: rule 118.14
+-- scopes it to "mana that player spends to cast spells that way", and the
+-- assisting player is not casting. CR 609.4b's per-player half IS theirs, so
+-- `spendManaAsThough` is read off them.
+--
+-- Not implemented: CR 400.7d's record of the mana this payment spent, which the
+-- caster's own window writes onto the spell (`payManaWindow`'s recordSpent) and
+-- this one does not -- so CR 106.6a's rider on an assisting player's mana never
+-- matches the spell it helped pay for (#3958).
+payAssist :: PlayerId -> PaymentSubject.PaymentSubject -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
+payAssist helper subject sid cost = case Cost.mana cost of
+  Nothing -> pure cost
+  Just manaCost -> do
+    gs <- State.get
+    let asThough = PlayerEffect.spendManaAsThough helper gs
+        (available, withheld) = Mana.spendableFor subject helper gs
+        generic amount = ManaCost.MkManaCost [ManaSymbol.Generic amount]
+        planFor amount = Mana.plan asThough ManaSpending.AsProduced 0 (generic amount) (Mana.Type.MkMana available)
+        bound = Natural.length (takeWhile (Maybe.isJust . planFor) [1 .. genericMana cost])
+    if bound == 0
+      then pure cost
+      else do
+        answer <- Game.choose (Prompt.ChooseAssistAmount (Decide.deciderFor helper gs) helper sid bound)
+        let amount = min answer bound
+        case planFor amount of
+          Nothing -> pure cost
+          Just (steps, _) -> do
+            (Mana.Type.MkMana left, _) <- Mana.spendChosen helper asThough steps (Mana.Type.MkMana available)
+            State.modify' (Mana.setPool helper (Mana.Type.MkMana (withheld <> left)))
+            pure cost {Cost.mana = Just (withoutMana (ManaSymbol.Generic 0) amount manaCost)}
+
 -- CR 106.12's "tap [a permanent] for mana" -- activate one of its mana
 -- abilities, which by CR 602.2b means paying that ability's whole cost and then
 -- adding what it yields. CR 605.3b keeps it off the stack, so this is immediate,

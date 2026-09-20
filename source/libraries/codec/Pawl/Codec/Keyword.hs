@@ -204,6 +204,7 @@ codec =
       Arm.payload "Escape" (Cost.codec codec) Keyword.Escape (\x -> case x of Keyword.Escape y -> Just y; _ -> Nothing),
       Arm.payload "Companion" (Filter.codec codec) Keyword.Companion (\x -> case x of Keyword.Companion y -> Just y; _ -> Nothing),
       Arm.nullary "Ascend" Keyword.Ascend,
+      Arm.nullary "Assist" Keyword.Assist,
       Arm.nullary "Storied" Keyword.Storied,
       Arm.nullary "Exhaust" Keyword.Exhaust,
       Arm.nullary "Boast" Keyword.Boast,
@@ -393,6 +394,7 @@ tagOf x = case x of
   Keyword.Escape {} -> "Escape"
   Keyword.Companion {} -> "Companion"
   Keyword.Ascend {} -> "Ascend"
+  Keyword.Assist {} -> "Assist"
   Keyword.Storied {} -> "Storied"
   Keyword.Exhaust {} -> "Exhaust"
   Keyword.Boast {} -> "Boast"

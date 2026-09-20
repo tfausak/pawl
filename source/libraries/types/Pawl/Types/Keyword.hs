@@ -598,6 +598,12 @@ data Keyword
     -- ability on an instant or sorcery, a static one anywhere else, both carried
     -- out by Pawl.Engine.PlayerDesignation rather than minted.
     Ascend
+  | -- | 702.132a: a static ability modifying the rules of paying for the spell
+    -- (CR 601.2g-h) -- before you activate mana abilities you may choose another
+    -- player, who then activates theirs and may pay for any amount of the
+    -- generic mana in the total cost. Pawl.Engine.Cost.offerAssist and
+    -- Pawl.Engine.Cost.payAssist are the two halves.
+    Assist
   | -- | 702.133a: cast this card from your graveyard by discarding a card as an
     -- ADDITIONAL cost, and exile it as it leaves the stack.
     JumpStart
