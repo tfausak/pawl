@@ -1268,6 +1268,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   grifterBladeSpec s registry
   hyenaUmbraSpec s registry
   darkblastSpec s registry
+  replicaFoundrySpec s registry
 
 -- Faerie Squadron {U} Creature -- Faerie 1/1, whole text: "Kicker {3}{U} (You may
 -- pay an additional {3}{U} as you cast this spell.) / If this creature was
@@ -3057,3 +3058,56 @@ dredging p = case p of
 -- graveyardNames one zone over.
 handNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
 handNames pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Hand pid gs))
+
+-- Synthetic Replica Foundry {2}{W} Artifact, whole text: "If one or more tokens
+-- would be created under your control, those tokens plus a 1/1 colorless Servo
+-- artifact creature token are created instead."
+--
+-- Synthetic because the ATOM is what needs a producer, not the sentence. Every
+-- printed row of this shape says "tokens" as the NOUN that
+-- Pawl.Types.TokenPattern's whatToken already scopes -- Scryfall
+-- @o:"would be created" or o:"would create one or more" or o:"you would create"@,
+-- 2026-09-20, 33 cards, each narrowing by card type or subtype and none by
+-- token-ness -- so their transcriptions leave whatToken empty and none puts
+-- Filter.IsToken, pawl's spelling of printed "token" (Ashaya, Soul of the Wild's
+-- "nontoken"), under it. Doubling Season or Quina, Qu Gourmet transcribed that
+-- way would refute this card. Writing the atom is what makes the two branches of
+-- Pawl.Engine.Replacement.matchesTokenLot observable apart.
+replicaFoundrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+replicaFoundrySpec s registry =
+  Spec.describe s "Synthetic Replica Foundry (CR 111.1)" $ do
+    -- THE PROVING TEST for the text-lot half of
+    -- Pawl.Engine.Replacement.matchesTokenLot. CR 111.1: the Goblins Dragon
+    -- Fodder would create are tokens, so the row's IsToken (CR 111.6) matches
+    -- them. Built from the printed face alone the view answers `token = False`,
+    -- and this case reads 0 Servos.
+    Spec.it s "CR 614.12 a text lot is judged as a token, so IsToken matches it" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      foundry <- S.printingOf s registry "Synthetic Replica Foundry"
+      dragonFodder <- S.printingOf s registry "Dragon Fodder"
+      let base = S.landsInPlay mountain 2
+          (_, g1) = S.addPermanent foundry S.alice base
+          (g2, spellId) = S.handOne dragonFodder g1
+          after = castAndResolve S.identityAnswer g2 spellId
+      Spec.assertEqWith s "the row saw the Goblins as tokens and appended its Servo" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Servo Token")) S.alice after) 1
+      Spec.assertEqWith s "setup: the Goblins themselves were created" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Token")) S.alice after) 2
+    -- The control, on the other branch of the same function: CR 707.1's copy
+    -- lot carries the copied permanent's characteristics instead of given text
+    -- and is judged through Pawl.Engine.Count.viewOfSnapshot, which was already
+    -- told the candidate is a token. Same row, same atom: the pair is what says
+    -- the two branches agree.
+    Spec.it s "CR 707.1 a copy lot is judged as a token too" $ do
+      island <- S.printingOf s registry "Island"
+      foundry <- S.printingOf s registry "Synthetic Replica Foundry"
+      piker <- S.printingOf s registry "Goblin Piker"
+      counterpart <- S.printingOf s registry "Cackling Counterpart"
+      let base = S.landsInPlay island 3
+          (_, g1) = S.addPermanent foundry S.alice base
+          (pikerId, g2) = S.addPermanent piker S.alice g1
+          (g3, spellId) = S.handOne counterpart g2
+          -- raceAnswer for its target arm alone: it aims the one slot at the
+          -- Piker by id, and this board has a single replacement row, so its
+          -- CR 616.1 arm never runs.
+          after = castAndResolve (raceAnswer pikerId pikerId) g3 spellId
+      Spec.assertEqWith s "the copy token drew the Servo as well" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Servo Token")) S.alice after) 1
+      Spec.assertEqWith s "setup: the copy token itself was created" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 2
