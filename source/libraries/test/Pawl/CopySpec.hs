@@ -3969,7 +3969,7 @@ flamerushRiderSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
 -- FOUR MOUNTAINS, which is exactly the printed {3}{R} and three short of the
 -- overload {5}{R}{R}{R}: the leg below is rule 707.12 on the targeted clause,
 -- and the card's overloaded clause is unreached on this board.
-castCopySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+castCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   Spec.it s "CR 707.12 Mizzix's Mastery casts a copy of the exiled Bolt, which the card itself never becomes" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -4002,11 +4002,61 @@ castCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
       (zones (leg OptionalDecision.Declines))
       (Just 20, exileAfterMastery, 0)
 
+  -- CR 707.12a's per-object choice, and the overloaded reading of the same card
+  -- (CR 702.96b): EIGHT MOUNTAINS is exactly the overload {5}{R}{R}{R} and four
+  -- more than the printed {3}{R}, so the cost is a choice rather than the only
+  -- thing payable. TWO Bolts in the graveyard is what makes the repetition
+  -- observable -- bob takes six, and both cards are still in exile beside the
+  -- Mastery.
+  Spec.it s "CR 707.12a overloaded, each of the two exiled Bolts is copied and its copy offered separately" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mastery <- S.printingOf s registry "Mizzix's Mastery"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, gs0) = S.addGraveyardCard bolt S.alice (S.landsInPlay mountain 8)
+        (_, gs1) = S.addGraveyardCard bolt S.alice gs0
+        (masteryId, gs2) = S.addHandCard mastery S.alice gs1
+        board =
+          gs2
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        answer = overloading S.bob
+        afterCast = S.runPure answer board (S.cast S.alice masteryId)
+        after = S.runPure answer afterCast (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith
+      s
+      "CR 707.12a bob took three from each copy, and both Bolt CARDS are in exile beside the Mastery with alice's graveyard empty"
+      (S.lifeOf S.bob after, List.sort (concatMap (\oid -> Set.toList (PC.names (Projection.project oid after))) (Game.zoneMembers Zone.Exile S.alice after)), length (Game.zoneMembers Zone.Graveyard S.alice after))
+      (Just 14, List.sort [boltName, boltName, masteryName], 0)
+
 -- What alice's exile holds once Mizzix's Mastery has resolved: the card its
 -- first clause exiled and the Mastery its last clause exiled, and nothing else.
 -- The copy is on neither leg -- cast on one, swept by CR 704.5e on the other.
 exileAfterMastery :: [CardName.CardName]
-exileAfterMastery = List.sort [CardName.MkCardName (Text.pack "Lightning Bolt"), CardName.MkCardName (Text.pack "Mizzix's Mastery")]
+exileAfterMastery = List.sort [boltName, masteryName]
+
+boltName, masteryName :: CardName.CardName
+boltName = CardName.MkCardName (Text.pack "Lightning Bolt")
+masteryName = CardName.MkCardName (Text.pack "Mizzix's Mastery")
+
+-- The overloaded leg's answerer: CR 702.96a's cost taken at CR 601.2b's
+-- announcement -- PINNED to the overload mana rather than to whatever is offered
+-- first, so the printed {3}{R} that the same eight Mountains would also pay is a
+-- real alternative -- then every offered copy cast, each aimed at bob.
+overloading :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+overloading victim p = case p of
+  Prompt.ChooseCost _ _ _ candidates ->
+    Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost overloadMana)) . Cost.Type.mana) candidates)
+  Prompt.ChooseOfferedCastSpell _ _ options -> NonEmpty.head options
+  _ -> burningDown victim OptionalDecision.Exercises p
+
+-- Mizzix's Mastery's overload {5}{R}{R}{R}; its printed cost is {3}{R}.
+overloadMana :: [ManaSymbol.ManaSymbol]
+overloadMana = [ManaSymbol.Generic 5, theRed, theRed, theRed]
+
+theRed :: ManaSymbol.ManaSymbol
+theRed = ManaSymbol.OfType (ManaType.Colored Color.Red)
 
 -- Takes or declines CR 601.3's offer as `decision` says, and aims every target
 -- slot at `victim` where he is offered -- the copy's own "any target", which is

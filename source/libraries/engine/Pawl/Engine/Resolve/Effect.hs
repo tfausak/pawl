@@ -1035,16 +1035,19 @@ offerCast context named caster optionality repetition copied offer = do
 -- hands that snapshot on (a copy of a copy has the copied values, not the
 -- printed ones), and an original carrying none leaves the copy reading its
 -- printing, which is what Pawl.Engine.Projection.View.copiableCharacteristics
--- answers for both.
+-- answers for both. That first limb is a REGRESSION FENCE rather than a proved
+-- line: every object a producer in data/cards/ offers a copy of is a card in a
+-- graveyard or in exile, and nothing stamps a snapshot on one of those.
 --
 -- Object.newIncarnation for everything else, CR 400.7's forgetting: the copy is
 -- a new object, so no counter, designation or announced cost of the original's
 -- rides onto it, and a field added to Object is reset here by construction.
 --
--- Its OWNER is the caster, CR 112.2a's "the owner of the spell is the player
--- under whose control it was put on the stack", read ahead of the cast because
--- pawl indexes a zone by seat and the copy has to be removable from the one it
--- was put in.
+-- Its OWNER is the caster, which CR 112.2a states outright -- "the owner of that
+-- copy is the player who is instructed to create it and given permission to cast
+-- it" -- and which has to be settled here rather than at the cast: pawl indexes
+-- a zone by seat, so the copy is put into the caster's share of the zone it was
+-- made in and CR 704.5e's sweep can find it there again.
 --
 -- No zone-change event, Pawl.Engine.Prepare.mint's reason: the copy is CREATED
 -- in that zone rather than moved there, so nothing was exiled or discarded and
