@@ -1427,6 +1427,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Ascend
       " {\"type\":\"Ascend\"} "
+  -- CR 702.132a. Nullary: the amount the chosen player may pay is the generic
+  -- mana in the total cost, so the card states no number of its own.
+  Spec.it s "Assist" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Assist
+      " {\"type\":\"Assist\"} "
   -- CR 702.195a. Ascend's mirror at a different count and a different mark, and
   -- told apart from it by the tag alone.
   Spec.it s "Storied" $ do

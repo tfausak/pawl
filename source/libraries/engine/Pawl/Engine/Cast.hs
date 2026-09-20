@@ -2709,7 +2709,30 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                       -- CR 601.2g's mana window opens first, and the payer is
                       -- asked once it closes (Cost.paySubstituting). The list is
                       -- the same one the gate above measured.
-                      (payment, substitutedBindings) <- Cost.paySubstituting perform Nothing PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid (Cost.announceSubstitutions Cost.manaSubstitutions pid sid) paidCost
+                      -- CR 702.132a: assist. The caster chooses another player
+                      -- and that player's mana window runs HERE, before CR
+                      -- 601.2g's own window below -- which is the order rule
+                      -- 702.132a states -- and their payment rides the
+                      -- substitution hook, which `payManaWindow` runs once both
+                      -- windows have shut and before a symbol is spent. That
+                      -- seam is rule 702.132a's "before you begin to pay the
+                      -- total cost" word for word.
+                      --
+                      -- AHEAD of CR 702.51b's substitution in the composition:
+                      -- both reduce the same total, and no printing states
+                      -- assist beside convoke, delve or improvise (Scryfall
+                      -- keyword:assist, 2026-09-20, sixteen cards, none of them
+                      -- also stating one of the three), so no card can tell the
+                      -- two orders apart.
+                      --
+                      -- Off the FACE being cast, every other keyword read in
+                      -- this announcement's reason: a card in a hand is the
+                      -- printed card.
+                      helper <- Cost.offerAssist perform (Face.keywordSet face) (PaymentSubject.Casting sid) pid sid paidCost
+                      let assisting c = do
+                            assisted <- maybe (pure c) (\h -> Cost.payAssist h (PaymentSubject.Casting sid) sid c) helper
+                            Cost.announceSubstitutions Cost.manaSubstitutions pid sid assisted
+                      (payment, substitutedBindings) <- Cost.paySubstituting perform Nothing PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid assisting paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed
