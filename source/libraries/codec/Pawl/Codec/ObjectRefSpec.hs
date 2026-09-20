@@ -22,6 +22,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -339,6 +340,22 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (Filter.Not (Filter.HasCardType CardType.Land)) (Quantity.Literal 2)))
       " {\"type\":\"RandomCardInHand\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},\"count\":{\"type\":\"Literal\",\"value\":2}}} "
+  -- Ghoulraiser's "return a Zombie card at random from your graveyard to your
+  -- hand": the filter narrows and the defaulted count writes no key.
+  Spec.it s "RandomCardInGraveyard" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) (Filter.HasSubtype Subtype.Zombie) (Quantity.Literal 1)))
+      " {\"type\":\"RandomCardInGraveyard\",\"value\":{\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Zombie\"}}}} "
+  -- Make a Wish's "two cards at random from your graveyard": the count narrows
+  -- and the defaulted filter writes no key, the arm above's other half.
+  Spec.it s "RandomCardInGraveyard counted" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) (Filter.And []) (Quantity.Literal 2)))
+      " {\"type\":\"RandomCardInGraveyard\",\"value\":{\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"count\":{\"type\":\"Literal\",\"value\":2}}} "
   -- The bare PlayerRef this arm used to take is not a whole payload any more,
   -- ChosenCardFromAmong's slot-name case above and for its reason.
   Spec.it s "RandomCardInHand rejects a bare player reference" $
@@ -425,13 +442,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1) (PlayerRef.Relative PlayerRelation.You))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Land))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
+                Codec.encode ObjectRef.codec (ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You))),
                 Codec.encode ObjectRef.codec (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature))
               ]
           )
       )
-      25
+      26
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

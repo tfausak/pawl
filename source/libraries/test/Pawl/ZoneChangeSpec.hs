@@ -2401,6 +2401,120 @@ elkinLairSpec s registry =
           Spec.assertEqWith s "the FIRST card this time" (namesIn Zone.Exile S.bob after) [named "Goblin Piker"]
           Spec.assertEqWith s "and the other two stay in hand" (namesIn Zone.Hand S.bob after) [named "Bog Wraith", named "Bird Maiden"]
 
+-- Randomness over CR 400.2's PUBLIC zone, the pair of cards that exercise
+-- Pawl.Types.ObjectRef.RandomCardInGraveyard. Ghoulraiser {1}{B}{B} Creature --
+-- Zombie 2/2 (Jumpstart) -- "When this creature enters, return a Zombie card at
+-- random from your graveyard to your hand." Make a Wish {3}{G} Sorcery
+-- (Innistrad) -- "Return two cards at random from your graveyard to your hand."
+-- Both checked against api.scryfall.com, 2026-09-19. Neither card elides
+-- anything.
+--
+-- The two halves the ref carries, one card each: Ghoulraiser is the FILTER
+-- ("a Zombie card") and Make a Wish is the COUNT ("two cards"), which is why
+-- both are here rather than one.
+--
+-- TWO SEATS, and BOB's graveyard is stocked with Zombies of his own: the scope
+-- is "your graveyard", so a scope reading every player's would pick a second
+-- card out of his pile, which the assertions on his graveyard and on alice's
+-- hand size read directly.
+ghoulraiserSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ghoulraiserSpec s registry =
+  let -- alice controls four Swamps -- slack over the creature's {1}{B}{B}, so no
+      -- payment order can fail for reasons of its own -- and holds the Zombie.
+      -- `buried` goes into the named graveyards in the order given, which is the
+      -- order the candidates are offered in.
+      board ghoulraiser swamp buried =
+        let mana = S.landsInPlay swamp 4
+            withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) mana buried
+            (withCard, handId) = S.handOne ghoulraiser withGraves
+         in (handId, withCard {GameState.priority = Just S.alice})
+      -- Cast, let the creature enter, let CR 603.3b put the enters trigger on the
+      -- stack, then resolve it.
+      run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      run answer handId gs = S.runPure answer gs (S.cast S.alice handId *> Stack.resolveTop *> Engine.settleForPriority *> Stack.resolveTop)
+      -- Pinned by INDEX into the offer rather than read off the prompt's fields:
+      -- an answerer that hunted for "a Zombie" would go on answering legally
+      -- after a mutation broke which card the engine honours.
+      rolling :: Int -> Prompt.Prompt r -> r
+      rolling i p = case p of
+        Prompt.RandomObject offered -> case List.drop (min i (length (NonEmpty.toList offered) - 1)) (NonEmpty.toList offered) of
+          h : _ -> h
+          [] -> NonEmpty.head offered
+        _ -> S.identityAnswer p
+      named n = Just (CardName.MkCardName (Text.pack n))
+      -- bob's three first, so a scope reading every graveyard reaches a pile whose
+      -- cards no assertion below can confuse with alice's; then alice's, with the
+      -- two non-Zombies INTERLEAVED, so the third candidate of the filtered offer
+      -- and the third of an unfiltered one are different cards.
+      stock =
+        [ ("Putrid Goblin", S.bob),
+          ("Headless Skaab", S.bob),
+          ("Khenra Eternal", S.bob),
+          ("Whipstitched Zombie", S.alice),
+          ("Lightning Bolt", S.alice),
+          ("Highborn Ghoul", S.alice),
+          ("Murder", S.alice),
+          ("Dregscape Zombie", S.alice)
+        ]
+      boardOf ghoulraiser swamp printings = board ghoulraiser swamp (zip printings (fmap snd stock))
+   in Spec.describe s "Ghoulraiser" $ do
+        -- The proving case.
+        Spec.it s "CR 404.1 the card returned is the Zombie randomness named, not the first card buried" $ do
+          ghoulraiser <- S.printingOf s registry "Ghoulraiser"
+          swamp <- S.printingOf s registry "Swamp"
+          printings <- traverse (S.printingOf s registry . fst) stock
+          let (handId, gs) = boardOf ghoulraiser swamp printings
+              after = run (rolling 2) handId gs
+          Spec.assertEqWith s "the THIRD Zombie of alice's graveyard is in her hand" (namesIn Zone.Hand S.alice after) [named "Dregscape Zombie"]
+          Spec.assertEqWith
+            s
+            "the two Zombies randomness passed over stay buried, and so do both non-Zombies"
+            (namesIn Zone.Graveyard S.alice after)
+            [named "Whipstitched Zombie", named "Lightning Bolt", named "Highborn Ghoul", named "Murder"]
+          Spec.assertEqWith
+            s
+            "CR 400.1 \"your graveyard\" is alice's: bob's Zombies are untouched"
+            (namesIn Zone.Graveyard S.bob after)
+            [named "Putrid Goblin", named "Headless Skaab", named "Khenra Eternal"]
+          Spec.assertEqWith s "and the trigger resolved" (length (GameState.stack after)) 0
+        -- The other half of the pair: the same board, the same everything, one
+        -- different answer. "At random" is not a property of one outcome, since
+        -- the engine does not roll, so the two legs differ in the index the
+        -- interpreter answered with and in nothing else.
+        Spec.it s "CR 404.1 the same board with a different roll returns a different card" $ do
+          ghoulraiser <- S.printingOf s registry "Ghoulraiser"
+          swamp <- S.printingOf s registry "Swamp"
+          printings <- traverse (S.printingOf s registry . fst) stock
+          let (handId, gs) = boardOf ghoulraiser swamp printings
+              after = run (rolling 0) handId gs
+          Spec.assertEqWith s "the FIRST Zombie this time" (namesIn Zone.Hand S.alice after) [named "Whipstitched Zombie"]
+          Spec.assertEqWith
+            s
+            "and the other four cards stay buried"
+            (namesIn Zone.Graveyard S.alice after)
+            [named "Lightning Bolt", named "Highborn Ghoul", named "Murder", named "Dregscape Zombie"]
+        -- The COUNT, and it counts DISTINCT cards: the answerer names the FIRST
+        -- candidate of every offer, so a second ask made over the whole pile
+        -- again would name the card already taken and only one card would move.
+        Spec.it s "CR 608.2c Make a Wish returns two DISTINCT cards, the same answer given twice" $ do
+          wish <- S.printingOf s registry "Make a Wish"
+          forest <- S.printingOf s registry "Forest"
+          printings <- traverse (S.printingOf s registry) ["Whipstitched Zombie", "Lightning Bolt", "Highborn Ghoul", "Murder"]
+          let mana = S.landsInPlay forest 4
+              withGraves = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) mana printings
+              (ready, spell) = S.handOne wish withGraves
+              after = S.runPure (rolling 0) (ready {GameState.priority = Just S.alice}) (S.cast S.alice spell *> Stack.resolveTop)
+          Spec.assertEqWith
+            s
+            "the first candidate of each offer, and the second offer no longer holds the first"
+            (namesIn Zone.Hand S.alice after)
+            [named "Whipstitched Zombie", named "Lightning Bolt"]
+          Spec.assertEqWith
+            s
+            "the other two stay buried, with the sorcery on top of them (CR 608.2n)"
+            (namesIn Zone.Graveyard S.alice after)
+            [named "Highborn Ghoul", named "Murder", named "Make a Wish"]
+
 -- CR 701.9b's two exceptions to the discarding player's own choice, both over
 -- Discard.These. bob holds four distinct cards, so every assertion reads
 -- identity, and the expectations are read off his hand's own order rather than
@@ -2469,6 +2583,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
   discardExceptionsSpec s registry
   elkinLairSpec s registry
+  ghoulraiserSpec s registry
   libraryPositionSpec s registry
   aetherspoutsSpec s registry
   drawCardSpec s registry

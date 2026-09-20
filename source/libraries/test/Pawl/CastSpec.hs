@@ -3544,9 +3544,10 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
   -- enters, target opponent exiles the top card of their library, a card at
   -- random from their graveyard, and a card at random from their hand. You may
   -- cast a spell from among cards exiled this way without paying its mana cost."
-  -- No Pawl.Types.Effect arm picks a card at random out of a zone (#3861). The
-  -- omission is stricter than printed -- alice exiles nothing and gains no cast
-  -- -- and nothing about it touches the emerge cost this group is about.
+  -- Not implemented: that ability, which the DSL can now spell out -- the three
+  -- exiles and the free cast from among them are still to be written (#3929).
+  -- The omission is stricter than printed -- alice exiles nothing and gains no
+  -- cast -- and nothing about it touches the emerge cost this group is about.
   --
   -- TWO BOARDS DIFFERING IN ONE PERMANENT'S CARD TYPE, which is the whole of
   -- rule 702.119b. Both are alice holding Crabomination over FOUR Swamps with a

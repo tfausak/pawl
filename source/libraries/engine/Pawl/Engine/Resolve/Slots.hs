@@ -138,6 +138,7 @@ import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstan
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
@@ -419,6 +420,9 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- The seats whose hands randomness reads are ChosenCardInHand's, and reported
   -- where that arm's are; the COUNT is TopOfLibrary's read, for its reason.
   ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ _ count) -> quantitySlots count
+  -- ChosenCardInGraveyard's read with the chooser struck out: the graveyards
+  -- come through the scope, and the COUNT is TopOfLibrary's read.
+  ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard scope _ count) -> joinTwo (zoneScopeSlots scope) (quantitySlots count)
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
   -- names them and the chooser is CR 608.2c's resolving controller.
   ObjectRef.AnyNumberMatching _ -> Map.empty
@@ -475,6 +479,9 @@ objectRefQuantities ref = case ref of
   -- REGRESSION FENCE for the arm above's reason: every count in the pool is a
   -- Literal, which reads no slot.
   ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ _ count) -> [count]
+  -- How many cards randomness names out of each graveyard -- Make a Wish's
+  -- printed two. The arm above's regression fence, for its reason.
+  ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard _ _ count) -> [count]
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
@@ -519,6 +526,9 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser) -> [chooser]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player _ _) -> [player]
+  -- ChosenCardInGraveyard's answer: the graveyards are named by a ZoneScope,
+  -- which is not a PlayerRef, and randomness names no seat at all.
+  ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard _ _ _) -> []
   ObjectRef.AnyNumberMatching _ -> []
   -- The seat that picks one permanent off the battlefield -- Wormfang Crab's
   -- opponent, and by default CR 608.2c's resolving controller. Reported for
@@ -2575,6 +2585,9 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- Answered for real by randomCardsInHand, over the seats handChoosers names --
   -- the Reveal arm, the Discard arm and Effect.MoveToZone's gather.
   ObjectRef.RandomCardInHand _ -> []
+  -- Answered for real by randomCardsInGraveyard, over the graveyards
+  -- zoneScopePlayers names -- Effect.MoveToZone's gather, and that alone.
+  ObjectRef.RandomCardInGraveyard _ -> []
 
 -- The players a ZoneScope names, in APNAP order -- whose graveyards is
 -- Target.zoneScopePlayers, the same answer a target pool over CR 400.1's

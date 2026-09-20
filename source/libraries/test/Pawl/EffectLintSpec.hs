@@ -147,6 +147,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
@@ -1135,6 +1136,7 @@ chooserRef ref = case ref of
   ObjectRef.ChosenCardInHand {} -> True
   ObjectRef.ChosenCardFromAmong {} -> True
   ObjectRef.RandomCardInHand {} -> True
+  ObjectRef.RandomCardInGraveyard {} -> True
   ObjectRef.AnyNumberMatching {} -> True
   ObjectRef.ChosenPermanent {} -> True
   ObjectRef.SourceAndChosenPermanent {} -> True
@@ -1152,6 +1154,7 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInHand {} -> True
     ObjectRef.ChosenCardFromAmong {} -> True
     ObjectRef.RandomCardInHand {} -> True
+    ObjectRef.RandomCardInGraveyard {} -> True
     ObjectRef.ChosenPermanent {} -> True
     ObjectRef.SourceAndChosenPermanent {} -> True
     ObjectRef.AnyNumberMatching {} -> True
@@ -1748,6 +1751,15 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player _ count) -> case count of
             Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
             _ -> False
+          -- One card per GRAVEYARD, the arm above one zone over: randomness picks
+          -- out of each graveyard the scope names, so a scope naming several is
+          -- plural however small the count -- which is why this arm asks the
+          -- SCOPE where ChosenCardInGraveyard above asks its chooser. A COMPUTED
+          -- count is plural whatever the board would make it, that arm's reading
+          -- and for its reason.
+          ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard scope _ count) -> case count of
+            Quantity.Type.Literal n -> n <= 1 && namesOneGraveyard scope
+            _ -> False
           -- FALSE, EachCardFromAmong's answer over the battlefield: "any number"
           -- states no bound, so nothing about the ref caps how many permanents
           -- the chooser may name.
@@ -1762,6 +1774,17 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.
+        -- namesOneSeat one type over, for the scope that says WHOSE zone (CR
+        -- 400.1): a slot holds one player and CR 108.4's controller is one
+        -- player, where the two plural PlayerScopes are the whole table or the
+        -- opponents. ControllingMostPermanents is at most one by its own rule.
+        namesOneGraveyard scope = case scope of
+          ZoneScope.Scoped PlayerScope.You -> True
+          ZoneScope.Scoped PlayerScope.Opponents -> False
+          ZoneScope.Scoped PlayerScope.EachPlayer -> False
+          ZoneScope.Scoped PlayerScope.ControllingMostPermanents -> True
+          ZoneScope.InSlot _ -> True
+          ZoneScope.ControllerOfBound _ -> True
         namesOneSeat player = case player of
           PlayerRef.Relative PlayerRelation.You -> True
           PlayerRef.Relative PlayerRelation.Opponent -> False
@@ -2287,6 +2310,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
         atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
+        atRandomInGraveyard = ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) anyCard (Quantity.Type.Literal 1))
         anyNumber = ObjectRef.AnyNumberMatching anyCard
         onePermanent = ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent anyCard (PlayerRef.Relative PlayerRelation.You))
         sourceAndOne = ObjectRef.SourceAndChosenPermanent anyCard
@@ -2352,6 +2376,19 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
       "the source with one chosen permanent is asked by the move gather alone"
       (inert [Effect.Transform sourceAndOne, moves sourceAndOne, reveals sourceAndOne, Effect.Tap sourceAndOne])
       [True, False, True, True]
+    -- The at-random arm one zone over, asked by the MoveToZone gather alone --
+    -- Ghoulraiser's "return a Zombie card at random from your graveyard to your
+    -- hand". Rejected under the two sites that DO ask the hand's at-random arm:
+    -- CR 400.2's face-up pile is already shown, so rule 701.20a's reveal has
+    -- nothing to ask there, and CR 701.9a discards out of a HAND. Asserted
+    -- separately rather than folded into the rows above because the two random
+    -- arms are distinct constructors, and one missing from asksFor would answer
+    -- False everywhere with no -Werror to name it.
+    Spec.assertEqWith
+      s
+      "a random graveyard card is asked by the move gather alone"
+      (inert [moves atRandomInGraveyard, reveals atRandomInGraveyard, Effect.Discard (Discard.These atRandomInGraveyard), Effect.Tap atRandomInGraveyard])
+      [False, True, True, True]
     -- CR 701.28a's convert, classified with Transform because it IS Transform's
     -- gather (Pawl.Engine.Resolve.Effect.turnPermanentsOver): the same four card-shaped
     -- arms are inert under it and the same battlefield subset is asked.

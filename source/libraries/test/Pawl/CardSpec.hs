@@ -244,6 +244,7 @@ import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
@@ -3397,6 +3398,11 @@ objectRefFilters ref = case ref of
   -- reason -- and Fall's count goes through refFilters beside it, TopOfLibrary's
   -- route above.
   ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ f _) -> unframed [f] <> refFilters ref
+  -- Ghoulraiser's "a Zombie card at random from your graveyard"; its ZoneScope
+  -- names the graveyards reached and holds no characteristic, so the Filter is
+  -- the whole of what there is to lint -- the arm above's answer, for its
+  -- reason -- and Make a Wish's count goes through refFilters beside it.
+  ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard _ f _) -> unframed [f] <> refFilters ref
   -- Tovolar's "any number of Human Werewolves you control": EachMatching's
   -- Filter position exactly -- same zone, same sweep, the chooser standing
   -- between the matches and the set -- so it is framed the same way.

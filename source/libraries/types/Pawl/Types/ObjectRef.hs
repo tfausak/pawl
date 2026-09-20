@@ -10,6 +10,7 @@ import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -139,6 +140,13 @@ data ObjectRef
     -- candidates. Carried out by Effect.Reveal, Effect.Discard and
     -- Effect.MoveToZone's gather, all three through randomCardsInHand.
     RandomCardInHand RandomCardInHand.RandomCardInHand
+  | -- | CR 404.1 / 608.2c / Ghoulraiser, Make a Wish: the cards randomness names
+    -- out of the graveyards the ZoneScope names, asked of the interpreter through
+    -- Prompt.RandomObject and filtered back against the candidates. The arm above
+    -- over a PUBLIC zone (CR 400.2), which is why a ZoneScope stands where that
+    -- arm's single PlayerRef does. Carried out by Effect.MoveToZone's gather,
+    -- through randomCardsInGraveyard.
+    RandomCardInGraveyard RandomCardInGraveyard.RandomCardInGraveyard
   | -- | CR 608.2d / Tovolar, Dire Overlord: any number of the permanents on the
     -- battlefield matching the Filter, offered rather than swept, the empty answer
     -- legal.

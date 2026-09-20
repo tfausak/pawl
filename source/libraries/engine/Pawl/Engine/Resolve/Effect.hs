@@ -259,6 +259,7 @@ import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
@@ -816,6 +817,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardFromAmong {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- No recipients: only randomCardsInHand can ask the interpreter.
   ObjectRef.RandomCardInHand _ -> []
+  -- No recipients: the arm above's answer, for its reason -- only
+  -- randomCardsInGraveyard can ask.
+  ObjectRef.RandomCardInGraveyard _ -> []
   -- No recipients: the answer needs the chooser asked, and only
   -- turnPermanentsOver's gather and the Effect.MoveToZone gather can ask.
   ObjectRef.AnyNumberMatching _ -> []
@@ -1829,6 +1833,48 @@ randomCardsInHand resolving source controller legal (RandomCardInHand.MkRandomCa
               pure (named : rest)
   fmap concat . Monad.mapM (\pid -> fmap (fmap ((,) pid)) (pick wanted (handCardsOf context gs pid filter_))) $
     handChoosers legal controller gs player
+
+-- CR 404.1 / 608.2c: the cards randomness names out of each graveyard the ref
+-- reaches. The ONE asking read of ObjectRef.RandomCardInGraveyard, made by
+-- Effect.MoveToZone's gather alone.
+--
+-- randomCardsInHand's posture over a PUBLIC zone (CR 400.2), and the differences
+-- all follow from that: the graveyards come from a ZoneScope rather than from
+-- handChoosers, since CR 402.3's bar on looking at another player's hand has no
+-- counterpart over a graveyard, and the seat each card came from is not paired
+-- back, since nobody has to carry the instruction out on their own zone.
+--
+-- Unchanged from that function: the question goes to the INTERPRETER rather than
+-- to a player or to a roll the engine makes, the answer is FILTERED against the
+-- offer rather than trusted, Game.ask and not Game.choose (randomness is not CR
+-- 104.4b's optional action), elided at one candidate and skipped at none (CR
+-- 101.3, CR 609.3), and the count names DISTINCT cards, so each card named is
+-- dropped from the candidates before the next ask.
+randomCardsInGraveyard ::
+  ObjectId ->
+  ObjectId ->
+  PlayerId ->
+  Map.Map SlotName (Set Recipient) ->
+  RandomCardInGraveyard.RandomCardInGraveyard ->
+  Game [ObjectId]
+randomCardsInGraveyard resolving source controller legal (RandomCardInGraveyard.MkRandomCardInGraveyard scope filter_ count) = do
+  gs <- State.get
+  let viewOf = effectViewOf source legal gs
+      context = effectContext gs controller source legal (slotBindings resolving gs)
+      wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
+      pick remaining candidates =
+        if remaining <= (0 :: Natural)
+          then pure []
+          else case candidates of
+            [] -> pure []
+            [only] -> pure [only]
+            first : second : more -> do
+              answer <- Game.ask (Prompt.RandomObject (first NonEmpty.:| (second : more)))
+              let named = if List.elem answer candidates then answer else first
+              rest <- pick (remaining - 1) (filter (/= named) candidates)
+              pure (named : rest)
+  fmap concat . Monad.mapM (\pid -> pick wanted (graveyardCardsOf context gs pid filter_)) $
+    zoneScopePlayers legal controller gs scope
 
 -- One effect, applied, wrapped in the window CR 607.2a's link is filed from:
 -- what was in exile before, and what is in it after.
@@ -4086,6 +4132,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- arrival under Object.owner (CR 400.3) as every sibling arm's
               -- does.
               ObjectRef.RandomCardInHand random -> fmap (fmap snd) (randomCardsInHand resolving source controller legal random)
+              -- The arm above over CR 400.2's public zone: Ghoulraiser's
+              -- "a Zombie card at random from your graveyard". The ONE
+              -- asking read of the ref -- no other opcode's gather reaches
+              -- it, because a graveyard's cards are neither revealed (they
+              -- are already face up, CR 400.2) nor discarded (CR 701.9a
+              -- moves a card out of a HAND).
+              ObjectRef.RandomCardInGraveyard random -> randomCardsInGraveyard resolving source controller legal random
               -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
               -- you control", announced while the effect is applied and so asked
               -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
