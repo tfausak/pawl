@@ -1089,6 +1089,129 @@ futureSightSpec s registry =
           Spec.assertBool s (any (S.isCastOf withTop) (Action.legalActions S.alice withElves)) "the top card is offered as a cast"
           Spec.assertBool s (not (any (S.isCastOf withoutTop) (Action.legalActions S.alice withoutElves))) "and is not offered on the board without Future Sight"
 
+-- Cast whichever of these objects the engine offers, and pass otherwise. Pinned
+-- to a LIST of ids rather than to "whichever cast is offered", so a board that
+-- stopped offering them passes rather than repairing the case with some other
+-- cast -- castOnly above, widened to the two cards a per-turn budget is counted
+-- over.
+castAnyOf :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+castAnyOf wanted p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (\a -> any (`S.isCastOf` a) wanted) actions of
+    h : _ -> h
+    [] -> Action.Type.Pass
+  _ -> S.identityAnswer p
+
+-- alice, bob and carol each have three Forests; alice's library holds TWO Fogs
+-- on top of two Forests, so the second Fog is on top the moment the first is
+-- cast and CR 104.3c cannot deck her. `granting` is the permanent put onto her
+-- battlefield -- Johann for the budgeted permission, Future Sight for the
+-- unlimited one -- so a pair of boards differs in that and in nothing else.
+--
+-- `GameState.remaining` is emptied so the priority loop stops at the end of this
+-- main phase: the offers below are read DURING alice's turn, where a loop that
+-- ran on into bob's would have reset the very budget under test.
+johannBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+johannBoard forest fog granting =
+  let lands = S.landsFor forest S.carol 3 (S.landsFor forest S.bob 3 (S.landsFor forest S.alice 3 S.threePlayerGame))
+      -- S.addLibraryCard puts each card ON TOP of the last, so the deepest goes
+      -- in first.
+      (_, g1) = S.addLibraryCard forest S.alice lands
+      (_, g2) = S.addLibraryCard forest S.alice g1
+      (deep, g3) = S.addLibraryCard fog S.alice g2
+      (top, g4) = S.addLibraryCard fog S.alice g3
+      (_, g5) = S.addLibraryCard forest S.bob g4
+      (_, g6) = S.addLibraryCard forest S.carol g5
+      g7 = maybe g6 (\printing -> snd (S.addPermanent printing S.alice g6)) granting
+   in ( top,
+        deep,
+        g7
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.empty
+          }
+      )
+
+-- CR 500.5 / 502.3: the handoff, with the pools swept and everything untapped --
+-- alice's next turn without running one and decking a fixture library (CR
+-- 104.3c). Engine.beginTurnOf is where GameState.castPermissionsUsedThisTurn is
+-- cleared, so this is the reset under test.
+nextTurnOfAliceAfter :: GameState.GameState -> GameState.GameState
+nextTurnOfAliceAfter gs =
+  S.runPure
+    S.identityAnswer
+    (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs))
+    (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+
+-- Johann, Apprentice Sorcerer {2}{U}{R} Legendary Creature -- Human Wizard
+-- Sorcerer 2/5: "You may look at the top card of your library any time. / Once
+-- each turn, you may cast an instant or sorcery spell from the top of your
+-- library."
+--
+-- The producer of PermissionLimit.OnceEachTurn, and the budgeted twin of Future
+-- Sight below it: one CR 601.3 permission naming the top of a library, told from
+-- the unlimited one by how many casts a turn it is good for.
+--
+-- Not implemented: "You may look at the top card of your library any time",
+-- which data/cards/johann-apprentice-sorcerer.json omits under the precedent
+-- data/cards/garruks-horde.json sets -- pawl hands every answerer the whole game
+-- already, so a looked-at card is indistinguishable from a hidden one (#1412).
+-- Neither stricter nor weaker than printed, and no case below rests on it.
+johannSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+johannSpec s registry =
+  let board granting = do
+        forest <- S.printingOf s registry "Forest"
+        fog <- S.printingOf s registry "Fog"
+        printing <- traverse (S.printingOf s registry) granting
+        pure (johannBoard forest fog printing)
+   in Spec.describe s "Johann" $ do
+        -- The gameplay-level proof (design.md section 4), driven through the
+        -- priority loop rather than by calling Cast.castSpell, which does not
+        -- gate. alice takes every Fog the engine offers off the top, on two
+        -- boards differing only in which permanent grants the permission. ONE
+        -- Fog in the graveyard rather than two is the whole assertion, and the
+        -- Future Sight board is what says the second cast was refused by the
+        -- budget and not by the mana, the timing or the top-card narrowing.
+        Spec.it s "CR 601.3 the once-each-turn permission casts one spell off the top and refuses the next" $ do
+          (top, deep, budgeted) <- board (Just "Johann, Apprentice Sorcerer")
+          (topU, deepU, unlimited) <- board (Just "Future Sight")
+          let after = S.runPure (castAnyOf [top, deep]) budgeted Engine.priorityLoop
+              afterU = S.runPure (castAnyOf [topU, deepU]) unlimited Engine.priorityLoop
+          Spec.assertEqWith s "only one Fog left alice's library under Johann" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+          Spec.assertEqWith s "so exactly one Fog is in her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+          Spec.assertEqWith s "while Future Sight's unlimited permission casts both off the same library" (length (Game.zoneMembers Zone.Graveyard S.alice afterU)) 2
+          Spec.assertEqWith s "and leaves it two cards shorter" (length (Game.zoneMembers Zone.Library S.alice afterU)) 2
+
+        -- WHAT was refused: the permission, not the card, the zone or the mana.
+        -- The second Fog is on top by now, so the top-card narrowing admits it;
+        -- Forests are still untapped, so {G} was payable; and the same object on
+        -- the Future Sight board is offered on the same board state.
+        Spec.it s "CR 601.3 the second cast is refused by the budget and by nothing else" $ do
+          (top, deep, budgeted) <- board (Just "Johann, Apprentice Sorcerer")
+          let after = S.runPure (castAnyOf [top]) budgeted Engine.priorityLoop
+          Spec.assertBool s (not (any (S.isCastOf deep) (Action.legalActions S.alice after))) "the second Fog is not offered"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Library deep after)) "and the typed question says the permission is spent"
+          Spec.assertEqWith s "though it is the top card of her library now" (take 1 (Game.zoneMembers Zone.Library S.alice after)) [deep]
+          Spec.assertEqWith s "and two Forests are untapped, so {G} was payable" (S.tappedCount S.alice after) 1
+
+        -- The period. The same board, the same spent permission, two handoffs
+        -- later: CR 601.3's "once EACH TURN" is back, which is what
+        -- Engine.beginTurnOf clearing the field means.
+        Spec.it s "CR 601.3 the budget comes back at the turn handoff" $ do
+          (top, deep, budgeted) <- board (Just "Johann, Apprentice Sorcerer")
+          let after = S.runPure (castAnyOf [top]) budgeted Engine.priorityLoop
+              next = nextTurnOfAliceAfter after
+          Spec.assertBool s (any (S.isCastOf deep) (Action.legalActions S.alice next)) "the same top card is offered again on her next turn"
+          Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Library deep next) "and the typed question says the permission is unspent"
+
+        -- The pair's other half: WITHOUT Johann the same top card is not
+        -- castable at all, so the first cast above was his permission and not
+        -- some rule of the game.
+        Spec.it s "CR 601.3 without Johann the top card is not castable" $ do
+          (top, _, bare) <- board Nothing
+          Spec.assertBool s (not (any (S.isCastOf top) (Action.legalActions S.alice bare))) "the top card is not offered"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Library top bare)) "and the typed question says no"
+
 -- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
 -- counteringBoard above, with a Goblin Piker as the victim spell.
 --
@@ -1895,6 +2018,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   crucibleSpec s registry
   garruksHordeSpec s registry
   futureSightSpec s registry
+  johannSpec s registry
   voidWinnowerSpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry

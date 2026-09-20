@@ -1656,6 +1656,12 @@ beginTurnOf pid gs =
             -- object, and a permanent whose controller is not the active player
             -- gets its activation back here just the same.
             GameState.activatedThisTurn = Map.empty,
+            -- CR 601.3's "Once each turn, you may cast ..." (Johann, Apprentice
+            -- Sorcerer), cleared for every object beside the activation-side
+            -- rider above and for its reason: the budget is the permission's
+            -- rather than a player's, so a permanent whose controller is not the
+            -- active player gets its use back here just the same.
+            GameState.castPermissionsUsedThisTurn = Map.empty,
             -- CR 502.2 / 731.2: the count the NEXT turn's untap step asks about
             -- "the previous turn's active player".
             GameState.spellsCastLastTurn = Map.findWithDefault 0 (GameState.activePlayer gs) casts,
