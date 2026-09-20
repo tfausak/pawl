@@ -176,6 +176,14 @@ modesEffects chosen m = concatMap (Foldable.toList . Mode.allEffects . snd) (cho
 modesTargetSlots :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card ability -> Map SlotName TargetSlot
 modesTargetSlots chosen m = Map.unions (fmap (\mi -> instanceTargetSlots mi m) (instancesOf chosen))
 
+-- CR 702.96b: the same modal with every mode's target slots dropped, which is
+-- what "that spell won't require any targets" leaves a castability gate to judge
+-- -- the MODES are still chosen and still have to be choosable, so this is
+-- narrower than answering the gate True. Pawl.Engine.Cast.targetable is the
+-- reader.
+untargeted :: Modal.Modal card ability -> Modal.Modal card ability
+untargeted m = m {Modal.modes = fmap (\mode -> mode {Mode.targetSlots = Map.empty}) (Modal.modes m)}
+
 -- One chosen instance's target slots, renamed under that instance's slot names.
 -- The inverse of the projection instanceView applies before running the
 -- instance's effects, which still read the printed names.

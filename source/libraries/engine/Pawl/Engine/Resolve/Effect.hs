@@ -410,14 +410,28 @@ bakeTokenCharacteristics eval card =
 -- per-effect skip -- go through this, so they cannot disagree.
 targetSlotsOf :: Object.Object -> ObjectId -> GameState -> Face.Face Card.Type.Card -> Map.Map SlotName TargetSlot.TargetSlot
 targetSlotsOf obj oid gs face =
-  fmap
-    (Projection.rewriteTargetSlot (Projection.textChangesAffecting oid gs))
-    -- CR 303.4a's slot comes off the PROJECTION and not off `face`, which is the
-    -- only reading that sees a granted enchant ability -- CR 702.103b gives a
-    -- spell cast bestowed one, and its printed face declares none. A printed
-    -- Aura's projection is seeded from that same printed list, so this is the
-    -- wider read rather than a different one.
-    (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Object.mutating obj) (Binding.modesOf (Object.bindings obj)) face)
+  if Keyword.castOverloaded (Object.castUsing obj)
+    then
+      -- CR 702.96b: a spell cast for its overload cost "won't require any
+      -- targets", so CR 608.2b has nothing to re-read. The announcement dropped
+      -- the same slots (Pawl.Engine.Cast.castProposed), so this is agreement
+      -- rather than a second reading.
+      --
+      -- A REGRESSION FENCE rather than a proved line: the announcement leaves
+      -- the slot unbound, so every reader here already answers the same with the
+      -- printed map -- mutating this arm away leaves Pawl.CastSpec's Overload
+      -- group green. stackTargetSlots' copy road (CR 707.10d's retarget) is what
+      -- would observe it, and no test copies an overloaded spell.
+      Map.empty
+    else
+      fmap
+        (Projection.rewriteTargetSlot (Projection.textChangesAffecting oid gs))
+        -- CR 303.4a's slot comes off the PROJECTION and not off `face`, which is
+        -- the only reading that sees a granted enchant ability -- CR 702.103b
+        -- gives a spell cast bestowed one, and its printed face declares none. A
+        -- printed Aura's projection is seeded from that same printed list, so
+        -- this is the wider read rather than a different one.
+        (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Object.mutating obj) (Binding.modesOf (Object.bindings obj)) face)
 
 -- CR 608.2c: one clause's instructions, in written order, carrying the one thing
 -- a later instruction can ask about an earlier one -- whether it HAPPENED. CR

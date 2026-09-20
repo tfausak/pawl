@@ -116,6 +116,7 @@ codec =
       Arm.nullary "Conspire" Keyword.Conspire,
       Arm.payload "Affinity" (Filter.codec codec) Keyword.Affinity (\x -> case x of Keyword.Affinity y -> Just y; _ -> Nothing),
       Arm.payload "Cleave" (Cost.codec codec) Keyword.Cleave (\x -> case x of Keyword.Cleave y -> Just y; _ -> Nothing),
+      Arm.payload "Overload" (Cost.codec codec) Keyword.Overload (\x -> case x of Keyword.Overload y -> Just y; _ -> Nothing),
       Arm.payload "Awaken" (Cost.codec codec) Keyword.Awaken (\x -> case x of Keyword.Awaken y -> Just y; _ -> Nothing),
       Arm.payload "Emerge" (Emerge.codec codec) Keyword.Emerge (\x -> case x of Keyword.Emerge y -> Just y; _ -> Nothing),
       Arm.payload "Evoke" (Cost.codec codec) Keyword.Evoke (\x -> case x of Keyword.Evoke y -> Just y; _ -> Nothing),
@@ -302,6 +303,7 @@ tagOf x = case x of
   Keyword.Conspire {} -> "Conspire"
   Keyword.Affinity {} -> "Affinity"
   Keyword.Cleave {} -> "Cleave"
+  Keyword.Overload {} -> "Overload"
   Keyword.Awaken {} -> "Awaken"
   Keyword.Emerge {} -> "Emerge"
   Keyword.Evoke {} -> "Evoke"

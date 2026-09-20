@@ -665,7 +665,9 @@ data Object = MkObject
     -- stack incarnation. Nothing for a printed or effect-granted cost. Read by
     -- Quantity.CastUsing: CR 702.74a's "if its evoke cost was paid", CR
     -- 702.109a's and CR 702.152a's "as long as this permanent's [dash or blitz]
-    -- cost was paid", and CR 702.138b's "escaped".
+    -- cost was paid", and CR 702.138b's "escaped". The rules core reads it once
+    -- too, for CR 702.96b's targetless overloaded spell
+    -- (Pawl.Engine.Keyword.castOverloaded).
     --
     -- One field for every such keyword rather than a Bool per keyword, beside
     -- `bestowed` and `prototyped` above, which stay: each has its own clearing
