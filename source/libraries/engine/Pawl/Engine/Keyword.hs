@@ -465,6 +465,9 @@ abilitiesFor keyword count = case keyword of
   -- 612.1 text change, which Pawl.Types.Keyword's Cleave says the card states for
   -- itself.
   Keyword.Cleave _ -> []
+  -- CR 702.96a's two static abilities are cleave's shape above: an alternative
+  -- cost and a CR 612.1 text change, neither of them a triggered ability.
+  Keyword.Overload _ -> []
   -- CR 702.113a states a static ability and a SPELL ability, neither of them a
   -- triggered one: the first is plainAlternativeCosts' alternative cost and the
   -- second is part of the spell, which Pawl.Types.Keyword's Awaken says the card
@@ -724,6 +727,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Overload _ -> []
   Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -1280,6 +1284,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Overload _ -> []
   Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -1915,6 +1920,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Overload _ -> []
   Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -2597,9 +2603,9 @@ permissionsFor cardTypes keyword = case keyword of
   -- Pawl.Engine.Cost.candidateCostsFor's, and rule 702.138a grants no exile
   -- replacement, so castFromGraveyardReplacementsOf stays flashback's.
   Keyword.Escape _ -> [CastingPermission.CastFromGraveyard]
-  -- CR 702.74a, 702.76a, 702.109a, 702.117a, 702.137a, 702.148a, 702.152a and
-  -- 702.173a state an alternative cost and no permission: the card is cast from
-  -- wherever something else lets it be.
+  -- CR 702.74a, 702.76a, 702.96a, 702.109a, 702.117a, 702.137a, 702.148a,
+  -- 702.152a and 702.173a state an alternative cost and no permission: the card
+  -- is cast from wherever something else lets it be.
   Keyword.Evoke _ -> []
   Keyword.Dash _ -> []
   Keyword.Blitz _ -> []
@@ -2630,6 +2636,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- castFromGraveyardReplacementsOf's.
   Keyword.Harmonize _ -> [CastingPermission.CastFromGraveyard]
   Keyword.Cleave _ -> []
+  Keyword.Overload _ -> []
   Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -2934,15 +2941,32 @@ copiedCastUsing castUsing = case castUsing of
   Just (Keyword.Suspend _) -> Nothing
   _ -> castUsing
 
--- CR 702.74a, 702.109a, 702.113a, 702.148a, 702.152a, 702.188a and 702.190a:
--- every evoke, dash, blitz, cleave, awaken, web-slinging and sneak cost this
--- card may be cast for, each beside the keyword that offers it -- the tag CR
--- 601.2b records as Object.castUsing -- in ascending Set order.
+-- CR 702.96b: was this the overload candidate? Rule 702.96b's "that spell won't
+-- require any targets" is what the answer buys -- the whole of rule 702.96a's
+-- text change that pawl reads, since the card states its "each" reading as a
+-- clause of its own (Pawl.Types.Keyword's Overload).
+--
+-- The BARE tag, Pawl.Engine.Cast's castBestowed shape: the two sites that drop
+-- the slots are CR 601.2c's announcement (Pawl.Engine.Cast.targetable and
+-- castProposed) and CR 608.2b's re-read
+-- (Pawl.Engine.Resolve.Effect.targetSlotsOf), so a cast that announced no target
+-- and a resolution that expects none cannot disagree. CR 707.10 carries the tag
+-- onto a copy (copiedCastUsing above), so a copy of an overloaded spell is
+-- targetless too.
+castOverloaded :: Maybe Keyword -> Bool
+castOverloaded castUsing = case castUsing of
+  Just (Keyword.Overload _) -> True
+  _ -> False
+
+-- CR 702.74a, 702.96a, 702.109a, 702.113a, 702.148a, 702.152a, 702.188a and
+-- 702.190a: every evoke, overload, dash, blitz, cleave, awaken, web-slinging
+-- and sneak cost this card may be cast for, each beside the keyword that offers
+-- it -- the tag CR 601.2b records as Object.castUsing -- in ascending Set order.
 -- Read by Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is
 -- offered, bestowCosts' reading: evoke's static ability functions "in any zone
 -- from which the card with evoke can be cast", dash and blitz name no zone, and
--- cleave's, web-slinging's and sneak's function "while a spell with [the
--- keyword] is on the stack", which CR 113.6e reaches from wherever the cast
+-- cleave's, overload's, web-slinging's and sneak's function "while a spell with
+-- [the keyword] is on the stack", which CR 113.6e reaches from wherever the cast
 -- begins, and awaken's is rule 702.113a's own "while the spell with awaken is on
 -- the stack".
 --
@@ -2969,6 +2993,7 @@ plainAlternativeCosts keywords =
         Keyword.Dash cost -> Just (keyword, cost)
         Keyword.Blitz cost -> Just (keyword, cost)
         Keyword.Cleave cost -> Just (keyword, cost)
+        Keyword.Overload cost -> Just (keyword, cost)
         Keyword.Awaken cost -> Just (keyword, cost)
         -- CR 702.188a's "a tapped creature you control", three conjuncts and CR
         -- 400.3 for the destination -- ninjutsu's component one rule over, whose
@@ -4001,6 +4026,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Overload _ -> []
   Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -4460,6 +4486,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Overload _ -> []
   Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -4735,6 +4762,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Disturb _ -> []
   Keyword.Harmonize _ -> []
   Keyword.Cleave _ -> []
+  Keyword.Overload _ -> []
   Keyword.Awaken _ -> []
   Keyword.Surge _ -> []
   Keyword.Spectacle _ -> []
@@ -5178,6 +5206,7 @@ familyOf keyword = case keyword of
   Keyword.Disturb _ -> Just KeywordFamily.Disturb
   Keyword.Harmonize _ -> Just KeywordFamily.Harmonize
   Keyword.Cleave _ -> Just KeywordFamily.Cleave
+  Keyword.Overload _ -> Just KeywordFamily.Overload
   Keyword.Awaken _ -> Just KeywordFamily.Awaken
   Keyword.Surge _ -> Just KeywordFamily.Surge
   Keyword.Spectacle _ -> Just KeywordFamily.Spectacle

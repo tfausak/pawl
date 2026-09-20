@@ -444,6 +444,15 @@ data Keyword
     -- off a card's printed keywords, which misses an effect that granted miracle
     -- there (#1859).
     Miracle (Cost.Cost Keyword)
+  | -- | 702.96a: overload [cost] -- an alternative cost, plus a CR 612.1
+    -- text-changing effect replacing every "target" with "each" if it was paid.
+    --
+    -- Not implemented: the text change as a text change (#3686). What the engine
+    -- reads is rule 702.96b's consequence alone, the spell requiring no targets
+    -- (Pawl.Engine.Keyword.castOverloaded), and the card states its "each"
+    -- reading as a second clause of the same mode gated on Quantity.CastUsing --
+    -- Cleave's shape below, and Cyclonic Rift's.
+    Overload (Cost.Cost Keyword)
   | -- | 702.98a: "You may have this permanent enter with an additional +1/+1
     -- counter on it" and "This permanent can't block as long as it has a +1/+1
     -- counter on it". The second half is not conditional on the first.
@@ -659,8 +668,9 @@ data Keyword
     -- Quantity.CastUsing -- Morsel Theft's prowl shape -- which states a bracket
     -- that is a whole clause or a whole ObjectRef.EachMatching filter (Path of
     -- Peril) and cannot state one inside a TARGET (Wash Away). CR 601.2c lets a
-    -- spell's targets depend on which alternative cost was chosen; what pawl
-    -- lacks is a cast that reads them off anything but the printed face.
+    -- spell's targets depend on which alternative cost was chosen, and the only
+    -- shape pawl states is rule 702.96b's, the whole slot dropped (Overload
+    -- above); a bracket that narrows a target's FILTER has none.
     Cleave (Cost.Cost Keyword)
   | -- | 702.149a: whenever this creature and at least one other creature with
     -- greater power attack, put a +1/+1 counter on this creature. The counter

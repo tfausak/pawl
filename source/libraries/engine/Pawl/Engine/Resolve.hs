@@ -325,7 +325,8 @@ putBindings holder bindings gs =
 -- effect list because CR 603.5's "may" belongs to a clause within a mode.
 --
 -- The mode's TARGET SLOTS are rewritten by targetSlotsOf instead: CR 608.2b
--- re-reads them off the printed face, which unions in CR 303.4a's enchant slot.
+-- re-reads them off the printed face, which unions in CR 303.4a's enchant slot
+-- and, for CR 702.96b's overloaded spell, drops them all.
 modesOf :: ObjectId -> GameState -> [(ModeInstance, Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []

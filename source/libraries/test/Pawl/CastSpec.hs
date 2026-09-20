@@ -3902,6 +3902,59 @@ cleaveCost = [ManaSymbol.Generic 4, theWhite, theBlack]
 theWhite :: ManaSymbol.ManaSymbol
 theWhite = ManaSymbol.OfType (ManaType.Colored Color.White)
 
+-- CR 702.96a and CR 702.96b on Cyclonic Rift {1}{U} Instant, "Return target
+-- nonland permanent you don't control to its owner's hand. / Overload {6}{U}"
+-- (Oracle text checked on Scryfall, 2026-09-19).
+--
+-- SEVEN ISLANDS for alice on every board, which is what makes each negative a
+-- rule and not a shortage: {6}{U} is exactly the overload cost and five more
+-- than the printed {1}{U}, so the case that leaves the Bogle on the battlefield
+-- had the overload cost available and declined it.
+--
+-- bob's SLIPPERY BOGLE is rule 702.96b's second sentence -- "it may affect
+-- objects that couldn't be chosen as legal targets" -- since CR 702.11b keeps a
+-- hexproof creature out of alice's target slot entirely, and his Island is the
+-- control on "nonland". The second case takes the Piker away, leaving a board
+-- where NOTHING is targetable: rule 702.96b's first sentence is the whole of why
+-- a cast is still offered there.
+--
+-- The card states its two readings as two clauses of one mode, each gated on
+-- Quantity.CastUsing (Path of Peril's cleave shape above), rather than as CR
+-- 612.1's text change; Pawl.Types.Keyword's Overload says why, see #3686.
+overloadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+overloadSpec s registry = Spec.describe s "Overload" $ do
+  Spec.it s "CR 702.96b overloaded, the Rift returns the hexproof Bogle too; cast for {1}{U} only the Piker goes home" $ do
+    island <- S.printingOf s registry "Island"
+    rift <- S.printingOf s registry "Cyclonic Rift"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bogle <- S.printingOf s registry "Slippery Bogle"
+    let (_, gs0) = S.addPermanent piker S.bob (S.landsFor island S.bob 1 (S.landsInPlay island 7))
+        (_, gs1) = S.addPermanent bogle S.bob gs0
+        (riftId, gs2) = S.addHandCard rift S.alice gs1
+        board = aliceOnTurn gs2
+        cast cost = castResolved (payingFor cost) riftId board
+        home gs = (length (namedOnBattlefield "Goblin Piker" gs), length (namedOnBattlefield "Slippery Bogle" gs), length (Game.zoneMembers Zone.Hand S.bob gs), length (namedOnBattlefield "Island" gs))
+    Spec.assertEqWith s "CR 702.96b the overload cost was paid, so the spell targets nothing and both creatures go home while the Islands stay" (home (cast overloadCost)) (0, 0, 2, 8)
+    Spec.assertEqWith s "CR 702.11b the printed cost was paid, so only the targetable Piker goes home" (home (cast riftCost)) (0, 1, 1, 8)
+  Spec.it s "CR 702.96b with only the hexproof Bogle out, the overload cast is offered where nothing is targetable" $ do
+    island <- S.printingOf s registry "Island"
+    rift <- S.printingOf s registry "Cyclonic Rift"
+    bogle <- S.printingOf s registry "Slippery Bogle"
+    let (_, gs0) = S.addPermanent bogle S.bob (S.landsFor island S.bob 1 (S.landsInPlay island 7))
+        (riftId, gs1) = S.addHandCard rift S.alice gs0
+        board = aliceOnTurn gs1
+        after = castResolved (payingFor overloadCost) riftId board
+    Spec.assertEqWith s "CR 702.96b the Bogle is in bob's hand and his Island is not" (length (namedOnBattlefield "Slippery Bogle" after), length (Game.zoneMembers Zone.Hand S.bob after), length (namedOnBattlefield "Island" after)) (0, 1, 8)
+    Spec.assertBool
+      s
+      (any (S.isCastOf riftId) (Action.legalActions S.alice board))
+      "CR 601.2c the cast is offered at all, although the printed slot has no legal target on this board"
+
+-- Cyclonic Rift's printed {1}{U} and its overload {6}{U}.
+riftCost, overloadCost :: [ManaSymbol.ManaSymbol]
+riftCost = [ManaSymbol.Generic 1, theBlue]
+overloadCost = [ManaSymbol.Generic 6, theBlue]
+
 -- CR 702.188a on Spider-Man, Web-Slinger {2}{W} Legendary Creature -- Spider
 -- Human Hero 3/3, "Web-slinging {W}", and nothing else printed on it (Oracle
 -- text checked on Scryfall, 2026-09-13). Chosen over Spider-Sense, the issue's
@@ -5532,6 +5585,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   blitzSpec s registry
   awakenSpec s registry
   cleaveSpec s registry
+  overloadSpec s registry
   webSlingingSpec s registry
   warpSpec s registry
   sneakSpec s registry

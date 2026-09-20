@@ -2793,8 +2793,10 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Dash cost -> costFilters cost
   Keyword.Blitz cost -> costFilters cost
   Keyword.Warp cost -> costFilters cost
-  -- CR 702.148a: the cleave cost, flashback's shape.
+  -- CR 702.148a and CR 702.96a: the cleave and overload costs, flashback's
+  -- shape.
   Keyword.Cleave cost -> costFilters cost
+  Keyword.Overload cost -> costFilters cost
   Keyword.Awaken cost -> costFilters cost
   -- CR 702.119a: the emerge cost, flashback's shape, plus CR 702.119b's quality
   -- beside it, Cycling's shape. The sacrifice the rule states is appended at the
