@@ -822,11 +822,11 @@ candidateCostsGiven permitted pid name oid gs =
           -- CR 707.10: "a copy of a spell isn't cast", so it is never announced and
           -- there is no cost to offer for it.
           Source.OfSpellCopy _ -> []
-          -- CR 722.3c's copy is CAST -- "the prepared permanent's controller may cast
-          -- the copy" -- so CR 601.2 announces it like any other spell and it is priced
-          -- exactly as the card-backed arm above prices a card, off the one-faced
-          -- printing Pawl.Engine.Prepare interned for the prepare spell's
-          -- characteristics.
+          -- A copy of a card is CAST -- CR 722.3c's "the prepared permanent's
+          -- controller may cast the copy", CR 707.12's "cast a copy of an object" --
+          -- so CR 601.2 announces it like any other spell and it is priced exactly as
+          -- the card-backed arm above prices a card, off whichever printing its source
+          -- names.
           Source.OfCardCopy printingId -> costsOfPrinting obj printingId
           Source.OfInherentTrigger _ -> []
 

@@ -47,6 +47,22 @@ data OfferCast = MkOfferCast
     -- them -- the axis `optionality` above is not. Fevered Suspicion's "you may
     -- cast any number of spells from among those nonland cards" writes both: a
     -- may, repeated.
-    repetition :: CastRepetition.CastRepetition
+    repetition :: CastRepetition.CastRepetition,
+    -- | CR 707.12: whether what is offered is a COPY of each object `ref` names,
+    -- created in the zone that object is in, rather than the object itself.
+    -- Mizzix's Mastery's "copy it, and you may cast the copy" sets it; every
+    -- other producer offers the card where it lies.
+    --
+    -- A field of THIS type and not of CastOffer, whose riders all describe the
+    -- cast -- which face, what it costs, how mana may be spent toward it. This
+    -- one changes WHICH OBJECTS the offer ranges over, which is `ref`'s axis, so
+    -- Pawl.Engine.Resolve.Effect's offerCast mints the copies before CR 601.3's
+    -- choice rather than inside the per-face proposal CastOffer feeds.
+    --
+    -- CR 707.12a is why one copy is minted per named object and `repetition`
+    -- above then asks per copy: "an effect that creates multiple copies and says
+    -- a player 'may cast' those objects allows that player to choose
+    -- individually, for each of those objects, whether or not to cast it".
+    copied :: Bool
   }
   deriving (Eq, Ord, Show)
