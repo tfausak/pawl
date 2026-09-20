@@ -1400,6 +1400,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Undying
       " {\"type\":\"Undying\"} "
     Spec.assertBool s (Codec.encode Keyword.codec Keyword.Undying /= Codec.encode Keyword.codec Keyword.Persist) "undying and persist encode differently"
+  -- CR 702.95a. Nullary: the two triggered abilities are the rule's, so the card
+  -- states the word and nothing else (Wolfir Silverheart).
+  Spec.it s "Soulbond" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Soulbond
+      " {\"type\":\"Soulbond\"} "
   -- CR 702.131b. Nullary: the ten and the mark are the rule's, not the card's.
   Spec.it s "Ascend" $
     Common.assertCodec

@@ -278,6 +278,7 @@ enter pid quality = do
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
+                Object.paired = Nothing,
                 Object.protector = Nothing,
                 Object.classLevel = Nothing,
                 -- CR 309.4a: "as a player puts a dungeon they own into the command

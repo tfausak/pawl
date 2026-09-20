@@ -1215,6 +1215,7 @@ ownCounts effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.Pair _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
   Effect.MakeForetold _ -> []
@@ -1591,6 +1592,7 @@ effectNestedEffects effect = case effect of
   Effect.Untap {} -> []
   Effect.Detain {} -> []
   Effect.Goad {} -> []
+  Effect.Pair {} -> []
   Effect.GrantLookAtExiled {} -> []
   Effect.MakePlotted {} -> []
   Effect.MakeForetold {} -> []
@@ -2067,6 +2069,7 @@ effectReplacements effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.Pair _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
   Effect.MakeForetold _ -> []
@@ -2500,6 +2503,7 @@ effectMintedFaces effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.Pair _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
   Effect.MakeForetold _ -> []
@@ -3150,6 +3154,7 @@ keywordPayloadFilters keyword = case keyword of
   -- "if" clause are written into the abilities Pawl.Engine.Keyword mints.
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Soulbond -> []
   -- CR 702.63a names no quality: the time counters and the upkeep are written
   -- into the replacement effect and the two abilities Pawl.Engine.Keyword mints,
   -- not into the keyword.
@@ -4260,6 +4265,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsExiledFaceDown -> []
   Filter.Type.Transformed -> []
   Filter.Type.IsRingBearer -> []
+  Filter.Type.IsPaired -> []
+  Filter.Type.IsPairedWithSource -> []
   Filter.Type.HasDesignation _ -> []
   -- The kind may be a whole Keyword hiding a Filter, left alone for the reason
   -- the keyword atom above is.
@@ -5328,6 +5335,7 @@ effectFilters effect = case effect of
   Effect.Untap ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Detain ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Goad ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.Pair ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.GrantLookAtExiled grant -> frame SourceHostFramed (objectRefFilters (GrantLookAtExiled.cards grant))
   Effect.MakePlotted ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.MakeForetold x -> frame SourceHostFramed (objectRefFilters (MakeForetold.cards x))

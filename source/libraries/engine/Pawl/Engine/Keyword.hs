@@ -370,6 +370,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Renown n -> List.genericReplicate count (renown n)
   Keyword.Persist -> List.genericReplicate count persist
   Keyword.Undying -> List.genericReplicate count undying
+  Keyword.Soulbond -> concat (List.genericReplicate count soulbond)
   -- CR 702.115b: each instance triggers separately.
   Keyword.Ingest -> List.genericReplicate count ingest
   Keyword.Myriad -> List.genericReplicate count myriad
@@ -774,6 +775,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Soulbond -> []
   -- CR 702.184a's ability puts its counters on "this permanent", so it belongs to
   -- battlefieldAbilitiesFor and not to this hand roster.
   Keyword.Station -> []
@@ -1329,6 +1331,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Soulbond -> []
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
@@ -1970,6 +1973,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Soulbond -> []
   -- CR 702.184a states a whole self-contained ability, so one per instance,
   -- crew's reading above.
   Keyword.Station -> List.genericReplicate count station
@@ -2698,6 +2702,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Soulbond -> []
   -- CR 702.184a permits no casting; the station card is cast for its own cost.
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
@@ -4397,6 +4402,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Soulbond -> []
   -- CR 702.184a replaces nothing: it is an activated ability.
   Keyword.Station -> []
   -- CR 702.89a's whole content, minted onto the AURA rather than onto what it
@@ -4676,6 +4682,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Soulbond -> []
   Keyword.Changeling -> []
   Keyword.Hideaway _ -> []
   Keyword.Reinforce {} -> []
@@ -4969,6 +4976,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Enlist -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Soulbond -> []
   Keyword.Changeling -> []
   Keyword.Hideaway _ -> []
   Keyword.Reinforce {} -> []
@@ -5234,6 +5242,7 @@ familyOf keyword = case keyword of
   Keyword.Enlist -> Nothing
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing
+  Keyword.Soulbond -> Nothing
   Keyword.Station -> Nothing
   -- CR 702.89a carries no parameter, so there is no family to name it by.
   Keyword.UmbraArmor -> Nothing
@@ -5709,6 +5718,123 @@ graft =
 --
 -- Effect.Evolve rather than Effect.PutCounters, which is rule 702.100b: one opcode
 -- is what ties the "evolves" marker to the placement. Renegade Krasis reads it.
+-- CR 702.95a: soulbond, two triggered abilities. Bushido's shape -- one keyword,
+-- two conditions, and a TriggeredAbility carries one each -- with the pair of
+-- them minted together so that the roster arm reads as one keyword.
+--
+-- The two differ only in WHICH creature is the new one: on this creature's own
+-- entry the partner is chosen (CR 608.2d), and on another creature's entry the
+-- partner is the entrant the trigger already bound. Both pair the SOURCE with it,
+-- which is what makes one opcode enough.
+soulbond :: [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+soulbond = [soulbondSelfEnters, soulbondOtherEnters]
+
+-- CR 702.95a's "another unpaired creature you control": "another" is Not
+-- IsSource, "you control" is ControlledBy You (CR 109.5), and "unpaired" is CR
+-- 702.95b's Not IsPaired. The rule's words rather than any card's.
+unpairedOther :: Filter Keyword
+unpairedOther =
+  Filter.And
+    [ Filter.HasCardType CardType.Creature,
+      Filter.ControlledBy PlayerRelation.You,
+      Filter.Not Filter.IsSource,
+      Filter.Not Filter.IsPaired
+    ]
+
+-- CR 702.95a's "you control this creature and it is unpaired", asked of the
+-- battlefield so that a source already gone answers False.
+soulbondSelfEligible :: Condition.Condition
+soulbondSelfEligible =
+  atLeastOneMatching
+    (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+    (Filter.And [Filter.IsSource, Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsPaired])
+
+-- "At least one candidate", as CR 603.4 wants it: a Count of the scope's members
+-- the Filter keeps, against 1.
+atLeastOneMatching :: Scope.Scope -> Filter Keyword -> Condition.Condition
+atLeastOneMatching scope quality =
+  Condition.Compares
+    ( Compares.MkCompares
+        (Quantity.Count (Count.MkCount scope quality Aggregation.Members))
+        Comparison.AtLeast
+        (Quantity.Literal 1)
+    )
+
+-- CR 702.95a's FIRST ability: "When this creature enters, if you control both
+-- this creature and another creature and both are unpaired, you may pair this
+-- creature with another unpaired creature you control".
+--
+-- The "may" is Optionality.Optional and not a PayGate, there being nothing to
+-- pay; the partner is ObjectRef.ChosenPermanent, which is CR 608.2d's choice
+-- rather than a target (rule 702.95a says "pair", never "target"), so it is asked
+-- only where two or more candidates make it a choice.
+soulbondSelfEnters :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+soulbondSelfEnters =
+  let clause =
+        Clause.MkClause
+          Nothing
+          Nothing
+          Nothing
+          (Optionality.Optional (PlayerRef.Relative PlayerRelation.You))
+          Nothing
+          (Seq.singleton (Effect.Pair (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent unpairedOther (PlayerRef.Relative PlayerRelation.You)))))
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening =
+            Just
+              ( Condition.All
+                  [ soulbondSelfEligible,
+                    atLeastOneMatching (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) unpairedOther
+                  ]
+              ),
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.95a's SECOND ability: "Whenever another creature you control enters, if
+-- you control both that creature and this one and both are unpaired, you may pair
+-- that creature with this creature".
+--
+-- The entrant needs no choosing, so the partner is the slot the trigger bound;
+-- "both are unpaired" splits into this creature's half, shared with the first
+-- ability, and the entrant's, asked over CR 400.7j's bound slot rather than the
+-- battlefield, since the rule names THAT creature and not any matching one.
+soulbondOtherEnters :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+soulbondOtherEnters =
+  let clause =
+        Clause.MkClause
+          Nothing
+          Nothing
+          Nothing
+          (Optionality.Optional (PlayerRef.Relative PlayerRelation.You))
+          Nothing
+          (Seq.singleton (Effect.Pair (ObjectRef.InSlot Binding.became)))
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition =
+            TriggerCondition.PermanentEnters
+              ( Filter.And
+                  [ Filter.HasCardType CardType.Creature,
+                    Filter.ControlledBy PlayerRelation.You,
+                    Filter.Not Filter.IsSource
+                  ]
+              ),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening =
+            Just
+              ( Condition.All
+                  [ soulbondSelfEligible,
+                    atLeastOneMatching (Scope.OverBound Binding.became) (Filter.Not Filter.IsPaired)
+                  ]
+              ),
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
 evolve :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 evolve =
   let effect = Effect.Evolve Binding.triggerSource

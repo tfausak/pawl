@@ -142,6 +142,8 @@ codec keywordCodec =
       Arm.nullary "IsExiledFaceDown" Filter.IsExiledFaceDown,
       Arm.nullary "Transformed" Filter.Transformed,
       Arm.nullary "IsRingBearer" Filter.IsRingBearer,
+      Arm.nullary "IsPaired" Filter.IsPaired,
+      Arm.nullary "IsPairedWithSource" Filter.IsPairedWithSource,
       Arm.payload "HasDesignation" Designation.codec Filter.HasDesignation (\x -> case x of Filter.HasDesignation y -> Just y; _ -> Nothing),
       Arm.payload "HasCounters" (CounterKind.codec keywordCodec) Filter.HasCounters (\x -> case x of Filter.HasCounters y -> Just y; _ -> Nothing),
       Arm.nullary "HasCountersOfAnyKind" Filter.HasCountersOfAnyKind,
@@ -241,6 +243,8 @@ tagOf x = case x of
   Filter.IsExiledFaceDown {} -> "IsExiledFaceDown"
   Filter.Transformed {} -> "Transformed"
   Filter.IsRingBearer {} -> "IsRingBearer"
+  Filter.IsPaired {} -> "IsPaired"
+  Filter.IsPairedWithSource {} -> "IsPairedWithSource"
   Filter.HasDesignation {} -> "HasDesignation"
   Filter.HasCounters {} -> "HasCounters"
   Filter.HasCountersOfAnyKind {} -> "HasCountersOfAnyKind"

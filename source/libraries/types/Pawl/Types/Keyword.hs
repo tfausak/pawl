@@ -444,6 +444,10 @@ data Keyword
     -- off a card's printed keywords, which misses an effect that granted miracle
     -- there (#1859).
     Miracle (Cost.Cost Keyword)
+  | -- | 702.95a: soulbond -- two triggered abilities that may pair this creature
+    -- with another unpaired creature its controller controls, on either one's
+    -- entry.
+    Soulbond
   | -- | 702.96a: overload [cost] -- an alternative cost, plus a CR 612.1
     -- text-changing effect replacing every "target" with "each" if it was paid.
     --

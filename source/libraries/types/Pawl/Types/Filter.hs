@@ -533,6 +533,15 @@ data Filter keyword
     -- Uncharacteristic, CR 701.54b making Ring-bearer a designation rather than a
     -- copiable value.
     IsRingBearer
+  | -- | CR 702.95b's "whether a creature is paired", asked of the CANDIDATE.
+    -- Uncharacteristic for IsRingBearer's reason: CR 702.95b makes pairing a
+    -- record on the permanent rather than a copiable value.
+    IsPaired
+  | -- | CR 702.95b's "the creature another creature is paired with", asked of the
+    -- CANDIDATE against the evaluation's SOURCE: IsAttachedToSource's comparison
+    -- one relation over. Vacuously False where the candidate is unpaired or where
+    -- no source frames the match.
+    IsPairedWithSource
   | -- | Does the CANDIDATE have this designation? Aragorn, Hornburg Hero's
     -- "renowned creature you control" and Rune-Brand Juggler's "suspected
     -- creature". Not Pawl.Types.Quantity.HasDesignation, which asks the same

@@ -196,6 +196,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Earthbend" Earthbend.codec Effect.Earthbend (\x -> case x of Effect.Earthbend y -> Just y; _ -> Nothing),
           Arm.payload "Airbend" ObjectRef.codec Effect.Airbend (\x -> case x of Effect.Airbend y -> Just y; _ -> Nothing),
           Arm.payload "Goad" ObjectRef.codec Effect.Goad (\x -> case x of Effect.Goad y -> Just y; _ -> Nothing),
+          Arm.payload "Pair" ObjectRef.codec Effect.Pair (\x -> case x of Effect.Pair y -> Just y; _ -> Nothing),
           Arm.payload "DoesNotUntapNext" ObjectRef.codec Effect.DoesNotUntapNext (\x -> case x of Effect.DoesNotUntapNext y -> Just y; _ -> Nothing),
           Arm.payload "Transform" ObjectRef.codec Effect.Transform (\x -> case x of Effect.Transform y -> Just y; _ -> Nothing),
           Arm.payload "Convert" ObjectRef.codec Effect.Convert (\x -> case x of Effect.Convert y -> Just y; _ -> Nothing),
@@ -336,6 +337,7 @@ tagOf x = case x of
   Effect.Earthbend {} -> "Earthbend"
   Effect.Airbend {} -> "Airbend"
   Effect.Goad {} -> "Goad"
+  Effect.Pair {} -> "Pair"
   Effect.DoesNotUntapNext {} -> "DoesNotUntapNext"
   Effect.Transform {} -> "Transform"
   Effect.Convert {} -> "Convert"

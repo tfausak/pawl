@@ -715,6 +715,8 @@ library codec
     Pawl.Codec.OutsideObjectSpec
     Pawl.Codec.PaidExpiry
     Pawl.Codec.PaidExpirySpec
+    Pawl.Codec.Pairing
+    Pawl.Codec.PairingSpec
     Pawl.Codec.PartnerText
     Pawl.Codec.PartnerTextSpec
     Pawl.Codec.PayBranch
@@ -1169,6 +1171,7 @@ library engine
     Pawl.Engine.Sba
     Pawl.Engine.Script
     Pawl.Engine.Setup
+    Pawl.Engine.Soulbond
     Pawl.Engine.Speed
     Pawl.Engine.SplitSecond
     Pawl.Engine.Stack
@@ -1941,6 +1944,7 @@ library types
     Pawl.Types.OutsideDestination
     Pawl.Types.OutsideObject
     Pawl.Types.PaidExpiry
+    Pawl.Types.Pairing
     Pawl.Types.PartnerText
     Pawl.Types.PayBranch
     Pawl.Types.PayGate
