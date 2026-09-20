@@ -1,0 +1,120 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Enchantment Alteration",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "AttachTarget",
+                    "value": {
+                      "filter": {
+                        "type": "Or",
+                        "value": [
+                          {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              {
+                                "type": "HostOfSubjectHasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
+                              },
+                              {
+                                "type": "HostOfSubjectHasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "slot": "target"
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "filter": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Aura"
+                      }
+                    },
+                    {
+                      "type": "AttachedTo",
+                      "value": {
+                        "type": "Or",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
+                          },
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "pool": {
+                  "type": "Permanents"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

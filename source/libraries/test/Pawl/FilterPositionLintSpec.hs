@@ -293,6 +293,10 @@ canHostSubjects predicate = case predicate of
   -- Zero: the MIRROR atom is not this one, and its own lint counts it through the
   -- codec (canAttachToSubjectCounts) rather than through this recursion.
   Filter.Type.CanAttachToSubject -> 0
+  -- Zero for the atom above's reason: CR 205.2a's read of the subject's host is
+  -- a different atom with a lint of its own (hostOfSubjectCardTypeCounts), even
+  -- though it is admitted in exactly the positions this one counts.
+  Filter.Type.HostOfSubjectHasCardType _ -> 0
   Filter.Type.IsCommander -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsActivatedAbility -> 0
@@ -525,6 +529,40 @@ canAttachToSubjectOffends :: Face.Face Card.Type.Card -> Bool
 canAttachToSubjectOffends card =
   let (framed, unframedCount) = canAttachToSubjectCounts card
    in unframedCount /= 0 || framed + unframedCount /= jsonAtoms canAttachToSubjectTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The CR 205.2a subject's-host tag, spelled once.
+hostOfSubjectCardTypeTag :: Text.Text
+hostOfSubjectCardTypeTag = Text.pack "HostOfSubjectHasCardType"
+
+-- How many CR 205.2a subject's-host atoms this card carries in a position an
+-- attach frames, and how many anywhere else. The second number is the offence;
+-- the first is what Enchantment Alteration legitimately has two of, one per card
+-- type its "of that type" ranges over.
+--
+-- The SAME position set canHostSubjectCounts admits, because
+-- Pawl.Engine.Attach.hostsFor is the one filler of
+-- Filter.Context.subjectHostCardTypes as it is of the view's `canHostSubject`.
+-- Admitted at CR 614.1c's entry choice and refused at CR 303.4k's turn-up rider
+-- for that reason alone, and not because either can ANSWER it: a permanent
+-- entering the battlefield and an Aura being turned face up are each attached
+-- to nothing yet, so the set is empty and the atom is False at both. Only a
+-- resolving attach has a subject with a host.
+hostOfSubjectCardTypeCounts :: Face.Face Card.Type.Card -> (Int, Int)
+hostOfSubjectCardTypeCounts card =
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms hostOfSubjectCardTypeTag f) (filter (\(framing, _) -> (framing == AttachDestination) == wanted) (cardFilters card)))
+   in (total True, total False)
+
+-- Filter.HostOfSubjectHasCardType is answerable only where an attach frames the
+-- match, and is a silent False everywhere else -- canAttachToSubjectOffends'
+-- claim with the two roles swapped back.
+--
+-- Two offences under one name, for canHostSubjectOffends' two reasons: the
+-- traversal found the atom outside an attach's destination, or the traversal and
+-- the codec disagree about how many the card holds.
+hostOfSubjectCardTypeOffends :: Face.Face Card.Type.Card -> Bool
+hostOfSubjectCardTypeOffends card =
+  let (framed, unframedCount) = hostOfSubjectCardTypeCounts card
+   in unframedCount /= 0 || framed + unframedCount /= jsonAtoms hostOfSubjectCardTypeTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- The CR 201.4 chosen-name tag, spelled once.
 hasChosenNameTag :: Text.Text
@@ -1300,6 +1338,26 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- a static restriction's affected set, read through a bare contextFor.
     Spec.assertBool s (sameControllerAsHostOfBoundOffends restricted) "the atom in an affected set offends"
     Spec.assertEqWith s "counted outside the admitted positions" (sameControllerAsHostOfBoundCounts restricted) (1, 1)
+  -- CR 205.2a asked of the same host (CR 303.4b), the arm above one
+  -- characteristic over and one position NARROWER: this atom reads
+  -- Filter.Context.subjectHostCardTypes, which Pawl.Engine.Attach.hostsFor fills
+  -- and nothing else does, so an attach's destination is the only position that
+  -- answers it. See hostOfSubjectCardTypeOffends for the two offences.
+  Spec.it s "CR 205.2a no card asks HostOfSubjectHasCardType outside a position an attach frames" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace hostOfSubjectCardTypeOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only where an attach fills the subject's host" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the card that does is
+    -- ACCEPTED. Two of them, one per card type "of that type" ranges over.
+    alteration <- S.printingOf s registry "Enchantment Alteration"
+    let face = S.combinedFace alteration
+        atom = Filter.Type.HostOfSubjectHasCardType CardType.Creature
+        restricted = face {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching atom) Nothing]}
+    Spec.assertEqWith s "Enchantment Alteration's two atoms are in its attach destination" (hostOfSubjectCardTypeCounts face) (2, 0)
+    -- The lint's own proof, the pair differing in one position: the same atom in
+    -- a static restriction's affected set, read through a bare contextFor.
+    Spec.assertBool s (hostOfSubjectCardTypeOffends restricted) "the atom in an affected set offends"
+    Spec.assertEqWith s "counted outside the admitted positions" (hostOfSubjectCardTypeCounts restricted) (2, 1)
   -- CR 110.2's Filter.SameControllerAsBound is CR 709.4a's atom one characteristic
   -- over, in the same position and with the STAKES reversed: it is vacuously TRUE
   -- where Filter.Context.slotControllers has no key for its slot, so an atom

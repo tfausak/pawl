@@ -395,6 +395,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.IsHostOfSource -> predicate
         Filter.Type.CanHostSubject -> predicate
         Filter.Type.CanAttachToSubject -> predicate
+        Filter.Type.HostOfSubjectHasCardType _ -> predicate
         Filter.Type.IsCommander -> predicate
         Filter.Type.IsToken -> predicate
         Filter.Type.IsActivatedAbility -> predicate

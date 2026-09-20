@@ -1179,6 +1179,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   simicGuildmageSpec s registry
   arbitrationSpec s registry
   auraGraftSpec s registry
+  enchantmentAlterationSpec s registry
   miracleWorkerSpec s registry
   enchantPlayerSpec s registry
   chosenLandTypeSpec s registry
@@ -4107,3 +4108,122 @@ auraTokenSpec s registry =
           Spec.assertEqWith s "CR 303.4i: the Aura token isn't created" (auraTokens resolved) []
           Spec.assertEqWith s "so nothing was minted at all, before any state-based action could bury it" (S.tokensOf resolved) []
           Spec.assertEqWith s "and neither land gained the token's ability" (length (Projection.abilitiesOf mountainId resolved), length (Projection.abilitiesOf forestId resolved)) (length (Projection.abilitiesOf mountainId staged), length (Projection.abilitiesOf forestId staged))
+
+-- CR 205.2a with CR 303.4b: a destination filter that reads the SUBJECT's host
+-- rather than the candidate. Enchantment Alteration {U} Instant, Oracle text
+-- re-fetched from Scryfall this session: "Attach target Aura attached to a
+-- creature or land to another permanent of that type."
+--
+-- "OF THAT TYPE" is two reads and not one comparison: the candidate's card types
+-- (Filter.HasCardType) and the host's (Filter.HostOfSubjectHasCardType, answered
+-- off Filter.Context.subjectHostCardTypes, which Pawl.Engine.Attach.hostsFor
+-- fills). The card pairs them per type rather than intersecting the two sets,
+-- which would let an artifact land stand in for an artifact creature on the
+-- Artifact they share -- a type the card never named.
+--
+-- THE AURA IS CONFISCATE, and that choice is what makes the atom observable at
+-- all: its enchant ability is "enchant permanent", so CR 701.3a admits every
+-- candidate on these boards and the card-type conjunct is the only thing
+-- excluding any. An "enchant creature" Aura would pass both legs vacuously. Its
+-- "you control enchanted permanent" (CR 613.1b) is also how the move is read a
+-- second way, beside Object.attachedTo.
+--
+-- TWO LEGS, because the card states two types and a board showing one proves
+-- nothing about the other: a land host with a creature among the candidates, and
+-- a creature host with lands among them. Two destinations of the right type in
+-- each, since Attach.chooseHost elides the prompt at one candidate and the
+-- offered set would then be unreadable.
+--
+-- The card does NOT write Filter.CanHostSubject: its text says nothing like "it
+-- can enchant", so CR 303.4j is the backstop for a destination the Aura could
+-- not legally enchant -- Crown of the Ages' treatment rather than Aura Graft's.
+enchantmentAlterationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enchantmentAlterationSpec s registry =
+  let -- The destination by INDEX into what was offered, never by naming an
+      -- object: an answerer that searched for a legal destination would find the
+      -- right one again after a mutation. simicGuildmageSpec's posture.
+      pickBy :: (NonEmpty.NonEmpty ObjectId.ObjectId -> ObjectId.ObjectId) -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      pickBy choose aura p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject aura))) sets
+        Prompt.ChooseAttachment _ _ _ offered -> choose offered
+        _ -> S.identityAnswer p
+      hostOf aura gs = Game.lookupObject aura gs >>= Object.attachedTo >>= Recipient.objectOf
+   in Spec.describe s "EnchantmentAlteration" $ do
+        -- The LAND leg. Alice's own Island pays for the spell and is a legal
+        -- destination besides -- the contrast with Simic Guildmage, whose
+        -- destination filter names a controller where this one does not -- and
+        -- it holds the lowest id, so it is what the FIRST offered destination
+        -- is. Bob's Goblin Piker holds the highest, so it is what the LAST
+        -- becomes if the host's card type stops being read.
+        Spec.it s "CR 205.2a an Aura on a land moves only to another land" $ do
+          island <- S.printingOf s registry "Island"
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          plains <- S.printingOf s registry "Plains"
+          piker <- S.printingOf s registry "Goblin Piker"
+          confiscate <- S.printingOf s registry "Confiscate"
+          alteration <- S.printingOf s registry "Enchantment Alteration"
+          let (mana, base0) = S.addPermanent island S.alice (Setup.emptyGame S.bothPlayers)
+              (host, base1) = S.addPermanent forest S.bob base0
+              (middleLand, base2) = S.addPermanent mountain S.bob base1
+              (lastLand, base3) = S.addPermanent plains S.bob base2
+              (aura, base4) = S.addPermanent confiscate S.alice base3
+              (creature, base5) = S.addPermanent piker S.bob base4
+              enchanted = (S.attach aura host base5) {GameState.priority = Just S.alice}
+              (gs, spell) = S.handOne alteration enchanted
+              run choose =
+                let answer :: Prompt.Prompt r -> r
+                    answer = pickBy choose aura
+                    cast = S.runPure answer gs (S.cast S.alice spell)
+                 in S.runPure answer cast Stack.resolveTop
+              taking = run NonEmpty.head
+              takingLast = run NonEmpty.last
+          Spec.assertEqWith s "before, alice's Confiscate holds bob's Forest" (Projection.controllerOf host gs) (Just S.alice)
+          -- THE gameplay-level assertion, ahead of every proxy: the LAST
+          -- destination offered is bob's Plains. Without the host's card type
+          -- being read it would be bob's Goblin Piker, which Confiscate's
+          -- "enchant permanent" admits and rule 205.2a's "that type" does not.
+          Spec.assertEqWith s "the last destination offered is bob's Plains" (hostOf aura takingLast) (Just lastLand)
+          Spec.assertEqWith s "and the first is alice's own Island, the destination filter naming no controller" (hostOf aura taking) (Just mana)
+          -- CR 613.1b read through the move: Confiscate's static follows the
+          -- Aura, so the land it landed on is alice's and the old host is bob's
+          -- again.
+          Spec.assertEqWith s "alice controls the Plains now" (Projection.controllerOf lastLand takingLast) (Just S.alice)
+          Spec.assertEqWith s "and bob has his Forest back" (Projection.controllerOf host takingLast) (Just S.bob)
+          Spec.assertEqWith s "the Mountain in the middle of the offer is untouched" (Projection.controllerOf middleLand takingLast) (Just S.bob)
+          Spec.assertEqWith s "and the creature stayed bob's in both legs" (Projection.controllerOf creature taking, Projection.controllerOf creature takingLast) (Just S.bob, Just S.bob)
+        -- The CREATURE leg, the board above with the two card types swapped:
+        -- the host is a creature, two creatures are legal destinations, and the
+        -- lands -- alice's Island at the bottom of the id order and bob's Forest
+        -- at the top -- are what the atom excludes at both ends of the offer.
+        Spec.it s "CR 205.2a an Aura on a creature moves only to another creature" $ do
+          island <- S.printingOf s registry "Island"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          confiscate <- S.printingOf s registry "Confiscate"
+          alteration <- S.printingOf s registry "Enchantment Alteration"
+          let (_, base0) = S.addPermanent island S.alice (Setup.emptyGame S.bothPlayers)
+              (host, base1) = S.addPermanent piker S.bob base0
+              (firstCreature, base2) = S.addPermanent giant S.bob base1
+              (lastCreature, base3) = S.addPermanent mammoth S.bob base2
+              (aura, base4) = S.addPermanent confiscate S.alice base3
+              (land, base5) = S.addPermanent forest S.bob base4
+              enchanted = (S.attach aura host base5) {GameState.priority = Just S.alice}
+              (gs, spell) = S.handOne alteration enchanted
+              run choose =
+                let answer :: Prompt.Prompt r -> r
+                    answer = pickBy choose aura
+                    cast = S.runPure answer gs (S.cast S.alice spell)
+                 in S.runPure answer cast Stack.resolveTop
+              taking = run NonEmpty.head
+              takingLast = run NonEmpty.last
+          -- Both ends of the offer, and both move under a filter that stopped
+          -- reading the host's card type: the first would be alice's Island and
+          -- the last bob's Forest.
+          Spec.assertEqWith s "the first destination offered is bob's Hill Giant" (hostOf aura taking) (Just firstCreature)
+          Spec.assertEqWith s "and the last is bob's War Mammoth" (hostOf aura takingLast) (Just lastCreature)
+          Spec.assertEqWith s "alice controls the Mammoth now" (Projection.controllerOf lastCreature takingLast) (Just S.alice)
+          Spec.assertEqWith s "bob keeps his Forest, which was never offered" (Projection.controllerOf land takingLast) (Just S.bob)
+          Spec.assertEqWith s "and his Piker, which the Aura left" (Projection.controllerOf host takingLast) (Just S.bob)

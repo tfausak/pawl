@@ -4256,6 +4256,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsHostOfSource -> []
   Filter.Type.CanHostSubject -> []
   Filter.Type.CanAttachToSubject -> []
+  Filter.Type.HostOfSubjectHasCardType _ -> []
   Filter.Type.IsCommander -> []
   Filter.Type.IsToken -> []
   Filter.Type.IsActivatedAbility -> []

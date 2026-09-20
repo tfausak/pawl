@@ -1945,6 +1945,39 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.CanAttachToSubject)) "player"
 
+  -- CR 205.2a with CR 303.4b: the third atom an attach frames, and the one that
+  -- reads the Context rather than the candidate's view.
+  Spec.describe s "HostOfSubjectHasCardType" $ do
+    let hostTypes types = self {Filter.subjectHostCardTypes = Set.fromList types}
+        creature = Filter.Type.HostOfSubjectHasCardType CardType.Creature
+        land = Filter.Type.HostOfSubjectHasCardType CardType.Land
+    Spec.it s "matches when the subject's host has the card type" $
+      Spec.assertBool s (Filter.matches (hostTypes [CardType.Land]) blackCreature land) "a land host"
+
+    Spec.it s "does not match another card type the host lacks" $
+      Spec.assertBool s (not (Filter.matches (hostTypes [CardType.Land]) blackCreature creature)) "a land host is not a creature host"
+
+    -- The atom says nothing about the CANDIDATE, which is what makes the card's
+    -- pairing with HasCardType do the work: a creature candidate answers False
+    -- while the host is a land, and a player candidate answers True while it is
+    -- not.
+    Spec.it s "is independent of every characteristic of the candidate" $ do
+      Spec.assertBool s (not (Filter.matches (hostTypes [CardType.Land]) blackCreature creature)) "being a creature does not answer for the host"
+      Spec.assertBool s (Filter.matches (hostTypes [CardType.Land]) aPlayer land) "and a player candidate does not refuse it"
+
+    -- Vacuously False wherever no attach frames the match: outside
+    -- Pawl.Engine.Attach.hostsFor the set is empty, and it is empty inside one
+    -- too for a subject attached to nothing or to a player (CR 303.4b).
+    Spec.it s "an unfilled context admits nothing" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature creature)) "no host at all"
+      Spec.assertBool s (not (Filter.matches (hostTypes []) blackCreature creature)) "a host with no card types"
+
+    -- Both card types at once, which is the board Dryad Arbor makes: "of that
+    -- type" then admits either reading, and the card's two disjuncts both hold.
+    Spec.it s "CR 205.1a a host with both card types answers both" $ do
+      Spec.assertBool s (Filter.matches (hostTypes [CardType.Creature, CardType.Land]) blackCreature creature) "creature"
+      Spec.assertBool s (Filter.matches (hostTypes [CardType.Creature, CardType.Land]) blackCreature land) "land"
+
   -- CR 400.1. The gameplay-level proof that this is the zone a spell is CAST
   -- FROM -- CR 601.2's "from where it is" -- is Pawl.CastSpec's Drannith
   -- Magistrate group; these cases pin the atom itself.

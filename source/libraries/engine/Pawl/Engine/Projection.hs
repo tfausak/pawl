@@ -2657,6 +2657,11 @@ filterReads f = case f of
   -- which that ability is read against, and nothing here distinguishes the two
   -- either.
   Filter.Type.CanAttachToSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
+  -- CR 205.2a: the card types of the SUBJECT's host, and nothing of the
+  -- candidate at all. Narrower than the two atoms above because the read is
+  -- exact -- one characteristic of one other object -- and declared even so,
+  -- since a layer-4 write (Song of the Dryads' SetCardType) moves this answer.
+  Filter.Type.HostOfSubjectHasCardType _ -> Set.singleton Types
   -- Reads nothing: no Modification writes Object.source.
   Filter.Type.IsToken -> Set.empty
   -- Reads nothing either: no Modification writes CR 903.3's designation.
@@ -2802,6 +2807,9 @@ filterReadsPeers f = case f of
   -- characteristics CR 301.5 and CR 702.5a compare against is another object.
   Filter.Type.CanHostSubject -> True
   Filter.Type.CanAttachToSubject -> True
+  -- True for the two atoms above's reason: CR 205.2a's read is of the subject's
+  -- HOST, which is another object's projection.
+  Filter.Type.HostOfSubjectHasCardType _ -> True
   -- DESCENT where a flat False would be right: Filter.matches answers this atom
   -- False outright, Pawl.Engine.Count.bakePerspective having settled it between
   -- projections, so the nest is not read here at all. Descending only costs the

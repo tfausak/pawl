@@ -395,6 +395,10 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- here where slotControllers' is a silent True, so a card writing it
             -- in a target slot admits nothing rather than everything.
             Filter.slotHostControllers = Map.empty,
+            -- Empty for the field above's reason, one characteristic over: CR
+            -- 205.2a's read of the subject's host is Pawl.Engine.Attach.hostsFor's
+            -- to fill, and an announcement has no attach subject at all.
+            Filter.subjectHostCardTypes = Set.empty,
             -- Empty: CR 205.3m's comparison is filled only in a resolution's
             -- own positions, and Pawl.FilterPositionLintSpec's lint refuses a
             -- card that writes it in a target slot.
