@@ -2559,7 +2559,7 @@ apply batch candidate event =
       -- it, so the filter can name no slot (Resolve.Slots.entryRewriteReads
       -- reports it all the same, for the lint that asks).
       --
-      -- Filter.CanHostSubject comes off the CARD here, where CR 303.4k's
+      -- Filter.CanHostSubject comes off the CARD here, whereas CR 303.4k's
       -- Attach.turnUpHosts adds it by rule: Grifter's Blade prints "it could be
       -- attached to", so the card writes the atom.
       --
@@ -5778,7 +5778,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- the seed alone would miss a permanent that arrived attached by
               -- its own static ability. Every seeded road still reaches it --
               -- `mkObj` writes the seed into this same field.
-              settledHost <- State.gets (\gs2 -> Game.lookupObject newId gs2 >>= Object.attachedTo)
+              settledHost <- State.gets (Game.lookupObject newId Monad.>=> Object.attachedTo)
               Monad.forM_ (if dest == Zone.Battlefield then settledHost else Nothing) $ \host ->
                 State.modify'
                   . recordEvent

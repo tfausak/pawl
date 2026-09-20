@@ -987,7 +987,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "CR 701.3a no card asks CanHostSubject outside a position an attach frames" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace canHostSubjectOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only in an attach opcode's destination" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "the atom sits only where an attach frames it" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous: the pool authors the atom, and the cards that do are ACCEPTED
     -- here rather than skipped. Aura Graft's "another permanent it can enchant"
     -- is the legal use, so a lint that swept past it would be indistinguishable
@@ -1019,7 +1019,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- The fourth, and the one whose atom sits in an ENTRY replacement rather
     -- than in a resolving effect: Grifter's Blade's "a creature you control it
     -- could be attached to" (CR 614.1c). A forgotten entryRewriteFilters arm
-    -- would report (0, 0) here rather than silently counting it as unframed.
+    -- would report (0, 0) here rather than the (1, 0) below.
     blade <- S.printingOf s registry "Grifter's Blade"
     Spec.assertEqWith
       s

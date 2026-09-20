@@ -2868,8 +2868,10 @@ grifterBladeSpec s registry = Spec.describe s "Grifter's Blade (CR 614.1c)" $ do
     -- attached elsewhere shows here.
     Spec.assertEqWith s "the Sorcerer alice chose is a 2/2" (S.powerToughnessOf sorcerer after) (Just (2, 2))
     Spec.assertEqWith s "and the Piker she passed over is still a printed 2/1" (S.powerToughnessOf piker after) (Just (2, 1))
-    -- CR 608.3c: a permanent that ARRIVES attached became attached, which is the
-    -- half Event.attach cannot record. Read off the LOG rather than through a
+    -- A permanent that ARRIVES attached became attached, which is the half
+    -- Event.attach cannot record -- there is no CR 701.3 move here, so the
+    -- record is written at the entry (Pawl.Engine.Event, where the reasoning
+    -- sits). Read off the LOG rather than through a
     -- trigger because nothing in data/cards/ prints one that would fire: a grep
     -- for TriggerCondition.SelfBecomesAttachedBy (2026-09-19) finds only Bramble
     -- Elemental, whose filter is HasSubtype Aura, and the attachment-side

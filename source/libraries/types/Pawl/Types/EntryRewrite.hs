@@ -117,13 +117,9 @@ data EntryRewrite ability effect
     -- prints, and CR 614.13a's exclusion of a card entering beside this one
     -- (#3293).
     ExileFromGraveyard (Filter.Filter Keyword.Keyword)
-  | -- | CR 614.1c / 301.5e / Grifter's Blade: "as this enters, choose a permanent
-    -- matching the Filter; it enters attached to that permanent."
-    --
-    -- The Filter carries CR 701.3a's Filter.CanHostSubject because the CARD
-    -- prints "it could be attached to"; Attach.turnUpHosts' engine-supplied
-    -- conjunct is the other posture, and Pawl.Engine.Attach says which rule
-    -- takes which.
+  | -- | CR 614.1c / 301.5e / Grifter's Blade: as this enters, its controller
+    -- chooses a permanent matching the Filter, and it enters attached to that
+    -- permanent.
     EntersAttachedTo (Filter.Filter Keyword.Keyword)
   | -- | CR 702.136a via CR 614.1c: riot, minted from the projection rather than
     -- written by a card.
