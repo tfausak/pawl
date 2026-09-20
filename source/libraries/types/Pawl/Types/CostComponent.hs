@@ -219,7 +219,15 @@ data CostComponent keyword
     -- and no more.
     --
     -- Not implemented: a waterbend cost in any other position -- a spell's
-    -- additional cost, a ward cost, an unless cost, an alternative cost (#3901)
-    -- -- and a waterbend cost written with X (#3902).
+    -- additional cost, a ward cost, an unless cost, an alternative cost (#3901).
     Waterbend Natural.Natural
+  | -- | CR 107.3a / 601.2b / Katara, Water Tribe's Hope: X as a waterbend
+    -- amount, announced by the activator and rewritten to a Waterbend by
+    -- Pawl.Engine.Cost.substituteX. BlightX's shape one keyword action over.
+    --
+    -- The MANA the licence scopes is the cost's own {X} (ManaSymbol.Variable),
+    -- substituted by the same announcement, so this arm carries no number of its
+    -- own: what it adds is CR 701.67b's ceiling, which without it would read 0
+    -- and offer no tap at all.
+    WaterbendX
   deriving (Eq, Ord, Show)

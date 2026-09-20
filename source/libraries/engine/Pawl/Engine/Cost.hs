@@ -1317,7 +1317,11 @@ substituteXInComponent x component = case component of
   CostComponent.FlipCoin -> component
   -- CR 702.174a's cost names no X.
   CostComponent.ChooseOpponent -> component
-  -- CR 701.67a states no X, so nothing in this arm is a variable (#3902).
+  -- BlightX's rewrite one keyword action over: the announcement fixes CR
+  -- 701.67b's ceiling exactly as it fixes the {X} that licence scopes.
+  CostComponent.WaterbendX -> CostComponent.Waterbend x
+  -- The amount is already fixed: a waterbend cost written with X is
+  -- WaterbendX above until the announcement rewrites it to this arm.
   CostComponent.Waterbend _ -> component
   -- PayLifeX's rewrite one keyword action over: CR 107.3a gives ONE announced
   -- value to the whole cost, so Soul Immolation's "blight X" takes the same X a
@@ -1387,6 +1391,7 @@ componentHasVariable component = case component of
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
   CostComponent.ChooseOpponent -> False
+  CostComponent.WaterbendX -> True
   CostComponent.Waterbend _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
@@ -1480,6 +1485,10 @@ componentDemandGrowsWithX component = case component of
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
   CostComponent.ChooseOpponent -> False
+  -- False, Waterbend's answer below: the licence itself demands nothing,
+  -- and the mana the announcement grows is the cost's own mana part,
+  -- which `manaHasVariable` answers for.
+  CostComponent.WaterbendX -> False
   CostComponent.Waterbend _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
@@ -1774,6 +1783,7 @@ loyaltyAmountOf component = case component of
   CostComponent.Forage -> Nothing
   CostComponent.FlipCoin -> Nothing
   CostComponent.ChooseOpponent -> Nothing
+  CostComponent.WaterbendX -> Nothing
   CostComponent.Waterbend _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileThis -> Nothing
@@ -1901,6 +1911,7 @@ zoneOfComponent component = case component of
   CostComponent.Forage -> Nothing
   CostComponent.FlipCoin -> Nothing
   CostComponent.ChooseOpponent -> Nothing
+  CostComponent.WaterbendX -> Nothing
   CostComponent.Waterbend _ -> Nothing
 
 -- CR 118.8c: does this cost include "actions involving cards with a stated
@@ -1981,6 +1992,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.Forage -> False
   CostComponent.FlipCoin -> False
   CostComponent.ChooseOpponent -> False
+  CostComponent.WaterbendX -> False
   CostComponent.Waterbend _ -> False
   -- The other hidden zone (CR 400.2), and the FIRST conjunct is satisfied where
   -- no other arm's is -- but the second is not: CR 701.17a takes the cards off
@@ -2485,6 +2497,7 @@ claimOf slots pid oid component gs =
         CostComponent.FlipCoin -> Nothing
         -- CR 702.174a's choice spends nothing, FlipCoin's answer just above.
         CostComponent.ChooseOpponent -> Nothing
+        CostComponent.WaterbendX -> Nothing
         -- No claim: rule 701.67a's taps are a component of their own once the
         -- payer takes the offer (`manaSubstitutions`), and that one claims them.
         CostComponent.Waterbend _ -> Nothing
@@ -2901,6 +2914,9 @@ uncountedCeiling component = case component of
   -- 702.174a's cost is offered once per gift ability
   -- (Pawl.Engine.Keyword.optionalCost) -- but the safe direction either way.
   CostComponent.ChooseOpponent -> Just 1
+  -- Zero, BlightX's answer above and for its reason: an unannounced X
+  -- cannot be paid even once.
+  CostComponent.WaterbendX -> Just 0
   -- 1, and counted by none of the three totals: rule 701.67a's licence spends
   -- nothing, so `objectCeiling` has no pool to divide. Unreachable -- a
   -- waterbend cost carries the mana it licenses, so `repeatsOf` answers 1
@@ -3096,6 +3112,7 @@ lifeOwedByComponent component = case component of
   CostComponent.Forage -> 0
   CostComponent.FlipCoin -> 0
   CostComponent.ChooseOpponent -> 0
+  CostComponent.WaterbendX -> 0
   CostComponent.Waterbend _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
@@ -3150,6 +3167,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.Forage -> 0
   CostComponent.FlipCoin -> 0
   CostComponent.ChooseOpponent -> 0
+  CostComponent.WaterbendX -> 0
   CostComponent.Waterbend _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
@@ -3402,6 +3420,12 @@ canPayComponent slots pid oid component gs = case component of
   -- with none left cannot pay it. Nothing about `oid`: the choice is about the
   -- table, not about the object the cost is on.
   CostComponent.ChooseOpponent -> not (null (Game.opponentsOf pid gs))
+  -- CR 601.2b: the component BEFORE X is announced, so there is no
+  -- ceiling for rule 701.67b to scope -- BlightX's arm below, verbatim.
+  -- Unreachable from the activation path, which substitutes before it
+  -- measures or pays; a fence, with Pawl.CostSpec's "an unannounced
+  -- waterbend X is unpayable" as the test.
+  CostComponent.WaterbendX -> False
   -- Always payable: rule 701.67a's licence spends nothing of its own, and the
   -- mana it scopes is the cost's own mana part, which the mana half gates.
   CostComponent.Waterbend _ -> True
@@ -3486,6 +3510,7 @@ criteriaOf component = case component of
   CostComponent.Forage -> []
   CostComponent.FlipCoin -> []
   CostComponent.ChooseOpponent -> []
+  CostComponent.WaterbendX -> []
   -- The criterion the licence leads to is MINTED by `waterbendSubstitute` from
   -- rule 701.67a's own words rather than printed, `manaSubstitutesFor`'s posture:
   -- no word of a card's is in it, so CR 612.2 has nothing to swap.
@@ -4135,6 +4160,7 @@ paidInSecondPass component = case component of
   -- CR 702.174a's choice moves no object and involves no random element, so
   -- neither half of rule 601.2h's first criterion reaches it.
   CostComponent.ChooseOpponent -> False
+  CostComponent.WaterbendX -> False
   CostComponent.Waterbend _ -> False
   -- CR 701.20b moves nothing out of any zone, so rule 601.2h's library half has
   -- nothing to ask of it.
@@ -4271,6 +4297,7 @@ orderSensitive component = case component of
   -- False: rule 702.174a's choice spends nothing another part of the same cost
   -- could have spent, FlipCoin's answer just above.
   CostComponent.ChooseOpponent -> False
+  CostComponent.WaterbendX -> False
   -- False: rule 701.67a's licence spends nothing another part of the same cost
   -- could have spent, ChooseOpponent's answer just above.
   CostComponent.Waterbend _ -> False
@@ -5388,6 +5415,9 @@ payComponent moment slots pid oid component = case component of
         answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor pid gs) pid oid offered)
         stampChosenPlayer oid (if List.elem answer (NonEmpty.toList offered) then answer else first)
         pure bindsNothing
+  -- Unpayable, `canPayComponent`'s answer and for its reason -- BlightX's
+  -- arm above, verbatim.
+  CostComponent.WaterbendX -> pure Payment.Unpaid
   -- NOTHING TO PAY. Rule 701.67a's waterbend cost is the mana this component
   -- scopes, and that mana is in the cost's own mana part, paid by `payMana`
   -- like every other symbol; what the component states is the licence to

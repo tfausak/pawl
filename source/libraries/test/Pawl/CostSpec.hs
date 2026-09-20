@@ -1965,6 +1965,23 @@ hatredSpec s registry =
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight 99) gs) "and so is an announced 99, CR 701.68b naming no number that is too many"
       Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.BlightX])) "it is a CR 107.3 variable"
       Spec.assertBool s (not (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.BlightX]))) "whose demand never grows, so only CR 101.1 can refuse a value"
+    -- The fence one keyword action further over, and the half that differs: a
+    -- waterbend cost's demand is the {X} in its own MANA part, so the cost
+    -- Katara, Water Tribe's Hope states does grow with the value and the board
+    -- can refuse one -- Pawl.CostSpec's "an announced waterbend X larger than the
+    -- board is not paid at all" is that refusal at gameplay level. The component
+    -- alone still carries no demand, which is what leaves this pair about CR
+    -- 601.2b's announcement and nothing else.
+    Spec.it s "CR 601.2b an unannounced waterbend X is unpayable, and the mana beside it is what the board refuses" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let (_, _, gs) = hatredBoard swamp piker hatred 20
+          announced = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Variable])) [CostComponent.WaterbendX]
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource CostComponent.WaterbendX gs)) "unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Waterbend 4) gs) "while the announced 4 it substitutes to is payable, rule 701.67a's licence spending nothing of its own"
+      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.WaterbendX])) "it is a CR 107.3 variable on its own"
+      Spec.assertBool s (Cost.demandGrowsWithX announced) "and the cost it is printed in grows with the value, the {X} beside it being real mana"
     -- The third substrate, and the classification that separates it from the
     -- blight above: CR 118.3 measures an announced "Pay X {E}" against the
     -- counters the player has, so the demand DOES grow and
@@ -2538,6 +2555,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   treasureCruiseSpec s registry
   merrowSkyswimmerSpec s registry
   geyserLeaperSpec s registry
+  kataraSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -5307,3 +5325,116 @@ unpaidLeaper s leaperId gs = case Projection.abilitiesOf leaperId gs of
     Spec.assertEqWith s "the ability was never paid for: alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
     Spec.assertEqWith s "and nothing of hers is tapped" (S.tappedCount S.alice resolved) 0
   [] -> Spec.assertFailure s "expected the Leaper to carry an activated ability"
+
+-- Katara, Water Tribe's Hope {2}{W}{U}{U} Legendary Creature -- Human Warrior
+-- Ally 3/3 (data/cards/katara-water-tribes-hope.json): "Vigilance / When Katara
+-- enters, create a 1/1 white Ally creature token. / Waterbend {X}: Creatures you
+-- control have base power and toughness X/X until end of turn. X can't be 0.
+-- Activate only during your turn."
+--
+-- CR 107.3a's variable in a waterbend cost, and ONE announcement fixes both
+-- halves of it: the {X} the licence scopes, in the cost's own mana part, and CR
+-- 701.67b's ceiling on how much of that generic taps may pay
+-- (CostComponent.WaterbendX). The base power and toughness is what a paid cost is
+-- read off -- a Goblin Piker is printed 2/1, so neither number the assertions
+-- read can be its own.
+--
+-- Not implemented: "X can't be 0", so alice may announce a value the printed card
+-- refuses (#3943).
+--
+-- Every board is LANDLESS, geyserLeaperSpec's posture above: an activation that
+-- succeeds can only have been paid by tapping. The pair below varies the value
+-- ANNOUNCED and nothing else -- same seats, same permanents, same absence of
+-- mana -- so what the negative shows is the demand moving with the
+-- announcement.
+kataraSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kataraSpec s registry = Spec.describe s "Katara, Water Tribe's Hope" $ do
+  -- The headline. Five untapped artifacts and creatures, no land, no mana: an
+  -- announced 3 puts {3} in the cost's mana part and licenses three taps for it,
+  -- and the Piker the taps did not touch comes out a 3/3.
+  Spec.it s "CR 107.3a an announced waterbend X is paid by tapping that many permanents" $ do
+    katara <- S.printingOf s registry "Katara, Water Tribe's Hope"
+    piker <- S.printingOf s registry "Goblin Piker"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    mountain <- S.printingOf s registry "Mountain"
+    let (kataraId, pikerId, tappable, gs) = kataraBoard mountain katara piker [crawlspace, crawlspace, crawlspace]
+    resolved <- activatingKatara s 3 (ManaCost.MkManaCost []) tappable kataraId gs
+    Spec.assertEqWith s "CR 107.3a the Piker's base power is the 3 alice announced, not its printed 2" (Projection.powerOf pikerId resolved) (Just 3)
+    Spec.assertEqWith s "and its base toughness is that same 3, not its printed 1" (Projection.toughnessOf pikerId resolved) (Just 3)
+    -- The taps themselves, which the assertions above do not see: a cost paid out
+    -- of nowhere would also have left the Piker a 3/3.
+    Spec.assertEqWith s "CR 701.67a and the three Crawlspaces she tapped for it are tapped" (S.tappedCount S.alice resolved) 3
+  -- The pair, varying the ANNOUNCED value and nothing else: rule 701.67b caps the
+  -- substitution at the waterbend cost's own generic, which is the announcement
+  -- itself, so a 6 asks for one more mana than the board can raise however
+  -- greedily alice pays.
+  Spec.it s "CR 701.67b an announced waterbend X larger than the board is not paid at all" $ do
+    katara <- S.printingOf s registry "Katara, Water Tribe's Hope"
+    piker <- S.printingOf s registry "Goblin Piker"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    mountain <- S.printingOf s registry "Mountain"
+    let (kataraId, pikerId, _, gs) = kataraBoard mountain katara piker [crawlspace, crawlspace, crawlspace]
+    resolved <- greedyKatara s 6 kataraId gs
+    Spec.assertEqWith s "the ability was never paid for: the Piker's power is its printed 2" (Projection.powerOf pikerId resolved) (Just 2)
+    Spec.assertEqWith s "and its toughness the printed 1" (Projection.toughnessOf pikerId resolved) (Just 1)
+    Spec.assertEqWith s "and nothing of hers is tapped" (S.tappedCount S.alice resolved) 0
+
+-- alice announces `x` for Katara's ability, takes the substitution that leaves
+-- `wanted` to pay with mana, taps `tapped` for the rest, and the ability
+-- resolves.
+activatingKatara :: (Monad m) => Spec.Spec m n -> Natural.Natural -> ManaCost.ManaCost -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
+activatingKatara s x wanted tapped = resolvingKatara s (waterbendingX x wanted tapped)
+
+-- The negative: alice announces `x` and pays as greedily as the board allows.
+-- Asserted at GAMEPLAY level rather than off Activate.activatable, unpaidLeaper's
+-- reason above -- an unpayable cost is rewound by Activate.activateAbility, so a
+-- Piker at its printed size is the whole of what a player would see.
+greedyKatara :: (Monad m) => Spec.Spec m n -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
+greedyKatara s x = resolvingKatara s (waterbendingXGreedily x)
+
+-- The body both share: activate Katara's sole activated ability under `answer`
+-- and resolve the stack down.
+resolvingKatara :: (Monad m) => Spec.Spec m n -> (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
+resolvingKatara s answer kataraId gs = case Projection.abilitiesOf kataraId gs of
+  ability : _ ->
+    let activated = S.runPure answer gs (Activate.activateAbility S.alice kataraId ability)
+     in pure (S.runPure answer activated Stack.resolveTop)
+  [] -> Spec.assertFailure s "expected Katara to carry an activated ability"
+
+-- CR 601.2b's announcement in front of `waterbending`'s two prompts. PINNED by
+-- value rather than read off the prompt: Prompt.ChooseX carries an advisory bound
+-- and nothing filters the answer against it, so an answerer that took the bound
+-- would repair a mutation that moved it.
+waterbendingX :: Natural.Natural -> ManaCost.ManaCost -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+waterbendingX x wanted tapped p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> waterbending wanted tapped p
+
+-- The same announcement in front of `waterbendingGreedily`, and what the negative
+-- is answered with for that function's reason: it takes whatever the engine
+-- offers, so the case fails only where no offer pays.
+waterbendingXGreedily :: Natural.Natural -> Prompt.Prompt r -> r
+waterbendingXGreedily x p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> waterbendingGreedily p
+
+-- alice controls Katara, a Goblin Piker and one permanent per printing in
+-- `others`, with no land at all -- `mountain` is the printing S.landsInPlay
+-- names and none of it is put out. She has priority in her own precombat main
+-- phase, which is when CR 117.1b lets her activate and what the ability's own
+-- rider requires (CR 602.5). Returns Katara, the Piker, the `others` in order,
+-- and that state.
+kataraBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+kataraBoard mountain katara piker others =
+  let (kataraId, gs1) = S.addPermanent katara S.alice (S.landsInPlay mountain 0)
+      (pikerId, gs2) = S.addPermanent piker S.alice gs1
+      (otherIds, gs3) = List.foldl' (\(ids, gs) printing -> let (oid, next) = S.addPermanent printing S.alice gs in (ids <> [oid], next)) ([], gs2) others
+   in ( kataraId,
+        pikerId,
+        otherIds,
+        gs3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )

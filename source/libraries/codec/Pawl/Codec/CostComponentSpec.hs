@@ -282,5 +282,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.Waterbend 4)
       " {\"type\":\"Waterbend\",\"value\":4} "
+  -- CR 107.3a's variable of the same cost: nullary, the amount arriving with the
+  -- announcement rather than off the card (Pawl.Engine.Cost.substituteX).
+  Spec.it s "WaterbendX" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.WaterbendX
+      " {\"type\":\"WaterbendX\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec

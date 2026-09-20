@@ -3270,6 +3270,7 @@ costComponentFilters component = case component of
   -- carries no Filter either.
   CostComponent.ChooseOpponent -> []
   CostComponent.Waterbend _ -> []
+  CostComponent.WaterbendX -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSlot too.

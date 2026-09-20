@@ -260,6 +260,7 @@ costMovesLibraryCard component = case component of
   -- CR 702.174a names a player and no card, the arm above's answer.
   CostComponent.ChooseOpponent -> False
   CostComponent.Waterbend _ -> False
+  CostComponent.WaterbendX -> False
 
 -- CR 605: does this effect add mana, and on what instruction? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by
