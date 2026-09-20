@@ -475,9 +475,11 @@ armsReflexive source effect gs = case effect of
 
 -- The players a PlayerRef names, in CR 101.4's APNAP order -- playerRefPlayers
 -- answers in PlayerId order and says so, leaving the ordering rule to its
--- caller. Three callers ask, and for the same reason: the seats a resolution cost
--- is offered to (CR 118.12a), the seats CR 111.2 has creating tokens, and the
--- seats CR 201.4 has naming a card. Mana Leak's reference names one and Rishadan
+-- caller. Its callers all ask for the same reason -- the seats a resolution cost
+-- is offered to (CR 118.12a), the seats a printed "may" is offered to (CR
+-- 603.5), the seats a CR 608.2d either-or is announced by, the seats CR 111.2
+-- has creating tokens, the seats CR 201.4 has naming a card. Mana Leak's
+-- reference names one and Rishadan
 -- Cutpurse's names every opponent; the order is observable only where the
 -- reference names more than one seat, which no printing in the pool does at the
 -- naming caller (Petra Sphinx's is a target slot).
@@ -512,12 +514,12 @@ apnapPlayersOf ref legal controller gs =
 -- Pawl.DepartureSpec's "CR 800.4g a departed player's choice is made by another
 -- opponent" is what proves the reassignment.
 --
--- The two PLURAL askers are not routed here and no board reaches them: every
--- Pawl.Types.Optionality asker (CR 603.5, Resolve.exercises) and every
--- Pawl.Types.OrElse chooser (CR 608.2d, Resolve.chosenBranch) data/cards writes
--- is CR 109.5's `you` or PlayerRef.EachPlayer, both of which playerRefPlayers
--- answers off Game.stillPlaying. A card writing PlayerRef.InSlot or
--- PlayerRef.ControllerOfBound into either field would refute that.
+-- The two PLURAL askers are not routed here at all, whatever a card writes into
+-- them: Pawl.Types.Optionality's asker (CR 603.5, Resolve.exercises) and
+-- Pawl.Types.OrElse's chooser (CR 608.2d, Resolve.chosenBranch and
+-- villainousPass) both go through apnapPlayersOf above, which answers a SET off
+-- Game.stillPlaying and so has already dropped a departed seat rather than
+-- reassigning its answer.
 askedChooser :: ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> PlayerRef -> Game (Maybe PlayerId)
 askedChooser source controller legal ref = do
   gs <- State.get

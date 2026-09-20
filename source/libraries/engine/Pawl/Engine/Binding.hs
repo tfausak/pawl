@@ -192,6 +192,29 @@ gatePlayers = SlotName.MkSlotName (Text.pack "thosePlayers")
 mayPlayers :: SlotName
 mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 
+-- CR 701.55d: the reserved slot under which the player FACING a villainous
+-- choice is bound while their announced option is performed -- the word "that
+-- player" in a limb whose actions are aimed at the chooser rather than at the
+-- resolving controller. The Dalek Emperor's "that player sacrifices a creature
+-- of their choice" is the producer.
+--
+-- Stamped by Pawl.Engine.Resolve.villainousPass, which is `mayPlayers` one
+-- question over, and a separate name for that reason: a limb may carry a printed
+-- "may" of its own, and sharing the name would have the second answer overwrite
+-- the first.
+--
+-- Rule 701.55d performs the process for one player at a time, so exactly ONE
+-- seat is in it whenever a limb reads it, and PlayerRef.InSlot and
+-- PlayerRef.EachInSlot therefore both answer it. That is a fact about the writer
+-- rather than about the type: the slot holds a player set like its two siblings.
+--
+-- Not a target, so CR 608.2b re-validates nothing -- `gatePlayers`' posture, and
+-- the same "no card's targetSlots may name it" sweep applies. Pawl.CardSpec's
+-- dataflow lint answers a read of it only for a mode one of whose clauses is
+-- half of a villainous pair.
+facingPlayers :: SlotName
+facingPlayers = SlotName.MkSlotName (Text.pack "thoseFacing")
+
 -- CR 400.7e / CR 603.6c: the reserved slot under which a zone-change trigger's
 -- ARRIVING incarnation is bound -- and, since CR 708.7's readers took it, the
 -- slot for the object an event trigger's event NAMES more generally.

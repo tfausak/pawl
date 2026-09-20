@@ -59,6 +59,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -1270,6 +1271,38 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "CR 701.55b bob took the impossible limb, so as much of it as was possible happened -- nothing -- and alice cast nothing: she still holds the three cards she drew" (length (Game.zoneMembers Zone.Hand S.alice after)) 3
     Spec.assertEqWith s "and nothing was cast onto the stack" (length (GameState.stack after)) 0
     Spec.assertEqWith s "CR 701.55b he was asked over BOTH limbs, the impossible one included, rather than forced into the other" asks [(S.bob, [ClauseIndex.MkClauseIndex 1, ClauseIndex.MkClauseIndex 2])]
+  -- CR 701.55d, an exception to rule 608.2e: "if more than one player is
+  -- instructed to face a villainous choice, the entire process described in rule
+  -- 701.55a is performed for each of those players one at a time in APNAP
+  -- order". The Dalek Emperor -- "each opponent faces a villainous choice --
+  -- that player sacrifices a creature of their choice, or you create a 3/3 black
+  -- Dalek artifact creature token with menace" -- is the producer, and its
+  -- beginning of combat trigger puts the pair on rule 608.2e's OTHER resolution
+  -- loop, the one Great Intelligence's Plan never reaches.
+  --
+  -- THE PAIR OF CASES IS THE ARGUMENT. Running each limb once for the set of
+  -- seats that announced it -- CR 608.2e's shape, which rule 701.55d carves out
+  -- of -- makes ONE token however many opponents asked for one, and hands the
+  -- sacrifice to every announcer at once or to nobody. The first case below
+  -- counts the tokens and the second reads which seat actually lost a creature.
+  Spec.it s "CR 701.55d two opponents each taking The Dalek Emperor's token limb make two tokens" $ do
+    board <- emperorBoard s registry
+    let (asks, after) = emperorCombat (Map.fromList [(S.bob, ClauseIndex.MkClauseIndex 1), (S.carol, ClauseIndex.MkClauseIndex 1)]) board
+    Spec.assertEqWith s "CR 701.55d the whole process ran once per opponent, so alice has TWO Dalek tokens" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dalek Token")) S.alice after) 2
+    Spec.assertEqWith s "CR 701.55a and the limb neither of them took did nothing: bob keeps both Pikers" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 2
+    Spec.assertEqWith s "nor did carol lose a Construct" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Bonded Construct")) S.carol after) 2
+    Spec.assertEqWith s "CR 101.4 both opponents were asked, in APNAP order, over both limbs" asks [(S.bob, [ClauseIndex.MkClauseIndex 0, ClauseIndex.MkClauseIndex 1]), (S.carol, [ClauseIndex.MkClauseIndex 0, ClauseIndex.MkClauseIndex 1])]
+  -- The same board with bob's answer changed, which is what stops the case above
+  -- passing because the sacrifice limb can never run: "that player" is the seat
+  -- FACING the choice (Binding.facingPlayers), so bob's Piker goes and carol,
+  -- who took the other limb, keeps both Constructs.
+  Spec.it s "CR 701.55d only the opponent who took The Dalek Emperor's sacrifice limb loses a creature" $ do
+    board <- emperorBoard s registry
+    let (_, after) = emperorCombat (Map.fromList [(S.bob, ClauseIndex.MkClauseIndex 0), (S.carol, ClauseIndex.MkClauseIndex 1)]) board
+    Spec.assertEqWith s "CR 701.55a bob announced the sacrifice, so one of his two Pikers is gone" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 1
+    Spec.assertEqWith s "and carol, who announced the other limb, keeps both Constructs" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Bonded Construct")) S.carol after) 2
+    Spec.assertEqWith s "CR 701.55a carol's limb ran once and bob's did not, so alice has exactly one token" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dalek Token")) S.alice after) 1
+    Spec.assertEqWith s "and alice, whose creature nobody was facing a choice about, still has the Emperor" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "The Dalek Emperor")) S.alice after) 1
   Spec.it s "CR 608.2d a tapped Piker leaves Teardrop Kami only its untap" $ do
     (gs, ability, kamiId, pikerId) <- kamiBoard s registry True
     case ability of
@@ -3267,6 +3300,58 @@ planAnswer branch p = case p of
   -- CR 608.2g's "may", taken: alice accepts every free cast she is offered, so
   -- a limb that reached her is visible on the stack.
   Prompt.OfferedCast {} -> pure OptionalDecision.Exercises
+  _ -> pure (S.identityAnswer p)
+
+-- CR 701.55d: the board The Dalek Emperor's two cases share. THREE SEATS,
+-- because "each opponent" is the whole point -- two collapse rule 701.55d's
+-- several players onto one, where rule 608.2e's ask-everybody-then-act is
+-- indistinguishable from it.
+--
+-- TWO creatures each rather than one, so CR 701.21a's pick is a real choice and
+-- Prompt.ChooseSacrifices does not elide itself; two DIFFERENT printings, so
+-- which seat lost one is read by name rather than by a count that a wrong seat's
+-- loss would also satisfy. alice's Emperor is a creature too, which is what the
+-- last assertion of the second case reads.
+emperorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+emperorBoard s registry = do
+  emperor <- S.printingOf s registry "The Dalek Emperor"
+  piker <- S.printingOf s registry "Goblin Piker"
+  construct <- S.printingOf s registry "Bonded Construct"
+  let placed pr pid n base = List.foldl' (\acc _ -> snd (S.addPermanent pr pid acc)) base [1 .. n :: Int]
+      (emperorId, withEmperor) = S.addPermanent emperor S.alice S.threePlayerGame
+  pure (placed construct S.carol 2 (placed piker S.bob 2 withEmperor), emperorId)
+
+-- alice's beginning of combat step, run for its turn-based actions and its
+-- trigger: Engine.runStep is what writes the CR 603.2b StepBegan record the
+-- Emperor's ability matches, and the priority loop is what resolves it.
+--
+-- `picks` is keyed by SEAT because the two ChooseClause prompts are structurally
+-- identical apart from the player they are put to: a pure answerer would answer
+-- both the same way and neither case below could tell the engine's order from
+-- its own. The pool is recorded alongside, so a limb that was never offered is
+-- visible rather than inferred from the answer.
+emperorCombat :: Map.Map PlayerId.PlayerId ClauseIndex.ClauseIndex -> (GameState.GameState, ObjectId.ObjectId) -> ([(PlayerId.PlayerId, [ClauseIndex.ClauseIndex])], GameState.GameState)
+emperorCombat picks (gs, _) =
+  let atCombat =
+        gs
+          { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      ((_, after), asks) = State.runState (Engine.runGame (emperorAnswer picks) atCombat (Engine.runStep >> Engine.priorityLoop)) []
+   in (reverse asks, after)
+
+-- The Emperor's two answers: the branch, pinned per seat and filtered back
+-- through the offer, and CR 701.21a's sacrifice, pinned to the head of whatever
+-- the announcer was offered. An answerer that hunted for a legal creature would
+-- repair a mutation that aimed the sacrifice at the wrong seat.
+emperorAnswer :: Map.Map PlayerId.PlayerId ClauseIndex.ClauseIndex -> Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ClauseIndex.ClauseIndex])] r
+emperorAnswer picks p = case p of
+  Prompt.ChooseClause _ pid _ _ live -> do
+    State.modify' ((pid, NonEmpty.toList live) :)
+    let wanted = Map.findWithDefault (NonEmpty.head live) pid picks
+    pure (if elem wanted live then wanted else NonEmpty.head live)
+  Prompt.ChooseSacrifices _ _ _ offered _ -> pure (Set.fromList (take 1 offered))
   _ -> pure (S.identityAnswer p)
 
 -- Which branches CR 608.2d actually asked about, in the order asked.
