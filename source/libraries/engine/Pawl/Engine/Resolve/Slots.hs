@@ -645,6 +645,7 @@ effectObjectRefs effect = case effect of
   Effect.Untap ref -> [ref]
   Effect.Detain ref -> [ref]
   Effect.Goad ref -> [ref]
+  Effect.Pair ref -> [ref]
   Effect.DoesNotUntapNext ref -> [ref]
   Effect.Transform ref -> [ref]
   Effect.Convert ref -> [ref]
@@ -821,6 +822,7 @@ effectPlayerRefs effect = case effect of
   Effect.Untap {} -> []
   Effect.Detain {} -> []
   Effect.Goad {} -> []
+  Effect.Pair {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
   Effect.Convert {} -> []
@@ -1147,6 +1149,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Untap _ -> Map.empty
   Effect.Detain _ -> Map.empty
   Effect.Goad _ -> Map.empty
+  Effect.Pair _ -> Map.empty
   Effect.GrantLookAtExiled _ -> Map.empty
   Effect.MakePlotted _ -> Map.empty
   Effect.MakeForetold _ -> Map.empty
@@ -1724,6 +1727,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Untap _ -> True
   Effect.Detain _ -> True
   Effect.Goad _ -> True
+  Effect.Pair _ -> True
   Effect.GrantLookAtExiled _ -> True
   Effect.MakePlotted _ -> True
   Effect.MakeForetold _ -> True
@@ -1942,6 +1946,7 @@ readsX =
         Effect.Untap _ -> False
         Effect.Detain _ -> False
         Effect.Goad _ -> False
+        Effect.Pair _ -> False
         Effect.GrantLookAtExiled _ -> False
         Effect.MakePlotted _ -> False
         Effect.MakeForetold _ -> False
@@ -2166,6 +2171,7 @@ boundSlots effect = case effect of
   Effect.Untap _ -> Set.empty
   Effect.Detain _ -> Set.empty
   Effect.Goad _ -> Set.empty
+  Effect.Pair _ -> Set.empty
   Effect.GrantLookAtExiled _ -> Set.empty
   Effect.MakePlotted _ -> Set.empty
   Effect.MakeForetold _ -> Set.empty

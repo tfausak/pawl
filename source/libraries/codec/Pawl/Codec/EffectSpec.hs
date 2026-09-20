@@ -1300,6 +1300,29 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.Detain (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       )
       "Goad and Detain of the same slot encode differently"
+  -- CR 702.95a, which shares Goad's wire shape for Goad's reason: a bare
+  -- ObjectRef, the rulebook fixing everything else. data/cards prints the chosen
+  -- arm (Wolfir Silverheart's soulbond mints it); the slot arm is the second
+  -- ability's.
+  Spec.it s "Pair round-trips both ObjectRef arms, and is not Goad" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Pair (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))))
+      " {\"type\":\"Pair\",\"value\":{\"type\":\"InSlot\",\"value\":\"became\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Pair (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"Pair\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+    Spec.assertBool
+      s
+      ( toJson (Effect.Pair (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))))
+          /= toJson (Effect.Goad (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))))
+      )
+      "Pair and Goad of the same slot encode differently"
   -- CR 502.3's one-shot prohibition, which shares Tap's and Untap's wire shape
   -- and must not collapse into either: a card printing "tap target creature. That
   -- creature doesn't untap ..." writes two effects over the same slot.

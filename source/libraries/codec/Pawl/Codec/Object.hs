@@ -22,6 +22,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Mana as Mana
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Codec.Pairing as Pairing
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.RoomIndex as RoomIndex
@@ -110,6 +111,7 @@ codec = Fields.object $ do
   warped <- Fields.defaulted "warped" Nothing (Common.maybe Common.natural) Object.warped
   preparedCopyOf <- Fields.defaulted "preparedCopyOf" Nothing (Common.maybe ObjectId.codec) Object.preparedCopyOf
   ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
+  paired <- Fields.defaulted "paired" Nothing (Common.maybe Pairing.codec) Object.paired
   protector <- Fields.defaulted "protector" Nothing (Common.maybe PlayerId.codec) Object.protector
   ventureRoom <- Fields.defaulted "ventureRoom" Nothing (Common.maybe RoomIndex.codec) Object.ventureRoom
   classLevel <- Fields.defaulted "classLevel" Nothing (Common.maybe ClassLevel.codec) Object.classLevel
@@ -166,6 +168,7 @@ codec = Fields.object $ do
         Object.warped = warped,
         Object.preparedCopyOf = preparedCopyOf,
         Object.ringBearerFor = ringBearerFor,
+        Object.paired = paired,
         Object.protector = protector,
         Object.ventureRoom = ventureRoom,
         Object.classLevel = classLevel,

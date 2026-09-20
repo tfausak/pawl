@@ -29,6 +29,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Pairing as Pairing
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -571,6 +572,15 @@ data View = MkView
     -- off the battlefield, a player, an event snapshot -- the vacuous posture
     -- power and controller already take.
     ringBearerFor :: Maybe PlayerId.PlayerId,
+    -- CR 702.95b: which creature this candidate is paired with, and under whom.
+    -- Read straight off Object.paired, for ringBearerFor's reason -- CR 702.95b
+    -- makes pairing a record on the permanent rather than a characteristic, so no
+    -- projection writes it.
+    --
+    -- Nothing for every candidate with no object to read it off: a printed card
+    -- off the battlefield, a player, an event snapshot -- ringBearerFor's vacuous
+    -- posture, and CR 702.95e leaves nothing paired off the battlefield anyway.
+    paired :: Maybe Pairing.Pairing,
     -- Which of Pawl.Types.Designation's marks does this candidate have? Read
     -- straight off Object.designations, for ringBearerFor's reason -- the rules
     -- behind that type make each a designation rather than a characteristic, so no
@@ -878,6 +888,7 @@ playerView pid =
       -- player is not one -- the same shape CR 725.1's monarch has with the two
       -- sides swapped.
       ringBearerFor = Nothing,
+      paired = Nothing,
       -- CR 702.112b: "only permanents can be or become renowned", CR 701.37b,
       -- CR 701.60b and CR 719.3b saying the same of the other marks, and a
       -- player is not one.
@@ -2103,6 +2114,18 @@ matches context view predicate = case predicate of
   Filter.IsRingBearer -> case (ringBearerFor view, perspective context) of
     (Just designated, Just you) -> designated == you
     _ -> False
+  -- CR 702.95b's "whether a creature is paired", off Object.paired. A live read of
+  -- a STORED record, IsRingBearer's posture and not IsAttachedToSource's: what
+  -- CR 702.95e ends the pairing for is swept by Pawl.Engine.Soulbond.endWhenBroken
+  -- before any player could receive priority, so no reader sees a lapsed row.
+  Filter.IsPaired -> Maybe.isJust (paired view)
+  -- CR 702.95b's "the creature another creature is paired with", asked as the
+  -- candidate's own partner against the match's source. Both creatures carry the
+  -- record, so this answers from either side; vacuously False where the candidate
+  -- is unpaired or no source frames the match.
+  Filter.IsPairedWithSource -> case (paired view, source context) of
+    (Just pairing, Just src) -> Pairing.partner pairing == src
+    _ -> False
   -- The designation, asked of the CANDIDATE. A live read of Object.designations,
   -- never a stamp on the candidate: every rule here ends its designation when the
   -- permanent leaves the battlefield, and CR 400.7's new incarnation simply arrives
@@ -2290,6 +2313,8 @@ rewrite pairs predicate = case predicate of
   Filter.IsExiledFaceDown -> predicate
   Filter.Transformed -> predicate
   Filter.IsRingBearer -> predicate
+  Filter.IsPaired -> predicate
+  Filter.IsPairedWithSource -> predicate
   Filter.HasDesignation _ -> predicate
   -- Untouched: CR 612.1 swaps a subtype, a colour or a card type word, and this
   -- atom names none -- "an activated ability that isn't a mana ability" has no
@@ -2708,6 +2733,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Enlist -> keyword
   Keyword.Type.Persist -> keyword
   Keyword.Type.Undying -> keyword
+  Keyword.Type.Soulbond -> keyword
   -- CR 702.184a's ability names "creature" and "charge counters", both the rules'
   -- own vocabulary; the criterion is written in Pawl.Engine.Keyword rather than
   -- on the card, so CR 612.2 has no printed word here to swap.
@@ -2995,6 +3021,8 @@ bakeBound players predicate = case predicate of
   Filter.IsExiledFaceDown -> predicate
   Filter.Transformed -> predicate
   Filter.IsRingBearer -> predicate
+  Filter.IsPaired -> predicate
+  Filter.IsPairedWithSource -> predicate
   Filter.HasDesignation _ -> predicate
   Filter.HasCounters _ -> predicate
   Filter.HasCountersOfAnyKind -> predicate
@@ -3153,6 +3181,8 @@ manaValueThresholds predicate = case predicate of
   Filter.IsExiledFaceDown -> []
   Filter.Transformed -> []
   Filter.IsRingBearer -> []
+  Filter.IsPaired -> []
+  Filter.IsPairedWithSource -> []
   Filter.HasDesignation _ -> []
   Filter.HasCounters _ -> []
   Filter.HasCountersOfAnyKind -> []
@@ -3320,6 +3350,8 @@ statesAQuality predicate = case predicate of
   Filter.IsExiledFaceDown -> True
   Filter.Transformed -> True
   Filter.IsRingBearer -> True
+  Filter.IsPaired -> True
+  Filter.IsPairedWithSource -> True
   Filter.HasDesignation _ -> True
   Filter.HasCounters _ -> True
   Filter.HasCountersOfAnyKind -> True

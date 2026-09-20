@@ -2744,6 +2744,8 @@ filterReads f = case f of
   -- Reads nothing: CR 701.54b keeps the ring-bearer designation off the copiable
   -- values, so no Modification writes Object.ringBearerFor.
   Filter.Type.IsRingBearer -> Set.empty
+  Filter.Type.IsPaired -> Set.empty
+  Filter.Type.IsPairedWithSource -> Set.empty
   -- Reads nothing, for that atom's reason. What CR 701.60c hangs off `Suspected`
   -- IS in layer 6, but that is what the designation WRITES, not what this reads.
   Filter.Type.HasDesignation _ -> Set.empty
@@ -2910,6 +2912,8 @@ filterReadsPeers f = case f of
   Filter.Type.WasCastFrom _ -> False
   Filter.Type.TagWasSpent _ -> False
   Filter.Type.IsRingBearer -> False
+  Filter.Type.IsPaired -> False
+  Filter.Type.IsPairedWithSource -> False
   Filter.Type.HasDesignation _ -> False
   Filter.Type.HasCounters _ -> False
   Filter.Type.HasCountersOfAnyKind -> False

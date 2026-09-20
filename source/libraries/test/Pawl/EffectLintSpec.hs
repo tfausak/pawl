@@ -307,6 +307,7 @@ ownQuantities effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.Pair _ -> []
   Effect.GrantLookAtExiled _ -> []
   Effect.MakePlotted _ -> []
   Effect.MakeForetold _ -> []
@@ -1075,7 +1076,7 @@ storedPlayerScope effect = case effect of
 -- what Pawl.Engine.Resolve implements, not of the card's alphabet.
 data Asks
   = -- | Read through Pawl.Engine.Resolve.Slots.objectRefObjects, which is pure and so
-    -- raises no prompt: every ObjectRef position but the three below.
+    -- raises no prompt: every ObjectRef position but the ones below.
     AsksNothing
   | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
     -- monad. The one site that asks EVERY choosing arm, the random one
@@ -1101,6 +1102,10 @@ data Asks
     -- it" -- through the same chooseCardsInHand the move gather uses, and falls
     -- through to the pure sweep for every other arm.
     AsksLookAtArm
+  | -- | Pawl.Engine.Resolve's Effect.Pair arm. It asks the chosen-permanent arm
+    -- through chosenPermanentOf -- CR 702.95a's "another unpaired creature you
+    -- control" -- and falls through to the pure sweep for everything else.
+    AsksPairPartner
   deriving (Eq, Show)
 
 -- Whether an ObjectRef arm is a resolution-time QUESTION rather than a read --
@@ -1181,6 +1186,12 @@ asksFor asks ref = case asks of
   -- falls through to the pure sweep for everything else.
   AsksLookAtArm -> case ref of
     ObjectRef.ChosenCardInHand {} -> True
+    _ -> False
+  -- One arm and one only, for AsksTransformGather's reason: Resolve's
+  -- Effect.Pair arm routes ObjectRef.ChosenPermanent through chosenPermanentOf
+  -- and reads every other arm off the pure sweep.
+  AsksPairPartner -> case ref of
+    ObjectRef.ChosenPermanent {} -> True
     _ -> False
 
 -- Every ObjectRef position one effect holds, each tagged with the asking site
@@ -1312,6 +1323,7 @@ effectObjectRefs effect =
         Effect.Untap ref -> read_ [ref]
         Effect.Detain ref -> read_ [ref]
         Effect.Goad ref -> read_ [ref]
+        Effect.Pair ref -> [(AsksPairPartner, ref)]
         Effect.GrantLookAtExiled grant -> read_ [GrantLookAtExiled.cards grant]
         Effect.MakePlotted ref -> read_ [ref]
         Effect.MakeForetold x -> read_ [MakeForetold.cards x]

@@ -413,6 +413,8 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.IsExiledFaceDown -> predicate
         Filter.Type.Transformed -> predicate
         Filter.Type.IsRingBearer -> predicate
+        Filter.Type.IsPaired -> predicate
+        Filter.Type.IsPairedWithSource -> predicate
         Filter.Type.HasDesignation _ -> predicate
         Filter.Type.HasCounters _ -> predicate
         Filter.Type.HasCountersOfAnyKind -> predicate
@@ -1139,6 +1141,7 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- about a permanent on the battlefield now (CR 701.54e), not about one at
       -- the moment of an event.
       Filter.ringBearerFor = Nothing,
+      Filter.paired = Nothing,
       Filter.designations = Set.empty,
       -- CR 701.37c's X rides the designation, so a past event records none --
       -- `designations` above, same sentence.

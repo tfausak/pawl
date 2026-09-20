@@ -249,6 +249,7 @@ viewOfCard face =
           -- CR 701.54b: the designation rides an OBJECT, and CR 701.54a gives it
           -- only to a battlefield permanent.
           Filter.ringBearerFor = Nothing,
+          Filter.paired = Nothing,
           -- The designations ride an OBJECT, and each of those rules gives its
           -- designation only to a permanent.
           Filter.designations = Set.empty,
@@ -766,6 +767,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 701.54b: a designation rather than a characteristic. Nothing for an id
       -- naming no object -- a designation dies with the permanent (CR 400.7).
       Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor,
+      Filter.paired = Game.lookupObject oid gs >>= Object.paired,
       -- Designations rather than characteristics: ringBearerFor's posture above.
       Filter.designations = maybe Set.empty Object.designations (Game.lookupObject oid gs),
       -- CR 701.37c: the number the mark was set with, read live off the object

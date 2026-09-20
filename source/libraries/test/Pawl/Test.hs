@@ -334,6 +334,7 @@ import qualified Pawl.Codec.OrElseSpec
 import qualified Pawl.Codec.OutsideDestinationSpec
 import qualified Pawl.Codec.OutsideObjectSpec
 import qualified Pawl.Codec.PaidExpirySpec
+import qualified Pawl.Codec.PairingSpec
 import qualified Pawl.Codec.PartnerTextSpec
 import qualified Pawl.Codec.PayBranchSpec
 import qualified Pawl.Codec.PayGateSpec
@@ -1008,6 +1009,7 @@ spec s registry = do
   Pawl.Codec.OutsideDestinationSpec.spec s
   Pawl.Codec.OutsideObjectSpec.spec s
   Pawl.Codec.PaidExpirySpec.spec s
+  Pawl.Codec.PairingSpec.spec s
   Pawl.Codec.PartnerTextSpec.spec s
   Pawl.Codec.PayBranchSpec.spec s
   Pawl.Codec.PayGateSpec.spec s

@@ -3106,6 +3106,137 @@ championSpec s registry =
 --
 -- Numbers all distinct: the graft is 1, the Goblin Piker a printed 2/1, the Hill
 -- Giant a 3/3, and the Initiate a 0/0 that holds 2 counters once the move lands.
+
+-- CR 702.95 soulbond, whose rule 702.95a is two triggered abilities, rule 702.95c
+-- and rule 702.95d a gate on the pairing, and rule 702.95e three endings.
+--
+-- Wolfir Silverheart {3}{G}{G} Creature -- Wolf Warrior 4\/4 is the printing:
+-- soulbond, plus "As long as this creature is paired with another creature, each
+-- of those creatures gets +4\/+4" -- the clause that makes the pairing OBSERVABLE,
+-- with nothing else on the card. (Name, cost, type line, P\/T and Oracle text
+-- checked against api.scryfall.com 2026-09-20; the card is transcribed whole.)
+--
+-- Numbers all distinct, so that no two readings coincide: the Wolfir is 4\/4 and
+-- 8\/8 paired, the Hill Giant 3\/3 and 7\/7 paired, and the Goblin Piker a 2\/1
+-- that is never paired at all. The Piker is on every board, which is what says
+-- the grant reached the PAIR rather than every creature alice controls -- and
+-- being a second candidate, it also keeps rule 702.95a's choice a real one rather
+-- than a prompt the engine could elide.
+soulbondSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulbondSpec s registry =
+  let wolfirName = CardName.MkCardName $ Text.pack "Wolfir Silverheart"
+      giantName = CardName.MkCardName $ Text.pack "Hill Giant"
+      -- Rule 702.95a's "you may", taken, and its partner named by identity. Pinned
+      -- to the Giant rather than to the first option offered, so an answerer
+      -- cannot repair a mutation by finding whatever is legal.
+      pairingWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      pairingWith partner p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChoosePermanent _ _ _ offered ->
+          Maybe.fromMaybe (NonEmpty.head offered) (List.find (== partner) (NonEmpty.toList offered))
+        _ -> S.identityAnswer p
+      -- Rule 702.95a's second ability offers the "may" and nothing else, the
+      -- entrant being the partner already.
+      taking :: Prompt.Prompt r -> r
+      taking p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      onBattlefield name gs =
+        List.find (\oid -> fmap Face.name (Game.faceOf oid gs) == Just name) (Game.zoneMembers Zone.Battlefield S.alice gs)
+      -- alice's Hill Giant and Goblin Piker, with the Wolfir on the stack over
+      -- them: rule 702.95a's FIRST ability is what fires when it enters.
+      wolfirEntering = do
+        wolfir <- S.printingOf s registry "Wolfir Silverheart"
+        giant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let base = Setup.emptyGame S.bothPlayers
+            (giantId, withGiant) = S.addPermanent giant S.alice base
+            (pikerId, withPiker) = S.addPermanent piker S.alice withGiant
+            (_, staged) = S.spellOnStack wolfir S.alice withPiker
+        pure (giantId, pikerId, staged)
+      -- The spell resolves, rule 702.95a's trigger is placed (CR 603.3) and
+      -- resolves.
+      played :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      played answer staged =
+        S.runPure answer staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+   in Spec.describe s "Soulbond" $ do
+        -- The proving case for rule 702.95a's first ability and for the grant the
+        -- pairing turns on.
+        Spec.it s "CR 702.95a pairing on its own entry gives both creatures +4/+4" $ do
+          (giantId, pikerId, staged) <- wolfirEntering
+          let after = played (pairingWith giantId) staged
+          case onBattlefield wolfirName after of
+            Nothing -> Spec.assertFailure s "the Wolfir did not reach the battlefield"
+            Just wolfirId -> do
+              Spec.assertEqWith s "CR 702.95a the Wolfir is 8/8 while paired" (S.powerToughnessOf wolfirId after) (Just (8, 8))
+              Spec.assertEqWith s "CR 702.95a and the creature alice paired it with is 7/7" (S.powerToughnessOf giantId after) (Just (7, 7))
+              -- The other candidate, which the choice did not reach: the grant is
+              -- the pair's and not every creature's.
+              Spec.assertEqWith s "the Goblin Piker alice did not name is its printed 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+        -- Rule 702.95e's third ending, off the same board: the partner leaves and
+        -- the pairing goes with it, which the Wolfir's own size reports.
+        Spec.it s "CR 702.95e the partner leaving the battlefield unpairs the Wolfir" $ do
+          (giantId, _, staged) <- wolfirEntering
+          let paired = played (pairingWith giantId) staged
+          case onBattlefield wolfirName paired of
+            Nothing -> Spec.assertFailure s "the Wolfir did not reach the battlefield"
+            Just wolfirId -> do
+              let after = S.runPure S.identityAnswer paired (Event.changeZone giantId Zone.Graveyard >> Engine.settleForPriority)
+              Spec.assertEqWith s "CR 702.95e the Wolfir is its printed 4/4 again" (S.powerToughnessOf wolfirId after) (Just (4, 4))
+              Spec.assertEqWith s "CR 702.95e and it is paired with nothing" (Game.lookupObject wolfirId after >>= Object.paired) Nothing
+        -- Rule 702.95a's SECOND ability: the Wolfir is already on the battlefield
+        -- and unpaired when another creature alice controls enters, so the entrant
+        -- is the partner with nothing to choose.
+        Spec.it s "CR 702.95a another creature entering pairs with the Wolfir" $ do
+          wolfir <- S.printingOf s registry "Wolfir Silverheart"
+          giant <- S.printingOf s registry "Hill Giant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let base = Setup.emptyGame S.bothPlayers
+              (wolfirId, withWolfir) = S.addPermanent wolfir S.alice base
+              (pikerId, withPiker) = S.addPermanent piker S.alice withWolfir
+              (_, staged) = S.spellOnStack giant S.alice withPiker
+              after = played taking staged
+          Spec.assertEqWith s "CR 702.95a the Wolfir is 8/8 while paired" (S.powerToughnessOf wolfirId after) (Just (8, 8))
+          case onBattlefield giantName after of
+            Nothing -> Spec.assertFailure s "the Hill Giant did not reach the battlefield"
+            Just giantId -> Spec.assertEqWith s "CR 702.95a and the creature that entered is 7/7" (S.powerToughnessOf giantId after) (Just (7, 7))
+          Spec.assertEqWith s "the Goblin Piker, which was on the battlefield already, is its printed 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+        -- CR 603.4's SECOND check, which is about the PROMPT rather than the
+        -- board: the condition is re-read as the ability resolves, and an entrant
+        -- alice no longer controls makes it false, so the ability leaves the stack
+        -- without asking her anything. Soulbond.pair would refuse the pairing
+        -- either way (CR 702.95c), so the board cannot tell the two apart -- only
+        -- the count of "you may" asks can.
+        --
+        -- A pair of boards differing in exactly one thing, whether bob takes the
+        -- entrant while the trigger waits. Counted through State rather than a
+        -- pure answerer, which cannot report what it was asked.
+        Spec.it s "CR 603.4 an entrant alice no longer controls is not asked about" $ do
+          wolfir <- S.printingOf s registry "Wolfir Silverheart"
+          giant <- S.printingOf s registry "Hill Giant"
+          let counting :: Prompt.Prompt r -> State.State Int r
+              counting p = case p of
+                Prompt.ChooseOptional {} -> do
+                  State.modify' (+ 1)
+                  pure OptionalDecision.Exercises
+                _ -> pure (S.identityAnswer p)
+              gs0 = Setup.emptyGame S.bothPlayers
+              (wolfirId, withWolfir) = S.addPermanent wolfir S.alice gs0
+              (_, staged) = S.spellOnStack giant S.alice withWolfir
+              -- The Giant has entered and rule 702.95a's second trigger is on the
+              -- stack, unresolved.
+              waiting = S.runPure S.identityAnswer staged (Stack.resolveTop >> Engine.settleForPriority)
+              asks board = State.execState (Engine.runGame counting board (Stack.resolveTop >> Engine.settleForPriority)) 0
+          case onBattlefield giantName waiting of
+            Nothing -> Spec.assertFailure s "the Hill Giant did not reach the battlefield"
+            Just giantId -> do
+              Spec.assertEqWith s "CR 603.4 bob having taken the entrant, alice is asked nothing" (asks (S.giveControl giantId S.bob waiting)) 0
+              -- The same board with the entrant left alone: one real "may", which
+              -- is what says the zero above is the condition failing and not a
+              -- trigger that never fired.
+              Spec.assertEqWith s "and with the entrant still hers, one" (asks waiting) 1
+              Spec.assertEqWith s "CR 702.95c the Wolfir stays its printed 4/4 either way" (S.powerToughnessOf wolfirId (snd (State.evalState (Engine.runGame counting (S.giveControl giantId S.bob waiting) (Stack.resolveTop >> Engine.settleForPriority)) 0))) (Just (4, 4))
+
 graftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graftSpec s registry =
   let newestOnBattlefield name gs =
@@ -3567,6 +3698,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   echoSpec s registry
   exploitSpec s registry
   championSpec s registry
+  soulbondSpec s registry
   graftSpec s registry
   backupSpec s registry
   poisonousSpec s registry
