@@ -34,6 +34,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -66,6 +67,9 @@ import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import Pawl.Types.Recipient (Recipient)
+import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.While as While
 
@@ -74,16 +78,20 @@ import qualified Pawl.Types.While as While
 -- from. Nothing means the duration never started, so per CR 611.2b the effect
 -- does nothing and is never stored at all.
 --
--- `players` is the resolution's binding environment, projected to the seats it
--- names (Binding.playersIn). It is what a CR 611.2b condition saying "that
--- player" is baked against, HERE and only here -- see the ForAsLongAs arm. Empty
--- for a caller with no resolution behind it, whose durations name no slot.
+-- `targets` is the resolution's binding environment -- CR 601.2c's chosen
+-- recipients, already filtered by CR 608.2b. Projected to the seats it names
+-- (Binding.playersIn) it is what a CR 611.2b condition saying "that player" is
+-- baked against, HERE and only here -- see the ForAsLongAs arm. It is also what
+-- UntilEndOfNextTurnOf's reference is sampled from, which is why the whole
+-- environment is passed rather than the seats alone: that arm may name a slot
+-- holding an OBJECT. Empty for a caller with no resolution behind it, whose
+-- durations name no slot.
 --
 -- CR 611.2b's second sentence is vacuous here: this runs once, at the point the
 -- effect would be stored, and no opcode both ends and restarts a condition
 -- mid-resolution.
-arm :: Map.Map SlotName PlayerId -> PlayerId -> ObjectId -> Duration -> GameState -> Maybe Expiry
-arm players controller source duration gs = case duration of
+arm :: Map.Map SlotName (Set.Set Recipient) -> PlayerId -> ObjectId -> Duration -> GameState -> Maybe Expiry
+arm targets controller source duration gs = case duration of
   Duration.UntilEndOfTurn -> Just Expiry.AtCleanup
   Duration.Indefinite -> Just Expiry.Never
   -- Alchemy's "perpetually": Never's lifetime under an arm a zone change can
@@ -98,6 +106,19 @@ arm players controller source duration gs = case duration of
   -- between this arm and the one above.
   Duration.UntilEndOfYourNextTurn ->
     Just (Expiry.AtEndOfTurnOf (AfterTurn.MkAfterTurn controller (GameState.turnNumber gs)))
+  -- CR 611.2a: the arm above's window with the seat SAMPLED from a reference
+  -- instead of taken from CR 109.5's "you". The turn number is sampled the same
+  -- way and for the same reason, so the two arms share dropAtCleanup's reading
+  -- whole and differ only in whose turn is counted.
+  --
+  -- Nothing where the reference names nobody, which is CR 611.2b's "the duration
+  -- never started": a slot emptied by CR 608.2b holds no recipient, and an effect
+  -- whose window cannot begin is not stored. Silent, deliberately -- the
+  -- alternative is arming against some other seat.
+  Duration.UntilEndOfNextTurnOf ref ->
+    fmap
+      (\pid -> Expiry.AtEndOfTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
+      (seatOf targets gs ref)
   -- BAKED, and stored baked: the condition outlives the resolution that stored
   -- it, and sweepConditional below re-reads it off the effect's
   -- SOURCE, whose bindings never held the resolution's slots. An InSlot left
@@ -106,7 +127,7 @@ arm players controller source duration gs = case duration of
   -- ability, never start at all, since the same unresolvable reference is read
   -- one line below.
   Duration.ForAsLongAs cond ->
-    let baked = Condition.bakeBound players cond
+    let baked = Condition.bakeBound (Binding.playersIn targets) cond
      in if Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just controller) (Just source)) gs source baked
           then Just (Expiry.While (While.MkWhile controller baked))
           else Nothing
@@ -135,6 +156,40 @@ arm players controller source duration gs = case duration of
   -- and then lasts until cleanup, and no lint refuses the duration there
   -- (#3176).
   Duration.UntilUsed -> Just Expiry.WhenUsed
+
+-- The ONE seat a Duration.UntilEndOfNextTurnOf reference names, sampled as the
+-- window begins. Pawl.Engine.Resolve.Slots.playerRefPlayers is the general road,
+-- and this is deliberately not it: that function is a resolution's, and this
+-- module sits below it -- every other caller of `arm` (Pawl.Engine.Stack,
+-- Pawl.Engine.Event, Pawl.Engine.ManaRider) has no resolution to hand.
+--
+-- InSlot is CR 601.2c's targeted player, through Binding.onlyOne, so a slot
+-- naming several names nobody. ControllerOfBound is CR 108.4a's substitute read
+-- through the projection: Suspend Aggression's "its owner" is asked of a card
+-- already in exile, which CR 108.4 leaves with no controller, and that rule then
+-- answers with the owner.
+--
+-- Not implemented: every other arm, which needs a resolution's whole evaluation
+-- context -- a perspective, a view and a candidate -- and answers Nothing here
+-- (#3950), and no lint refuses one, which is the posture Duration.UntilUsed's own
+-- unbuilt carrier takes above.
+seatOf :: Map.Map SlotName (Set.Set Recipient) -> GameState -> PlayerRef.PlayerRef -> Maybe PlayerId
+seatOf targets gs ref = case ref of
+  PlayerRef.InSlot slot -> Map.lookup slot (Binding.playersIn targets)
+  PlayerRef.ControllerOfBound slot ->
+    Map.lookup slot targets
+      >>= Binding.onlyOne
+      >>= Recipient.objectOf
+      >>= \oid -> Projection.controllerWithLastKnown oid gs
+  PlayerRef.EachPlayer -> Nothing
+  PlayerRef.EachPlayerExcept _ -> Nothing
+  PlayerRef.EachOpponentExcept _ -> Nothing
+  PlayerRef.Relative _ -> Nothing
+  PlayerRef.EachInSlot _ -> Nothing
+  PlayerRef.Specific _ -> Nothing
+  PlayerRef.Candidate -> Nothing
+  PlayerRef.ChosenPlayerOfBound _ -> Nothing
+  PlayerRef.Attacking _ -> Nothing
 
 -- Does a stored effect under this duration FOLLOW its objects across a zone
 -- change? CR 400.7's default is no -- the object that arrives is a new object

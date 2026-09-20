@@ -3,6 +3,7 @@ module Pawl.Types.Duration where
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PlayerRef as PlayerRef
 
 -- | How long a stored continuous effect lasts, as the CARD says it (CR 611.2).
 -- PRINTED data: this is what appears in card JSON. The game stores
@@ -27,6 +28,20 @@ data Duration
     -- cleanup step (CR 514), rather than as it begins. Both "your"s are resolved
     -- the same way, by Pawl.Engine.Expiry.arm.
     UntilEndOfYourNextTurn
+  | -- | CR 611.2a: "until the end of their next turn" (Suspend Aggression), where
+    -- the seat is named by a reference rather than being CR 109.5's "you".
+    --
+    -- The arm above's window with the seat spelled out, and never derivable from
+    -- it: CR 109.5 fixes that one to the effect's controller, and the exiled
+    -- card Suspend Aggression hands back belongs to whoever owned it.
+    -- Pawl.Engine.Expiry.arm samples the reference ONCE, as the duration begins,
+    -- so the stored Pawl.Types.AfterTurn holds a seat and not a reference.
+    --
+    -- Not implemented: any arm of the reference beyond InSlot and
+    -- ControllerOfBound, which are what Pawl.Engine.Expiry.arm can answer without
+    -- a resolution's whole evaluation context; a card writing another arm arms
+    -- nothing and its effect does not happen (#3950).
+    UntilEndOfNextTurnOf PlayerRef.PlayerRef
   | -- | CR 611.2b: "for as long as ...". The duration has a BEGINNING as well as
     -- an end -- "if the 'for as long as' duration never starts, the effect does
     -- nothing" -- which is why Pawl.Engine.Expiry.arm returns a Maybe.

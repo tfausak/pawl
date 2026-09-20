@@ -1,5 +1,6 @@
 module Pawl.Codec.DurationSpec where
 
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -13,7 +14,9 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotName as SlotName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Duration" $ do
@@ -59,6 +62,14 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       Duration.UntilEndOfYourNextTurn
       " {\"type\":\"UntilEndOfYourNextTurn\"} "
+  -- CR 611.2a: the arm above's window against a seat a reference names, carrying
+  -- that reference (Suspend Aggression's "their next turn").
+  Spec.it s "UntilEndOfNextTurnOf carries its reference" $
+    Common.assertCodec
+      s
+      Duration.codec
+      (Duration.UntilEndOfNextTurnOf (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "exiled"))))
+      " {\"type\":\"UntilEndOfNextTurnOf\",\"value\":{\"type\":\"ControllerOfBound\",\"value\":\"exiled\"}} "
   -- CR 611.2b, carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
     Common.assertCodec
