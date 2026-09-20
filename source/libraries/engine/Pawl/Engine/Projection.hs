@@ -3133,6 +3133,9 @@ quantityReads q = case q of
   Quantity.Type.Literal _ -> Set.empty
   Quantity.Type.ManaValue -> Set.empty
   Quantity.Type.InSlot _ -> Set.empty
+  -- InSlot's answer: a binding is not a projected aspect, so neither half of the
+  -- slot reads one.
+  Quantity.Type.WasBound _ -> Set.empty
   Quantity.Type.Star -> Set.empty
   Quantity.Type.ManaCount _ -> Set.empty
   Quantity.Type.LifeTotal _ -> Set.empty

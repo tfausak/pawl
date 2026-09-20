@@ -1754,6 +1754,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Power -> quantity
   Quantity.Type.Toughness -> quantity
   Quantity.Type.InSlot _ -> quantity
+  Quantity.Type.WasBound _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
   Quantity.Type.LifeTotal _ -> quantity
