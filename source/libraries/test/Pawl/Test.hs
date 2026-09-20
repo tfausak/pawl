@@ -520,6 +520,7 @@ import qualified Pawl.DamageSpec
 import qualified Pawl.DaytimeSpec
 import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
+import qualified Pawl.DeckListSpec
 import qualified Pawl.DepartureSpec
 import qualified Pawl.DetainSpec
 import qualified Pawl.DevotionSpec
@@ -1213,6 +1214,7 @@ spec s registry = do
   Pawl.DaytimeSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
+  Pawl.DeckListSpec.spec s
   Pawl.DepartureSpec.spec s registry
   Pawl.DetainSpec.spec s registry
   Pawl.DevotionSpec.spec s registry

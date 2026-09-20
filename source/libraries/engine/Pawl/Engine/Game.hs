@@ -749,7 +749,9 @@ namesFor mObj card = case mObj of
   -- 710.2's own Example true from this side, a "search your library for a
   -- legendary card" finding no Tok-Tok because the card in the library is not a
   -- flipped permanent. CR 710.5 is the separate clause that lets a player CHOOSE
-  -- the alternative name off an unflipped card, and is #679's.
+  -- the alternative name off an unflipped card; Prompt.ChooseCardName offers no
+  -- candidate list, so that choice is already open, and it does not give an
+  -- unflipped permanent the name chosen.
   Just obj
     | Object.flipped obj,
       Just flipped <- Card.flippedFace card ->

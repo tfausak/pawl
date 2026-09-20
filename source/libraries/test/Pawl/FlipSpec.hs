@@ -24,7 +24,9 @@
 -- Harm's Way pair at the end -- and the Soul's Fire pair beside it is CR 120.1's
 -- other half, noncombat damage from the same creature.
 --
--- Not implemented: CR 710.5's alternative name, which is #679's.
+-- CR 710.5's alternative name needs nothing here: Prompt.ChooseCardName offers
+-- no candidate list, so a player may already choose it -- Pawl.AdventureSpec
+-- says the same of CR 715.5.
 --
 -- CR 707.2 / 707.3's copies of it are the Clone cases at the end, and CR
 -- 707.9b's exceptions on a copy that flips are the Sakashima case after them.
