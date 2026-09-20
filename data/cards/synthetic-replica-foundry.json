@@ -1,0 +1,76 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Replica Foundry",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "TokenR",
+            "value": {
+              "matching": {
+                "whatToken": {
+                  "type": "IsToken"
+                },
+                "whose": {
+                  "type": "Yours"
+                }
+              },
+              "plus": {
+                "faces": [
+                  {
+                    "name": "Servo Token",
+                    "power": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "toughness": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "typeLine": {
+                      "subtypes": [
+                        {
+                          "type": "Servo"
+                        }
+                      ],
+                      "types": [
+                        {
+                          "type": "Artifact"
+                        },
+                        {
+                          "type": "Creature"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

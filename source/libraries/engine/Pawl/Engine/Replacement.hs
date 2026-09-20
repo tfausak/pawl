@@ -1560,7 +1560,11 @@ matchesTokenLot context filter_ pid lot =
         -- read CR 108.3 off either: a lot that named one would answer two ways
         -- for the same token depending on whether it was a copy.
         Just snapshot -> Count.viewOfSnapshot (Just pid) Nothing True Map.empty snapshot
-        Nothing -> (Projection.viewOfCard (NonEmpty.head (Card.Type.faces (TokenLot.card lot)))) {Filter.controller = Just pid}
+        -- CR 111.1: what the lot describes is a TOKEN whichever way its
+        -- characteristics were given, so `token` is True here as it is in the
+        -- copy branch above. Projection.viewOfCard answers False, describing a
+        -- printed face rather than the object this lot would mint.
+        Nothing -> (Projection.viewOfCard (NonEmpty.head (Card.Type.faces (TokenLot.card lot)))) {Filter.controller = Just pid, Filter.token = True}
    in Filter.matches context view filter_
 
 -- The counters `oid` is so far entering with, empty outside an entry (see
