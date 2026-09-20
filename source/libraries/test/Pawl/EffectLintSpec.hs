@@ -378,6 +378,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.Power -> False
   Quantity.Type.Toughness -> False
   Quantity.Type.InSlot _ -> False
+  Quantity.Type.WasBound _ -> False
   Quantity.Type.Halved {} -> False
   Quantity.Type.Times {} -> False
   Quantity.Type.Negate {} -> False

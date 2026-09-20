@@ -252,6 +252,20 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.InSlot slot ->
           let boundOn holder = Game.lookupObject holder gs >>= Binding.amountOf slot . Object.bindings
            in fmap toInteger ((mOid >>= boundOn) <|> boundOn announcedOn <|> Map.lookup slot (Filter.boundAmounts context) <|> Map.lookup slot (GameState.ambientAmounts gs))
+        -- CR 701.4b: was the action taken at all? The BINDING alone answers it,
+        -- read out of the announcement's context rather than off the board, which
+        -- is what the rule's "regardless of whether or not the revealed card or
+        -- chosen permanent still has that quality" asks for -- the object may
+        -- have changed zones, lost the quality, or ceased to exist since the
+        -- payment, and none of that is this phrase's question. The cost's own
+        -- Filter settled the quality when the slot was bound.
+        --
+        -- Never Nothing: an unbound slot is an honest 0 (the payer did not take
+        -- the action) rather than a hole, which is InSlot's answer above turned
+        -- around -- that arm asks for a number a slot HOLDS, this one for whether
+        -- the slot is there.
+        Quantity.WasBound slot ->
+          Just (if Set.null (Map.findWithDefault Set.empty slot (Filter.slotObjects context)) then 0 else 1)
         -- CR 208.2: a bare star has no value of its own. Both readers of a
         -- characteristic-defining P/T substitute the object's quantity for it first,
         -- through Projection.seedCharacteristicPT at the projection's seed
@@ -1131,6 +1145,10 @@ objectSlots :: Quantity -> Set SlotName
 objectSlots quantity = case quantity of
   -- The amount reader, left out for the reason above.
   Quantity.InSlot _ -> Set.empty
+  -- CR 701.4b's reader, left out for the SAME reason from the other side: it
+  -- names an object slot but reaches Filter.slotOneObject on no road, asking
+  -- only whether the slot is bound, so a plural slot does not damage it.
+  Quantity.WasBound _ -> Set.empty
   Quantity.Literal _ -> Set.empty
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
@@ -1370,6 +1388,9 @@ bakePlayerRef players ref = case ref of
 readsX :: Quantity -> Bool
 readsX quantity = case quantity of
   Quantity.InSlot slot -> slot == Binding.variableX
+  -- Never X: CR 601.2b's announcement binds an AMOUNT, and this arm asks whether
+  -- a slot names an OBJECT, which Binding.variableX never does.
+  Quantity.WasBound _ -> False
   -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
   -- Plus X (Literal 3), which reads X without being equal to it.
   Quantity.Plus (Plus.MkPlus a b) -> readsX a || readsX b

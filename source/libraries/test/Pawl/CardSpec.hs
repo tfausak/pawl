@@ -1352,15 +1352,32 @@ declaresVariable = Cost.hasVariable
 -- may not.
 --
 -- CostComponent.Behold is deliberately not counted, though CR 701.4a's hand half
--- IS a reveal: its payment binds nothing (Pawl.Engine.Cost.payComponent answers
--- bindsNothing), so a spell let through here could read a slot no payment ever
--- writes.
+-- IS a reveal: it binds a slot of its own (Binding.beheldObject), and merging
+-- the two names would let a spell that beholds read "the revealed card's mana
+-- value" off a permanent chosen on the battlefield, which rule 701.4a reveals to
+-- nobody. beholdsAsCost below is its exemption.
 revealsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 revealsAsCost =
   let isReveal component = case component of
         CostComponent.RevealCardFromHand _ -> True
         _ -> False
    in any isReveal . Cost.Type.components
+
+-- Does this cost BEHOLD an object? revealsAsCost's shape exactly: CR 601.2h's
+-- payment binds Binding.beheldObject (Pawl.Engine.Cost.payComponent's Behold
+-- arm, folded onto the spell by Pawl.Engine.Cast), so a spell whose cost has such
+-- a component may read the slot and one whose cost has not may not. That is CR
+-- 701.4b's linkage -- "if a [quality] was beheld" is printed only on a card whose
+-- own cost beholds -- falling out of the ordinary available-slots comparison.
+--
+-- AbilitySlotLintSpec offers no such exemption: no printing puts this component
+-- on an activation cost.
+beholdsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+beholdsAsCost =
+  let isBehold component = case component of
+        CostComponent.Behold _ -> True
+        _ -> False
+   in any isBehold . Cost.Type.components
 
 -- Does this cost sacrifice a permanent the payer CHOOSES? revealsAsCost's shape
 -- exactly: CR 601.2h's payment binds Binding.sacrificedPermanent
@@ -2302,6 +2319,7 @@ reservedSlots =
       Binding.tappedPermanent,
       Binding.tappedForTotalPower,
       Binding.revealedCard,
+      Binding.beheldObject,
       Binding.crewedVehicle,
       Binding.crewers,
       Binding.manaSource,
@@ -3481,6 +3499,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.Power -> []
   Quantity.Type.Toughness -> []
   Quantity.Type.InSlot _ -> []
+  Quantity.Type.WasBound _ -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus (Plus.MkPlus a b) -> quantityKindFilters a <> quantityKindFilters b
   Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityKindFilters inner
@@ -5769,6 +5788,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         --     "the revealed card's mana value" is an ordinary slot read.
         --     activatedAbilityOffends offers no such exemption: no printing puts
         --     this component on an activation cost.
+        --   * Binding.beheldObject, and only when the cost beholds, per
+        --     `beholdsAsCost`. CR 601.2h's payment binds it and Pawl.Engine.Cast
+        --     folds it onto the spell, so Osseous Exhale's "if a Dragon was
+        --     beheld" is an ordinary slot read -- of the BINDING alone, which is
+        --     what CR 701.4b asks for.
         --   * Binding.sacrificedPermanent, and only when the cost sacrifices a
         --     permanent the payer chooses, per `sacrificesAsCost`. CR 601.2h's
         --     payment binds it and Pawl.Engine.Cast folds it onto the spell, so
@@ -5790,7 +5814,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 if any sacrificesAsCost (spellCostsOf card)
                   then Set.singleton Binding.sacrificedPermanent
                   else Set.empty
-           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed]) (Face.spell card)
+              beheld =
+                if any beholdsAsCost (spellCostsOf card)
+                  then Set.singleton Binding.beheldObject
+                  else Set.empty
+           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed, beheld]) (Face.spell card)
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

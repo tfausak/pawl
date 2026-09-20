@@ -278,8 +278,9 @@ candidateCostsFor = candidateCostsGiven False
 -- ability that offered a cost (CR 702.34a), and a choice printed inside an
 -- additional cost is not one.
 --
--- Not implemented: CR 701.4b's "if a [quality] was beheld", the one clause that
--- would ask which branch was taken (#3888).
+-- Nor is the branch recorded as a branch: what CR 701.4b's "if a [quality] was
+-- beheld" reads is the SLOT the chosen option's own payment bound
+-- (Binding.beheldObject), so no clause has to ask which candidate carried it.
 choiceVariants :: Face.Face card -> CandidateCost.CandidateCost -> [CandidateCost.CandidateCost]
 choiceVariants face =
   let variants candidates choice =
@@ -5217,8 +5218,11 @@ payComponent moment slots pid oid component = case component of
   -- The reveal is conditioned on the ZONE the chosen object is in rather than on
   -- which half the answer came from, so the two halves cannot disagree.
   --
-  -- Binds nothing. Not implemented: CR 701.4b's "if a [quality] was beheld",
-  -- which is what would want the beheld object bound here (#3888).
+  -- BINDS the object under Binding.beheldObject, which is what CR 701.4b's "if a
+  -- [quality] was beheld" is read off -- through Quantity.WasBound, which asks
+  -- whether the slot is bound and never goes back to the board for the quality.
+  -- Osseous Exhale is the card, and Pawl.CostSpec's "CR 701.4b the quality is
+  -- the one the object had when it was beheld" is the proof.
   CostComponent.Behold criterion -> do
     gs <- State.get
     let candidates = beholdCandidates slots pid oid criterion gs
@@ -5232,7 +5236,7 @@ payComponent moment slots pid oid component = case component of
             answer <- Game.choose (Prompt.ChooseBehold decider pid oid (first NonEmpty.:| (second : more)))
             pure (if List.elem answer candidates then answer else first)
         Monad.when (fmap Object.zone (Game.lookupObject chosen gs) == Just Zone.Hand) (Event.reveal RevealCause.Ordinary pid chosen)
-        pure bindsNothing
+        pure (Payment.Paid (Map.singleton Binding.beheldObject (Set.singleton (Recipient.ToObject chosen))))
   -- CR 107.14: paying energy removes that many energy counters from the player.
   -- Natural subtraction is PARTIAL, so `left` is guarded; canPayComponent
   -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.

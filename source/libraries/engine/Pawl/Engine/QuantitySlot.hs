@@ -90,6 +90,11 @@ overSlots f quantity =
         Quantity.Power -> pure quantity
         Quantity.Toughness -> pure quantity
         Quantity.InSlot slot -> fmap Quantity.InSlot (f slot)
+        -- CR 701.4b's reader names a slot too, and is visited here for
+        -- AgainstSlot's reason below: the slot has to be on the READ side of the
+        -- D4 dataflow lint, and a mode that renames its slots has to rename this
+        -- one with them.
+        Quantity.WasBound slot -> fmap Quantity.WasBound (f slot)
         Quantity.Star -> pure quantity
         Quantity.Plus (Plus.MkPlus a b) -> fmap Quantity.Plus (Plus.MkPlus <$> recur a <*> recur b)
         -- Composition, as Plus is: the rounding names no slot and the payload may name
@@ -284,6 +289,9 @@ nestedRefs quantity = case quantity of
   Quantity.Toughness -> Set.empty
   -- The amount reader, which `slots` above reports itself.
   Quantity.InSlot _ -> Set.empty
+  -- AgainstSlot's answer below: `slots` above DOES report this arm's own slot,
+  -- and it hides no nested reference.
+  Quantity.WasBound _ -> Set.empty
   Quantity.Star -> Set.empty
   Quantity.Plus (Plus.MkPlus a b) -> Set.union (nestedRefs a) (nestedRefs b)
   -- Plus' answer: the rounding hides no reference, so what the payload hides is
@@ -377,6 +385,9 @@ nestedCounts quantity = case quantity of
   -- A slot read, not a fold over game state: the value was bound by an earlier
   -- effect of the same resolution and there is no Count inside it.
   Quantity.InSlot _ -> []
+  -- InSlot's answer, one half of the binding over: CR 701.4b's yes-or-no holds
+  -- no Count either.
+  Quantity.WasBound _ -> []
   Quantity.Star -> []
   Quantity.Plus (Plus.MkPlus a b) -> nestedCounts a <> nestedCounts b
   -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it halves
@@ -597,6 +608,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.Power -> quantity
         Quantity.Toughness -> quantity
         Quantity.InSlot _ -> quantity
+        Quantity.WasBound _ -> quantity
         Quantity.Star -> quantity
         Quantity.ObjectCounters _ -> quantity
         Quantity.ObjectCountersOfAnyKind -> quantity
