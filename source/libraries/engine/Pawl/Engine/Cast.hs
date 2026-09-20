@@ -934,10 +934,11 @@ candidateFillable pid oid name proposed candidate =
 -- canonical order -- what castableSpells scans, and the list castableZones
 -- filters, so the two can never disagree about where to look.
 --
--- The LIBRARY is in the list for one permission only: the standing "you may cast
--- spells from the top of your library", which Garruk's Horde narrows to creature
--- spells and Future Sight states unrestricted. pileCandidates narrows it to the
--- top card and castableZones' own arm permits it.
+-- The LIBRARY is in the list for one permission only: "you may cast spells from
+-- the top of your library", which Garruk's Horde narrows to creature spells,
+-- Future Sight states unrestricted, and Johann, Apprentice Sorcerer budgets at
+-- once each turn. pileCandidates narrows it to the top card and castableZones'
+-- own arm permits it.
 -- Panglacial Wurm is NOT that road -- its permission is scoped to a search in
 -- progress rather than to the whole game, and castableWhileSearching walks the
 -- library for it separately.

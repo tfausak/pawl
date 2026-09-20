@@ -6,17 +6,19 @@ module Pawl.Types.PermissionLimit where
 -- unrestricted sentence is Unlimited.
 --
 -- Carried by the permission itself (Pawl.Types.CastFromZone.limit), because CR
--- 118.9 and CR 601.2 supply no default budget: nothing in the rules counts a
--- permission's uses, so an effect that prints a limit is the only thing that
--- can say there is one.
+-- 601.3 supplies no default budget: nothing in the rules counts how often a
+-- permission has been used, so an effect that prints a limit is the only thing
+-- that can say there is one.
 --
 -- The CASTING-side twin of Pawl.Types.ActivationRestriction's OnlyOnceEachTurn,
 -- and deliberately a separate type rather than that one reused: CR 602.5b's
 -- rider is one clause of a list an activated ability prints about itself, while
 -- this is a field of a permission, and the two vocabularies share nothing else.
 --
--- A sum type rather than a Bool or a Maybe Natural: no boolean blindness, and no
--- card prints a cast permission with any budget but one.
+-- A sum type rather than a Bool or a Maybe Natural: no boolean blindness, and a
+-- budget of two would want a card to state it -- Scryfall
+-- @o:"twice each turn" o:cast@, 2026-09-20, one hit, and it budgets loyalty
+-- abilities rather than a cast (Urza, Planeswalker).
 --
 -- Not implemented: a budget scoped to a subset of turns. Johann's "once each
 -- turn" and Serra Paragon's "once during each of your turns" differ in whose

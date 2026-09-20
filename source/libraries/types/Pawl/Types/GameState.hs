@@ -286,6 +286,12 @@ data GameState = MkGameState
     -- spends them separately -- the grain activatedThisTurn above uses for CR
     -- 602.5b's activation-side twin, and for that rule's reason: the budget is
     -- the ability's and survives a change of control.
+    --
+    -- The permission BY VALUE, so a CR 612.1 word swap that changed this
+    -- permission's own filter mid-turn would leave a spent budget unfound --
+    -- the caveat activatedThisTurn's key carries too. No text change reaches
+    -- one: Pawl.Engine.Projection.Rewrite swaps subtype words, and the pool's
+    -- one budgeted permission narrows by card type.
     castPermissionsUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set CastFromZone.CastFromZone),
     -- | The printed rider "This ability triggers only once"
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
