@@ -720,6 +720,20 @@ data Keyword
   | -- | 702.164a: toxic N. CR 702.164b's total toxic value is the SUM over every
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic).
     Toxic Natural.Natural
+  | -- | 702.165a: backup N -- "when this creature enters, put N +1\/+1 counters
+    -- on target creature. If that's another creature, it also gains the
+    -- non-backup abilities of this creature printed below this one until end of
+    -- turn." Minted by Pawl.Engine.Keyword.backup.
+    --
+    -- Not implemented: CR 702.165a's "printed below this one", which needs the
+    -- printed ORDER of a face's keywords and abilities against one another --
+    -- Pawl.Types.Face keeps the keywords in a Set beside the ability lists, so
+    -- every non-backup printed ability is granted whether it was printed above
+    -- or below (gap #3938). Cragsmasher Yeti is the card that needs it.
+    --
+    -- Not implemented: CR 702.165d's determination as the ability is put on the
+    -- stack; the grant is baked as the ability RESOLVES instead (#3939).
+    Backup Natural.Natural
   | -- | 702.166a: bargain -- an optional additional cost of sacrificing an
     -- artifact, enchantment or token, minted by Pawl.Engine.Keyword.bargainCost.
     -- CR 702.166c's "if it was bargained" clauses are the card's own, gated on

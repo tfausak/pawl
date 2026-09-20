@@ -198,6 +198,7 @@ import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
@@ -2861,16 +2862,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             case Projection.freezeQuantities gs resolving source (effectContext gs controller source legal (slotBindings resolving gs)) modification of
               Nothing -> gs
               Just frozen ->
-                let (ts, gs1) = Game.freshTimestamp gs
-                    eff =
-                      ContinuousEffect.MkContinuousEffect
-                        { ContinuousEffect.source = source,
-                          ContinuousEffect.timestamp = ts,
-                          ContinuousEffect.expiry = expiry,
-                          ContinuousEffect.modification = frozen,
-                          ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
-                        }
-                 in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+                let store g m =
+                      let (ts, g1) = Game.freshTimestamp g
+                          eff =
+                            ContinuousEffect.MkContinuousEffect
+                              { ContinuousEffect.source = source,
+                                ContinuousEffect.timestamp = ts,
+                                ContinuousEffect.expiry = expiry,
+                                ContinuousEffect.modification = m,
+                                ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
+                              }
+                       in g1 {GameState.continuousEffects = eff : GameState.continuousEffects g1}
+                 in List.foldl' store gs (expandGrant source gs frozen)
   -- CR 608.2d: a subtype word swap is not among CR 601.2b-d's announcements, so
   -- the choice is made here, as the effect applies. Observable: a countered
   -- Magical Hack is never asked.
@@ -8411,6 +8414,45 @@ bindEarthbentLand :: ObjectId -> ObjectId -> GameState -> GameState
 bindEarthbentLand resolving land gs =
   let put obj = obj {Object.bindings = Map.insert Binding.earthbentLand (Binding.toObject land) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put resolving (GameState.objects gs)}
+
+-- CR 702.165a's grant, expanded as the ability RESOLVES: one ordinary
+-- modification per ability the source carries, so what is stored outlives the
+-- creature with backup exactly as "until end of turn" says it must. Every other
+-- modification passes through as the one it already is.
+--
+-- A LIST, so a source with nothing to grant stores no effect at all rather than
+-- one with no content, and so the arm never has to reach the projection: each
+-- grant becomes a GainKeyword or a GainAbility that CR 613.7 timestamps and CR
+-- 613.1f applies like any other. Several timestamps where the rule states one
+-- effect, which no board can tell apart -- every part of this grant is an
+-- APPEND to a layer-6 list, and appends do not compete for order.
+--
+-- Read off the COPIABLE characteristics (CR 707.2), never the printed face: CR
+-- 702.165b grants what a permanent that entered as a copy of a card with backup
+-- copied, and CR 702.165c keeps out every ability a later effect gave it.
+--
+-- The KEYWORDS are granted one modification per written instance, CR 613.1f's
+-- reading that Pawl.Engine.Projection.applyModification's GainKeyword arm
+-- already takes: a card printing a keyword twice grants it twice. Backup's own
+-- family is dropped, rule 702.165a's "non-backup".
+--
+-- Not implemented: the source's static abilities, player static abilities and
+-- special actions, which are gathered from the copiable characteristics rather
+-- than from the projection (#3748). Streetwise Negotiator is the card with
+-- backup that needs them. A printed REPLACEMENT ability is out of reach for a
+-- different reason and no card asks: Pawl.Types.GrantedAbility holds CR 113.3's
+-- activated and triggered kinds alone, and no printing with backup prints one.
+expandGrant :: ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
+expandGrant source gs modification = case modification of
+  Modification.GainAbilitiesOfSource ->
+    let pc = Projection.copiableCharacteristics source gs
+        granted keyword count
+          | Keyword.familyOf keyword == Just KeywordFamily.Backup = []
+          | otherwise = List.genericReplicate count (Modification.GainKeyword keyword)
+     in concatMap (uncurry granted) (Map.toAscList (PC.keywords pc))
+          <> fmap (Modification.GainAbility . GrantedAbility.Activated) (PC.activatedAbilities pc)
+          <> fmap (Modification.GainAbility . GrantedAbility.Triggered) (PC.triggeredAbilities pc)
+  _ -> [modification]
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
