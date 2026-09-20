@@ -3330,8 +3330,10 @@ canPayComponent slots pid oid component gs = case component of
     Natural.length (exileCandidates slots pid criterion gs) >= n
   -- CR 118.3: the arm above over CR 702.167a's two pools at once, so that a craft
   -- ability is not OFFERED where the battlefield and the graveyard together hold
-  -- too few materials.
-  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n criterion) ->
+  -- too few materials. ">=" answers both readings of the count: an exact one is
+  -- payable at exactly that many and a minimum at that many or more, so rule
+  -- 702.167a's "one or more" moves the CEILING and never the floor.
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n _ criterion) ->
     Natural.length (materialCandidates slots pid oid criterion gs) >= n
   -- CR 701.59b: a player who cannot reach the total can't collect evidence at all.
   -- The arm above read as a SUM rather than a size, TapForTotalPower's question one
@@ -5491,17 +5493,25 @@ payComponent moment slots pid oid component = case component of
   -- Prompt.ChooseMaterials for the ask. Elided only when forced, and
   -- reject-not-repair, both that arm's posture verbatim.
   --
+  -- `orMore` is rule 702.167a's "one or more", which makes the count a MINIMUM:
+  -- the size the answer is checked against becomes a floor rather than an
+  -- equality, and nothing else moves. The ELISION is the same test under both
+  -- readings -- with no more candidates than the count there is exactly one legal
+  -- answer either way, the whole pool, so eliding decides nothing for the payer;
+  -- with fewer the check below leaves the component Unpaid.
+  --
   -- Binds nothing. Not implemented: CR 702.167c's "the exiled cards used to craft
   -- it", which is what would want the materials bound here (#3931).
-  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n criterion) -> do
+  CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore criterion) -> do
     gs <- State.get
     let candidates = materialCandidates slots pid oid criterion gs
         decider = Decide.deciderFor pid gs
+        enough chosen = if orMore then Natural.length chosen >= n else Natural.length chosen == n
     chosen <-
       if Natural.length candidates <= n
         then pure (Set.fromList candidates)
-        else Game.choose (Prompt.ChooseMaterials decider pid oid candidates n)
-    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
+        else Game.choose (Prompt.ChooseMaterials decider pid oid candidates n orMore)
+    if Set.isSubsetOf chosen (Set.fromList candidates) && enough chosen
       then do
         Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
         pure bindsNothing

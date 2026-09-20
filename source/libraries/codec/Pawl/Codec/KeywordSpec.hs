@@ -1632,7 +1632,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Craft (Craft.MkCraft cost (ExileMaterials.MkExileMaterials 1 (Filter.HasCardType CardType.Creature))))
+      (Keyword.Craft (Craft.MkCraft cost (ExileMaterials.MkExileMaterials 1 False (Filter.HasCardType CardType.Creature))))
       " {\"type\":\"Craft\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":4},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}]},\"materials\":{\"count\":1,\"whichObjects\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}} "
   Spec.it s "Scavenge carries its cost" $ do
     Common.assertCodec

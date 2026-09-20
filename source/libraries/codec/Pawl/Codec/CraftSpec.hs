@@ -30,7 +30,7 @@ spec s = Spec.describe s "Pawl.Codec.Craft" $ do
       codec
       ( Craft.MkCraft
           { Craft.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, ManaSymbol.OfType (ManaType.Colored Color.Black)]), Cost.components = []},
-            Craft.materials = ExileMaterials.MkExileMaterials {ExileMaterials.count = 1, ExileMaterials.whichObjects = Filter.HasCardType CardType.Creature}
+            Craft.materials = ExileMaterials.MkExileMaterials {ExileMaterials.count = 1, ExileMaterials.orMore = False, ExileMaterials.whichObjects = Filter.HasCardType CardType.Creature}
           }
       )
       " {\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":4},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}]},\"materials\":{\"count\":1,\"whichObjects\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "

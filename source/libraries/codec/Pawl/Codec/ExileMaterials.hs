@@ -15,5 +15,6 @@ import qualified Pawl.Types.ExileMaterials as ExileMaterials
 codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (ExileMaterials.ExileMaterials keyword)
 codec keywordCodec = Fields.object $ do
   count <- Fields.required "count" Common.natural ExileMaterials.count
+  orMore <- Fields.defaulted "orMore" False Common.boolean ExileMaterials.orMore
   whichObjects <- Fields.required "whichObjects" (Filter.codec keywordCodec) ExileMaterials.whichObjects
-  pure ExileMaterials.MkExileMaterials {ExileMaterials.count = count, ExileMaterials.whichObjects = whichObjects}
+  pure ExileMaterials.MkExileMaterials {ExileMaterials.count = count, ExileMaterials.orMore = orMore, ExileMaterials.whichObjects = whichObjects}
