@@ -5549,7 +5549,16 @@ craftBoard s registry onBattlefield inGraveyard = do
 -- answer naming something the engine never offered cannot repair the assertion.
 craftExiling :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 craftExiling oid p = case p of
-  Prompt.ChooseMaterials _ _ _ candidates _ -> Set.fromList (filter (== oid) candidates)
+  Prompt.ChooseMaterials _ _ _ candidates _ _ -> Set.fromList (filter (== oid) candidates)
+  _ -> S.identityAnswer p
+
+-- The arm above with TWO objects, for rule 702.167a's "one or more": the answer
+-- is still cut out of the offer rather than built, so an answer the engine never
+-- offered cannot repair the assertion, and it is bigger than the minimum the
+-- prompt carries.
+craftExilingBoth :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+craftExilingBoth first second p = case p of
+  Prompt.ChooseMaterials _ _ _ candidates _ _ -> Set.fromList (filter (\c -> c == first || c == second) candidates)
   _ -> S.identityAnswer p
 
 -- The names alice's battlefield shows, read through the projection: the card a
@@ -5565,11 +5574,13 @@ craftBattlefieldNames gs = Set.unions (fmap (\o -> Projection.namesOf o gs) (Gam
 craftNamesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
 craftNamesIn zone gs = List.sort (Maybe.mapMaybe (\o -> fmap S.nameOf (Game.cardOf o gs)) (Game.zoneMembers zone S.alice gs))
 
-tithingBlade, consumingSepulcher, goblinPiker, armoredGalleon :: CardName.CardName
+tithingBlade, consumingSepulcher, goblinPiker, armoredGalleon, hillGiantName, dinosaurHeaddress :: CardName.CardName
 tithingBlade = CardName.MkCardName (Text.pack "Tithing Blade")
 consumingSepulcher = CardName.MkCardName (Text.pack "Consuming Sepulcher")
 goblinPiker = CardName.MkCardName (Text.pack "Goblin Piker")
 armoredGalleon = CardName.MkCardName (Text.pack "Armored Galleon")
+hillGiantName = CardName.MkCardName (Text.pack "Hill Giant")
+dinosaurHeaddress = CardName.MkCardName (Text.pack "Dinosaur Headdress")
 
 craftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
@@ -5623,3 +5634,50 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
       "CR 602.5d and not in the end step"
       (filter (isActivationOf craftable) (Action.legalActions S.alice (stocked {GameState.phase = Phase.Ending EndingStep.EndStep})))
       []
+
+  -- CR 702.167a's "[materials] is a description of ONE OR MORE objects":
+  -- Paleontologist's Pick-Axe // Dinosaur Headdress {2} Artifact - Equipment,
+  -- "Craft with one or more creatures {5}", whose back face is Dinosaur Headdress
+  -- (Oracle text checked against Scryfall, 2026-09-20). That back face also
+  -- prints "As this Equipment becomes attached to a creature, choose an exiled
+  -- creature card used to craft this Equipment" and "Equipped creature is a copy
+  -- of the last chosen card"; neither clause is transcribed (#3931), which leaves
+  -- pawl's card STRICTER than printed and touches nothing below -- no case here
+  -- attaches the Headdress to anything whose characteristics it would rewrite.
+  --
+  -- THREE candidates against a minimum of one, so the prompt is raised rather
+  -- than elided, and the payer answers with TWO of them: the size the exact
+  -- reading of the count refuses and the minimum admits. One comes off the
+  -- battlefield and one out of the graveyard, so the answer the engine accepts is
+  -- a subset of neither pool alone.
+  --
+  -- Five Swamps, which is exactly {5}.
+  Spec.it s "CR 702.167a one or more materials: the payer exiles more than the minimum" $ do
+    pickAxe <- S.printingOf s registry "Paleontologist's Pick-Axe"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    galleon <- S.printingOf s registry "Armored Galleon"
+    swamp <- S.printingOf s registry "Swamp"
+    let (axeId, g0) = S.addPermanent pickAxe S.alice (S.landsInPlay swamp 5)
+        (pikerId, g1) = S.addPermanent piker S.alice g0
+        (_, g2) = S.addPermanent giant S.alice g1
+        (galleonId, g3) = S.addGraveyardCard galleon S.alice g2
+        board =
+          g3
+            { GameState.priority = Just S.alice,
+              GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PostcombatMain
+            }
+        isCraft ability = case ActivatedAbility.keyword ability of
+          Just (Keyword.Craft _) -> True
+          _ -> False
+    case filter isCraft (Activate.abilitiesFor axeId board) of
+      [ability] -> do
+        let after = S.runPure (craftExilingBoth pikerId galleonId) board (Activate.activateAbility S.alice axeId ability >> Stack.resolveTop)
+        -- THE GAMEPLAY ASSERTION, ahead of every other read: BOTH materials the
+        -- payer named left their zones, which an exact count of one refuses
+        -- outright -- the whole payment is then Unpaid and nothing is exiled.
+        Spec.assertEqWith s "CR 702.167a both materials the payer chose are in exile, a size the exact reading of the count would refuse" (craftNamesIn Zone.Exile after) [armoredGalleon, goblinPiker]
+        Spec.assertBool s (Set.member hillGiantName (craftBattlefieldNames after)) "CR 702.167a and the Hill Giant, which the payer did not choose, is still on the battlefield"
+        Spec.assertBool s (Set.member dinosaurHeaddress (craftBattlefieldNames after)) "CR 702.167a the card the cost exiled came back TRANSFORMED, as Dinosaur Headdress"
+      abilities -> Spec.assertFailure s ("expected one craft ability, got " <> show (length abilities))

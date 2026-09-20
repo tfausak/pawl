@@ -133,9 +133,10 @@ data CostComponent keyword
     -- matching the Filter from the paying player's own graveyard (CR 400.3, CR
     -- 108.4), which the payer chooses.
     ExileCardsFromGraveyard (ExileCardsFromGraveyard.ExileCardsFromGraveyard keyword)
-  | -- | CR 702.167a's [materials] / Tithing Blade: exile this many objects
-    -- matching the Filter from among the permanents the paying player controls
-    -- and the cards in their own graveyard, which the payer chooses.
+  | -- | CR 702.167a's [materials] / Tithing Blade: exile this many objects --
+    -- or, where the payload says so, at least this many -- matching the Filter
+    -- from among the permanents the paying player controls and the cards in their
+    -- own graveyard, which the payer chooses.
     --
     -- A TWO-ZONE choice, Behold's shape below one zone over, and that is why this
     -- is not ExileCardsFromGraveyard with a wider criterion: rule 702.167b makes

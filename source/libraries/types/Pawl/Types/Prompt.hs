@@ -549,7 +549,13 @@ data Prompt r where
   -- payer's battlefield and their graveyard, which CR 702.167b reads one
   -- criterion across. Its own constructor rather than the arm above, whose name
   -- states a zone this pool is not confined to.
-  ChooseMaterials :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  --
+  -- The Bool is rule 702.167a's "one or more": False makes the Natural the exact
+  -- count the arms above state, True makes it a MINIMUM the answer may exceed.
+  -- Carried rather than inferred, because the answerer cannot tell the two apart
+  -- from the pool and the number alone, and an engine that guessed would be
+  -- choosing how many to exile for the payer.
+  ChooseMaterials :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Bool -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 701.59a: which cards are exiled from the payer\'s graveyard to collect
   -- evidence, the Natural the TOTAL MANA VALUE they must reach rather than how
   -- many. The arm above\'s payload read as a threshold, which is
