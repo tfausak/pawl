@@ -60,12 +60,13 @@ data Response
     DeterminedFirstPlayer PlayerId.PlayerId
   | -- | The object randomness named for a
     -- Pawl.Types.ObjectRef.RandomCardInHand -- Merfolk Spy's "a card at random
-    -- from their hand".
+    -- from their hand" -- or for a Pawl.Types.ObjectRef.RandomCardInGraveyard,
+    -- Ghoulraiser's "a Zombie card at random from your graveyard".
     --
-    -- Its own constructor rather than ChoseCardInHand reused, though both name
-    -- one card in one hand: this type's rule at the top, and here the difference
-    -- is the whole point -- a transcript of a player DECIDING must not satisfy a
-    -- prompt that asked randomness, which is CR 701.9b's distinction.
+    -- Its own constructor rather than ChoseCardInHand reused, though both may
+    -- name one card in one hand: this type's rule at the top, and here the
+    -- difference is the whole point -- a transcript of a player DECIDING must not
+    -- satisfy a prompt that asked randomness, which is CR 701.9b's distinction.
     SelectedAtRandom ObjectId.ObjectId
   | -- | The player randomness named for a
     -- Pawl.Types.Effect.ChoosePlayerAtRandom (Ruhan of the Fomori's "choose an

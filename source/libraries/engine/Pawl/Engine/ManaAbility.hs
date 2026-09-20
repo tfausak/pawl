@@ -725,6 +725,9 @@ refReachesLibrary ref = case ref of
   -- library it was shown from (CR 701.20b).
   ObjectRef.EachCardFromAmong {} -> True
   ObjectRef.RandomCardInHand _ -> False
+  -- FALSE for the arm above's reason and for ChosenCardInGraveyard's: the
+  -- position is in a GRAVEYARD, so the ref itself reaches no library.
+  ObjectRef.RandomCardInGraveyard _ -> False
   -- The battlefield, the arm this one offers a subset of: EachMatching's
   -- answer, unchanged by a chooser standing between the sweep and the set.
   ObjectRef.AnyNumberMatching _ -> False
