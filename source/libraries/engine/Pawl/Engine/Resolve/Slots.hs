@@ -2024,7 +2024,7 @@ boundSlots effect = case effect of
   -- Not implemented: Pawl.Types.Conjure carries no slot, so a printing that DOES
   -- name the conjured card later in its own instruction list (Kari Zev, Crew of
   -- Two's "if that card is on the battlefield, return it to its owner's hand")
-  -- cannot be transcribed and this binds nothing (#2638).
+  -- cannot be transcribed and this binds nothing (#3971).
   Effect.Conjure {} -> Set.empty
   -- Create's reason: the copy tokens minted, for CR 603.7c.
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ _ mSlot _) -> foldMap Set.singleton mSlot
