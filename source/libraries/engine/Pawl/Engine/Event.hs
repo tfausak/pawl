@@ -298,7 +298,10 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- bracket leaves a gap rather than leaking its group to the next event.
 --
 -- Not bracketed: token creation and CR 508.1's attacker declaration, so the
--- events each records are read as a sequence (see #441). CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
+-- events each records are read as a sequence: a token minted partway through a
+-- batch enters at a group of its own, which is what
+-- Pawl.Engine.Event.Trigger's `arrivedOnBattlefieldLater` reads to keep it from
+-- witnessing the batch's earlier events. CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
 -- brackets each combat damage step -- the damage and its CR 120.3 results, with
 -- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
 -- each source's gain an event of its own.

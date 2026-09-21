@@ -806,13 +806,16 @@ eventGroups = NonEmpty.groupBy (\a b -> LoggedEvent.group a == LoggedEvent.group
 -- every event of a strictly earlier group, which is the same per-event reading
 -- `laterGroups` gives the battlefield.
 --
--- Not reconstructed: a permanent that ENTERED later in the batch and left before
--- the boundary is still offered to the batch's earlier events (#441). Nor is a
--- departed graveyard card offered to any event but its own arrival: the three
--- conditions zonesTriggeredFrom sends to a graveyard are self-referential arrival
--- conditions whose only matching event IS that arrival, so the only ability that
--- could observe the difference is a CR 113.6m one -- Squee, Goblin Nabob's
--- upkeep, read from a graveyard (#1732).
+-- The battlefield's arrival side is narrowed the same way: a permanent that
+-- ENTERED later in the batch and left again before the boundary is withheld from
+-- the batch's earlier events (`arrivedOnBattlefieldLater`), which is the mirror
+-- of `arrivedLater` one zone over.
+--
+-- Not reconstructed: a departed graveyard card is offered to no event but its
+-- own arrival -- the three conditions zonesTriggeredFrom sends to a graveyard
+-- are self-referential arrival conditions whose only matching event IS that
+-- arrival, so the only ability that could observe the difference is a CR 113.6m
+-- one -- Squee, Goblin Nabob's upkeep, read from a graveyard (#1732).
 --
 -- Events outer, permanents inner (ascending by id): the deterministic canonical
 -- order the CR 603.3b ordering prompt indexes into. Groups do not disturb it --
@@ -1105,7 +1108,49 @@ eventTriggers events gs =
       -- Pawl.TriggerSpec's `bystanderZoneSpec` -- which reaches the same answer
       -- through the sample above, that being the reading that wins. The filter is
       -- kept identical here so the two cannot disagree on the fallback path.
-      laterGroups = drop 1 (List.scanr Map.union Map.empty perGroup)
+      --
+      -- NARROWED by `arrivedOnBattlefieldLater` below, the mirror question this
+      -- recovery does not otherwise ask: a permanent the batch put onto the
+      -- battlefield AFTER this event did not exist immediately after it, so its
+      -- departure at a later group makes it no witness rather than one.
+      laterGroups = List.zipWith Map.withoutKeys (drop 1 (List.scanr Map.union Map.empty perGroup)) arrivedOnBattlefieldLater
+      -- The ids a BATTLEFIELD arrival in this block minted, keyed the way
+      -- `leftBattlefield` keys a departure: ZoneChange.object is the incarnation
+      -- that stood on the battlefield, and ZoneChange.departed names that same
+      -- incarnation when it leaves, so the two coincide on exactly the permanent
+      -- this narrowing is about. `arrivedInGraveyard`'s argument one zone over.
+      --
+      -- CR 111.3's token and CR 400.11c's conjured card come through too:
+      -- recordMintedEntry writes from == to == Battlefield, which fails every
+      -- departure test and passes this arrival one -- so a token created partway
+      -- through a batch and buried by CR 704.5f before the boundary is withheld
+      -- from the batch's earlier events for the same reason a returning card is.
+      arrivalsOnBattlefieldIn block = Set.fromList (Maybe.mapMaybe (arrivedOnBattlefieldAt . LoggedEvent.event) (Foldable.toList block))
+      arrivedOnBattlefieldAt event = case movedOf event of
+        Just zc | ZoneChange.to zc == Zone.Battlefield -> Just (ZoneChange.object zc)
+        _ -> Nothing
+      -- CR 603.10's first sentence on the battlefield's ARRIVAL side, and
+      -- `arrivedLater`'s mirror: entry i holds the ids that reached the
+      -- battlefield at a STRICTLY LATER group, which `laterGroups` subtracts.
+      --
+      -- Strictly later for `arrivedLater`'s reason, which is CR 603.6a: two events
+      -- of one group happened at the same time, so a permanent that entered
+      -- alongside the event did exist immediately after it and keeps its place --
+      -- the simultaneous newcomer the whole grouping exists to preserve.
+      --
+      -- Narrowing `laterGroups` alone, never the sample: `battlefieldAt` already
+      -- reads the board as it stood at each group, so a permanent that had not
+      -- arrived is missing from it. What is left is this recovery, which is per
+      -- BATCH -- it asks only whether an id departed later, never whether it had
+      -- arrived yet.
+      --
+      -- Not applied to `sameGroup`, which is CR 603.10a's look-back at "the
+      -- appearance of objects immediately prior to the event": a permanent that
+      -- both arrived and departed in the event's OWN group is the case the two
+      -- narrowings have to answer alike, and `arrivedLater` leaves it alone.
+      -- Nothing in the suite observes the boundary either way; it is kept
+      -- aligned rather than proved.
+      arrivedOnBattlefieldLater = drop 1 (List.scanr (Set.union . arrivalsOnBattlefieldIn) Set.empty groups)
       -- The ids a graveyard arrival in this block minted, keyed by the ARRIVING
       -- incarnation -- ZoneChange.object, the key `inGraveyards` would hold them
       -- under, `arrivedInGraveyard` below arguing that the two ids coincide.
