@@ -305,7 +305,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     let goblinCard = Printing.card piker
         gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         before = Game.objectCount gone
-        ontoBattlefield = S.runPure S.identityAnswer gone (Event.conjureOntoBattlefield S.alice goblinCard 2)
+        ontoBattlefield = S.runPure S.identityAnswer gone (Event.conjureOntoBattlefield S.alice goblinCard 2 TapState.Untapped)
         intoHand = S.runPure S.identityAnswer gone (Event.conjure S.alice goblinCard Zone.Hand LibraryPosition.defaultValue)
     Spec.assertBool s (notElem S.alice (Game.stillPlaying gone)) "alice really has left"
     Spec.assertEqWith s "nothing reached the battlefield" (Set.size (GameState.battlefield ontoBattlefield)) 0
@@ -323,7 +323,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     let goblinCard = Printing.card piker
         gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         before = Game.objectCount gone
-        ontoBattlefield = S.runPure S.identityAnswer gone (Event.conjureOntoBattlefield S.bob goblinCard 2)
+        ontoBattlefield = S.runPure S.identityAnswer gone (Event.conjureOntoBattlefield S.bob goblinCard 2 TapState.Untapped)
         intoHand = S.runPure S.identityAnswer gone (Event.conjure S.bob goblinCard Zone.Hand LibraryPosition.defaultValue)
     Spec.assertEqWith s "bob's two conjured cards are on the battlefield" (Set.size (GameState.battlefield ontoBattlefield)) 2
     Spec.assertEqWith s "and the other road put one in his hand" (length (Game.zoneMembers Zone.Hand S.bob intoHand)) 1

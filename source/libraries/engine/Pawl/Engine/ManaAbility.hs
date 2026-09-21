@@ -582,7 +582,7 @@ movesLibraryCard effect = case effect of
     ConjureDestination.Hand -> False
     ConjureDestination.Library -> True
     ConjureDestination.Graveyard -> False
-    ConjureDestination.Battlefield -> False
+    ConjureDestination.Battlefield _ -> False
   Effect.CreateCopy {} -> False
   -- CR 707.4 says so in as many words: the permanent remains on the
   -- battlefield, so no card moves out of a library or anywhere else.

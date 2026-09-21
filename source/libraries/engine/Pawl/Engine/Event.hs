@@ -776,8 +776,15 @@ placeObject pid mkObj dest position = do
 -- instructs a player to put an object onto the battlefield, that object enters
 -- the battlefield under that player's control" -- and Nothing for every other
 -- zone, where CR 110.2 leaves the object no controller to record.
-mintCard :: PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> LibraryPosition.LibraryPosition -> GameState.GameState -> (ObjectId, GameState.GameState)
-mintCard pid under printingId dest position gs =
+--
+-- `tapped` is CR 110.5b's status, supplied by the caller rather than defaulted
+-- here for createTokens' reason: a card tapped after the mint would sit untapped
+-- for the instant its own CR 616.1 loop and the CR 603.6a scan of its entry read
+-- it. Inert for every other zone, CR 110.5d denying a card outside the
+-- battlefield a status at all, and every road but conjureOntoBattlefield's hands
+-- it the rule's untapped default.
+mintCard :: PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> LibraryPosition.LibraryPosition -> TapState.TapState -> GameState.GameState -> (ObjectId, GameState.GameState)
+mintCard pid under printingId dest position tapped gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
@@ -786,7 +793,7 @@ mintCard pid under printingId dest position gs =
             Object.enteredUnder = under,
             Object.source = Source.OfCard printingId,
             Object.zone = dest,
-            Object.tapped = TapState.Untapped,
+            Object.tapped = tapped,
             Object.facing = Facing.FaceUp,
             Object.flipped = False,
             Object.exiledFaceDown = False,
@@ -877,7 +884,7 @@ conjure pid card dest position = do
     then pure Nothing
     else do
       printingId <- State.state (Game.intern (Printing.MkPrinting card))
-      Just <$> State.state (mintCard pid Nothing printingId dest position)
+      Just <$> State.state (mintCard pid Nothing printingId dest position TapState.Untapped)
 
 -- The same keyword action with the BATTLEFIELD as its destination, which is the
 -- one arrival that is an entry: `conjure` above puts the card into a zone and
@@ -889,13 +896,21 @@ conjure pid card dest position = do
 -- the permanent as it would exist on the battlefield", and `siblingsOf` is what
 -- hands each entry loop the others. Marwyn's Kindred's "conjure a card named
 -- Marwyn, the Nurturer and X cards named Llanowar Elves onto the battlefield" is
--- the printed batch; no card in data/cards/ conjures more than one onto the
--- battlefield, so the batch behaviour here is a regression fence rather than a
--- test-backed one.
+-- the printed batch of two DIFFERENT cards, which the opcode still cannot say;
+-- Foundry Groundbreaker's "conjure two cards named Mishra's Foundry onto the
+-- battlefield tapped" is a batch of one card twice over, and Pawl.ConjureSpec
+-- reads its two arrivals. What stays a regression fence is `siblingsOf` itself:
+-- no printing in data/cards/ conjures a batch whose members a CR 614.12
+-- replacement would read each other through.
 --
--- CR 110.5b's defaults throughout: nothing here taps the arrival or puts it into
--- combat, which is what this road's producer prints;
--- Pawl.Types.ConjureDestination names the printings that state otherwise.
+-- CR 110.5b's tapped status is the CALLER's, read off the destination arm the
+-- sentence wrote -- Lam, Storm Crane Elder states none and takes the rule's
+-- untapped default, Foundry Groundbreaker states "tapped". It rides mintCard
+-- rather than a tap after the mint, that function's own note saying why.
+--
+-- CR 508.4's combat state is still this road's default and nothing here puts the
+-- arrival into combat; Pawl.Types.ConjureDestination names the printings that
+-- state otherwise.
 --
 -- CR 110.2a's `Just controller` is correct by construction and unobservable: a
 -- conjured card's OWNER is the player who conjured it (mintCard's `pid`, the
@@ -920,14 +935,14 @@ conjure pid card dest position = do
 -- Inline rather than delegating to a `conjureOntoBattlefieldFor` body, which is
 -- createTokens' reason: the project writes no export lists, so a second
 -- top-level name would be a public door past the check.
-conjureOntoBattlefield :: PlayerId -> Card -> Natural -> Game (Seq.Seq ObjectId)
-conjureOntoBattlefield controller card count = do
+conjureOntoBattlefield :: PlayerId -> Card -> Natural -> TapState.TapState -> Game (Seq.Seq ObjectId)
+conjureOntoBattlefield controller card count tapped = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
     then pure Seq.empty
     else do
       printingId <- State.state (Game.intern (Printing.MkPrinting card))
-      ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue))
+      ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue tapped))
       let siblingsOf oid = Set.delete oid (Set.fromList ids)
       Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
       Monad.mapM_ recordMintedEntry ids
@@ -1223,7 +1238,7 @@ arrivalOf destination = case destination of
 bringIn :: OutsideDestination.OutsideDestination -> PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
 bringIn destination pid printingId gs =
   let (zone, position) = arrivalOf destination
-      (oid, gs1) = mintCard pid Nothing printingId zone position gs
+      (oid, gs1) = mintCard pid Nothing printingId zone position TapState.Untapped gs
       -- One copy, not the entry: CR 100.2a's four-card limit is applied to the
       -- combined deck and sideboard (CR 100.4a), so copies of a card are COUNTED
       -- and a player who set aside two can be brought the second one later.
@@ -1249,7 +1264,7 @@ bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outs
   Nothing -> (Nothing, gs)
   Just entry ->
     let (zone, position) = arrivalOf destination
-        (oid, gs1) = mintCard pid Nothing (OutsideObject.printing entry) zone position gs
+        (oid, gs1) = mintCard pid Nothing (OutsideObject.printing entry) zone position TapState.Untapped gs
      in ( Just oid,
           gs1
             { GameState.outsideObjects = Map.delete outerId (GameState.outsideObjects gs1),
