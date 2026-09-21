@@ -119,6 +119,14 @@ arm targets controller source duration gs = case duration of
     fmap
       (\pid -> Expiry.AtEndOfTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
       (seatOf targets gs ref)
+  -- CR 611.2a: the same seat and the same turn number as the arm above, under an
+  -- arm that also states a BEGINNING. Sampled through seatOf for that arm's
+  -- reasons, and Nothing where the reference names nobody for that arm's reason
+  -- too -- a window that cannot begin stores nothing.
+  Duration.DuringNextTurnOf ref ->
+    fmap
+      (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
+      (seatOf targets gs ref)
   -- BAKED, and stored baked: the condition outlives the resolution that stored
   -- it, and sweepConditional below re-reads it off the effect's
   -- SOURCE, whose bindings never held the resolution's slots. An InSlot left
@@ -208,9 +216,41 @@ follows expiry = case expiry of
   Expiry.While {} -> False
   Expiry.AtTurnOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
+  Expiry.DuringTurnOf _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.WhenPaid _ -> False
   Expiry.WhenUsed -> False
+
+-- CR 611.2a: has this duration's window BEGUN? Every arm but DuringTurnOf states
+-- only an end, so the answer for them is True from the moment the effect is
+-- stored and a sweep is the whole of their life cycle. This one names a turn
+-- that has not started yet, and a reader that asks only whether the row was
+-- swept applies it a turn early.
+--
+-- The reading is dropAtCleanup's, one turn shifted: the window is the first turn
+-- of the named player numbered ABOVE the one the duration began on, so it is
+-- open exactly while that player is active on such a turn. The row is dropped at
+-- that turn's cleanup, so no LATER turn of theirs can be mistaken for it and the
+-- bound needs no upper half.
+--
+-- Not implemented: only Pawl.Engine.CombatRestriction asks this, so a row stored
+-- under DuringTurnOf on any other carrier applies from the moment it is stored
+-- (#3983). A gate this narrow is safe only while Wall of Dust is the
+-- pool's one producer -- see Pawl.Types.Expiry.
+begun :: GameState -> Expiry -> Bool
+begun gs expiry = case expiry of
+  Expiry.DuringTurnOf afterTurn ->
+    AfterTurn.player afterTurn == GameState.activePlayer gs
+      && GameState.turnNumber gs > AfterTurn.turn afterTurn
+  Expiry.AtCleanup -> True
+  Expiry.Never -> True
+  Expiry.Perpetual -> True
+  Expiry.While {} -> True
+  Expiry.AtTurnOf _ -> True
+  Expiry.AtEndOfTurnOf _ -> True
+  Expiry.AtEndOf _ -> True
+  Expiry.WhenPaid _ -> True
+  Expiry.WhenUsed -> True
 
 -- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
 -- step. Delete-and-recompute (design.md 2.5): dropping the stored entry makes
@@ -236,6 +276,15 @@ dropAtCleanup gs =
         -- this cleanup belongs to that player, and its number is above the one
         -- the duration began on, so it is not the duration's own turn.
         Expiry.AtEndOfTurnOf afterTurn ->
+          AfterTurn.player afterTurn /= GameState.activePlayer gs
+            || GameState.turnNumber gs <= AfterTurn.turn afterTurn
+        -- CR 611.2a: "during that player's next turn" ends where the arm above
+        -- ends, off the same pair and by the same reading -- the window it
+        -- states is that one turn, so the cleanup that ends the turn ends it.
+        -- The BEGINNING the arm also states is `begun`'s half and is not asked
+        -- here: a row swept before it ever began is a row whose turn came and
+        -- went, which is the cleanup this arm reaches.
+        Expiry.DuringTurnOf afterTurn ->
           AfterTurn.player afterTurn /= GameState.activePlayer gs
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
         Expiry.AtEndOf _ -> True
@@ -304,6 +353,7 @@ sweepConditional = do
         Expiry.Perpetual -> True
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
+        Expiry.DuringTurnOf _ -> True
         Expiry.AtEndOf _ -> True
         -- CR 116.2c states a price, not a condition, so no board change ends it.
         Expiry.WhenPaid _ -> True
@@ -465,6 +515,12 @@ dropAtTurnOf pid gs =
         Expiry.Perpetual -> True
         Expiry.While {} -> True
         Expiry.AtEndOfTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
+        -- CR 800.4m reaches this arm for the arm above's reason and one more: a
+        -- departed player's turn never begins, so the window never begins either
+        -- and the effect could do nothing for the rest of the game. A player
+        -- still in the game keeps it, and this is the very moment `begun` starts
+        -- answering True for the turn it names.
+        Expiry.DuringTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
         Expiry.AtEndOf _ -> True
         -- CR 116.2c: no turn of anyone's ends it, and CR 800.4m does not reach it
         -- either -- the offer goes away with the departed player's objects rather
@@ -524,6 +580,7 @@ dropAtEndOf ending gs =
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
+        Expiry.DuringTurnOf _ -> True
         -- CR 116.2c: no window of the turn ends it.
         Expiry.WhenPaid _ -> True
         -- No step or phase ending is a use.
@@ -577,6 +634,7 @@ paidExpiries gs =
         Expiry.While {} -> []
         Expiry.AtTurnOf _ -> []
         Expiry.AtEndOfTurnOf _ -> []
+        Expiry.DuringTurnOf _ -> []
         Expiry.AtEndOf _ -> []
         Expiry.WhenUsed -> []
    in concatMap paid (sourcedExpiries gs)
@@ -621,6 +679,7 @@ dropWhenPaidBy oid gs =
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
+        Expiry.DuringTurnOf _ -> True
         Expiry.AtEndOf _ -> True
         Expiry.WhenUsed -> True
       keepEffect x = survives (ContinuousEffect.source x) (ContinuousEffect.expiry x)
@@ -667,5 +726,6 @@ expiresWhenUsed expiry = case expiry of
   Expiry.While {} -> False
   Expiry.AtTurnOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
+  Expiry.DuringTurnOf _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.WhenPaid _ -> False

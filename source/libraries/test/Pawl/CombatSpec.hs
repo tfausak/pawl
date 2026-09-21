@@ -41,6 +41,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -5020,6 +5021,126 @@ escapeBoards s registry = do
   Spec.assertEqWith s "and left the pair nothing" (GameState.attackProhibitions control) []
   pure (early, late, restricted, lateControl, control)
 
+-- CR 611.2a: a duration that names a WINDOW rather than a deadline -- Wall of
+-- Dust's "Whenever this creature blocks a creature, that creature can't attack
+-- during its controller's next turn" (Oracle checked against Scryfall
+-- 2026-09-21), the pool's only printing of such a duration. The row lands in
+-- GameState.attackProhibitions under Expiry.DuringTurnOf and
+-- Pawl.Engine.CombatRestriction.liveAttackProhibitions is the gate that keeps it
+-- inert until that turn.
+--
+-- The window is observable only because a CONTROL CHANGE can put the creature in
+-- a combat the window does not cover: its controller is sampled as the block
+-- happens, and another player's turn comes first. Act of Treason is what makes
+-- that combat happen, and it is the whole reason bob has three Mountains.
+--
+-- THE PAIR: the same attacker, the same declaration and the same block on every
+-- board here, differing only in WHICH wall blocked -- Wall of Dust, or Wall of
+-- Stone, a vanilla 0/8 defender whose block stores nothing. A green leg
+-- therefore cannot come from summoning sickness, from a missing haste or from a
+-- creature that was never offered.
+windowAttackRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+windowAttackRestrictionSpec s registry = Spec.describe s "WindowAttackRestriction" $ do
+  Spec.it s "CR 611.2a the window names alice's next turn, so bob attacks with the creature on his" $ do
+    (giant, treason, blocked) <- wallBoard s registry "Wall of Dust"
+    (openGiant, openTreason, control) <- wallBoard s registry "Wall of Stone"
+    let bobsTurn = stealing treason giant (handoffUntapping blocked)
+        openTurn = stealing openTreason openGiant (handoffUntapping control)
+    Spec.assertEqWith s "the block stored one row, over the creature the Wall blocked" (fmap ActiveAttackProhibition.affected (GameState.attackProhibitions blocked)) [RestrictedCreatures.Named giant]
+    Spec.assertEqWith s "and the pair stored none" (GameState.attackProhibitions control) []
+    -- Not swept, just not begun -- which is the whole claim.
+    Spec.assertEqWith s "the row is still stored on bob's turn" (length (GameState.attackProhibitions bobsTurn)) 1
+    Spec.assertEqWith s "bob controls the Giant and is active" (Projection.controllerOf giant bobsTurn, GameState.activePlayer bobsTurn) (Just S.bob, S.bob)
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(giant, AttackTarget.OfPlayer S.alice)] (declaringAt S.alice bobsTurn)) "CR 611.2a: bob's turn is not the turn the window names, so the Giant may attack"
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(openGiant, AttackTarget.OfPlayer S.alice)] (declaringAt S.alice openTurn)) "as the pair's Giant does"
+    -- Ordered LAST so a card that printed the end-only duration reddens the
+    -- declaration above rather than being absorbed here: alice is the sampled
+    -- seat (CR 108.4 / 110.2, through the blocked creature) and 1 is the turn
+    -- the block happened on.
+    Spec.assertEqWith s "under a window naming alice's turn after turn 1" (fmap ActiveAttackProhibition.expiry (GameState.attackProhibitions blocked)) [Expiry.DuringTurnOf (AfterTurn.MkAfterTurn S.alice 1)]
+  Spec.it s "CR 611.2a and cannot attack once that turn has begun" $ do
+    (giant, _, blocked) <- wallBoard s registry "Wall of Dust"
+    (openGiant, _, control) <- wallBoard s registry "Wall of Stone"
+    let alicesTurn = handoffUntapping (handoffUntapping blocked)
+        openAlices = handoffUntapping (handoffUntapping control)
+    Spec.assertEqWith s "alice is active on turn 3" (GameState.activePlayer alicesTurn, GameState.turnNumber alicesTurn) (S.alice, 3)
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(giant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob alicesTurn))) "the window is open, so the Giant may not attack"
+    Spec.assertBool s (not (Combat.canAttack S.alice giant (declaringAt S.bob alicesTurn))) "and it is off CR 508.1a's candidate list"
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(openGiant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob openAlices)) "the pair: with nothing stored the same Giant attacks"
+  Spec.it s "CR 514.2 the window closes at the end of the turn it named" $ do
+    (giant, _, blocked) <- wallBoard s registry "Wall of Dust"
+    let afterwards = handoffUntapping (handoffUntapping (handoffUntapping blocked))
+        later = handoffUntapping afterwards
+    Spec.assertEqWith s "alice is active again on turn 5" (GameState.activePlayer later, GameState.turnNumber later) (S.alice, 5)
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(giant, AttackTarget.OfPlayer S.bob)] (declaringAt S.bob later)) "the Giant attacks on the turn after the one the window named"
+    -- Ordered BEHIND the declaration above so a sweep that kept the row reddens
+    -- the gameplay assertion rather than being absorbed by a list length.
+    Spec.assertEqWith s "with nothing left stored once that turn's cleanup has run" (GameState.attackProhibitions afterwards) []
+
+-- Turn 1 played through its whole combat phase: alice attacks with a Hill Giant
+-- and bob blocks with `blocker`, whose only job on the Wall of Stone leg is to
+-- be a legal block. The Giant is a 3/3 so it survives Wall of Dust's 1, and the
+-- Wall is a 1/4 so it survives the Giant's 3 -- both boards end combat with
+-- every permanent still on the battlefield.
+--
+-- bob's three Mountains and his Act of Treason are for `stealing` below; they
+-- are on both legs so the two boards differ in one card.
+wallBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+wallBoard s registry blocker = do
+  let bobsSide =
+        (S.battlefield S.bob (S.settled "blocker" blocker : replicate 3 (S.ready (S.permanent "Mountain"))))
+          { S.setupHand = Seq.singleton (S.aliased "treason" (S.cardSetup "Act of Treason"))
+          }
+      setup =
+        S.board
+          (S.battlefield S.alice [S.settled "giant" "Hill Giant"] NonEmpty.:| [bobsSide])
+          S.alice
+          S.beginningOfCombat
+      script =
+        S.turn
+          1
+          [ S.on S.declareAttackers S.alice (S.attack [S.aliasRef "giant"]),
+            S.on S.declareBlockers S.bob (S.block [(S.aliasRef "blocker", S.aliasRef "giant")])
+          ]
+  built <- S.buildBoardOrFail s registry setup
+  (_, after) <- S.runScriptOrFail s script built S.combatGame
+  case (aliasOf "giant" built, aliasOf "treason" built) of
+    (Just giant, Just treason) -> pure (giant, treason, after)
+    _ -> Spec.assertFailure s "the board omitted an alias"
+
+aliasOf :: String -> S.BuiltBoard -> Maybe ObjectId.ObjectId
+aliasOf name built = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
+
+-- bob's Act of Treason, cast from his hand in his own precombat main phase and
+-- resolved with its one target slot aimed at the Giant: he gains control of it
+-- until end of turn, untaps it and gives it haste, which is what lets it attack
+-- on a turn that is not its owner's.
+stealing :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+stealing treason giant gs =
+  let board = gs {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+   in S.runPure (namingTarget giant) board (S.cast S.bob treason >> Stack.resolveTop)
+
+-- CR 514.2, then the seat walk, then CR 502.3: this turn's cleanup sweep, the
+-- next seat's turn, and that turn's untap step. The untap is what `handoff` above
+-- leaves owed and every case here needs: a creature that attacked on turn 1 is
+-- tapped (CR 508.1f), and a tapped creature is off CR 508.1a's candidate list
+-- for a reason that has nothing to do with the row under test.
+handoffUntapping :: GameState.GameState -> GameState.GameState
+handoffUntapping gs =
+  S.runPure
+    S.identityAnswer
+    (Expiry.dropAtCleanup gs)
+    (Engine.handoffTurn >> Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+
+-- The active player's declare attackers step with `defending` as the one
+-- defending player, stated rather than derived for `declaringAttackers`' reason.
+declaringAt :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+declaringAt defending gs =
+  gs
+    { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [defending]}
+    }
+
 -- Bob's turn at its beginning of combat step, with the combat phase's steps
 -- ahead of it: `handoff` leaves the board at his untap step, and S.runCombat
 -- runs only while inside the combat phase. S.threePlayerCombat's shape.
@@ -5151,6 +5272,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   storedBlockRestrictionSpec s registry
   storedAttackRestrictionSpec s registry
   storedClassAttackRestrictionSpec s registry
+  windowAttackRestrictionSpec s registry
   suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
   defendingPlayerRestrictionSpec s registry

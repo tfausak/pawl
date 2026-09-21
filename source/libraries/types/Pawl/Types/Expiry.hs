@@ -46,6 +46,20 @@ data Expiry
     -- sweep ends this at the first turn of theirs numbered above it, so their
     -- current turn is not mistaken for their next one.
     AtEndOfTurnOf AfterTurn.AfterTurn
+  | -- | CR 611.2a: "during that player's next turn" -- a WINDOW rather than a
+    -- deadline. Ends where AtEndOfTurnOf above ends, off the same
+    -- Pawl.Types.AfterTurn and by the same reading, and BEGINS where AtTurnOf
+    -- ends: the effect does nothing until that turn is under way.
+    --
+    -- The one arm whose stored row is inert for part of its life, which is why
+    -- Pawl.Engine.Expiry.begun exists beside the sweeps -- a reader that asks
+    -- only "has this ended" sees this row from the moment it is stored and
+    -- applies it a turn early.
+    --
+    -- Not implemented: every carrier but GameState.attackProhibitions reads its
+    -- rows without asking `begun`, so one stored under this arm applies from the
+    -- moment it is stored (#3983). Wall of Dust is the only producer in the pool.
+    DuringTurnOf AfterTurn.AfterTurn
   | -- | CR 500.5: effects lasting until the end of a step or phase expire as it
     -- ends. A Pawl.Types.PhaseSelector because CR 500.5 names both grains and
     -- that type spans both.

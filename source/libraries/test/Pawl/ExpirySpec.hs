@@ -289,6 +289,61 @@ endOfNextTurnSpec s = Spec.describe s "DropAtEndOfTurnOf" $ do
     Spec.assertEqWith s "carol takes the turn, not bob" (GameState.activePlayer after) S.carol
     Spec.assertEqWith s "bob's effect ended at bob's seat" (GameState.continuousEffects after) []
 
+-- CR 611.2a's WINDOW, the one arm that states a beginning as well as an end. It
+-- ends exactly where DropAtEndOfTurnOf above ends -- same pair, same reading --
+-- so every case here is about the half no sweep can answer: Pawl.Engine.Expiry.begun,
+-- which is False for the whole stretch between the arming and the turn the pair
+-- names. A reader that asks only whether the row was swept sees it from the
+-- moment it is stored, and Pawl.CombatSpec's WindowAttackRestriction group is
+-- where that is observable at the gameplay level.
+windowSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+windowSpec s = Spec.describe s "DuringTurnOf" $ do
+  Spec.it s "CR 611.2a the window is shut on the arming turn and on every turn before the one it names" $ do
+    let gs0 = S.threePlayerGame
+        window = Expiry.Type.DuringTurnOf (AfterTurn.MkAfterTurn S.alice 1)
+        armed = effectWith window gs0
+        bobsTurn = handoff (Expiry.dropAtCleanup armed)
+        carolsTurn = handoff (Expiry.dropAtCleanup bobsTurn)
+        alicesNext = handoff (Expiry.dropAtCleanup carolsTurn)
+    Spec.assertEqWith s "alice is active on turn 1, the turn it was armed on" (GameState.activePlayer armed, GameState.turnNumber armed) (S.alice, 1)
+    Spec.assertBool s (not (Expiry.begun armed window)) "alice's own turn 1 is not the turn it names"
+    Spec.assertEqWith s "bob is active on turn 2" (GameState.activePlayer bobsTurn, GameState.turnNumber bobsTurn) (S.bob, 2)
+    Spec.assertBool s (not (Expiry.begun bobsTurn window)) "nor is bob's"
+    Spec.assertEqWith s "carol is active on turn 3" (GameState.activePlayer carolsTurn, GameState.turnNumber carolsTurn) (S.carol, 3)
+    Spec.assertBool s (not (Expiry.begun carolsTurn window)) "nor carol's"
+    Spec.assertEqWith s "alice is active again on turn 4" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 4)
+    Spec.assertBool s (Expiry.begun alicesNext window) "and the window is open on alice's next turn"
+    -- Which is the point of the arm: the row was there for all four turns and
+    -- only the last one may read it.
+    Spec.assertEqWith s "the row survived every cleanup in between" (length (GameState.continuousEffects alicesNext)) 1
+  Spec.it s "CR 514.2 the window closes at the cleanup of the turn it named" $ do
+    let gs0 = Setup.emptyGame S.bothPlayers
+        window = Expiry.Type.DuringTurnOf (AfterTurn.MkAfterTurn S.alice 1)
+        armed = effectWith window gs0
+        alicesNext = handoff (handoff (Expiry.dropAtCleanup armed))
+        ended = Expiry.dropAtCleanup alicesNext
+    Spec.assertEqWith s "alice is active again on turn 3" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 3)
+    Spec.assertBool s (Expiry.begun alicesNext window) "the window is open while that turn runs"
+    Spec.assertEqWith s "and the row is gone once its cleanup has run" (GameState.continuousEffects ended) []
+  -- Where the turn handoff leaves an AtEndOfTurnOf row alone, it ends this one
+  -- for the same reason it ends that one at a departed seat: a turn that never
+  -- begins is a window that never opens.
+  Spec.it s "CR 800.4m a departed seat's window ends at the point their turn would have begun" $ do
+    let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
+        window = Expiry.Type.DuringTurnOf (AfterTurn.MkAfterTurn S.bob 1)
+        armed = effectWith window gone
+        after = handoff armed
+    Spec.assertEqWith s "it survived bob's departure itself" (length (GameState.continuousEffects armed)) 1
+    Spec.assertEqWith s "carol takes the turn, not bob" (GameState.activePlayer after) S.carol
+    Spec.assertEqWith s "and bob's window ended at bob's seat" (GameState.continuousEffects after) []
+  Spec.it s "CR 611.2a a seat still in the game keeps their window as their turn begins" $ do
+    let window = Expiry.Type.DuringTurnOf (AfterTurn.MkAfterTurn S.bob 1)
+        armed = effectWith window S.threePlayerGame
+        bobsTurn = handoff armed
+    Spec.assertEqWith s "bob is active" (GameState.activePlayer bobsTurn) S.bob
+    Spec.assertEqWith s "and the sweep that ends an AtTurnOf row keeps this one" (length (GameState.continuousEffects bobsTurn)) 1
+    Spec.assertBool s (Expiry.begun bobsTurn window) "with its window now open"
+
 cleanupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cleanupSpec s registry = Spec.describe s "DropAtCleanup" $ do
   Spec.it s "CR 514.2 cleanup drops an AtCleanup continuous effect and keeps a Never one" $ do
@@ -1887,6 +1942,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   garlandSpec s registry
   hagSpec s registry
   endOfNextTurnSpec s
+  windowSpec s
   soulfireSpec s registry
   suspendAggressionSpec s registry
   dovinSpec s registry

@@ -83,6 +83,20 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
             }
       )
       " {\"type\":\"AtEndOfTurnOf\",\"value\":{\"player\":1,\"turn\":3}} "
+  -- CR 611.2a: the arm above's pair under an arm that also states a BEGINNING,
+  -- so the wire format is the same pair under its own tag -- which is what a
+  -- delayed trigger's stored duration has to survive.
+  Spec.it s "DuringTurnOf carries its player and turn" $
+    Common.assertCodec
+      s
+      Expiry.codec
+      ( Expiry.DuringTurnOf
+          AfterTurn.MkAfterTurn
+            { AfterTurn.player = PlayerId.MkPlayerId 1,
+              AfterTurn.turn = 3
+            }
+      )
+      " {\"type\":\"DuringTurnOf\",\"value\":{\"player\":1,\"turn\":3}} "
   -- CR 500.5, carrying the PhaseSelector window. Both grains -- a stepless
   -- phase and a step -- because Pawl.Engine.Expiry.dropAtEndOf tells them apart
   -- by EQUALITY, so a codec that collapsed them would let the end of a combat

@@ -70,6 +70,14 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       (Duration.UntilEndOfNextTurnOf (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "exiled"))))
       " {\"type\":\"UntilEndOfNextTurnOf\",\"value\":{\"type\":\"ControllerOfBound\",\"value\":\"exiled\"}} "
+  -- CR 611.2a: the WINDOW, carrying the reference its seat is sampled from (Wall
+  -- of Dust's "its controller's next turn").
+  Spec.it s "DuringNextTurnOf carries its reference" $
+    Common.assertCodec
+      s
+      Duration.codec
+      (Duration.DuringNextTurnOf (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "thatAttacker"))))
+      " {\"type\":\"DuringNextTurnOf\",\"value\":{\"type\":\"ControllerOfBound\",\"value\":\"thatAttacker\"}} "
   -- CR 611.2b, carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
     Common.assertCodec
