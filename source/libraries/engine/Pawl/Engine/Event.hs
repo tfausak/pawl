@@ -99,6 +99,9 @@ import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DiceRoll as DiceRoll
+import qualified Pawl.Types.DieRollR as DieRollR
+import qualified Pawl.Types.DieRollRewrite as DieRollRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.DrawCountR as DrawCountR
@@ -1696,6 +1699,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.DrawCountR {} -> False
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
+  ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
@@ -3595,6 +3599,32 @@ apply batch candidate event =
         pure (Just (ProposedEvent.WouldFlipCoin pid (n * 2)))
     -- Unreachable: `applies` admits CoinFlipR only against WouldFlipCoin.
     (ReplacementEffect.CoinFlipR {}, _) -> pure (Just event)
+    -- CR 706.1 / 614.1a: Pixie Guide's "instead roll that many dice plus one and
+    -- ignore the lowest roll". The event is left STANDING with one more die and
+    -- one more ignore rather than cancelled, the CoinFlipR arm above for its
+    -- reason: CR 616.2's next iteration re-collects against it, so a second such
+    -- row adds a second die and a second ignore -- and CR 614.5 is what keeps
+    -- THIS row off the modified event it just made.
+    --
+    -- WHICH roll is ignored is not decided here. The rewrite says how many dice
+    -- the instruction throws and how many of the lowest go, and Resolve's
+    -- Effect.RollDie arm throws them all before Pawl.Engine.Dice.ignoreLowest
+    -- takes any -- the order CR 706.6 requires, since the lowest roll is not
+    -- known until every die has come up.
+    (ReplacementEffect.DieRollR (DieRollR.MkDieRollR _ rewrite), ProposedEvent.WouldRollDice roll) -> case rewrite of
+      DieRollRewrite.ExtraIgnoringLowest -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure
+          ( Just
+              ( ProposedEvent.WouldRollDice
+                  roll
+                    { DiceRoll.dice = DiceRoll.dice roll + 1,
+                      DiceRoll.ignored = DiceRoll.ignored roll + 1
+                    }
+              )
+          )
+    -- Unreachable: `applies` admits DieRollR only against WouldRollDice.
+    (ReplacementEffect.DieRollR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
@@ -4564,6 +4594,38 @@ flipOneCoin mFlipper stated = do
         gs <- State.get
         Game.choose (Prompt.ChooseCoinResult (Decide.deciderFor pid gs) pid (first NonEmpty.:| rest))
   pure (Maybe.fromMaybe actual (Coin.statedFace stated), any StatedFlip.wins stated)
+
+-- CR 706.1's instruction to roll dice, as a replaceable event. The ONE road every
+-- roll in the engine takes: Pawl.Engine.Resolve's Effect.RollDie arm calls it once
+-- per instruction, before the first die, and nothing else rolls -- no cost and no
+-- turn-based action names a roll.
+--
+-- HERE rather than in Pawl.Engine.Dice, `flipOneCoin` above and for its reason:
+-- the roll is a replaceable event, CR 614's loop lives in this module, and this
+-- module is on the importing side of that edge.
+--
+-- Takes the count the INSTRUCTION named and answers what to actually do: how many
+-- dice to throw, and how many of the lowest rolls CR 706.6 then ignores. Both
+-- numbers rather than the count alone, because a row that adds a die adds an
+-- ignore with it and the caller cannot recover which from the count -- see
+-- Pawl.Types.DiceRoll.
+--
+-- A count of ZERO raises nothing: rule 706.1's "one or more dice" is not met by an
+-- instruction that rolls none, so there is no event to replace and no row gets its
+-- CR 614.5 opportunity. (CR 107.2's posture upstream is what produces that count.)
+--
+-- A cancelled event is unreachable -- no arm of Pawl.Types.DieRollRewrite replaces
+-- the roll with nothing -- so the fallback is defensive, and in the direction rule
+-- 706.1 leaves standing: the instruction's own dice, none of them ignored.
+proposeDiceRoll :: PlayerId -> Natural -> Game (Natural, Natural)
+proposeDiceRoll pid named =
+  if named == 0
+    then pure (0, 0)
+    else do
+      let proposed = DiceRoll.MkDiceRoll {DiceRoll.roller = pid, DiceRoll.dice = named, DiceRoll.ignored = 0}
+      outcome <- applyReplacements (ProposedEvent.WouldRollDice proposed)
+      let roll = Maybe.fromMaybe proposed (outcome >>= Replacement.asDiceRoll)
+      pure (DiceRoll.dice roll, DiceRoll.ignored roll)
 
 -- CR 705.2's win/lose flip, whole: the call, the flip, the comparison and the CR
 -- 705.1 event. The ONE road for the kind of flip a player wins or loses --

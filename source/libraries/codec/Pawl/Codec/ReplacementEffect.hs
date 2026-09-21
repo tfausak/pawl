@@ -5,6 +5,7 @@ import qualified Pawl.Codec.CoinFlipR as CoinFlipR
 import qualified Pawl.Codec.CounterR as CounterR
 import qualified Pawl.Codec.DamageR as DamageR
 import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Codec.DieRollR as DieRollR
 import qualified Pawl.Codec.DrawCountR as DrawCountR
 import qualified Pawl.Codec.DrawR as DrawR
 import qualified Pawl.Codec.EntryR as EntryR
@@ -50,6 +51,7 @@ codec cardCodec abilityCodec effectCodec =
       Arm.payload "DrawCountR" DrawCountR.codec ReplacementEffect.DrawCountR (\x -> case x of ReplacementEffect.DrawCountR y -> Just y; _ -> Nothing),
       Arm.payload "MillCountR" MillCountR.codec ReplacementEffect.MillCountR (\x -> case x of ReplacementEffect.MillCountR y -> Just y; _ -> Nothing),
       Arm.payload "CoinFlipR" CoinFlipR.codec ReplacementEffect.CoinFlipR (\x -> case x of ReplacementEffect.CoinFlipR y -> Just y; _ -> Nothing),
+      Arm.payload "DieRollR" DieRollR.codec ReplacementEffect.DieRollR (\x -> case x of ReplacementEffect.DieRollR y -> Just y; _ -> Nothing),
       Arm.payload "PhaseR" PhasePattern.codec ReplacementEffect.PhaseR (\x -> case x of ReplacementEffect.PhaseR y -> Just y; _ -> Nothing)
     ]
 
@@ -69,4 +71,5 @@ tagOf x = case x of
   ReplacementEffect.DrawCountR {} -> "DrawCountR"
   ReplacementEffect.MillCountR {} -> "MillCountR"
   ReplacementEffect.CoinFlipR {} -> "CoinFlipR"
+  ReplacementEffect.DieRollR {} -> "DieRollR"
   ReplacementEffect.PhaseR {} -> "PhaseR"

@@ -45,9 +45,16 @@ import qualified Pawl.Types.SlotName as SlotName
 -- rather than left to the card to re-derive, FlipCoin's `misses` and for its
 -- reason. Nothing for every roll that reads one result.
 --
+-- CR 706.6's ignored roll is not a field here YET: the count of ignored rolls
+-- rides Pawl.Types.DiceRoll, where a replacement over the roll can change it,
+-- and the only printings of the word in data\/cards\/ are such replacements
+-- (Pawl.Types.DieRollRewrite, Pixie Guide). An instruction that prints the
+-- ignore itself -- Berserker's Frenzy, "roll two d20 and ignore the lower roll"
+-- -- would seed this record's count instead of leaving it at zero. The field
+-- appears when that card does.
+--
 -- Not implemented: the readings that take the results as a SET rather than one
--- at a time -- CR 706.5's doubles and a total (#3243) -- and CR 706.6's ignored
--- roll (#2083).
+-- at a time -- CR 706.5's doubles and a total (#3243).
 --
 -- CR 706.3's results table is NOT a field here and never will be: a striation
 -- is a Pawl.Types.Clause of the same mode whose `condition` compares this slot

@@ -4,6 +4,7 @@ import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DieRollR as DieRollR
 import qualified Pawl.Types.DrawCountR as DrawCountR
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.EntryR as EntryR
@@ -180,5 +181,15 @@ data ReplacementEffect card ability effect
     -- Carries no pattern beyond CR 109.5's relation, for LifeGainR's reason --
     -- see Pawl.Types.CoinFlipR.
     CoinFlipR CoinFlipR.CoinFlipR
+  | -- | CR 706.1 / 614.1a: "if you would roll one or more dice, instead roll that
+    -- many dice plus one and ignore the lowest roll" (Pixie Guide). Its own arm
+    -- beside CoinFlipR because rule 706's roll and rule 705's flip are two event
+    -- classes with two vocabularies: a roll has a die SIZE and a COUNT the
+    -- instruction names and no call and no winner, and a row watching one can say
+    -- nothing about the other.
+    --
+    -- Carries no pattern beyond CR 109.5's relation, for CoinFlipR's reason --
+    -- see Pawl.Types.DieRollR.
+    DieRollR DieRollR.DieRollR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

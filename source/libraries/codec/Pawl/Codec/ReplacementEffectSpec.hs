@@ -23,6 +23,8 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DieRollR as DieRollR
+import qualified Pawl.Types.DieRollRewrite as DieRollRewrite
 import qualified Pawl.Types.DrawCountR as DrawCountR
 import qualified Pawl.Types.DrawCountRewrite as DrawCountRewrite
 import qualified Pawl.Types.DrawR as DrawR
@@ -227,6 +229,13 @@ spec s =
             codec
             (ReplacementEffect.CoinFlipR (CoinFlipR.MkCoinFlipR ControllerRelation.Yours CoinFlipRewrite.Doubled))
             " {\"type\":\"CoinFlipR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Doubled\"}}} "
+        -- CR 706.6: Pixie Guide, the one DieRollR producer.
+        Spec.it s "DieRollR (Pixie Guide)" $
+          Common.assertCodec
+            s
+            codec
+            (ReplacementEffect.DieRollR (DieRollR.MkDieRollR ControllerRelation.Yours DieRollRewrite.ExtraIgnoringLowest))
+            " {\"type\":\"DieRollR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"ExtraIgnoringLowest\"}}} "
         -- A fixed kind, a real filter, and CR 614.16's AddMore.
         Spec.it s "CounterR (Hardened Scales)" $
           Common.assertCodec

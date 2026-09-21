@@ -1160,6 +1160,9 @@ rewriteReplacementEffect pairs effect = case effect of
   -- CR 614.1a / 705.1: a CoinFlipR is one CR 109.5 relation and one nullary
   -- rewrite. LifeGainR's answer, and for its reason.
   ReplacementEffect.CoinFlipR {} -> effect
+  -- CR 614.1a / 706.1: a DieRollR is one CR 109.5 relation and one nullary
+  -- rewrite, so CR 612.1's text change has nothing to walk into.
+  ReplacementEffect.DieRollR {} -> effect
   -- A DrawR's pattern is one CR 109.5 relation, but the REWRITE can hold CR 400.11c's
   -- wish filter, which rewriteEffect's own Effect.FromOutsideTheGame arm swaps on
   -- the resolution road -- so it has to be swapped here too, or the same sentence

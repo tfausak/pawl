@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Detain as Detain
+import qualified Pawl.Engine.Dice as Dice
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Earthbend as Earthbend
 import qualified Pawl.Engine.Event as Event
@@ -1601,6 +1602,7 @@ referentsOfReplacement re = case re of
   ReplacementEffect.DrawCountR _ -> []
   ReplacementEffect.MillCountR _ -> []
   ReplacementEffect.CoinFlipR _ -> []
+  ReplacementEffect.DieRollR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The recipients a damage REWRITE bakes, which is CR 614.9's redirect destination
@@ -3536,12 +3538,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.RollDie rollDie -> do
     before <- State.get
     let sides = RollDie.sides rollDie
-        -- How many dice the instruction throws, read ONCE before the first of
-        -- them, FlipCoin's count below and for its reason: the number is part of
-        -- the instruction, and re-reading it per die would let a count over the
-        -- board throw a different number than the instruction named. CR 107.2's
+        -- How many dice the instruction NAMES -- what a CR 614.1a row is then
+        -- offered below, and not necessarily how many are thrown. Read ONCE
+        -- before the first of them, FlipCoin's count below and for its reason:
+        -- the number is part of the instruction, and re-reading it per die would
+        -- let a count over the board throw a different number than the
+        -- instruction named. CR 107.2's
         -- posture for a quantity that cannot be evaluated: no dice at all.
-        dice =
+        named =
           Integer.toNaturalSaturating
             ( Maybe.fromMaybe
                 0
@@ -3568,7 +3572,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
               natural = if rolled >= 1 && rolled <= sides then rolled else 1
           pure (Integer.toNaturalSaturating (toInteger natural + modifier))
-    results <- traverse (const rollOne) [1 .. dice]
+    -- CR 614.1a over CR 706.1: the instruction's count is offered to the
+    -- replacement effects watching this roller's rolls (Pixie Guide) before the
+    -- first die is thrown, and what comes back is how many dice to throw and how
+    -- many of the lowest rolls CR 706.6 then ignores.
+    (dice, ignored) <- Event.proposeDiceRoll controller named
+    -- CR 706.6: every die is thrown and every face asked for -- an ignored roll
+    -- HAPPENED and is only then treated as never having happened -- so the ignore
+    -- runs on the results and not on the count -- and could not run any earlier
+    -- in any case, the lowest roll not being known until every die has come up.
+    thrown <- traverse (const rollOne) [1 .. dice]
+    let results = Dice.ignoreLowest ignored thrown
     Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
       gs <- State.get
       -- CR 706.4: WHICH result the instruction uses, where it threw more than
