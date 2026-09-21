@@ -1,5 +1,7 @@
 module Pawl.Types.ConjureDestination where
 
+import qualified Pawl.Types.TapState as TapState
+
 -- | Where an Alchemy conjure puts the card it creates.
 --
 -- Conjure is a DIGITAL-ONLY keyword action and is in no rule of the CR --
@@ -60,10 +62,27 @@ data ConjureDestination
     -- trigger scan, so Pawl.Engine.Event.conjureOntoBattlefield is a road of its
     -- own rather than another argument to Pawl.Engine.Event.conjure.
     --
-    -- Not implemented: a STATED status. The arrival is untapped and out of
-    -- combat, which is CR 110.5b's default and what this arm\'s producer prints,
-    -- but several printings state otherwise and this arm cannot carry it --
-    -- Thendar, the Overminer\'s "onto the battlefield tapped" and Kari Zev, Crew
-    -- of Two\'s "onto the battlefield tapped and attacking" (#2638).
-    Battlefield
-  deriving (Bounded, Enum, Eq, Ord, Show)
+    -- The 'Pawl.Types.TapState.TapState' is CR 110.5b's status, STATED by the
+    -- effect rather than carried by the arriving card -- Foundry
+    -- Groundbreaker\'s "conjure two cards named Mishra\'s Foundry onto the
+    -- battlefield tapped" and Thendar, the Overminer\'s "onto the battlefield
+    -- tapped". CR 110.5b\'s untapped is the default, which Lam prints and the
+    -- codec elides.
+    --
+    -- On the ARM rather than beside 'Pawl.Types.Conjure.destination', which is
+    -- what makes a conjure into a hand, a library or a graveyard unable to state
+    -- one: CR 110.5d gives a card outside the battlefield no status at all, so a
+    -- field there would be a key three of the four destinations could write and
+    -- nothing could read. 'Pawl.Types.EntryRiders.EntryRiders', what the other
+    -- three entry doors carry, is not what this arm holds: beyond the status and
+    -- the combat state below, its riders are counters, two kinds of
+    -- face-downness, transformation, attachment, blocking and CR 110.2a\'s
+    -- controller, and no printed conjure states one.
+    --
+    -- Not implemented: CR 508.4\'s combat state, which two printings state
+    -- beside the status -- Stormforged Armor\'s equipped creature "conjure a card
+    -- named Ball Lightning onto the battlefield tapped and attacking", and Kari
+    -- Zev, Crew of Two\'s same sentence, whose rider then names the conjured card
+    -- and so wants a slot this opcode does not bind either (#2638).
+    Battlefield TapState.TapState
+  deriving (Eq, Ord, Show)

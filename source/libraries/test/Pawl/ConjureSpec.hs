@@ -14,7 +14,9 @@
 -- casts a noncreature spell under a printed Lam, Storm Crane Elder; the seventh
 -- activates a printed Tome of the Infinite, whose card file writes a printed
 -- SPELLBOOK rather than one card; the eighth casts a printed Follow the Tracks,
--- the same spellbook shape with the other question asked of it.
+-- the same spellbook shape with the other question asked of it; the ninth enters
+-- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
+-- take.
 --
 -- The first four CAST what the conjure created, which is the point -- conjure
 -- creates a CARD and not CR 111.1's token, and a token in a hand, a library or a
@@ -32,6 +34,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -85,6 +88,9 @@ thinkTwice = CardName.MkCardName (Text.pack "Think Twice")
 
 monasteryMentor :: CardName.CardName
 monasteryMentor = CardName.MkCardName (Text.pack "Monastery Mentor")
+
+mishrasFoundry :: CardName.CardName
+mishrasFoundry = CardName.MkCardName (Text.pack "Mishra's Foundry")
 
 islandName :: CardName.CardName
 islandName = CardName.MkCardName (Text.pack "Island")
@@ -344,6 +350,50 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "and it reached no other zone of alice's"
       (length (namedIn monasteryMentor Zone.Hand final), length (namedIn monasteryMentor Zone.Graveyard final))
       (0, 0)
+  -- Foundry Groundbreaker ({3}{G} Creature -- Human Artificer, 3/4, "When
+  -- Foundry Groundbreaker enters, sacrifice a land. Then conjure two cards named
+  -- Mishra's Foundry onto the battlefield tapped."), Oracle text verified on
+  -- Scryfall 2026-09-21. The same entry the Lam case drives, with the one thing
+  -- that arm could not say until now: CR 110.5b's status, STATED by the sentence.
+  --
+  -- The gameplay assertion is the mana, not the flag. A land is tapped for mana
+  -- (CR 605.1a), so two Foundries that arrived untapped would be two more
+  -- Action.ActivateManaAbility offers in alice's menu; the surviving Island is
+  -- what says the menu is read at all and that the board is one where a land CAN
+  -- be tapped. The status read off the objects is beside it rather than instead
+  -- of it.
+  --
+  -- TWO conjured, which is the count and the status together: a batch is minted
+  -- whole before any member enters, so a status applied to the arrival rather
+  -- than to the mint could reach one of them and not the other.
+  --
+  -- The sacrifice is the rest of the printed trigger, and alice is left one
+  -- Island of the two: an effect list that stopped at the conjure would leave
+  -- both.
+  Spec.it s "CR 110.5b a conjure that states tapped puts the card onto the battlefield tapped" $ do
+    islandPrinting <- S.printingOf s registry "Island"
+    groundbreaker <- S.printingOf s registry "Foundry Groundbreaker"
+    let board0 = S.landsInPlay islandPrinting 2
+        (_, entered) = S.entersWithTrigger groundbreaker S.alice board0
+        final = (settleTriggers entered) {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain}
+        foundries = namedIn mishrasFoundry Zone.Battlefield final
+        islands = namedIn islandName Zone.Battlefield final
+        manaOffers = Maybe.mapMaybe manaSource (Action.legalActions S.alice final)
+    Spec.assertEqWith
+      s
+      "CR 605.1a neither conjured Mishra's Foundry can be tapped for mana, where the Island alice kept can"
+      (filter (`elem` foundries) manaOffers, filter (`elem` islands) manaOffers)
+      ([], islands)
+    Spec.assertEqWith
+      s
+      "both of them arrived tapped"
+      (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid final)) foundries)
+      [Just TapState.Tapped, Just TapState.Tapped]
+    Spec.assertEqWith
+      s
+      "the trigger's own sacrifice ran, so one of alice's two Islands is gone"
+      (length islands)
+      1
   -- Tome of the Infinite ({2}{U} Legendary Artifact -- Book, "{U}, {T}: Conjure
   -- a random card from Tome of the Infinite's spellbook into your hand."), the
   -- printed SPELLBOOK: ten candidates in the card file and one pick over them.
@@ -478,6 +528,13 @@ activationOf :: ObjectId.ObjectId -> Action.Action -> Bool
 activationOf oid action = case action of
   Action.Activate o _ -> o == oid
   _ -> False
+
+-- The object a mana activation names, which `manaActivation` below only asks
+-- the existence of: the tapped case reads WHICH permanents alice may tap.
+manaSource :: Action.Action -> Maybe ObjectId.ObjectId
+manaSource action = case action of
+  Action.ActivateManaAbility oid -> Just oid
+  _ -> Nothing
 
 manaActivation :: Action.Action -> Bool
 manaActivation action = case action of

@@ -5650,7 +5650,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- 614.12 entry loop from. Nothing in data/cards/ states a count
             -- above one over a spellbook, so which reading this is stays a
             -- regression fence (#3648).
-            ConjureDestination.Battlefield -> pick >>= \card -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n))
+            -- CR 110.5b's status is the arm's own payload, stated by the
+            -- sentence rather than defaulted here (Foundry Groundbreaker's
+            -- "onto the battlefield tapped"), and it reaches the mint rather
+            -- than a tap afterwards: a permanent that arrived untapped and was
+            -- tapped after would have been read untapped by its own CR 616.1
+            -- loop and by every CR 603.6a watcher of the entry.
+            ConjureDestination.Battlefield tapped -> pick >>= \card -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n) tapped)
       _ -> pure ()
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry mSlot exceptions) -> do
     gs <- State.get
