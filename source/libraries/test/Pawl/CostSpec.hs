@@ -2636,10 +2636,11 @@ payAnswers = filter (\r -> case r of Response.ChoseToPay _ -> True; _ -> False)
 -- reduced by {2}" -- the one card in the pool whose resolution cost is DESCRIBED
 -- in terms of another object rather than printed (Pawl.Types.CostBasis).
 --
--- Flash {1}{U} Instant. api.scryfall.com is unreachable from this environment,
--- so this card's text is NOT checked against Scryfall the way the rest of the
--- pool's is. Its whole printed text is those two sentences, so nothing else on
--- the card can be what these assertions read.
+-- Flash {1}{U} Instant (name, cost, type line and Oracle text confirmed by the
+-- repository's owner during this unit's review; api.scryfall.com is unreachable
+-- from this environment, so this one card is not checked against the API the way
+-- the rest of the pool is). Its whole printed text is those two sentences, so
+-- nothing else on the card can be what these assertions read.
 --
 -- Hill Giant {3}{R} is the put creature everywhere but the copy leg, and its
 -- cost is what makes the board discriminating: reduced by {2} it is {1}{R}, so
