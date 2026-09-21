@@ -103,10 +103,9 @@ data ObjectRef
     -- this position more than one card deep. A card naming "the top two cards of
     -- your graveyard" would want the depth the library arm above carries.
     --
-    -- Not implemented: a card that TESTS the top card rather than acting on it
-    -- unconditionally -- Guiding Spirit's "if the top card of target player's
-    -- graveyard is a creature card" -- which wants a Condition that can name this
-    -- position, not another field here (gap #3318).
+    -- TESTING that card without acting on it is Pawl.Types.Scope.TopOfGraveyard,
+    -- the same position read from inside a Condition -- Guiding Spirit prints
+    -- both halves and is what proves the pair agree.
     TopOfGraveyard PlayerRef.PlayerRef
   | -- | CR 608.2d / Port of Karfell: a card in a graveyard matching the Filter,
     -- chosen as the effect runs rather than targeted (CR 115.1).

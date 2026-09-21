@@ -141,6 +141,25 @@ evaluate viewOf quantityOf context gs count =
           let ids = Set.toList (Map.findWithDefault Set.empty slot (Filter.slotObjects context))
               kept = Maybe.mapMaybe (\oid -> if findableAfterMove gs oid then fmap ((,) (Just oid)) (keep predicate context (viewOf oid)) else Nothing) ids
            in aggregate quantityOf aggregation kept
+        -- CR 404.1: one card per named graveyard rather than the whole pile --
+        -- the LAST member, which is the newest arrival (Game.insertIntoZone
+        -- appends a graveyard arrival). The zone arm above with the candidates
+        -- narrowed by POSITION before the Filter is asked, which is the order
+        -- Guiding Spirit's "if the top card of target player's graveyard is a
+        -- creature card" reads in; asking the Filter over the whole zone instead
+        -- answers a different question.
+        --
+        -- No APNAP ordering here where Pawl.Engine.Resolve.Slots' ObjectRef arm
+        -- takes care to keep it: that one hands an ordered instruction list to an
+        -- opcode, while this fold's Aggregations are all order-insensitive.
+        --
+        -- Candidates are LIVE objects in a PUBLIC zone (CR 400.2, CR 404.2), so
+        -- the injected ViewOf answers them exactly as it answers the zone arm's.
+        Scope.TopOfGraveyard ref -> do
+          pids <- playersFor viewOf context gs ref
+          let ids = Maybe.mapMaybe (\pid -> Maybe.listToMaybe (reverse (Game.zoneMembers Zone.Graveyard pid gs))) pids
+              kept = Maybe.mapMaybe (\oid -> fmap ((,) (Just oid)) (keep predicate context (viewOf oid))) ids
+          aggregate quantityOf aggregation kept
 
 -- CR 400.7j / CR 400.2: may a later part of the effect that moved this object
 -- FIND it? Where it landed in a public zone, which is what Game.isHiddenZone
