@@ -3,15 +3,11 @@
 -- that can be pinned on a hand-built board belongs in the spec for the
 -- subsystem that owns it -- what is here is only what needs a WHOLE game,
 -- because the claim is about the turn loop, the SBA sweep and the departure
--- gate agreeing with each other over hundreds of turns.
+-- gate agreeing from setup through the game's end.
 --
--- Every case runs at least one full game, so this module holds the suite's two
--- slowest cases by an order of magnitude: 25.8s and 13.9s, measured 2026-09-05
--- unloaded on aarch64-darwin, against about 4s for the slowest case anywhere
--- else. They are why the suite's own --timeout is set where it is: every case
--- here depends on a game ENDING, and a driver that fails to terminate hangs the
--- suite rather than failing it, so the figure has to leave these room on a
--- runner roughly half this machine's speed (#3284).
+-- The fixtures are deliberately short. The whole-game shape is load-bearing;
+-- a 60-card game is not, and made these correctness cases depend on CI speed
+-- (#3284). Full-length workloads belong in Pawl.Benchmark.
 --
 -- These are deterministic on purpose. They replace a QuickCheck suite that
 -- played 96 random games per run and cost more than the rest of the tests
@@ -70,7 +66,7 @@ battlefieldCount gs =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
-  -- A 60-basic-land mirror can cast nothing and attack with nothing, so the
+  -- An eight-basic-land mirror can cast nothing and attack with nothing, so the
   -- only loss condition reachable is CR 704.5b and the only end is CR 104.2a's
   -- last player standing. That forces the shape of a three-seat game: CR 704.5b
   -- takes the first player, the game CONTINUES with two, CR 704.5b takes a
@@ -81,7 +77,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
   -- and passes "a result exists and someone decked out".
   --
   -- Determinism is free here rather than assumed: Prompt.Shuffle is the
-  -- identity under castAnswer, and 60 identical Mountains make the order
+  -- identity under castAnswer, and eight identical Mountains make the order
   -- irrelevant anyway, so there is nothing for a seed to vary.
   Spec.it s "CR 704.5b/104.2a a three-seat lands-only game needs TWO deck-outs to find a winner" $ do
     matchup <- S.threePlayerLandsOnly (S.printingOf s registry)
@@ -96,14 +92,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
     -- owned by that player leave the game." Leaving is not a zone change, so
     -- those objects are not moved anywhere -- they are deleted -- and the
     -- conserved quantity is one deck per player STILL IN THE GAME. Two
-    -- departures at three seats therefore end at 60, not 180.
-    Spec.assertEqWith s "CR 800.4a only the survivor's deck outlives the game" (cardBackedCount final) 60
-  -- The paired control for CR 800.4a's count, and the reason 60 above is a
+    -- departures at three seats therefore end at 8, not 24.
+    Spec.assertEqWith s "CR 800.4a only the survivor's deck outlives the game" (cardBackedCount final) 8
+  -- The paired control for CR 800.4a's count, and the reason 8 above is a
   -- claim rather than an accident. CR 800.1: "A multiplayer game is a game that
   -- begins with more than two players." Only such a game continues after a
   -- departure, so at two seats CR 800.4a's removal never runs and BOTH decks
-  -- outlive the game's end -- 120, not 60. A gate that fired at two seats would
-  -- delete the loser's 60 cards and this is what would catch it.
+  -- outlive the game's end -- 16, not 8. A gate that fired at two seats would
+  -- delete the loser's eight cards and this is what would catch it.
   Spec.it s "CR 800.1 a two-seat lands-only game ends on the FIRST deck-out, and keeps both decks" $ do
     matchup <- S.landsOnly (S.printingOf s registry)
     let final = snd (Engine.runMatchPure S.castAnswer matchup)
@@ -113,9 +109,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
       Just (Result.Won w) ->
         Spec.assertBool s (not (Set.member w decked)) "CR 104.2a the other player wins"
       other -> Spec.assertFailure s ("CR 104.2a expected a won game, got " <> show other)
-    Spec.assertEqWith s "CR 800.1 no removal at two seats, so both decks survive" (cardBackedCount final) 120
-  -- Combat is the first thing that can end a game before a library runs out, and
-  -- the driver has to survive hundreds of turns of it. S.fightAnswer differs
+    Spec.assertEqWith s "CR 800.1 no removal at two seats, so both decks survive" (cardBackedCount final) 16
+  -- Combat is the first thing that can end a game before a library runs out.
+  -- S.fightAnswer differs
   -- from S.castAnswer in exactly the two combat declarations (CR 508.1a, CR
   -- 509.1a), so the control is the same game with combat switched off.
   --
@@ -124,7 +120,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
   -- that survive in the control, so combat demonstrably ran. Without it the
   -- case would still pass if DeclareAttackers were ignored outright.
   Spec.it s "a game driven through combat terminates, and combat actually happened" $ do
-    matchup <- S.greenBlack (S.printingOf s registry)
+    matchup <- S.shortGreenBlack (S.printingOf s registry)
     let fought = snd (Engine.runMatchPure S.fightAnswer matchup)
         control = snd (Engine.runMatchPure S.castAnswer matchup)
     Spec.assertBool s (Maybe.isJust (GameState.result fought)) "the fought game reaches a result"
@@ -136,5 +132,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Engine" $ do
     -- CR 400.7 again, on the branch the lands-only cases cannot reach: dying,
     -- being cast and resolving are all zone changes, and none of them may mint
     -- or lose a card.
-    Spec.assertEqWith s "CR 400.7 the fought game still conserves its cards" (cardBackedCount fought) 120
-    Spec.assertEqWith s "CR 400.7 and so does the control" (cardBackedCount control) 120
+    Spec.assertEqWith s "CR 400.7 the fought game still conserves its cards" (cardBackedCount fought) 60
+    Spec.assertEqWith s "CR 400.7 and so does the control" (cardBackedCount control) 60
