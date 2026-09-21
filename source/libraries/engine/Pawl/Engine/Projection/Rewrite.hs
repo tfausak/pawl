@@ -415,6 +415,9 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantGetCounters _ -> effect
   -- Nor is a coin's face, or the two flags beside it.
   PlayerEffect.StateCoinFlip _ -> effect
+  -- Nor is a die's size, the number it came up, or which of CR 706.2b's two
+  -- buckets the modifier is in.
+  PlayerEffect.ModifyDieRoll _ -> effect
   PlayerEffect.AdditionalVotes _ -> effect
   PlayerEffect.CantGainLife -> effect
   PlayerEffect.CantLoseLife -> effect

@@ -164,6 +164,7 @@ creatureTypeWord subtype = case subtype of
   Subtype.Child -> Just (Text.pack "Child")
   Subtype.Chimera -> Just (Text.pack "Chimera")
   Subtype.Citizen -> Just (Text.pack "Citizen")
+  Subtype.Clamfolk -> Just (Text.pack "Clamfolk")
   Subtype.Cleric -> Just (Text.pack "Cleric")
   Subtype.Clown -> Just (Text.pack "Clown")
   Subtype.Cockatrice -> Just (Text.pack "Cockatrice")
