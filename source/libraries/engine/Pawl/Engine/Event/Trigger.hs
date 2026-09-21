@@ -1138,6 +1138,18 @@ eventTriggers events gs =
       -- alongside the event did exist immediately after it and keeps its place --
       -- the simultaneous newcomer the whole grouping exists to preserve.
       --
+      -- That boundary is UNOBSERVABLE on any board this module recorded, and no
+      -- card can be found that reaches it: the only id the `drop 1` keeps is one
+      -- that arrived at this very group and departed at a later one, and such an
+      -- id is on the battlefield when `recordEvent` samples the group's last
+      -- member -- so `onBattlefieldAt` already holds it, and Map.unions' left
+      -- bias makes the sample outrank whatever this narrowing does to `later`.
+      -- The one path where it decides anything is the sample's fallback to the
+      -- LIVE board, which is a fixture appending to the log directly. Written
+      -- strictly all the same: the two narrowings have to state the same
+      -- boundary, since the day a sample goes missing on a real board is not the
+      -- day to discover they disagreed about simultaneity.
+      --
       -- Narrowing `laterGroups` alone, never the sample: `battlefieldAt` already
       -- reads the board as it stood at each group, so a permanent that had not
       -- arrived is missing from it. What is left is this recovery, which is per
@@ -1148,8 +1160,6 @@ eventTriggers events gs =
       -- appearance of objects immediately prior to the event": a permanent that
       -- both arrived and departed in the event's OWN group is the case the two
       -- narrowings have to answer alike, and `arrivedLater` leaves it alone.
-      -- Nothing in the suite observes the boundary either way; it is kept
-      -- aligned rather than proved.
       arrivedOnBattlefieldLater = drop 1 (List.scanr (Set.union . arrivalsOnBattlefieldIn) Set.empty groups)
       -- The ids a graveyard arrival in this block minted, keyed by the ARRIVING
       -- incarnation -- ZoneChange.object, the key `inGraveyards` would hold them
