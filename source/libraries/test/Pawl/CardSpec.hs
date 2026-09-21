@@ -2172,6 +2172,25 @@ modeBranchesOffend mode =
             || fmap Clause.orElse (Map.lookup (OrElse.sibling orElse) byIndex) /= names cIdx (OrElse.chooser orElse) (OrElse.villainous orElse)
    in any offends indexed
 
+-- CR 118.6: does any clause state a cost DESCRIBED in terms of another object's
+-- mana cost (Pawl.Types.CostBasis) and a mana part of its own beside it?
+--
+-- The two are one field's worth of answer at the payment
+-- (Pawl.Engine.Resolve.describedCost overwrites Cost.mana with the derived
+-- amount), so a card writing both states mana nothing pays -- silently, which is
+-- why this is a lint. A card whose cost really is described states
+-- `mana: null`, which is the unpayable cost CR 118.6's first sentence describes
+-- and the basis then supplies. The stated COMPONENTS are untouched by the
+-- derivation and untouched by this lint.
+cardCostBasisStatesMana :: Face.Face Card.Type.Card -> Bool
+cardCostBasisStatesMana = any (any modeGateStatesMana . Modal.modes) . faceModals
+
+-- One mode's half of that lint.
+modeGateStatesMana :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+modeGateStatesMana mode =
+  let offends gate = Maybe.isJust (PayGate.basis gate) && Maybe.isJust (Cost.Type.mana (PayGate.cost gate))
+   in any (maybe False offends . Clause.payGate) (Mode.clauses mode)
+
 -- Do these slot-name sets overlap? True when any name appears in more than one
 -- of them, which is exactly what a Map.unions over them would silently collapse.
 slotNamesCollide :: [Set.Set SlotName.SlotName] -> Bool
@@ -6107,6 +6126,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite dangling)) "branches naming an ordinal no clause has are rejected"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite disagreeing)) "and a pair whose halves name different choosers is rejected"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite halfVillainous)) "CR 701.55a a pair only one half of which is villainous is rejected"
+  -- CR 118.6's described cost, whose mana part comes from the object its basis
+  -- names: the corpus half.
+  Spec.it s "no card states a mana part beside a cost described in terms of another object" $ do
+    ps <- S.allPrintings s
+    let describes = any (any (any (maybe False (Maybe.isJust . PayGate.basis) . Clause.payGate) . Mode.clauses) . Modal.modes) . faceModals
+        offenders = filter (anyFace cardCostBasisStatesMana . Printing.card) ps
+    -- Guards against passing vacuously, the either-or sweep's reason: Flash is
+    -- the one card in the pool describing its cost at all.
+    Spec.assertBool s (any (anyFace describes . Printing.card) ps) "the pool has a gate whose cost is described"
+    Spec.assertEqWith s "no doubly stated mana part" (fmap (S.nameOf . Printing.card) offenders) []
+  -- And the rejecting direction, against Flash misauthored on purpose.
+  Spec.it s "the lint itself catches a described cost that also states mana" $ do
+    flash <- S.printingOf s registry "Flash"
+    let face = S.combinedFace flash
+        overGate f = face {Face.spell = (Face.spell face) {Modal.modes = fmap (\mode -> mode {Mode.clauses = fmap (\clause -> clause {Clause.payGate = fmap f (Clause.payGate clause)}) (Mode.clauses mode)}) (Modal.modes (Face.spell face))}}
+        stated gate = gate {PayGate.cost = (PayGate.cost gate) {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])}}
+        undescribed gate = gate {PayGate.basis = Nothing}
+    Spec.assertBool s (not (cardCostBasisStatesMana face)) "Flash, whose gate states no mana of its own, is accepted"
+    Spec.assertBool s (cardCostBasisStatesMana (overGate stated)) "a described cost stating a mana part of its own is rejected"
+    Spec.assertBool s (not (cardCostBasisStatesMana (overGate (stated . undescribed)))) "and a gate stating mana and describing nothing is what every other card writes"
   -- The filing convention, now that no lookup enforces it (#649): a file's stem
   -- must be the slug Registry.filedAs derives from the card inside it.
   --

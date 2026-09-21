@@ -4,6 +4,7 @@ module Pawl.Codec.PayGate where
 
 import qualified Pawl.Codec.ClauseIndex as ClauseIndex
 import qualified Pawl.Codec.Cost as Cost
+import qualified Pawl.Codec.CostBasis as CostBasis
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PayBranch as PayBranch
 import qualified Pawl.Codec.PayObligation as PayObligation
@@ -21,16 +22,20 @@ import qualified Pawl.Types.PayObligation as PayObligation
 -- the branch, where a default would let a card written a word short play as the
 -- opposite card.
 --
--- The other three are elided when unmarked, which is what every card but
+-- The other four are elided when unmarked, which is what every card but
 -- Standstill and Don't Make a Sound writes: CR 118.12a's rewriting makes an
 -- "unless" cost optional, a clause that names no other clause makes its own
 -- offer, and a cost is offered once rather than once per counted thing.
 -- Rakshasa's Disdain is the card in `data/cards/` that writes `perEach`; CR
 -- 702.24a's mint writes one too, but a minted ability never goes on the wire.
+-- `basis` is Flash's alone: CR 118.6 lets a cost be described in terms of
+-- another object's mana cost rather than printed, and every other gate prints
+-- one.
 codec :: Codec.Codec PayGate.PayGate
 codec = Fields.object $ do
   payer <- Fields.required "payer" PlayerRef.codec PayGate.payer
   cost <- Fields.required "cost" (Cost.codec Keyword.codec) PayGate.cost
+  basis <- Fields.defaulted "basis" Nothing (Common.maybe CostBasis.codec) PayGate.basis
   branch <- Fields.required "branch" PayBranch.codec PayGate.branch
   obligation <- Fields.defaulted "obligation" PayObligation.Optional PayObligation.codec PayGate.obligation
   perEach <- Fields.defaulted "perEach" Nothing (Common.maybe Quantity.codec) PayGate.perEach
@@ -39,6 +44,7 @@ codec = Fields.object $ do
     PayGate.MkPayGate
       { PayGate.payer = payer,
         PayGate.cost = cost,
+        PayGate.basis = basis,
         PayGate.branch = branch,
         PayGate.obligation = obligation,
         PayGate.perEach = perEach,

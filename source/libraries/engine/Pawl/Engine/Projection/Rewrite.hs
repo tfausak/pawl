@@ -1474,11 +1474,17 @@ rewriteModal pairs modal =
 -- `perEach` takes rewriteQuantity, rewriteEffect's own descent through a counted
 -- amount: a gate scaled by "for each Elf you control" counts what a Magical Hack
 -- made an Elf.
+--
+-- `basis` is kept: CR 118.6's described cost is a SLOT and an amount of mana
+-- (Pawl.Types.CostBasis), and rule 612.1 swaps neither -- the mana cost it
+-- describes is read off the projection of the named object as the gate is
+-- offered, so a word swap there lands through that object's own rewrite.
 rewritePayGate :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PayGate.PayGate -> PayGate.PayGate
 rewritePayGate pairs gate =
   PayGate.MkPayGate
     { PayGate.payer = PayGate.payer gate,
       PayGate.cost = Filter.rewriteCost pairs (PayGate.cost gate),
+      PayGate.basis = PayGate.basis gate,
       PayGate.branch = PayGate.branch gate,
       PayGate.obligation = PayGate.obligation gate,
       PayGate.perEach = fmap (rewriteQuantity pairs) (PayGate.perEach gate),

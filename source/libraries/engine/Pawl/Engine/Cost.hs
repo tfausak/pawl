@@ -221,9 +221,23 @@ grantedForetellCost face obj = do
   manaCost <- Face.manaCost face
   pure
     Cost.MkCost
-      { Cost.mana = Just (applyAdjustments (plusReductions [amount] noAdjustments) manaCost),
+      { Cost.mana = Just (reducedManaCost amount manaCost),
         Cost.components = []
       }
+
+-- CR 118.7: one object's mana cost with an amount taken off it, which is the
+-- whole of what "its mana cost reduced by {2}" names. Rule 118.7a-g's spill is
+-- `applyAdjustments`', a reduction arriving here being a reduction like any
+-- other; an empty amount is {0} and takes nothing off (CR 118.5).
+--
+-- SHARED by the two provenances that describe a cost this way, so neither can
+-- drift from the other: CR 702.143d's foretell cost above, settled as the cast
+-- is proposed, and CR 118.6's resolution cost (Pawl.Types.CostBasis), settled
+-- as Pawl.Engine.Resolve offers the gate. Both stay COSTS rather than becoming
+-- CR 601.2f reductions -- grantedForetellCost's haddock is where that is
+-- argued.
+reducedManaCost :: ManaCost.ManaCost -> ManaCost.ManaCost -> ManaCost.ManaCost
+reducedManaCost amount = applyAdjustments (plusReductions [amount] noAdjustments)
 
 -- CR 601.2f with nothing in it: the board's own increases and reductions are the
 -- caster's business further down this module, and rule 702.143d's amount is the

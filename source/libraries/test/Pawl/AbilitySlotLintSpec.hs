@@ -897,6 +897,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
                         PayGate.MkPayGate
                           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
                             PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [],
+                            PayGate.basis = Nothing,
                             PayGate.branch = PayBranch.IfNotPaid,
                             PayGate.obligation = PayObligation.Optional,
                             PayGate.perEach = Just quantity,

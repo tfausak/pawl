@@ -2,6 +2,7 @@ module Pawl.Types.PayGate where
 
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostBasis as CostBasis
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayObligation as PayObligation
@@ -75,6 +76,24 @@ data PayGate = MkPayGate
     -- CR 601.2b. Clash of Wills' is {X}; Pawl.Engine.Resolve.announcedXOn is
     -- where it is substituted in.
     cost :: Cost.Cost Keyword.Keyword,
+    -- | CR 118.6's other kind of cost: one the card DESCRIBES in terms of
+    -- another object rather than printing -- Flash's "unless you pay its mana
+    -- cost reduced by {2}". Nothing is the printed case every other gate in the
+    -- pool writes, and then `cost` above is the whole of the offer.
+    --
+    -- Beside `cost` and not inside it, because Pawl.Types.Cost is the carrier a
+    -- spell's own cost and an activation cost share (CR 601.2f, CR 602.1a) and
+    -- neither has a resolution's slots to name an object with. What it supplies
+    -- is the MANA part alone: a gate writing one states no mana of its own, and
+    -- the components it states are paid beside the derived mana as they are
+    -- beside a printed one.
+    --
+    -- Settled HERE, as the gate is offered, and never a CR 601.2f reduction:
+    -- that rule totals a cost being CAST or ACTIVATED, and rule 118.12's is
+    -- neither -- Pawl.Engine.Cost.grantedForetellCost's haddock argues the same
+    -- point for rule 702.143d's derivation, where a reduction carried into rule
+    -- 601.2f would come off a tax instead.
+    basis :: Maybe CostBasis.CostBasis,
     -- | Which of CR 118.12's branches this clause's instructions are. See
     -- Pawl.Types.PayBranch, and Pawl.Engine.Resolve.payGateAdmits for where the
     -- comparison is made.
