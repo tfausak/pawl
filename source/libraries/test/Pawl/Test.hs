@@ -122,6 +122,7 @@ import qualified Pawl.Codec.ComparesSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.CompletedDungeonSpec
 import qualified Pawl.Codec.ConditionSpec
+import qualified Pawl.Codec.ConjureCardsSpec
 import qualified Pawl.Codec.ConjureDestinationSpec
 import qualified Pawl.Codec.ConjureSelectionSpec
 import qualified Pawl.Codec.ConjureSpec
@@ -836,6 +837,7 @@ spec s registry = do
   Pawl.Codec.CopyStackObjectSpec.spec s
   Pawl.Codec.CopyTargetsSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
+  Pawl.Codec.ConjureCardsSpec.spec s
   Pawl.Codec.ConjureDestinationSpec.spec s
   Pawl.Codec.ConjureSelectionSpec.spec s
   Pawl.Codec.ConjureSpec.spec s

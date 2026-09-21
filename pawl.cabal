@@ -288,6 +288,8 @@ library codec
     Pawl.Codec.Condition
     Pawl.Codec.ConditionSpec
     Pawl.Codec.Conjure
+    Pawl.Codec.ConjureCards
+    Pawl.Codec.ConjureCardsSpec
     Pawl.Codec.ConjureDestination
     Pawl.Codec.ConjureDestinationSpec
     Pawl.Codec.ConjureSelection
@@ -1719,6 +1721,7 @@ library types
     Pawl.Types.Concession
     Pawl.Types.Condition
     Pawl.Types.Conjure
+    Pawl.Types.ConjureCards
     Pawl.Types.ConjureDestination
     Pawl.Types.ConjureSelection
     Pawl.Types.Connive

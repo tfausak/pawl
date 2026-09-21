@@ -880,14 +880,34 @@ mintCard pid under printingId dest position tapped gs =
 --
 -- Nothing is this funnel's word for a card that was not created, the empty Seq's
 -- twin in conjureOntoBattlefield below.
-conjure :: PlayerId -> Card -> Zone -> LibraryPosition.LibraryPosition -> Game (Maybe ObjectId)
-conjure pid card dest position = do
+--
+-- `copied` is the CR 707.2 snapshot the minted card carries at layer 1a, and it
+-- is Nothing for every conjure that names its card outright: a card written out
+-- in the card file is its own copiable values. A DUPLICATE hands one over
+-- (Pawl.Types.ConjureCards.Duplicate), because what is duplicated is the named
+-- object's copiable values rather than the card printed under it -- a Clone
+-- copying an Ornithopter duplicates as an Ornithopter. Stamped through
+-- Binding.setCopy, which is where every other copy road writes, so the two
+-- cannot disagree about what a copy is.
+conjure :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Zone -> LibraryPosition.LibraryPosition -> Game (Maybe ObjectId)
+conjure pid card copied dest position = do
   gs <- State.get
   if List.notElem pid (Game.stillPlaying gs)
     then pure Nothing
     else do
       printingId <- State.state (Game.intern (Printing.MkPrinting card))
-      Just <$> State.state (mintCard pid Nothing printingId dest position TapState.Untapped)
+      oid <- State.state (mintCard pid Nothing printingId dest position TapState.Untapped)
+      Monad.forM_ copied (stampCopy oid)
+      pure (Just oid)
+
+-- Write a CR 707.2 snapshot onto an object already minted, the one line
+-- `conjure` above and `conjureOntoBattlefield` below share. Between the mint and
+-- the entry for the battlefield road, so CR 616.1's loop and CR 603.6a's trigger
+-- scan read the duplicated values rather than the printed ones.
+stampCopy :: ObjectId -> PC.ProjectedCharacteristics -> Game ()
+stampCopy oid snapshot =
+  State.modify' $ \g ->
+    g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}) oid (GameState.objects g)}
 
 -- The same keyword action with the BATTLEFIELD as its destination, which is the
 -- one arrival that is an entry: `conjure` above puts the card into a zone and
@@ -905,6 +925,11 @@ conjure pid card dest position = do
 -- reads its two arrivals. What stays a regression fence is `siblingsOf` itself:
 -- no printing in data/cards/ conjures a batch whose members a CR 614.12
 -- replacement would read each other through.
+--
+-- `copied` is `conjure` above's and carries its reason, written onto every
+-- member of the batch BEFORE the entry loop: CR 614.12 reads "the
+-- characteristics of the permanent as it would exist on the battlefield", so a
+-- snapshot stamped after the loop would be a value the loop could not see.
 --
 -- CR 110.5b's tapped status is the CALLER's, read off the destination arm the
 -- sentence wrote -- Lam, Storm Crane Elder states none and takes the rule's
@@ -938,14 +963,15 @@ conjure pid card dest position = do
 -- Inline rather than delegating to a `conjureOntoBattlefieldFor` body, which is
 -- createTokens' reason: the project writes no export lists, so a second
 -- top-level name would be a public door past the check.
-conjureOntoBattlefield :: PlayerId -> Card -> Natural -> TapState.TapState -> Game (Seq.Seq ObjectId)
-conjureOntoBattlefield controller card count tapped = do
+conjureOntoBattlefield :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Game (Seq.Seq ObjectId)
+conjureOntoBattlefield controller card copied count tapped = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
     then pure Seq.empty
     else do
       printingId <- State.state (Game.intern (Printing.MkPrinting card))
       ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue tapped))
+      Monad.forM_ copied (\snapshot -> Monad.mapM_ (`stampCopy` snapshot) ids)
       let siblingsOf oid = Set.delete oid (Set.fromList ids)
       Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
       Monad.mapM_ recordMintedEntry ids

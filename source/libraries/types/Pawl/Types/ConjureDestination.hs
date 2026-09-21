@@ -23,8 +23,12 @@ import qualified Pawl.Types.TapState as TapState
 -- play that card until the end of your next turn" and Darigaaz, Shivan
 -- Champion\'s arrival "face down with three egg counters on it" both name the
 -- conjured card in a later clause, which wants the slot the conjure does not
--- bind (#3971); Limitless Rekindling picks from outside the game (#3063); Gyox
--- and Smog Smasher conjure a duplicate (#2643). So no board reaches such an arm
+-- bind (#3971); Gyox, Brutal Carnivora\'s "those duplicates perpetually get
+-- +X\/+X. Then shuffle those duplicates into your library" names them the same
+-- way and wants the same slot; Limitless Rekindling picks from outside the game
+-- (#3063); Smog Smasher\'s conjuring line wants nothing else, and its "Max
+-- speed -- ... put all cards exiled with this creature onto the battlefield" is
+-- a speed threshold no ability condition states. So no board reaches such an arm
 -- (#2653).
 data ConjureDestination
   = -- | Emporium Thopterist\'s "conjure a card named Ornithopter into your
@@ -46,8 +50,9 @@ data ConjureDestination
     -- arrival, and that is the BOTTOM -- the opposite end from the one every
     -- printing above names. Nothing is red because none of those printings is in
     -- @data\/cards\/@: Jewel Mine Overseer\'s rider has to NAME the seven cards it
-    -- conjured, which wants them bound to a slot (#3971), Pampered Loamfrill
-    -- conjures a duplicate (#2643), and this arm\'s own producer shuffles
+    -- conjured, which wants them bound to a slot (#3971), Pampered Loamfrill\'s
+    -- "the duplicate perpetually gets +1\/+1 and gains deathtouch" names its own
+    -- the same way and wants the same slot, and this arm\'s own producer shuffles
     -- immediately, which makes the end unobservable there. Pampered Loamfrill is
     -- the one that would OBSERVE it, since it never shuffles (#3972).
     Library
