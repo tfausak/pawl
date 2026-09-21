@@ -1918,6 +1918,7 @@ replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
+  ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -1944,6 +1945,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
+  ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 111.1's token a replacement MINTS: TokenR's appended token (Queen Allenal
@@ -1968,6 +1970,7 @@ replacementMintedCards replacement = case replacement of
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
+  ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -4628,6 +4631,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
+  ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 614.9's printed destination, the one Filter a damage REWRITE carries.

@@ -8828,9 +8828,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- reading a numerical result ignores it, so a condition gated on the result
   -- would be the wrong shape rather than a stricter one (#934).
   --
-  -- Not implemented: CR 706.6's ignored roll, which "is considered to have never
-  -- happened" and triggers nothing -- nothing in data/cards ignores or rerolls a
-  -- roll (#2083), so no recorded event is one this must skip.
+  -- CR 706.6's ignored roll is nothing this must skip, although Pixie Guide puts
+  -- one in the pool: GameEvent.DiceRolled is recorded once per INSTRUCTION, and
+  -- the instruction that had a roll ignored still rolled one or more dice. The
+  -- rule's "no abilities trigger because of the ignored roll" bars a condition
+  -- reading THAT roll, and this one reads none.
   TriggerCondition.PlayerRollsDice relation -> case event of
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
