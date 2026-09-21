@@ -6,6 +6,7 @@ import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DestructionCause as DestructionCause
+import qualified Pawl.Types.DiceRoll as DiceRoll
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -221,4 +222,22 @@ data ProposedEvent
     -- The PlayerId is CR 705.2's flipper, the only seat rule 705.2's last
     -- sentence leaves involved.
     WouldFlipCoin PlayerId.PlayerId Natural.Natural
+  | -- | CR 706.1 / 614.1a: this player would be instructed to roll this many
+    -- dice, with this many of the lowest rolls ignored (CR 706.6). Raised by
+    -- Pawl.Engine.Event.proposeDiceRoll, the one funnel every roll in the engine
+    -- goes through -- today that is Resolve's Effect.RollDie arm and nothing
+    -- else, since no cost and no turn-based action rolls.
+    --
+    -- ONE event for the whole INSTRUCTION, where a flip of several coins raises
+    -- WouldFlipCoin per coin: Pixie Guide's sentence is scoped to the
+    -- instruction ("if you would roll ONE OR MORE dice, instead roll THAT MANY
+    -- dice plus one"), where Krark's Thumb's own ruling scopes the coin
+    -- replacement to each individual flip. So a row that resizes this event
+    -- leaves ONE instruction throwing more dice, and an instruction rolling five
+    -- dice raises this event once.
+    --
+    -- An instruction that rolls NO dice raises nothing, having rolled none --
+    -- rule 706.1's "one or more" is not met, so there is no event for a row to
+    -- replace.
+    WouldRollDice DiceRoll.DiceRoll
   deriving (Eq, Ord, Show)

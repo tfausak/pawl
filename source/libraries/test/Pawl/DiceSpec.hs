@@ -6,7 +6,7 @@
 -- roll is externalised through. The transcript legs live in Pawl.ReplaySpec
 -- with the other randomness prompts.
 --
--- FOUR FIXTURES. Ancient Copper Dragon ("Flying /
+-- FIVE FIXTURES. Ancient Copper Dragon ("Flying /
 -- Whenever this creature deals combat damage to a player, roll a d20. You create
 -- a number of Treasure tokens equal to the result") is CR 706.4's, the result
 -- read straight into a count; Djinni Windseer ("Flying / When this creature
@@ -20,6 +20,9 @@
 -- that result. Then create a number of 2/2 white Knight creature tokens with
 -- vigilance equal to the other result") is the fourth fixture and CR 706.1's
 -- count, CR 706.4's choice among the results and the "other result" beside it.
+-- CR 614.1a's replacement over the roll is the fifth fixture, Pixie Guide, at the
+-- bottom of this file -- the ignore of CR 706.6 rides it, no instruction in
+-- data\/cards\/ printing one of its own.
 -- Left out: no reroll and no modifier from another source (#2083), no "Roll
 -- again" (#2124), and no reading that takes the results as a set (#3243). CR
 -- 706.1's roll does record its event, but the trigger reading it lives in
@@ -93,6 +96,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   resultsTableSpec s registry
   modifierSpec s registry
   severalDiceSpec s registry
+  dieRollRSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -531,3 +535,171 @@ severalDiceSpec s registry = Spec.describe s "RollSeveralDice" $ do
     let (offers, choices) = endeavorPrompts [5, 2] spell board
     Spec.assertEqWith s "asked twice, offering six sides each" offers [6, 6]
     Spec.assertEqWith s "and offered both results, in roll order" choices [[5, 2]]
+
+-- CR 614.1a over CR 706.1, and CR 706.6 behind it: Pixie Guide's "if you would
+-- roll one or more dice, instead roll that many dice plus one and ignore the
+-- lowest roll". The Thumb group in Pawl.CoinSpec one rule over, and the same
+-- shape -- the Guide is the ONE thing that differs between the legs, so every
+-- reading that moves is the replacement's doing.
+--
+-- TWO FIXTURES, because the sentence says "one or more dice" and the two halves
+-- of that are separately breakable. Ancient Copper Dragon rolls ONE d20 and reads
+-- the result straight into a token count, which is where "plus one, ignore the
+-- lowest" reads as "take the higher"; Valiant Endeavor rolls TWO d6 and reads
+-- BOTH results, which is where an engine that added the die without ignoring one
+-- is visible -- three results leave no "other result" to count, so it mints
+-- nothing.
+--
+-- NOT LEGENDARY, unlike Krark's Thumb, so a board may carry two Guides -- which
+-- is what puts CR 614.5's read-forward under a gameplay assertion rather than a
+-- prompt tally: the second row applies to the modified event, so four dice are
+-- thrown and the TWO lowest go.
+--
+-- STATE-THREADED answerers throughout: the dice of one instruction are
+-- structurally identical Prompt.RollDie questions, and a pure answerer cannot
+-- tell them apart -- it would answer every die the same number, which is exactly
+-- the board on which ignoring the lowest changes nothing.
+dieRollRSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dieRollRSpec s registry = Spec.describe s "DieRollR" $ do
+  Spec.it s "CR 614.1a Pixie Guide rolls one more die and CR 706.6 ignores the lowest" $ do
+    dragon <- S.printingOf s registry "Ancient Copper Dragon"
+    guide <- S.printingOf s registry "Pixie Guide"
+    let (bare, _, _) = S.combatBoardOf [dragon] []
+        guarded = snd (S.addPermanent guide S.alice bare)
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation: two dice came up 7 and 13, the 7 was ignored, and the Dragon
+    -- reads the 13 into thirteen Treasures. An engine that ignored the HIGHEST
+    -- mints 7, one that ignored NEITHER reads the first die and mints 7 too, and
+    -- one that never added the die never asks for the 13 at all.
+    Spec.assertEqWith
+      s
+      "CR 706.6: the 7 is ignored, so the result is the 13"
+      (S.countOnBattlefieldByName treasure S.alice (fst (guideCombat [7, 13] guarded)))
+      13
+    -- The same two faces in the other order, so the kept roll is the SECOND die
+    -- under one reading and the FIRST under the other: an engine that kept a
+    -- fixed position rather than the higher number separates these two boards.
+    Spec.assertEqWith
+      s
+      "CR 706.6: the lowest goes whichever die showed it"
+      (S.countOnBattlefieldByName treasure S.alice (fst (guideCombat [13, 7] guarded)))
+      13
+    -- The paired board, one thing different: no Guide. The same pinned faces, and
+    -- the second is never reached.
+    Spec.assertEqWith
+      s
+      "CR 706.1: without the Guide the instruction's own one die settles it"
+      (S.countOnBattlefieldByName treasure S.alice (fst (guideCombat [7, 13] bare)))
+      7
+  Spec.it s "CR 706.1 the Guide adds a die to the instruction" $ do
+    dragon <- S.printingOf s registry "Ancient Copper Dragon"
+    guide <- S.printingOf s registry "Pixie Guide"
+    let (bare, _, _) = S.combatBoardOf [dragon] []
+        guarded = snd (S.addPermanent guide S.alice bare)
+    -- Supporting, and in its own case so it cannot stand in for the counts
+    -- above: what the engine ASKED. Two twenty-sided dice under the Guide, one
+    -- without -- and the SIZE is untouched, which is the half of rule 706.1 the
+    -- replacement says nothing about.
+    Spec.assertEqWith s "CR 706.1a: two d20 under the Guide" (snd (guideCombat [7, 13] guarded)) [20, 20]
+    Spec.assertEqWith s "CR 706.1a: one d20 without it" (snd (guideCombat [7, 13] bare)) [20]
+  Spec.it s "CR 706.6 an ignored roll is not the other result" $ do
+    (spell, weak, strong, board) <- endeavorBoard s registry
+    guide <- S.printingOf s registry "Pixie Guide"
+    let guarded = snd (S.addPermanent guide S.alice board)
+    -- THE GAMEPLAY ASSERTION: three d6 came up 1, 3 and 5, the 1 is ignored, and
+    -- what the Endeavor reads is the two that are left -- the roller chose the 3,
+    -- so "the other result" is the 5 and five Knights arrive. An engine that
+    -- added the die without ignoring one leaves THREE results, where the card's
+    -- "other result" is not one number and the slot stays unbound: no Knights at
+    -- all.
+    Spec.assertEqWith
+      s
+      "CR 706.6: the ignored 1 is not the other result, so the 5 is"
+      (S.countOnBattlefieldByName knight S.alice (runEndeavor [1, 3, 5] 0 spell guarded))
+      5
+    -- The chosen result moves with the ignore too: the 3 is what the destruction
+    -- judges, so power 4 dies and power 1 lives. Without the Guide the same
+    -- script leaves the 1 chosen, and BOTH creatures die -- two boards apart.
+    let guarded3 = runEndeavor [1, 3, 5] 0 spell guarded
+    Spec.assertBool s (not (S.onBattlefield strong guarded3)) "power 4 is at least the chosen 3, so it is destroyed"
+    Spec.assertBool s (S.onBattlefield weak guarded3) "power 1 is below it, so it survives"
+    -- The paired board, one thing different: no Guide, so two dice and no ignore.
+    Spec.assertEqWith
+      s
+      "CR 706.1: without the Guide the 1 is chosen and the 3 is the other"
+      (S.countOnBattlefieldByName knight S.alice (runEndeavor [1, 3, 5] 0 spell board))
+      3
+  Spec.it s "CR 706.6 rolls tied for the lowest leave nothing to ask" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    guide <- S.printingOf s registry "Pixie Guide"
+    let guarded = snd (S.addPermanent guide S.alice board)
+        (offers, choices) = endeavorPrompts [4, 4, 4] spell guarded
+    -- Three dice all showing 4: rule 706.6's second sentence gives the roller the
+    -- tie-break, and every way of breaking it leaves the same two 4s -- so no
+    -- board can tell the answers apart and the engine asks nothing. CR 706.4's
+    -- choice among what is left is elided for its own reason, the two being equal.
+    Spec.assertEqWith s "CR 706.1: three dice under the Guide" offers [6, 6, 6]
+    Spec.assertEqWith s "nothing was asked to choose" choices []
+    -- And exactly ONE of the tied rolls went: two 4s are left, so the other
+    -- result is a 4 and four Knights arrive. An implementation that dropped every
+    -- copy of the lowest leaves one result and mints none.
+    Spec.assertEqWith
+      s
+      "CR 706.6: one of the tied 4s is ignored, so the other result is the other 4"
+      (S.countOnBattlefieldByName knight S.alice (runEndeavor [4, 4, 4] 0 spell guarded))
+      4
+  Spec.it s "CR 614.5 a second Guide adds a second die and a second ignore" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    guide <- S.printingOf s registry "Pixie Guide"
+    let one = snd (S.addPermanent guide S.alice board)
+        two = snd (S.addPermanent guide S.alice one)
+    -- THE GAMEPLAY ASSERTION: each row gets its own CR 614.5 opportunity, the
+    -- second on the event the first produced, so four dice are thrown and the two
+    -- lowest go -- leaving the 4 and the 6, the 4 chosen and the 6 counted. An
+    -- engine that spent both rows on the original event throws three, and one
+    -- that added two dice while ignoring one leaves three results and no "other".
+    Spec.assertEqWith
+      s
+      "CR 614.5: four dice, the 1 and the 2 ignored, so the other result is the 6"
+      (S.countOnBattlefieldByName knight S.alice (runEndeavor [1, 2, 4, 6] 0 spell two))
+      6
+    -- The paired board, one thing different: ONE Guide. Three dice, one ignore,
+    -- so the 2 is chosen and the 4 is counted.
+    Spec.assertEqWith
+      s
+      "CR 706.6: one Guide ignores only the 1"
+      (S.countOnBattlefieldByName knight S.alice (runEndeavor [1, 2, 4, 6] 0 spell one))
+      4
+    -- Supporting: the dice really were thrown, four of them.
+    Spec.assertEqWith s "CR 706.1: four dice under two Guides" (fst (endeavorPrompts [1, 2, 4, 6] spell two)) [6, 6, 6, 6]
+
+-- The Dragon's combat under an answerer that hands out the given faces IN ORDER
+-- to CR 706.1's rolls and RECORDS what each roll prompt offered. `offeredSides`
+-- above one monad up, and for its reason: the roll happens in the combat damage
+-- step rather than the step the fixture starts in.
+--
+-- Twenty for a roll the script did not plan, which is the die's TOP face: a
+-- surplus die then shows up as the largest number on the board rather than as CR
+-- 706.1a's floor, which is also what Replay.defaultAnswer would have supplied.
+guideCombat :: [Natural.Natural] -> GameState.GameState -> (GameState.GameState, [Natural.Natural])
+guideCombat rolls board =
+  let answering :: Prompt.Prompt r -> State.State ([Natural.Natural], [Natural.Natural]) r
+      answering p = case p of
+        Prompt.RollDie sides -> do
+          (pending, offers) <- State.get
+          case pending of
+            face : rest -> do
+              State.put (rest, sides : offers)
+              pure face
+            [] -> do
+              State.put ([], sides : offers)
+              pure 20
+        _ -> pure (S.attackTo S.bob p)
+      go n gs =
+        if n <= (0 :: Int) || Maybe.isJust (GameState.result gs) || not (S.inCombatPhase (GameState.phase gs))
+          then pure gs
+          else do
+            (_, next) <- Engine.runGame answering gs Engine.runStep
+            go (n - 1) next
+      (settled, (_, seen)) = State.runState (go (24 :: Int) board) (rolls, [])
+   in (settled, reverse seen)
