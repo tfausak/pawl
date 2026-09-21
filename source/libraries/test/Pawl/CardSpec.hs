@@ -4446,6 +4446,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 705.3's statement narrows by nothing at all: it names a face, a win and
   -- a once-per-turn flag, and no Filter over objects.
   PlayerEffect.StateCoinFlip _ -> []
+  -- CR 706.2's modifier narrows by a die size and a number, neither a Filter
+  -- over objects.
+  PlayerEffect.ModifyDieRoll _ -> []
   PlayerEffect.AdditionalVotes _ -> []
   PlayerEffect.CantGainLife -> []
   PlayerEffect.CantLoseLife -> []

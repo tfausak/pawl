@@ -74,6 +74,7 @@ import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaUnit (ManaUnit)
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
@@ -636,6 +637,7 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -763,6 +765,7 @@ prohibitsPlayingLand pid names oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -834,6 +837,7 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -897,6 +901,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -965,6 +970,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -1215,6 +1221,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -1261,6 +1268,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -1310,6 +1318,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -1465,6 +1474,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -1524,6 +1534,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -1581,6 +1592,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -1693,6 +1705,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
   PlayerEffect.CantGetCounters _ -> Nothing
   PlayerEffect.StateCoinFlip _ -> Nothing
+  PlayerEffect.ModifyDieRoll _ -> Nothing
   PlayerEffect.AdditionalVotes _ -> Nothing
   PlayerEffect.CantGainLife -> Nothing
   PlayerEffect.CantLoseLife -> Nothing
@@ -1902,6 +1915,7 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -2000,6 +2014,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost criterion -> matchesObjectFrom source criterion oid gs
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -2121,6 +2136,7 @@ playLandPiles pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> []
         PlayerEffect.CantGetCounters _ -> []
         PlayerEffect.StateCoinFlip _ -> []
+        PlayerEffect.ModifyDieRoll _ -> []
         PlayerEffect.AdditionalVotes _ -> []
         PlayerEffect.CantGainLife -> []
         PlayerEffect.CantLoseLife -> []
@@ -2208,6 +2224,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -2296,6 +2313,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -2374,6 +2392,7 @@ protectionCarriers gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -2448,6 +2467,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -2509,6 +2529,7 @@ votesAllowed pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost {} -> Nothing
         PlayerEffect.CantGetCounters {} -> Nothing
         PlayerEffect.StateCoinFlip {} -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes extra -> Just extra
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -2595,6 +2616,7 @@ maximumHandSize pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> current
         PlayerEffect.CantGetCounters _ -> current
         PlayerEffect.StateCoinFlip _ -> current
+        PlayerEffect.ModifyDieRoll _ -> current
         PlayerEffect.AdditionalVotes _ -> current
         PlayerEffect.CantGainLife -> current
         PlayerEffect.CantLoseLife -> current
@@ -2666,6 +2688,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -2729,6 +2752,7 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -2793,6 +2817,7 @@ prohibitsGainingLife pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantLoseLife -> False
    in any (prohibits . snd) (applying pid gs)
@@ -2852,6 +2877,7 @@ prohibitsLosingLife pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
    in any (prohibits . snd) (applying pid gs)
@@ -2912,6 +2938,7 @@ spendManaAsThough pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -2991,6 +3018,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
@@ -3055,6 +3083,7 @@ unpreventable gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -3124,6 +3153,7 @@ unredirectable gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -3171,6 +3201,7 @@ statedFlips :: PlayerId -> GameState -> [StatedFlip.StatedFlip]
 statedFlips pid gs =
   let says effect = case effect of
         PlayerEffect.StateCoinFlip statement -> Just statement
+        PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
@@ -3217,6 +3248,65 @@ statedFlips pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
    in Maybe.mapMaybe (says . snd) (applying pid gs)
+
+-- CR 706.2's third sentence: every modifier in force right now over a die roll
+-- `pid` is about to make from an instruction that knows nothing about it.
+-- Clam-I-Am is the whole producer.
+--
+-- `statedFlips` above one rule over, and the same division of labour: a LIST
+-- rather than a first or a last, because rule 706.2 puts no limit on how many
+-- sources modify one roll, and Pawl.Engine.Dice is what reads them against the
+-- die that came up.
+--
+-- In timestamp order, `applying`'s order, so a reader that cares which modifier
+-- came last can have it. Rule 706.2b gives the ROLLER the pick among competing
+-- modifiers rather than the timestamps (#3976), which is why nothing here
+-- collapses the list.
+rollModifiers :: PlayerId -> GameState -> [ModifiedRoll.ModifiedRoll]
+rollModifiers pid gs =
+  let modifies effect = case effect of
+        PlayerEffect.ModifyDieRoll modifier -> Just modifier
+        PlayerEffect.StateCoinFlip _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.CantGainLife -> Nothing
+        PlayerEffect.CantLoseLife -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost {} -> Nothing
+        PlayerEffect.IncreaseActivationCost {} -> Nothing
+        PlayerEffect.ReduceSpellCost {} -> Nothing
+        PlayerEffect.ReduceActivationCost {} -> Nothing
+        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AddSpellCost {} -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
+        PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom _ -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
+   in Maybe.mapMaybe (modifies . snd) (applying pid gs)
 
 -- CR 611.2a / Quicken: the one-shot (Expiry.WhenUsed) stored grants `pid`
 -- would SPEND by casting `oid` -- every row on this axis that applies to them
@@ -3305,6 +3395,7 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> pure effect
   PlayerEffect.CantGetCounters _ -> pure effect
   PlayerEffect.StateCoinFlip _ -> pure effect
+  PlayerEffect.ModifyDieRoll _ -> pure effect
   PlayerEffect.AdditionalVotes _ -> pure effect
   PlayerEffect.CantGainLife -> pure effect
   PlayerEffect.CantLoseLife -> pure effect
@@ -3369,6 +3460,7 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> pure effect
   PlayerEffect.CantGetCounters _ -> pure effect
   PlayerEffect.StateCoinFlip _ -> pure effect
+  PlayerEffect.ModifyDieRoll _ -> pure effect
   PlayerEffect.AdditionalVotes _ -> pure effect
   PlayerEffect.CantGainLife -> pure effect
   PlayerEffect.CantLoseLife -> pure effect

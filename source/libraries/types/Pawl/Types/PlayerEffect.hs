@@ -12,6 +12,7 @@ import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaFilter as ManaFilter
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
@@ -189,6 +190,13 @@ data PlayerEffect
   | -- | CR 705.3 / Edgar, King of Figaro: an effect stating that a coin flip this
     -- player flips has a certain result and\/or that this player wins it.
     StateCoinFlip StatedFlip.StatedFlip
+  | -- | CR 706.2 / Clam-I-Am: a modifier this player's die rolls take from a
+    -- source other than the instruction that ordered them.
+    --
+    -- StateCoinFlip's sibling one rule over: rule 705.3's statement and rule
+    -- 706.2's other-source modifier both reach a piece of randomness a
+    -- resolution is in the middle of, and neither names an object to hang on.
+    ModifyDieRoll ModifiedRoll.ModifiedRoll
   | -- | CR 701.38d / Brago's Representative: this player gets this many votes
     -- beyond the one CR 701.38a gives every seat, cast at the same time they
     -- would otherwise have voted.

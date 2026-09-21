@@ -677,6 +677,8 @@ library codec
     Pawl.Codec.ModeSpec
     Pawl.Codec.Modification
     Pawl.Codec.ModificationSpec
+    Pawl.Codec.ModifiedRoll
+    Pawl.Codec.ModifiedRollSpec
     Pawl.Codec.ModifyPowerToughness
     Pawl.Codec.ModifyPowerToughnessSpec
     Pawl.Codec.ModifyTarget
@@ -887,6 +889,8 @@ library codec
     Pawl.Codec.RevealSpec
     Pawl.Codec.RollDie
     Pawl.Codec.RollDieSpec
+    Pawl.Codec.RollModifier
+    Pawl.Codec.RollModifierSpec
     Pawl.Codec.RoomIndex
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
@@ -1934,6 +1938,7 @@ library types
     Pawl.Types.ModeInstance
     Pawl.Types.ModeSelection
     Pawl.Types.Modification
+    Pawl.Types.ModifiedRoll
     Pawl.Types.ModifyPowerToughness
     Pawl.Types.ModifyTarget
     Pawl.Types.MonarchTarget
@@ -2059,6 +2064,7 @@ library types
     Pawl.Types.RevealCause
     Pawl.Types.Revealed
     Pawl.Types.RollDie
+    Pawl.Types.RollModifier
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
     Pawl.Types.RuleAbilities

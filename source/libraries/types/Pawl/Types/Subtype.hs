@@ -192,6 +192,7 @@ data Subtype
   | Child
   | Chimera
   | Citizen
+  | Clamfolk
   | Cleric
   | Clown
   | Cockatrice

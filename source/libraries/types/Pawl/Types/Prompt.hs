@@ -114,6 +114,19 @@ data Prompt r where
   -- raised where every result is the same number, which no card can tell from
   -- either answer.
   ChooseDieResult :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Natural.Natural -> Prompt Natural.Natural
+  -- | CR 706.2b's first step: whether the roller takes a reroll a permanent
+  -- offers them (Clam-I-Am's "you may reroll that die"). A choice and not a
+  -- roll, so it carries a Decider and the seat where RollDie above carries
+  -- neither.
+  --
+  -- The Natural is the NATURAL result the die came up, which is what rule
+  -- 706.2b hands the offer and the only thing separating this question from the
+  -- next die's. The die's SIZE is not here: every offer in force has already
+  -- been matched against it, so it narrows nothing the roller is deciding.
+  --
+  -- Never elided. CR 706.2a's "may" makes one offer a real fork, and the two
+  -- answers are two different numbers on the board.
+  RerollDie :: Decider.Decider -> PlayerId.PlayerId -> Natural.Natural -> Prompt OptionalDecision.OptionalDecision
   -- | CR 705.1: which face a flipped coin came up, asked after CallCoin (CR
   -- 705.2). RandomObject's reasons for carrying neither Decider nor PlayerId.
   FlipCoin :: Prompt CoinFace.CoinFace
