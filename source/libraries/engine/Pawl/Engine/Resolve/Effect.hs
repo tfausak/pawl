@@ -3513,9 +3513,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- after -- a d20 answered 20 with a modifier of 5 is a result of 25, past the
   -- die's own top face. CR 107.1b for a sum a negative modifier drove below zero.
   --
-  -- Not implemented: a binding for the natural result, CR 706.2a's costed
-  -- modifier and CR 706.2b's ordering among competing modifiers (#2083); with one
-  -- mandatory, free modifier there is nothing to order and no second reader.
+  -- Not implemented: a modifier reaching this roll from a source other than its
+  -- own instruction, optional or costed (#3974), a reroll of the die (#3975), and
+  -- a binding for the natural result beside CR 706.2b's ordering among competing
+  -- modifiers (#3976); with one mandatory, free modifier there is nothing to order
+  -- and no second reader.
   --
   -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
   -- (Feywild Trickster). Recorded under `controller`, not `source`: rule 706.1's
