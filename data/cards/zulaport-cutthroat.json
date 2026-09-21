@@ -97,10 +97,10 @@
             "type": "Ally"
           },
           {
-            "type": "Cleric"
+            "type": "Human"
           },
           {
-            "type": "Human"
+            "type": "Rogue"
           }
         ],
         "types": [

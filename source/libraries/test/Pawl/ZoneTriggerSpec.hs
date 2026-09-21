@@ -1603,11 +1603,15 @@ permanentsDieSpec s registry =
 -- any trigger conditions", so a permanent that was not on the battlefield when
 -- an event happened is no witness to it -- however briefly it stands after.
 --
--- Zulaport Cutthroat {1}{B} Creature -- Human Cleric Ally 1/1, "Whenever
--- Zulaport Cutthroat or another creature you control dies, each opponent loses
--- 1 life and you gain 1 life." TRANSCRIBED FROM MEMORY: this sandbox's egress
--- proxy blocks Scryfall, so the name, cost, type line and oracle text are the
--- one thing in this file nothing checked.
+-- Zulaport Cutthroat {1}{B} Creature -- Human Rogue Ally 1/1, "Whenever this
+-- creature or another creature you control dies, each opponent loses 1 life and
+-- you gain 1 life." (name, cost, type line and oracle text checked by the
+-- repository owner; this sandbox's egress proxy blocks Scryfall.)
+--
+-- CR 201.5: "this creature" is the current templating for the card's own name
+-- and means just that object, so the printed sentence names every creature its
+-- controller controls, the source included -- which is why the condition's
+-- filter carries no Not IsSource where Meren of Clan Nel Toth's does.
 --
 -- The board is the one shape that reaches the rule with a real card. Come Back
 -- Wrong destroys the Cutthroat and returns it in ONE resolution, so the death
