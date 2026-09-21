@@ -23,8 +23,8 @@
 -- CR 614.1a's replacement over the roll is the fifth fixture, Pixie Guide, at the
 -- bottom of this file -- the ignore of CR 706.6 rides it, no instruction in
 -- data\/cards\/ printing one of its own.
--- Left out: no reroll and no modifier from another source (#2083), no "Roll
--- again" (#2124), and no reading that takes the results as a set (#3243). CR
+-- Left out: no reroll (#3975) and no modifier from another source (#3974), no
+-- "Roll again" (#2124), and no reading that takes the results as a set (#3243). CR
 -- 706.1's roll does record its event, but the trigger reading it lives in
 -- Pawl.EventTriggerSpec beside the other condition cases.
 --
@@ -243,7 +243,7 @@ resultsTableSpec s registry = Spec.describe s "ResultsTable" $ do
         -- every outcome, and swapping the card's Exactly for an AtLeast leaves
         -- this assertion green. Windseer's own instruction prints no modifier, so
         -- it becomes discriminable here only alongside one reaching the roll from
-        -- ANOTHER source (#2083); the single-endpoint form itself is proved on
+        -- ANOTHER source (#3974); the single-endpoint form itself is proved on
         -- Diviner's Portent below, whose printed modifier pushes a natural 20
         -- past the face count. What the assertion DOES prove is that 20 selects
         -- this striation and not the 10-19 band above it.
