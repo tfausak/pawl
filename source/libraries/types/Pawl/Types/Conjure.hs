@@ -40,9 +40,11 @@ import qualified Pawl.Types.Quantity as Quantity
 -- controller of another object (Thendar, the Overminer\'s "its controller
 -- conjures a card named Wastes onto the battlefield tapped") are both printed --
 -- so a 'Pawl.Types.PlayerRef.PlayerRef' is what this would carry, the field
--- 'Pawl.Types.Create.Create' already has. Also not implemented: a slot binding
--- the conjured card for a later clause to name (Kari Zev, Crew of Two\'s "if
--- that card is on the battlefield, return it to its owner\'s hand") (#2638).
+-- 'Pawl.Types.Create.Create' already has (#3970).
+--
+-- Not implemented: a slot binding the conjured card for a later clause to name
+-- (Kari Zev, Crew of Two\'s "if that card is on the battlefield, return it to
+-- its owner\'s hand") (#3971).
 data Conjure card = MkConjure
   { -- | How many copies of the card. Toralf\'s Disciple\'s "conjure four cards
     -- named Lightning Bolt"; a printed "a card" is one.

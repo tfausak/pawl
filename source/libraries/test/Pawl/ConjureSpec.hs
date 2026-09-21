@@ -401,7 +401,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- Not implemented: the rider, "It perpetually gains 'You may spend mana as
   -- though it were mana of any color to cast this spell.'" A conjure binds its
   -- card to no slot, so no later clause can name it; pawl's Tome is stricter
-  -- than the printing, never weaker (#2638).
+  -- than the printing, never weaker (#3971).
   --
   --
   -- The answerer pins the pick to the LAST candidate, which the offered list's

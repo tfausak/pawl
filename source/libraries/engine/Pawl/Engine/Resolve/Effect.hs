@@ -5582,7 +5582,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- The conjurer is the resolving CONTROLLER (CR 109.5's "you"). Not implemented:
   -- a printing that states one instead, which is a shape rather than one card --
-  -- Pawl.Types.Conjure lists the two forms (#2638).
+  -- Pawl.Types.Conjure lists the two forms (#3970).
   Effect.Conjure (Conjure.MkConjure quantity cards selection destination) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -5607,7 +5607,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- LibraryPosition.defaultValue, which is the BOTTOM, and the printings
         -- that state an end all say the TOP -- Pawl.Types.ConjureDestination's
         -- Library arm names them and says why none of them is in data/cards/
-        -- (#2638).
+        -- (#3972).
         --
         -- The CANDIDATES are picked over once per card conjured, and the pick is
         -- ASKED rather than rolled: docs/design.md section 2.2 makes randomness

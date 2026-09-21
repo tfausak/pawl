@@ -912,8 +912,8 @@ conjure pid card dest position = do
 -- rather than a tap after the mint, that function's own note saying why.
 --
 -- CR 508.4's combat state is still this road's default and nothing here puts the
--- arrival into combat; Pawl.Types.ConjureDestination names the printings that
--- state otherwise.
+-- arrival into combat; Pawl.Types.ConjureDestination's Battlefield arm names
+-- the printings that state otherwise (#3973).
 --
 -- CR 110.2a's `Just controller` is correct by construction and unobservable: a
 -- conjured card's OWNER is the player who conjured it (mintCard's `pid`, the
@@ -921,7 +921,7 @@ conjure pid card dest position = do
 -- `enteredUnder` is Nothing, so no board can tell the two writings apart.
 -- Mutating it to Nothing leaves Pawl.ConjureSpec green, and would stop doing so
 -- the day a printing names a conjurer other than the resolving controller
--- (#2638).
+-- (#3970).
 --
 -- CR 800.4d's guard, `conjure` above's, for the same reason and read off the
 -- same parameter -- and CR 800.4b's third sentence agrees for this destination
@@ -929,7 +929,7 @@ conjure pid card dest position = do
 -- under a departed player's control does not arrive. `controller` is also the
 -- OWNER (mintCard's `pid` below is the same seat), so one read answers both
 -- rules. Reachable in gameplay the day a printing names a conjurer other than
--- the resolving controller (#2638); until then a departed player controls no
+-- the resolving controller (#3970); until then a departed player controls no
 -- resolving spell or ability (CR 800.4a, whose three clauses
 -- Pawl.Engine.Departure performs), so Pawl.EventSpec's "CR 800.4d no card is
 -- conjured under a player who has left the game" drives both funnels directly,

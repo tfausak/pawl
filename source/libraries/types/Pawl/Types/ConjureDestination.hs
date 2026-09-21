@@ -23,7 +23,7 @@ import qualified Pawl.Types.TapState as TapState
 -- play that card until the end of your next turn" and Darigaaz, Shivan
 -- Champion\'s arrival "face down with three egg counters on it" both name the
 -- conjured card in a later clause, which wants the slot the conjure does not
--- bind (#2638); Limitless Rekindling picks from outside the game (#3063); Gyox
+-- bind (#3971); Limitless Rekindling picks from outside the game (#3063); Gyox
 -- and Smog Smasher conjure a duplicate (#2643). So no board reaches such an arm
 -- (#2653).
 data ConjureDestination
@@ -46,10 +46,10 @@ data ConjureDestination
     -- arrival, and that is the BOTTOM -- the opposite end from the one every
     -- printing above names. Nothing is red because none of those printings is in
     -- @data\/cards\/@: Jewel Mine Overseer\'s rider has to NAME the seven cards it
-    -- conjured, which wants them bound to a slot (#2638), Pampered Loamfrill
+    -- conjured, which wants them bound to a slot (#3971), Pampered Loamfrill
     -- conjures a duplicate (#2643), and this arm\'s own producer shuffles
     -- immediately, which makes the end unobservable there. Pampered Loamfrill is
-    -- the one that would OBSERVE it, since it never shuffles (#2638).
+    -- the one that would OBSERVE it, since it never shuffles (#3972).
     Library
   | -- | Shellfish Scholar\'s "conjure a card named Think Twice into your
     -- graveyard" (CR 404.1).
@@ -83,6 +83,6 @@ data ConjureDestination
     -- beside the status -- Stormforged Armor\'s equipped creature "conjure a card
     -- named Ball Lightning onto the battlefield tapped and attacking", and Kari
     -- Zev, Crew of Two\'s same sentence, whose rider then names the conjured card
-    -- and so wants a slot this opcode does not bind either (#2638).
+    -- and so wants the binding see #3971 as well (#3973).
     Battlefield TapState.TapState
   deriving (Eq, Ord, Show)
