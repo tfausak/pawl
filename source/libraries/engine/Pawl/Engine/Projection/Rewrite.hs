@@ -45,6 +45,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
@@ -574,7 +575,7 @@ rewriteEffect pairs effect = case effect of
   -- in data/cards/ mints a token with a keyword counter rider, so the key
   -- rewrite is proven through MoveToZone's arm above and not through this one.
   Effect.Create (Create.MkCreate quantity card riders slot creator) -> Effect.Create (Create.MkCreate (rewriteQuantity pairs quantity) (rewriteCard pairs card) (rewriteEntryRiders pairs riders) slot creator)
-  Effect.Conjure (Conjure.MkConjure quantity cards selection destination) -> Effect.Conjure (Conjure.MkConjure (rewriteQuantity pairs quantity) (fmap (rewriteCard pairs) cards) selection destination)
+  Effect.Conjure (Conjure.MkConjure quantity cards selection destination) -> Effect.Conjure (Conjure.MkConjure (rewriteQuantity pairs quantity) (rewriteConjureCards pairs cards) selection destination)
   -- CR 707.2 excludes text-changing effects from copiable values, so what the
   -- token becomes is not rewritten -- only the ref, the count and the riders'
   -- counter amounts and their keys are. A REGRESSION FENCE on this arm too,
@@ -876,6 +877,15 @@ swapWordIn :: SubtypeFamily.SubtypeFamily -> [(Subtype.Type.Subtype, Subtype.Typ
 swapWordIn family pairs word =
   let step s (from, to) = if s == from && Subtype.inFamily family from then to else s
    in List.foldl' step word pairs
+
+-- CR 612.1 through an Alchemy conjure's card half. A written candidate is card
+-- data and takes the same walk as any other nested card; a duplicate names an
+-- object already in the game and takes the ObjectRef walk below, since the card
+-- it duplicates is read off the board rather than out of the opcode.
+rewriteConjureCards :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ConjureCards.ConjureCards Card.Type.Card -> ConjureCards.ConjureCards Card.Type.Card
+rewriteConjureCards pairs cards = case cards of
+  ConjureCards.Written written -> ConjureCards.Written (fmap (rewriteCard pairs) written)
+  ConjureCards.Duplicate ref -> ConjureCards.Duplicate (rewriteObjectRef pairs ref)
 
 -- CR 612.1 through an ObjectRef. An InSlot names an object chosen at cast time,
 -- and the player-naming arms hold no subtype word; only the Filters and the
