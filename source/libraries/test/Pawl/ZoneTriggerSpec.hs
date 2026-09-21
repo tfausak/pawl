@@ -1598,6 +1598,98 @@ permanentsDieSpec s registry =
                 )
             ]
 
+-- CR 603.10's first sentence on the ARRIVAL side of the battlefield: "objects
+-- that exist immediately after an event are checked to see if the event matched
+-- any trigger conditions", so a permanent that was not on the battlefield when
+-- an event happened is no witness to it -- however briefly it stands after.
+--
+-- Zulaport Cutthroat {1}{B} Creature -- Human Rogue Ally 1/1, "Whenever this
+-- creature or another creature you control dies, each opponent loses 1 life and
+-- you gain 1 life." (name, cost, type line and oracle text checked by the
+-- repository owner; this sandbox's egress proxy blocks Scryfall.)
+--
+-- CR 201.5: "this creature" is the current templating for the card's own name
+-- and means just that object, so the printed sentence names every creature its
+-- controller controls, the source included -- which is why the condition's
+-- filter carries no Not IsSource where Meren of Clan Nel Toth's does.
+--
+-- The board is the one shape that reaches the rule with a real card. Come Back
+-- Wrong destroys the Cutthroat and returns it in ONE resolution, so the death
+-- and the arrival share a CR 117.5 scan, and CR 400.7 mints a fresh id for the
+-- returning incarnation -- which is what makes the printed "or another creature
+-- you control" match the death of the incarnation it came from. Night of Souls'
+-- Betrayal then buries that arrival at the settle's CR 704.5f pass, a third
+-- event group: the returned 1/1 is a 0/0 without the +1/+1 counter the original
+-- stood on.
+--
+-- That last fact is the whole case. A permanent still standing at the boundary
+-- is read from the live board, which `battlefieldAt`'s per-group sample already
+-- narrows correctly; only one that has LEFT is recovered from CR 608.2h last
+-- known information, and that recovery is per BATCH. Two triggers is the rules
+-- answer -- the original's own death and the arrival's own death -- and three
+-- is the arrival witnessing a death it was not there for.
+arrivedLaterSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+arrivedLaterSpec s registry =
+  let cutthroatName = CardName.MkCardName (Text.pack "Zulaport Cutthroat")
+      -- The distinct EventGroups the log's battlefield-to-graveyard moves carry,
+      -- permanentsDieSpec's precondition read for the opposite reason: here the
+      -- two deaths must be DIFFERENT groups, or "entered later" and "entered
+      -- simultaneously" would be the same board and CR 603.6a would be the rule
+      -- under test instead.
+      deathGroups gs =
+        Set.fromList
+          ( Maybe.mapMaybe
+              ( \logged -> case LoggedEvent.event logged of
+                  GameEvent.Moved (Moved.MkMoved zc _ _ _)
+                    | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard -> Just (LoggedEvent.group logged)
+                  _ -> Nothing
+              )
+              (Foldable.toList (GameState.events gs))
+          )
+      resolveWholeStack gs =
+        if null (GameState.stack gs)
+          then gs
+          else resolveWholeStack (S.runPure S.identityAnswer gs Stack.resolveTop)
+      -- alice: three Swamps for Come Back Wrong, Night of Souls' Betrayal, and a
+      -- Zulaport Cutthroat carrying one +1/+1 counter so that it stands as a 1/1
+      -- under Night and returns as a 0/0 without it (CR 400.7 leaves the counter
+      -- behind with the incarnation that had it).
+      board = do
+        swamp <- S.printingOf s registry "Swamp"
+        night <- S.printingOf s registry "Night of Souls' Betrayal"
+        cutthroat <- S.printingOf s registry "Zulaport Cutthroat"
+        comeBackWrong <- S.printingOf s registry "Come Back Wrong"
+        let (cutthroatId, withCutthroat) = S.addPermanent cutthroat S.alice (S.landsInPlay swamp 3)
+            (_, withNight) = S.addPermanent night S.alice withCutthroat
+            propped = S.addCounter CounterKind.PlusOnePlusOne 1 cutthroatId withNight
+            (withSpell, spellId) = S.handOne comeBackWrong propped
+        pure (cutthroatId, spellId, withSpell {GameState.priority = Just S.alice})
+   in Spec.describe s "ArrivedLater" $ do
+        Spec.it s "CR 603.10 a permanent that arrived after a death and left again does not witness it" $ do
+          (cutthroatId, spellId, gs) <- board
+          let -- Pinned by FILTERING the offered set, graveyardTriggerSpec's way.
+              -- The Cutthroat is the only creature, so this is the identity on a
+              -- set of one.
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature cutthroatId) . snd) sets
+                _ -> S.identityAnswer p
+              cast = S.runPure answer gs (S.cast S.alice spellId)
+              resolved = S.runPure answer cast Stack.resolveTop
+              settled = S.runPure answer resolved Engine.settleForPriority
+              after = resolveWholeStack settled
+          -- The board the case needs, before the count is read.
+          Spec.assertEqWith s "CR 400.7 the Cutthroat that died is gone" (Game.lookupObject cutthroatId resolved) Nothing
+          Spec.assertEqWith s "and a fresh one stood on the battlefield when the resolution finished" (S.countOnBattlefieldByName cutthroatName S.alice resolved) 1
+          Spec.assertEqWith s "CR 704.5f which the settle buried as a 0/0 under Night of Souls' Betrayal" (S.countOnBattlefieldByName cutthroatName S.alice settled) 0
+          Spec.assertEqWith s "so the two deaths are two event groups: the arrival happened between them" (Set.size (deathGroups settled)) 2
+          -- The gameplay-level answer, read first so that nothing ahead of it can
+          -- absorb a mutation: a third trigger is the arrival witnessing the
+          -- death that preceded it, and it is worth one life each way.
+          Spec.assertEqWith s "CR 603.10 bob lost 1 life per death and no more" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "and alice gained as much" (S.lifeOf S.alice after) (Just 22)
+          Spec.assertEqWith s "which is two triggers on the stack rather than three" (length (GameState.stack settled)) 2
+
 -- Meren of Clan Nel Toth's SECOND ability, the half permanentDiesSpec above does
 -- not cover: "At the beginning of your end step, choose target
 -- creature card in your graveyard. If that card's mana value is less than or
@@ -2818,5 +2910,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   diesTriggerSpec s registry
   permanentDiesSpec s registry
   permanentsDieSpec s registry
+  arrivedLaterSpec s registry
   merenEndStepSpec s registry
   leavesBattlefieldSpec s registry
