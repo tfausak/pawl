@@ -734,21 +734,30 @@ greenBlack fetch = do
   black <- Cards.blackDeck fetch
   pure ((alice, green) NonEmpty.:| [(bob, black)])
 
--- A 60-basic-land mirror: no spell can be cast and no creature can attack, so the
--- only loss condition reachable is CR 704.5b deck-out. EngineSpec plays it out.
+-- The same card mix as greenBlack at half the counts. EngineSpec needs the
+-- cast-and-combat interaction, not a tournament-length deck-out.
+shortGreenBlack :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+shortGreenBlack fetch = do
+  green <- Cards.greenDeck fetch
+  black <- Cards.blackDeck fetch
+  let halve deck = deck {Deck.cards = fmap (`div` 2) (Deck.cards deck)}
+  pure ((alice, halve green) NonEmpty.:| [(bob, halve black)])
+
+-- An eight-basic-land mirror: no spell can be cast and no creature can attack, so
+-- the only loss condition reachable is CR 704.5b deck-out. EngineSpec plays it out.
 landsOnly :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 landsOnly fetch = do
   mountain <- fetch "Mountain"
-  pure (Setup.mirror (Deck.fromCards (Map.singleton mountain 60)) bothPlayers)
+  pure (Setup.mirror (Deck.fromCards (Map.singleton mountain 8)) bothPlayers)
 
--- CR 800.1: the three-seat twin of landsOnly. 60 basic lands each, so the only
+-- CR 800.1: the three-seat twin of landsOnly. Eight basic lands each, so the only
 -- reachable loss condition is CR 704.5b deck-out and the only reachable end is
 -- CR 104.2a's last player standing. The seat count is what makes it a falsifier:
 -- at two players the first deck-out ends the game, at three it must not.
 threePlayerLandsOnly :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 threePlayerLandsOnly fetch = do
   mountain <- fetch "Mountain"
-  pure (Setup.mirror (Deck.fromCards (Map.singleton mountain 60)) threePlayers)
+  pure (Setup.mirror (Deck.fromCards (Map.singleton mountain 8)) threePlayers)
 
 -- CR 800.1: the three-seat twin of redRed -- one red deck each for alice, bob and
 -- carol. Setup.mirror is already NonEmpty-shaped, so the seat count is the only
