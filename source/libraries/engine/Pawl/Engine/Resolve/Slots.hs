@@ -52,6 +52,7 @@ import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
@@ -612,7 +613,12 @@ effectObjectRefs effect = case effect of
   Effect.IncreaseSpeed {} -> []
   Effect.DecreaseSpeed {} -> []
   Effect.Create {} -> []
-  Effect.Conjure {} -> []
+  -- A written conjure names no object -- its candidates are card data -- where a
+  -- duplicate names the object it is a duplicate OF, which is the arm that makes
+  -- a conjure able to target (Sinister Reflections).
+  Effect.Conjure (Conjure.MkConjure _ cards _ _) -> case cards of
+    ConjureCards.Written {} -> []
+    ConjureCards.Duplicate ref -> [ref]
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> [ref]
   -- Both sides: CR 707.2's copiable values come off one and go onto the other.
   -- The exceptions beside them read no slot: CR 707.9a's "this ability" is the
@@ -1687,10 +1693,13 @@ ownSlotsAreExhaustive effect = case effect of
   -- Its entry riders are not either: CR 122.6's count per kind is the effect
   -- speaking, read in the resolution's own slots.
   Effect.Create (Create.MkCreate quantity card riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders <> tokenBoxQuantities card)
-  -- Every candidate is literal text THROUGHOUT, unlike Create's token above:
-  -- nothing bakes a conjured card's printed box, so Pawl.Engine.Resolve.Effect
-  -- hands the one it picks to Event.conjure exactly as written. The COUNT is
-  -- the effect speaking, read in the resolution's own slots.
+  -- Every WRITTEN candidate is literal text THROUGHOUT, unlike Create's token
+  -- above: nothing bakes a conjured card's printed box, so
+  -- Pawl.Engine.Resolve.Effect hands the one it picks to Event.conjure exactly
+  -- as written, and a DUPLICATE reads its card off the board rather than out of
+  -- the opcode. The COUNT is the effect speaking, read in the resolution's own
+  -- slots -- CreateCopy's arm below reads its own ref the same way, which is to
+  -- say not at all.
   Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _) -> all durationSlotsAreExhaustive duration

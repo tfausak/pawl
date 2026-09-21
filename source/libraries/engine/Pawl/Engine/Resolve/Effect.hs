@@ -129,6 +129,7 @@ import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ConjureSelection as ConjureSelection
 import qualified Pawl.Types.Connive as Connive.Type
@@ -5609,7 +5610,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Library arm names them and says why none of them is in data/cards/
         -- (#3972).
         --
-        -- The CANDIDATES are picked over once per card conjured, and the pick is
+        -- The CANDIDATES of a WRITTEN conjure are picked over once per card
+        -- conjured, and the pick is
         -- ASKED rather than rolled: docs/design.md section 2.2 makes randomness
         -- a prompt, RandomObject's posture. A one-candidate list is the card the
         -- sentence names outright, which no board can tell from a pick, so no
@@ -5629,16 +5631,45 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Secrets' "conjure X random cards from Giant Secrets's spellbook into
         -- your hand"). Each pick here is independent, so one card can come up
         -- twice (#3648).
-        offered = fmap conjuredName cards
-        answered answer = Maybe.fromMaybe (NonEmpty.head cards) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList cards))
-        pick = case cards of
-          one NonEmpty.:| [] -> pure one
+        --
+        -- A DUPLICATE names objects already in the game rather than candidates
+        -- written out in the card file, so there is nothing to pick over and
+        -- `selection` asks nothing. Each named object is duplicated in turn, the
+        -- whole count per object -- Gyox, Brutal Carnivora's "conjure X
+        -- duplicates of it" names one object and makes X cards -- and the set is
+        -- swept ONCE off the pre-effect board (CR 608.2f), as CreateCopy's arm
+        -- below sweeps its own.
+        --
+        -- What is duplicated is the object's COPIABLE values (CR 707.2) and not
+        -- the card printed under it: a Clone that is a copy of an Ornithopter
+        -- duplicates as an Ornithopter. The PAIR of reads is CreateCopy's and
+        -- has to move together -- Game.cardOfWithLastKnown for the card a reader
+        -- past the projection sees, Event.copiedSnapshotWithLastKnown for the
+        -- values themselves -- and both take CR 608.2h's last-known branch, since
+        -- the object a trigger named can be gone by the time it resolves
+        -- (Sinister Reflections is an instant and its targets can be killed in
+        -- response to it).
+        --
+        -- Not implemented: the duplicate keeps those copiable values only as the
+        -- incarnation this mints. CR 400.7 gives the next one no memory, so a
+        -- duplicate of a Clone that is cast from the hand it landed in resolves
+        -- as a Clone (#3979).
+        duplicatesOf ref = Maybe.mapMaybe (\oid -> fmap (\card -> (card, Just (Event.copiedSnapshotWithLastKnown oid gs))) (Game.cardOfWithLastKnown oid gs)) (objectRefObjects legal resolving controller source gs ref)
+        answered written answer = Maybe.fromMaybe (NonEmpty.head written) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList written))
+        pickWritten written = case written of
+          one NonEmpty.:| [] -> pure (one, Nothing)
           _ -> case selection of
-            ConjureSelection.AtRandom -> fmap answered (Game.ask (Prompt.RandomCard offered))
+            ConjureSelection.AtRandom -> fmap (\answer -> (answered written answer, Nothing)) (Game.ask (Prompt.RandomCard (fmap conjuredName written)))
             ConjureSelection.ByChoice -> do
               g <- State.get
-              fmap answered (Game.choose (Prompt.ChooseConjuredCard (Decide.deciderFor controller g) controller offered))
-        intoZone zone n = Monad.replicateM_ (Integer.toIntSaturating n) (pick >>= \card -> Monad.void (Event.conjure controller card zone LibraryPosition.defaultValue))
+              fmap (\answer -> (answered written answer, Nothing)) (Game.choose (Prompt.ChooseConjuredCard (Decide.deciderFor controller g) controller (fmap conjuredName written)))
+        -- One pick per card conjured on the written road, and one entry per
+        -- named object on the duplicate road. `pure` rather than a prompt for a
+        -- duplicate: the object was named before the conjure ran.
+        picks n = case cards of
+          ConjureCards.Written written -> replicate (Integer.toIntSaturating n) (pickWritten written)
+          ConjureCards.Duplicate ref -> fmap pure (duplicatesOf ref)
+        intoZone zone n = Monad.mapM_ (\p -> p >>= \(card, copied) -> Monad.void (Event.conjure controller card copied zone LibraryPosition.defaultValue)) (picks n)
     case evaluateForRecipient viewOf context gs resolving source controller quantity of
       Just n
         | n > 0 -> case destination of
@@ -5658,7 +5689,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- than a tap afterwards: a permanent that arrived untapped and was
             -- tapped after would have been read untapped by its own CR 616.1
             -- loop and by every CR 603.6a watcher of the entry.
-            ConjureDestination.Battlefield tapped -> pick >>= \card -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n) tapped)
+            -- One batch per pick, which on the written road is the one pick the
+            -- whole count is minted from and on the duplicate road is one batch
+            -- of `n` per named object.
+            ConjureDestination.Battlefield tapped -> case cards of
+              ConjureCards.Written written -> pickWritten written >>= \(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped)
+              ConjureCards.Duplicate ref -> Monad.forM_ (duplicatesOf ref) (\(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped))
       _ -> pure ()
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry mSlot exceptions) -> do
     gs <- State.get

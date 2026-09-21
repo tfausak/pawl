@@ -1,6 +1,6 @@
 module Pawl.Types.Conjure where
 
-import qualified Data.List.NonEmpty as NonEmpty
+import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ConjureSelection as ConjureSelection
 import qualified Pawl.Types.Quantity as Quantity
@@ -15,24 +15,24 @@ import qualified Pawl.Types.Quantity as Quantity
 -- so the conjured object is an ordinary card, castable and shufflable, and
 -- 'Pawl.Types.Source.OfCard' is what backs it.
 --
--- The card is carried INLINE, 'Pawl.Types.Meld.Meld''s reason spelled out
--- there: no @Pawl.Engine@ module imports @Pawl.Registry@ and
+-- A card the sentence NAMES is carried INLINE, 'Pawl.Types.Meld.Meld''s reason
+-- spelled out there: no @Pawl.Engine@ module imports @Pawl.Registry@ and
 -- 'Pawl.Types.GameState.GameState' holds no name-keyed map, so an opcode naming
 -- its card by name would have nothing to resolve the name against. The printed
 -- sentence names the card ("a card named Ornithopter"); pawl\'s card file
--- writes that card out.
+-- writes that card out. A DUPLICATE names no card at all --
+-- 'Pawl.Types.ConjureCards.Duplicate' names an object already in the game and
+-- the resolver reads the card off it -- so that road needs no registry either.
 --
 -- Parametric in @card@ for 'Pawl.Types.Effect.Effect''s reason: the conjured
 -- card is card DATA nested inside card data, and the parameter is what keeps
 -- 'Pawl.Types.Effect' from naming a concrete card type.
 --
--- Not implemented: a conjure whose candidates are not WRITTEN OUT in the card
--- file. A duplicate of an object already in the game (Futurist Spellthief\'s
--- "conjure a duplicate of target spell into your hand") wants an
--- 'Pawl.Types.ObjectRef.ObjectRef' where the list holds card data (#2643), and
--- a pick from outside the game (Anina, Natural Parallelist\'s "conjure a random
--- creature card with mana value X") wants the card registry a filter narrows
--- (#3063). Neither is a list this type can hold.
+-- Not implemented: a conjure whose card is picked from OUTSIDE THE GAME (Anina,
+-- Natural Parallelist\'s "conjure a random creature card with mana value X"),
+-- which wants the card registry a filter narrows (#3063). That is neither a
+-- written-out list nor an object already in the game, so it is no arm
+-- 'Pawl.Types.ConjureCards.ConjureCards' holds.
 --
 -- Not implemented: a conjurer other than the resolving controller. That is a
 -- SHAPE and not one card -- a chosen player (Juggernaut Peddler\'s "that player
@@ -49,18 +49,12 @@ data Conjure card = MkConjure
   { -- | How many copies of the card. Toralf\'s Disciple\'s "conjure four cards
     -- named Lightning Bolt"; a printed "a card" is one.
     quantity :: Quantity.Quantity,
-    -- | The candidates, each written out in full. ONE is a card the sentence
-    -- names outright (Emporium Thopterist\'s "a card named Ornithopter"); more
-    -- than one is the printed spellbook the sentence names instead (Tome of the
-    -- Infinite\'s "a random card from Tome of the Infinite\'s spellbook"), and
-    -- the conjure picks one of them, 'selection' below saying how. One list
-    -- rather than a card and an optional spellbook beside it: a named card is
-    -- the pick over a one-candidate pool, which no board can tell from taking it
-    -- outright, and a prompt is raised only for two or more.
-    cards :: NonEmpty.NonEmpty card,
+    -- | WHAT is conjured -- a list written out in the card file, or a duplicate
+    -- of an object already in the game.
+    cards :: ConjureCards.ConjureCards card,
     -- | Which question the sentence asks of the candidates above -- "a random
-    -- card" or "a card of your choice". Unobservable on a one-candidate list,
-    -- where neither question is asked.
+    -- card" or "a card of your choice". Unobservable on a one-candidate list
+    -- and on a duplicate, where neither question is asked.
     selection :: ConjureSelection.ConjureSelection,
     -- | The zone it arrives in.
     destination :: ConjureDestination.ConjureDestination

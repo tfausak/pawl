@@ -26,193 +26,196 @@
                   {
                     "type": "Conjure",
                     "value": {
-                      "cards": [
-                        {
-                          "faces": [
-                            {
-                              "name": "Gate of the Black Dragon",
-                              "replacementEffects": [
-                                {
-                                  "effect": {
-                                    "type": "EntryR",
-                                    "value": {
-                                      "matching": {
-                                        "type": "IsSource"
-                                      },
-                                      "rewrite": {
-                                        "type": "Tapped"
+                      "cards": {
+                        "type": "Written",
+                        "value": [
+                          {
+                            "faces": [
+                              {
+                                "name": "Gate of the Black Dragon",
+                                "replacementEffects": [
+                                  {
+                                    "effect": {
+                                      "type": "EntryR",
+                                      "value": {
+                                        "matching": {
+                                          "type": "IsSource"
+                                        },
+                                        "rewrite": {
+                                          "type": "Tapped"
+                                        }
                                       }
                                     }
                                   }
-                                }
-                              ],
-                              "typeLine": {
-                                "subtypes": [
-                                  {
-                                    "type": "Gate"
-                                  },
-                                  {
-                                    "type": "Swamp"
-                                  }
                                 ],
-                                "types": [
-                                  {
-                                    "type": "Land"
-                                  }
-                                ]
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Gate"
+                                    },
+                                    {
+                                      "type": "Swamp"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Land"
+                                    }
+                                  ]
+                                }
                               }
-                            }
-                          ]
-                        },
-                        {
-                          "faces": [
-                            {
-                              "name": "Gate to Manorborn",
-                              "replacementEffects": [
-                                {
-                                  "effect": {
-                                    "type": "EntryR",
-                                    "value": {
-                                      "matching": {
-                                        "type": "IsSource"
-                                      },
-                                      "rewrite": {
-                                        "type": "Tapped"
+                            ]
+                          },
+                          {
+                            "faces": [
+                              {
+                                "name": "Gate to Manorborn",
+                                "replacementEffects": [
+                                  {
+                                    "effect": {
+                                      "type": "EntryR",
+                                      "value": {
+                                        "matching": {
+                                          "type": "IsSource"
+                                        },
+                                        "rewrite": {
+                                          "type": "Tapped"
+                                        }
                                       }
                                     }
                                   }
-                                }
-                              ],
-                              "typeLine": {
-                                "subtypes": [
-                                  {
-                                    "type": "Forest"
-                                  },
-                                  {
-                                    "type": "Gate"
-                                  }
                                 ],
-                                "types": [
-                                  {
-                                    "type": "Land"
-                                  }
-                                ]
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Forest"
+                                    },
+                                    {
+                                      "type": "Gate"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Land"
+                                    }
+                                  ]
+                                }
                               }
-                            }
-                          ]
-                        },
-                        {
-                          "faces": [
-                            {
-                              "name": "Gate to Seatower",
-                              "replacementEffects": [
-                                {
-                                  "effect": {
-                                    "type": "EntryR",
-                                    "value": {
-                                      "matching": {
-                                        "type": "IsSource"
-                                      },
-                                      "rewrite": {
-                                        "type": "Tapped"
+                            ]
+                          },
+                          {
+                            "faces": [
+                              {
+                                "name": "Gate to Seatower",
+                                "replacementEffects": [
+                                  {
+                                    "effect": {
+                                      "type": "EntryR",
+                                      "value": {
+                                        "matching": {
+                                          "type": "IsSource"
+                                        },
+                                        "rewrite": {
+                                          "type": "Tapped"
+                                        }
                                       }
                                     }
                                   }
-                                }
-                              ],
-                              "typeLine": {
-                                "subtypes": [
-                                  {
-                                    "type": "Gate"
-                                  },
-                                  {
-                                    "type": "Island"
-                                  }
                                 ],
-                                "types": [
-                                  {
-                                    "type": "Land"
-                                  }
-                                ]
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Gate"
+                                    },
+                                    {
+                                      "type": "Island"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Land"
+                                    }
+                                  ]
+                                }
                               }
-                            }
-                          ]
-                        },
-                        {
-                          "faces": [
-                            {
-                              "name": "Gate to the Citadel",
-                              "replacementEffects": [
-                                {
-                                  "effect": {
-                                    "type": "EntryR",
-                                    "value": {
-                                      "matching": {
-                                        "type": "IsSource"
-                                      },
-                                      "rewrite": {
-                                        "type": "Tapped"
+                            ]
+                          },
+                          {
+                            "faces": [
+                              {
+                                "name": "Gate to the Citadel",
+                                "replacementEffects": [
+                                  {
+                                    "effect": {
+                                      "type": "EntryR",
+                                      "value": {
+                                        "matching": {
+                                          "type": "IsSource"
+                                        },
+                                        "rewrite": {
+                                          "type": "Tapped"
+                                        }
                                       }
                                     }
                                   }
-                                }
-                              ],
-                              "typeLine": {
-                                "subtypes": [
-                                  {
-                                    "type": "Gate"
-                                  },
-                                  {
-                                    "type": "Plains"
-                                  }
                                 ],
-                                "types": [
-                                  {
-                                    "type": "Land"
-                                  }
-                                ]
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Gate"
+                                    },
+                                    {
+                                      "type": "Plains"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Land"
+                                    }
+                                  ]
+                                }
                               }
-                            }
-                          ]
-                        },
-                        {
-                          "faces": [
-                            {
-                              "name": "Gate to Tumbledown",
-                              "replacementEffects": [
-                                {
-                                  "effect": {
-                                    "type": "EntryR",
-                                    "value": {
-                                      "matching": {
-                                        "type": "IsSource"
-                                      },
-                                      "rewrite": {
-                                        "type": "Tapped"
+                            ]
+                          },
+                          {
+                            "faces": [
+                              {
+                                "name": "Gate to Tumbledown",
+                                "replacementEffects": [
+                                  {
+                                    "effect": {
+                                      "type": "EntryR",
+                                      "value": {
+                                        "matching": {
+                                          "type": "IsSource"
+                                        },
+                                        "rewrite": {
+                                          "type": "Tapped"
+                                        }
                                       }
                                     }
                                   }
-                                }
-                              ],
-                              "typeLine": {
-                                "subtypes": [
-                                  {
-                                    "type": "Gate"
-                                  },
-                                  {
-                                    "type": "Mountain"
-                                  }
                                 ],
-                                "types": [
-                                  {
-                                    "type": "Land"
-                                  }
-                                ]
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Gate"
+                                    },
+                                    {
+                                      "type": "Mountain"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Land"
+                                    }
+                                  ]
+                                }
                               }
-                            }
-                          ]
-                        }
-                      ],
+                            ]
+                          }
+                        ]
+                      },
                       "destination": {
                         "type": "Battlefield"
                       },
