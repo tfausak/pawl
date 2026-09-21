@@ -1260,6 +1260,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
 durationPlayerRefs :: Duration.Duration -> [PlayerRef]
 durationPlayerRefs duration = case duration of
   Duration.UntilEndOfNextTurnOf ref -> [ref]
+  -- The seat the WINDOW is counted against, read exactly as the arm above's is.
+  Duration.DuringNextTurnOf ref -> [ref]
   Duration.UntilEndOfTurn -> []
   Duration.Indefinite -> []
   Duration.Perpetual -> []
@@ -1283,6 +1285,7 @@ durationSlots duration = case duration of
   -- The seat the window is counted against, read exactly as every other
   -- PlayerRef position is (CR 601.2c).
   Duration.UntilEndOfNextTurnOf ref -> playerRefSlots ref
+  Duration.DuringNextTurnOf ref -> playerRefSlots ref
   Duration.ForAsLongAs condition -> conditionSlots condition
   -- A Cost reads no slot: the activation cost of an ability is not walked by
   -- modeSlots either, and CR 116.2c's price is paid outside any resolution, so
@@ -1831,6 +1834,7 @@ durationSlotsAreExhaustive duration = case duration of
   -- playerRefSlots' answer is complete for every arm: a PlayerRef names at
   -- most one slot and nothing nested inside it names another.
   Duration.UntilEndOfNextTurnOf _ -> True
+  Duration.DuringNextTurnOf _ -> True
   Duration.ForAsLongAs condition -> conditionSlotsAreExhaustive condition
   -- durationSlots' answer: a Cost reads no slot, so its enumeration is complete.
   Duration.UntilPaid _ -> True

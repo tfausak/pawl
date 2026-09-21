@@ -32,6 +32,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Detain as Detain
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.IgnoredAbility as IgnoredAbility
@@ -178,8 +179,23 @@ cantBlock defending candidates gs =
 -- residue, and `cantAttackPlayer` is where it lands.
 attackProhibited :: [ObjectId] -> GameState -> Set ObjectId
 attackProhibited candidates gs =
-  let unaimed = filter (Maybe.isNothing . ActiveAttackProhibition.aimedAt) (GameState.attackProhibitions gs)
+  let unaimed = filter (Maybe.isNothing . ActiveAttackProhibition.aimedAt) (liveAttackProhibitions gs)
    in Set.fromList (concatMap (storedSubjects candidates gs) unaimed)
+
+-- CR 611.2a: the stored attack restrictions whose duration is UNDER WAY, which
+-- is every row but one whose window begins on a later turn
+-- (Pawl.Engine.Expiry.begun). Wall of Dust's "that creature can't attack during
+-- its controller's next turn" is stored as the block happens and says nothing
+-- about the turns before that one, so a row read from the moment it is stored
+-- forbids an attack the card allows -- which a control change makes observable,
+-- since a creature taken by another player attacks on THAT player's turn.
+--
+-- `attackProhibited` above and `cantAttackPlayer` below both go through this
+-- rather than the field, so the two roads CR 508.1c takes -- a blanket
+-- restriction and CR 802.3a's aimed one -- share one answer. Pawl.CombatSpec's WindowAttackRestriction group is the proof.
+liveAttackProhibitions :: GameState -> [ActiveAttackProhibition.ActiveAttackProhibition]
+liveAttackProhibitions gs =
+  filter (Expiry.begun gs . ActiveAttackProhibition.expiry) (GameState.attackProhibitions gs)
 
 -- Which of `candidates` a stored attack restriction covers, its
 -- Pawl.Types.RestrictedCreatures read the way CR 611.2c says: a Named row is the
@@ -976,7 +992,7 @@ cantAttackPlayer candidates players gs =
       -- of that announcement. One gather, one gate reading per seat,
       -- cantAttackDefender's shape. No printing gates this arm today.
       forSeat player = concatMap (fromRestriction player) (filter (not . lifted (Just player) gs) rows)
-   in Set.fromList (concatMap forSeat players <> concatMap stored (GameState.attackProhibitions gs))
+   in Set.fromList (concatMap forSeat players <> concatMap stored (liveAttackProhibitions gs))
 
 -- The walk behind `blockLimit`, over the restrictions `select` keeps: the
 -- tightest of them, or Nothing where none is in force. `attackLimit` spells its

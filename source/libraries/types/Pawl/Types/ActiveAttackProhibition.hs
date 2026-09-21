@@ -37,7 +37,13 @@ import qualified Pawl.Types.Timestamp as Timestamp
 --
 -- `expiry` decides when a Pawl.Engine.Expiry sweep drops it (CR 514.2, 611.2a,
 -- 611.2b); "this turn" arms Expiry.AtCleanup, "until your next turn" arms
--- Expiry.AtTurnOf.
+-- Expiry.AtTurnOf and "during its controller's next turn" (Wall of Dust) arms
+-- Expiry.DuringTurnOf.
+--
+-- That last one is the only arm a sweep does not settle on its own: its window
+-- BEGINS on a later turn, so both readers above go through
+-- Pawl.Engine.CombatRestriction.liveAttackProhibitions, which drops a row whose
+-- turn has not come. This is the one carrier that asks (#3983).
 --
 -- `timestamp` is stored for ActiveBlockProhibition's reason: CR 613.11 orders by
 -- CR 613.7 timestamp, and nothing observes this one because two prohibitions
