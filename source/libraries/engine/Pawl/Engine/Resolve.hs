@@ -32,7 +32,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, clauseIsImpossible, noSubgame, performManaAbility, targetSlotsOf)
-import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, oneSlot, playerRefSlots, quantitySlots, slotBindings, slotsAreExhaustive, slotsOf)
+import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, objectRefObjects, oneSlot, playerRefSlots, quantitySlots, slotBindings, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
 import Pawl.Types.AbilityName (AbilityName)
@@ -45,6 +45,8 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostBasis as CostBasis
 import qualified Pawl.Types.Crewing as Crewing
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
@@ -64,6 +66,7 @@ import Pawl.Types.ModeInstance (ModeInstance)
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
@@ -149,6 +152,7 @@ targetSlotSlots slot =
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
 -- [a player] pays" names, every slot that gate's own "for each" counts over,
+-- every slot a gate's described cost reads a mana cost off,
 -- every slot a CR 701.46a "if" tests, and every slot a target slot's own pool,
 -- filter or bound names. A payer, multiplier, gate or pool slot no effect also
 -- reads would otherwise dangle.
@@ -162,6 +166,13 @@ modeSlots mode =
       -- against this resolution's own context, so the slot really is asked for.
       -- quantitySlots' WHOLE answer, targetSlotSlots' computed bound's reason.
       multiplierSlot = maybe Map.empty quantitySlots . (Clause.payGate Monad.>=> PayGate.perEach)
+      -- And the slot a gate's DESCRIBED cost reads its mana part off
+      -- (Pawl.Types.CostBasis): Flash's "its mana cost reduced by {2}" names the
+      -- creature its first clause put onto the battlefield, a read no other
+      -- field of the clause repeats. At arity ONE -- a slot naming several names
+      -- no one mana cost, and `describedCost` answers Nothing there rather than
+      -- picking.
+      basisSlot = maybe Map.empty (oneSlot . CostBasis.slot) . (Clause.payGate Monad.>=> PayGate.basis)
       -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
       -- clause too, and Jungle Wayfinder's names the table rather than a slot --
       -- but a card may name one, and an asker slot no effect also reads would
@@ -183,6 +194,7 @@ modeSlots mode =
         [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
           joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
           joinSlots (fmap multiplierSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap basisSlot (Foldable.toList (Mode.clauses mode))),
           joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
           joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
           joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
@@ -1391,7 +1403,7 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
           let viewOf = effectViewOf source legal gs
               context = effectContext gs controller source legal (slotBindings resolving gs)
            in maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source quantity)
-      cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate))
+      cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (describedCost resolving controller source legal gs gate))
   if notElem payer (Game.stillPlaying gs) || not (Cost.canPay PaymentSubject.ForNeither payer source cost gs)
     then pure False
     else do
@@ -1434,6 +1446,49 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
           pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
+
+-- CR 118.6: the gate's cost with its mana part DESCRIBED rather than printed --
+-- Flash's "unless you pay its mana cost reduced by {2}", where the mana part is
+-- the mana cost of the creature its first clause put onto the battlefield, less
+-- the {2} (CR 118.7). The gate's own cost unchanged when it describes nothing,
+-- which is every other gate in the pool.
+--
+-- Settled HERE, as the gate is offered, because there is no earlier moment: CR
+-- 118.12 puts the payment at resolution, and the object the basis names is one
+-- an earlier clause of this same resolution bound (CR 608.2c). Ahead of
+-- `substituteX` in the caller, so an {X} in the derived mana cost is
+-- substituted by the same announcement a stated one's is -- CR 107.3h fixes
+-- that value at 0 for every object but a spell on the stack, and a basis names
+-- a PERMANENT on every printing of this family.
+--
+-- Through the PROJECTION (`effectViewOf`), never the printed card: CR 706.2
+-- makes a mana cost a copiable value, so a permanent that is a copy of another
+-- card owes the copied cost, and a permanent whose mana cost a CR 613 effect
+-- changed owes the changed one.
+--
+-- Nothing where the slot names no object or several, and Nothing where the
+-- object has no mana cost (CR 202.1b) -- CR 118.6's own second sentence, "an
+-- ability can also have an unpayable cost if its cost is based on the mana cost
+-- of an object with no mana cost", which Cost.canPay then refuses. A slot
+-- naming several names no one cost, which is why Pawl.Engine.Resolve.modeSlots
+-- reports the read at SlotArity.One.
+--
+-- The stated COMPONENTS survive: what a basis supplies is the mana part alone,
+-- and a card stating both pays both. None in the pool does.
+describedCost :: ObjectId -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> GameState -> PayGate.PayGate -> Cost.Type.Cost Keyword.Keyword
+describedCost resolving controller source legal gs gate = case PayGate.basis gate of
+  Nothing -> PayGate.cost gate
+  Just basis ->
+    let -- The gate's own `legal` is the START-of-resolution targets (CR 608.2b,
+        -- payGateAdmits' caller), which is not where a slot an EARLIER CLAUSE
+        -- defined lives: CR 400.7j's binding is written to the resolving object
+        -- as that clause runs, and Flash's "it" is one of those. Both halves,
+        -- the validated targets winning where a card names a slot that is both.
+        bound = Map.union legal (Binding.targetsOf (slotBindings resolving gs))
+        described = case objectRefObjects bound resolving controller source gs (ObjectRef.InSlot (CostBasis.slot basis)) of
+          [oid] -> Filter.manaCost =<< effectViewOf source bound gs oid
+          _ -> Nothing
+     in (PayGate.cost gate) {Cost.Type.mana = fmap (Cost.reducedManaCost (CostBasis.reducedBy basis)) described}
 
 -- CR 118.4 / CR 107.3a: the value of X in a cost paid during resolution. NOT a
 -- choice the payer makes -- CR 107.3a fixes it at the value the object's own

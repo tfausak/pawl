@@ -120,6 +120,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
               PayGate.MkPayGate
                 { PayGate.payer = PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "spell")),
                   PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
+                  PayGate.basis = Nothing,
                   PayGate.branch = PayBranch.IfNotPaid,
                   PayGate.obligation = PayObligation.Optional,
                   PayGate.perEach = Nothing,

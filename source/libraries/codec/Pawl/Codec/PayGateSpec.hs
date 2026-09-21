@@ -9,12 +9,14 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostBasis as CostBasis
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -23,6 +25,7 @@ manaLeak =
   PayGate.MkPayGate
     { PayGate.payer = PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "spell")),
       PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
+      PayGate.basis = Nothing,
       PayGate.branch = PayBranch.IfNotPaid,
       PayGate.obligation = PayObligation.Optional,
       PayGate.perEach = Nothing,
@@ -65,6 +68,23 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       PayGate.codec
       manaLeak {PayGate.perEach = Just (Quantity.Literal 2)}
       " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfNotPaid\"},\"perEach\":{\"type\":\"Literal\",\"value\":2}} "
+  -- CR 118.6's described cost, Flash's: no mana part of its own, and a basis
+  -- naming the slot whose object's mana cost it is.
+  Spec.it s "MkPayGate, a cost described in terms of another object's mana cost" $
+    Common.assertCodec
+      s
+      PayGate.codec
+      manaLeak
+        { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+          PayGate.cost = Cost.MkCost {Cost.mana = Nothing, Cost.components = []},
+          PayGate.basis =
+            Just
+              CostBasis.MkCostBasis
+                { CostBasis.slot = SlotName.MkSlotName (Text.pack "put"),
+                  CostBasis.reducedBy = ManaCost.MkManaCost [ManaSymbol.Generic 2]
+                }
+        }
+      " {\"payer\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"cost\":{\"mana\":null},\"basis\":{\"slot\":\"put\",\"reducedBy\":[{\"type\":\"Generic\",\"value\":2}]},\"branch\":{\"type\":\"IfNotPaid\"}} "
   Spec.it s "MkPayGate, a clause hanging off an earlier clause's offer" $
     Common.assertCodec
       s

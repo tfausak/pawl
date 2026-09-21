@@ -1731,6 +1731,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                                       PayGate.MkPayGate
                                         { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
                                           PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)],
+                                          PayGate.basis = Nothing,
                                           PayGate.branch = PayBranch.IfNotPaid,
                                           PayGate.obligation = PayObligation.Optional,
                                           PayGate.perEach = Nothing,
@@ -1929,6 +1930,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           PayGate.MkPayGate
             { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
               PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [],
+              PayGate.basis = Nothing,
               PayGate.branch = PayBranch.IfNotPaid,
               PayGate.obligation = PayObligation.Optional,
               PayGate.perEach = Just (Quantity.Type.ObjectCounters kind),

@@ -2589,6 +2589,151 @@ flingSpec s registry =
           Spec.assertEqWith s "and the Berserkers the Clone copied is untouched" (S.powerToughnessOf berserkerId resolved) (Just (4, 4))
         _ -> Spec.assertFailure s "the Clone did not enter as a single permanent"
 
+-- alice casts Flash over exactly two Islands, holding `creature`, with one
+-- untapped land of each printing in `spare` left over for the gate. The Islands
+-- are tapped by the cast itself, so whatever `spare` holds is ALL the mana the
+-- payment can reach -- which is what makes the tap counts below a measurement of
+-- the derived cost rather than of the board.
+flashCast :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Printing.Printing -> GameState.GameState -> GameState.GameState
+flashCast island flash spare creature base =
+  let lands = S.landsFor island S.alice 2 base
+      withSpare = List.foldl' (\g land -> S.landsFor land S.alice 1 g) lands spare
+      -- The Flash FIRST: S.handOne replaces the hand rather than adding to it,
+      -- where S.addHandCard appends, so the creature card has to arrive after.
+      (withFlash, flashId) = S.handOne flash withSpare
+      (_creature, gs) = S.addHandCard creature S.alice withFlash
+   in S.runPure S.identityAnswer gs (S.cast S.alice flashId)
+
+-- Takes CR 603.5's "you may put", then pays whatever CR 118.12 offers.
+putsAndPays :: Prompt.Prompt r -> r
+putsAndPays p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  Prompt.ChooseToPay {} -> PaymentDecision.Pays
+  _ -> S.identityAnswer p
+
+-- putsAndPays' sibling, differing in NOTHING but the answer to the gate:
+-- S.identityAnswer declines a payment.
+putsAndDeclines :: Prompt.Prompt r -> r
+putsAndDeclines p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- putsAndPays plus cloneCopying's as-enters choice, for the leg whose put card
+-- is a Clone.
+putsPaysCopying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+putsPaysCopying wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  _ -> putsAndPays p
+
+-- The pay-or-not answers in a transcript, in order. An EMPTY list is the
+-- observation CR 118.6's unpayable cost makes: Cost.canPay refuses ahead of the
+-- offer, so nobody is asked at all.
+payAnswers :: [Response.Response] -> [Response.Response]
+payAnswers = filter (\r -> case r of Response.ChoseToPay _ -> True; _ -> False)
+
+-- CR 118.6 / 118.7 / 118.12: Flash's "You may put a creature card from your hand
+-- onto the battlefield. If you do, sacrifice it unless you pay its mana cost
+-- reduced by {2}" -- the one card in the pool whose resolution cost is DESCRIBED
+-- in terms of another object rather than printed (Pawl.Types.CostBasis).
+--
+-- Flash {1}{U} Instant (name, cost, type line and Oracle text confirmed by the
+-- repository's owner during this unit's review; api.scryfall.com is unreachable
+-- from this environment, so this one card is not checked against the API the way
+-- the rest of the pool is). Its whole printed text is those two sentences, so
+-- nothing else on the card can be what these assertions read.
+--
+-- Hill Giant {3}{R} is the put creature everywhere but the copy leg, and its
+-- cost is what makes the board discriminating: reduced by {2} it is {1}{R}, so
+-- TWO lands pay it and one of them must be red. Each leg leaves alice exactly
+-- the mana one reading of the sentence needs:
+--
+--   * A Mountain and a Forest pay {1}{R}. The unreduced {3}{R} could not be
+--     paid at all on that board (CR 118.3), so the Giant surviving with exactly
+--     two more lands tapped is the reduction.
+--   * Two Forests pay {2} but not {1}{R} (CR 118.7a: a generic reduction leaves
+--     the coloured component alone), so a cost taken to be the mana VALUE less
+--     two -- or reduced through the coloured pip -- would be payable there and
+--     is not.
+--
+-- The COPY leg is the projection: a Clone put onto the battlefield enters as a
+-- copy of Tarmogoyf {1}{G} (CR 706.2), whose mana cost reduced by {2} is {G} --
+-- payable off the one Forest alice holds, where the printed Clone's {3}{U}
+-- reduced to {1}{U} is not payable there at all.
+flashSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flashSpec s registry = Spec.describe s "Flash" $ do
+  Spec.it s "CR 118.6 the put creature's own mana cost, reduced by {2}, is what is offered" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    flash <- S.printingOf s registry "Flash"
+    giant <- S.printingOf s registry "Hill Giant"
+    let cast = flashCast island flash [mountain, forest] giant (Setup.emptyGame S.bothPlayers)
+        ((_, after), transcript) = Replay.record putsAndPays cast Stack.resolveTop
+    -- The BOARD first, so a mutation of the derivation reddens the gameplay-level
+    -- assertion rather than the prompt count ahead of it.
+    Spec.assertEqWith s "the Hill Giant stayed on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.alice after) 1
+    Spec.assertEqWith s "only Flash is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "alice was asked exactly once, and paid" (payAnswers transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- Two Islands for the cast and two more lands for {1}{R}: the whole board.
+    -- The unreduced {3}{R} would have needed two lands alice does not have.
+    Spec.assertEqWith s "paying tapped exactly two more lands" (S.tappedCount S.alice after) 4
+  -- The same board and the same cast, differing in NOTHING but the answer.
+  Spec.it s "CR 118.12a declining the offer sacrifices the creature" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    flash <- S.printingOf s registry "Flash"
+    giant <- S.printingOf s registry "Hill Giant"
+    let cast = flashCast island flash [mountain, forest] giant (Setup.emptyGame S.bothPlayers)
+        ((_, after), transcript) = Replay.record putsAndDeclines cast Stack.resolveTop
+    Spec.assertEqWith s "the Hill Giant is gone from the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.alice after) 0
+    Spec.assertEqWith s "and it and Flash are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+    -- The offer was real and its answer is what sacrificed the creature: she
+    -- could have paid on this board, which the leg above does.
+    Spec.assertEqWith s "alice was asked exactly once, and declined" (payAnswers transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    Spec.assertEqWith s "declining spent nothing" (S.tappedCount S.alice after) 2
+  -- CR 118.7a, the colour leg: the {2} comes off the GENERIC component, so
+  -- {3}{R} becomes {1}{R} and not {2}. Two Forests are two mana and pay neither
+  -- the {R} nor anything standing in for it.
+  Spec.it s "CR 118.7a the reduction leaves the coloured component alone" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    flash <- S.printingOf s registry "Flash"
+    giant <- S.printingOf s registry "Hill Giant"
+    let cast = flashCast island flash [forest, forest] giant (Setup.emptyGame S.bothPlayers)
+        ((_, after), transcript) = Replay.record putsAndPays cast Stack.resolveTop
+    -- CR 118.3 ahead of the offer: a cost alice cannot pay is not put to her,
+    -- so the empty transcript says the {R} was really demanded.
+    Spec.assertEqWith s "alice was never asked" (payAnswers transcript) []
+    Spec.assertEqWith s "the Hill Giant was sacrificed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.alice after) 0
+    Spec.assertEqWith s "it and Flash are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+    Spec.assertEqWith s "and her Forests are untouched" (S.tappedCount S.alice after) 2
+  -- CR 706.2: the mana cost read is the permanent's, which for a Clone is the
+  -- one it copied. The printed Clone's {3}{U} reduced by {2} is {1}{U}, which
+  -- this board cannot pay -- so a read through the printed card sacrifices the
+  -- Clone where the copiable {1}{G} reduced to {G} keeps it.
+  Spec.it s "CR 706.2 a Clone put by Flash is bought at the copied mana cost" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    flash <- S.printingOf s registry "Flash"
+    clone <- S.printingOf s registry "Clone"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    let (goyfId, withGoyf) = S.addPermanent tarmogoyf S.bob (Setup.emptyGame S.bothPlayers)
+        cast = flashCast island flash [forest] clone withGoyf
+        ((_, after), transcript) = Replay.record (putsPaysCopying goyfId) cast Stack.resolveTop
+    -- CR 400.7 mints a fresh incarnation, so the Clone is found as the one
+    -- permanent the resolution added rather than by the id it had in hand.
+    case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield cast)) of
+      [cloneId] -> do
+        -- The guard that the copy happened at all, which is what makes {G} the
+        -- cost: read through the projection, since Game.cardOf still answers
+        -- Clone.
+        Spec.assertBool s (Projection.hasName (CardName.MkCardName (Text.pack "Tarmogoyf")) cloneId after) "the Clone entered as a copy of the Tarmogoyf"
+        Spec.assertEqWith s "only Flash is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+        Spec.assertEqWith s "paying tapped exactly one more land" (S.tappedCount S.alice after) 3
+        Spec.assertEqWith s "alice was asked exactly once, and paid" (payAnswers transcript) [Response.ChoseToPay PaymentDecision.Pays]
+      other -> Spec.assertFailure s ("expected the Clone alone to arrive, got " <> show (length other))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
@@ -2644,6 +2789,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   merrowSkyswimmerSpec s registry
   geyserLeaperSpec s registry
   kataraSpec s registry
+  flashSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery

@@ -2105,7 +2105,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
                   )
                   (ModeSelection.ChooseExactly 1)
             }
-        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (Cost.Type.MkCost Nothing []) PayBranch.IfNotPaid PayObligation.Optional Nothing Nothing)) Optionality.Mandatory
+        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (Cost.Type.MkCost Nothing []) Nothing PayBranch.IfNotPaid PayObligation.Optional Nothing Nothing)) Optionality.Mandatory
         askerFace ref = clauseFace Nothing (Optionality.Optional ref)
         -- CR 111.1's token, whose OWN printed text carries that same predicate:
         -- Face.enchant is a Filter position cardFilters walks, so effectFilters

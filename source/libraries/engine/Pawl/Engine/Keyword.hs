@@ -5958,6 +5958,7 @@ extort =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
             PayGate.cost = extortCost,
+            PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfPaid,
             PayGate.obligation = PayObligation.Optional,
             PayGate.perEach = Nothing,
@@ -6389,6 +6390,7 @@ ward w =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.ControllerOfBound Binding.targetingObject,
             PayGate.cost = Ward.cost w,
+            PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfNotPaid,
             PayGate.obligation = PayObligation.Optional,
             PayGate.perEach = fmap Quantity.PlayerCounters (Ward.perEach w),
@@ -7095,6 +7097,7 @@ fabricate n =
                   Cost.mana = Just (ManaCost.MkManaCost []),
                   Cost.components = [CostComponent.PutPlusOneCountersOnThis n]
                 },
+            PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfNotPaid,
             -- Optional because rule 702.123a prints the "may" itself; no offeredAt,
             -- one clause making its own offer.
@@ -7855,6 +7858,7 @@ recover cost =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
             PayGate.cost = cost,
+            PayGate.basis = Nothing,
             PayGate.branch = branch,
             PayGate.obligation = PayObligation.Optional,
             PayGate.perEach = Nothing,
@@ -8923,6 +8927,7 @@ cumulativeUpkeep cost =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
             PayGate.cost = cost,
+            PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfNotPaid,
             PayGate.obligation = PayObligation.Optional,
             PayGate.perEach = Just (Quantity.ObjectCounters CounterKind.Age),
@@ -8976,6 +8981,7 @@ echo cost =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
             PayGate.cost = cost,
+            PayGate.basis = Nothing,
             PayGate.branch = PayBranch.IfNotPaid,
             PayGate.obligation = PayObligation.Optional,
             PayGate.perEach = Nothing,
