@@ -6,7 +6,7 @@
 -- roll is externalised through. The transcript legs live in Pawl.ReplaySpec
 -- with the other randomness prompts.
 --
--- FIVE FIXTURES. Ancient Copper Dragon ("Flying /
+-- SIX FIXTURES. Ancient Copper Dragon ("Flying /
 -- Whenever this creature deals combat damage to a player, roll a d20. You create
 -- a number of Treasure tokens equal to the result") is CR 706.4's, the result
 -- read straight into a count; Djinni Windseer ("Flying / When this creature
@@ -23,10 +23,13 @@
 -- CR 614.1a's replacement over the roll is the fifth fixture, Pixie Guide, at the
 -- bottom of this file -- the ignore of CR 706.6 rides it, no instruction in
 -- data\/cards\/ printing one of its own.
--- Left out: no reroll (#3975) and no modifier from another source (#3974), no
--- "Roll again" (#2124), and no reading that takes the results as a set (#3243). CR
--- 706.1's roll does record its event, but the trigger reading it lives in
--- Pawl.EventTriggerSpec beside the other condition cases.
+-- CR 706.2b's first step is the SIXTH fixture, Clam-I-Am, at the bottom of this
+-- file -- a reroll offered to the roller by a permanent the instruction knows
+-- nothing about.
+-- Left out: no modifier from another source that increases or decreases the
+-- result (#3974), no "Roll again" (#2124), and no reading that takes the results
+-- as a set (#3243). CR 706.1's roll does record its event, but the trigger
+-- reading it lives in Pawl.EventTriggerSpec beside the other condition cases.
 --
 -- THE ASSERTED QUANTITY on the DRAGON's boards is how many Treasure tokens alice
 -- controls once combat damage has been dealt. It is the roll's result made
@@ -87,6 +90,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Zone as Zone
 
@@ -97,6 +101,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   modifierSpec s registry
   severalDiceSpec s registry
   dieRollRSpec s registry
+  rerollSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -694,6 +699,215 @@ guideCombat rolls board =
             [] -> do
               State.put ([], sides : offers)
               pure 20
+        _ -> pure (S.attackTo S.bob p)
+      go n gs =
+        if n <= (0 :: Int) || Maybe.isJust (GameState.result gs) || not (S.inCombatPhase (GameState.phase gs))
+          then pure gs
+          else do
+            (_, next) <- Engine.runGame answering gs Engine.runStep
+            go (n - 1) next
+      (settled, (_, seen)) = State.runState (go (24 :: Int) board) (rolls, [])
+   in (settled, reverse seen)
+
+-- CR 706.2 / 706.2b's first step: Clam-I-Am's "if you roll a 3 on a six-sided
+-- die, you may reroll that die". The Pixie Guide group just above one clause of
+-- rule 706 over, and the same shape -- the Clam is the ONE thing that differs
+-- between the paired boards, so every reading that moves is the modifier's
+-- doing.
+--
+-- VALIANT ENDEAVOR is the fixture, because the Clam names a SIX-sided die and
+-- the Endeavor is the only d6 in data\/cards\/. Its "other result" is what the
+-- assertions read: the die the reroll touched is the one the roller does NOT
+-- choose, so the Knight count IS the number the second throw produced.
+--
+-- ONE SCRIPT ACROSS THE PAIR -- 3, then 6, then 2, in that order -- rather than a
+-- script per board. Under the Clam the first die's 3 is rerolled into the 6 and
+-- the second die is the 2; without it the 3 and the 6 are the two dice and the 2
+-- is never reached. So the boards differ in the Clam alone, and an engine that
+-- offered no reroll reads the same numbers in a different order.
+--
+-- THE ANCIENT COPPER DRAGON's d20 is the negative leg, and it has to be a
+-- different card: rule 706.1a makes the die's size the whole description of a
+-- die, and a d20 that comes up 3 is the board on which the Clam's "six-sided"
+-- narrowing is visible.
+rerollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rerollSpec s registry = Spec.describe s "Reroll" $ do
+  Spec.it s "CR 706.2b a reroll replaces the natural result" $ do
+    (spell, weak, strong, board) <- endeavorBoard s registry
+    clam <- S.printingOf s registry "Clam-I-Am"
+    let clammed = snd (S.addPermanent clam S.alice board)
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation: the first die's 3 was thrown away and came back a 6, the roller
+    -- chose the second die's 2, so "the other result" is the 6 and six Knights
+    -- arrive. An engine that never offered the reroll reads the 3 and the 6 as
+    -- its two dice and mints three.
+    Spec.assertEqWith
+      s
+      "CR 706.2b: the rerolled die's 6 is the other result"
+      (S.countOnBattlefieldByName knight S.alice (runClam [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed))
+      6
+    -- The paired board, one thing different: no Clam. The SAME script, and the 2
+    -- is never reached.
+    Spec.assertEqWith
+      s
+      "CR 706.1: without the Clam the 3 stands and the 6 is the second die"
+      (S.countOnBattlefieldByName knight S.alice (runClam [3, 6, 2] [OptionalDecision.Exercises] 1 spell board))
+      3
+    -- The chosen result moves with the reroll too, read as a bound rather than a
+    -- count: under the Clam the roller chose a 2, so power 4 dies; without it
+    -- they chose the 6 and nothing does.
+    let clammed2 = runClam [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed
+    Spec.assertBool s (not (S.onBattlefield strong clammed2)) "power 4 is at least the chosen 2, so it is destroyed"
+    Spec.assertBool s (S.onBattlefield weak clammed2) "power 1 is below it, so it survives"
+  Spec.it s "CR 706.2a the reroll is the roller's to decline" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    clam <- S.printingOf s registry "Clam-I-Am"
+    let clammed = snd (S.addPermanent clam S.alice board)
+    -- The same board and the same script as the case above, one thing different:
+    -- the roller says no. CR 706.2a makes the modifier optional, so declining
+    -- leaves the natural 3 standing and the 6 is the second die -- the reading an
+    -- engine that applied the modifier unasked cannot produce.
+    Spec.assertEqWith
+      s
+      "CR 706.2a: a declined reroll leaves the natural result"
+      (S.countOnBattlefieldByName knight S.alice (runClam [3, 6, 2] [OptionalDecision.Declines] 1 spell clammed))
+      3
+  Spec.it s "CR 706.2 a rerolled die that repeats the number is offered again" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    clam <- S.printingOf s registry "Clam-I-Am"
+    let clammed = snd (S.addPermanent clam S.alice board)
+    -- The Clam's gate is on the NATURAL result, and a reroll produces one: the
+    -- first die comes up 3, the reroll comes up 3 again, and the third throw is
+    -- the 5 the instruction keeps. An engine that offered the reroll once per die
+    -- stops at the second 3 and mints three Knights.
+    Spec.assertEqWith
+      s
+      "CR 706.2: a second 3 is a third throw, and the 5 is the other result"
+      (S.countOnBattlefieldByName knight S.alice (runClam [3, 3, 5, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] 1 spell clammed))
+      5
+    -- Supporting, and in its own assertion: the offer really was raised twice,
+    -- and both times over a 3.
+    Spec.assertEqWith
+      s
+      "CR 706.2b: both offers carried the natural 3"
+      (snd (clamPrompts [3, 3, 5, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed))
+      [3, 3]
+  Spec.it s "CR 706.2 the offer is gated on the number the card names" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    clam <- S.printingOf s registry "Clam-I-Am"
+    let clammed = snd (S.addPermanent clam S.alice board)
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation: two d6 come up 2 and 5, neither of them the 3 the Clam names, so
+    -- the roller chooses the 2 and the 5 is the other result. Every reroll on
+    -- offer is ACCEPTED in this script, so an engine whose gate is wider in
+    -- EITHER direction takes the 1 waiting behind them: one that matches every
+    -- number rerolls the 2 and mints six, and one that matches 3 and up rerolls
+    -- the 5 and mints one.
+    Spec.assertEqWith
+      s
+      "CR 706.2: neither die shows the Clam's 3, so both stand"
+      (S.countOnBattlefieldByName knight S.alice (runClam [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] 0 spell clammed))
+      5
+    -- Supporting, and in its own assertion: two dice were thrown and nothing was
+    -- offered, which separates a gate that matched from a reroll the roller
+    -- happened to decline.
+    let (offers, naturals) = clamPrompts [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed
+    Spec.assertEqWith s "CR 706.1: two d6 were thrown" offers [6, 6]
+    Spec.assertEqWith s "and no reroll was offered" naturals []
+  Spec.it s "CR 706.1a the offer is gated on the die the card names" $ do
+    dragon <- S.printingOf s registry "Ancient Copper Dragon"
+    clam <- S.printingOf s registry "Clam-I-Am"
+    let (bare, _, _) = S.combatBoardOf [dragon] []
+        clammed = snd (S.addPermanent clam S.alice bare)
+    -- THE GAMEPLAY ASSERTION: a d20 that came up 3 is not the Clam's six-sided
+    -- die, so the 3 stands and the Dragon mints three Treasures. An engine that
+    -- matched on the number alone rerolls into the 20 the script supplies next
+    -- and mints twenty.
+    Spec.assertEqWith
+      s
+      "CR 706.1a: a d20's 3 is not a six-sided die's 3"
+      (S.countOnBattlefieldByName treasure S.alice (fst (clamCombat [3, 20] clammed)))
+      3
+
+-- Answers all three questions one Endeavor under the Clam asks: each die comes
+-- up the next number of `rolls`, each reroll offer takes the next answer of
+-- `decisions`, and the roller chooses the result at `index`.
+--
+-- STATEFUL for endeavorAnswer's reason, which the reroll sharpens: the first
+-- die's two throws are the same Prompt.RollDie question, so a pure answerer
+-- cannot tell a die from its own reroll.
+--
+-- Six for a roll the script did not plan and Declines for an offer it did not
+-- plan: a surplus throw shows up as the die's top face rather than as CR
+-- 706.1a's floor, and a surplus offer stops rather than looping.
+clamAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [OptionalDecision.OptionalDecision]) r
+clamAnswer index p = case p of
+  Prompt.RollDie _ -> do
+    (rolls, decisions) <- State.get
+    case rolls of
+      h : t -> do
+        State.put (t, decisions)
+        pure h
+      [] -> pure 6
+  Prompt.RerollDie {} -> do
+    (rolls, decisions) <- State.get
+    case decisions of
+      h : t -> do
+        State.put (rolls, t)
+        pure h
+      [] -> pure OptionalDecision.Declines
+  Prompt.ChooseDieResult {} -> pure index
+  _ -> pure (S.identityAnswer p)
+
+-- Cast the Endeavor and resolve it, one run under one answerer.
+runClam :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+runClam rolls decisions index spell board =
+  snd (State.evalState (Engine.runGame (clamAnswer index) board (S.cast S.alice spell >> Stack.resolveTop)) (rolls, decisions))
+
+-- The same cast under an answerer that RECORDS what each roll prompt offered and
+-- what natural result each reroll offer carried, neither being readable off the
+-- board.
+clamPrompts :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> ObjectId.ObjectId -> GameState.GameState -> ([Natural.Natural], [Natural.Natural])
+clamPrompts rolls decisions spell board =
+  let logging :: Prompt.Prompt r -> State.State ([Natural.Natural], [Natural.Natural], ([Natural.Natural], [OptionalDecision.OptionalDecision])) r
+      logging p = case p of
+        Prompt.RollDie sides -> do
+          (seen, asked, scripted) <- State.get
+          let (answer, next) = State.runState (clamAnswer 0 p) scripted
+          State.put (sides : seen, asked, next)
+          pure answer
+        Prompt.RerollDie _ _ natural -> do
+          (seen, asked, scripted) <- State.get
+          let (answer, next) = State.runState (clamAnswer 0 p) scripted
+          State.put (seen, natural : asked, next)
+          pure answer
+        _ -> do
+          scripted <- fmap (\(_, _, x) -> x) State.get
+          let (answer, next) = State.runState (clamAnswer 0 p) scripted
+          State.modify' (\(seen, asked, _) -> (seen, asked, next))
+          pure answer
+      (offers, naturals, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], [], (rolls, decisions))
+   in (reverse offers, reverse naturals)
+
+-- The Dragon's combat under the Clam, guideCombat's shape and for its reason:
+-- the roll happens in the combat damage step rather than the step the fixture
+-- starts in. Every reroll offer is ACCEPTED, so a board that wrongly raised one
+-- takes the script's next number rather than quietly declining back to the same
+-- reading.
+clamCombat :: [Natural.Natural] -> GameState.GameState -> (GameState.GameState, [Natural.Natural])
+clamCombat rolls board =
+  let answering :: Prompt.Prompt r -> State.State ([Natural.Natural], [Natural.Natural]) r
+      answering p = case p of
+        Prompt.RollDie sides -> do
+          (pending, offers) <- State.get
+          case pending of
+            face : rest -> do
+              State.put (rest, sides : offers)
+              pure face
+            [] -> do
+              State.put ([], sides : offers)
+              pure 20
+        Prompt.RerollDie {} -> pure OptionalDecision.Exercises
         _ -> pure (S.attackTo S.bob p)
       go n gs =
         if n <= (0 :: Int) || Maybe.isJust (GameState.result gs) || not (S.inCombatPhase (GameState.phase gs))

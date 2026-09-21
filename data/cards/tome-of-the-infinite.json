@@ -30,807 +30,810 @@
                       {
                         "type": "Conjure",
                         "value": {
-                          "cards": [
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
-                                        "value": {
-                                          "type": "Red"
-                                        }
-                                      }
-                                    }
-                                  ],
-                                  "name": "Assault Strobe",
-                                  "spell": {
-                                    "modes": [
+                          "cards": {
+                            "type": "Written",
+                            "value": [
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
                                       {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "ModifyTarget",
-                                                "value": {
-                                                  "duration": {
-                                                    "type": "UntilEndOfTurn"
-                                                  },
-                                                  "modification": {
-                                                    "type": "GainKeyword",
-                                                    "value": {
-                                                      "type": "DoubleStrike"
-                                                    }
-                                                  },
-                                                  "ref": {
-                                                    "type": "InSlot",
-                                                    "value": "target"
-                                                  }
-                                                }
-                                              }
-                                            ]
-                                          }
-                                        ],
-                                        "targetSlots": {
-                                          "target": {
-                                            "pool": {
-                                              "type": "Creatures"
-                                            }
+                                        "type": "OfType",
+                                        "value": {
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Red"
                                           }
                                         }
                                       }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Sorcery"
-                                      }
-                                    ]
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
-                                        "value": {
-                                          "type": "Black"
-                                        }
-                                      }
-                                    }
-                                  ],
-                                  "name": "Dark Ritual",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "AddMana",
-                                                "value": {
-                                                  "production": {
-                                                    "type": "OfType",
-                                                    "value": {
-                                                      "type": "Colored",
-                                                      "value": {
-                                                        "type": "Black"
-                                                      }
-                                                    }
-                                                  }
-                                                }
-                                              },
-                                              {
-                                                "type": "AddMana",
-                                                "value": {
-                                                  "production": {
-                                                    "type": "OfType",
-                                                    "value": {
-                                                      "type": "Colored",
-                                                      "value": {
-                                                        "type": "Black"
-                                                      }
-                                                    }
-                                                  }
-                                                }
-                                              },
-                                              {
-                                                "type": "AddMana",
-                                                "value": {
-                                                  "production": {
-                                                    "type": "OfType",
-                                                    "value": {
-                                                      "type": "Colored",
-                                                      "value": {
-                                                        "type": "Black"
-                                                      }
-                                                    }
-                                                  }
-                                                }
-                                              }
-                                            ]
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Instant"
-                                      }
-                                    ]
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
-                                        "value": {
-                                          "type": "Black"
-                                        }
-                                      }
-                                    }
-                                  ],
-                                  "name": "Duress",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "Reveal",
-                                                "value": {
-                                                  "ref": {
-                                                    "type": "EachCardInHand",
-                                                    "value": {
-                                                      "hands": {
-                                                        "type": "InSlot",
-                                                        "value": "target"
-                                                      }
-                                                    }
-                                                  },
-                                                  "slot": "revealed"
-                                                }
-                                              }
-                                            ]
-                                          },
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "Discard",
-                                                "value": {
-                                                  "type": "These",
+                                    ],
+                                    "name": "Assault Strobe",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "ModifyTarget",
                                                   "value": {
-                                                    "type": "ChosenCardFromAmong",
-                                                    "value": {
-                                                      "filter": {
-                                                        "type": "And",
-                                                        "value": [
-                                                          {
-                                                            "type": "Not",
-                                                            "value": {
-                                                              "type": "HasCardType",
-                                                              "value": {
-                                                                "type": "Creature"
-                                                              }
-                                                            }
-                                                          },
-                                                          {
-                                                            "type": "Not",
-                                                            "value": {
-                                                              "type": "HasCardType",
-                                                              "value": {
-                                                                "type": "Land"
-                                                              }
-                                                            }
-                                                          }
-                                                        ]
-                                                      },
-                                                      "slot": "revealed"
+                                                    "duration": {
+                                                      "type": "UntilEndOfTurn"
+                                                    },
+                                                    "modification": {
+                                                      "type": "GainKeyword",
+                                                      "value": {
+                                                        "type": "DoubleStrike"
+                                                      }
+                                                    },
+                                                    "ref": {
+                                                      "type": "InSlot",
+                                                      "value": "target"
                                                     }
                                                   }
                                                 }
+                                              ]
+                                            }
+                                          ],
+                                          "targetSlots": {
+                                            "target": {
+                                              "pool": {
+                                                "type": "Creatures"
                                               }
-                                            ]
-                                          }
-                                        ],
-                                        "targetSlots": {
-                                          "target": {
-                                            "filter": {
-                                              "type": "IsPlayer",
-                                              "value": {
-                                                "type": "Opponent"
-                                              }
-                                            },
-                                            "pool": {
-                                              "type": "Players"
                                             }
                                           }
                                         }
-                                      }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Sorcery"
-                                      }
-                                    ]
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Sorcery"
+                                        }
+                                      ]
+                                    }
                                   }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
                                         "value": {
-                                          "type": "Green"
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Black"
+                                          }
                                         }
                                       }
-                                    }
-                                  ],
-                                  "name": "Fog",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "Replace",
-                                                "value": {
-                                                  "duration": {
-                                                    "type": "UntilEndOfTurn"
-                                                  },
-                                                  "effect": {
-                                                    "type": "DamageR",
-                                                    "value": {
-                                                      "matching": {
-                                                        "whichKind": {
-                                                          "type": "Combat"
+                                    ],
+                                    "name": "Dark Ritual",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "AddMana",
+                                                  "value": {
+                                                    "production": {
+                                                      "type": "OfType",
+                                                      "value": {
+                                                        "type": "Colored",
+                                                        "value": {
+                                                          "type": "Black"
                                                         }
-                                                      },
-                                                      "rewrite": {
-                                                        "type": "PreventAll"
                                                       }
                                                     }
-                                                  },
-                                                  "origin": {
-                                                    "type": "Other"
-                                                  },
-                                                  "uses": {
-                                                    "type": "Unlimited"
+                                                  }
+                                                },
+                                                {
+                                                  "type": "AddMana",
+                                                  "value": {
+                                                    "production": {
+                                                      "type": "OfType",
+                                                      "value": {
+                                                        "type": "Colored",
+                                                        "value": {
+                                                          "type": "Black"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "type": "AddMana",
+                                                  "value": {
+                                                    "production": {
+                                                      "type": "OfType",
+                                                      "value": {
+                                                        "type": "Colored",
+                                                        "value": {
+                                                          "type": "Black"
+                                                        }
+                                                      }
+                                                    }
                                                   }
                                                 }
-                                              }
-                                            ]
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Instant"
-                                      }
-                                    ]
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Instant"
+                                        }
+                                      ]
+                                    }
                                   }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
                                         "value": {
-                                          "type": "Blue"
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Black"
+                                          }
                                         }
                                       }
-                                    }
-                                  ],
-                                  "name": "Force Spike",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "Counter",
-                                                "value": {
-                                                  "ref": {
-                                                    "type": "InSlot",
-                                                    "value": "spell"
+                                    ],
+                                    "name": "Duress",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "Reveal",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "EachCardInHand",
+                                                      "value": {
+                                                        "hands": {
+                                                          "type": "InSlot",
+                                                          "value": "target"
+                                                        }
+                                                      }
+                                                    },
+                                                    "slot": "revealed"
                                                   }
                                                 }
-                                              }
-                                            ],
-                                            "payGate": {
-                                              "branch": {
-                                                "type": "IfNotPaid"
-                                              },
-                                              "cost": {
-                                                "mana": [
-                                                  {
-                                                    "type": "Generic",
-                                                    "value": 1
-                                                  }
-                                                ]
-                                              },
-                                              "payer": {
-                                                "type": "ControllerOfBound",
-                                                "value": "spell"
-                                              }
-                                            }
-                                          }
-                                        ],
-                                        "targetSlots": {
-                                          "spell": {
-                                            "pool": {
-                                              "type": "Spells"
-                                            }
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Instant"
-                                      }
-                                    ]
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
-                                        "value": {
-                                          "type": "Green"
-                                        }
-                                      }
-                                    }
-                                  ],
-                                  "name": "Giant Growth",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "ModifyTarget",
-                                                "value": {
-                                                  "duration": {
-                                                    "type": "UntilEndOfTurn"
-                                                  },
-                                                  "modification": {
-                                                    "type": "ModifyPowerToughness",
+                                              ]
+                                            },
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "Discard",
+                                                  "value": {
+                                                    "type": "These",
                                                     "value": {
-                                                      "power": {
-                                                        "type": "Literal",
-                                                        "value": 3
-                                                      },
-                                                      "toughness": {
-                                                        "type": "Literal",
-                                                        "value": 3
+                                                      "type": "ChosenCardFromAmong",
+                                                      "value": {
+                                                        "filter": {
+                                                          "type": "And",
+                                                          "value": [
+                                                            {
+                                                              "type": "Not",
+                                                              "value": {
+                                                                "type": "HasCardType",
+                                                                "value": {
+                                                                  "type": "Creature"
+                                                                }
+                                                              }
+                                                            },
+                                                            {
+                                                              "type": "Not",
+                                                              "value": {
+                                                                "type": "HasCardType",
+                                                                "value": {
+                                                                  "type": "Land"
+                                                                }
+                                                              }
+                                                            }
+                                                          ]
+                                                        },
+                                                        "slot": "revealed"
                                                       }
                                                     }
-                                                  },
-                                                  "ref": {
-                                                    "type": "InSlot",
-                                                    "value": "target"
                                                   }
                                                 }
+                                              ]
+                                            }
+                                          ],
+                                          "targetSlots": {
+                                            "target": {
+                                              "filter": {
+                                                "type": "IsPlayer",
+                                                "value": {
+                                                  "type": "Opponent"
+                                                }
+                                              },
+                                              "pool": {
+                                                "type": "Players"
                                               }
-                                            ]
-                                          }
-                                        ],
-                                        "targetSlots": {
-                                          "target": {
-                                            "pool": {
-                                              "type": "Creatures"
                                             }
                                           }
                                         }
-                                      }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Instant"
-                                      }
-                                    ]
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Sorcery"
+                                        }
+                                      ]
+                                    }
                                   }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
                                         "value": {
-                                          "type": "Red"
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Green"
+                                          }
                                         }
                                       }
-                                    }
-                                  ],
-                                  "name": "Lightning Bolt",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "DealDamage",
-                                                "value": {
-                                                  "parts": [
-                                                    {
-                                                      "quantity": {
-                                                        "type": "Literal",
-                                                        "value": 3
-                                                      },
-                                                      "ref": {
-                                                        "type": "InSlot",
-                                                        "value": "target"
+                                    ],
+                                    "name": "Fog",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "Replace",
+                                                  "value": {
+                                                    "duration": {
+                                                      "type": "UntilEndOfTurn"
+                                                    },
+                                                    "effect": {
+                                                      "type": "DamageR",
+                                                      "value": {
+                                                        "matching": {
+                                                          "whichKind": {
+                                                            "type": "Combat"
+                                                          }
+                                                        },
+                                                        "rewrite": {
+                                                          "type": "PreventAll"
+                                                        }
                                                       }
+                                                    },
+                                                    "origin": {
+                                                      "type": "Other"
+                                                    },
+                                                    "uses": {
+                                                      "type": "Unlimited"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Instant"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
+                                        "value": {
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Blue"
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "name": "Force Spike",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "Counter",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "InSlot",
+                                                      "value": "spell"
+                                                    }
+                                                  }
+                                                }
+                                              ],
+                                              "payGate": {
+                                                "branch": {
+                                                  "type": "IfNotPaid"
+                                                },
+                                                "cost": {
+                                                  "mana": [
+                                                    {
+                                                      "type": "Generic",
+                                                      "value": 1
                                                     }
                                                   ]
+                                                },
+                                                "payer": {
+                                                  "type": "ControllerOfBound",
+                                                  "value": "spell"
                                                 }
                                               }
-                                            ]
-                                          }
-                                        ],
-                                        "targetSlots": {
-                                          "target": {
-                                            "pool": {
-                                              "type": "AnyTarget"
+                                            }
+                                          ],
+                                          "targetSlots": {
+                                            "spell": {
+                                              "pool": {
+                                                "type": "Spells"
+                                              }
                                             }
                                           }
                                         }
-                                      }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Instant"
-                                      }
-                                    ]
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
-                                        "value": {
-                                          "type": "White"
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Instant"
                                         }
-                                      }
+                                      ]
                                     }
-                                  ],
-                                  "name": "Light of Hope",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "GainLife",
-                                                "value": {
-                                                  "player": {
-                                                    "type": "Relative",
-                                                    "value": {
-                                                      "type": "You"
-                                                    }
-                                                  },
-                                                  "quantity": {
-                                                    "type": "Literal",
-                                                    "value": 4
-                                                  }
-                                                }
-                                              }
-                                            ]
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "Destroy",
-                                                "value": {
-                                                  "ref": {
-                                                    "type": "InSlot",
-                                                    "value": "enchantment"
-                                                  },
-                                                  "regenerability": {
-                                                    "type": "Regenerable"
-                                                  }
-                                                }
-                                              }
-                                            ]
-                                          }
-                                        ],
-                                        "targetSlots": {
-                                          "enchantment": {
-                                            "filter": {
-                                              "type": "HasCardType",
-                                              "value": {
-                                                "type": "Enchantment"
-                                              }
-                                            },
-                                            "pool": {
-                                              "type": "Permanents"
-                                            }
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "PutCounters",
-                                                "value": {
-                                                  "kind": {
-                                                    "type": "PlusOnePlusOne"
-                                                  },
-                                                  "quantity": {
-                                                    "type": "Literal",
-                                                    "value": 1
-                                                  },
-                                                  "ref": {
-                                                    "type": "InSlot",
-                                                    "value": "creature"
-                                                  }
-                                                }
-                                              }
-                                            ]
-                                          }
-                                        ],
-                                        "targetSlots": {
-                                          "creature": {
-                                            "pool": {
-                                              "type": "Creatures"
-                                            }
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Instant"
-                                      }
-                                    ]
                                   }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
                                         "value": {
-                                          "type": "Blue"
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Green"
+                                          }
                                         }
                                       }
-                                    }
-                                  ],
-                                  "name": "Ponder",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "LookAt",
-                                                "value": {
-                                                  "ref": {
-                                                    "type": "TopOfLibrary",
-                                                    "value": {
-                                                      "count": {
-                                                        "type": "Literal",
-                                                        "value": 3
-                                                      },
-                                                      "player": {
-                                                        "type": "Relative",
-                                                        "value": {
-                                                          "type": "You"
+                                    ],
+                                    "name": "Giant Growth",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "ModifyTarget",
+                                                  "value": {
+                                                    "duration": {
+                                                      "type": "UntilEndOfTurn"
+                                                    },
+                                                    "modification": {
+                                                      "type": "ModifyPowerToughness",
+                                                      "value": {
+                                                        "power": {
+                                                          "type": "Literal",
+                                                          "value": 3
+                                                        },
+                                                        "toughness": {
+                                                          "type": "Literal",
+                                                          "value": 3
                                                         }
                                                       }
+                                                    },
+                                                    "ref": {
+                                                      "type": "InSlot",
+                                                      "value": "target"
                                                     }
-                                                  },
-                                                  "slot": "looked"
-                                                }
-                                              },
-                                              {
-                                                "type": "ArrangeInLibrary",
-                                                "value": {
-                                                  "type": "InSlot",
-                                                  "value": "looked"
-                                                }
-                                              }
-                                            ]
-                                          },
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "Shuffle",
-                                                "value": {
-                                                  "type": "Relative",
-                                                  "value": {
-                                                    "type": "You"
                                                   }
                                                 }
-                                              }
-                                            ],
-                                            "optionality": {
-                                              "type": "Optional"
+                                              ]
                                             }
-                                          },
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "Draw",
+                                          ],
+                                          "targetSlots": {
+                                            "target": {
+                                              "pool": {
+                                                "type": "Creatures"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Instant"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
+                                        "value": {
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Red"
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "name": "Lightning Bolt",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "DealDamage",
+                                                  "value": {
+                                                    "parts": [
+                                                      {
+                                                        "quantity": {
+                                                          "type": "Literal",
+                                                          "value": 3
+                                                        },
+                                                        "ref": {
+                                                          "type": "InSlot",
+                                                          "value": "target"
+                                                        }
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ],
+                                          "targetSlots": {
+                                            "target": {
+                                              "pool": {
+                                                "type": "AnyTarget"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Instant"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
+                                        "value": {
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "White"
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "name": "Light of Hope",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "GainLife",
+                                                  "value": {
+                                                    "player": {
+                                                      "type": "Relative",
+                                                      "value": {
+                                                        "type": "You"
+                                                      }
+                                                    },
+                                                    "quantity": {
+                                                      "type": "Literal",
+                                                      "value": 4
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "Destroy",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "InSlot",
+                                                      "value": "enchantment"
+                                                    },
+                                                    "regenerability": {
+                                                      "type": "Regenerable"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ],
+                                          "targetSlots": {
+                                            "enchantment": {
+                                              "filter": {
+                                                "type": "HasCardType",
                                                 "value": {
-                                                  "player": {
+                                                  "type": "Enchantment"
+                                                }
+                                              },
+                                              "pool": {
+                                                "type": "Permanents"
+                                              }
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "PutCounters",
+                                                  "value": {
+                                                    "kind": {
+                                                      "type": "PlusOnePlusOne"
+                                                    },
+                                                    "quantity": {
+                                                      "type": "Literal",
+                                                      "value": 1
+                                                    },
+                                                    "ref": {
+                                                      "type": "InSlot",
+                                                      "value": "creature"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ],
+                                          "targetSlots": {
+                                            "creature": {
+                                              "pool": {
+                                                "type": "Creatures"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Instant"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
+                                        "value": {
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Blue"
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "name": "Ponder",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "LookAt",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "TopOfLibrary",
+                                                      "value": {
+                                                        "count": {
+                                                          "type": "Literal",
+                                                          "value": 3
+                                                        },
+                                                        "player": {
+                                                          "type": "Relative",
+                                                          "value": {
+                                                            "type": "You"
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "slot": "looked"
+                                                  }
+                                                },
+                                                {
+                                                  "type": "ArrangeInLibrary",
+                                                  "value": {
+                                                    "type": "InSlot",
+                                                    "value": "looked"
+                                                  }
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "Shuffle",
+                                                  "value": {
                                                     "type": "Relative",
                                                     "value": {
                                                       "type": "You"
                                                     }
-                                                  },
-                                                  "quantity": {
-                                                    "type": "Literal",
-                                                    "value": 1
                                                   }
                                                 }
+                                              ],
+                                              "optionality": {
+                                                "type": "Optional"
                                               }
-                                            ]
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Sorcery"
-                                      }
-                                    ]
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "faces": [
-                                {
-                                  "manaCost": [
-                                    {
-                                      "type": "OfType",
-                                      "value": {
-                                        "type": "Colored",
-                                        "value": {
-                                          "type": "White"
-                                        }
-                                      }
-                                    }
-                                  ],
-                                  "name": "Swords to Plowshares",
-                                  "spell": {
-                                    "modes": [
-                                      {
-                                        "clauses": [
-                                          {
-                                            "effects": [
-                                              {
-                                                "type": "MoveToZone",
-                                                "value": {
-                                                  "ref": {
-                                                    "type": "InSlot",
-                                                    "value": "creature"
-                                                  },
-                                                  "zone": {
-                                                    "type": "Exile"
-                                                  }
-                                                }
-                                              },
-                                              {
-                                                "type": "GainLife",
-                                                "value": {
-                                                  "player": {
-                                                    "type": "ControllerOfBound",
-                                                    "value": "creature"
-                                                  },
-                                                  "quantity": {
-                                                    "type": "AgainstSlot",
-                                                    "value": {
-                                                      "quantity": {
-                                                        "type": "Power"
-                                                      },
-                                                      "slot": "creature"
+                                            },
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "Draw",
+                                                  "value": {
+                                                    "player": {
+                                                      "type": "Relative",
+                                                      "value": {
+                                                        "type": "You"
+                                                      }
+                                                    },
+                                                    "quantity": {
+                                                      "type": "Literal",
+                                                      "value": 1
                                                     }
                                                   }
                                                 }
-                                              }
-                                            ]
-                                          }
-                                        ],
-                                        "targetSlots": {
-                                          "creature": {
-                                            "pool": {
-                                              "type": "Creatures"
+                                              ]
                                             }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Sorcery"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "faces": [
+                                  {
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
+                                        "value": {
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "White"
                                           }
                                         }
                                       }
-                                    ]
-                                  },
-                                  "typeLine": {
-                                    "types": [
-                                      {
-                                        "type": "Instant"
-                                      }
-                                    ]
+                                    ],
+                                    "name": "Swords to Plowshares",
+                                    "spell": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "MoveToZone",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "InSlot",
+                                                      "value": "creature"
+                                                    },
+                                                    "zone": {
+                                                      "type": "Exile"
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "type": "GainLife",
+                                                  "value": {
+                                                    "player": {
+                                                      "type": "ControllerOfBound",
+                                                      "value": "creature"
+                                                    },
+                                                    "quantity": {
+                                                      "type": "AgainstSlot",
+                                                      "value": {
+                                                        "quantity": {
+                                                          "type": "Power"
+                                                        },
+                                                        "slot": "creature"
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ],
+                                          "targetSlots": {
+                                            "creature": {
+                                              "pool": {
+                                                "type": "Creatures"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Instant"
+                                        }
+                                      ]
+                                    }
                                   }
-                                }
-                              ]
-                            }
-                          ],
+                                ]
+                              }
+                            ]
+                          },
                           "destination": {
                             "type": "Hand"
                           }

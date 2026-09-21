@@ -11,6 +11,7 @@ import qualified Pawl.Codec.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaFilter as ManaFilter
+import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.ReduceActivationCost as ReduceActivationCost
@@ -66,6 +67,7 @@ codec =
           Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),
           Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing),
           Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing),
+          Arm.payload "ModifyDieRoll" ModifiedRoll.codec PlayerEffect.ModifyDieRoll (\x -> case x of PlayerEffect.ModifyDieRoll y -> Just y; _ -> Nothing),
           Arm.payload "AdditionalVotes" Common.natural PlayerEffect.AdditionalVotes (\x -> case x of PlayerEffect.AdditionalVotes y -> Just y; _ -> Nothing),
           Arm.nullary "CantGainLife" PlayerEffect.CantGainLife,
           Arm.nullary "CantLoseLife" PlayerEffect.CantLoseLife
@@ -110,6 +112,7 @@ tagOf x = case x of
   PlayerEffect.CastFromHandWithoutPayingManaCost {} -> "CastFromHandWithoutPayingManaCost"
   PlayerEffect.CantGetCounters {} -> "CantGetCounters"
   PlayerEffect.StateCoinFlip {} -> "StateCoinFlip"
+  PlayerEffect.ModifyDieRoll {} -> "ModifyDieRoll"
   PlayerEffect.AdditionalVotes {} -> "AdditionalVotes"
   PlayerEffect.CantGainLife {} -> "CantGainLife"
   PlayerEffect.CantLoseLife {} -> "CantLoseLife"

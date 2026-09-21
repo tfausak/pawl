@@ -60,6 +60,7 @@ import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlSides as ControlSides
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
@@ -954,6 +955,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
   PlayerEffect.StateCoinFlip _ -> False
+  PlayerEffect.ModifyDieRoll _ -> False
   PlayerEffect.AdditionalVotes _ -> False
   PlayerEffect.CantGainLife -> False
   PlayerEffect.CantLoseLife -> False
@@ -1020,6 +1022,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
   PlayerEffect.StateCoinFlip _ -> False
+  PlayerEffect.ModifyDieRoll _ -> False
   PlayerEffect.AdditionalVotes _ -> False
   PlayerEffect.CantGainLife -> False
   PlayerEffect.CantLoseLife -> False
@@ -1292,7 +1295,12 @@ effectObjectRefs effect =
         -- object's; mintedFaces is that axis, and every caller here sweeps one face at
         -- a time. CreateEmblem answers the same way for CR 114.2's emblem.
         Effect.Create {} -> []
-        Effect.Conjure {} -> []
+        -- The WRITTEN arm is a token's case above: the card is minted text, not a
+        -- ref. A DUPLICATE names an object already in the game, and reads it the
+        -- way CreateCopy's arm below reads its own.
+        Effect.Conjure (Conjure.MkConjure _ cards _ _) -> case cards of
+          ConjureCards.Written {} -> []
+          ConjureCards.Duplicate ref -> read_ [ref]
         Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> read_ [ref]
         Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _ _) -> read_ [original, subject]
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _ _ _) -> read_ (ref : copyTargetsRefs targets)

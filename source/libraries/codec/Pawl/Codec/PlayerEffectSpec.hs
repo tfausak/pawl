@@ -25,6 +25,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -33,6 +34,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
+import qualified Pawl.Types.RollModifier as RollModifier
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
@@ -477,6 +479,20 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
             }
       )
       " {\"type\":\"StateCoinFlip\",\"value\":{\"face\":{\"type\":\"Heads\"},\"wins\":true,\"firstEachTurn\":true}} "
+  -- CR 706.2 as Clam-I-Am prints it, and the wire form
+  -- data/cards/clam-i-am.json writes.
+  Spec.it s "ModifyDieRoll, Clam-I-Am's reroll" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      ( PlayerEffect.ModifyDieRoll
+          ModifiedRoll.MkModifiedRoll
+            { ModifiedRoll.sides = Just 6,
+              ModifiedRoll.natural = Just 3,
+              ModifiedRoll.modifier = RollModifier.Reroll
+            }
+      )
+      " {\"type\":\"ModifyDieRoll\",\"value\":{\"sides\":6,\"natural\":3,\"modifier\":{\"type\":\"Reroll\"}}} "
   -- CR 701.38d as Brago's Representative prints it, and the wire form
   -- data/cards/bragos-representative.json writes.
   Spec.it s "AdditionalVotes, Brago's Representative's one" $

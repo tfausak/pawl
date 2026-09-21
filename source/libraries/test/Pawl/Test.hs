@@ -122,6 +122,7 @@ import qualified Pawl.Codec.ComparesSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.CompletedDungeonSpec
 import qualified Pawl.Codec.ConditionSpec
+import qualified Pawl.Codec.ConjureCardsSpec
 import qualified Pawl.Codec.ConjureDestinationSpec
 import qualified Pawl.Codec.ConjureSelectionSpec
 import qualified Pawl.Codec.ConjureSpec
@@ -314,6 +315,7 @@ import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
 import qualified Pawl.Codec.ModeSpec
 import qualified Pawl.Codec.ModificationSpec
+import qualified Pawl.Codec.ModifiedRollSpec
 import qualified Pawl.Codec.ModifyPowerToughnessSpec
 import qualified Pawl.Codec.ModifyTargetSpec
 import qualified Pawl.Codec.MonarchTargetSpec
@@ -417,6 +419,7 @@ import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RevealSpec
 import qualified Pawl.Codec.RevealedSpec
 import qualified Pawl.Codec.RollDieSpec
+import qualified Pawl.Codec.RollModifierSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
 import qualified Pawl.Codec.RuleAbilitiesSpec
@@ -834,6 +837,7 @@ spec s registry = do
   Pawl.Codec.CopyStackObjectSpec.spec s
   Pawl.Codec.CopyTargetsSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
+  Pawl.Codec.ConjureCardsSpec.spec s
   Pawl.Codec.ConjureDestinationSpec.spec s
   Pawl.Codec.ConjureSelectionSpec.spec s
   Pawl.Codec.ConjureSpec.spec s
@@ -994,6 +998,7 @@ spec s registry = do
   Pawl.Codec.ModeSelectionSpec.spec s
   Pawl.Codec.ModeSpec.spec s
   Pawl.Codec.ModificationSpec.spec s
+  Pawl.Codec.ModifiedRollSpec.spec s
   Pawl.Codec.ModifyPowerToughnessSpec.spec s
   Pawl.Codec.ModifyTargetSpec.spec s
   Pawl.Codec.InitiativeTargetSpec.spec s
@@ -1098,6 +1103,7 @@ spec s registry = do
   Pawl.Codec.RevealSpec.spec s
   Pawl.Codec.RevealedSpec.spec s
   Pawl.Codec.RollDieSpec.spec s
+  Pawl.Codec.RollModifierSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.RuleAbilitiesSpec.spec s

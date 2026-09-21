@@ -129,6 +129,7 @@ import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ConjureSelection as ConjureSelection
 import qualified Pawl.Types.Connive as Connive.Type
@@ -3513,11 +3514,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- after -- a d20 answered 20 with a modifier of 5 is a result of 25, past the
   -- die's own top face. CR 107.1b for a sum a negative modifier drove below zero.
   --
+  -- CR 706.2b's first step IS implemented, in `rerolling` below: a source other
+  -- than this instruction may offer the roller a fresh throw of the same die.
+  --
   -- Not implemented: a modifier reaching this roll from a source other than its
-  -- own instruction, optional or costed (#3974), a reroll of the die (#3975), and
-  -- a binding for the natural result beside CR 706.2b's ordering among competing
-  -- modifiers (#3976); with one mandatory, free modifier there is nothing to order
-  -- and no second reader.
+  -- own instruction that INCREASES or DECREASES the result (#3974), a reroll
+  -- carrying a cost, which is where CR 706.2a's mana-ability window lives
+  -- (#3981), and a binding for the natural result beside CR 706.2b's ordering
+  -- among competing modifiers (#3976); with rule 706.2b's second bucket empty
+  -- there is nothing to order.
   --
   -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
   -- (Feywild Trickster). Recorded under `controller`, not `source`: rule 706.1's
@@ -3526,7 +3531,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- card telling ANOTHER player to roll would put the seat on Pawl.Types.RollDie.
   --
   -- One writer, one road: Prompt.RollDie is asked from this arm and from no
-  -- other place in the engine, so there is no second road to record on.
+  -- other place in the engine, so there is no second road to record on. A
+  -- reroll asks it a second time from inside the same arm, and records nothing
+  -- of its own -- see `rerolling`.
   --
   -- Recorded AFTER the binding, so a trigger placed by CR 603.3 sees the same
   -- state a later effect of this resolution would. Nothing observes the order --
@@ -3560,8 +3567,43 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     (RollDie.count rollDie)
                 )
             )
+        -- CR 706.1a's outcomes "numbered from 1 to N", BOTH ends included: the
+        -- answer filtered back to a face the die could show. Its own binding
+        -- because a reroll runs it a second time.
+        faceOf rolled = if rolled >= 1 && rolled <= sides then rolled else 1
+        -- CR 706.2b's FIRST step, taken before the instruction's own modifier
+        -- is added below: a source other than this instruction offers to throw
+        -- the same die again and take the new number as the natural result
+        -- (Clam-I-Am). CR 706.1a's "the same die", so `sides` is unchanged and
+        -- the second answer is filtered back against the same range.
+        --
+        -- RECURSIVE, because the offer is a static ability and its gate is on
+        -- the natural result: a rerolled 3 that comes up 3 again is a 3 the
+        -- Clam sees, and rule 706.2 puts no limit on how many times a roll is
+        -- modified. Terminating because every round costs the roller a
+        -- Prompt.RerollDie they may decline.
+        --
+        -- The offers are re-read each round for the same reason, rather than
+        -- captured before the first die.
+        --
+        -- CR 706.1's EVENT is not recorded again: the die was rolled once, and
+        -- the discarded number is not CR 706.6's ignored roll -- it happened,
+        -- and it has already triggered "you roll one or more dice".
+        rerolling natural = do
+          modifiers <- Dice.modifiersFor controller
+          if not (Dice.offersReroll sides natural modifiers)
+            then pure natural
+            else do
+              gs <- State.get
+              answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor controller gs) controller natural)
+              case answer of
+                OptionalDecision.Declines -> pure natural
+                OptionalDecision.Exercises -> do
+                  again <- Game.ask (Prompt.RollDie sides)
+                  rerolling (faceOf again)
         rollOne = do
           rolled <- Game.ask (Prompt.RollDie sides)
+          natural <- rerolling (faceOf rolled)
           gs <- State.get
           let viewOf = effectViewOf source legal gs
               context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -3569,10 +3611,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- the rule adds the modifier to the natural result of a roll, so a
               -- count above one adds it to each. CR 107.2's posture for a
               -- modifier that cannot be evaluated: no modifier at all.
+              --
+              -- After the rerolls above, which is CR 706.2b's order: rerolls are
+              -- considered first, and what they leave is the natural result this
+              -- adds to.
               modifier = case RollDie.modifier rollDie of
                 Nothing -> 0
                 Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
-              natural = if rolled >= 1 && rolled <= sides then rolled else 1
           pure (Integer.toNaturalSaturating (toInteger natural + modifier))
     -- CR 614.1a over CR 706.1: the instruction's count is offered to the
     -- replacement effects watching this roller's rolls (Pixie Guide) before the
@@ -5609,7 +5654,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Library arm names them and says why none of them is in data/cards/
         -- (#3972).
         --
-        -- The CANDIDATES are picked over once per card conjured, and the pick is
+        -- The CANDIDATES of a WRITTEN conjure are picked over once per card
+        -- conjured, and the pick is
         -- ASKED rather than rolled: docs/design.md section 2.2 makes randomness
         -- a prompt, RandomObject's posture. A one-candidate list is the card the
         -- sentence names outright, which no board can tell from a pick, so no
@@ -5629,16 +5675,45 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Secrets' "conjure X random cards from Giant Secrets's spellbook into
         -- your hand"). Each pick here is independent, so one card can come up
         -- twice (#3648).
-        offered = fmap conjuredName cards
-        answered answer = Maybe.fromMaybe (NonEmpty.head cards) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList cards))
-        pick = case cards of
-          one NonEmpty.:| [] -> pure one
+        --
+        -- A DUPLICATE names objects already in the game rather than candidates
+        -- written out in the card file, so there is nothing to pick over and
+        -- `selection` asks nothing. Each named object is duplicated in turn, the
+        -- whole count per object -- Gyox, Brutal Carnivora's "conjure X
+        -- duplicates of it" names one object and makes X cards -- and the set is
+        -- swept ONCE off the pre-effect board (CR 608.2f), as CreateCopy's arm
+        -- below sweeps its own.
+        --
+        -- What is duplicated is the object's COPIABLE values (CR 707.2) and not
+        -- the card printed under it: a Clone that is a copy of an Ornithopter
+        -- duplicates as an Ornithopter. The PAIR of reads is CreateCopy's and
+        -- has to move together -- Game.cardOfWithLastKnown for the card a reader
+        -- past the projection sees, Event.copiedSnapshotWithLastKnown for the
+        -- values themselves -- and both take CR 608.2h's last-known branch, since
+        -- the object a trigger named can be gone by the time it resolves
+        -- (Sinister Reflections is an instant and its targets can be killed in
+        -- response to it).
+        --
+        -- Not implemented: the duplicate keeps those copiable values only as the
+        -- incarnation this mints. CR 400.7 gives the next one no memory, so a
+        -- duplicate of a Clone that is cast from the hand it landed in resolves
+        -- as a Clone (#3979).
+        duplicatesOf ref = Maybe.mapMaybe (\oid -> fmap (\card -> (card, Just (Event.copiedSnapshotWithLastKnown oid gs))) (Game.cardOfWithLastKnown oid gs)) (objectRefObjects legal resolving controller source gs ref)
+        answered written answer = Maybe.fromMaybe (NonEmpty.head written) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList written))
+        pickWritten written = case written of
+          one NonEmpty.:| [] -> pure (one, Nothing)
           _ -> case selection of
-            ConjureSelection.AtRandom -> fmap answered (Game.ask (Prompt.RandomCard offered))
+            ConjureSelection.AtRandom -> fmap (\answer -> (answered written answer, Nothing)) (Game.ask (Prompt.RandomCard (fmap conjuredName written)))
             ConjureSelection.ByChoice -> do
               g <- State.get
-              fmap answered (Game.choose (Prompt.ChooseConjuredCard (Decide.deciderFor controller g) controller offered))
-        intoZone zone n = Monad.replicateM_ (Integer.toIntSaturating n) (pick >>= \card -> Monad.void (Event.conjure controller card zone LibraryPosition.defaultValue))
+              fmap (\answer -> (answered written answer, Nothing)) (Game.choose (Prompt.ChooseConjuredCard (Decide.deciderFor controller g) controller (fmap conjuredName written)))
+        -- One pick per card conjured on the written road, and one entry per
+        -- named object on the duplicate road. `pure` rather than a prompt for a
+        -- duplicate: the object was named before the conjure ran.
+        picks n = case cards of
+          ConjureCards.Written written -> replicate (Integer.toIntSaturating n) (pickWritten written)
+          ConjureCards.Duplicate ref -> fmap pure (duplicatesOf ref)
+        intoZone zone n = Monad.mapM_ (\p -> p >>= \(card, copied) -> Monad.void (Event.conjure controller card copied zone LibraryPosition.defaultValue)) (picks n)
     case evaluateForRecipient viewOf context gs resolving source controller quantity of
       Just n
         | n > 0 -> case destination of
@@ -5658,7 +5733,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- than a tap afterwards: a permanent that arrived untapped and was
             -- tapped after would have been read untapped by its own CR 616.1
             -- loop and by every CR 603.6a watcher of the entry.
-            ConjureDestination.Battlefield tapped -> pick >>= \card -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n) tapped)
+            -- One batch per pick, which on the written road is the one pick the
+            -- whole count is minted from and on the duplicate road is one batch
+            -- of `n` per named object.
+            ConjureDestination.Battlefield tapped -> case cards of
+              ConjureCards.Written written -> pickWritten written >>= \(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped)
+              ConjureCards.Duplicate ref -> Monad.forM_ (duplicatesOf ref) (\(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped))
       _ -> pure ()
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry mSlot exceptions) -> do
     gs <- State.get

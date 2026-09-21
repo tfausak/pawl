@@ -16,7 +16,8 @@
 -- SPELLBOOK rather than one card; the eighth casts a printed Follow the Tracks,
 -- the same spellbook shape with the other question asked of it; the ninth enters
 -- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
--- take.
+-- take; the last two cast a printed Sinister Reflections, whose conjure names an
+-- object already in the game rather than writing its card out.
 --
 -- The first four CAST what the conjure created, which is the point -- conjure
 -- creates a CARD and not CR 111.1's token, and a token in a hand, a library or a
@@ -25,6 +26,11 @@
 -- so no board of that shape tells a conjured card from a token. The fifth is the
 -- graveyard arrival's SHAPE rather than its cardness, read off a printed Planar
 -- Void that watches the graveyard.
+--
+-- The DUPLICATE pair is the other axis: the first of them reads the duplicates
+-- once the originals are in the graveyard, which is what tells a card from CR
+-- 707.1's token, and the second points the conjure at a Clone, which is where
+-- the printed card under an object and its CR 707.2 copiable values disagree.
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
@@ -38,7 +44,9 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -52,6 +60,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -488,6 +497,144 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "asked once, offering every card of the printed spellbook"
       offers
       [tracksSpellbook]
+  -- Sinister Reflections ({1}{U} Instant, "Conjure a duplicate of each of up to
+  -- two target nontoken creatures you control into your hand."), Oracle text
+  -- verified on Scryfall 2026-09-21. The conjure whose card is no longer written
+  -- out in the card file: the opcode names an object already in the game and
+  -- takes the card from there.
+  --
+  -- TWO DIFFERENT creatures targeted, which is what says the duplicate is read
+  -- per named object: one card taken twice would leave two of one name.
+  --
+  -- The originals are DESTROYED after the spell resolves, and the assertions are
+  -- read off that board. A CreateCopy token whose copiable values point at the
+  -- original would have nothing left to point at; a conjured duplicate is a card
+  -- of its own and outlives it.
+  Spec.it s "a conjured duplicate of each targeted creature reaches the hand and outlives the original" $ do
+    islandPrinting <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    -- Enough red mana left over to CAST both duplicates once the two Islands
+    -- have paid for the instant, which the last assertion asks for.
+    let board0 = S.landsFor mountain S.alice 6 (S.landsInPlay islandPrinting 2)
+        (pikerId, board1) = S.addPermanent piker S.alice board0
+        (giantId, board2) = S.addPermanent giant S.alice board1
+        (spell, board3) = S.addHandCard reflections S.alice board2
+        board = board3 {GameState.phase = Phase.PrecombatMain}
+        resolved = S.runPure (aimingAtAll [pikerId, giantId]) board (S.cast S.alice spell >> Stack.resolveTop)
+        -- CR 704.5g's destroy, driven directly: the point is the board AFTER the
+        -- originals are gone, and nothing about how they went.
+        gone = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId, giantId]))
+        duplicates = List.sort (filter (`notElem` [islandName, mountainName]) (namesIn Zone.Hand gone))
+    Spec.assertEqWith
+      s
+      "one duplicate of each targeted creature is in alice's hand once both originals are in the graveyard"
+      (duplicates, List.sort (namesIn Zone.Graveyard gone))
+      ([goblinPiker, hillGiant], [goblinPiker, hillGiant, sinisterReflections])
+    -- Cardness, the first four cases' own assertion: a duplicate is castable out
+    -- of the hand it landed in, where CR 111.7 would have swept up a token.
+    Spec.assertEqWith
+      s
+      "each duplicate is a card its owner could cast"
+      (fmap (\oid -> S.castable S.alice oid gone) (namedIn goblinPiker Zone.Hand gone <> namedIn hillGiant Zone.Hand gone))
+      [True, True]
+  -- The COPIABLE-VALUES tripwire. A Clone (CR 707.2) is a printed Clone whose
+  -- copiable values are the Piker's, so the two roads a duplicate could take
+  -- answer different names: the printed card under the object says Clone, and
+  -- its copiable values say Goblin Piker.
+  --
+  -- READ THROUGH THE PROJECTION, which is where CR 707.2's copiable values live
+  -- (CR 613.1a): the duplicate's printed card still says Clone -- it is minted
+  -- off the named object's printing -- and every characteristic a rule asks of it
+  -- says Goblin Piker. The two are asserted side by side, so a duplicate that
+  -- took the printed card instead would fail on the projection while the
+  -- printed-name read went on passing.
+  --
+  -- The Piker is DEAD when the assertions are read, which is what makes this a
+  -- duplicate rather than CreateCopy's token: a snapshot is a value (CR 707.2b)
+  -- and does not go looking for the object it came from.
+  --
+  -- Not asserted: the duplicate CAST out of that hand. CR 400.7's next
+  -- incarnation carries no binding, so the copiable values do not survive the
+  -- zone change (#3979).
+  Spec.it s "CR 707.2 a duplicate of a Clone is a duplicate of what the Clone copies" $ do
+    islandPrinting <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    let board0 = S.landsFor mountain S.alice 3 (S.landsInPlay islandPrinting 2)
+        (pikerId, board1) = S.addPermanent piker S.alice board0
+        -- Pawl.CopySpec's road onto the battlefield: the Clone is RESOLVED, with
+        -- CR 614.12's as-enters copy answered by naming the Piker, so it is on
+        -- the battlefield as a copy rather than as the 0/0 CR 704.5f sweeps up.
+        (_, staged) = S.spellOnStack clone S.alice board1
+        entered = S.settleSba (copyingPiker pikerId staged)
+    case clonesOnBattlefield entered of
+      [] -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      cloneId : _ -> do
+        let (spell, board2) = S.addHandCard reflections S.alice entered
+            board = board2 {GameState.phase = Phase.PrecombatMain}
+            resolved = S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop)
+            gone = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId, cloneId]))
+            duplicates = filter (\oid -> S.soleFaceName oid gone `notElem` [islandName, mountainName]) (Game.zoneMembers Zone.Hand S.alice gone)
+        Spec.assertEqWith
+          s
+          "CR 707.2 the duplicate's copiable values are the Piker's, where its printed card is the Clone's"
+          (fmap (\oid -> (Set.toList (Projection.namesOf oid gone), S.soleFaceName oid gone)) duplicates)
+          [([goblinPiker], cloneName)]
+        Spec.assertEqWith
+          s
+          "and it reads the Piker's 2/1 with the Piker itself in the graveyard"
+          (fmap (\oid -> S.powerToughnessOf oid gone) duplicates, List.sort (namesIn Zone.Graveyard gone))
+          ([Just (2, 1)], List.sort [cloneName, goblinPiker, sinisterReflections])
+
+goblinPiker :: CardName.CardName
+goblinPiker = CardName.MkCardName (Text.pack "Goblin Piker")
+
+hillGiant :: CardName.CardName
+hillGiant = CardName.MkCardName (Text.pack "Hill Giant")
+
+sinisterReflections :: CardName.CardName
+sinisterReflections = CardName.MkCardName (Text.pack "Sinister Reflections")
+
+-- CR 601.2c's announcement and choice in one, pinned to the named objects:
+-- announce as many as there are and hand back exactly those. Pinned rather than
+-- searched, Pawl.CopySpec's posture, so a mutation cannot be repaired by the
+-- answerer finding some other legal target.
+aimingAtAll :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+aimingAtAll oids p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const (Natural.length oids)) offers
+  -- FILTERED out of the offered recipients rather than built, the Toralf's
+  -- Disciple case's reason: CR 608.2b re-reads the targets at resolution, and a
+  -- recipient assembled here would carry the wrong tag for the slot's pool.
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, rs) -> Set.filter (maybe False (`elem` oids) . Recipient.objectOf) rs) asked
+  _ -> S.identityAnswer p
+
+-- Resolves the staged Clone with its CR 614.12 as-enters copy pinned to the
+-- named permanent, Pawl.CopySpec's copyNamed for its reason: a searching
+-- answerer could repair a mutation by finding some other legal source.
+copyingPiker :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+copyingPiker oid gs =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseCopyTarget {} -> Just oid
+        _ -> S.identityAnswer p
+   in S.runPure answer gs Stack.resolveTop
+
+-- The battlefield objects whose PRINTED card is Clone, which is what tells the
+-- copy from the Piker it copied -- every projected characteristic of the two is
+-- the same.
+clonesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
+clonesOnBattlefield gs = filter (\oid -> S.soleFaceName oid gs == cloneName) (Game.zoneMembers Zone.Battlefield S.alice gs)
+
+cloneName :: CardName.CardName
+cloneName = CardName.MkCardName (Text.pack "Clone")
+
+mountainName :: CardName.CardName
+mountainName = CardName.MkCardName (Text.pack "Mountain")
 
 -- The ten cards data/cards/tome-of-the-infinite.json prints as the Tome's
 -- spellbook, in the order the card file writes them.
