@@ -306,7 +306,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
               Deck.commander = Set.empty,
               Deck.vanguard = Nothing,
               Deck.dungeons = Set.empty,
-              Deck.sideboard = Map.fromList [(signInBlood, 2), (dragon, 1)]
+              Deck.sideboard = Map.fromList [(signInBlood, 2), (dragon, 1)],
+              Deck.conspiracies = Map.empty
             }
         after = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice deck)
         heldBy pid = traverse (\(i, n) -> fmap (\p -> (p, n)) (Game.printingOf i after)) (Map.toList (poolOf pid after))
@@ -744,6 +745,19 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     Spec.assertEqWith s "CR 121.1 she drew the library card" (printingsIn Zone.Hand S.alice after) [piker]
     Spec.assertEqWith s "which came off her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
     Spec.assertEqWith s "CR 400.11b and nothing was taken out of the pool" (Map.size (poolOf S.alice after)) 1
+  -- CR 315.3: "conspiracy cards that aren't in the game can't be brought into the
+  -- game". The first case's board with Sentinel Dispatch in the pool instead of
+  -- Sign in Blood: the draw is still replaced, and nothing arrives (CR 609.3).
+  Spec.it s "CR 315.3 a conspiracy outside the game cannot be brought in" $ do
+    plains <- S.printingOf s registry "Plains"
+    ring <- S.printingOf s registry "Ring of Ma'rûf"
+    piker <- S.printingOf s registry "Goblin Piker"
+    dispatch <- S.printingOf s registry "Sentinel Dispatch"
+    let (armed, _) = ringBoard plains ring piker dispatch True
+        after = S.runPure S.identityAnswer armed (Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 315.3 the conspiracy did not reach her hand" (printingsIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "CR 400.11b and it is still in the pool" (Map.size (poolOf S.alice after)) 1
+    Spec.assertEqWith s "CR 614.6 the draw was still replaced" (length (Game.zoneMembers Zone.Library S.alice after)) 2
   -- CR 400.11b: a destination that is not the hand. The Raven's Warning
   -- ({1}{W}{U} Enchantment -- Saga; name, cost, type line and Oracle text checked
   -- against api.scryfall.com 2026-09-16, paper printing `khm`) is the only

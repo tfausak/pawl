@@ -225,9 +225,9 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
     let delayed = Face.delayedAbilities face
         -- CR 113.6p, the limb beside CR 113.6b that reads the OBJECT rather than
         -- the ability: an emblem's abilities function in the command zone (CR
-        -- 114.4) and a face-up vanguard card's do too (CR 902.7), so a row of one
-        -- that states no zone functions here instead of taking rule 113.6's
-        -- battlefield default. functionsIn keeps the default and this disjunct
+        -- 114.4), and a face-up vanguard card's (CR 902.7) and conspiracy's (CR
+        -- 315.5) do too, so a row of one that states no zone functions here
+        -- instead of taking rule 113.6's battlefield default. functionsIn keeps the default and this disjunct
         -- overrides it, rather than the two readings being written twice;
         -- Vanguard.functionsFromCommandZone is rule 113.6p's own list, shared with
         -- the static, replacement, triggered and combat-restriction walks over

@@ -1610,8 +1610,8 @@ gatherGiven stripped functioning seed gs =
             -- The Walls of Ba Sing Se's unstated row still is not.
             --
             -- Never stripped: the pool's CR 613.1f removers reach creatures, which
-            -- CR 114.5 says an emblem is not and CR 313.2 keeps a vanguard card out
-            -- of being.
+            -- CR 114.5 says an emblem is not and CR 313.2 and CR 315.3 keep a
+            -- vanguard card and a conspiracy out of being.
             let keeps sa =
                   if Set.null (StaticAbility.functionsFrom sa)
                     then Vanguard.functionsFromCommandZone commandId gs
@@ -4133,7 +4133,7 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- no such field -- and does not need to be: replacementsAffecting projects
 -- battlefield permanents and the command zone's CR 113.6p objects, and CR 122.1h
 -- mints this row from counters on a PERMANENT, which CR 114.5 says an emblem is
--- not and CR 313.2 says a vanguard card is not --
+-- not and CR 313.2 and CR 315.3 say a vanguard card and a conspiracy are not --
 -- so a row minted here can only ever be a candidate while its source is on the
 -- battlefield, which is exactly "from the battlefield". The walks that
 -- reach the other zones cannot carry it: CR 113.6b gathers PRINTED rows and this
@@ -4379,8 +4379,9 @@ replacementsAffecting gs =
       -- it: that function asks what a Modification WRITES, and it is shared
       -- verbatim with CombatRestriction.inForce's `anyMinted`, which does not ask
       -- this question at all. Copiability is not asked either, unlike `baseHas`:
-      -- CR 114.3 makes the emblem's abilities the whole of it, CR 313.2 keeps a
-      -- vanguard card in this zone all game, and no copy effect reaches either.
+      -- CR 114.3 makes the emblem's abilities the whole of it, CR 313.2 and CR
+      -- 315.3 keep a vanguard card and a conspiracy in this zone all game, and no
+      -- copy effect reaches any of them.
       --
       -- CR 113.6b is the OTHER limb this zone meets, and it sits BESIDE rule
       -- 113.6p in that list rather than under it: a commander's or a dungeon
@@ -4521,10 +4522,10 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- Does any static ability functioning from a zone OTHER than the battlefield
 -- write a modification satisfying `p`? storedWrites' sibling disjunct in both
 -- gates, and the other half of what a walk of the permanents cannot reach: an
--- emblem's or a vanguard card's abilities function in the command zone, where an
--- emblem is neither a card nor a permanent and a vanguard card is not a permanent
--- either (CR 114.4 / 114.5 / 902.7 / 313.2, the arm CR 113.6p names), and CR
--- 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
+-- emblem's, a vanguard card's or a conspiracy's abilities function in the command
+-- zone, where an emblem is neither a card nor a permanent and the two cards are
+-- not permanents either (CR 114.4 / 114.5 / 902.7 / 313.2 / 315.3, the arm CR
+-- 113.6p names), and CR 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
 -- hand, a library or exile.
 --
 -- anyConditional's walk with its predicate swapped, and sound for that
