@@ -1739,6 +1739,7 @@ rewriteDuration pairs duration = case duration of
   -- carries no word CR 612.1 can swap, so the reference is left alone.
   Duration.UntilEndOfNextTurnOf _ -> duration
   Duration.DuringNextTurnOf _ -> duration
+  Duration.DuringYourNextTurn -> duration
   Duration.UntilEndOfCombat -> duration
   -- CR 116.2c's price, which is a Cost and not a Condition. An activated
   -- ability's own cost is left alone by this descent for the same reason: no

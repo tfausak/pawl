@@ -127,6 +127,11 @@ arm targets controller source duration gs = case duration of
     fmap
       (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
       (seatOf targets gs ref)
+  -- CR 611.2a: the arm above's window with the seat taken from CR 109.5's "you",
+  -- as UntilYourNextTurn takes it. Never Nothing -- a controller is always a
+  -- seat, so this window always begins.
+  Duration.DuringYourNextTurn ->
+    Just (Expiry.DuringTurnOf (AfterTurn.MkAfterTurn controller (GameState.turnNumber gs)))
   -- BAKED, and stored baked: the condition outlives the resolution that stored
   -- it, and sweepConditional below re-reads it off the effect's
   -- SOURCE, whose bindings never held the resolution's slots. An InSlot left
@@ -233,10 +238,11 @@ follows expiry = case expiry of
 -- that turn's cleanup, so no LATER turn of theirs can be mistaken for it and the
 -- bound needs no upper half.
 --
--- Not implemented: only Pawl.Engine.CombatRestriction asks this, so a row stored
--- under DuringTurnOf on any other carrier applies from the moment it is stored
--- (#3983). A gate this narrow is safe only while Wall of Dust is the
--- pool's one producer -- see Pawl.Types.Expiry.
+-- Not implemented: only Pawl.Engine.CombatRestriction and
+-- Pawl.Engine.Cast.permitsPlayFromExile ask this, so a row stored under
+-- DuringTurnOf on any other carrier applies from the moment it is stored
+-- (#3983). A gate this narrow is safe only while Wall of Dust and Galvanic Relay
+-- are the pool's producers -- see Pawl.Types.Expiry.
 begun :: GameState -> Expiry -> Bool
 begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->

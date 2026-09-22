@@ -78,6 +78,13 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       (Duration.DuringNextTurnOf (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "thatAttacker"))))
       " {\"type\":\"DuringNextTurnOf\",\"value\":{\"type\":\"ControllerOfBound\",\"value\":\"thatAttacker\"}} "
+  -- CR 611.2a: the same window against CR 109.5's "you" (Galvanic Relay).
+  Spec.it s "DuringYourNextTurn" $
+    Common.assertCodec
+      s
+      Duration.codec
+      Duration.DuringYourNextTurn
+      " {\"type\":\"DuringYourNextTurn\"} "
   -- CR 611.2b, carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
     Common.assertCodec

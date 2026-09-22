@@ -785,6 +785,7 @@ durationConditions duration = case duration of
   -- A PlayerRef carries no Condition, and so no Count.
   Duration.UntilEndOfNextTurnOf _ -> []
   Duration.DuringNextTurnOf _ -> []
+  Duration.DuringYourNextTurn -> []
   Duration.ForAsLongAs condition -> [condition]
   Duration.UntilEndOfCombat -> []
   -- CR 116.2c's price is a Cost, whose Filters are swept by durationFilters
@@ -3655,6 +3656,7 @@ durationFilters duration =
           Duration.UntilEndOfYourNextTurn -> []
           Duration.UntilEndOfNextTurnOf _ -> []
           Duration.DuringNextTurnOf _ -> []
+          Duration.DuringYourNextTurn -> []
           Duration.ForAsLongAs _ -> []
           Duration.UntilEndOfCombat -> []
           Duration.UntilUsed -> []

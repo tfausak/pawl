@@ -57,6 +57,14 @@ data Duration
     -- (Sphinx's Decree) wants -- one reference is sampled once, so a single
     -- stored row names a single turn (#3982).
     DuringNextTurnOf PlayerRef.PlayerRef
+  | -- | CR 611.2a: "during your next turn" (Galvanic Relay) -- the arm above's
+    -- window with the seat taken from CR 109.5's "you" instead of sampled from a
+    -- reference, as UntilYourNextTurn stands to UntilEndOfNextTurnOf.
+    --
+    -- Nullary and not DuringNextTurnOf (PlayerRef.Relative You), because that
+    -- reference arms nothing: Pawl.Engine.Expiry.seatOf answers only InSlot and
+    -- ControllerOfBound (#3950), and a printed card does not know a PlayerId.
+    DuringYourNextTurn
   | -- | CR 611.2b: "for as long as ...". The duration has a BEGINNING as well as
     -- an end -- "if the 'for as long as' duration never starts, the effect does
     -- nothing" -- which is why Pawl.Engine.Expiry.arm returns a Maybe.

@@ -56,9 +56,10 @@ data Expiry
     -- only "has this ended" sees this row from the moment it is stored and
     -- applies it a turn early.
     --
-    -- Not implemented: every carrier but GameState.attackProhibitions reads its
-    -- rows without asking `begun`, so one stored under this arm applies from the
-    -- moment it is stored (#3983). Wall of Dust is the only producer in the pool.
+    -- Not implemented: every carrier but GameState.attackProhibitions and
+    -- Object.playableFromExile reads its rows without asking `begun`, so one
+    -- stored under this arm applies from the moment it is stored (#3983). Wall of
+    -- Dust and Galvanic Relay are the only producers in the pool.
     DuringTurnOf AfterTurn.AfterTurn
   | -- | CR 500.5: effects lasting until the end of a step or phase expire as it
     -- ends. A Pawl.Types.PhaseSelector because CR 500.5 names both grains and
