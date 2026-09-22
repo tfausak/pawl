@@ -3,12 +3,13 @@
 -- Covers: CR 801's limited range of influence option -- Pawl.Types.RangeOfInfluence,
 -- the Pawl.Types.GameSettings field that carries it, Pawl.Engine.Game.inRangeOf,
 -- and its readers: Pawl.Engine.Combat's attackableOpponents (CR 801.3),
--- Pawl.Engine.Target's legalRecipientsGiven (CR 801.4) and
--- Pawl.Engine.Activate's activatableGiven (CR 801.6).
+-- Pawl.Engine.Target's legalRecipientsGiven (CR 801.4),
+-- Pawl.Engine.Activate's activatableGiven (CR 801.6) and Pawl.Engine.Sba's
+-- fallsOff and becomesUnattached (CR 801.8 / CR 801.9).
 --
--- FOUR SEATS at range 1 throughout, turn order [alice, bob, carol, dave]: bob
--- and dave sit next to alice and carol sits two seats away. Three seats would
--- cut nothing, every seat being adjacent there. Each negative is paired with
+-- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
+-- carol, dave]: bob and dave sit next to alice and carol sits two seats away.
+-- Three seats would cut nothing, every seat being adjacent there. Each negative is paired with
 -- the same board at an unlimited range.
 module Pawl.RangeOfInfluenceSpec where
 
@@ -19,6 +20,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -27,10 +29,12 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -129,3 +133,30 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (not (offeredTo S.alice (S.withRange 1 board))) "CR 801.6 at range 1 alice is not offered the Lion carol controls"
     Spec.assertBool s (offeredTo S.alice board) "at an unlimited range she is"
     Spec.assertBool s (offeredTo S.bob (S.withRange 1 board)) "and bob, one seat from carol, is at range 1"
+
+  -- CR 801.8 / CR 801.9: alice's Goblin Piker (2/1) wears her Unholy Strength
+  -- (+2/+1) and her Bonesplitter (+2/+0), and carol's Control Magic has taken
+  -- it. Carol reaches two seats and alice one, so the Piker now sits outside
+  -- alice's range while carol's own Aura stays legal. Paired with the same board
+  -- at an unlimited range.
+  Spec.it s "CR 801.8 / 801.9 an Aura or Equipment on a host outside its controller's range falls off" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholy <- S.printingOf s registry "Unholy Strength"
+    splitter <- S.printingOf s registry "Bonesplitter"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    let (creature, g0) = S.addPermanent piker S.alice S.fourPlayerGame
+        (aura, g1) = S.addPermanent unholy S.alice g0
+        (equipment, g2) = S.addPermanent splitter S.alice g1
+        (steal, g3) = S.addPermanent controlMagic S.carol g2
+        board = S.attach steal creature (S.attach equipment creature (S.attach aura creature g3))
+        ranged gs =
+          let ranges = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(S.alice, 1), (S.bob, 1), (S.carol, 2), (S.dave, 1)])
+           in gs {GameState.settings = (GameState.settings gs) {GameSettings.rangeOfInfluence = ranges}}
+        limited = S.settleSba (ranged board)
+        unlimited = S.settleSba board
+    Spec.assertEqWith s "CR 801.8 / 801.9 at alice's range 1 the Piker loses both bonuses" (S.powerToughnessOf creature limited) (Just (2, 1))
+    Spec.assertBool s (not (S.onBattlefield aura limited)) "CR 801.8 alice's Unholy Strength leaves the battlefield"
+    Spec.assertEqWith s "CR 801.9 alice's Bonesplitter is unattached" (fmap Object.attachedTo (Game.lookupObject equipment limited)) (Just Nothing)
+    Spec.assertBool s (S.onBattlefield equipment limited) "CR 801.9 and stays on the battlefield"
+    Spec.assertBool s (S.onBattlefield steal limited) "carol's Control Magic, on a creature she controls, stays"
+    Spec.assertEqWith s "at an unlimited range the Piker keeps both" (S.powerToughnessOf creature unlimited) (Just (6, 2))

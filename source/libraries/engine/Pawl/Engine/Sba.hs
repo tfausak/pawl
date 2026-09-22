@@ -37,6 +37,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -48,6 +49,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotCount as SlotCount
@@ -203,8 +205,11 @@ destroyedBySba gs pc oid =
 -- Rule 704.5n's own "illegal permanent" is the conjunct above it, and the two
 -- are kept apart because they read different things -- CR 301.5's and CR 301.6's
 -- card type, and CR 613.11's continuous effect.
-becomesUnattached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
-becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
+--
+-- CR 801.9 is the third: a host outside the attached permanent's controller's
+-- range of influence (outOfReach below).
+becomesUnattached :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> GameState -> ObjectId -> Bool
+becomesUnattached pcs grants gs oid = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj -> case Object.attachedTo obj of
     Nothing -> False
@@ -221,7 +226,17 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
           hostIsLand = hostCardType CardType.Land
           hostIsIllegal = (isEquipment && not hostIsCreature) || (isFortification && not hostIsLand)
           hostRefuses = Maybe.maybe False (\h -> AttachRestriction.removesGiven pcs oid h gs) (Recipient.objectOf host)
-       in (isEquipment || isFortification) && (hostIsIllegal || hostRefuses)
+       in (isEquipment || isFortification) && (hostIsIllegal || hostRefuses || outOfReach grants gs oid host)
+
+-- CR 801.8 / CR 801.9: is this attachment's host outside its controller's range
+-- of influence? Always False in a game without CR 801's option, which is
+-- answered before the control walk, so such a game never forces `grants`.
+outOfReach :: [Projection.ControlGrant] -> GameState -> ObjectId -> Recipient.Recipient -> Bool
+outOfReach grants gs oid host
+  | Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs))) = False
+  | otherwise = case Projection.controllerOfGiven grants Set.empty oid gs of
+      Nothing -> False
+      Just you -> not (Target.inRangeGiven grants you host gs)
 
 -- CR 704.5p: a battle or creature attached to an object or player becomes
 -- unattached and remains on the battlefield, and so does any nonbattle,
@@ -385,6 +400,9 @@ fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
             -- only by an Aura attached to a player, which is no Aura at all on
             -- almost every board.
             || Maybe.maybe False (\pid -> PlayerEffect.protectedFrom oid pid gs) (Recipient.playerOf recipient)
+            -- CR 801.8: an object or player outside the Aura's controller's
+            -- range of influence.
+            || outOfReach grants gs oid recipient
 
 -- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s enchant
 -- slot ADMITS?
@@ -678,7 +696,7 @@ performStateBasedActions = Event.simultaneously $ do
       -- CR 704.5n and CR 704.5p: computed from the same pre-pass state, for the
       -- same reason. One list because they share an action -- detach, stay on
       -- the battlefield -- and differ only in why the attachment is illegal.
-      detaching = filter (\oid -> becomesUnattached pcs gs oid || cannotBeAttached pcs gs oid) onBattlefield
+      detaching = filter (\oid -> becomesUnattached pcs grants gs oid || cannotBeAttached pcs gs oid) onBattlefield
       -- CR 704.5h's window is "since the last SBA check", so the watermark is the
       -- log length AS THIS PASS BEGAN: every 704.5h victim was computed from that
       -- same pre-pass state, and the Moved events this pass itself appends carry
