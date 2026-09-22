@@ -2595,7 +2595,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseSurveil decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseFateseal decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExplore decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.RerollDie decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.RerollDie decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDefender decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseManaSource decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExtraManaSource decider _ _ -> Just (Decider.unwrap decider)

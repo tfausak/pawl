@@ -206,6 +206,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.Morph as Morph
@@ -4449,8 +4450,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- a once-per-turn flag, and no Filter over objects.
   PlayerEffect.StateCoinFlip _ -> []
   -- CR 706.2's modifier narrows by a die size and a number, neither a Filter
-  -- over objects.
-  PlayerEffect.ModifyDieRoll _ -> []
+  -- over objects. Its CR 706.2a cost holds them, Wall of Fortune's "an untapped
+  -- Wall you control" being one.
+  PlayerEffect.ModifyDieRoll modified -> foldMap costFilters (ModifiedRoll.cost modified)
   PlayerEffect.AdditionalVotes _ -> []
   PlayerEffect.CantGainLife -> []
   PlayerEffect.CantLoseLife -> []

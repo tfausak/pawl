@@ -107,6 +107,7 @@ import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveCounters as MoveCounters
@@ -417,8 +418,11 @@ rewritePlayerEffect pairs effect = case effect of
   -- Nor is a coin's face, or the two flags beside it.
   PlayerEffect.StateCoinFlip _ -> effect
   -- Nor is a die's size, the number it came up, or which of CR 706.2b's two
-  -- buckets the modifier is in.
-  PlayerEffect.ModifyDieRoll _ -> effect
+  -- buckets the modifier is in. Rule 706.2a's COST is text a swap reaches --
+  -- Wall of Fortune's "tap an untapped Wall you control" names a subtype -- so
+  -- it descends where the rest of the payload does not.
+  PlayerEffect.ModifyDieRoll modified ->
+    PlayerEffect.ModifyDieRoll modified {ModifiedRoll.cost = fmap (Filter.rewriteCost pairs) (ModifiedRoll.cost modified)}
   PlayerEffect.AdditionalVotes _ -> effect
   PlayerEffect.CantGainLife -> effect
   PlayerEffect.CantLoseLife -> effect

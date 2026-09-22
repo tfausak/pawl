@@ -214,6 +214,7 @@ import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mentored as Mentored
@@ -223,6 +224,7 @@ import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
@@ -237,6 +239,9 @@ import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
+import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
@@ -3518,11 +3523,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- than this instruction may offer the roller a fresh throw of the same die.
   --
   -- Not implemented: a modifier reaching this roll from a source other than its
-  -- own instruction that INCREASES or DECREASES the result (#3974), a reroll
-  -- carrying a cost, which is where CR 706.2a's mana-ability window lives
-  -- (#3981), and a binding for the natural result beside CR 706.2b's ordering
-  -- among competing modifiers (#3976); with rule 706.2b's second bucket empty
-  -- there is nothing to order.
+  -- own instruction that INCREASES or DECREASES the result (#3974), and a
+  -- binding for the natural result beside CR 706.2b's ordering among competing
+  -- modifiers (#3976); with rule 706.2b's second bucket empty there is nothing
+  -- to order.
   --
   -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
   -- (Feywild Trickster). Recorded under `controller`, not `source`: rule 706.1's
@@ -3580,7 +3584,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- RECURSIVE, because the offer is a static ability and its gate is on
         -- the natural result: a rerolled 3 that comes up 3 again is a 3 the
         -- Clam sees, and rule 706.2 puts no limit on how many times a roll is
-        -- modified. Terminating because every round costs the roller a
+        -- modified. Terminating because every round costs some player a
         -- Prompt.RerollDie they may decline.
         --
         -- The offers are re-read each round for the same reason, rather than
@@ -3590,17 +3594,82 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- the discarded number is not CR 706.6's ignored roll -- it happened,
         -- and it has already triggered "you roll one or more dice".
         rerolling natural = do
+          gs <- State.get
           modifiers <- Dice.modifiersFor controller
-          if not (Dice.offersReroll sides natural modifiers)
-            then pure natural
-            else do
-              gs <- State.get
-              answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor controller gs) controller natural)
-              case answer of
-                OptionalDecision.Declines -> pure natural
-                OptionalDecision.Exercises -> do
-                  again <- Game.ask (Prompt.RollDie sides)
-                  rerolling (faceOf again)
+          offering (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers))) natural
+        -- CR 109.5's "you" on the modifier, which is the player its "may" and
+        -- its CR 706.2a cost belong to -- Clam-I-Am's own controller, who is
+        -- also the roller, and Wall of Fortune's, who need not be. The ROLLER
+        -- where the carrier names no object, which CR 611.2a's stored form would
+        -- be and no printing of this family is.
+        offerOf gs (stated, offer) =
+          ( Maybe.fromMaybe controller (stated >>= \oid -> Projection.controllerOf oid gs),
+            stated,
+            ModifiedRoll.cost offer
+          )
+        -- Two FREE offers to the same player are the same question asked twice:
+        -- the answers are indistinguishable, and either accepted throws the same
+        -- die. So two Clam-I-Ams ask once. Where CR 706.2a's cost is stated the
+        -- offers stand apart -- what is paid, and the permanent it is paid
+        -- against, are things the payer can tell apart -- so each is asked.
+        distinct seen candidates = case candidates of
+          [] -> []
+          candidate@(payer, _, mCost) : rest
+            | Maybe.isJust mCost -> candidate : distinct seen rest
+            | Set.member payer seen -> distinct seen rest
+            | otherwise -> candidate : distinct (Set.insert payer seen) rest
+        -- Not implemented: CR 706.2b's pick among COMPETING modifiers, which is
+        -- the ROLLER's (#3976). The offers are put to their own payers in
+        -- timestamp order instead, and the first taken is the one applied.
+        offering offers natural = case offers of
+          [] -> pure natural
+          (payer, stated, mCost) : rest -> do
+            gs <- State.get
+            -- CR 118.3, Prompt.ChooseToPay's posture for CR 118.12: a cost the
+            -- payer has not the resources to pay fully is not offered. A stated
+            -- cost with no object behind it cannot be paid at all -- every
+            -- component is paid against the permanent that printed it -- and is
+            -- skipped for that reason.
+            let payable = case (stated, mCost) of
+                  (_, Nothing) -> True
+                  (Just oid, Just cost) -> Cost.canPay PaymentSubject.ForNeither payer oid cost gs
+                  (Nothing, Just _) -> False
+            if not payable
+              then offering rest natural
+              else do
+                answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor payer gs) payer natural mCost)
+                case answer of
+                  OptionalDecision.Declines -> offering rest natural
+                  OptionalDecision.Exercises -> do
+                    paid <- case (stated, mCost) of
+                      (Just oid, Just cost) -> payForReroll payer oid cost
+                      _ -> pure True
+                    if not paid
+                      then offering rest natural
+                      else do
+                        again <- Game.ask (Prompt.RollDie sides)
+                        rerolling (faceOf again)
+        -- CR 706.2a's cost, charged between the offer and the second throw: a
+        -- declined or failed payment leaves the natural result standing.
+        --
+        -- DuringResolution, payGatePaidBy's moment and for its reason -- the
+        -- roll is CR 609.1's effect being followed -- so the payment is CR
+        -- 733.1's own reversible action and the CR 605.3a window it opens is
+        -- the payer's to keep.
+        --
+        -- Not implemented: CR 706.2a's second sentence gives that mana window to
+        -- the player who ROLLED, where Cost.pay opens it for the payer. The two
+        -- are the same player on every printing but Wall of Fortune, whose cost
+        -- states no mana and so opens no window at all (#3981).
+        --
+        -- The bound slots are dropped, payGatePaidBy's elision and its reason:
+        -- a permanent this payment tapped cannot be read by a later clause of
+        -- the same resolution (#1872).
+        payForReroll payer oid cost = do
+          (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer oid pure cost
+          began <- State.get
+          outcome <- Cost.pay performManaAbility (Just began) PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
+          pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
         rollOne = do
           rolled <- Game.ask (Prompt.RollDie sides)
           natural <- rerolling (faceOf rolled)

@@ -136,8 +136,8 @@ data Response
   | -- | CR 701.44a: whether the exploring permanent's controller binned the
     -- revealed nonland card.
     ChoseExplore OptionalDecision.OptionalDecision
-  | -- | CR 706.2b: whether the roller took a reroll offered to them
-    -- (Clam-I-Am).
+  | -- | CR 706.2b: whether the seat CR 109.5's "you" names on the modifier took
+    -- a reroll it offered (Clam-I-Am, Wall of Fortune).
     ChoseReroll OptionalDecision.OptionalDecision
   | -- | CR 507.1: the opponent the active player chose to attack.
     ChoseDefender PlayerId.PlayerId

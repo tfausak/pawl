@@ -3262,7 +3262,14 @@ statedFlips pid gs =
 -- came last can have it. Rule 706.2b gives the ROLLER the pick among competing
 -- modifiers rather than the timestamps (#3976), which is why nothing here
 -- collapses the list.
-rollModifiers :: PlayerId -> GameState -> [ModifiedRoll.ModifiedRoll]
+--
+-- Each modifier is TAGGED with the object that states it, `applying`'s own
+-- answer, because CR 706.2a's cost is owed by the player that object's "you"
+-- names rather than by `pid`: Wall of Fortune reaches every player's roll and
+-- charges its own controller. Nothing for a stored carrier with no object behind
+-- it, which no printing of this family has (CR 611.2a); Pawl.Engine.Dice is what
+-- turns the tag into a seat.
+rollModifiers :: PlayerId -> GameState -> [(Maybe ObjectId, ModifiedRoll.ModifiedRoll)]
 rollModifiers pid gs =
   let modifies effect = case effect of
         PlayerEffect.ModifyDieRoll modifier -> Just modifier
@@ -3306,7 +3313,7 @@ rollModifiers pid gs =
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
-   in Maybe.mapMaybe (modifies . snd) (applying pid gs)
+   in Maybe.mapMaybe (\(source, effect) -> fmap ((,) source) (modifies effect)) (applying pid gs)
 
 -- CR 611.2a / Quicken: the one-shot (Expiry.WhenUsed) stored grants `pid`
 -- would SPEND by casting `oid` -- every row on this axis that applies to them
