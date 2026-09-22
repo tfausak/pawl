@@ -3658,9 +3658,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- the payer's to keep.
         --
         -- Not implemented: CR 706.2a's second sentence gives that mana window to
-        -- the player who ROLLED, where Cost.pay opens it for the payer. The two
-        -- are the same player on every printing but Wall of Fortune, whose cost
-        -- states no mana and so opens no window at all (#3981).
+        -- the player who ROLLED, where Cost.pay opens it for the payer (#3981).
+        -- NO PRINTING tells the two readings apart, and Monitor Monitor -- the
+        -- one printed modifier carrying a mana cost, once CR 717's Attractions
+        -- land (#871) -- will not either: its roller IS its payer, "you may pay
+        -- {1} to reroll one or more dice you rolled". Wall of Fortune is the
+        -- only printing whose payer is not the roller and its cost states no
+        -- mana, so it opens no window at all. The shape that would separate them
+        -- is Wall of Fortune's scope with a mana cost, which nothing prints, so
+        -- this is falsifiable only by a synthetic card.
+        --
+        -- Cost.pay takes ONE seat, for the payment and for the window both, so
+        -- the change is a second seat threaded through paySubstituting and
+        -- payManaWindow -- the path every cast, activation and CR 118.12 gate
+        -- also takes.
         --
         -- The bound slots are dropped, payGatePaidBy's elision and its reason:
         -- a permanent this payment tapped cannot be read by a later clause of

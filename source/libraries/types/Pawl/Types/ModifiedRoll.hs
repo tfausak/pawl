@@ -37,8 +37,21 @@ import qualified Pawl.Types.RollModifier as RollModifier
 -- 109.5), who is not always the roller: Wall of Fortune's scope is every player
 -- and its "you" is the Wall's controller.
 --
--- Not implemented: a modifier that is MANDATORY (#3981). CR 706.2a allows one,
--- and every printed reroll is a bare "may", so the engine always asks.
+-- Not implemented: a modifier that is MANDATORY (#3981). CR 706.2a allows one
+-- and no printing states one: Scryfall @o:reroll@, 2026-09-22, returns seven
+-- printings and @o:reroll is:digital@ none, and every one of the seven is a bare
+-- "may" (Clam-I-Am, Wall of Fortune, Monitor Monitor, Centaur of Attention) or
+-- an activated ability whose cost is the ABILITY's rather than the modifier's
+-- (Goblin Bookie, Pippa Duchess of Dice, see #3989).
+--
+-- A STOP is what it would need before it needs a producer, and rule 706 states
+-- none. The offer is re-read against each new natural result, so the decline is
+-- what ends Pawl.Engine.Resolve.Effect's `rerolling`; take it away from a
+-- modifier stating neither `sides` nor `natural` and the reroll matches its own
+-- output forever, with real randomness as much as with a fixed answerer. The one
+-- printed mandatory reroll is bounded by the card's own words and belongs to the
+-- rolling instruction rather than to this type -- Ricochet's "reroll to break
+-- ties, if necessary", see #3990.
 --
 -- Construct with BRACE syntax: `sides` and `natural` are two Naturals in a row,
 -- and positional construction that transposed them would compile.
