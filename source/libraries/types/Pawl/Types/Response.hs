@@ -671,6 +671,9 @@ data Response
     -- spell's buyback cost, which is what rule 702.27a's second static ability
     -- reads as the spell resolves.
     AnnouncedBuyback BuybackDecision.BuybackDecision
+  | -- | CR 702.47a / 601.2b: the cards a caster spliced onto a spell, in the
+    -- order CR 702.47b has them choose.
+    AnnouncedSplice [ObjectId.ObjectId]
   | -- | CR 702.132a's answer: which other player the caster chose to assist the
     -- spell, Nothing where they chose nobody.
     ChoseAssistant (Maybe PlayerId.PlayerId)

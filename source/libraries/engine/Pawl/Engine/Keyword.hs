@@ -166,6 +166,7 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
@@ -383,6 +384,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.Ninjutsu _ -> []
+  Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -596,6 +598,9 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Cycling (Cycling.MkCycling cost searchFor) -> [cycling cost searchFor]
   Keyword.Reinforce (Reinforce.MkReinforce n cost) -> [reinforce n cost]
   Keyword.Ninjutsu cost -> [ninjutsu cost]
+  -- CR 702.47a is a STATIC ability read by Pawl.Engine.Cast's CR 601.2b
+  -- announcement, so it mints nothing here.
+  Keyword.Splice _ -> []
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
   Keyword.Saddle _ -> []
@@ -1161,6 +1166,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Cycling _ -> []
   Keyword.Reinforce _ -> []
   Keyword.Ninjutsu _ -> []
+  Keyword.Splice _ -> []
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
   Keyword.Saddle _ -> []
@@ -1799,6 +1805,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- CR 702.49a's ability functions from a HAND, so it is minted by
   -- handAbilitiesFor above and never from the battlefield.
   Keyword.Ninjutsu _ -> []
+  Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -2474,6 +2481,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.Ninjutsu _ -> []
+  Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
   -- CR 702.8a grants no permission, and it is the near miss worth stating: its
   -- SECOND sentence widens the TIME a cast may be proposed at (Cast.instantSpeed)
@@ -3606,6 +3614,15 @@ buybackCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
+-- CR 702.47a: every splice ability a card prints, which Pawl.Engine.Cast offers
+-- as the card sits in its owner's hand.
+splices :: Set Keyword -> [Splice.Splice Keyword]
+splices keywords =
+  let spliceOf keyword = case keyword of
+        Keyword.Splice splicing -> Just splicing
+        _ -> Nothing
+   in Maybe.mapMaybe spliceOf (Set.toAscList keywords)
+
 -- CR 702.62a: the suspend ability this card prints -- the N and the cost of CR
 -- 116.2f's special action together -- or Nothing when the card has no suspend.
 --
@@ -4130,6 +4147,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.Ninjutsu _ -> []
+  Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -4534,6 +4552,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.Ninjutsu _ -> []
+  Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -4813,6 +4832,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Equip _ -> []
   Keyword.Fortify _ -> []
   Keyword.Ninjutsu _ -> []
+  Keyword.Splice _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -5079,6 +5099,7 @@ familyOf keyword = case keyword of
   Keyword.Equip _ -> Just KeywordFamily.Equip
   Keyword.Fortify _ -> Just KeywordFamily.Fortify
   Keyword.Ninjutsu _ -> Just KeywordFamily.Ninjutsu
+  Keyword.Splice _ -> Just KeywordFamily.Splice
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
   Keyword.Cycling {} -> Just KeywordFamily.Cycling

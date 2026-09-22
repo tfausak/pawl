@@ -283,6 +283,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -3249,6 +3250,8 @@ keywordPayloadFilters keyword = case keyword of
   -- other keyword's is: rule 702.167a writes the materials into the ability's
   -- cost, so both halves are the card's own words.
   Keyword.Craft crafting -> costFilters (Craft.cost crafting) <> [ExileMaterials.whichObjects (Craft.materials crafting)]
+  -- CR 702.47a's payload is a [quality] and a Cost, both printed.
+  Keyword.Splice splicing -> Splice.onto splicing : costFilters (Splice.cost splicing)
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
@@ -6686,7 +6689,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- Not vacuous: the pool declares slots at all, and the check really rejects.
     Spec.assertBool
       s
-      (Text.isInfixOf hash (SlotName.unwrap (Modal.instanceSlot (ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 1) (SlotName.MkSlotName (Text.pack "creature")))))
+      (Text.isInfixOf hash (SlotName.unwrap (Modal.instanceSlot (ModeInstance.MkModeInstance 0 (ModeIndex.MkModeIndex 0) 1) (SlotName.MkSlotName (Text.pack "creature")))))
       "instanceSlot's second occurrence really uses the separator"
   -- The sweep above's other half: declaring a reserved slot as a target is not
   -- the only way a card names one. Four opcodes carry a SlotName they

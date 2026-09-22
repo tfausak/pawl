@@ -968,6 +968,7 @@ addObjectIn zone printing pid gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1223,6 +1224,7 @@ addToken card pid gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1294,6 +1296,7 @@ addLibraryCard printing pid gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1370,6 +1373,7 @@ addGraveyardCard printing pid gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1450,6 +1454,7 @@ addExiledCard printing pid gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1535,6 +1540,7 @@ addHandCard printing pid gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1629,6 +1635,7 @@ landsFor land pid n base =
                   Object.mutating = False,
                   Object.prototyped = False,
                   Object.boughtBack = False,
+                  Object.spliced = Seq.empty,
                   Object.phyrexianLifePaid = 0,
                   Object.manaSpent = Mana.MkMana [],
                   Object.announcedX = Nothing,
@@ -1699,6 +1706,7 @@ handOne printing base =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1775,6 +1783,7 @@ pikerInHand land piker n ph =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -2652,6 +2661,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseClash decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEntwine decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBuyback decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseSplice decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseAssistant decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseAssistAmount decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseKicker decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -2794,6 +2804,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseClash {} -> "ChooseClash"
   Prompt.ChooseEntwine {} -> "ChooseEntwine"
   Prompt.ChooseBuyback {} -> "ChooseBuyback"
+  Prompt.ChooseSplice {} -> "ChooseSplice"
   Prompt.ChooseAssistant {} -> "ChooseAssistant"
   Prompt.ChooseAssistAmount {} -> "ChooseAssistAmount"
   Prompt.ChooseKicker {} -> "ChooseKicker"
@@ -3292,6 +3303,7 @@ oneMountainState mountain ph =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -3517,6 +3529,7 @@ spellOnStack printing pid gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,

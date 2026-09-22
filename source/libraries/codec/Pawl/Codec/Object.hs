@@ -3,6 +3,7 @@
 module Pawl.Codec.Object where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
@@ -24,6 +25,7 @@ import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Pairing as Pairing
 import qualified Pawl.Codec.PlayerId as PlayerId
+import qualified Pawl.Codec.PrintingId as PrintingId
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.Sickness as Sickness
@@ -124,6 +126,7 @@ codec = Fields.object $ do
   mutating <- Fields.defaulted "mutating" False Common.boolean Object.mutating
   prototyped <- Fields.defaulted "prototyped" False Common.boolean Object.prototyped
   boughtBack <- Fields.defaulted "boughtBack" False Common.boolean Object.boughtBack
+  spliced <- Fields.defaulted "spliced" Seq.empty (Common.seq PrintingId.codec) Object.spliced
   phyrexianLifePaid <- Fields.defaulted "phyrexianLifePaid" 0 Common.natural Object.phyrexianLifePaid
   manaSpent <- Fields.defaulted "manaSpent" (Mana.Type.MkMana []) Mana.codec Object.manaSpent
   announcedX <- Fields.defaulted "announcedX" Nothing (Common.maybe Common.natural) Object.announcedX
@@ -181,6 +184,7 @@ codec = Fields.object $ do
         Object.mutating = mutating,
         Object.prototyped = prototyped,
         Object.boughtBack = boughtBack,
+        Object.spliced = spliced,
         Object.phyrexianLifePaid = phyrexianLifePaid,
         Object.manaSpent = manaSpent,
         Object.announcedX = announcedX,

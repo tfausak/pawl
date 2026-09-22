@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
@@ -46,6 +47,9 @@ import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.MergeComponent as MergeComponent
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
@@ -59,11 +63,13 @@ import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -1032,6 +1038,28 @@ meldComponentsOf source = case source of
 -- is not the rule speaking.
 frontFaceOfPrinting :: GameState -> PrintingId.PrintingId -> Seq.Seq (Face Card)
 frontFaceOfPrinting gs pid = maybe Seq.empty (Seq.singleton . Card.frontFace . Printing.card) (printingOf pid gs)
+
+-- CR 702.47c: the rules text each card spliced onto a spell gave it, as mode
+-- instances after the spell's own (CR 702.47b's "the effects of the main spell
+-- must happen first"), numbered in the order its controller chose. The ONE reader
+-- of Object.spliced, so the announcement's targets, CR 608.2b's re-check and the
+-- resolution see the same text.
+--
+-- Every mode of the card, each once. No printing with splice is modal: Scryfall
+-- keyword:splice o:"choose one" and o:"choose two", 2026-09-22, no hit -- such a
+-- card would need CR 700.2's choice made for its added text.
+splicedModes :: Object -> GameState -> [(ModeInstance.ModeInstance, Mode.Mode Card (GrantedAbility.GrantedAbility Card))]
+splicedModes obj gs =
+  let spliceOf k face =
+        let modal = Face.spell face
+            every = Seq.fromList (fmap ModeIndex.MkModeIndex (List.genericTake (Modal.modeCount modal) [0 ..]))
+         in fmap (\(mi, mode) -> (mi {ModeInstance.splice = k}, mode)) (Card.chosenModes every face)
+   in concat (zipWith spliceOf [1 ..] (concatMap (Foldable.toList . frontFaceOfPrinting gs) (Object.spliced obj)))
+
+-- CR 702.47d: the target slots the spliced text adds, under the names
+-- Modal.instanceSlot gives them apart from the spell's own.
+splicedTargetSlots :: Object -> GameState -> Map.Map SlotName.SlotName TargetSlot.TargetSlot
+splicedTargetSlots obj gs = Map.unions (fmap (uncurry Modal.modeInstanceTargetSlots) (splicedModes obj gs))
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
 -- fallback, for its reasons (CR 608.2h). Shares resolveFace with faceOf: if the

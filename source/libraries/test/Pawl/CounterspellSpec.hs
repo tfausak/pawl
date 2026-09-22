@@ -159,6 +159,7 @@ twoBoltState piker mountain lightningBolt =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -194,7 +195,7 @@ handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (
 handAppend printing pid gs =
   let (printingId, gsP) = Game.intern printing gs
       (oid, gs1) = Game.freshObjectId gsP
-      obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False False 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty False Set.empty Set.empty Nothing
+      obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False False Seq.empty 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty False Set.empty Set.empty Nothing
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -3297,7 +3298,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         -- reserved slot -- never targeted -- stays vacuously legal.
         gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
         mode = Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing Nothing Nothing), Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing)]))) slots
-        run = Resolve.resolveModes abilId source [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)]
+        run = Resolve.resolveModes abilId source [(ModeInstance.MkModeInstance 0 (ModeIndex.MkModeIndex 0) 0, mode)]
         after = snd (Engine.runGamePure S.identityAnswer gone run)
     Spec.assertEqWith s "the targetless Draw did not run: the ability fizzled" (S.handSize S.alice after) handBefore
   Spec.it s "CR 704.5a a Bolt can end the game mid-step" $ do

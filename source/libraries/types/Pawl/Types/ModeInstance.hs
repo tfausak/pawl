@@ -14,11 +14,16 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 -- two independent slots, and a 'ModeIndex' alone cannot name them apart, so this
 -- is the key Pawl.Engine.Modal qualifies a mode's slot names by.
 --
--- Ord is load-bearing, and its field order with it: modes resolve in ModeIndex
--- order (CR 608.2c), with a repeated mode's occurrences adjacent and in order,
--- which is exactly this type's ascending order.
+-- Ord is load-bearing, and its field order with it: the spell's own text
+-- resolves before every card spliced onto it (CR 702.47b), and within one text
+-- modes resolve in ModeIndex order (CR 608.2c), with a repeated mode's
+-- occurrences adjacent and in order, which is exactly this type's ascending
+-- order.
 data ModeInstance = MkModeInstance
-  { index :: ModeIndex.ModeIndex,
+  { -- | CR 702.47b: 0 for the spell's own text, k for the k-th card spliced
+    -- onto it, in the order its controller chose.
+    splice :: Natural.Natural,
+    index :: ModeIndex.ModeIndex,
     occurrence :: Natural.Natural
   }
   deriving (Eq, Ord, Show)

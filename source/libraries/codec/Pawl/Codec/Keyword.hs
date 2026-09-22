@@ -14,6 +14,7 @@ import qualified Pawl.Codec.PartnerText as PartnerText
 import qualified Pawl.Codec.Protection as Protection
 import qualified Pawl.Codec.Prototype as Prototype
 import qualified Pawl.Codec.Reinforce as Reinforce
+import qualified Pawl.Codec.Splice as Splice
 import qualified Pawl.Codec.Suspend as Suspend
 import qualified Pawl.Codec.Ward as Ward
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -105,6 +106,7 @@ codec =
       -- untouched by this arm being optional.
       Arm.optionalPayload "Vanishing" Common.natural Keyword.Vanishing (\x -> case x of Keyword.Vanishing y -> Just y; _ -> Nothing),
       Arm.payload "Fortify" (Cost.codec codec) Keyword.Fortify (\x -> case x of Keyword.Fortify y -> Just y; _ -> Nothing),
+      Arm.payload "Splice" (Splice.codec codec) Keyword.Splice (\x -> case x of Keyword.Splice y -> Just y; _ -> Nothing),
       Arm.payload "Ninjutsu" (Cost.codec codec) Keyword.Ninjutsu (\x -> case x of Keyword.Ninjutsu y -> Just y; _ -> Nothing),
       Arm.payload "Frenzy" Common.natural Keyword.Frenzy (\x -> case x of Keyword.Frenzy y -> Just y; _ -> Nothing),
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous (\x -> case x of Keyword.Poisonous y -> Just y; _ -> Nothing),
@@ -296,6 +298,7 @@ tagOf x = case x of
   Keyword.Suspend {} -> "Suspend"
   Keyword.Vanishing {} -> "Vanishing"
   Keyword.Fortify {} -> "Fortify"
+  Keyword.Splice {} -> "Splice"
   Keyword.Ninjutsu {} -> "Ninjutsu"
   Keyword.Frenzy {} -> "Frenzy"
   Keyword.Poisonous {} -> "Poisonous"
