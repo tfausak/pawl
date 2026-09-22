@@ -97,6 +97,124 @@
         "type": "Literal",
         "value": 3
       },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "ordinal": 2,
+              "phase": {
+                "type": "PostcombatMain"
+              },
+              "scope": {
+                "type": "ControllersTurn"
+              }
+            }
+          },
+          "intervening": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "LifeGainedThisTurn",
+                "value": {
+                  "type": "Relative",
+                  "value": {
+                    "type": "You"
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 4
+              }
+            }
+          },
+          "limit": {
+            "type": "OncePerGame"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Conjure",
+                        "value": {
+                          "cards": {
+                            "type": "Written",
+                            "value": [
+                              {
+                                "faces": [
+                                  {
+                                    "activatedAbilities": [
+                                      {
+                                        "cost": {
+                                          "components": [
+                                            {
+                                              "type": "TapThis"
+                                            }
+                                          ],
+                                          "mana": []
+                                        },
+                                        "modal": {
+                                          "modes": [
+                                            {
+                                              "clauses": [
+                                                {
+                                                  "effects": [
+                                                    {
+                                                      "type": "AddMana",
+                                                      "value": {
+                                                        "production": {
+                                                          "type": "OfType",
+                                                          "value": {
+                                                            "type": "Colored",
+                                                            "value": {
+                                                              "type": "White"
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ],
+                                    "manaCost": [],
+                                    "name": "Mox Pearl",
+                                    "typeLine": {
+                                      "types": [
+                                        {
+                                          "type": "Artifact"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          "destination": {
+                            "type": "Hand"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       "typeLine": {
         "subtypes": [
           {
