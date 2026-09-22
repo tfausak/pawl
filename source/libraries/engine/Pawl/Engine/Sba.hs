@@ -563,9 +563,8 @@ chooseLegendVictims (controller, candidates) = do
 -- Read off the PROJECTION rather than the printed type line, for the reason
 -- legendGroups is: CR 707.2 makes a copy of a world permanent world too.
 --
--- CR 801.12 narrows this rule to a controller's range of influence. CR 801.1
--- makes limited range of influence an OPTION, and GameSettings carries no field
--- for it (#2831), so the narrowing is inert.
+-- Not implemented: CR 801.12's narrowing of this rule to world permanents within
+-- a controller's range of influence (#3074).
 --
 -- A put-into-graveyard, NOT a destruction, so the caller consults neither
 -- indestructible (CR 702.12b) nor a regeneration shield.

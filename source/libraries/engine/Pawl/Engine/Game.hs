@@ -62,6 +62,7 @@ import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -1738,6 +1739,26 @@ teams = GameSettings.teams . GameState.settings
 -- comparison is CR 806.1's free-for-all, exact only while nobody has a teammate.
 areOpponents :: GameState -> PlayerId -> PlayerId -> Bool
 areOpponents gs = Teams.areOpponents (teams gs)
+
+-- CR 801.2 / CR 801.2b: is @candidate@ within @you@'s range of influence --
+-- within that many seats of them, counted either way round the table? Always
+-- for yourself, and always under an unlimited range (CR 801.1).
+--
+-- Seats are counted over the players still in the game, so a departed seat
+-- closes up. Not implemented: CR 801.2c fixes who is in range as each turn
+-- begins, so a seat emptied mid-turn should close only when the next turn
+-- begins; this closes it at once (#3995).
+inRangeOf :: PlayerId -> PlayerId -> GameState -> Bool
+inRangeOf you candidate gs =
+  candidate == you || case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
+    Nothing -> True
+    Just range ->
+      let seats = stillPlayingInOrder gs
+       in case (List.elemIndex you seats, List.elemIndex candidate seats) of
+            (Just mine, Just theirs) ->
+              let apart = abs (mine - theirs)
+               in toInteger (min apart (length seats - apart)) <= toInteger range
+            _ -> False
 
 -- CR 102.3 with CR 104.2a: this player's opponents who are still in the game, in
 -- stillPlaying's PlayerId order -- which is the order the offers built from it

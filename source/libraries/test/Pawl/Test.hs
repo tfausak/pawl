@@ -394,6 +394,7 @@ import qualified Pawl.Codec.PrototypeSpec
 import qualified Pawl.Codec.PutCountersFromSpec
 import qualified Pawl.Codec.PutCountersSpec
 import qualified Pawl.Codec.QuantitySpec
+import qualified Pawl.Codec.RangeOfInfluenceSpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RedirectDamageSpec
 import qualified Pawl.Codec.ReduceActivationCostSpec
@@ -612,6 +613,7 @@ import qualified Pawl.ProjectionSpec
 import qualified Pawl.PrototypeSpec
 import qualified Pawl.PutCounterSpec
 import qualified Pawl.RadSpec
+import qualified Pawl.RangeOfInfluenceSpec
 import qualified Pawl.RecruitSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
@@ -1154,6 +1156,7 @@ spec s registry = do
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s
   Pawl.Codec.TeamIdSpec.spec s
+  Pawl.Codec.RangeOfInfluenceSpec.spec s
   Pawl.Codec.TeamsSpec.spec s
   Pawl.Codec.TimesSpec.spec s
   Pawl.Codec.TimestampSpec.spec s
@@ -1345,6 +1348,7 @@ spec s registry = do
   Pawl.StationSpec.spec s registry
   Pawl.SupportSpec.spec s registry
   Pawl.TargetSpec.spec s registry
+  Pawl.RangeOfInfluenceSpec.spec s registry
   Pawl.TeamSpec.spec s registry
   Pawl.TransformSpec.spec s registry
   Pawl.TriggerSpec.spec s registry

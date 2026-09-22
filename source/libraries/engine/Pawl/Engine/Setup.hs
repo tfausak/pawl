@@ -43,6 +43,7 @@ import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
@@ -126,7 +127,7 @@ emptyGame order =
       --
       -- CR 102.4 / CR 808.1: and a game not played between teams, which every
       -- variant but CR 808's, CR 809's, CR 810's and CR 811's is.
-      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none}
+      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
       newPlayer pid =
         ( pid,
           Player.MkPlayer
