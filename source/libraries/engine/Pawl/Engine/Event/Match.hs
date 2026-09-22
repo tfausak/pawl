@@ -15,6 +15,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
+import Pawl.Engine.Event.Binding (admittedDepartures)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -36,7 +37,7 @@ import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
-import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
@@ -324,7 +325,7 @@ countersRemovedFrom bearer wanted event = case event of
 -- be answered off a snapshot of a permanent that is gone.
 boundDeparts :: Map.Map SlotName.SlotName Binding -> Set.Set Zone -> SlotName.SlotName -> GameEvent -> Bool
 boundDeparts bindings destinations slot event = case event of
-  GameEvent.Moved (Moved.MkMoved zc _ _ _)
+  GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
     | ZoneChange.from zc == Zone.Battlefield && Set.member (ZoneChange.to zc) destinations ->
         Map.lookup slot (Binding.objectSlots bindings) == Just (ZoneChange.departed zc)
   GameEvent.Moved {} -> False
@@ -408,7 +409,7 @@ matchesTriggerGiven :: Map.Map SlotName.SlotName Binding -> GameState -> ObjectI
 matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
   TriggerCondition.SelfEnters -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _) -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _) -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
@@ -482,7 +483,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- "another"), and its controller is the perspective CR 109.5 gives "you" in
   -- "a creature YOU CONTROL enters".
   TriggerCondition.PermanentEnters f -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _)
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
       | ZoneChange.to zc == Zone.Battlefield ->
           -- Deliberately NOT the snapshot the Moved event carries: that is the
           -- object as it last existed in the zone it LEFT, and reading it here
@@ -3920,7 +3921,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- `from` is the half that does the work: the same card discarded out of a hand
   -- or dying off the battlefield reaches the same graveyard and must not trigger.
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _) ->
       ZoneChange.object zc == bearer
         && ZoneChange.from zc == Zone.Library
         && ZoneChange.to zc == Zone.Graveyard
@@ -4006,7 +4007,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- what makes the graveyard the one zone the scan has to find the bearer in,
   -- however far away the card started.
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _) ->
       ZoneChange.object zc == bearer
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
@@ -4098,7 +4099,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.6c's last sentence keeps this out of the leaves-the-battlefield
   -- family.
   TriggerCondition.SelfPutIntoGraveyardDuringResolution -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ duringResolution) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ duringResolution) ->
       ZoneChange.object zc == bearer
         && ZoneChange.to zc == Zone.Graveyard
         && duringResolution
@@ -4217,7 +4218,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
                      Nothing -> False
                      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
      in case event of
-          GameEvent.Moved (Moved.MkMoved zc _ _ _) -> admits zc
+          GameEvent.Moved (Moved.MkMoved zc _ _ _ _) -> admits zc
           GameEvent.CardArrived zc -> admits zc
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
@@ -4296,7 +4297,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- abilities look back in time, so the bearer offered here is the permanent as it
   -- was immediately before the event, never the CR 400.7 incarnation.
   TriggerCondition.SelfDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _) ->
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
@@ -4388,7 +4389,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Nothing is a permanent that is gone AND filed no last known information, about
   -- which no Filter can honestly answer.
   TriggerCondition.PermanentDies f -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _)
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
           let deceased = ZoneChange.departed zc
            in case Projection.viewWithLastKnown deceased gs deceased of
@@ -4523,7 +4524,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Empty for a departure the funnel never filed, which no event this arm admits
   -- can be: a battlefield-to-graveyard move is the funnel's own.
   TriggerCondition.AttachedCreatureDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _)
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
           maybe False (Set.member bearer . LastKnown.attached) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
     GameEvent.Moved {} -> False
@@ -5126,7 +5127,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- SelfDies deliberately does NOT take the same arm: CR 700.4 makes "dies" a
   -- move to a graveyard, and leaving the game reaches no zone at all.
   TriggerCondition.SelfLeavesTheBattlefield -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _) ->
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc /= Zone.Battlefield
@@ -5212,7 +5213,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           Nothing -> False
           Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
      in case event of
-          GameEvent.Moved (Moved.MkMoved zc _ _ _)
+          GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
                 admits (ZoneChange.departed zc)
           GameEvent.Moved {} -> False
@@ -5308,7 +5309,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           Nothing -> False
           Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
      in case event of
-          GameEvent.Moved (Moved.MkMoved zc _ _ _)
+          GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Hand ->
                 admits (ZoneChange.departed zc)
           GameEvent.Moved {} -> False
@@ -5393,7 +5394,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- targeted "regardless of whether or not that object is still a creature", so a
   -- creature that was turned into a Treasure and then destroyed still fires this.
   TriggerCondition.HauntedCreatureDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _ _ _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _ _ _) ->
       ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
         && Map.lookup bearer (GameState.haunting gs) == Just (ZoneChange.departed zc)
@@ -5464,15 +5465,19 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Waterbent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
-  -- CR 603.10a's third look-back family: PermanentReturnedToHand's match with the
-  -- zone pinned on the DEPARTURE side instead -- the origin is a graveyard and the
-  -- destination is wherever the card went. CR 400.3 files a card in its owner's
-  -- graveyard, so "your graveyard" is an OwnedBy conjunct of the Filter rather
-  -- than a zone this arm could name (Pawl.Types.Zone names no player).
+  -- PermanentReturnedToHand's match with the zone pinned on the DEPARTURE side
+  -- instead -- the origin is the zone the condition names, and the destination is
+  -- the one it names or, where it names none, wherever the card went. CR 400.3
+  -- files a card in its owner's graveyard, so "your graveyard" is an OwnedBy
+  -- conjunct of the Filter rather than a zone this arm could name
+  -- (Pawl.Types.Zone names no player).
   --
-  -- The same viewWithLastKnown read on ZoneChange.departed, and CR 603.10a is
-  -- what makes it the only possible read: the card is no longer in the graveyard
-  -- by the time CR 603.10 checks, so a live lookup of the id that left answers
+  -- ANY of Moved.departures admits, not only ZoneChange.departed: a meld's entry
+  -- is one event naming every card that left exile (CR 701.42a, CR 712.14c).
+  --
+  -- The same viewWithLastKnown read on each departed id, and CR 608.2h is what
+  -- makes it the only possible read: the card is no longer in the zone it left by
+  -- the time CR 603.10 checks, so a live lookup of the id that left answers
   -- nothing at all.
   --
   -- The TurnScope comes from the GAME STATE, the SpellCast arm's reason: no
@@ -5482,15 +5487,14 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- GameEvent.LeftTheGame is declined, the PermanentReturnedToHand arm's reason
   -- one zone over: CR 800.4a's departure reaches no zone, so no zone change names
   -- a graveyard it came out of.
-  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard f scope) ->
-    let admits departed = case Projection.viewWithLastKnown departed gs departed of
-          Nothing -> False
-          Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+  TriggerCondition.CardLeavesZone p ->
+    let admitted = admittedDepartures gs bearer you p
      in case event of
-          GameEvent.Moved (Moved.MkMoved zc _ _ _)
-            | ZoneChange.from zc == Zone.Graveyard ->
-                turnScopeAdmits gs scope (GameState.activePlayer gs) you
-                  && admits (ZoneChange.departed zc)
+          GameEvent.Moved m
+            | ZoneChange.from (Moved.change m) == CardLeavesZone.from p,
+              maybe True (== ZoneChange.to (Moved.change m)) (CardLeavesZone.to p) ->
+                turnScopeAdmits gs (CardLeavesZone.scope p) (GameState.activePlayer gs) you
+                  && not (Seq.null (admitted m))
           GameEvent.Moved {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
@@ -5564,7 +5568,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- reason: which moves this condition admits is the arm above's answer, and
   -- firing once for the batch is `batchScoped` plus eventTriggers' dedup, never
   -- this arm.
-  TriggerCondition.CardsLeaveGraveyard p -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.CardLeavesGraveyard p) event
+  TriggerCondition.CardsLeaveZone p -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.CardLeavesZone p) event
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the

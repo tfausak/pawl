@@ -62,7 +62,8 @@ deckOf mountain vanguard =
       Deck.commander = Set.empty,
       Deck.vanguard = vanguard,
       Deck.dungeons = Set.empty,
-      Deck.sideboard = Map.empty
+      Deck.sideboard = Map.empty,
+      Deck.conspiracies = Map.empty
     }
 
 -- Alice brings `vanguard`, bob brings none. Bob's deck is built too, so his

@@ -14,7 +14,7 @@ import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 -- face up, CR 116.2c's paying to end a continuous effect, CR 116.2d's ignoring a
 -- static ability's effect, CR 116.2e's Circling Vultures discard, CR 116.2h's
 -- foretell, CR 116.2f's suspend, CR 116.2k's plot and CR 116.2m's unlock cost.
--- CR 116.2i's planar die is #934 and CR 116.2j's conspiracy is #937. Grows.
+-- CR 116.2i's planar die is #934 and CR 116.2j's conspiracy is #3497. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The

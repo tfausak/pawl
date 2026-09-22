@@ -46,7 +46,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
@@ -1368,7 +1368,7 @@ permanentsDieSpec s registry =
         Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
-                  GameEvent.Moved (Moved.MkMoved zc _ _ _)
+                  GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
                     | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard -> Just (LoggedEvent.group logged)
                   _ -> Nothing
               )
@@ -1640,7 +1640,7 @@ arrivedLaterSpec s registry =
         Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
-                  GameEvent.Moved (Moved.MkMoved zc _ _ _)
+                  GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
                     | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard -> Just (LoggedEvent.group logged)
                   _ -> Nothing
               )
@@ -1979,7 +1979,7 @@ leavesBattlefieldSpec s registry =
         Spec.it s "CR 400.2 eventBindings binds became for every PUBLIC destination and for no hidden one" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              leftFor to = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
+              leftFor to = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.alice TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
               bound = Map.singleton Binding.became (Binding.toObject arrived)
           Spec.assertEqWith s "a graveyard is public" (leftFor Zone.Graveyard) bound
           Spec.assertEqWith s "exile is public" (leftFor Zone.Exile) bound
@@ -2317,15 +2317,15 @@ representativeEvents cond =
         -- the singular's), CR 603.2c's once-per-batch scoping living in
         -- Event.eventTriggers instead -- PermanentsDie's posture below.
         TriggerCondition.PermanentsReturnedToHand _ -> one (moved Zone.Battlefield Zone.Hand)
-        -- The zone read on the DEPARTURE side instead: every destination is
-        -- admitted, and the floor is the same for all of them, so one event says
-        -- as much as a list would -- SelfPutIntoGraveyardFromAnywhere's reasoning
-        -- pointed the other way. Empty either way: this condition binds nothing.
-        TriggerCondition.CardLeavesGraveyard {} -> one (moved Zone.Graveyard Zone.Exile)
+        -- The zone read on the DEPARTURE side instead: every destination the
+        -- condition admits has the same floor, so one event out of the zone it
+        -- names says as much as a list would -- SelfPutIntoGraveyardFromAnywhere's
+        -- reasoning pointed the other way. Empty: this condition binds nothing.
+        TriggerCondition.CardLeavesZone p -> one (moved (CardLeavesZone.from p) (Maybe.fromMaybe Zone.Battlefield (CardLeavesZone.to p)))
         -- The same one event, PermanentsReturnedToHand's reason: the batch arm
-        -- delegates to the singular's, so the two match alike, and both bind
-        -- nothing.
-        TriggerCondition.CardsLeaveGraveyard {} -> one (moved Zone.Graveyard Zone.Exile)
+        -- delegates to the singular's, so the two match alike. It binds the
+        -- event's share of CR 603.2c's "that many".
+        TriggerCondition.CardsLeaveZone p -> one (moved (CardLeavesZone.from p) (Maybe.fromMaybe Zone.Battlefield (CardLeavesZone.to p)))
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all
@@ -2703,8 +2703,9 @@ everyTriggerCondition =
     TriggerCondition.PermanentLeavesTheBattlefield Filter.Type.IsSource,
     TriggerCondition.PermanentReturnedToHand Filter.Type.IsSource,
     TriggerCondition.PermanentsReturnedToHand Filter.Type.IsSource,
-    TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard Filter.Type.IsSource TurnScope.EachTurn),
-    TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard Filter.Type.IsSource TurnScope.EachTurn),
+    TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Graveyard Nothing),
+    TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Graveyard Nothing),
+    TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Exile Nothing),
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.AbilityIsCountered,

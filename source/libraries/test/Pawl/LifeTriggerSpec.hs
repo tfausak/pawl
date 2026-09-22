@@ -349,7 +349,7 @@ lifeGainAmountSpec s registry =
           Spec.assertEqWith
             s
             "thatMuch is the gain and thatPlayer is the gainer"
-            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.bob (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 7)))
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.bob (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 7)))
             (Binding.setTriggerPlayer S.bob (Map.singleton Binding.eventAmount (Binding.toAmount 7)))
 
 -- CR 119.9's event read for its PLAYER, which neither group above can ask for:
@@ -1322,7 +1322,7 @@ forthEorlingasSpec s registry =
 -- The observable is the PROMPT and nothing else, which is why this is its own
 -- group. Walk the unfixed engine to the end: it raises the question, the answer
 -- names one of the batch's members, and Event.eventBindings then binds NOTHING
--- off that member -- eventBindingSlots gives a batch condition no slots. So the
+-- off that member -- eventBindingSlots gives its condition no slots. So the
 -- pending trigger, the life totals and the cards drawn are identical whichever
 -- member was named, and singularCureSpec's `choosingGain` trick cannot separate
 -- the seats here. Counting the questions is the only reading left.
@@ -1755,7 +1755,7 @@ lifeLossTriggerSpec s registry =
           Spec.assertEqWith
             s
             "thatMuch is the loss and thatPlayer is who lost it"
-            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 7)))
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.alice (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 7)))
             (Map.fromList [(Binding.eventAmount, Binding.toAmount 7), (Binding.triggerPlayer, Binding.toPlayer S.bob)])
         -- The loser is bound under the OTHER relation too, and that is a claim
         -- about the event rather than about the relation: CR 603.2's environment
@@ -1766,7 +1766,7 @@ lifeLossTriggerSpec s registry =
           Spec.assertEqWith
             s
             "thatPlayer names the loser whichever relation matched"
-            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.PlayerLosesLife PlayerRelation.You) (GameEvent.LifeLost (LifeChange.MkLifeChange S.alice 3)))
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.alice (TriggerCondition.PlayerLosesLife PlayerRelation.You) (GameEvent.LifeLost (LifeChange.MkLifeChange S.alice 3)))
             (Map.fromList [(Binding.eventAmount, Binding.toAmount 3), (Binding.triggerPlayer, Binding.toPlayer S.alice)])
 
 -- CR 603.2's other half of a life-loss event: the PLAYER it named, not only the

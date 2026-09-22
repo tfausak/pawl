@@ -7,7 +7,8 @@ import qualified Pawl.Types.Printing as Printing
 
 -- | A deck: the multiset of printings a player's library is built from, plus the
 -- things a player brings alongside it -- CR 903.3's commander designation, CR
--- 902.3's vanguard card, CR 309.2's dungeon cards and CR 100.4's sideboard.
+-- 902.3's vanguard card, CR 309.2's dungeon cards, CR 100.4's sideboard and CR
+-- 315.2's conspiracies.
 --
 -- The cards are a multiset because a shuffle erases any order among them, so
 -- counts are the honest model. `Printing` and everything beneath it derive `Ord`,
@@ -90,12 +91,21 @@ data Deck = MkDeck
     -- Pawl.Engine.Setup.createDeck interns these into Player.outsideTheGame, which
     -- is the pool the rules read; this field is the deck-building half and nothing
     -- in the engine reads it after setup.
-    sideboard :: Map.Map Printing.Printing Natural.Natural
+    sideboard :: Map.Map Printing.Printing Natural.Natural,
+    -- | CR 315.2: the conspiracy cards this player puts from their sideboard into
+    -- the command zone at the start of the game. The player's choice, arriving
+    -- with the deck as the commander designation does; the conspiracies they
+    -- leave behind stay in `sideboard`.
+    --
+    -- A multiset for `sideboard`'s reason: two copies of one conspiracy are two
+    -- cards, and each functions (CR 315.5).
+    conspiracies :: Map.Map Printing.Printing Natural.Natural
   }
   deriving (Eq, Ord, Show)
 
--- | A deck with no commander, no vanguard, no dungeons and no sideboard -- every
--- format but Commander and Vanguard, every game nobody ventures in, and every
--- game nobody wishes in.
+-- | A deck with no commander, no vanguard, no dungeons, no sideboard and no
+-- conspiracies -- every format but Commander and Vanguard, every game nobody
+-- ventures in, every game nobody wishes in, and every game outside Conspiracy
+-- Draft.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty}
+fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty}

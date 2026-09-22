@@ -210,8 +210,8 @@ library codec
     Pawl.Codec.Card
     Pawl.Codec.CardArrivedIn
     Pawl.Codec.CardArrivedInSpec
-    Pawl.Codec.CardLeavesGraveyard
-    Pawl.Codec.CardLeavesGraveyardSpec
+    Pawl.Codec.CardLeavesZone
+    Pawl.Codec.CardLeavesZoneSpec
     Pawl.Codec.CardName
     Pawl.Codec.CardNameSpec
     Pawl.Codec.CardSpec
@@ -1116,6 +1116,7 @@ library engine
     Pawl.Engine.Commander
     Pawl.Engine.Companion
     Pawl.Engine.Condition
+    Pawl.Engine.Conspiracy
     Pawl.Engine.Cost
     Pawl.Engine.Count
     Pawl.Engine.CounterRestriction
@@ -1492,6 +1493,7 @@ library test
     Pawl.CompanionSpec
     Pawl.ConditionSpec
     Pawl.ConjureSpec
+    Pawl.ConspiracySpec
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec
@@ -1681,7 +1683,7 @@ library types
     Pawl.Types.CantSearchLibraries
     Pawl.Types.Card
     Pawl.Types.CardArrivedIn
-    Pawl.Types.CardLeavesGraveyard
+    Pawl.Types.CardLeavesZone
     Pawl.Types.CardName
     Pawl.Types.CardType
     Pawl.Types.CarryOver

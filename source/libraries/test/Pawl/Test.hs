@@ -84,7 +84,7 @@ import qualified Pawl.Codec.CantBeBlockedBySpec
 import qualified Pawl.Codec.CantBeRegeneratedSpec
 import qualified Pawl.Codec.CantSearchLibrariesSpec
 import qualified Pawl.Codec.CardArrivedInSpec
-import qualified Pawl.Codec.CardLeavesGraveyardSpec
+import qualified Pawl.Codec.CardLeavesZoneSpec
 import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
@@ -515,6 +515,7 @@ import qualified Pawl.CommanderSpec
 import qualified Pawl.CompanionSpec
 import qualified Pawl.ConditionSpec
 import qualified Pawl.ConjureSpec
+import qualified Pawl.ConspiracySpec
 import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec
@@ -773,7 +774,7 @@ spec s registry = do
   Pawl.Codec.CantBeRegeneratedSpec.spec s
   Pawl.Codec.CantSearchLibrariesSpec.spec s
   Pawl.Codec.CardArrivedInSpec.spec s
-  Pawl.Codec.CardLeavesGraveyardSpec.spec s
+  Pawl.Codec.CardLeavesZoneSpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
@@ -1204,6 +1205,7 @@ spec s registry = do
   Pawl.CompanionSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
   Pawl.ConjureSpec.spec s registry
+  Pawl.ConspiracySpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CopySpec.copySpellSpec s registry
   Pawl.CopySpec.copyTargetSpec s registry
