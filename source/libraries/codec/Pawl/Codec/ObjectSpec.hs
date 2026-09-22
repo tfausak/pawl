@@ -1,6 +1,7 @@
 module Pawl.Codec.ObjectSpec where
 
 import qualified Data.Map as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbilitySourceSpec as ActivatedAbilitySourceSpec
@@ -101,6 +102,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.mutating = False,
           Object.prototyped = False,
           Object.boughtBack = False,
+          Object.spliced = Seq.empty,
           Object.phyrexianLifePaid = 0,
           Object.manaSpent = Mana.MkMana [],
           Object.announcedX = Nothing,
@@ -206,6 +208,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.mutating = True,
           Object.prototyped = True,
           Object.boughtBack = True,
+          Object.spliced = Seq.fromList [PrintingId.MkPrintingId 31, PrintingId.MkPrintingId 30],
           Object.phyrexianLifePaid = 19,
           Object.manaSpent =
             Mana.MkMana
@@ -259,6 +262,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"mutating\":true"
           <> ",\"prototyped\":true"
           <> ",\"boughtBack\":true"
+          <> ",\"spliced\":[31,30]"
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
           <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null,\"sourceChosenSubtype\":null}]"

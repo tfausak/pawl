@@ -76,8 +76,10 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -687,6 +689,30 @@ stampPaidCosts paid sid gs =
     { GameState.objects =
         Map.adjust (\o -> o {Object.paidCosts = paid}) sid (GameState.objects gs)
     }
+
+-- CR 702.47c: the printings whose rules text the spell gains, in the order CR
+-- 702.47b's announcement gave them.
+stampSpliced :: [ObjectId] -> ObjectId -> GameState -> GameState
+stampSpliced cards sid gs =
+  let printings = Seq.fromList (Maybe.mapMaybe (\cid -> Game.printingIdOfSource . Object.source =<< Game.lookupObject cid gs) cards)
+   in gs {GameState.objects = Map.adjust (\o -> o {Object.spliced = printings}) sid (GameState.objects gs)}
+
+-- CR 702.47a/b: the splice ability a card in the caster's hand offers the spell
+-- being cast, with the cost it adds -- the first one whose [quality] the spell
+-- has, and only if every target the card's text asks for can be chosen.
+--
+-- Read off the card's PROJECTED keywords, so a granted splice ability is offered
+-- as a printed one is; its text is the printing's, which is what
+-- Game.splicedModes reads back.
+spliceOffer :: PlayerId -> ObjectId -> GameState -> ObjectId -> Maybe (ObjectId, Cost Keyword)
+spliceOffer pid sid gs cid = do
+  face <- Game.faceOf cid gs
+  splicing <- List.find (\splicing -> PlayerEffect.matchesObjectFrom (Just cid) (Splice.onto splicing) sid gs) (Keyword.splices (Map.keysSet (Projection.keywordsOf cid gs)))
+  let modal = Face.spell face
+      fillable = Target.fillableModes (Just pid) Map.empty sid Map.empty modal gs
+      every = List.genericTake (Modal.modeCount modal) (fmap ModeIndex.MkModeIndex [0 ..])
+  Monad.guard (all (`Set.member` fillable) every)
+  pure (cid, Splice.cost splicing)
 
 -- CR 702.27a's designation, written onto the spell's own stack incarnation: "if
 -- the buyback cost was paid". Read back by Pawl.Engine.Resolve.finishSpell, which
@@ -2373,6 +2399,24 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- cast that fails after this point rewinds to `before`, which takes the stamp
       -- with it along with the spell.
       Monad.when (Maybe.isJust boughtBack) (State.modify' (stampBoughtBack sid))
+      -- CR 702.47a: splice, asked after buyback and before the cost -- CR 601.2b
+      -- reveals the cards to splice in the same step that announces an
+      -- additional cost, and rule 702.47a's cost is one.
+      --
+      -- The choice is never made for them: every card in the caster's hand whose
+      -- splice ability names this spell, whose text can have its targets chosen
+      -- (CR 702.47b) and whose cost is payable beside what is already announced
+      -- is offered, and where one is, the player answers.
+      let withBoughtBack candidate = maybe candidate (Cost.plus candidate) boughtBack
+          spliceAffordable extra =
+            any (\(reduced, candidate) -> payableCost reduced spending pid sid gs (Cost.plus (withBoughtBack (withOptionalPayments paid candidate)) extra)) announcedCandidates
+          spliceOffers = filter (spliceAffordable . snd) (Maybe.mapMaybe (spliceOffer pid sid gs) (Game.zoneMembers Zone.Hand pid gs))
+      spliced <- if null spliceOffers then pure [] else Game.choose (Prompt.ChooseSplice decider pid sid spliceOffers)
+      -- CR 702.47b: "you can't splice any one card onto the same spell more than
+      -- once". An answer naming a card twice, or one not offered, rejects the
+      -- cast below rather than being repaired.
+      let spliceCosts = Maybe.mapMaybe (`lookup` spliceOffers) spliced
+          spliceValid = Set.size (Set.fromList spliced) == length spliced && length spliceCosts == length spliced
       -- CR 702.33a's and CR 702.175a's additional costs are payable ONCE, where
       -- rule 702.33c's multikicker and rule 702.157a's squad state no limit. An
       -- answer past a stated limit is text the card does not have, so it rejects
@@ -2385,6 +2429,8 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
           withKicker = withOptionalPayments paid
           -- CR 702.27a's cost is additional too, so it rides the same fold.
           withBuyback candidate = maybe candidate (Cost.plus candidate) boughtBack
+          -- CR 702.47a's costs are additional too, one per spliced card.
+          withSplice candidate = List.foldl' Cost.plus candidate spliceCosts
           -- The additional costs are folded into each candidate's COST and
           -- never into its keyword: CR 702.33a's kicker, CR 702.42a's entwine,
           -- CR 702.27a's buyback, CR 702.120a's escalate and CR 700.2h's
@@ -2401,11 +2447,16 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
           payableCandidates =
             filter
               (\candidate -> payableCost (CandidateCost.reductions candidate) spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate))
-              (fmap (\candidate -> candidate {CandidateCost.cost = withBuyback (withKicker (withModeCost (withEscalate (withEntwine (CandidateCost.cost candidate)))))}) candidateCosts)
+              (fmap (\candidate -> candidate {CandidateCost.cost = withSplice (withBuyback (withKicker (withModeCost (withEscalate (withEntwine (CandidateCost.cost candidate))))))}) candidateCosts)
           payable = fmap CandidateCost.cost payableCandidates
-      if null payable || overKickerLimit
+      if null payable || overKickerLimit || not spliceValid
         then reject
         else do
+          -- CR 702.47a's reveal and CR 702.47c's gained text, stamped once the
+          -- answer is known to be legal. A cast that fails after this point
+          -- rewinds to `before`, which takes both with it.
+          Monad.forM_ spliced (Event.reveal RevealCause.Ordinary pid)
+          Monad.unless (null spliced) (State.modify' (stampSpliced spliced sid))
           chosenCost <- case payable of
             [only] -> pure only
             _ -> Game.choose (Prompt.ChooseCost decider pid sid payable)
@@ -2485,7 +2536,12 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   slots =
                     if Keyword.castOverloaded castFor
                       then Map.empty
-                      else Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes face
+                      else
+                        -- CR 702.47d: the spliced text's targets are chosen here
+                        -- beside the spell's own.
+                        Map.union
+                          (Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes face)
+                          (maybe Map.empty (`Game.splicedTargetSlots` bestowedGs) (Game.lookupObject sid bestowedGs))
                   -- CR 101.1: the ceiling this card's own words put on the value
                   -- about to be announced -- "X can't be greater than the
                   -- greatest toughness among creatures you control". Read HERE

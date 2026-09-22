@@ -440,7 +440,10 @@ targetSlotsOf obj oid gs face =
         -- gives a spell cast bestowed one, and its printed face declares none. A
         -- printed Aura's projection is seeded from that same printed list, so
         -- this is the wider read rather than a different one.
-        (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Object.mutating obj) (Binding.modesOf (Object.bindings obj)) face)
+        --
+        -- CR 702.47d's slots ride beside the face's: the spliced text is the
+        -- spell's own (CR 702.47c), so its targets are re-checked with the rest.
+        (Map.union (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Object.mutating obj) (Binding.modesOf (Object.bindings obj)) face) (Game.splicedTargetSlots obj gs))
 
 -- CR 608.2c: one clause's instructions, in written order, carrying the one thing
 -- a later instruction can ask about an earlier one -- whether it HAPPENED. CR
@@ -6113,6 +6116,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- CR 707.10 copies the alternative cost, but a copy isn't
                       -- CAST, so it keeps evoke's record and not escape's.
                       Object.castUsing = Keyword.copiedCastUsing (Object.castUsing obj),
+                      -- CR 707.2: "text-changing effects ... are not copied",
+                      -- and CR 702.47c makes splice one, so the copy has only
+                      -- the printed text. Pawl.CastSpec's Twincast splice case
+                      -- is the proof.
+                      Object.spliced = Seq.empty,
                       -- CR 400.7d's record of what PAID, which CR 707.10 does not
                       -- carry across: the copy is neither cast nor activated, and
                       -- the rule's objects-used-to-pay sentence stops at objects --

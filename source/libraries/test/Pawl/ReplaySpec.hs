@@ -190,6 +190,20 @@ combatReplaySpec s =
             "an optional decision is not an entwine announcement"
             (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises))
             Nothing
+        -- CR 702.47b: the spliced cards AND their order decide what the spell
+        -- does, so the answer round trips as a list; a short transcript
+        -- splices nothing, the "may" declined.
+        Spec.it s "ChooseSplice records and replays the ordered cards" $ do
+          let spliceCost =
+                Cost.Type.MkCost
+                  { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]),
+                    Cost.Type.components = []
+                  }
+              first = ObjectId.MkObjectId 21
+              second = ObjectId.MkObjectId 22
+              p = Prompt.ChooseSplice decider S.alice oid [(first, spliceCost), (second, spliceCost)]
+          Spec.assertEqWith s "round trip, in the chosen order" (Replay.decode p (Replay.encode p [second, first])) (Just [second, first])
+          Spec.assertEqWith s "a short transcript splices nothing" (Replay.defaultAnswer p) []
         Spec.it s "a short transcript declines entwine" $
           -- CR 702.42a: declining is always legal and costs nothing, so it is
           -- the least-eventful fallback when a transcript runs short.

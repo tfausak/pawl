@@ -119,10 +119,22 @@ allTargetSlots m = Map.unions (fmap Mode.targetSlots (Foldable.toList (Modal.mod
 -- ever called. Later occurrences take
 -- a suffix a card cannot print: Pawl.CardSpec rejects a declared slot name
 -- containing '#'.
+--
+-- CR 702.47d's added text is named apart the same way: a spliced card's slots
+-- take a suffix naming which spliced card they came from, so the main spell's
+-- "target" and a spliced card's "target" are two slots, as the rule's "choose
+-- targets for the added text normally" needs.
 instanceSlot :: ModeInstance.ModeInstance -> SlotName -> SlotName
-instanceSlot mi slot = case ModeInstance.occurrence mi of
-  0 -> slot
-  k -> SlotName.MkSlotName (SlotName.unwrap slot <> Text.pack ("#" <> show k))
+instanceSlot mi slot =
+  let spliced = case ModeInstance.splice mi of
+        0 -> ""
+        k -> "#splice" <> show k
+      repeated = case ModeInstance.occurrence mi of
+        0 -> ""
+        k -> "#" <> show k
+   in case spliced <> repeated of
+        "" -> slot
+        suffix -> SlotName.MkSlotName (SlotName.unwrap slot <> Text.pack suffix)
 
 -- CR 608.2c/700.2: the CHOSEN modes themselves, each with the ModeInstance
 -- naming which mode it is and which occurrence of it, in printed order. Out-of-
@@ -152,7 +164,7 @@ instancesOf chosen =
   let number _ [] = []
       number seen (idx : rest) =
         let k = Maybe.fromMaybe 0 (Map.lookup idx seen)
-         in ModeInstance.MkModeInstance idx k : number (Map.insert idx (k + 1) seen) rest
+         in ModeInstance.MkModeInstance 0 idx k : number (Map.insert idx (k + 1) seen) rest
    in number Map.empty (List.sort (Foldable.toList chosen))
 
 -- One mode by index, or Nothing when the index is out of range (total).

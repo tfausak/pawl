@@ -123,6 +123,7 @@ encode p answer = case p of
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseKicker {} -> Response.AnnouncedKicker answer
   Prompt.ChooseBuyback {} -> Response.AnnouncedBuyback answer
+  Prompt.ChooseSplice {} -> Response.AnnouncedSplice answer
   Prompt.ChooseAssistant {} -> Response.ChoseAssistant answer
   Prompt.ChooseAssistAmount {} -> Response.ChoseAssistAmount answer
   Prompt.ReturnCommander {} -> Response.ReturnedCommander answer
@@ -589,6 +590,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseBuyback {} -> case response of
     Response.AnnouncedBuyback decision -> Just decision
+    _ -> Nothing
+  Prompt.ChooseSplice {} -> case response of
+    Response.AnnouncedSplice cards -> Just cards
     _ -> Nothing
   Prompt.ChooseAssistant {} -> case response of
     Response.ChoseAssistant helper -> Just helper
@@ -1115,6 +1119,9 @@ defaultAnswer p = case p of
   -- CR 702.27a: buyback is a "may" too, so declining is always legal and costs no
   -- mana -- entwine's reason above.
   Prompt.ChooseBuyback {} -> BuybackDecision.Declines
+  -- CR 702.47a: splice is a "may" too, so splicing nothing is always legal and
+  -- costs no mana -- entwine's reason above.
+  Prompt.ChooseSplice {} -> []
   -- CR 702.132a: choosing a player is a "may", so choosing nobody is always
   -- legal -- entwine's reason above -- and it is the answer that opens no second
   -- window.

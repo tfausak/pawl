@@ -1571,7 +1571,8 @@ targetsOfStackObject gs obj
           -- unconditionally: both are named by a RULE rather than by the face,
           -- so a face read cannot see them, and the restriction below drops
           -- either where the spell never filled it.
-          ofFace face = Set.insert Card.mutateSlot (Set.insert Card.enchantSlot (Map.keysSet (Card.modesTargetSlots chosen face)))
+          -- CR 702.47d's spliced slots beside the face's own.
+          ofFace face = Set.insert Card.mutateSlot (Set.insert Card.enchantSlot (Map.keysSet (Map.union (Card.modesTargetSlots chosen face) (Game.splicedTargetSlots obj gs))))
           declared = case Object.source obj of
             Source.OfCard _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
             Source.OfSpellCopy _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)

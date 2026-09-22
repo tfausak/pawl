@@ -25,6 +25,7 @@ module Pawl.Engine.Prepare where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
@@ -211,6 +212,7 @@ mint oid gs =
                 Object.mutating = False,
                 Object.prototyped = False,
                 Object.boughtBack = False,
+                Object.spliced = Seq.empty,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,

@@ -28,6 +28,7 @@ import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
+import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Suspend as Suspend
@@ -1651,6 +1652,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (Keyword.Craft (Craft.MkCraft cost (ExileMaterials.MkExileMaterials 1 False (Filter.HasCardType CardType.Creature))))
       " {\"type\":\"Craft\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":4},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}]},\"materials\":{\"count\":1,\"whichObjects\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}} "
+  -- CR 702.47a: Desperate Ritual's "Splice onto Arcane {1}{R}".
+  Spec.it s "Splice carries its quality and its cost" $ do
+    let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)])) []
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Splice (Splice.MkSplice (Filter.HasSubtype Subtype.Arcane) cost))
+      " {\"type\":\"Splice\",\"value\":{\"onto\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Arcane\"}},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}}]}}} "
   Spec.it s "Scavenge carries its cost" $ do
     Common.assertCodec
       s

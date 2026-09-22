@@ -40,6 +40,7 @@ import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Suspend as Suspend
@@ -2810,12 +2811,15 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Encore cost -> Keyword.Type.Encore (rewriteCost pairs cost)
   Keyword.Type.Transmute cost -> Keyword.Type.Transmute (rewriteCost pairs cost)
   Keyword.Type.Transfigure cost -> Keyword.Type.Transfigure (rewriteCost pairs cost)
-  -- CR 702.167a's payload is the only one that is not a bare Cost: its cost and
+  -- CR 702.167a's payload is not a bare Cost: its cost and
   -- its [materials] criterion are both printed, so both halves descend.
   Keyword.Type.Craft crafting ->
     let materials = Craft.materials crafting
         swapped = ExileMaterials.MkExileMaterials (ExileMaterials.count materials) (ExileMaterials.orMore materials) (rewrite pairs (ExileMaterials.whichObjects materials))
      in Keyword.Type.Craft (Craft.MkCraft (rewriteCost pairs (Craft.cost crafting)) swapped)
+  -- CR 702.47a's [quality] and [cost] are both printed, so both halves descend,
+  -- craft's reason.
+  Keyword.Type.Splice splicing -> Keyword.Type.Splice (Splice.MkSplice (rewrite pairs (Splice.onto splicing)) (rewriteCost pairs (Splice.cost splicing)))
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is

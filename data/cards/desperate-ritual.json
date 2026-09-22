@@ -1,0 +1,118 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Splice",
+          "value": {
+            "cost": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 1
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Red"
+                    }
+                  }
+                }
+              ]
+            },
+            "onto": {
+              "type": "HasSubtype",
+              "value": {
+                "type": "Arcane"
+              }
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Desperate Ritual",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "production": {
+                        "type": "OfType",
+                        "value": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "Red"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "production": {
+                        "type": "OfType",
+                        "value": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "Red"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "production": {
+                        "type": "OfType",
+                        "value": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "Red"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Arcane"
+          }
+        ],
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

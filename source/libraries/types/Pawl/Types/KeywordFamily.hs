@@ -101,6 +101,8 @@ data KeywordFamily
     Bushido
   | -- | CR 702.46a: soulshift N.
     Soulshift
+  | -- | CR 702.47a: splice onto [quality] [cost].
+    Splice
   | -- | CR 702.49a: ninjutsu [cost]. Silver-Fur Master's "ninjutsu abilities you
     -- activate cost {1} less to activate" is the card asking, through
     -- Pawl.Types.ReduceActivationCost's @grantedBy@ rather than through a Filter;
