@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Match as Event
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
@@ -1080,9 +1081,20 @@ grantedByAdventureRule oid gs =
 -- 715.3 has the player choose between playing the card normally and casting it
 -- as an Adventure -- so refusing the Adventure half says nothing about the
 -- normal one, which is the half a land play would take.
+--
+-- CR 611.2a's WINDOW is the other conjunct, and it is asked here rather than at
+-- the mint: Galvanic Relay's "during your next turn, you may play that card"
+-- stores the permission as the Relay resolves and says nothing about the rest of
+-- that turn, so a permission read from the moment it is stored allows a play the
+-- card forbids. Pawl.Engine.Expiry.begun is the question, and every other
+-- duration a permission can carry answers it True. Pawl.BoardEffectSpec's
+-- GalvanicRelay group is the proof.
 permitsPlayFromExile :: PlayerId -> ObjectId -> GameState -> Bool
-permitsPlayFromExile pid oid gs =
-  fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid
+permitsPlayFromExile pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromExile of
+  Nothing -> False
+  Just permission ->
+    ExilePlayPermission.player permission == pid
+      && Expiry.begun gs (ExilePlayPermission.expiry permission)
 
 -- CR 118.14: how may this player spend mana toward casting THIS object, as the
 -- object lies right now? Dire Fleet Daredevil's "and mana of any type can be

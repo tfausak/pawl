@@ -15,6 +15,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -41,6 +42,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -55,6 +57,8 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
+import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
@@ -1150,6 +1154,103 @@ actOnImpulseSpec s registry =
             ([], [])
           Spec.assertEqWith s "bob's library is still untouched" (namesIn Zone.Library S.bob after) [named "Ogre Sentry"]
           Spec.assertEqWith s "the game has no result" (GameState.result after) Nothing
+
+-- CR 611.2a: a duration that names a WINDOW rather than a deadline, on the PLAY
+-- PERMISSION carrier -- Galvanic Relay {2}{R} Sorcery, "Exile the top card of
+-- your library. During your next turn, you may play that card. / Storm" (name,
+-- cost, type line and Oracle text checked against api.scryfall.com 2026-09-22).
+-- Storm is printed and works; with no spell cast before it the trigger makes no
+-- copy, so nothing on the card but those two sentences reaches these assertions.
+--
+-- The permission lands on Object.playableFromExile under Expiry.DuringTurnOf and
+-- Pawl.Engine.Cast.permitsPlayFromExile is the gate that keeps it inert until
+-- that turn -- the second carrier to ask Pawl.Engine.Expiry.begun (#3983).
+--
+-- THE PAIR is Commune with Lava {X}{R}{R} Instant, announced at X = 1: the same
+-- one card off the same library under a permission for the same player, differing
+-- only in that its duration states an END and no beginning (Duration.UntilEndOfYourNextTurn).
+-- A leg that is green because the exiled card was unaffordable, uncastable by
+-- timing or never exiled at all would take the pair down with it.
+--
+-- EIGHT Mountains, so the exiled Goblin Piker's {2}{R} is payable on every turn
+-- asked about, the turn the Relay itself was cast included (cast-gate vacuity).
+galvanicRelaySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+galvanicRelaySpec s registry =
+  let -- alice's turn 3 and turn 5, reached through Engine.handoffTurn so CR
+      -- 514.2's sweep runs ahead of each handoff: the row must survive the
+      -- cleanup of the turn it was stored on, which is the whole difference from
+      -- "this turn".
+      handoff gs =
+        S.runPure
+          S.identityAnswer
+          (Expiry.dropAtCleanup gs)
+          (Engine.handoffTurn >> Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+      -- The active player's precombat main phase with priority, which is where a
+      -- sorcery-speed play is offered at all (CR 307.1).
+      mainPhase gs = gs {GameState.phase = Phase.PrecombatMain, GameState.priority = Just (GameState.activePlayer gs)}
+      offeredTo pid oid gs = any (S.isCastOf oid) (Action.legalActions pid (mainPhase gs))
+      permissionFor oid gs = Game.lookupObject oid gs >>= Object.playableFromExile
+   in Spec.describe s "GalvanicRelay" $ do
+        -- THE PROVING TEST: the window has not begun on the turn the Relay
+        -- resolved, and the pair's end-only duration is live on that same turn.
+        Spec.it s "CR 611.2a the permission is inert on the turn it was stored, where an end-only duration is not" $ do
+          (exiled, relayed) <- relayBoard s registry "Galvanic Relay"
+          (openExiled, communed) <- relayBoard s registry "Commune with Lava"
+          Spec.assertBool s (not (offeredTo S.alice exiled relayed)) "CR 611.2a: alice's next turn has not begun, so the exiled card is not offered"
+          Spec.assertBool s (offeredTo S.alice openExiled communed) "the pair: under a duration that states only an end, the same card is offered at once"
+          -- Ordered BEHIND the offers so a permission that was never stored
+          -- reddens the pair rather than being absorbed here.
+          Spec.assertEqWith s "the Relay stored a window naming alice's turn after turn 1" (fmap ExilePlayPermission.expiry (permissionFor exiled relayed)) (Just (Expiry.Type.DuringTurnOf (AfterTurn.MkAfterTurn S.alice 1)))
+          Spec.assertEqWith s "and the pair a deadline off the same pair of samples" (fmap ExilePlayPermission.expiry (permissionFor openExiled communed)) (Just (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.alice 1)))
+        Spec.it s "CR 611.2a and the card is playable once that turn has begun" $ do
+          (exiled, relayed) <- relayBoard s registry "Galvanic Relay"
+          let bobsTurn = handoff relayed
+              alicesTurn = handoff bobsTurn
+          Spec.assertEqWith s "alice is active on turn 3" (GameState.activePlayer alicesTurn, GameState.turnNumber alicesTurn) (S.alice, 3)
+          Spec.assertBool s (offeredTo S.alice exiled alicesTurn) "CR 611.2a: the window is open, so alice may play the exiled card"
+          -- Not swept on bob's turn, just not begun -- which is the whole claim.
+          Spec.assertBool s (Maybe.isJust (permissionFor exiled bobsTurn)) "and the permission was still stored through bob's turn"
+        Spec.it s "CR 514.2 the window closes at the end of the turn it named" $ do
+          (exiled, relayed) <- relayBoard s registry "Galvanic Relay"
+          let afterwards = handoff (handoff (handoff relayed))
+              later = handoff afterwards
+          Spec.assertEqWith s "alice is active again on turn 5" (GameState.activePlayer later, GameState.turnNumber later) (S.alice, 5)
+          Spec.assertBool s (not (offeredTo S.alice exiled later)) "the card is no longer playable on the turn after the one the window named"
+          -- Ordered BEHIND the offer so a sweep that kept the permission reddens
+          -- the gameplay assertion rather than an absence here.
+          Spec.assertEqWith s "with the permission cleared once that turn's cleanup has run" (permissionFor exiled afterwards) Nothing
+
+-- alice's precombat main phase on turn 1, eight Mountains out and one Goblin
+-- Piker as the whole of her library, with `name` in hand and cast. Returns the
+-- id the exile MINTED (CR 400.7) rather than the library card's, and the board
+-- with the stack resolved down to empty -- which is what settles Galvanic
+-- Relay's storm trigger along with the spell.
+relayBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (ObjectId.ObjectId, GameState.GameState)
+relayBoard s registry name = do
+  mountain <- S.printingOf s registry "Mountain"
+  spell <- S.printingOf s registry name
+  piker <- S.printingOf s registry "Goblin Piker"
+  let g1 = snd (S.addLibraryCard piker S.alice (S.landsFor mountain S.alice 8 (Setup.emptyGame S.bothPlayers)))
+      (spellId, g2) = S.addHandCard spell S.alice g1
+      board =
+        g2
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      -- Commune with Lava's X, which Galvanic Relay never asks: its depth is a
+      -- literal one.
+      announcing :: Prompt.Prompt r -> r
+      announcing p = case p of
+        Prompt.ChooseX {} -> 1
+        _ -> S.identityAnswer p
+      step gs game = S.runPure announcing gs (game >> Engine.settleForPriority)
+      resolveAll gs = if null (GameState.stack gs) then gs else resolveAll (step gs Stack.resolveTop)
+      after = resolveAll (step board (S.cast S.alice spellId))
+  Spec.assertEqWith s "one card is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+  case Game.zoneMembers Zone.Exile S.alice after of
+    [exiled] -> pure (exiled, after)
+    _ -> pure (ObjectId.MkObjectId 0, after)
 
 -- A COMPUTED depth on ObjectRef.TopOfLibrary: CR 601.2b's announced X, read as
 -- how deep into a library a move reaches. Act on Impulse's literal three above
@@ -3899,6 +4000,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   countOnLuckSpec s registry
   soldeviDiggerSpec s registry
   actOnImpulseSpec s registry
+  galvanicRelaySpec s registry
   communeWithLavaSpec s registry
   apocalypseChimeSpec s registry
   golgothianSylexSpec s registry
