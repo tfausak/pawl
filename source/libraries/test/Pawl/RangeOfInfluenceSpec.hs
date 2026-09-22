@@ -9,8 +9,8 @@
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
 -- carol, dave]: bob and dave sit next to alice and carol sits two seats away.
--- Three seats would cut nothing, every seat being adjacent there. Each negative is paired with
--- the same board at an unlimited range.
+-- Three seats would cut nothing, every seat being adjacent there. Each negative
+-- is paired with the same board at an unlimited range.
 module Pawl.RangeOfInfluenceSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
