@@ -5614,6 +5614,13 @@ payComponent moment slots pid oid component = case component of
   -- Reject-not-repair, Sacrifice's posture verbatim. The candidates are read
   -- ONCE, before the prompt, so the answer is checked against the same list the
   -- player was offered.
+  --
+  -- The exiles are ONE event group (Event.simultaneously): paying CR 601.2h's
+  -- cost exiles them as a single action (Rakshasa Vizier's ruling, 2014-09-20),
+  -- so a "one or more cards" trigger fires once for the lot.
+  -- Pawl.CostSpec's "CR 601.2h delving three cards fires Rakshasa Vizier once,
+  -- for three counters" proves it; ExileMaterials and CollectEvidence below
+  -- follow.
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> do
     gs <- State.get
     let candidates = exileCandidates slots pid criterion gs
@@ -5624,7 +5631,7 @@ payComponent moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseExilesFromGraveyard decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
-        Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
+        Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
         pure bindsNothing
       else pure Payment.Unpaid
   -- CR 702.167a's [materials]: the arm above over the battlefield and the
@@ -5652,7 +5659,7 @@ payComponent moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseMaterials decider pid oid candidates n orMore)
     if Set.isSubsetOf chosen (Set.fromList candidates) && enough chosen
       then do
-        Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
+        Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
         pure bindsNothing
       else pure Payment.Unpaid
   -- CR 701.59a: the payer chooses WHICH cards and HOW MANY, so this is a prompt,
@@ -5675,7 +5682,7 @@ payComponent moment slots pid oid component = case component of
     let collected = sum (fmap (`evidenceValue` gs) (Set.toAscList chosen))
     if Set.isSubsetOf chosen (Set.fromList candidates) && collected >= toInteger n
       then do
-        Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
+        Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
         pure bindsNothing
       else pure Payment.Unpaid
   -- CR 406.2 with no prompt: CR 404.2's order determines the card. Unpaid where

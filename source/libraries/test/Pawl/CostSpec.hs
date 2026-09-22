@@ -5337,6 +5337,37 @@ treasureCruiseSpec s registry = Spec.describe s "Treasure Cruise" $ do
     -- The eighth, plus the Cruise itself: CR 608.2n puts a resolved sorcery into
     -- its owner's graveyard.
     Spec.assertEqWith s "leaving the eighth where it was" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 2
+  -- Paying CR 601.2h's cost is one action, so delve's exiles are ONE event group
+  -- (Rakshasa Vizier's ruling of 2014-09-20: one trigger, a counter per card).
+  -- Rakshasa Vizier {2}{B}{G}{U} Creature -- Demon 4/4, "Whenever one or more
+  -- cards are put into exile from your graveyard, put that many +1/+1 counters on
+  -- this creature." Spirit Mascot beside it ("Whenever one or more cards leave
+  -- your graveyard, put a +1/+1 counter on this creature.") is what separates one
+  -- group from three by size: 3/3 against 5/5. Three cards delved and five
+  -- Islands for the {4}{U} left.
+  Spec.it s "CR 601.2h delving three cards fires Rakshasa Vizier once, for three counters" $ do
+    cruise <- S.printingOf s registry "Treasure Cruise"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    vizier <- S.printingOf s registry "Rakshasa Vizier"
+    mascot <- S.printingOf s registry "Spirit Mascot"
+    let (spell, board) = delveBoard island piker cruise 5 3
+        (vizierId, withVizier) = S.addPermanent vizier S.alice board
+        (mascotId, gs) = S.addPermanent mascot S.alice withVizier
+        residual = ManaCost.MkManaCost [ManaSymbol.Generic 4, ManaSymbol.OfType (ManaType.Colored Color.Blue)]
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered (filter ((== Just residual) . Cost.Type.mana) candidates)
+          _ -> S.identityAnswer p
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        placed = S.runPure answer cast Engine.settleForPriority
+        resolveAll g = if null (GameState.stack g) then g else resolveAll (S.runPure answer g Stack.resolveTop)
+        after = resolveAll placed
+    Spec.assertEqWith s "CR 601.2h one exile event group: Spirit Mascot is a 3/3, not the 5/5 three groups would leave" (Projection.powerOf mascotId after, Projection.toughnessOf mascotId after) (Just 3, Just 3)
+    Spec.assertEqWith s "CR 603.2c the Vizier is a 7/7, one counter per card delved" (Projection.powerOf vizierId after, Projection.toughnessOf vizierId after) (Just 7, Just 7)
+    -- The proxies, AFTER the assertions above.
+    Spec.assertEqWith s "one trigger each above the Cruise" (length (GameState.stack placed)) 3
+    Spec.assertEqWith s "and all three cards were delved" (length (Game.zoneMembers Zone.Exile S.alice after)) 3
   -- The pair, varying the ISLAND and nothing else: same graveyard, same hand,
   -- same seats. CR 702.66a names "each generic mana", so eight cards in the
   -- graveyard reach the {7} and never the {U}.
