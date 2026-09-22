@@ -115,6 +115,7 @@ import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
@@ -522,6 +523,13 @@ inTeams :: [[PlayerId.PlayerId]] -> GameState.GameState -> GameState.GameState
 inTeams teams gs =
   let entries = concat (zipWith (\i team -> fmap (\pid -> (pid, TeamId.MkTeamId i)) team) [0 ..] teams)
    in gs {GameState.settings = (GameState.settings gs) {GameSettings.teams = Teams.MkTeams (Map.fromList entries)}}
+
+-- CR 801.2a: the board handed in, every seat of it given the same range of
+-- influence and differing in nothing else, inTeams's posture.
+withRange :: Natural -> GameState.GameState -> GameState.GameState
+withRange range gs =
+  let ranges = RangeOfInfluence.MkRangeOfInfluence (Map.fromList (fmap (\pid -> (pid, range)) (GameState.turnOrder gs)))
+   in gs {GameState.settings = (GameState.settings gs) {GameSettings.rangeOfInfluence = ranges}}
 
 -- A fourth seat, alongside threePlayers, for cases where three seats cannot
 -- distinguish two candidate answers (a departure walk with only one
@@ -3317,7 +3325,7 @@ oneMountainState mountain ph =
             Object.activatedOnce = Set.empty
           }
    in GameState.MkGameState
-        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none},
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited},
           GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),

@@ -839,6 +839,8 @@ library codec
     Pawl.Codec.QuantitySpec
     Pawl.Codec.RandomCardInGraveyard
     Pawl.Codec.RandomCardInHand
+    Pawl.Codec.RangeOfInfluence
+    Pawl.Codec.RangeOfInfluenceSpec
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientSpec
     Pawl.Codec.RedirectDamage
@@ -1558,6 +1560,7 @@ library test
     Pawl.PrototypeSpec
     Pawl.PutCounterSpec
     Pawl.RadSpec
+    Pawl.RangeOfInfluenceSpec
     Pawl.RecruitSpec
     Pawl.RegistrySpec
     Pawl.ReplacementSpec
@@ -2037,6 +2040,7 @@ library types
     Pawl.Types.Quantity
     Pawl.Types.RandomCardInGraveyard
     Pawl.Types.RandomCardInHand
+    Pawl.Types.RangeOfInfluence
     Pawl.Types.Recipient
     Pawl.Types.RedirectDamage
     Pawl.Types.ReduceActivationCost
