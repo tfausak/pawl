@@ -947,6 +947,8 @@ library codec
     Pawl.Codec.SpellWasCastSpec
     Pawl.Codec.SpendManaAsThough
     Pawl.Codec.SpendManaAsThoughSpec
+    Pawl.Codec.Splice
+    Pawl.Codec.SpliceSpec
     Pawl.Codec.StackObjectKind
     Pawl.Codec.StackObjectKindSpec
     Pawl.Codec.StatedFlip
@@ -2094,6 +2096,7 @@ library types
     Pawl.Types.SpellCast
     Pawl.Types.SpellWasCast
     Pawl.Types.SpendManaAsThough
+    Pawl.Types.Splice
     Pawl.Types.StackObjectKind
     Pawl.Types.StatedFlip
     Pawl.Types.StaticAbility

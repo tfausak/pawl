@@ -734,6 +734,7 @@ handInPlay printing board =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1825,6 +1826,216 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     Spec.assertEqWith s "the {2}{U} trigger drew two cards" (handSize S.alice settled) 2
     Spec.assertEqWith s "and the {1}{G} trigger did not run, so bob's Bird Maiden lives" (S.countOnBattlefieldByName (birdMaidenName board) S.bob settled) 1
     Spec.assertEqWith s "both questions were put, and only the blue one kicked" (kickerAnnouncements asked) [KickerDecision.MkKickerDecision 0, KickerDecision.MkKickerDecision 1]
+
+-- CR 702.47: splice. Desperate Ritual ({1}{R} Instant -- Arcane, "Add {R}{R}{R}.
+-- / Splice onto Arcane {1}{R}") and Glacial Ray ({1}{R} Instant -- Arcane,
+-- "Glacial Ray deals 2 damage to any target. / Splice onto Arcane {1}{R}") are
+-- the producers, Lightning Bolt the non-Arcane control (Oracle text fetched from
+-- Scryfall 2026-09-22).
+--
+-- The board: alice has `mountains` untapped Mountains, the spell she casts in
+-- her hand, and the cards named in `rest` beside it; bob has a Goblin Piker. The
+-- MANA the resolution leaves in her pool is what the cases assert: CR 106.4 keeps
+-- it there until the step ends, and neither a card's own resolution nor a spliced
+-- one's can be mistaken for the other when their counts differ.
+spliceBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  [Printing.Printing] ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId)
+spliceBoard mountain piker spell rest mountains =
+  let (pikerId, gs1) = S.addPermanent piker S.bob (S.landsInPlay mountain mountains)
+      (gs2, spellId) = S.handOne spell gs1
+      add (ids, board) printing = let (oid, board') = S.addHandCard printing S.alice board in (ids <> [oid], board')
+      (restIds, gs) = List.foldl' add ([], gs2) rest
+   in (gs, spellId, restIds, pikerId)
+
+-- How many red units sit in one player's pool.
+redFloating :: PlayerId.PlayerId -> GameState.GameState -> Int
+redFloating pid gs = length (filter ((== ManaType.Colored Color.Red) . ManaUnit.manaType) (Mana.Type.unwrap (Game.poolOf pid gs)))
+
+-- Splices exactly `wanted`, in that order, where every one of them was offered
+-- -- FILTERED against the offer rather than answered blind, so a mutation that
+-- drops an offer cannot be repaired by the answerer -- and aims each target slot
+-- at the first offered recipient `aim` admits for that slot.
+splicing ::
+  [ObjectId.ObjectId] ->
+  (SlotName.SlotName -> Recipient.Recipient -> Bool) ->
+  Prompt.Prompt r ->
+  r
+splicing wanted aim p = case p of
+  Prompt.ChooseSplice _ _ _ offers -> filter (`elem` fmap fst offers) wanted
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybeWithKey (\slot (_, offered) -> fmap Set.singleton (List.find (aim slot) (Set.toList offered))) sets
+  _ -> S.identityAnswer p
+
+-- Is this the slot the spliced text declared? Modal.instanceSlot's suffix, read
+-- off the name the prompt offers.
+isSplicedSlot :: SlotName.SlotName -> Bool
+isSplicedSlot = Text.isInfixOf (Text.pack "#splice") . SlotName.unwrap
+
+spliceAnnouncements :: [Response.Response] -> [[ObjectId.ObjectId]]
+spliceAnnouncements = Maybe.mapMaybe (\response -> case response of Response.AnnouncedSplice cards -> Just cards; _ -> Nothing)
+
+spliceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spliceSpec s registry = Spec.describe s "Splice" $ do
+  -- CR 702.47c: the spell gains the spliced card's rules text, so one Desperate
+  -- Ritual resolves both texts and adds six; the spliced card stays in hand (CR
+  -- 702.47a's example).
+  Spec.it s "CR 702.47c a Desperate Ritual spliced onto another adds {R} six times" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    let (gs, spellId, restIds, _) = spliceBoard mountain piker ritual [ritual] 4
+        (asked, after) = castAndResolve (splicing restIds (\_ _ -> False)) gs spellId
+    Spec.assertEqWith s "CR 702.47c: both texts resolved, six red float" (redFloating S.alice after) 6
+    Spec.assertEqWith s "CR 702.47a: the spliced card is still in alice's hand" (Game.zoneMembers Zone.Hand S.alice after) restIds
+    Spec.assertEqWith s "the player was asked, and spliced it" (spliceAnnouncements asked) [restIds]
+    Spec.assertEqWith s "{1}{R} plus the splice {1}{R}: four Mountains are tapped" (S.tappedCount S.alice after) 4
+  -- CR 702.47a's "you MAY reveal": declining is a real answer, on the SAME board.
+  Spec.it s "CR 702.47a declining to splice adds {R} three times" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    let (gs, spellId, restIds, _) = spliceBoard mountain piker ritual [ritual] 4
+        (asked, after) = castAndResolve (splicing [] (\_ _ -> False)) gs spellId
+    Spec.assertEqWith s "only the spell's own text resolved: three red float" (redFloating S.alice after) 3
+    Spec.assertEqWith s "the player was asked, and spliced nothing" (spliceAnnouncements asked) [[]]
+    Spec.assertEqWith s "only {1}{R} was paid: two Mountains are tapped" (S.tappedCount S.alice after) 2
+    Spec.assertEqWith s "the other Ritual is still in hand" (Game.zoneMembers Zone.Hand S.alice after) restIds
+  -- CR 702.47b: "you can't splice any one card onto the same spell more than
+  -- once". Six Mountains could pay for the card twice, so only the rule stands
+  -- between the answer and nine red; the answer is rejected, not repaired, and
+  -- CR 601.2e takes the whole cast back.
+  Spec.it s "CR 702.47b splicing one card twice rejects the cast" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    let (gs, spellId, restIds, _) = spliceBoard mountain piker ritual [ritual] 6
+        (_, after) = castAndResolve (splicing (restIds <> restIds) (\_ _ -> False)) gs spellId
+    Spec.assertEqWith s "nothing resolved: no red floats" (redFloating S.alice after) 0
+    Spec.assertEqWith s "both Rituals are back in alice's hand" (List.sort (Game.zoneMembers Zone.Hand S.alice after)) (List.sort (spellId : restIds))
+    Spec.assertEqWith s "and no Mountain was tapped" (S.tappedCount S.alice after) 0
+  -- CR 702.47a's [quality]: Lightning Bolt is no Arcane spell, so the Ritual is
+  -- not offered, though the answerer would splice it and the Mountains could pay.
+  Spec.it s "CR 702.47a a non-Arcane spell is offered no splice" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (gs, spellId, restIds, _) = spliceBoard mountain piker bolt [ritual] 4
+        (asked, after) = castAndResolve (splicing restIds (const (== Recipient.ToPlayer S.bob))) gs spellId
+    Spec.assertEqWith s "no red floats, since no Ritual text joined it" (redFloating S.alice after) 0
+    Spec.assertEqWith s "Lightning Bolt's own text resolved" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "only {R} was paid" (S.tappedCount S.alice after) 1
+    Spec.assertEqWith s "no splice was asked" (spliceAnnouncements asked) []
+  -- CR 702.47d: the added text's target is chosen with the spell's, and CR
+  -- 702.47c's damage is dealt by the spell. The main spell has no target of its
+  -- own, so a Glacial Ray target that was never announced would deal nothing.
+  Spec.it s "CR 702.47d Glacial Ray spliced onto Desperate Ritual deals its 2 to the target chosen" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    ray <- S.printingOf s registry "Glacial Ray"
+    let (gs, spellId, restIds, _) = spliceBoard mountain piker ritual [ray] 4
+        (asked, after) = castAndResolve (splicing restIds (const (== Recipient.ToPlayer S.bob))) gs spellId
+    Spec.assertEqWith s "CR 702.47d: bob took Glacial Ray's 2" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "and the Ritual's own text added three red" (redFloating S.alice after) 3
+    Spec.assertEqWith s "Glacial Ray is still in alice's hand" (Game.zoneMembers Zone.Hand S.alice after) restIds
+    Spec.assertEqWith s "the player was asked, and spliced it" (spliceAnnouncements asked) [restIds]
+  -- CR 702.47d's "choose targets for the added text normally", on a main spell
+  -- with a target of its own: a Glacial Ray spliced onto a Glacial Ray is two
+  -- instances of the word "target", so two different targets may be chosen (CR
+  -- 601.2c) and each takes 2.
+  Spec.it s "CR 702.47d the spliced text's target is chosen apart from the spell's own" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ray <- S.printingOf s registry "Glacial Ray"
+    let (gs, spellId, restIds, pikerId) = spliceBoard mountain piker ray [ray] 4
+        aim slot = if isSplicedSlot slot then (== Recipient.ToCreature pikerId) else (== Recipient.ToPlayer S.bob)
+        (_, after) = castAndResolve (splicing restIds aim) gs spellId
+    Spec.assertEqWith s "the spell's own target, bob, took 2" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "and the spliced text's, the Piker, has its 2 marked" (fmap Object.damage (Game.lookupObject pikerId after)) (Just 2)
+    Spec.assertEqWith s "the spliced Glacial Ray is still in alice's hand" (Game.zoneMembers Zone.Hand S.alice after) restIds
+  -- CR 707.2: "text-changing effects ... are not copied", and CR 702.47c makes
+  -- splice one. Twincast's copy of a spliced Desperate Ritual has only the
+  -- printed text: three red from the copy and six from the original.
+  Spec.it s "CR 707.2 a copy of a spliced spell does not have the spliced text" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    twincast <- S.printingOf s registry "Twincast"
+    let (gs0, spellId, restIds, _) = spliceBoard mountain piker ritual [ritual, twincast] 4
+        gs = S.landsFor island S.alice 2 gs0
+        (spliceIds, twincastId) = case restIds of
+          [ritualId, tId] -> ([ritualId], tId)
+          _ -> ([], spellId)
+        answer :: Prompt.Prompt r -> r
+        answer = splicing spliceIds (\_ _ -> False)
+        cast1 = snd (S.runPureWith answer gs (S.cast S.alice spellId))
+        spellOnStack = Maybe.listToMaybe (GameState.stack cast1)
+        aimAtSpell :: Prompt.Prompt r -> r
+        aimAtSpell p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== spellOnStack) . Recipient.objectOf) offered) sets
+          _ -> S.identityAnswer p
+        cast2 = snd (S.runPureWith aimAtSpell cast1 (S.cast S.alice twincastId))
+        resolveAll board = case GameState.stack board of
+          [] -> board
+          _ -> resolveAll (snd (S.runPureWith S.identityAnswer board Stack.resolveTop))
+        after = resolveAll cast2
+    Spec.assertEqWith s "CR 707.2: the copy's three and the original's six" (redFloating S.alice after) 9
+    Spec.assertEqWith s "Twincast and the original Ritual were both cast" (length (GameState.stack cast2)) 2
+  -- CR 702.47b: "you can't choose to use a splice ability if you can't make
+  -- the required choices (targets, etc.) for that card's rules text". Wear Away
+  -- ({G}{G} Instant -- Arcane, "Destroy target artifact or enchantment. / Splice
+  -- onto Arcane {3}{G}", Oracle text fetched 2026-09-22) on a board with no
+  -- artifact is not offered, so the Ritual is cast unspliced; had it been
+  -- spliced, CR 601.2e would take the whole cast back for want of a target.
+  Spec.it s "CR 702.47b a card whose text has no legal target is not offered" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    wearAway <- S.printingOf s registry "Wear Away"
+    let (gs0, spellId, restIds, _) = spliceBoard mountain piker ritual [wearAway] 2
+        gs = S.landsFor forest S.alice 4 gs0
+        (asked, after) = castAndResolve (splicing restIds (\_ _ -> False)) gs spellId
+    Spec.assertEqWith s "the Ritual was cast and resolved unspliced: three red float" (redFloating S.alice after) 3
+    Spec.assertEqWith s "no splice was asked" (spliceAnnouncements asked) []
+  -- The pair's other board, differing in bob's Sol Ring alone: Wear Away's
+  -- target now exists, so it is offered, spliced, and destroys the Ring.
+  Spec.it s "CR 702.47b the same card is offered once its target exists" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    wearAway <- S.printingOf s registry "Wear Away"
+    solRing <- S.printingOf s registry "Sol Ring"
+    let (gs0, spellId, restIds, _) = spliceBoard mountain piker ritual [wearAway] 2
+        (ringId, gs) = S.addPermanent solRing S.bob (S.landsFor forest S.alice 4 gs0)
+        aim _ recipient = Recipient.objectOf recipient == Just ringId
+        (asked, after) = castAndResolve (splicing restIds aim) gs spellId
+    Spec.assertEqWith s "Wear Away's text destroyed the Sol Ring" (List.elem ringId (Game.zoneMembers Zone.Battlefield S.bob after)) False
+    Spec.assertEqWith s "and the Ritual's own text added three red" (redFloating S.alice after) 3
+    Spec.assertEqWith s "the player was asked, and spliced it" (spliceAnnouncements asked) [restIds]
+  -- CR 702.47d's note and CR 608.2b: the spliced text's target is the spell's
+  -- ONLY target, so once the Piker is gone every target is illegal and nothing
+  -- resolves -- not even the Ritual's untargeted mana.
+  Spec.it s "CR 608.2b a spell whose only target came from spliced text does not resolve once it is illegal" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ritual <- S.printingOf s registry "Desperate Ritual"
+    ray <- S.printingOf s registry "Glacial Ray"
+    let (gs, spellId, restIds, pikerId) = spliceBoard mountain piker ritual [ray] 4
+        answer :: Prompt.Prompt r -> r
+        answer = splicing restIds (const (== Recipient.ToCreature pikerId))
+        cast = snd (S.runPureWith answer gs (S.cast S.alice spellId))
+        gone = snd (S.runPureWith answer cast (Event.changeZone pikerId Zone.Graveyard))
+        after = snd (S.runPureWith answer gone Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2b: no mana was added" (redFloating S.alice after) 0
+    Spec.assertEqWith s "the Ritual still left the stack for alice's graveyard" (buybackNamesIn Zone.Graveyard S.alice after) [Just (S.printingName ritual)]
 
 -- CR 702.27a: buyback, the one keyword whose cast-time announcement changes where
 -- CR 608.2n sends the spell. Elvish Fury {G} Instant is the producer -- "Buyback
@@ -5621,6 +5832,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   tieredSpec s registry
   kickerSpec s registry
   buybackSpec s registry
+  spliceSpec s registry
   auraTargetSpec s registry
   fireboltSpec s registry
   flashbackCardTypeSpec s registry

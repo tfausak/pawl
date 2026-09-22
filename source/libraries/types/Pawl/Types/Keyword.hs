@@ -15,6 +15,7 @@ import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
+import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.Suspend as Suspend
 import qualified Pawl.Types.Ward as Ward
 
@@ -225,6 +226,9 @@ data Keyword
     -- Spirit card with mana value N or less from your graveyard to your hand;
     -- each instance triggers separately (CR 702.46b).
     Soulshift Natural.Natural
+  | -- | 702.47a: splice onto [quality] [cost] -- a static ability functioning
+    -- from a hand, read by Pawl.Engine.Cast's CR 601.2b announcement.
+    Splice (Splice.Splice Keyword)
   | -- | 702.49a: ninjutsu [cost] -- an activated ability functioning only from a
     -- hand, whose cost returns an unblocked attacker you control and whose effect
     -- puts this card onto the battlefield tapped and attacking.

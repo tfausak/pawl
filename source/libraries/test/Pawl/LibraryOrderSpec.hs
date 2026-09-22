@@ -2657,7 +2657,7 @@ optionalEffectSpec s registry =
               before = S.handSize S.alice gs
               -- S.identityAnswer declines every optional prompt, so this is the
               -- declining half with no bespoke answerer needed.
-              after = S.runPure S.identityAnswer gs (Resolve.resolveModes stackId stackId [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)])
+              after = S.runPure S.identityAnswer gs (Resolve.resolveModes stackId stackId [(ModeInstance.MkModeInstance 0 (ModeIndex.MkModeIndex 0) 0, mode)])
           Spec.assertEqWith s "the mandatory clause drew, the declined one did not" (S.handSize S.alice after) (before + 1)
         -- The same rule at gameplay level, through a real cast: Corpse Churn
         -- PRINTS the mandatory-then-optional pair the case above builds by hand.

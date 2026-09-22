@@ -1,6 +1,7 @@
 module Pawl.Types.Object where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -22,6 +23,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Pairing as Pairing
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
@@ -613,6 +615,17 @@ data Object = MkObject
     -- instant or a sorcery can carry buyback, so there is no permanent to
     -- reference it afterwards. Nothing carries it across a zone change.
     boughtBack :: Bool,
+    -- | CR 702.47a: the cards spliced onto this SPELL, in the order CR 702.47b
+    -- has its controller choose. Stamped by Pawl.Engine.Cast at CR 601.2b and
+    -- read by Pawl.Engine.Resolve.splicedModes, which gives the spell each
+    -- card's rules text (CR 702.47c).
+    --
+    -- The PRINTING, not the card: the card stays in its owner's hand and may be
+    -- discarded or cast (CR 702.47a's example), and the text the spell gained is
+    -- the printing's whatever the card goes on to do.
+    --
+    -- Per-incarnation with no exception, which is CR 702.47e.
+    spliced :: Seq.Seq PrintingId.PrintingId,
     -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
     -- cost of the SPELL that became this permanent its controller announced they
     -- would pay 2 life for. CR 702.150a's compleated is the one reader, through
@@ -903,6 +916,9 @@ newIncarnation object =
       -- in the hand, so the card that arrives there is a new object that was
       -- never bought back.
       boughtBack = False,
+      -- CR 702.47e: "the spell loses any splice changes once it leaves the
+      -- stack for any reason", and nothing writes it back.
+      spliced = Seq.empty,
       -- CR 601.2b's record is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
       phyrexianLifePaid = 0,

@@ -428,6 +428,12 @@ data Prompt r where
   -- and before ChooseCost (CR 601.2b); the Cost is what buying back adds (CR
   -- 601.2f).
   ChooseBuyback :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt BuybackDecision.BuybackDecision
+  -- | CR 702.47a/b: which cards in the caster's hand are spliced onto the spell,
+  -- and in what order their effects happen, after ChooseBuyback and before
+  -- ChooseCost (CR 601.2b). Each offer is a card and the splice cost it adds;
+  -- the empty answer splices nothing, and an answer naming a card twice or one
+  -- not offered is rejected.
+  ChooseSplice :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [(ObjectId.ObjectId, Cost.Cost Keyword.Keyword)] -> Prompt [ObjectId.ObjectId]
   -- | CR 702.132a: which other player assists the spell, asked of the caster
   -- before CR 601.2g's mana window; the candidates are the other players still
   -- in the game, and Nothing declines. Raised even for a single candidate,

@@ -293,6 +293,7 @@ enter pid quality = do
                 Object.mutating = False,
                 Object.prototyped = False,
                 Object.boughtBack = False,
+                Object.spliced = Seq.empty,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,

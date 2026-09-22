@@ -836,6 +836,7 @@ mintCard pid under printingId dest position tapped gs =
             Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
+            Object.spliced = Seq.empty,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1069,6 +1070,7 @@ createEmblem pid card = do
                 Object.mutating = False,
                 Object.prototyped = False,
                 Object.boughtBack = False,
+                Object.spliced = Seq.empty,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,
@@ -5492,6 +5494,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- on the one destination it replaces, and only an instant or a
                     -- sorcery can carry buyback, so no permanent can reference it.
                     Object.boughtBack = False,
+                    Object.spliced = Seq.empty,
                     -- CR 400.7d a third time, and rule 702.150a is the ability
                     -- that references it: how many of the spell's Phyrexian mana
                     -- symbols were announced to be paid with life (CR 601.2b).
@@ -6972,6 +6975,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.mutating = False,
                       Object.prototyped = False,
                       Object.boughtBack = False,
+                      Object.spliced = Seq.empty,
                       Object.phyrexianLifePaid = 0,
                       Object.manaSpent = Mana.MkMana [],
                       Object.announcedX = Nothing,
@@ -7204,6 +7208,7 @@ meld controller victims resultCard = do
                 Object.mutating = False,
                 Object.prototyped = False,
                 Object.boughtBack = False,
+                Object.spliced = Seq.empty,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,

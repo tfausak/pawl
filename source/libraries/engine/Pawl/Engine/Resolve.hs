@@ -355,7 +355,9 @@ modesOf oid gs = case Game.lookupObject oid gs of
                 Clause.condition = fmap (Projection.rewriteCondition changes) (Clause.condition c)
               }
           rewriteMode m = m {Mode.clauses = fmap rewriteClause (Mode.clauses m)}
-       in fmap (fmap rewriteMode) (Card.chosenModes chosen face)
+       in -- CR 702.47b: the spliced text after the spell's own, and CR 702.47c
+          -- makes it the spell's text, so CR 612's changes reach it too.
+          fmap (fmap rewriteMode) (Card.chosenModes chosen face <> Game.splicedModes obj gs)
 
 -- CR 405.4: who controls a SPELL on the stack -- both CR 608.2b's legality
 -- perspective and the effects' execution, which must name the same player. The
@@ -405,9 +407,11 @@ resolveSpellWith runSubgame oid = do
         -- CR 608.2b/700.2c: re-validate only the CHOSEN modes' slots.
         let chosenSelection = Binding.modesOf (Object.bindings obj)
             slots = targetSlotsOf obj oid gs face
-            -- CR 700.2d: the slots the MODES own -- `slots` minus CR 303.4a's
-            -- enchant slot.
-            modeOwnedSlots = Modal.modesTargetSlots chosenSelection (Face.spell face)
+            -- CR 700.2d: the slots the MODES own, the spliced text's among them
+            -- (CR 702.47d) -- `slots` minus CR 303.4a's enchant slot. The spliced
+            -- half is a REGRESSION FENCE: no effect names a slot under its
+            -- suffixed name, so leaving it in an instance's view is unobserved.
+            modeOwnedSlots = Map.union (Modal.modesTargetSlots chosenSelection (Face.spell face)) (Game.splicedTargetSlots obj gs)
             legalSlot slot recipients = case Map.lookup slot slots of
               -- CR 608.2b is about TARGETS. A slot declaring none is a RESERVED
               -- binding and was never targeted.

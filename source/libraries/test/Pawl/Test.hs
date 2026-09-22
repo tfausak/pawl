@@ -448,6 +448,7 @@ import qualified Pawl.Codec.SpeedDecreaseSpec
 import qualified Pawl.Codec.SpellCastSpec
 import qualified Pawl.Codec.SpellWasCastSpec
 import qualified Pawl.Codec.SpendManaAsThoughSpec
+import qualified Pawl.Codec.SpliceSpec
 import qualified Pawl.Codec.StackObjectKindSpec
 import qualified Pawl.Codec.StatedFlipSpec
 import qualified Pawl.Codec.StaticAbilitySpec
@@ -904,6 +905,7 @@ spec s registry = do
   Pawl.Codec.ExcessDestinationSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
   Pawl.Codec.CraftSpec.spec s
+  Pawl.Codec.SpliceSpec.spec s
   Pawl.Codec.ExileCardsFromGraveyardSpec.spec s
   Pawl.Codec.ExileMaterialsSpec.spec s
   Pawl.Codec.ExileHauntingSpec.spec s
