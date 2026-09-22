@@ -16,8 +16,10 @@
 -- SPELLBOOK rather than one card; the eighth casts a printed Follow the Tracks,
 -- the same spellbook shape with the other question asked of it; the ninth enters
 -- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
--- take; the last two cast a printed Sinister Reflections, whose conjure names an
--- object already in the game rather than writing its card out.
+-- take; the tenth and eleventh cast a printed Sinister Reflections, whose
+-- conjure names an object already in the game rather than writing its card out;
+-- the last two begin alice's second main phase under a printed Pearl Collector,
+-- the one conjure in the corpus behind CR 603.4's intervening "if".
 --
 -- The first four CAST what the conjure created, which is the point -- conjure
 -- creates a CARD and not CR 111.1's token, and a token in a hand, a library or a
@@ -38,6 +40,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
@@ -45,7 +48,9 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -590,6 +595,153 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "and it reads the Piker's 2/1 with the Piker itself in the graveyard"
           (fmap (\oid -> S.powerToughnessOf oid gone) duplicates, List.sort (namesIn Zone.Graveyard gone))
           ([Just (2, 1)], List.sort [cloneName, goblinPiker, sinisterReflections])
+  -- Pearl Collector ({2}{B} Creature -- Human Warlock 3/3, "Deathtouch,
+  -- Lifelink. At the beginning of your second main phase, if you gained 4 or
+  -- more life this turn, conjure a card named Mox Pearl into your hand. This
+  -- ability triggers only once. {2}{W}: Another target creature perpetually
+  -- gains lifelink."), the only conjure in the corpus behind CR 603.4's
+  -- intervening "if" -- and the threshold is the life GAINED this turn, so the
+  -- spell alice casts in her precombat main is what decides whether the ability
+  -- triggers at all.
+  --
+  -- The pair is one cast apart. Sun's Bounty ({1}{W} Instant, "You gain 4 life")
+  -- meets the threshold exactly; Morsel Theft ({2}{B}{B} Kindred Sorcery --
+  -- Rogue, "Target player loses 3 life and you gain 3 life") falls one short.
+  -- Both runs share one fixture -- the same Collector, the same six lands, both
+  -- spells in hand -- so the only difference between them is which spell was
+  -- cast, and an engine reading the threshold as three, or not reading the "if"
+  -- at all, would conjure in both.
+  --
+  -- The Mox is CAST, the Thopterist case's reason: conjure creates a CARD rather
+  -- than CR 111.1's token, and a token in a hand would be swept up by CR 111.7
+  -- before any cast. What this case adds is reading the permanent it became for
+  -- its own mana ability, which is what makes the assertion about the card the
+  -- file writes rather than about a name -- an empty face under the right name
+  -- would be castable too, and would offer nothing to tap.
+  Spec.it s "CR 603.4 conjure behind an intervening if: 4 life gained puts a castable Mox Pearl in hand" $ do
+    (bountyId, _, gs) <- pearlBoard s registry
+    let gained = S.runPure S.identityAnswer gs (S.cast S.alice bountyId >> Stack.resolveTop)
+        secondMain = postcombatMainOf gained
+        fired = oneStep secondMain
+        inHand = namedIn moxPearl Zone.Hand fired
+        -- CR 117.1a: a noninstant spell is cast during a main phase with the
+        -- stack empty, so the cast below is asked at one rather than in the step
+        -- Engine.runStep left the board in.
+        main_ = fired {GameState.phase = Phase.PostcombatMain, GameState.priority = Just S.alice}
+        cast_ = case inHand of
+          oid : _ -> S.runPure S.identityAnswer main_ (S.cast S.alice oid >> Stack.resolveTop)
+          [] -> main_
+        tappable g oid = elem oid (Maybe.mapMaybe manaSource (Action.legalActions S.alice g))
+    Spec.assertEqWith
+      s
+      "the conjured Mox was cast and is a mana source alice may tap"
+      (fmap (tappable cast_) (namedIn moxPearl Zone.Battlefield cast_))
+      [True]
+    Spec.assertEqWith
+      s
+      "it was a card its owner could cast"
+      (fmap (\oid -> S.castable S.alice oid main_) inHand)
+      [True]
+    Spec.assertEqWith
+      s
+      "exactly one Mox Pearl reached alice's hand"
+      (length inHand)
+      1
+    Spec.assertEqWith
+      s
+      "the Bounty gained exactly the threshold, at a second main phase the trigger saw"
+      (S.lifeOf S.alice fired, GameState.phase secondMain)
+      (Just 24, Phase.PostcombatMain)
+    Spec.assertEqWith
+      s
+      "the printed rider is spent, so a later second main phase has nothing left to fire"
+      (Set.size (GameState.triggeredThisGame fired))
+      1
+  -- The control, one cast apart: three life gained is one short of the printed
+  -- four, so CR 603.4 keeps the ability off the stack entirely -- which the
+  -- unspent rider is the second reading of. bob's life is what tells the Theft
+  -- resolving from the Theft being countered on the way: 3 lost there against 3
+  -- gained here.
+  Spec.it s "CR 603.4 and three life is one short, so nothing is conjured" $ do
+    (_, theftId, gs) <- pearlBoard s registry
+    let gained = S.runPure aimedAtBob gs (S.cast S.alice theftId >> Stack.resolveTop)
+        secondMain = postcombatMainOf gained
+        fired = oneStep secondMain
+    Spec.assertEqWith
+      s
+      "no Mox Pearl in hand, and the second main phase really ran"
+      (namedIn moxPearl Zone.Hand fired, GameState.phase secondMain)
+      ([], Phase.PostcombatMain)
+    Spec.assertEqWith
+      s
+      "the Theft gained three and took three"
+      (S.lifeOf S.alice fired, S.lifeOf S.bob fired)
+      (Just 23, Just 17)
+    Spec.assertEqWith
+      s
+      "the intervening if is what held it back: the rider is unspent"
+      (Set.size (GameState.triggeredThisGame fired))
+      0
+
+moxPearl :: CardName.CardName
+moxPearl = CardName.MkCardName (Text.pack "Mox Pearl")
+
+-- Pearl Collector's fixture: the Collector on alice's battlefield, both
+-- life-gain spells in her hand, and the six lands that pay for either, at the
+-- precombat main of her own turn.
+--
+-- `remaining` is rewritten for Pawl.EventTriggerSpec's reason: Setup.emptyGame
+-- still holds the beginning phase and the precombat main, so stepping from a
+-- board already set to the precombat main would begin it a SECOND time -- and CR
+-- 505.1b counts the main phases that have begun, which would make the postcombat
+-- main this turn's third.
+pearlBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+pearlBoard s registry = do
+  collector <- S.printingOf s registry "Pearl Collector"
+  bounty <- S.printingOf s registry "Sun's Bounty"
+  theft <- S.printingOf s registry "Morsel Theft"
+  plains <- S.printingOf s registry "Plains"
+  swamp <- S.printingOf s registry "Swamp"
+  let (_, withCollector) = S.addPermanent collector S.alice (Setup.emptyGame S.bothPlayers)
+      withLands = S.landsFor swamp S.alice 4 (S.landsFor plains S.alice 2 withCollector)
+      (bountyId, withBounty) = S.addHandCard bounty S.alice withLands
+      (theftId, withTheft) = S.addHandCard theft S.alice withBounty
+  pure
+    ( bountyId,
+      theftId,
+      withTheft
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.remaining = Seq.drop 1 (Turn.dropRestOfPhase (Phase.Beginning BeginningStep.Upkeep) Turn.laterPhases),
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- Pawl.EventTriggerSpec's stepUntil: run whole steps until the postcombat main
+-- is the current phase and has NOT yet run -- Engine.runStep runs
+-- GameState.phase and only then advances -- so a case can read the board as that
+-- step begins. Bounded so a fixture that never reaches it ends rather than
+-- hangs. S.identityAnswer declares no attackers, so nothing but the cast spell
+-- moves a life total on the way.
+postcombatMainOf :: GameState.GameState -> GameState.GameState
+postcombatMainOf gs0 =
+  let go n g =
+        if n <= (0 :: Int) || GameState.phase g == Phase.PostcombatMain
+          then g
+          else go (n - 1) (oneStep g)
+   in go 24 gs0
+
+oneStep :: GameState.GameState -> GameState.GameState
+oneStep g = snd (Engine.runGamePure S.identityAnswer g Engine.runStep)
+
+-- Morsel Theft's target. FILTERED out of the offered recipients rather than
+-- built, the Toralf's Disciple case's reason: CR 608.2b re-reads the targets at
+-- resolution, and a recipient assembled here would be a different one than the
+-- prompt offered.
+aimedAtBob :: Prompt.Prompt r -> r
+aimedAtBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) sets
+  _ -> S.identityAnswer p
 
 goblinPiker :: CardName.CardName
 goblinPiker = CardName.MkCardName (Text.pack "Goblin Piker")
