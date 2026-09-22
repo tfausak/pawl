@@ -1,7 +1,7 @@
 module Pawl.Codec.TriggerCondition where
 
 import qualified Pawl.Codec.AbilityAddsMana as AbilityAddsMana
-import qualified Pawl.Codec.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Codec.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Condition as Condition
@@ -98,8 +98,8 @@ codec =
           Arm.payload "PermanentLeavesTheBattlefield" filterCodec TriggerCondition.PermanentLeavesTheBattlefield (\x -> case x of TriggerCondition.PermanentLeavesTheBattlefield y -> Just y; _ -> Nothing),
           Arm.payload "PermanentReturnedToHand" filterCodec TriggerCondition.PermanentReturnedToHand (\x -> case x of TriggerCondition.PermanentReturnedToHand y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsReturnedToHand" filterCodec TriggerCondition.PermanentsReturnedToHand (\x -> case x of TriggerCondition.PermanentsReturnedToHand y -> Just y; _ -> Nothing),
-          Arm.payload "CardLeavesGraveyard" CardLeavesGraveyard.codec TriggerCondition.CardLeavesGraveyard (\x -> case x of TriggerCondition.CardLeavesGraveyard y -> Just y; _ -> Nothing),
-          Arm.payload "CardsLeaveGraveyard" CardLeavesGraveyard.codec TriggerCondition.CardsLeaveGraveyard (\x -> case x of TriggerCondition.CardsLeaveGraveyard y -> Just y; _ -> Nothing),
+          Arm.payload "CardLeavesZone" CardLeavesZone.codec TriggerCondition.CardLeavesZone (\x -> case x of TriggerCondition.CardLeavesZone y -> Just y; _ -> Nothing),
+          Arm.payload "CardsLeaveZone" CardLeavesZone.codec TriggerCondition.CardsLeaveZone (\x -> case x of TriggerCondition.CardsLeaveZone y -> Just y; _ -> Nothing),
           Arm.nullary "AttachedCreatureDies" TriggerCondition.AttachedCreatureDies,
           Arm.nullary "AttachedCreatureBecomesTapped" TriggerCondition.AttachedCreatureBecomesTapped,
           Arm.nullary "SelfBecomesUntapped" TriggerCondition.SelfBecomesUntapped,
@@ -235,8 +235,8 @@ tagOf x = case x of
   TriggerCondition.PermanentLeavesTheBattlefield {} -> "PermanentLeavesTheBattlefield"
   TriggerCondition.PermanentReturnedToHand {} -> "PermanentReturnedToHand"
   TriggerCondition.PermanentsReturnedToHand {} -> "PermanentsReturnedToHand"
-  TriggerCondition.CardLeavesGraveyard {} -> "CardLeavesGraveyard"
-  TriggerCondition.CardsLeaveGraveyard {} -> "CardsLeaveGraveyard"
+  TriggerCondition.CardLeavesZone {} -> "CardLeavesZone"
+  TriggerCondition.CardsLeaveZone {} -> "CardsLeaveZone"
   TriggerCondition.AttachedCreatureDies {} -> "AttachedCreatureDies"
   TriggerCondition.AttachedCreatureBecomesTapped {} -> "AttachedCreatureBecomesTapped"
   TriggerCondition.SelfBecomesUntapped {} -> "SelfBecomesUntapped"

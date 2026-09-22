@@ -1,72 +1,37 @@
 {
   "faces": [
     {
-      "keywords": [
-        {
-          "type": "Flying"
-        }
-      ],
       "manaCost": [
         {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
-              "type": "Green"
-            }
-          }
-        },
-        {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
-              "type": "Blue"
-            }
-          }
+          "type": "Generic",
+          "value": 2
         }
       ],
-      "name": "Kishla Skimmer",
+      "name": "Synthetic Exile Tally",
       "power": {
         "type": "Literal",
-        "value": 2
+        "value": 1
       },
       "toughness": {
         "type": "Literal",
-        "value": 2
+        "value": 1
       },
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "CardLeavesZone",
+            "type": "CardsLeaveZone",
             "value": {
               "filter": {
                 "type": "And",
-                "value": [
-                  {
-                    "type": "OwnedBy",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Not",
-                    "value": {
-                      "type": "IsToken"
-                    }
-                  }
-                ]
+                "value": []
               },
               "from": {
-                "type": "Graveyard"
+                "type": "Exile"
               },
               "scope": {
-                "type": "ControllersTurn"
+                "type": "EachTurn"
               }
             }
-          },
-          "limit": {
-            "type": "OncePerTurn"
           },
           "modal": {
             "modes": [
@@ -75,7 +40,7 @@
                   {
                     "effects": [
                       {
-                        "type": "Draw",
+                        "type": "GainLife",
                         "value": {
                           "player": {
                             "type": "Relative",
@@ -84,8 +49,8 @@
                             }
                           },
                           "quantity": {
-                            "type": "Literal",
-                            "value": 1
+                            "type": "InSlot",
+                            "value": "thatMuch"
                           }
                         }
                       }
@@ -100,10 +65,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Bird"
-          },
-          {
-            "type": "Scout"
+            "type": "Spirit"
           }
         ],
         "types": [

@@ -2,7 +2,7 @@ module Pawl.Types.TriggerCondition where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
-import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Condition as Condition
@@ -289,12 +289,12 @@ data TriggerCondition
     -- noncreature permanents are returned to hand" (Tameshi, Reality Architect),
     -- once however many moved, the way PermanentsDie stands beside PermanentDies.
     PermanentsReturnedToHand (Filter.Filter Keyword.Keyword)
-  | -- | CR 603.10a's third look-back family: "whenever a card leaves your
-    -- graveyard during your turn" (Kishla Skimmer).
-    CardLeavesGraveyard CardLeavesGraveyard.CardLeavesGraveyard
+  | -- | CR 400.7: a card leaves a named zone, per card -- "whenever a card leaves
+    -- your graveyard during your turn" (Kishla Skimmer).
+    CardLeavesZone CardLeavesZone.CardLeavesZone
   | -- | CR 603.2c's batch reading of the arm above: "whenever one or more cards
     -- leave your graveyard" (Spirit Mascot), once however many left.
-    CardsLeaveGraveyard CardLeavesGraveyard.CardLeavesGraveyard
+    CardsLeaveZone CardLeavesZone.CardLeavesZone
   | -- | CR 700.4's "dies" read off the permanent the bearer is attached to
     -- (Screams from Within); the one condition CR 113.6m's Aura clause names.
     AttachedCreatureDies
