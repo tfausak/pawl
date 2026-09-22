@@ -145,6 +145,10 @@ skipEmptyCombat gs =
 -- through the still-playing list expresses -- Game.apnapOrder keeps a departed
 -- seat, so it is the emptied seat itself that is named and then dropped.
 --
+-- CR 801.3 cuts the same list to the opponents within the active player's range
+-- of influence, and so needs no clause for planeswalkers and battles either; no
+-- opponent in range leaves the list empty, which is its "can't attack".
+--
 -- Left is the next seat in turn order and right is the previous one, which is CR
 -- 101.4's identification of the two ("the next player in turn order (usually the
 -- player seated to the active player's left)"); GameState.turnOrder is the
@@ -156,7 +160,7 @@ attackableOpponents gs =
       active = GameState.activePlayer gs
       seats = Game.apnapOrder gs
       others = drop 1 seats
-      opponents = filter (\pid -> Game.areOpponents gs active pid && List.elem pid playing) seats
+      opponents = filter (\pid -> Game.areOpponents gs active pid && List.elem pid playing && Game.inRangeOf active pid gs) seats
       seatedAt neighbour = filter (\pid -> Just pid == neighbour) opponents
    in case GameSettings.attackOption (GameState.settings gs) of
         Just AttackOption.Leftward -> seatedAt (Maybe.listToMaybe others)

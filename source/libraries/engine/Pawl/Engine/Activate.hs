@@ -660,6 +660,10 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
       -- than taken twice: they are the same question (CR 700.2a).
       aimable = candidateSlotsGiven pcs grants pools pid srcId modal fillable gs
    in mayActivateGiven grants pid srcId ability gs
+        -- CR 801.6. Not asked of a mana ability's windows (Cost.manaActivations):
+        -- their sources are the permanents the player controls
+        -- (Mana.manaSourcesGiven), always in range by CR 801.2b.
+        && Target.objectInRangeGiven grants pid srcId gs
         && elem ability (abilitiesForGiven pcs srcId gs)
         && not (ManaAbility.isManaAbility ability)
         -- CR 702.61a's other limb -- "players can't ... activate abilities that

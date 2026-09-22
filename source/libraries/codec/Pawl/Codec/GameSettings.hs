@@ -3,6 +3,7 @@
 module Pawl.Codec.GameSettings where
 
 import qualified Pawl.Codec.AttackOption as AttackOption
+import qualified Pawl.Codec.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Codec.Teams as Teams
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -10,7 +11,7 @@ import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.GameSettings as GameSettings
 
 -- | An OBJECT and not a bare boolean: each further option of CR 800.2 is
--- another field here (#2831 is the next), and a wire shape that changed kind
+-- another field here (#2850 is the next), and a wire shape that changed kind
 -- when the second one landed would break every document written before it.
 --
 -- 'Fields.required' rather than a default, for Pawl.Codec.Player's reason: a
@@ -22,9 +23,11 @@ codec = Fields.object $ do
   brawl <- Fields.required "brawl" Common.boolean GameSettings.brawl
   attackOption <- Fields.required "attackOption" (Common.maybe AttackOption.codec) GameSettings.attackOption
   teams <- Fields.required "teams" Teams.codec GameSettings.teams
+  rangeOfInfluence <- Fields.required "rangeOfInfluence" RangeOfInfluence.codec GameSettings.rangeOfInfluence
   pure
     GameSettings.MkGameSettings
       { GameSettings.brawl = brawl,
         GameSettings.attackOption = attackOption,
-        GameSettings.teams = teams
+        GameSettings.teams = teams,
+        GameSettings.rangeOfInfluence = rangeOfInfluence
       }
