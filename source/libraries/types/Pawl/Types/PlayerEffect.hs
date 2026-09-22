@@ -190,8 +190,8 @@ data PlayerEffect
   | -- | CR 705.3 / Edgar, King of Figaro: an effect stating that a coin flip this
     -- player flips has a certain result and\/or that this player wins it.
     StateCoinFlip StatedFlip.StatedFlip
-  | -- | CR 706.2 / Clam-I-Am: a modifier this player's die rolls take from a
-    -- source other than the instruction that ordered them.
+  | -- | CR 706.2 / Clam-I-Am, Wall of Fortune: a modifier this player's die rolls
+    -- take from a source other than the instruction that ordered them.
     --
     -- StateCoinFlip's sibling one rule over: rule 705.3's statement and rule
     -- 706.2's other-source modifier both reach a piece of randomness a

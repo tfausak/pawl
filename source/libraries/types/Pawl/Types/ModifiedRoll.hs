@@ -1,6 +1,8 @@
 module Pawl.Types.ModifiedRoll where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.RollModifier as RollModifier
 
 -- | The payload of Pawl.Types.PlayerEffect's ModifyDieRoll arm (CR 706.2's third
@@ -29,17 +31,21 @@ import qualified Pawl.Types.RollModifier as RollModifier
 -- one printing says; a card gating on a range would widen this field rather than
 -- add one.
 --
--- Not implemented: a modifier that is MANDATORY, one carrying a cost, and one
--- reaching a roll another player made (#3981). CR 706.2a allows the first two,
--- and every printed reroll is a bare "may", so the engine asks and charges
--- nothing; the seat is Pawl.Types.PlayerStaticAbility's PlayerScope, which the
--- one printing writes as "you".
+-- `cost` is CR 706.2a's "associated cost", and Nothing states none -- Clam-I-Am's
+-- bare "you may reroll" against Wall of Fortune's "you may tap an untapped Wall
+-- you control to". Paid by the player the MODIFIER's carrier names as "you" (CR
+-- 109.5), who is not always the roller: Wall of Fortune's scope is every player
+-- and its "you" is the Wall's controller.
+--
+-- Not implemented: a modifier that is MANDATORY (#3981). CR 706.2a allows one,
+-- and every printed reroll is a bare "may", so the engine always asks.
 --
 -- Construct with BRACE syntax: `sides` and `natural` are two Naturals in a row,
 -- and positional construction that transposed them would compile.
 data ModifiedRoll = MkModifiedRoll
   { sides :: Maybe Natural.Natural,
     natural :: Maybe Natural.Natural,
-    modifier :: RollModifier.RollModifier
+    modifier :: RollModifier.RollModifier,
+    cost :: Maybe (Cost.Cost Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)

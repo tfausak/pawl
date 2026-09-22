@@ -1,0 +1,99 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Defender"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Wall of Fortune",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ModifyDieRoll",
+            "value": {
+              "cost": {
+                "components": [
+                  {
+                    "type": "TapPermanents",
+                    "value": {
+                      "count": 1,
+                      "whichPermanents": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasSubtype",
+                            "value": {
+                              "type": "Wall"
+                            }
+                          },
+                          {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "IsTapped"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "mana": []
+              },
+              "modifier": {
+                "type": "Reroll"
+              }
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Wall"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

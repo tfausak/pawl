@@ -489,7 +489,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
           ModifiedRoll.MkModifiedRoll
             { ModifiedRoll.sides = Just 6,
               ModifiedRoll.natural = Just 3,
-              ModifiedRoll.modifier = RollModifier.Reroll
+              ModifiedRoll.modifier = RollModifier.Reroll,
+              ModifiedRoll.cost = Nothing
             }
       )
       " {\"type\":\"ModifyDieRoll\",\"value\":{\"sides\":6,\"natural\":3,\"modifier\":{\"type\":\"Reroll\"}}} "

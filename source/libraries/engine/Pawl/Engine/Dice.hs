@@ -12,6 +12,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
+import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.RollModifier as RollModifier
 
@@ -24,32 +25,32 @@ import qualified Pawl.Types.RollModifier as RollModifier
 -- once-per-instruction posture: that one is Edgar, King of Figaro's printed
 -- "the first time you flip one or more coins each turn", plain card text with no
 -- rule behind it, and no printing of a die-roll modifier says anything like it.
-modifiersFor :: PlayerId -> Game [ModifiedRoll.ModifiedRoll]
+modifiersFor :: PlayerId -> Game [(Maybe ObjectId, ModifiedRoll.ModifiedRoll)]
 modifiersFor pid = fmap (PlayerEffect.rollModifiers pid) State.get
 
--- | CR 706.2b's first step: does anything in force offer a REROLL of a die of
--- `sides` that came up the natural result `natural`?
+-- | CR 706.2b's first step: which of the modifiers in force offer a REROLL of a
+-- die of `sides` that came up the natural result `natural`, each still tagged
+-- with the object that states it.
 --
 -- The NATURAL result, because rule 706.2b considers rerolls before any increase
 -- or decrease -- so nothing has moved the number when this is asked, and an
 -- implementation that read the instruction's own modifier in first would gate
 -- Clam-I-Am's "if you roll a 3" on a number no die showed.
 --
--- A Bool and not the matching modifiers, because CR 706.2a's offer is the same
--- offer however many sources make it: two Clam-I-Ams give the roller one reroll
--- to accept or decline, and accepting it throws one die. Rule 706.2b's pick
--- among COMPETING modifiers is what a second bucket would need (#3976), and
--- there is only one bucket.
+-- The matching modifiers and not a Bool, because CR 706.2a lets each one carry
+-- its own COST and name its own payer, and two offers that differ in either are
+-- two different questions. Rule 706.2b's pick among COMPETING modifiers is what
+-- a second bucket would need (#3976), and there is only one bucket.
 --
 -- An unstated `sides` or `natural` matches every roll -- Wall of Fortune's bare
 -- "a die" -- rather than none.
-offersReroll :: Natural.Natural -> Natural.Natural -> [ModifiedRoll.ModifiedRoll] -> Bool
-offersReroll sides natural modifiers =
+rerollOffers :: Natural.Natural -> Natural.Natural -> [(Maybe ObjectId, ModifiedRoll.ModifiedRoll)] -> [(Maybe ObjectId, ModifiedRoll.ModifiedRoll)]
+rerollOffers sides natural modifiers =
   let matches modifier =
         ModifiedRoll.modifier modifier == RollModifier.Reroll
           && all (== sides) (ModifiedRoll.sides modifier)
           && all (== natural) (ModifiedRoll.natural modifier)
-   in any matches modifiers
+   in filter (matches . snd) modifiers
 
 -- | CR 706.6: throw away the `n` lowest of these rolls, so that what comes back
 -- is the rolls the instruction may still read. Rule 706.6 makes an ignored roll

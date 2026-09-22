@@ -25,7 +25,9 @@
 -- data\/cards\/ printing one of its own.
 -- CR 706.2b's first step is the SIXTH fixture, Clam-I-Am, at the bottom of this
 -- file -- a reroll offered to the roller by a permanent the instruction knows
--- nothing about.
+-- nothing about. CR 706.2a's cost on such a modifier is the SEVENTH, Wall of
+-- Fortune, below it -- the only printing whose reroll charges anything and the
+-- only one reaching a roll its own controller did not make.
 -- Left out: no modifier from another source that increases or decreases the
 -- result (#3974), no "Roll again" (#2124), and no reading that takes the results
 -- as a set (#3243). CR 706.1's roll does record its event, but the trigger
@@ -91,6 +93,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Zone as Zone
 
@@ -102,6 +105,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   severalDiceSpec s registry
   dieRollRSpec s registry
   rerollSpec s registry
+  costedRerollSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -744,19 +748,19 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
     Spec.assertEqWith
       s
       "CR 706.2b: the rerolled die's 6 is the other result"
-      (S.countOnBattlefieldByName knight S.alice (runClam [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed))
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed))
       6
     -- The paired board, one thing different: no Clam. The SAME script, and the 2
     -- is never reached.
     Spec.assertEqWith
       s
       "CR 706.1: without the Clam the 3 stands and the 6 is the second die"
-      (S.countOnBattlefieldByName knight S.alice (runClam [3, 6, 2] [OptionalDecision.Exercises] 1 spell board))
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell board))
       3
     -- The chosen result moves with the reroll too, read as a bound rather than a
     -- count: under the Clam the roller chose a 2, so power 4 dies; without it
     -- they chose the 6 and nothing does.
-    let clammed2 = runClam [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed
+    let clammed2 = runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed
     Spec.assertBool s (not (S.onBattlefield strong clammed2)) "power 4 is at least the chosen 2, so it is destroyed"
     Spec.assertBool s (S.onBattlefield weak clammed2) "power 1 is below it, so it survives"
   Spec.it s "CR 706.2a the reroll is the roller's to decline" $ do
@@ -770,8 +774,31 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
     Spec.assertEqWith
       s
       "CR 706.2a: a declined reroll leaves the natural result"
-      (S.countOnBattlefieldByName knight S.alice (runClam [3, 6, 2] [OptionalDecision.Declines] 1 spell clammed))
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell clammed))
       3
+  Spec.it s "CR 706.2a two free offers to the same player are one question" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    clam <- S.printingOf s registry "Clam-I-Am"
+    let clammed = snd (S.addPermanent clam S.alice (snd (S.addPermanent clam S.alice board)))
+    -- Two Clams state two modifiers over the same 3, and neither states a cost,
+    -- so the two offers are the same question put to the same player: either
+    -- accepted throws the same die, and no board can tell which Clam was taken.
+    -- Where the rules leave nothing to ask, don't prompt -- so ONE offer is
+    -- raised and a decline is a decline of both. The costed case is the opposite
+    -- reading and has its own group below: a stated cost is something the payer
+    -- can tell apart.
+    Spec.assertEqWith
+      s
+      "CR 706.2a: two Clams raise one offer"
+      (snd (rerollPrompts [3, 6, 2] [OptionalDecision.Declines] spell clammed))
+      [3]
+    -- Supporting, and in its own assertion: the one offer really is live, so the
+    -- reading above is an elision rather than a modifier that never applied.
+    Spec.assertEqWith
+      s
+      "CR 706.2b: accepting that one offer rerolls the die"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell clammed))
+      6
   Spec.it s "CR 706.2 a rerolled die that repeats the number is offered again" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     clam <- S.printingOf s registry "Clam-I-Am"
@@ -783,14 +810,14 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
     Spec.assertEqWith
       s
       "CR 706.2: a second 3 is a third throw, and the 5 is the other result"
-      (S.countOnBattlefieldByName knight S.alice (runClam [3, 3, 5, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] 1 spell clammed))
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 3, 5, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] 1 spell clammed))
       5
     -- Supporting, and in its own assertion: the offer really was raised twice,
     -- and both times over a 3.
     Spec.assertEqWith
       s
       "CR 706.2b: both offers carried the natural 3"
-      (snd (clamPrompts [3, 3, 5, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed))
+      (snd (rerollPrompts [3, 3, 5, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed))
       [3, 3]
   Spec.it s "CR 706.2 the offer is gated on the number the card names" $ do
     (spell, _, _, board) <- endeavorBoard s registry
@@ -806,12 +833,12 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
     Spec.assertEqWith
       s
       "CR 706.2: neither die shows the Clam's 3, so both stand"
-      (S.countOnBattlefieldByName knight S.alice (runClam [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] 0 spell clammed))
+      (S.countOnBattlefieldByName knight S.alice (runReroll [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] 0 spell clammed))
       5
     -- Supporting, and in its own assertion: two dice were thrown and nothing was
     -- offered, which separates a gate that matched from a reroll the roller
     -- happened to decline.
-    let (offers, naturals) = clamPrompts [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed
+    let (offers, naturals) = rerollPrompts [2, 5, 1] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell clammed
     Spec.assertEqWith s "CR 706.1: two d6 were thrown" offers [6, 6]
     Spec.assertEqWith s "and no reroll was offered" naturals []
   Spec.it s "CR 706.1a the offer is gated on the die the card names" $ do
@@ -829,9 +856,11 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
       (S.countOnBattlefieldByName treasure S.alice (fst (clamCombat [3, 20] clammed)))
       3
 
--- Answers all three questions one Endeavor under the Clam asks: each die comes
--- up the next number of `rolls`, each reroll offer takes the next answer of
--- `decisions`, and the roller chooses the result at `index`.
+-- Answers all three questions one Endeavor under a CR 706.2 reroll asks: each
+-- die comes up the next number of `rolls`, each reroll offer takes the next
+-- answer of `decisions`, and the roller chooses the result at `index`. Shared by
+-- the Clam-I-Am group above and the Wall of Fortune group below -- neither the
+-- modifier nor its payer is anything this answerer reads.
 --
 -- STATEFUL for endeavorAnswer's reason, which the reroll sharpens: the first
 -- die's two throws are the same Prompt.RollDie question, so a pure answerer
@@ -840,8 +869,8 @@ rerollSpec s registry = Spec.describe s "Reroll" $ do
 -- Six for a roll the script did not plan and Declines for an offer it did not
 -- plan: a surplus throw shows up as the die's top face rather than as CR
 -- 706.1a's floor, and a surplus offer stops rather than looping.
-clamAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [OptionalDecision.OptionalDecision]) r
-clamAnswer index p = case p of
+rerollAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [OptionalDecision.OptionalDecision]) r
+rerollAnswer index p = case p of
   Prompt.RollDie _ -> do
     (rolls, decisions) <- State.get
     case rolls of
@@ -860,30 +889,30 @@ clamAnswer index p = case p of
   _ -> pure (S.identityAnswer p)
 
 -- Cast the Endeavor and resolve it, one run under one answerer.
-runClam :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-runClam rolls decisions index spell board =
-  snd (State.evalState (Engine.runGame (clamAnswer index) board (S.cast S.alice spell >> Stack.resolveTop)) (rolls, decisions))
+runReroll :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+runReroll rolls decisions index spell board =
+  snd (State.evalState (Engine.runGame (rerollAnswer index) board (S.cast S.alice spell >> Stack.resolveTop)) (rolls, decisions))
 
 -- The same cast under an answerer that RECORDS what each roll prompt offered and
 -- what natural result each reroll offer carried, neither being readable off the
 -- board.
-clamPrompts :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> ObjectId.ObjectId -> GameState.GameState -> ([Natural.Natural], [Natural.Natural])
-clamPrompts rolls decisions spell board =
+rerollPrompts :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> ObjectId.ObjectId -> GameState.GameState -> ([Natural.Natural], [Natural.Natural])
+rerollPrompts rolls decisions spell board =
   let logging :: Prompt.Prompt r -> State.State ([Natural.Natural], [Natural.Natural], ([Natural.Natural], [OptionalDecision.OptionalDecision])) r
       logging p = case p of
         Prompt.RollDie sides -> do
           (seen, asked, scripted) <- State.get
-          let (answer, next) = State.runState (clamAnswer 0 p) scripted
+          let (answer, next) = State.runState (rerollAnswer 0 p) scripted
           State.put (sides : seen, asked, next)
           pure answer
-        Prompt.RerollDie _ _ natural -> do
+        Prompt.RerollDie _ _ natural _ -> do
           (seen, asked, scripted) <- State.get
-          let (answer, next) = State.runState (clamAnswer 0 p) scripted
+          let (answer, next) = State.runState (rerollAnswer 0 p) scripted
           State.put (seen, natural : asked, next)
           pure answer
         _ -> do
           scripted <- fmap (\(_, _, x) -> x) State.get
-          let (answer, next) = State.runState (clamAnswer 0 p) scripted
+          let (answer, next) = State.runState (rerollAnswer 0 p) scripted
           State.modify' (\(seen, asked, _) -> (seen, asked, next))
           pure answer
       (offers, naturals, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], [], (rolls, decisions))
@@ -917,3 +946,154 @@ clamCombat rolls board =
             go (n - 1) next
       (settled, (_, seen)) = State.runState (go (24 :: Int) board) (rolls, [])
    in (settled, reverse seen)
+
+-- CR 706.2a's OTHER half: "Modifiers may be optional and\/or have associated
+-- costs." Wall of Fortune ("Defender \/ You may tap an untapped Wall you control
+-- to have any player reroll a die that player rolled") is the whole producer --
+-- the only printing whose reroll charges anything, and the only one whose
+-- modifier reaches a roll the modifier's own controller did not make.
+--
+-- THE SAME ENDEAVOR FIXTURE and the same 3-6-2 script as the Clam group above,
+-- deliberately: the Wall states no die size and no natural result, so the two
+-- modifiers differ in the COST alone and the Clam's numbers carry over. Six
+-- Knights means the reroll happened, three means it did not.
+--
+-- THE COST PROVES ITSELF by tapping the only Wall on the board. The Wall is a
+-- Wall, so it pays for itself; having paid it is tapped, and its own filter no
+-- longer admits anything -- which is why ONE Exercises is the whole script even
+-- though the Wall gates on no number and would otherwise be offered over every
+-- throw. An engine that charged nothing offers the second throw's 6 a reroll
+-- too.
+--
+-- THREE BOARDS differing in one thing: no Wall, an untapped Wall, and a Wall
+-- already tapped. The third is the cost's own leg -- the modifier is in force
+-- and matches the die, and only CR 118.3 -- no paying a cost without the
+-- resources to pay it fully -- keeps the reroll off the board.
+--
+-- THE SEAT is the fourth case and needs the second player: BOB's Wall over
+-- ALICE's roll. Rule 109.5 puts the "may" and the payment on the Wall's
+-- controller, so bob is asked and bob's Wall taps, and the die alice rolled is
+-- the one thrown again.
+costedRerollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+costedRerollSpec s registry = Spec.describe s "Costed reroll" $ do
+  Spec.it s "CR 706.2a a reroll that carries a cost" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (walled, withWall) = S.addPermanent wall S.alice board
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation: the first die's 3 was thrown away for the price of one tap and
+    -- came back a 6, the roller chose the second die's 2, so "the other result"
+    -- is the 6 and six Knights arrive.
+    Spec.assertEqWith
+      s
+      "CR 706.2a: the paid-for reroll's 6 is the other result"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall))
+      6
+    -- The paired board, one thing different: no Wall. The SAME script, and the 2
+    -- is never reached.
+    Spec.assertEqWith
+      s
+      "CR 706.1: without the Wall the 3 stands and the 6 is the second die"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell board))
+      3
+    -- Supporting, and in its own assertion: the cost was actually charged. A
+    -- board that rerolled for free leaves the Wall untapped.
+    Spec.assertBool
+      s
+      (Game.isTapped walled (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall))
+      "CR 706.2a: the Wall paid for the reroll and is tapped"
+    Spec.assertBool
+      s
+      (not (Game.isTapped walled (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell withWall)))
+      "and a declined offer charges nothing"
+  Spec.it s "CR 706.2a an unpayable cost is not offered" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (walled, withWall) = S.addPermanent wall S.alice board
+        spent = S.tapObject walled withWall
+    -- THE GAMEPLAY ASSERTION: the Wall is the only Wall and it is already
+    -- tapped, so "an untapped Wall you control" admits nothing and the modifier
+    -- -- in force, and matching a die it narrows in no way -- charges a cost
+    -- nobody can pay. The 3 stands. Every Exercises in this script is accepted,
+    -- so an engine that offered the reroll anyway mints six.
+    Spec.assertEqWith
+      s
+      "CR 706.2a: no untapped Wall, so no offer"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] 1 spell spent))
+      3
+    -- Supporting, and in its own assertion: the offer was never raised at all,
+    -- which separates a gate that refused from a reroll the answerer declined.
+    Spec.assertEqWith
+      s
+      "and no reroll was offered"
+      (snd (rerollPrompts [3, 6, 2] [OptionalDecision.Exercises, OptionalDecision.Exercises] spell spent))
+      []
+  Spec.it s "CR 109.5 the offer and its cost belong to the modifier's controller" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (walled, withWall) = S.addPermanent wall S.bob board
+    -- THE GAMEPLAY ASSERTION: the Wall is BOB's and the roll is ALICE's, which
+    -- is the seat Clam-I-Am's "you" cannot show. Rule 706.2a's cost is bob's to
+    -- pay, so bob's Wall taps, and the die alice rolled comes back a 6.
+    Spec.assertEqWith
+      s
+      "CR 706.2: an opponent's Wall rerolls alice's die"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall))
+      6
+    Spec.assertBool
+      s
+      (Game.isTapped walled (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall))
+      "CR 109.5: bob's Wall is what paid"
+    -- Supporting, and in its own assertion: WHO was asked, which neither count
+    -- above can show -- both read the same had the engine put the offer to the
+    -- roller and charged bob's Wall anyway.
+    Spec.assertEqWith
+      s
+      "CR 109.5: bob is the seat the offer was put to"
+      (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell withWall)
+      [S.bob]
+  Spec.it s "CR 706.2a each costed modifier is its own offer" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (first_, withFirst) = S.addPermanent wall S.alice board
+        (second_, withBoth) = S.addPermanent wall S.alice withFirst
+        after = runReroll [3, 6, 2] [OptionalDecision.Declines, OptionalDecision.Exercises] 1 spell withBoth
+    -- THE GAMEPLAY ASSERTION: two Walls state two modifiers, each with its own
+    -- cost to pay, so declining the first leaves the second still to be offered
+    -- -- and the reroll taken off it produces the same 6. An engine that read
+    -- the first decline as the answer for every modifier in force leaves the 3
+    -- standing and mints three.
+    Spec.assertEqWith
+      s
+      "CR 706.2a: the second Wall's offer still stands after the first is declined"
+      (S.countOnBattlefieldByName knight S.alice after)
+      6
+    -- Supporting, and in its own assertion: ONE Wall paid. Rule 706.2b applies
+    -- one modifier to a roll, not both.
+    Spec.assertEqWith
+      s
+      "CR 706.2b: exactly one Wall was tapped"
+      (length (filter (\oid -> Game.isTapped oid after) [first_, second_]))
+      1
+    -- And in its own assertion again: the offers really were two, over the same
+    -- natural 3, rather than one offer asked twice by a loop.
+    Spec.assertEqWith
+      s
+      "CR 706.2a: both Walls offered over the natural 3"
+      (take 2 (snd (rerollPrompts [3, 6, 2] [OptionalDecision.Declines, OptionalDecision.Exercises] spell withBoth)))
+      [3, 3]
+
+-- The same cast under an answerer that records WHICH player each reroll offer
+-- was put to. rerollPrompts' shape, and separate from it because the seat is a
+-- different question from the natural result: the Clam group reads the number
+-- and this one reads the player.
+rerollSeats :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> ObjectId.ObjectId -> GameState.GameState -> [PlayerId.PlayerId]
+rerollSeats rolls decisions spell board =
+  let logging :: Prompt.Prompt r -> State.State ([PlayerId.PlayerId], ([Natural.Natural], [OptionalDecision.OptionalDecision])) r
+      logging p = do
+        (asked, scripted) <- State.get
+        let (answer, next) = State.runState (rerollAnswer 0 p) scripted
+        State.put (case p of Prompt.RerollDie _ pid _ _ -> pid : asked; _ -> asked, next)
+        pure answer
+      (seats, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], (rolls, decisions))
+   in reverse seats
