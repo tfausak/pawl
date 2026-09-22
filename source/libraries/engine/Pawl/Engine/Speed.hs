@@ -32,6 +32,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Compares as Compares
@@ -188,14 +189,17 @@ belowMaxSpeed =
 -- `increaseAbility` prints the rider and Engine.withinTriggerLimit spends it off
 -- the CR 603.3b log, as it does for an ability a card bears.
 --
--- Only the ACTIVE player's ability can fire, which is CR 702.179d's "during your
--- turn" and not a shortcut. Only a player with 1 or more speed HAS the ability at
--- all -- the rule hangs it off exactly that -- so a player CR 704.5aa has not yet
--- reached is asked nothing.
+-- Only an ACTIVE player's ability can fire, which is CR 702.179d's "during your
+-- turn" and not a shortcut -- each member of the active team's under CR 805.4.
+-- Only a player with 1 or more speed HAS the ability at all -- the rule hangs it
+-- off exactly that -- so a player CR 704.5aa has not yet reached is asked
+-- nothing.
 inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
-inherentPending events gs =
-  let you = GameState.activePlayer gs
-      opponents = Set.fromList (Game.opponentsOf you gs)
+inherentPending events gs = concatMap (pendingFor events gs) (Turn.activePlayers gs)
+
+pendingFor :: [GameEvent] -> GameState -> PlayerId -> [PendingTrigger]
+pendingFor events gs you =
+  let opponents = Set.fromList (Game.opponentsOf you gs)
       -- A PARTIAL case with a wildcard, Pawl.Engine.Monarch.inherentMatch's
       -- posture and not an oversight: this matcher answers about one event shape,
       -- and a new GameEvent constructor is not an event rule 702.179d names.

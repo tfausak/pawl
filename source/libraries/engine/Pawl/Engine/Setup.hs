@@ -127,7 +127,7 @@ emptyGame order =
       --
       -- CR 102.4 / CR 808.1: and a game not played between teams, which every
       -- variant but CR 808's, CR 809's, CR 810's and CR 811's is.
-      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
+      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
       newPlayer pid =
         ( pid,
           Player.MkPlayer

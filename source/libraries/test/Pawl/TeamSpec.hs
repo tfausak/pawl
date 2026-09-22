@@ -31,6 +31,7 @@
 module Pawl.TeamSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -42,10 +43,12 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.TurnSpec as TurnSpec
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -228,3 +231,103 @@ spec s registry = Spec.describe s "Teams" $ do
         after = S.runPure S.identityAnswer cast Engine.priorityLoop
     Spec.assertEqWith s "one token per opponent, and bob is not one" (length (S.tokensOf after)) 2
     Spec.assertEqWith s "the spell resolved" (GameState.stack after) []
+  sharedTurnsSpec s registry
+
+-- CR 805.1: twoTeams with the shared team turns option on.
+sharedTurns :: GameState.GameState -> GameState.GameState
+sharedTurns gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.sharedTeamTurns = True}}
+
+-- CR 805.4's shared team turns. Every case is a PAIR of boards differing only in
+-- the option: twoTeams with it and twoTeams without, so a case cannot pass for
+-- the teams alone.
+sharedTurnsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
+  -- Each library holds cards enough for the turns run, so CR 704.5b ends nothing.
+  let stockedWith island option =
+        let teamed = option (twoTeams S.fourPlayerGame)
+            stockOne gs pid = List.foldl' (\g _ -> snd (S.addLibraryCard island pid g)) gs [1 :: Int .. 4]
+         in List.foldl' stockOne teamed [S.alice, S.bob, S.carol, S.dave]
+      takers n gs =
+        if n <= (0 :: Int)
+          then []
+          else
+            let next = fst (TurnSpec.runTurn S.identityAnswer gs)
+             in GameState.activePlayer next : takers (n - 1) next
+  -- CR 805.4: the turn passes team to team, so bob's seat is passed over after
+  -- alice's turn and dave's after carol's.
+  Spec.it s "CR 805.4 each team takes turns rather than each player" $ do
+    island <- S.printingOf s registry "Island"
+    Spec.assertEqWith s "carol's team, then alice's, then carol's" (takers 3 (stockedWith island sharedTurns)) [S.carol, S.alice, S.carol]
+    Spec.assertEqWith s "without the option every seat takes one" (takers 3 (stockedWith island id)) [S.bob, S.carol, S.dave]
+  -- CR 805.4b / 502.3: bob is an active player on alice's turn, so he untaps and
+  -- draws in it. Carol is not, and does neither.
+  Spec.it s "CR 805.4b each player on the active team untaps and draws" $ do
+    island <- S.printingOf s registry "Island"
+    let run option =
+          let (bobs, staged) = S.addPermanent island S.bob (stockedWith island option)
+              (carols, placed) = S.addPermanent island S.carol staged
+              board = S.tapObject carols (S.tapObject bobs placed)
+           in fst (TurnSpec.runTurn S.identityAnswer board)
+        after = run sharedTurns
+        alone = run id
+        observe gs = (fmap (`S.handSize` gs) [S.bob, S.carol], fmap (`S.tappedCount` gs) [S.bob, S.carol])
+    Spec.assertEqWith s "bob drew and untapped on alice's turn, carol neither" (observe after) ([1, 0], [0, 1])
+    Spec.assertEqWith s "without the option bob does neither" (observe alone) ([0, 0], [1, 1])
+  -- CR 805.4c: bob may play a land during his team's turn. The land play is
+  -- offered to whoever holds priority, so the one board differs only in the
+  -- option.
+  Spec.it s "CR 805.4c each player on the active team may play a land" $ do
+    forest <- S.printingOf s registry "Forest"
+    let run option =
+          let (_, staged) = S.addHandCard forest S.bob (option (twoTeams S.fourPlayerGame))
+              board =
+                staged
+                  { GameState.phase = Phase.PrecombatMain,
+                    GameState.activePlayer = S.alice,
+                    GameState.priority = Just S.alice
+                  }
+           in S.runPure S.playLandAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "bob's Forest is on the battlefield" (S.countOnBattlefieldByName (S.printingName forest) S.bob (run sharedTurns)) 1
+    Spec.assertEqWith s "without the option it stays in his hand" (S.countOnBattlefieldByName (S.printingName forest) S.bob (run id)) 0
+  -- CR 502.2a / 731.2a: bob casts one spell on his team's turn and alice none, so
+  -- the previous turn's active team cast a spell. The count the next untap step
+  -- reads is bob's one, where the unshared game reads alice's none.
+  Spec.it s "CR 502.2a the handoff records what the previous active team cast" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let run option =
+          let lands = S.landsFor mountain S.bob 1 (option (twoTeams S.fourPlayerGame))
+              (held, staged) = S.addHandCard bolt S.bob lands
+              board =
+                staged
+                  { GameState.phase = Phase.PrecombatMain,
+                    GameState.activePlayer = S.alice,
+                    GameState.priority = Just S.bob
+                  }
+              cast = S.runPure S.castAnswer board (S.cast S.bob held)
+           in GameState.spellsCastLastTurn (Engine.beginTurnOf S.carol cast)
+    Spec.assertEqWith s "bob's one spell counts for his team" (run sharedTurns) 1
+    Spec.assertEqWith s "without the option only alice's none counts" (run id) 0
+  -- CR 805.4 / 514.1: bob is an active player, so his cleanup discard happens on
+  -- alice's turn. He holds eight and draws a ninth; two go.
+  Spec.it s "CR 514.1 each player on the active team discards to hand size" $ do
+    island <- S.printingOf s registry "Island"
+    let run option =
+          let board = List.foldl' (\g _ -> snd (S.addHandCard island S.bob g)) (stockedWith island option) [1 :: Int .. 8]
+           in S.handSize S.bob (fst (TurnSpec.runTurn S.identityAnswer board))
+    Spec.assertEqWith s "bob ends alice's turn at seven" (run sharedTurns) 7
+    Spec.assertEqWith s "without the option he keeps eight" (run id) 8
+  -- CR 805.4 / 603.2: "your upkeep" is bob's upkeep on his team's turn.
+  --
+  -- Bitterblossom, {1}{B} Kindred Enchantment: "At the beginning of your upkeep,
+  -- you lose 1 life and create a 1/1 black Faerie Rogue creature token with
+  -- flying."
+  Spec.it s "CR 805.4 a teammate's your-upkeep trigger fires on the team's turn" $ do
+    island <- S.printingOf s registry "Island"
+    bitterblossom <- S.printingOf s registry "Bitterblossom"
+    let run option =
+          let (_, board) = S.addPermanent bitterblossom S.bob (stockedWith island option)
+              after = fst (TurnSpec.runTurn S.identityAnswer board)
+           in (S.lifeOf S.bob after, length (S.tokensOf after))
+    Spec.assertEqWith s "bob lost 1 life and made a Faerie" (run sharedTurns) (Just 19, 1)
+    Spec.assertEqWith s "without the option nothing happened" (run id) (Just 20, 0)

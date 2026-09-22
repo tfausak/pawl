@@ -23,11 +23,13 @@ codec = Fields.object $ do
   brawl <- Fields.required "brawl" Common.boolean GameSettings.brawl
   attackOption <- Fields.required "attackOption" (Common.maybe AttackOption.codec) GameSettings.attackOption
   teams <- Fields.required "teams" Teams.codec GameSettings.teams
+  sharedTeamTurns <- Fields.required "sharedTeamTurns" Common.boolean GameSettings.sharedTeamTurns
   rangeOfInfluence <- Fields.required "rangeOfInfluence" RangeOfInfluence.codec GameSettings.rangeOfInfluence
   pure
     GameSettings.MkGameSettings
       { GameSettings.brawl = brawl,
         GameSettings.attackOption = attackOption,
         GameSettings.teams = teams,
+        GameSettings.sharedTeamTurns = sharedTeamTurns,
         GameSettings.rangeOfInfluence = rangeOfInfluence
       }

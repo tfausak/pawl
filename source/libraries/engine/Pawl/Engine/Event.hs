@@ -58,6 +58,7 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype.Engine
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -8395,7 +8396,7 @@ settleOnsets gs =
         -- The turn that is beginning IS the one the printed phrase named exactly
         -- when it belongs to the entry's controller (CR 603.7d-f).
         TurnWindow.ControllersNextTurn
-          | DelayedTrigger.controller entry == GameState.activePlayer gs ->
+          | Turn.isActive gs (DelayedTrigger.controller entry) ->
               entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
         -- Anyone else's turn, including an intervening opponent's: still waiting.
         TurnWindow.ControllersNextTurn -> entry
